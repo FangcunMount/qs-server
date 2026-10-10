@@ -89,6 +89,10 @@ class FakeRunner:
             raw = ("\n".join(k + " " + v for k, v in f.settings.items()) + "\n").encode()
         elif kind == "docker_inspect":
             raw = m.canonical(f.inspect)
+        elif kind == "qs_restore_image_present":
+            raw = ("sha256:"+("b" if arg=="mysql:8.0" else "c")*64+"\n").encode()
+        elif kind == "qs_restore_image_inspect":
+            raw = m.canonical({"id":"sha256:"+("b" if arg=="mysql:8.0" else "c")*64,"os":"linux","architecture":"amd64"})
         elif kind == "unit":
             raw = b"Id=qs.service\nActiveState=active\nSubState=running\nMainPID=1\nFragmentPath=/etc/systemd/system/qs.service\nDropInPaths=\nUser=deploy\nGroup=deploy\nWorkingDirectory=/data/qs\n"
         elif kind == "session":
@@ -155,6 +159,32 @@ class InventoryTests(unittest.TestCase):
             self.assertEqual(sum(x["kind"]=="qs_service_inspect" for x in runner.calls),2*len(rows))
             self.assertEqual(m.validate_qs_service_observation(value,role),value)
             self.assertNotIn("Env",m.QS_SERVICE_FORMAT)
+            self.assertNotIn("Env",m.QS_RESTORE_IMAGE_FORMAT)
+            if role == "server_a":
+                self.assertEqual(value["restore_images"]["status"],"cached")
+                self.assertEqual(sum(x["kind"]=="qs_restore_image_inspect" for x in runner.calls),4)
+            else:self.assertIsNone(value["restore_images"])
+
+
+    def test_restore_images_missing_drift_and_permission_are_real_observations(self):
+        for mode in ("missing","drift","permission"):
+            runner,unused=self.service_runner(); original=runner.run; calls={}
+            def run(kind,arg=None):
+                if kind=="qs_restore_image_present" and mode=="missing" and arg=="mysql:8.0":return b""
+                raw=original(kind,arg)
+                if kind=="qs_restore_image_inspect":
+                    calls[arg]=calls.get(arg,0)+1
+                    if mode=="permission":m.reject("command_denied_or_failed")
+                    if mode=="drift" and calls[arg]==2:
+                        value=json.loads(raw);value["id"]="sha256:"+"d"*64;return m.canonical(value)
+                return raw
+            runner.run=run;value=self.collect(runner)
+            if mode=="missing":
+                actual=value["observations"]["qs_services"]["restore_images"]
+                self.assertEqual(actual["status"],"cache_missing");self.assertEqual(actual["missing"],["mysql:8.0"])
+            else:
+                self.assertIsNone(value["observations"]["qs_services"])
+                self.assertTrue(any(x.startswith("qs_service_visibility:") for x in value["unknown"]))
 
     def test_service_drift_bad_argv_and_missing_component_are_not_input_basis(self):
         for change in (lambda kind,n,v:v.update(started_at="2026-10-10T01:00:00Z") if kind=="qs_service_inspect" and n==2 else None,

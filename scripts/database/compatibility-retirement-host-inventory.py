@@ -376,16 +376,31 @@ QS_SERVICE_FORMAT = ('{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .I
  '"entrypoint":{{json .Config.Entrypoint}},"command":{{json .Config.Cmd}},'
  '"running":{{json .State.Running}},"started_at":{{json .State.StartedAt}},'
  '"restart_policy":{{json .HostConfig.RestartPolicy.Name}},"restart_maximum":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}')
+QS_RESTORE_IMAGE_FORMAT = '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}}}'
+QS_RESTORE_IMAGES = ("mysql:8.0", "mongo:7.0")
 QS_COMPONENTS = ("qs-apiserver", "qs-collection-server", "qs-worker")
 
 def validate_qs_service_observation(value, role):
-    expected = {"kind", "host_role", "machine_id_sha256", "docker_path", "docker_sha256", "containers", "observation_sha256", "recheck_equal"}
+    expected = {"kind", "host_role", "machine_id_sha256", "docker_path", "docker_sha256", "containers", "restore_images", "observation_sha256", "recheck_equal"}
     if (type(value) is not dict or set(value) != expected or role not in ("server_a", "server_d") or
             value["kind"] != "readonly_qs_service_descriptor_observation" or value["host_role"] != role.replace("_", "-") or
             value["docker_path"] != "/usr/bin/docker" or value["recheck_equal"] is not True or
             any(type(value[k]) is not str or not SHA.fullmatch(value[k]) for k in ("machine_id_sha256", "docker_sha256", "observation_sha256")) or
             type(value["containers"]) is not list or not 1 <= len(value["containers"]) <= 32):
         reject("docker_projection_schema_unknown")
+    images = value["restore_images"]
+    if role == "server_d":
+        if images is not None: reject("docker_projection_schema_unknown")
+    else:
+        if type(images) is not dict or set(images) != {"status", "images", "missing"} or type(images["images"]) is not list or type(images["missing"]) is not list:
+            reject("docker_projection_schema_unknown")
+        refs = []
+        for row in images["images"]:
+            if (type(row) is not dict or set(row) != {"reference", "id", "os", "architecture"} or row["reference"] not in QS_RESTORE_IMAGES or type(row["id"]) is not str or not re.fullmatch(r"sha256:[0-9a-f]{64}", row["id"]) or row["os"] != "linux" or row["architecture"] not in ("amd64", "arm64")):
+                reject("docker_projection_schema_unknown")
+            refs.append(row["reference"])
+        if (refs != [v for v in QS_RESTORE_IMAGES if v not in images["missing"]] or images["missing"] != [v for v in QS_RESTORE_IMAGES if v not in refs] or images["status"] != ("cache_missing" if images["missing"] else "cached") or len({r["architecture"] for r in images["images"]}) > 1 or len({r["id"] for r in images["images"]}) != len(refs)):
+            reject("docker_projection_schema_unknown")
     expected_components = set(QS_COMPONENTS[:2] if role == "server_a" else QS_COMPONENTS[2:])
     keys = {"id", "name", "image", "component", "project", "service", "entrypoint", "command", "running", "started_at", "restart_policy", "restart_maximum"}
     seen = set()
@@ -434,6 +449,10 @@ def _argv(kind, arg=None):
             return ["/usr/sbin/sshd", "-T", "-f", path, "-C", ",".join(k + "=" + match[k] for k in ("user", "host", "addr", "laddr", "lport"))]
     if kind == "docker_inspect" and type(arg) is str and re.fullmatch(r"[0-9a-f]{64}", arg):
         return ["/usr/bin/docker", "inspect", "--format", DOCKER_FORMAT, arg]
+    if kind == "qs_restore_image_inspect" and arg in QS_RESTORE_IMAGES:
+        return ["/usr/bin/docker", "image", "inspect", "--format", QS_RESTORE_IMAGE_FORMAT, arg]
+    if kind == "qs_restore_image_present" and arg in QS_RESTORE_IMAGES:
+        return ["/usr/bin/docker", "image", "ls", "--no-trunc", "--quiet", arg]
     if kind == "qs_service_inspect" and type(arg) is str and SHA.fullmatch(arg):
         return ["/usr/bin/docker", "inspect", "--format", QS_SERVICE_FORMAT, arg]
     if kind == "unit" and type(arg) is str and UNIT.fullmatch(arg):
@@ -837,16 +856,30 @@ class _Observer:
             if {v["component"] for v in rows} != expected_components or sum(v["component"] == "qs-apiserver" for v in rows) > 1:
                 reject("docker_projection_schema_unknown")
             return rows
+        def restore_images():
+            rows, missing = [], []
+            for reference in QS_RESTORE_IMAGES:
+                present = self.runner.run("qs_restore_image_present", reference).decode("ascii").strip()
+                if not present:
+                    missing.append(reference) # Successful exact native image ls, not an inspect permission failure.
+                    continue
+                if not re.fullmatch(r"sha256:[0-9a-f]{64}", present): reject("docker_projection_schema_unknown")
+                row = json.loads(self.runner.run("qs_restore_image_inspect", reference))
+                if type(row) is not dict or set(row) != {"id", "os", "architecture"} or row["id"] != present:
+                    reject("docker_projection_schema_unknown")
+                rows.append(dict(reference=reference, **row))
+            return {"status": "cache_missing" if missing else "cached", "images": rows, "missing": missing}
         machine = self.read("/etc/machine-id").strip()
         if not re.fullmatch(rb"[0-9a-f]{32}", machine): reject("docker_projection_schema_unknown")
         before = read_rows()
+        restored = restore_images() if role == "server_a" else None
         ids = sorted(self.runner.run("docker_list").decode("ascii").splitlines())
-        if ids != docker["before_ids"] or read_rows() != before or self.read("/etc/machine-id").strip() != machine:
+        if ids != docker["before_ids"] or read_rows() != before or (restore_images() if role == "server_a" else None) != restored or self.read("/etc/machine-id").strip() != machine:
             reject("command_executable_changed")
         executable = [v["executable_sha256"] for v in self.runner.calls if v["kind"] == "qs_service_inspect"]
         if not executable or len(set(executable)) != 1 or not SHA.fullmatch(executable[0]): reject("command_executable_unprotected")
         actual = {"kind": "readonly_qs_service_descriptor_observation", "host_role": role.replace("_", "-"),
-                  "machine_id_sha256": sha(machine), "docker_path": "/usr/bin/docker", "docker_sha256": executable[0], "containers": before}
+                  "machine_id_sha256": sha(machine), "docker_path": "/usr/bin/docker", "docker_sha256": executable[0], "containers": before, "restore_images": restored}
         return validate_qs_service_observation(dict(actual, observation_sha256=sha(canonical(actual)), recheck_equal=True), role)
 
     def systemd(self):
