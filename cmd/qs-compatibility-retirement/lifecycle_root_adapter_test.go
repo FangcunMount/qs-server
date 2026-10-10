@@ -3,14 +3,18 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 )
 
 func TestLifecycleRootCopyPreservesBytesOwnerAndRejectsRebinding(t *testing.T) {
@@ -219,5 +223,105 @@ func TestLifecyclePreparationDeadlineIncludesActualPipeCleanup(t *testing.T) {
 	case <-c.done:
 	default:
 		t.Fatal("actual child not joined before failure")
+	}
+}
+
+// This narrow fixture exercises the actual request readers with owned files in
+// the fixed native paths. It supplies no database, archive, fence or recovery
+// capability; distinct calls must still fail at the next missing-input gate.
+func TestLifecycleNativeRunReuseRejectedBeforeLaterGates(t *testing.T) {
+	if runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 {
+		t.Skip("actual Linux/root request fixture required")
+	}
+	oldSource := sourceSHA
+	sourceSHA = strings.Repeat("a", 40)
+	t.Cleanup(func() { sourceSHA = oldSource })
+	t.Setenv("QS_RETIREMENT_SOURCE_UID", strconv.Itoa(os.Getuid()))
+	stamp := strconv.FormatInt(time.Now().UnixNano(), 10)
+	operation, original, current := stamp+"-1", stamp+"-2", stamp+"-3"
+	originalRoot := filepath.Join("/opt/backups/qs-server/compatibility-retirement", operation)
+	request := func(run string) lifecycleRequest {
+		r := lifecycleRequest{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", ToolSourceSHA: sourceSHA,
+			OriginalSourceSHA: strings.Repeat("b", 40), OperationID: operation, ActualRunID: run, ManifestSHA256: strings.Repeat("c", 64),
+			ArchiveDirectory: filepath.Join(originalRoot, "archive"), WindowDirectory: filepath.Join(originalRoot, "window"), JournalDirectory: filepath.Join(originalRoot, "journal"),
+			SourceDirectory: filepath.Join(originalRoot, "inventory-"+original), RestoreEngines: &lifecycleRestoreEngines{MySQLImageID: "sha256:" + strings.Repeat("d", 64), MongoImageID: "sha256:" + strings.Repeat("e", 64), Architecture: runtime.GOARCH},
+			Approval:         backup.Approval{SourceSHA: strings.Repeat("b", 40), OperationID: operation, RunID: original},
+			Recovery:         backup.TargetRecoveryRequest{SourceSHA: strings.Repeat("b", 40), OperationID: operation, OriginalRunID: original, ActualRunID: run, ManifestSHA256: strings.Repeat("c", 64), MongoNonTargetSHA256: strings.Repeat("f", 64), SQLHead: 99, MongoHead: 38},
+			SourceFileSHA256: map[string]string{}}
+		for _, name := range lifecycleSourceNames {
+			r.SourceFileSHA256[name] = strings.Repeat("f", 64)
+		}
+		return r
+	}
+	for _, row := range []struct {
+		name, run     string
+		staging       bool
+		recoveryReuse bool
+		want          string
+	}{
+		{"staging_original_reuse", original, true, false, "lifecycle_staging_binding_rejected"},
+		{"staging_recovery_original_reuse", current, true, true, "lifecycle_staging_binding_rejected"},
+		{"staging_distinct_still_requires_ordered_schema", current, true, false, "lifecycle_ordered_mongo_schema_approval_missing"},
+		{"loader_original_reuse", original, false, false, "lifecycle_binding_rejected"},
+		{"loader_distinct_still_requires_manifest", current, false, false, "lifecycle_private_input_rejected"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			dir := lifecycleRootBatch(operation, row.run)
+			if row.staging {
+				dir = lifecycleInvocationBatch(operation, row.run)
+			}
+			if err := os.MkdirAll(filepath.Dir(dir), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(dir, 0700); err != nil {
+				t.Fatal("exclusive fixture directory", err)
+			}
+			path := filepath.Join(dir, "lifecycle-request.json")
+			t.Cleanup(func() {
+				if err := os.Remove(path); err != nil {
+					t.Error("owned request cleanup", err)
+				}
+				if err := os.Remove(dir); err != nil {
+					t.Error("owned fixture directory cleanup", err)
+				}
+			})
+			r := request(row.run)
+			if row.recoveryReuse {
+				r.Recovery.OriginalRunID = current
+			}
+			raw, err := json.Marshal(r)
+			if err != nil || os.WriteFile(path, raw, 0600) != nil {
+				t.Fatal("owned request fixture")
+			}
+			// A wrong digest must retain the earlier read/hash rejection, even
+			// when this request also reuses an original run.
+			if row.staging {
+				_, err = stageLifecycleRootInputs(context.Background(), path, strings.Repeat("0", 64), operation, row.run)
+				if lifecycleCategory(err) != "lifecycle_staging_bytes_changed_or_hash_rejected" {
+					t.Fatalf("hash priority changed: %v", err)
+				}
+				_, err = stageLifecycleRootInputs(context.Background(), path, digestRaw(raw), operation, row.run)
+			} else {
+				_, _, err = loadLifecycleRequest(context.Background(), path, strings.Repeat("0", 64), operation, row.run, "prepare")
+				if lifecycleCategory(err) != "lifecycle_private_input_rejected" {
+					t.Fatalf("hash priority changed: %v", err)
+				}
+				_, archive, actualErr := loadLifecycleRequest(context.Background(), path, digestRaw(raw), operation, row.run, "prepare")
+				if archive != nil {
+					t.Fatal("fixture gained archive capability")
+				}
+				err = actualErr
+			}
+			if lifecycleCategory(err) != row.want {
+				t.Fatalf("native run binding: got %v, want %s", err, row.want)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(path) {
+				t.Fatal("rejection created staging or restore material")
+			}
+			if after, err := os.ReadFile(path); err != nil || !bytes.Equal(after, raw) {
+				t.Fatal("rejection changed original input")
+			}
+		})
 	}
 }

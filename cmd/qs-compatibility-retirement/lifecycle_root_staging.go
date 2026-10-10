@@ -190,7 +190,7 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	if e != nil {
 		return "", e
 	}
-	if !runRE.MatchString(r.Approval.RunID) || !shaRE.MatchString(r.OriginalSourceSHA) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" || r.OperationID != operation || r.ActualRunID != actualRun || r.ToolSourceSHA != sourceSHA || r.Recovery.ArchiveSHA256 != "" || !r.RestoreEngines.valid() || r.SourceDirectory != filepath.Join(original, "inventory-"+r.Approval.RunID) || len(r.SourceFileSHA256) != 7 {
+	if !runRE.MatchString(r.Approval.RunID) || actualRun == r.Approval.RunID || actualRun == r.Recovery.OriginalRunID || !shaRE.MatchString(r.OriginalSourceSHA) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" || r.OperationID != operation || r.ActualRunID != actualRun || r.ToolSourceSHA != sourceSHA || r.Recovery.ArchiveSHA256 != "" || !r.RestoreEngines.valid() || r.SourceDirectory != filepath.Join(original, "inventory-"+r.Approval.RunID) || len(r.SourceFileSHA256) != 7 {
 		return "", lifecycleError("lifecycle_staging_binding_rejected")
 	}
 	// Ordered raw BSON schema requires its distinct approval from an actual

@@ -308,6 +308,7 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 		r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
 		!hashRE.MatchString(r.ManifestSHA256) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation ||
 		recovery.SourceSHA != r.OriginalSourceSHA || recovery.OperationID != operation || recovery.OriginalRunID != r.Approval.RunID ||
+		actualRun == r.Approval.RunID || actualRun == recovery.OriginalRunID ||
 		recovery.ManifestSHA256 != r.ManifestSHA256 || (recovery.ArchiveSHA256 != "" && !hashRE.MatchString(recovery.ArchiveSHA256)) ||
 		(recovery.SQLNonTargetSHA256 != "" && !hashRE.MatchString(recovery.SQLNonTargetSHA256)) || !hashRE.MatchString(recovery.MongoNonTargetSHA256) ||
 		recovery.SQLHead != 99 || recovery.MongoHead != 38 || !runRE.MatchString(recovery.ActualRunID) {
