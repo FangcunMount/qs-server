@@ -111,7 +111,7 @@ func (l *Lease) observeRunningDependents(ctx context.Context, nativeInlineAPIID 
 	if l.closed || l.failed || !l.controlledResumed || ctx == nil || ctx.Err() != nil || checkWindow(ctx, l.approval, l.window) != nil {
 		return nil, ErrBinding
 	}
-	q, c, e := l.window.ForwardContext(ctx)
+	q, c, e := observedServiceContext(ctx, l.window)
 	if e != nil {
 		return nil, ErrBinding
 	}

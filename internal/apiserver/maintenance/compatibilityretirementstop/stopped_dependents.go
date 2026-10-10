@@ -20,7 +20,7 @@ func (l *Lease) CheckStoppedDependents(ctx context.Context, nativeInlineAPIID st
 	if l.closed || l.failed || ctx == nil || ctx.Err() != nil || l.approval == nil || l.approval.descriptor.HostRole != "server-a" || checkWindow(ctx, l.approval, l.window) != nil {
 		return ErrBinding
 	}
-	bounded, cancel, e := l.window.ForwardContext(ctx)
+	bounded, cancel, e := observedServiceContext(ctx, l.window)
 	if e != nil {
 		return ErrBinding
 	}

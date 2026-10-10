@@ -91,16 +91,66 @@ func (h *lifecycleFixedHost) checkOriginalDManagementPhase(ctx context.Context, 
 }
 
 func (h *lifecycleFixedHost) observeWholeWriterScopesForOriginalD(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
+	// A failed fresh read cannot reuse an older actor observation.
+	if h != nil {
+		h.writerRuntime = nil
+	}
 	if e := h.observePlatformQuarantineForOriginalD(ctx, r, terminal); e != nil {
 		return e
 	}
 	if e := h.checkDatabaseWriterLease(ctx, r); e != nil {
 		return e
 	}
-	// Current workflows and the four-target database lease are only components.
-	// Other native host/config/session/external writers still require their real
-	// installed controls. No source/environment/receipt turns this into success.
-	return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+	// The approved four-target scope is closed only by real original actor
+	// reads, not host account enumeration, broker history or a receipt flag.
+	if e := h.observeKnownTargetServiceWriters(ctx, r, terminal); e != nil {
+		return e
+	}
+	if e := h.checkDatabaseWriterLease(ctx, r); e != nil {
+		return e // Actor readback cannot hide a new shared or foreign DB session.
+	}
+	return ctx.Err()
+}
+
+// All caller branches retain original native owners. API/Collection/Worker
+// controlled runtime is accepted only after actual four-target absence, original
+// frozen comparison and credential restoration. Unknown original writers fail.
+func (h *lifecycleFixedHost) observeKnownTargetServiceWriters(ctx context.Context, r lifecycleRequest, terminal *lifecycleDTerminal) error {
+	v := h.services
+	if v == nil || v.local == nil || v.remote == nil || !v.stopAttempted || !v.remoteStopAttempted || !v.identity.matches(r) || h.aiStopped == nil || h.api == nil || h.api.self != h.api || h.api.unknown || h.api.rollbackCID != "" || h.dbWriters == nil {
+		return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+	}
+	if h.api.bCID == "" {
+		if h.dbWriters.restored || v.controlledAttempted || terminal != nil {
+			return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+		}
+		if e := v.Check(ctx); e != nil {
+			return e
+		}
+	} else {
+		if !h.dbWriters.restored || h.verifyPreBDataComparison(ctx, r) != nil || h.acceptancePair == nil || h.api.observeAcceptance(ctx, r) != nil {
+			return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+		}
+		if terminal != nil {
+			// Original D's last live read was consumed by its native purge. It is
+			// bound to this terminal sequence, not claimed as a new runtime GET.
+			if h.finalRuntime.validate(h) != nil || terminal.native.ValidateOriginalRuntime(ctx, h.finalRuntime.remote) != nil {
+				return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+			}
+			if _, e := v.local.ObserveRunningDependentsWithInlineAPI(ctx, h.api.bCID); e != nil {
+				return e
+			}
+		} else if v.controlledAttempted {
+			observed, e := v.observeControlled(ctx, h.api)
+			if e != nil || observed.validate(h) != nil {
+				return lifecycleError("lifecycle_host_database_external_writer_isolation_unproven")
+			}
+			h.writerRuntime = observed // Original latest read, not a serialized isolation flag.
+		} else if e := v.CheckStoppedDependents(ctx, h.api.bCID); e != nil {
+			return e
+		}
+	}
+	return h.aiStopped.CheckWriterScope(ctx)
 }
 
 // This pre-stop observation deliberately has a narrower contract than the

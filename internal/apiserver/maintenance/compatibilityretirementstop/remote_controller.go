@@ -56,7 +56,10 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 		return v, ErrRemoteBudget
 	}
 	if action == "bind" && c.seq != 0 || action == "stop" && c.stopIssued || c.forwardRefused && !recoveryAction(action) || recoveryAction(action) && (c.recoveryIssued || c.seq != 0 && !c.stopIssued) ||
-		(action == "check" || action == "observe_db_principals" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || action == "observe_db_principals" && (!c.managementBound || c.controlledIssued) || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil) {
+		(action == "check" || recoveryReadAction(action) || action == "observe_db_principals" || action == "resume_dependents" || controlledAction(action)) && !c.stopIssued || action == "observe_db_principals" && (!c.managementBound || c.controlledIssued) || controlledAction(action) && (!c.managementBound || action == "controlled_resume" && c.controlledIssued || (action == "check_running" || action == "observe_loaded_mq" || action == "purge_materials") && !c.controlledResumed || (action == "purge_materials" || action == "observe_loaded_mq") && c.runtimeObservation == nil) {
+		return v, ErrRemoteBudget
+	}
+	if action == "check_running_recovery" && (!c.managementBound || !c.controlledResumed) {
 		return v, ErrRemoteBudget
 	}
 	var a, b unix.Stat_t
@@ -92,7 +95,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if action == "controlled_resume" {
 		c.controlledIssued = true
 	}
-	if recoveryAction(action) {
+	if recoveryReleaseAction(action) {
 		c.recoveryIssued = true
 	}
 	c.seq++
@@ -153,7 +156,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 	if action == "controlled_resume" {
 		c.controlledResumed = true
 	}
-	if action == "check_running" {
+	if action == "check_running" || action == "check_running_recovery" {
 		o := &RemoteRuntimeObservation{controller: c, sequence: c.seq, snapshot: *v.Runtime, seal: runtimeDigest(*v.Runtime)}
 		o.self = o
 		c.runtimeObservation = o
@@ -168,7 +171,7 @@ func (c *RemoteController) Do(ctx context.Context, action string) (v SessionDiag
 }
 
 func remoteRuntimeDiagnosticValid(v SessionDiagnostic) bool {
-	if v.Action != "check_running" || v.Outcome != "observed" {
+	if v.Action != "check_running" && v.Action != "check_running_recovery" || v.Outcome != "observed" {
 		return v.Runtime == nil
 	}
 	if v.Runtime == nil || len(v.Runtime.Instances) == 0 || len(v.Runtime.Instances) > 32 {

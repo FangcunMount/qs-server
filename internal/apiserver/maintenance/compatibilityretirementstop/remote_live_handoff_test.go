@@ -232,3 +232,13 @@ func TestLiveOriginalControlPipeSurvivesEarlierDeadlineAndFinalChildExit(t *test
 		}
 	}
 }
+
+func TestRemoteTerminalZeroCannotAdoptAnotherOrOldRuntime(t *testing.T) {
+	for _, z := range []*RemoteMaterialZero{nil, {}} {
+		for _, o := range []*RemoteRuntimeObservation{nil, {}} {
+			if z.ValidateOriginalRuntime(t.Context(), o) == nil {
+				t.Fatal("unissued terminal/runtime pair became original handoff")
+			}
+		}
+	}
+}

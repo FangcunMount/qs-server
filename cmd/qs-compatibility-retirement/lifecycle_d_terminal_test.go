@@ -116,7 +116,7 @@ func TestDTerminalActualCallerPreservesPlatformAndOrdinaryLiveChecks(t *testing.
 	if purge < 0 || closeOriginal <= purge || postTerminal <= closeOriginal {
 		t.Fatal("terminal phase bypassed original native zero or same child completion")
 	}
-	calls = preBComparisonProductionCalls(t, "lifecycle_writer_scope.go", "observeWholeWriterScopesForOriginalD")
+	calls = preBComparisonProductionCalls(t, "lifecycle_writer_scope.go", "observePlatformQuarantineForOriginalD")
 	before, platform, after := -1, -1, -1
 	for i, c := range calls {
 		if c == "checkOriginalDManagementPhase" {

@@ -609,3 +609,15 @@ func TestDatabaseWriterNativeProducerBindsCensusAndOriginalActors(t *testing.T) 
 		t.Fatal("expected input activated production effects")
 	}
 }
+
+func TestKnownWriterFenceRequiresEachOriginalActorAndKeepsEffectsClosed(t *testing.T) {
+	r := lifecycleRequest{}
+	for _, h := range []*lifecycleFixedHost{{}, {services: &lifecycleServiceController{}}, {services: &lifecycleServiceController{stopAttempted: true, remoteStopAttempted: true}}} {
+		if e := h.observeKnownTargetServiceWriters(t.Context(), r, nil); e == nil {
+			t.Fatal("unissued actor/config became target fence")
+		}
+	}
+	if lifecycleEffectsPreflight(t.Context()) == nil {
+		t.Fatal("fixed actor wiring activated unverified production adapters")
+	}
+}

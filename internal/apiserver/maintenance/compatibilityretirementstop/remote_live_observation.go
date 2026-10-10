@@ -49,8 +49,35 @@ func (z *RemoteMaterialZero) ValidateOriginalController(ctx context.Context, c *
 	}
 	return ctx.Err()
 }
+
+// Bind the terminal zero to the exact last original live observation consumed
+// by PurgeOwnedMaterials. This validates a completed handoff, never a new GET.
+func (z *RemoteMaterialZero) ValidateOriginalRuntime(ctx context.Context, o *RemoteRuntimeObservation) error {
+	if z == nil || o == nil || o.self != o || z.ValidateOriginalController(ctx, o.controller) != nil {
+		return ErrRemoteMaterials
+	}
+	c := o.controller
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.runtimeObservation != o || z.sequence != o.sequence+1 || o.seal != runtimeDigest(o.snapshot) {
+		return ErrRemoteMaterials
+	}
+	return nil
+}
+
 func (c *RemoteController) ObserveRunningDependents(ctx context.Context) (*RemoteRuntimeObservation, error) {
-	if _, e := c.Do(ctx, "check_running"); e != nil {
+	if c == nil || c.self != c || c.issuer == nil || c.issuer.window == nil {
+		return nil, ErrRemoteBudget
+	}
+	d, e := c.issuer.window.Diagnostic(ctx)
+	if e != nil {
+		return nil, e
+	}
+	action := "check_running"
+	if d.RecoverySHA256 != "" {
+		action = "check_running_recovery"
+	}
+	if _, e := c.Do(ctx, action); e != nil {
 		return nil, e
 	}
 	c.mu.Lock()

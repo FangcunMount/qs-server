@@ -125,6 +125,7 @@ func (h *lifecycleFixedHost) purgeAcceptedRemoteMaterials(ctx context.Context, r
 	if e != nil || snapshot.RemainingTemporaryFiles != 0 {
 		return nil, lifecycleError("lifecycle_material_zero_unproven")
 	}
+	h.finalRuntime = fresh // Exact last native read bound to the following D terminal proof.
 	if e = h.observeWholeWriterScopesAfterDTerminal(ctx, r, terminal); e != nil {
 		return nil, e
 	}
@@ -132,7 +133,6 @@ func (h *lifecycleFixedHost) purgeAcceptedRemoteMaterials(ctx context.Context, r
 	remote.self = remote
 	c.remote = remote // Only the actual zero AND original SSH terminal reach here.
 	c.scopes[lifecycleRemoteServiceMaterials] = struct{}{}
-	h.finalRuntime = fresh // Completed pre-purge native read, never post-purge runtime proof.
 	return remote, nil
 }
 
@@ -163,7 +163,18 @@ func (h *lifecycleFixedHost) observeFinalControlledRuntime(ctx context.Context, 
 	if e = h.CheckWholeWriterFence(ctx, r); e != nil {
 		return nil, e
 	}
-	return fresh, nil
+	// Whole fence refreshed D again. Purge must consume that exact latest
+	// controller sequence, never the earlier otherwise-valid runtime snapshot.
+	latest := h.writerRuntime
+	if latest.validate(h) != nil {
+		return nil, lifecycleError("lifecycle_controlled_original_runtime_missing")
+	}
+	lastLocal, _ := latest.local.Snapshot()
+	lastRemote, _ := latest.remote.Snapshot()
+	if !lifecycleSameRuntimeInstances(newLocal, lastLocal) || !lifecycleSameRuntimeInstances(newRemote, lastRemote) {
+		return nil, lifecycleError("lifecycle_controlled_original_runtime_changed")
+	}
+	return latest, nil
 }
 
 // Snapshots only compare original identity with a newly issued native read.

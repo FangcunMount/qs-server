@@ -239,10 +239,12 @@ type signedRemoteBudget struct {
 	Signature string              `json:"signature"`
 }
 
-func recoveryAction(s string) bool { return s == "restore" || s == "restore_dependents" }
+func recoveryReadAction(s string) bool    { return s == "check_recovery" || s == "check_running_recovery" }
+func recoveryReleaseAction(s string) bool { return s == "restore" || s == "restore_dependents" }
+func recoveryAction(s string) bool        { return recoveryReleaseAction(s) || recoveryReadAction(s) }
 func serviceAction(s string) bool {
 	switch s {
-	case "bind", "stop", "check", "observe_db_principals", "resume_dependents", "restore", "restore_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
+	case "bind", "stop", "check", "check_recovery", "check_running_recovery", "observe_db_principals", "resume_dependents", "restore", "restore_dependents", "controlled_resume", "check_running", "observe_loaded_mq", "purge_materials":
 		return true
 	}
 	return false

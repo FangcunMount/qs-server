@@ -52,7 +52,7 @@ func parseSessionAction(raw []byte, sequence uint64, remote bool) (SessionReques
 	if len(raw) > 1024 || exactJSON(raw, &v) != nil || v.Protocol != sessionProtocol || v.Sequence != sequence || sequence == 0 || sequence > 256 {
 		return v, ErrCommand
 	}
-	if !serviceAction(v.Action) || !remote && (v.Action == "bind" || v.Action == "observe_db_principals" || controlledAction(v.Action)) {
+	if !serviceAction(v.Action) || !remote && (v.Action == "bind" || v.Action == "observe_db_principals" || recoveryReadAction(v.Action) || controlledAction(v.Action)) {
 		return v, ErrCommand
 	}
 	return v, nil

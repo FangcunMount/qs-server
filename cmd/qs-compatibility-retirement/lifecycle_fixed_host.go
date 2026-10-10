@@ -45,6 +45,7 @@ type lifecycleFixedHost struct {
 	currentMQ                            *lifecycleCurrentMQConnections
 	aiStopped                            *retirement.AIStoppedRuntimeLease
 	finalRuntime                         *lifecycleControlledRuntime
+	writerRuntime                        *lifecycleControlledRuntime
 }
 
 func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Archive) (lifecycleHost, error) {

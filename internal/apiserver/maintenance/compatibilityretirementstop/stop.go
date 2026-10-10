@@ -767,13 +767,30 @@ func (l *Lease) check(ctx context.Context) error {
 	}
 	return nil
 }
+
+// Read-only checks use only the epoch already held by the original caller.
+// This never begins recovery merely because a request chooses an action name.
+func observedServiceContext(ctx context.Context, w serviceWindow) (context.Context, context.CancelFunc, error) {
+	if w == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, ErrBinding
+	}
+	d, e := w.Diagnostic(ctx)
+	if e != nil || !d.DirectoryLeaseHeld || d.RemainingMilliseconds <= 0 {
+		return nil, nil, ErrBinding
+	}
+	if d.RecoverySHA256 != "" {
+		return w.RecoveryContext(ctx)
+	}
+	return w.ForwardContext(ctx)
+}
+
 func (l *Lease) Check(ctx context.Context) error {
 	if l == nil || l.self != l {
 		return ErrBinding
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	bounded, cancel, e := l.window.ForwardContext(ctx)
+	bounded, cancel, e := observedServiceContext(ctx, l.window)
 	if e != nil {
 		return ErrBinding
 	}

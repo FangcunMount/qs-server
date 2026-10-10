@@ -237,8 +237,26 @@ func (v *lifecycleServiceController) Check(ctx context.Context) error {
 	if err := v.local.Check(ctx); err != nil {
 		return err
 	}
-	_, err := v.remote.Do(ctx, "check")
+	action, err := v.originalReadAction(ctx, "check", "check_recovery")
+	if err != nil {
+		return err
+	}
+	_, err = v.remote.Do(ctx, action)
 	return err
+}
+
+func (v *lifecycleServiceController) originalReadAction(ctx context.Context, forward, recovery string) (string, error) {
+	if v == nil || v.window == nil {
+		return "", lifecycleError("lifecycle_actual_service_lease_missing")
+	}
+	d, e := v.window.Diagnostic(ctx)
+	if e != nil || d.Binding != v.identity.windowBinding || !d.DirectoryLeaseHeld || d.RemainingMilliseconds <= 0 {
+		return "", lifecycleError("lifecycle_service_controller_binding_rejected")
+	}
+	if d.RecoverySHA256 != "" {
+		return recovery, nil
+	}
+	return forward, nil
 }
 
 // This post-deployment readback keeps the original A/D leases and the full
@@ -252,7 +270,11 @@ func (v *lifecycleServiceController) CheckStoppedDependents(ctx context.Context,
 	if err := v.local.CheckStoppedDependents(ctx, nativeInlineAPIID); err != nil {
 		return err
 	}
-	_, err := v.remote.Do(ctx, "check")
+	action, err := v.originalReadAction(ctx, "check", "check_recovery")
+	if err != nil {
+		return err
+	}
+	_, err = v.remote.Do(ctx, action)
 	return err
 }
 

@@ -187,3 +187,34 @@ func TestDisconnectedStopCannotReportStillRunningDependentRestored(t *testing.T)
 		t.Fatal("forced exit was relabelled completed graceful stop")
 	}
 }
+
+func TestSignedRecoveryReadKeepsOriginalBudgetAndRestoreEligibility(t *testing.T) {
+	trust, p, key := budgetCryptoFixture(t)
+	for _, action := range []string{"check_recovery", "check_running_recovery"} {
+		p.Action = action
+		if _, e := decodeBudget(encodeBudgetFixture(t, p, key), trust, p.RemoteDescriptorSHA256); e == nil {
+			t.Fatal("forward grant admitted recovery read", action)
+		}
+	}
+	p.RecoverySHA256 = strings.Repeat("2", 64)
+	p.ForwardMilliseconds = 0
+	p.RemainingMilliseconds = 600000
+	var state remoteBudgetState
+	for i, action := range []string{"check_recovery", "check_running_recovery", "restore_dependents"} {
+		p.Action, p.Counter = action, uint64(i+1)
+		decoded, e := decodeBudget(encodeBudgetFixture(t, p, key), trust, p.RemoteDescriptorSHA256)
+		if e != nil {
+			t.Fatal("original signed recovery denied", action, e)
+		}
+		next, e := candidateBudgetState(state, decoded.Payload, "same-boot", int64(time.Second)+int64(i)*int64(time.Millisecond))
+		if e != nil || next.ForwardDeadline != 0 || i > 0 && next.TotalDeadline != state.TotalDeadline {
+			t.Fatal("recovery read renewed original deadline or consumed restore", action, e)
+		}
+		state = next
+	}
+	p.Counter++
+	p.RecoverySHA256, p.Action = "", "check"
+	if _, e := candidateBudgetState(state, p, "same-boot", int64(time.Second)); e == nil {
+		t.Fatal("recovery read returned to forward epoch")
+	}
+}

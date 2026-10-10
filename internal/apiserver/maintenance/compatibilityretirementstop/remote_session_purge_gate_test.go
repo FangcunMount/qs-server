@@ -69,3 +69,23 @@ func TestRemoteSessionRequestGateRejectsEarlyPurgeAndRetainsRecovery(t *testing.
 		})
 	}
 }
+
+func TestRemoteRecoveryReadStaysReadOnlyAndDoesNotReleaseOriginalLease(t *testing.T) {
+	for _, action := range []string{"check_recovery", "check_running_recovery"} {
+		if !serviceAction(action) || !recoveryAction(action) || !recoveryReadAction(action) || recoveryReleaseAction(action) || controlledAction(action) {
+			t.Fatal("recovery observation grants release/forward effect", action)
+		}
+		if !remoteSessionRequestAllowed(action, true, true, true, false, true, true) {
+			t.Fatal("original stopped/controlled read unavailable after forward failure", action)
+		}
+		if remoteSessionRequestAllowed(action, true, true, true, true, true, true) || remoteSessionRequestAllowed(action, true, false, false, false, true, true) {
+			t.Fatal("released or unissued lease became current scope", action)
+		}
+	}
+	if remoteSessionRequestAllowed("check_running_recovery", true, true, false, false, true, false) {
+		t.Fatal("partial controlled start became running proof")
+	}
+	if !remoteSessionRequestAllowed("restore_dependents", true, true, true, false, true, true) {
+		t.Fatal("read-only recovery consumed original restore responsibility")
+	}
+}

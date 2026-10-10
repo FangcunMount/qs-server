@@ -125,7 +125,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			if req.Action == "stop" {
 				stopIssued = true
 			}
-			if recoveryAction(req.Action) {
+			if recoveryReleaseAction(req.Action) {
 				recoveryIssued = true
 			}
 		}
@@ -184,7 +184,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			e = validateRemoteManagementCatalog(ctx, a, b)
 		case "stop":
 			l, e = StopAndDrainRemote(ctx, a, journalDir, b)
-		case "check":
+		case "check", "check_recovery":
 			if l == nil {
 				return ErrCommand
 			}
@@ -206,7 +206,7 @@ func serveRemoteHostSession(ctx context.Context, a *Approval, journalDir string,
 			}
 			e = l.ControlledResumeDependents(ctx)
 			controlledResumed = e == nil
-		case "check_running":
+		case "check_running", "check_running_recovery":
 			if l == nil {
 				return ErrCommand
 			}
@@ -369,6 +369,9 @@ func remoteSessionActionAllowed(action string, bound, stopIssued, forwardRefused
 func remoteSessionRequestAllowed(action string, bound, stopIssued, forwardRefused, recoveryIssued, controlledIssued, controlledResumed bool) bool {
 	if !remoteSessionActionAllowed(action, bound, stopIssued, forwardRefused, recoveryIssued) {
 		return false
+	}
+	if action == "check_running_recovery" {
+		return bound && stopIssued && controlledResumed
 	}
 	if action == "observe_db_principals" {
 		return bound && stopIssued && !controlledIssued

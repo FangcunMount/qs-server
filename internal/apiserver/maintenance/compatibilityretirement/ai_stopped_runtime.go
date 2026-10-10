@@ -272,6 +272,43 @@ func (l *AIStoppedRuntimeLease) DatabasePrincipal(ctx context.Context) (string, 
 	return u.User.Username(), strings.TrimPrefix(u.Path, "/"), nil
 }
 
+// CheckWriterScope observes only this original actor in the caller's already
+// held epoch. Current controlled runtime is allowed only after its real Resume;
+// unknown signals, identity changes or an unready original process still fail.
+func (l *AIStoppedRuntimeLease) CheckWriterScope(ctx context.Context) error {
+	if l == nil || l.self != l || l.window == nil {
+		return ErrAIStoppedRuntime
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	d, e := l.window.Diagnostic(ctx)
+	if e != nil || !l.stopped || l.unknown || l.carrierUnknown {
+		return ErrAIStoppedRuntime
+	}
+	recovery := d.RecoverySHA256 != ""
+	var q context.Context
+	var cancel context.CancelFunc
+	if recovery {
+		q, cancel, e = l.window.RecoveryContext(ctx)
+	} else {
+		q, cancel, e = l.forwardScope(ctx)
+	}
+	if e != nil {
+		return e
+	}
+	defer cancel()
+	if l.checkWindow(q, recovery) != nil {
+		return ErrAIStoppedRuntime
+	}
+	if l.restored {
+		if l.carrierAttempted && (!l.carrierZero || l.protocol.requireCarrierAbsent(q, l.carrierID) != nil || l.protocol.requireOwnerCarriersAbsent(q, l.binding.OperationID) != nil) {
+			return ErrAIStoppedRuntime
+		}
+		return l.waitRestoredReady(q, recovery)
+	}
+	return l.checkStoppedInScope(q, recovery)
+}
+
 func (l *AIStoppedRuntimeLease) CheckStopped(ctx context.Context) error {
 	if l == nil || l.self != l {
 		return ErrAIStoppedRuntime
@@ -292,7 +329,10 @@ func (l *AIStoppedRuntimeLease) forwardScope(ctx context.Context) (context.Conte
 	return l.window.ForwardContext(ctx)
 }
 func (l *AIStoppedRuntimeLease) checkStopped(ctx context.Context) error {
-	if l.checkWindow(ctx, false) != nil || !l.stopped || l.unknown || l.restored {
+	return l.checkStoppedInScope(ctx, false)
+}
+func (l *AIStoppedRuntimeLease) checkStoppedInScope(ctx context.Context, recovery bool) error {
+	if l.checkWindow(ctx, recovery) != nil || !l.stopped || l.unknown || l.restored {
 		return ErrAIStoppedRuntime
 	}
 	current, e := l.protocol.snapshot(ctx, l.input.ContainerID)

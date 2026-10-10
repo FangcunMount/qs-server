@@ -445,3 +445,51 @@ func TestAIStoppedJournalHandoffClosesWritersBeforeUnlinkAndFinalResume(t *testi
 		t.Fatal("final resume started/appended after purge")
 	}
 }
+
+func TestAIWriterScopeReadsOnlyOriginalStoppedOrControlledEpoch(t *testing.T) {
+	l, p := aiStoppedUnitLease(t)
+	if l.CheckWriterScope(t.Context()) == nil {
+		t.Fatal("preflight owner became stopped writer scope")
+	}
+	if e := l.Stop(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	if e := l.CheckWriterScope(t.Context()); e != nil {
+		t.Fatal("actual stopped original rejected", e)
+	}
+	if e := l.Resume(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	if e := l.CheckWriterScope(t.Context()); e != nil || p.stops != 1 || p.starts != 1 {
+		t.Fatal("controlled original read attempted another signal", e)
+	}
+	// Final VerifyResumed remains stricter: live journals cannot satisfy zero.
+	if l.VerifyResumed(t.Context()) == nil {
+		t.Fatal("ordinary writer read became purged final acceptance")
+	}
+	p.snap.ConfigSHA256 = strings.Repeat("9", 64)
+	if l.CheckWriterScope(t.Context()) == nil {
+		t.Fatal("different live config accepted")
+	}
+}
+func TestAIWriterScopeKeepsOriginalRecoveryBudgetAndUnknownFailures(t *testing.T) {
+	l, p := aiStoppedUnitLease(t)
+	if e := l.Stop(t.Context()); e != nil {
+		t.Fatal(e)
+	}
+	if _, c, e := l.window.RecoveryContext(t.Context()); e != nil {
+		t.Fatal(e)
+	} else {
+		c()
+	}
+	if l.CheckStopped(t.Context()) == nil {
+		t.Fatal("old forward API silently changed its contract")
+	}
+	if e := l.CheckWriterScope(t.Context()); e != nil || p.stops != 1 || p.starts != 0 {
+		t.Fatal("existing recovery read rearmed or signalled actor", e)
+	}
+	l.unknown = true
+	if l.CheckWriterScope(t.Context()) == nil {
+		t.Fatal("unknown original effect became proof")
+	}
+}
