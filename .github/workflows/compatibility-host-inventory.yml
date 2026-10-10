@@ -110,7 +110,7 @@ jobs:
         run: python3 scripts/database/compatibility-host-inventory-action.py run --repo "$GITHUB_WORKSPACE"
       - name: Save this run's closed readonly QS service input
         if: steps.inventory.outputs.service_observation_path != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.inventory.outputs.service_observation_artifact }}
           path: ${{ steps.inventory.outputs.service_observation_path }}
