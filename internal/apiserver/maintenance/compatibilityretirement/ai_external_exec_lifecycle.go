@@ -682,7 +682,8 @@ func (p *aiExecDockerProtocol) ordinary(ctx context.Context, method, path string
 			_ = s.finish(true)
 		}
 	}()
-	if req.Write(s.in) != nil || s.in.Close() != nil {
+	// Premature dial-stdio stdin EOF can cancel the Docker HTTP handler; close after the reply.
+	if req.Write(s.in) != nil {
 		aiExternalExecutionFailure("http_write", ErrAIExternalExecUnknown)
 		return nil, ErrAIExternalExecUnknown
 	}
