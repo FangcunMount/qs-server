@@ -353,6 +353,29 @@ func lifecycleDBAdmissionRecordsMatch(intent, result []byte, expected lifecycleD
 	return nil
 }
 
+// A still-fenced principal must not bypass its original restore journal: an
+// unsettled unlock/grant can become visible after the recovery has started.
+func lifecycleDBOriginalRestoreForRefence(dir, name string, expected lifecycleDBAdmissionEffect, currentRestored bool) (bool, error) {
+	settled, e := lifecycleDBAdmissionEffectSettled(dir, name, expected)
+	if e != nil {
+		return false, e
+	}
+	if e = lifecycleDBRestoreStateMatches(settled, currentRestored); e != nil {
+		return false, e
+	}
+	return currentRestored, nil
+}
+
+func lifecycleDBRestoreStateMatches(settled, currentRestored bool) error {
+	if settled && !currentRestored {
+		return lifecycleError("lifecycle_database_account_restore_conflict")
+	}
+	if !settled && currentRestored {
+		return lifecycleError("lifecycle_database_account_effect_unknown")
+	}
+	return nil
+}
+
 func decodeLifecycleDBRecoveryBasis(raw []byte) (lifecycleDBRecoveryBasis, error) {
 	var v lifecycleDBRecoveryBasis
 	if len(raw) == 0 || len(raw) > 96<<20 || rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &v) != nil || len(v.BaselineBSON) == 0 || len(v.BaselineBSON) > 64<<20 || !bytes.Equal(append(mustLifecycleJSON(v), '\n'), raw) {
@@ -481,15 +504,16 @@ func (h *lifecycleFixedHost) reopenDatabaseWriterLease(ctx context.Context, r li
 				needsEffect = len(roles) > 0
 				v.mongoAttempted[key] = true
 			}
-			if !needsEffect {
-				continue
-			}
-			// Native baseline states alone cannot prove the original unlock/grant
-			// settled. Require its original durable intent/result before refencing.
+			// Check every active principal, including one still natively fenced.
+			// An incomplete restore pair can represent a delayed unlock/grant.
 			expected.Action = "restore"
 			restoreName := "database-admission-" + b.ActualRunID + "-" + scope.db + "-" + strconv.Itoa(i) + "-restore"
-			if settled, e := lifecycleDBAdmissionEffectSettled(h.api.dir, restoreName, expected); e != nil || !settled {
-				return lifecycleError("lifecycle_database_account_effect_unknown")
+			refenceRequired, e := lifecycleDBOriginalRestoreForRefence(h.api.dir, restoreName, expected, needsEffect)
+			if e != nil {
+				return e
+			}
+			if !refenceRequired {
+				continue
 			}
 			refence[scope.db] = append(refence[scope.db], p)
 		}

@@ -717,6 +717,69 @@ func TestDatabaseSettledRestoreRechecksCurrentStateWithoutAnotherALTER(t *testin
 	}
 }
 
+func TestDatabaseReopenRestoreStateBeforeRefence(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		settled, currentRestored bool
+		category                 string
+	}{
+		{"not-attempted-still-fenced", false, false, ""},
+		{"settled-actually-restored", true, true, ""},
+		{"settled-but-still-fenced", true, false, "lifecycle_database_account_restore_conflict"},
+		{"unrecorded-currently-restored", false, true, "lifecycle_database_account_effect_unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := lifecycleDBRestoreStateMatches(tc.settled, tc.currentRestored)
+			if (e == nil) != (tc.category == "") || e != nil && lifecycleCategory(e) != tc.category {
+				t.Fatal("original restore journal and actual principal state disagreed", e)
+			}
+		})
+	}
+	// This ordinary directory cannot satisfy the protected reader. Even when
+	// natively still fenced, the reopener must read/refuse it rather than skip it.
+	if refence, e := lifecycleDBOriginalRestoreForRefence(t.TempDir(), "restore", lifecycleDBAdmissionEffect{}, false); e == nil || refence {
+		t.Fatal("still-fenced principal bypassed its original restore journal")
+	}
+}
+
+func TestDatabaseNativeReopenRejectsUnsettledRestoreWhileFenced(t *testing.T) {
+	if os.Geteuid() != 0 || os.Getenv("QS_RETIREMENT_OWNED_DB_FIXTURE") != "mysql-network-none-tmpfs" && os.Getenv("QS_RETIREMENT_OWNED_DB_FIXTURE") != "mongo-network-none-tmpfs" {
+		t.Skip("requires the existing root-owned isolated native database fixture")
+	}
+	for _, database := range []string{"mysql", "mongodb"} {
+		t.Run(database, func(t *testing.T) {
+			expected := lifecycleDBAdmissionEffect{Kind: "original-database-admission-effect/v1", Database: database, Action: "restore", SourceSHA: strings.Repeat("a", 40), OperationID: "12-1", ActualRunID: "22-1", WindowStartSHA256: strings.Repeat("b", 64), BasisSHA256: strings.Repeat("c", 64), PrincipalSHA256: strings.Repeat("d", 64)}
+			raw := append(mustLifecycleJSON(expected), '\n')
+			for _, tc := range []struct {
+				name           string
+				intent, result []byte
+				category       string
+			}{
+				{"not-attempted", nil, nil, ""},
+				{"restore-intent-only", raw, nil, "lifecycle_database_account_effect_unknown"},
+				{"restore-result-only", nil, raw, "lifecycle_database_account_effect_unknown"},
+				{"restore-byte-conflict", raw, append(append([]byte(nil), raw...), '\n'), "lifecycle_database_account_effect_unknown"},
+				{"restore-settled-but-fenced", raw, raw, "lifecycle_database_account_restore_conflict"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					dir, name := t.TempDir(), "database-admission-22-1-"+database+"-0-restore"
+					for suffix, body := range map[string][]byte{"intent": tc.intent, "result": tc.result} {
+						if body != nil {
+							if e := os.WriteFile(filepath.Join(dir, name+"-"+suffix+".private.json"), body, 0600); e != nil {
+								t.Fatal(e)
+							}
+						}
+					}
+					refence, e := lifecycleDBOriginalRestoreForRefence(dir, name, expected, false)
+					if refence || (e == nil) != (tc.category == "") || e != nil && lifecycleCategory(e) != tc.category {
+						t.Fatal("still-fenced principal ignored unknown/conflicting original restore", e)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestDatabaseRecoveryBasisKeepsOriginalCatalogAndRejectsUnknownEncoding(t *testing.T) {
 	_, original := databaseWriterPolicyFixture(t)
 	body, e := bson.Marshal(original)
