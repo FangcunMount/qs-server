@@ -523,12 +523,33 @@ jobs:
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
           go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
 
+      # R4: temporary actual qs-ai runtime fixture; no image push or deploy.
+      - name: Checkout fixed public AI runtime for historical CAS fixture
+        uses: actions/checkout@v6
+        with:
+          repository: FangcunMount/qs-ai
+          ref: 90403f759d1d034c7adfbbdaf5f2bd1803daa931
+          path: .retirement-ai-native-source
+          persist-credentials: false
+      - name: Build actual AI runtime fixture image
+        run: |
+          set -euo pipefail
+          ai_source=90403f759d1d034c7adfbbdaf5f2bd1803daa931
+          test "$(git -C .retirement-ai-native-source rev-parse HEAD)" = "$ai_source"
+          test -z "$(git -C .retirement-ai-native-source status --porcelain=v1)"
+          docker build --platform linux/amd64 --build-arg "RELEASE_SHA=$ai_source" \
+            --label "org.opencontainers.image.revision=$ai_source" \
+            --tag "qs-retirement-ai-native:$ai_source" .retirement-ai-native-source
+          docker pull nsqio/nsq:v1.3.0
+
       - name: Verify retained historical evidence persistence on real databases
         env:
           QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           QS_HISTORY_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
           QS_HISTORY_REQUIRE_DATABASE: '1'
           QS_HISTORY_CLI_CI_INTEGRATION: '1'
+          QS_HISTORY_AI_RUNTIME_SOURCE: 90403f759d1d034c7adfbbdaf5f2bd1803daa931
+          QS_HISTORY_AI_SOURCE_DIR: ${{ github.workspace }}/.retirement-ai-native-source
           MYSQL_HOST: 127.0.0.1
           MYSQL_PORT: '3306'
           MYSQL_USERNAME: root
@@ -548,7 +569,7 @@ jobs:
           export QS_HISTORY_GO="$(command -v go)"
           go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative' | tee "$sql_component_log"
           go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds)$' | tee "$cli_input_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds|TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback|TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent|TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack)$' | tee "$cli_input_log"
           if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log" "$cli_input_log"; then
             echo 'Actual historical owner component proof skipped or failed' >&2
             exit 1
@@ -583,6 +604,9 @@ jobs:
           for marker in \
             'TestHistoryCIFixtureRequiresActualJobContainers' \
             'TestHistoryCLINativeInitialTwoSnapshotInputRounds' \
+            'TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback' \
+            'TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent' \
+            'TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack' \
             'TestHistoryCLINativeInitialTwoSnapshotInputRounds/false' \
             'TestHistoryCLINativeInitialTwoSnapshotInputRounds/true'; do
             grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$cli_input_log"
