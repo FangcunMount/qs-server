@@ -355,7 +355,8 @@ func originalInventoryMaterialFixture(t *testing.T, records uint64) (string, bac
 	r := report{FormatVersion: 2, Kind: "readonly_compatibility_inventory", SourceSHA: a.SourceSHA, OperationID: a.OperationID, RunID: a.RunID, RequestHash: a.RequestHash, TargetHash: digest(targets), Complete: true, ErrorCategory: "none"}
 	for i, v := range targets {
 		b := targetBoundary{Database: v[0], Name: v[1], Kind: v[2], Present: true, Empty: records == 0}
-		pages := records/1000 + 1
+		pageSize := uint64(productionLimits().PageSize)
+		pages := records/pageSize + 1
 		if records == 0 {
 			pages = 0
 		}
@@ -371,7 +372,7 @@ func originalInventoryMaterialFixture(t *testing.T, records uint64) (string, bac
 		}
 		for pass := 1; pass <= 2; pass++ {
 			for page := 1; uint64(page) <= pages; page++ {
-				count := min(uint64(page)*1000, records)
+				count := min(uint64(page)*pageSize, records)
 				p := lifecycleInventoryCheckpoint{1, "readonly_inventory_page_checkpoint", a.SourceSHA, pass, page, fmt.Sprint(count), count, count, s.DataHash, true, false}
 				name := fmt.Sprintf("%s-%s-pass-%d-page-%06d.checkpoint.json", s.Database, s.Name, pass, page)
 				if writeJSON(filepath.Join(dir, name), p) != nil {
@@ -392,7 +393,8 @@ func originalInventoryMaterialFixture(t *testing.T, records uint64) (string, bac
 	return dir, a, hashes
 }
 func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources(t *testing.T) {
-	for _, records := range []uint64{0, 1, 1000, 1001} {
+	pageSize := uint64(productionLimits().PageSize)
+	for _, records := range []uint64{0, 1, pageSize, pageSize + 1} {
 		t.Run(fmt.Sprint(records), func(t *testing.T) {
 			dir, a, hashes := originalInventoryMaterialFixture(t, records)
 			d, e := openLifecycleInventoryMaterialFiles(context.Background(), dir, uint32(os.Getuid()), a, hashes)
@@ -400,7 +402,7 @@ func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources
 				t.Fatal(e)
 			}
 			defer d.close()
-			pages := records/1000 + 1
+			pages := records/pageSize + 1
 			if records == 0 {
 				pages = 0
 			}
