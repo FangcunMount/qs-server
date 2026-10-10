@@ -57,14 +57,26 @@ func mongoCycleRange(lower, upper, last bson.RawValue) bson.D {
 }
 
 func (s *MongoResponsibilitySnapshot) scanCollection(ctx context.Context, name string, fixed *mongoCycleBoundary, classify bool) (mongoCycleBoundary, error) {
+	return s.scanCollectionWithInput(ctx, name, fixed, classify, s.ValidateBorrowedSnapshot, nil)
+}
+
+// The shared paging executor does not mint a responsibility snapshot. The
+// original transaction path above retains its original transaction validator;
+// the input-only snapshot reader supplies a distinct private native guard.
+func (s *MongoResponsibilitySnapshot) scanCollectionWithInput(ctx context.Context, name string, fixed *mongoCycleBoundary, classify bool, validate func(context.Context) error, freeze func(context.Context, mongoCycleBoundary, []bson.Raw, bool) error) (mongoCycleBoundary, error) {
 	b := mongoCycleBoundary{report: MongoResponsibilityCollectionReport{Collection: name}}
-	if err := s.ValidateBorrowedSnapshot(ctx); err != nil {
+	if err := validate(ctx); err != nil {
 		return b, err
 	}
 	definition, present := s.metadata.definitions[name]
 	b.report.Present = present
 	if !present {
 		b.report.RowsSHA256 = mongoOwnerHashParts("mongo-full-bson-rows/v1", name, "absent")
+		if freeze != nil {
+			if err := freeze(ctx, b, nil, true); err != nil {
+				return b, err
+			}
+		}
 		return b, nil
 	}
 	b.report.UUID = definition.uuid
@@ -126,11 +138,16 @@ func (s *MongoResponsibilitySnapshot) scanCollection(ctx context.Context, name s
 	sourceFrame(h, []byte(name), false)
 	if total == 0 || fixed != nil && b.upper.Type == 0 {
 		b.report.RowsSHA256 = hex.EncodeToString(h.Sum(nil))
+		if freeze != nil {
+			if err := freeze(ctx, b, nil, true); err != nil {
+				return b, err
+			}
+		}
 		return b, nil
 	}
 	var last bson.RawValue
 	for {
-		if err = s.ValidateBorrowedSnapshot(ctx); err != nil {
+		if err = validate(ctx); err != nil {
 			return b, err
 		}
 		s.report.Pages++
@@ -138,11 +155,14 @@ func (s *MongoResponsibilitySnapshot) scanCollection(ctx context.Context, name s
 		if s.report.Pages > s.limits.MaxPages {
 			return b, ErrMongoCycleBounds
 		}
+		pageStarted := time.Now()
 		cur, err = coll.Find(ctx, mongoCycleRange(b.lower, b.upper, last), options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetLimit(int64(s.limits.PageRows)).SetBatchSize(int32(s.limits.PageRows)).SetMaxTime(15*time.Second).SetCollation(&options.Collation{Locale: "simple"}))
 		if err != nil {
 			return b, ErrMongoCycleRead
 		}
 		page := 0
+		var inputRows []bson.Raw
+		var inputBytes int
 		for cur.Next(ctx) {
 			raw := cur.Current
 			if len(raw) > MaxSourceRowBytes || mongoUniqueBSON(raw, 0) != nil {
@@ -164,6 +184,14 @@ func (s *MongoResponsibilitySnapshot) scanCollection(ctx context.Context, name s
 				return b, ErrMongoCycleBounds
 			}
 			sourceFrame(h, raw, false)
+			if freeze != nil {
+				inputBytes += len(raw)
+				if inputBytes > mongoSnapshotInputPageBytes {
+					_ = cur.Close(ctx)
+					return b, ErrMongoCycleBounds
+				}
+				inputRows = append(inputRows, append(bson.Raw(nil), raw...))
+			}
 			if classify {
 				if e := s.classifyRow(name, raw); e != nil {
 					_ = cur.Close(ctx)
@@ -176,6 +204,20 @@ func (s *MongoResponsibilitySnapshot) scanCollection(ctx context.Context, name s
 		closeErr := cur.Close(ctx)
 		if cursorErr != nil || closeErr != nil {
 			return b, ErrMongoCycleRead
+		}
+		if freeze != nil {
+			if page == 0 {
+				if fixed == nil && (int64(b.report.Rows) != total || !bytes.Equal(last.Value, b.upper.Value)) {
+					return b, ErrMongoCycleConflict
+				}
+				b.report.RowsSHA256 = hex.EncodeToString(h.Sum(nil))
+			}
+			pageScope, cancel := context.WithDeadline(ctx, pageStarted.Add(time.Minute))
+			err = freeze(mongo.NewSessionContext(pageScope, mongo.SessionFromContext(ctx)), b, inputRows, page == 0)
+			cancel()
+			if err != nil {
+				return b, err
+			}
 		}
 		if page == 0 {
 			break

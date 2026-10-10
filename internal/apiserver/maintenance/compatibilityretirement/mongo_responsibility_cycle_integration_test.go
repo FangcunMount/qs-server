@@ -5,6 +5,8 @@ package retirement
 import (
 	"context"
 	"errors"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +26,163 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 )
+
+func snapshotInputNativeSession(t *testing.T, client *mongo.Client) mongo.Session {
+	t.Helper()
+	s, err := client.StartSession(options.Session().SetSnapshot(true).SetCausalConsistency(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.EndSession(context.Background()) })
+	return s
+}
+
+func snapshotInputNativeFile(t *testing.T) *os.File {
+	t.Helper()
+	f, err := os.CreateTemp(t.TempDir(), "snapshot-input-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if f.Close() != nil {
+			t.Error("close input")
+		}
+	})
+	return f
+}
+
+func TestMongoSnapshotInputNativePinnedPagingFrozenAfterEndAndGenuineFresh(t *testing.T) {
+	client, db, cfg := mongoCycleNativeDB(t)
+	for i := uint64(1); i <= 7; i++ {
+		mongoCycleNativeSheet(t, db, 20_000+i, "", "")
+	}
+	limits := MongoSnapshotInputLimits{Scan: mongoCycleTestLimits(), MaxDuration: 2 * time.Minute}
+	s := snapshotInputNativeSession(t, client)
+	ctx := mongo.NewSessionContext(t.Context(), s)
+	file := snapshotInputNativeFile(t)
+	first, err := PrepareMongoSnapshotInputEpoch(ctx, db, cfg, limits, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = PrepareMongoResponsibilitySnapshot(ctx, db, cfg, limits.Scan); !errors.Is(err, ErrMongoCycleTransaction) {
+		t.Fatal("input epoch was accepted as original transaction authority", err)
+	}
+	r := first.Summary()
+	if !r.CompleteInput || r.Rows != 7 || r.Collections[0].Pages < 4 || r.CASAuthorized || r.DropReady || r.NativeEpochSHA256 == "" {
+		t.Fatal("input counts/EOF/authority", r)
+	}
+	if first.CompareFreshInput(t.Context(), first) == nil {
+		t.Fatal("same input accepted as fresh")
+	}
+	// These writes use only the harness's unique owned database. The final
+	// rows are unchanged, but the server necessarily chooses a newer timestamp.
+	row := mongoLocalSheet()
+	row.ID = primitive.NewObjectID()
+	row.DomainID = 29_999
+	insertMongoLocalSheet(t, db, row)
+	if _, err = db.Collection("answersheets").DeleteOne(t.Context(), bson.D{{Key: "_id", Value: row.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	// The SAME native snapshot still sees exactly seven original raw rows.
+	var count int64
+	count, err = db.Collection("answersheets").CountDocuments(ctx, bson.D{})
+	if err != nil || count != 7 || first.ValidateBorrowedInputEpoch(ctx) != nil {
+		t.Fatal("server snapshot time was not pinned", count, err)
+	}
+	secondSession := snapshotInputNativeSession(t, client)
+	second, err := PrepareMongoSnapshotInputEpoch(mongo.NewSessionContext(t.Context(), secondSession), db, cfg, limits, snapshotInputNativeFile(t))
+	if err != nil || first.CompareFreshInput(t.Context(), second) != nil || second.Summary().NativeEpochSHA256 == r.NativeEpochSHA256 {
+		t.Fatal("genuine separate native snapshot did not preserve inputs", err)
+	}
+	s.EndSession(context.Background())
+	if first.ValidateBorrowedInputEpoch(ctx) == nil {
+		t.Fatal("ended snapshot still live")
+	}
+	first.started = time.Now().Add(-3 * time.Minute)
+	var rows int
+	for index := range first.pages {
+		page, err := first.ReadFrozenPage(t.Context(), index)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.frame.EOF && page.frame.Boundary.Report.RowsSHA256 == "" {
+			t.Fatal("EOF input lacked final collection digest")
+		}
+		if err = page.VisitRows(t.Context(), func(_ string, _ bson.Raw) error { rows++; return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if rows != 7 || first.ValidateBorrowedInputEpoch(ctx) == nil || first.Summary().CASAuthorized {
+		t.Fatal("frozen inputs renewed authority", rows)
+	}
+	if _, err = file.WriteAt([]byte{0}, first.pages[0].Offset); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = first.ReadFrozenPage(t.Context(), 0); err == nil {
+		t.Fatal("changed original input bytes accepted")
+	}
+	if first.CompareFreshInput(t.Context(), second) == nil {
+		t.Fatal("changed frozen bytes accepted by input comparison")
+	}
+}
+
+func TestMongoSnapshotInputNativeRejectsWrongModeAndExpiry(t *testing.T) {
+	client, db, cfg := mongoCycleNativeDB(t)
+	limits := MongoSnapshotInputLimits{Scan: mongoCycleTestLimits(), MaxDuration: time.Minute}
+	if err := mongoCycleNativeTx(t, client, func(ctx mongo.SessionContext) error {
+		_, err := PrepareMongoSnapshotInputEpoch(ctx, db, cfg, limits, snapshotInputNativeFile(t))
+		if err == nil {
+			t.Fatal("transaction accepted as nontransaction snapshot input")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s := snapshotInputNativeSession(t, client)
+	if err := s.StartTransaction(); err == nil {
+		t.Fatal("snapshot session allowed a transaction")
+	}
+	ctx := mongo.NewSessionContext(t.Context(), s)
+	epoch, err := PrepareMongoSnapshotInputEpoch(ctx, db, cfg, limits, snapshotInputNativeFile(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	epoch.started = time.Now().Add(-2 * time.Minute)
+	if epoch.ValidateBorrowedInputEpoch(ctx) == nil {
+		t.Fatal("input budget was renewed")
+	}
+	other := snapshotInputNativeSession(t, client)
+	if epoch.ValidateBorrowedInputEpoch(mongo.NewSessionContext(t.Context(), other)) == nil {
+		t.Fatal("another session impersonated original input")
+	}
+}
+
+func TestMongoSnapshotInputNativeServerErrorsDoNotReturnCompletion(t *testing.T) {
+	// Run only against the same explicitly-owned Mongo fixture. The test-owned
+	// server must enable failCommand; errors are actual native responses, not
+	// a claim about production permissions or snapshot retention settings.
+	// A stable server error is required: one-shot failpoints may be consumed
+	// by an internal read retry before this API sees a failure.
+	for _, code := range []int{286, 13, 303} {
+		t.Run(strconv.Itoa(code), func(t *testing.T) {
+			client, db, cfg := mongoCycleNativeDB(t)
+			command := bson.D{{Key: "configureFailPoint", Value: "failCommand"}, {Key: "mode", Value: "alwaysOn"}, {Key: "data", Value: bson.D{{Key: "failCommands", Value: bson.A{"find"}}, {Key: "errorCode", Value: code}}}}
+			if err := client.Database("admin").RunCommand(t.Context(), command).Err(); err != nil {
+				t.Fatal("owned failCommand required", err)
+			}
+			t.Cleanup(func() {
+				if err := client.Database("admin").RunCommand(context.Background(), bson.D{{Key: "configureFailPoint", Value: "failCommand"}, {Key: "mode", Value: "off"}}).Err(); err != nil {
+					t.Error(err)
+				}
+			})
+			s := snapshotInputNativeSession(t, client)
+			result, err := PrepareMongoSnapshotInputEpoch(mongo.NewSessionContext(t.Context(), s), db, cfg, MongoSnapshotInputLimits{Scan: mongoCycleTestLimits(), MaxDuration: time.Minute}, snapshotInputNativeFile(t))
+			if err == nil || result != nil {
+				t.Fatal("native read error became completed input", code)
+			}
+		})
+	}
+}
 
 func mongoCycleNativeDB(t *testing.T) (*mongo.Client, *mongo.Database, MongoOwnerConfig) {
 	t.Helper()
