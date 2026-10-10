@@ -1561,7 +1561,58 @@ def failed_inventory_stat(st):
             st.st_uid, stat.S_IMODE(st.st_mode), st.st_nlink]
 
 
-def failed_inventory_file(dirfd, name, deadline, *, decode_json=False):
+def failed_inventory_source_uid(value):
+    # The privileged S0 caller derives this from real sudo's SUDO_UID. No
+    # approval/report/JSON field can select an owner, and ordinary callers
+    # retain their actual original producer identity.
+    if value is None:
+        return os.getuid()
+    if os.getuid() != 0 or os.geteuid() != 0 or type(value) is not int or not 0 <= value < 2**32:
+        fail("failed_inventory_source_owner_unbound")
+    return value
+
+
+def failed_inventory_source_directory(path, source_uid):
+    owner = failed_inventory_source_uid(source_uid)
+    if owner == os.getuid():
+        return private_directory(path)
+    path = Path(path)
+    if not path.is_absolute() or ".." in path.parts:
+        fail("operation_path_invalid")
+    for component in reversed((path, *path.parents)):
+        try: info = component.lstat()
+        except OSError: fail("operation_directory_missing")
+        if not stat.S_ISDIR(info.st_mode): fail("operation_path_invalid")
+        if info.st_mode & 0o022 and not (info.st_mode & stat.S_ISVTX and info.st_uid in (0, owner)):
+            fail("operation_ancestor_writable")
+    info = path.lstat()
+    if info.st_uid != owner or stat.S_IMODE(info.st_mode) != 0o700:
+        fail("failed_inventory_source_owner_unbound")
+    return path
+
+
+def failed_inventory_read_private(directory, name, expected, source_uid):
+    if name not in ("inventory-request.json", "inventory.private.json"):
+        fail("failed_inventory_scope_invalid")
+    token(expected, HASH)
+    dirfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(dirfd)
+        if not stat.S_ISDIR(before.st_mode) or before.st_uid != failed_inventory_source_uid(source_uid) or stat.S_IMODE(before.st_mode) != 0o700:
+            fail("failed_inventory_source_owner_unbound")
+        observed, value = failed_inventory_file(dirfd, name, time.monotonic()+100,
+            decode_json=True, source_uid=source_uid)
+        visible = os.stat(directory, follow_symlinks=False)
+        identity = lambda v: (v.st_dev, v.st_ino, v.st_uid, v.st_mode)
+        if identity(before) != identity(os.fstat(dirfd)) or identity(before) != identity(visible):
+            fail("failed_inventory_directory_changed")
+        if observed["sha256"] != expected: fail("evidence_hash_mismatch")
+        return value, observed["sha256"]
+    finally: os.close(dirfd)
+
+
+def failed_inventory_file(dirfd, name, deadline, *, decode_json=False, source_uid=None):
+    owner = failed_inventory_source_uid(source_uid)
     # Names come only from the closed original producer list below. Hold the
     # actual file FD while hashing; no source body enters a JSON receipt.
     try: fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
@@ -1569,7 +1620,7 @@ def failed_inventory_file(dirfd, name, deadline, *, decode_json=False):
     try:
         before = os.fstat(fd)
         maximum = MAX_JSON if decode_json else FAILED_INVENTORY_LIMITS["max_bytes"]
-        if not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid() or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1 or not 0 <= before.st_size <= maximum:
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != owner or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1 or not 0 <= before.st_size <= maximum:
             fail("failed_inventory_file_not_private")
         digest = hashlib.sha256(); chunks = []
         while True:
@@ -1586,17 +1637,20 @@ def failed_inventory_file(dirfd, name, deadline, *, decode_json=False):
     finally: os.close(fd)
 
 
-def failed_inventory_inputs(args):
-    directory = operation_directory(args.root, FAILED_INVENTORY_OPERATION)
+def failed_inventory_inputs(args, *, source_uid=None):
+    root = Path(args.root)
+    if tuple(root.parts[-3:]) != ROOT_SUFFIX: fail("operation_root_invalid")
+    failed_inventory_source_directory(root, source_uid)
+    directory = failed_inventory_source_directory(root / FAILED_INVENTORY_OPERATION, source_uid)
     ref = FAILED_INVENTORY_REFERENCE
-    request, _ = read_private(directory, "inventory-request.json", ref["request_sha256"])
+    request, _ = failed_inventory_read_private(directory, "inventory-request.json", ref["request_sha256"], source_uid)
     if request.get("limits") != FAILED_INVENTORY_LIMITS or any(type(v) is not int for v in request["limits"].values()):
         fail("failed_inventory_old_profile_mismatch")
     # Validate all other existing request semantics without permitting the old
     # profile in the ordinary/current inventory entry points.
     validate_v2_request(dict(request, limits=dict(INVENTORY_V2_LIMITS)), FAILED_INVENTORY_OPERATION, ref["source_sha"], boundary=False)
-    output = private_directory(directory / ("inventory-" + ref["run_id"]))
-    report, _ = read_private(output, "inventory.private.json", ref["sha256"])
+    output = failed_inventory_source_directory(directory / ("inventory-" + ref["run_id"]), source_uid)
+    report, _ = failed_inventory_read_private(output, "inventory.private.json", ref["sha256"], source_uid)
     if report.get("kind") != "readonly_compatibility_inventory" or report.get("format_version") != 2 or report.get("source_sha") != ref["source_sha"] or report.get("operation_id") != FAILED_INVENTORY_OPERATION or report.get("run_id") != ref["run_id"] or report.get("request_hash") != ref["request_sha256"] or report.get("target_hash") != TARGET_HASH or report.get("complete") is not False or report.get("drop_ready") is not False or report.get("diagnostic_only") is not True:
         fail("failed_inventory_report_mismatch")
     targets = report.get("targets")

@@ -158,7 +158,7 @@ class ExactExit(unittest.TestCase):
         # The real caller keeps stdin open as its native cancellation channel.
         # Only the fixture child's UID probes are replaced; no remote call runs.
         program='import os\nos.getuid=lambda:0\nos.geteuid=lambda:0\n'+s0.BOOTSTRAP
-        child=subprocess.Popen([sys.executable,'-I','-c',program],stdin=subprocess.PIPE,
+        child=subprocess.Popen([sys.executable,'-I','-c',program,'root-direct','0'],stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         try:
             child.stdin.write(b'{}\n');child.stdin.flush()
@@ -308,7 +308,7 @@ class FixedSudoRoute(unittest.TestCase):
                  " if event=='subprocess.Popen':\n"
                  "  command=args[1]\n"
                  "  assert command[:4]==['/usr/bin/sudo','-A','--','/usr/bin/python3']\n"
-                 "  assert len(command)==7 and command[4:6]==['-I','-c']\n"
+                 "  assert len(command)==9 and command[4:6]==['-I','-c']\n"
                  "  assert 'fixture-sudo-password' not in repr(command)\n"
                  "  sys.stdout.write('fixture fixed launch refused\\n');sys.stdout.flush()\n"
                  "  raise RuntimeError('fixture pre-launch refusal')\n"
@@ -336,7 +336,7 @@ class FixedSudoRoute(unittest.TestCase):
         # Only fixture transport digest and UID probes change; no native purge runs.
         program='import os\nos.getuid=lambda:0\nos.geteuid=lambda:0\n'+s0.BOOTSTRAP.replace(s0.TRANSPORT_SHA,s0.sha(transport))
         with patch.dict(os.environ,{'SUDO_PASSWORD':'fixture-sudo-password','SUDO_ASKPASS':'/unapproved'},clear=True):
-            child=self.real_popen([sys.executable,'-I','-c',program],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            child=self.real_popen([sys.executable,'-I','-c',program,'root-direct','0'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
             self.children.append(child)
             try:
                 child.stdin.write(s0.canonical(packet));child.stdin.flush()
@@ -346,6 +346,71 @@ class FixedSudoRoute(unittest.TestCase):
             finally:
                 if child.poll() is None:child.kill();child.wait(timeout=3)
                 for stream in (child.stdin,child.stdout,child.stderr):stream.close()
+
+
+class OriginalSourceOwner(unittest.TestCase):
+    def setUp(self):
+        # Real fixture ancestry avoids macOS /var and /tmp symlink aliases.
+        with patch.object(tempfile,'gettempdir',return_value='/private/tmp'):
+            ExactExit.setUp(self)
+    tearDown=ExactExit.tearDown
+    absent=ExactExit.absent
+    """Original local inode ownership; UID probes never grant real root."""
+    def test_actual_original_owner_with_authenticated_root_origin(self):
+        owner=os.getuid()
+        with patch.object(s0.os,'getuid',return_value=0),patch.object(s0.os,'geteuid',return_value=0):
+            result=s0.purge_open(self.fd,self.output.name,self.baseline,set(self.files),self.authority,self.absent,time.monotonic()+10,source_uid=owner)
+        self.assertTrue(result['complete']);self.assertFalse(self.output.exists())
+
+    def test_source_owner_mismatch_refuses_before_effect(self):
+        owner=os.getuid()
+        with patch.object(s0.os,'getuid',return_value=0),patch.object(s0.os,'geteuid',return_value=0):
+            with self.assertRaises(s0.Rejected):s0.purge_open(self.fd,self.output.name,self.baseline,set(self.files),self.authority,self.absent,time.monotonic()+10,source_uid=owner+1)
+        self.assertEqual(set(p.name for p in self.output.iterdir()),set(self.files))
+        self.assertEqual(set(self.parent.iterdir()),{self.output})
+
+    def test_original_private_reader_does_not_weaken_global_helper(self):
+        helper=s0.load(Path(__file__).with_name('compatibility-retirement.py'),'s0_owner_read_helper')
+        owner=os.getuid();name='inventory.private.json';expected=self.baseline['files'][name]['sha256']
+        with patch.object(s0.os,'getuid',return_value=0),patch.object(s0.os,'geteuid',return_value=0):
+            self.assertEqual(helper.failed_inventory_source_directory(self.output,owner),self.output)
+            self.assertEqual(helper.failed_inventory_read_private(self.output,name,expected,owner),({'fixture':True},expected))
+            with self.assertRaises(helper.Blocked):helper.private_directory(self.output)
+            with self.assertRaises(helper.Blocked):helper.failed_inventory_source_directory(self.output,owner+1)
+            with self.assertRaises(helper.Blocked):helper.failed_inventory_read_private(self.output,name,expected,owner+1)
+            with self.assertRaises(helper.Blocked):helper.failed_inventory_read_private(self.output,'unapproved.json',expected,owner)
+        self.assertEqual(self.output.stat().st_uid,owner)
+        self.assertEqual(set(p.name for p in self.output.iterdir()),set(self.files))
+
+    def test_nonroot_cannot_supply_another_owner_to_narrow_reader(self):
+        helper=s0.load(Path(__file__).with_name('compatibility-retirement.py'),'s0_owner_nonroot_helper')
+        with self.assertRaises(helper.Blocked):helper.failed_inventory_source_uid(os.getuid())
+        self.assertEqual(helper.failed_inventory_source_uid(None),os.getuid())
+
+    def test_actual_fixed_root_bootstrap_requires_sudo_origin_uid_and_not_json_owner(self):
+        owner=os.getuid()
+        operator=('import os\ndef remote(a,p,r,h,t,source_uid):\n assert source_uid=='+str(owner)+'\n return {"fixture":"sudo origin bound"}\n').encode()
+        helper=b'fixture_import_only=True\n';transport=b'fixture_import_only=True\n'
+        packet={'approval':{'operator_sha256':s0.sha(operator),'helper_sha256':s0.sha(helper)},'proof':{},'actual_run_id':'99999999999-1',
+                'sources':{k:base64.b64encode(v).decode() for k,v in {'operator':operator,'helper':helper,'transport':transport}.items()}}
+        program='import os\nos.getuid=lambda:0\nos.geteuid=lambda:0\n'+s0.BOOTSTRAP.replace(s0.TRANSPORT_SHA,s0.sha(transport))
+        for channel,argument,sudo_uid,extra,expected in (('sudo-user',str(owner),str(owner),False,0),('sudo-user',str(owner+1),str(owner),False,1),
+                ('sudo-user',str(owner),'',False,1),('sudo-user',str(owner),str(owner),True,1),('root-direct','0',str(owner),False,1)):
+            with self.subTest(channel=channel,extra=extra,expected=expected):
+                env={'PATH':'/usr/bin:/bin'}
+                if sudo_uid:env['SUDO_UID']=sudo_uid
+                body=dict(packet)
+                if extra:body['source_uid']=owner
+                child=subprocess.Popen([sys.executable,'-I','-c',program,channel,argument],env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                try:
+                    child.stdin.write(s0.canonical(body));child.stdin.flush()
+                    self.assertEqual(child.wait(timeout=3),expected)
+                    output=child.stdout.read();self.assertEqual(child.stderr.read(),b'')
+                    if expected:self.assertNotIn(b'sudo origin bound',output)
+                    else:self.assertIn(b'sudo origin bound',output)
+                finally:
+                    if child.poll() is None:child.kill();child.wait(timeout=3)
+                    for stream in (child.stdin,child.stdout,child.stderr):stream.close()
 
 
 if __name__=='__main__':unittest.main()

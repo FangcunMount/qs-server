@@ -138,8 +138,10 @@ def directory_matches(parentfd, name, dirfd, identity):
         fail('s0_directory_changed')
 
 
-def purge_open(parentfd, name, baseline, names, authority, absence, deadline):
+def purge_open(parentfd, name, baseline, names, authority, absence, deadline, *, source_uid=None):
     """Actual FD owner. Only the fixed production caller can reach this leaf."""
+    owner = os.getuid() if source_uid is None else source_uid
+    if type(owner) is not int or not 0 <= owner < 2**32 or (source_uid is not None and (os.getuid()!=0 or os.geteuid()!=0)): fail('s0_source_owner_unbound')
     if set(baseline['files']) != set(names): fail('s0_scope_changed')
     fds = {}; removed = []; dirfd = None; known = False
     intent_name = 's0-exit-'+authority['actual_run_id']+'.intent.json'
@@ -147,7 +149,7 @@ def purge_open(parentfd, name, baseline, names, authority, absence, deadline):
         dirfd = os.open(name, os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW, dir_fd=parentfd)
         identity = baseline['directory_identity']
         directory_matches(parentfd,name,dirfd,identity)
-        if identity[2:] != [os.getuid(),0o700] or set(os.listdir(dirfd)) != set(names): fail('s0_scope_changed')
+        if identity[2:] != [owner,0o700] or set(os.listdir(dirfd)) != set(names): fail('s0_scope_changed')
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
         needed = len(names)+64
         if needed > 8192 or needed > hard: fail('s0_fd_budget_unavailable')
@@ -159,7 +161,7 @@ def purge_open(parentfd, name, baseline, names, authority, absence, deadline):
             if type(expected) is not dict or set(expected) != {'sha256','stat'} or not HASH.fullmatch(expected['sha256']) or type(expected['stat']) is not list or len(expected['stat']) != 8: fail('s0_baseline_rejected')
             fd = os.open(member,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=dirfd); fds[member]=fd
             st = os.fstat(fd)
-            if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or stat.S_IMODE(st.st_mode) != 0o600 or st.st_nlink != 1 or stamp(st) != expected['stat'] or stamp(os.stat(member,dir_fd=dirfd,follow_symlinks=False)) != expected['stat']: fail('s0_file_changed')
+            if not stat.S_ISREG(st.st_mode) or st.st_uid != owner or stat.S_IMODE(st.st_mode) != 0o600 or st.st_nlink != 1 or stamp(st) != expected['stat'] or stamp(os.stat(member,dir_fd=dirfd,follow_symlinks=False)) != expected['stat']: fail('s0_file_changed')
             held_hash(fd,expected,deadline)
         directory_matches(parentfd,name,dirfd,identity)
         if set(os.listdir(dirfd)) != set(names): fail('s0_scope_changed')
@@ -222,29 +224,33 @@ def purge_open(parentfd, name, baseline, names, authority, absence, deadline):
         if unknown or (known and fds): fail('s0_physical_exit_unknown')
 
 
-def remote(a, proof, actual_run, helper, transport):
+def remote(a, proof, actual_run, helper, transport, source_uid):
     validate_authority(a,proof,transport)
+    if type(source_uid) is not int or not 0 <= source_uid < 2**32: fail('s0_source_owner_unbound')
     if os.getuid()!=0 or os.geteuid()!=0 or not RUN.fullmatch(actual_run) or actual_run in (OLD_RUN,a['completion_run_id']): fail('s0_host_or_run_rejected')
     args=argparse.Namespace(root=ROOT)
-    directory,output,request,names,_=helper.failed_inventory_inputs(args)
+    directory,output,request,names,_=helper.failed_inventory_inputs(args,source_uid=source_uid)
     # Existing lock only: never create or adopt a missing lock.
     parentfd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     lockfd=None
     try:
         lockfd=os.open('operation.lock',os.O_RDWR|os.O_NOFOLLOW,dir_fd=parentfd)
         st=os.fstat(lockfd)
-        if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or stat.S_IMODE(st.st_mode)!=0o600 or st.st_nlink!=1: fail('s0_lock_rejected')
+        if not stat.S_ISREG(st.st_mode) or st.st_uid!=source_uid or stat.S_IMODE(st.st_mode)!=0o600 or st.st_nlink!=1: fail('s0_lock_rejected')
         import fcntl
         fcntl.flock(lockfd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        parent_identity=(os.fstat(parentfd).st_dev,os.fstat(parentfd).st_ino)
+        parent=os.fstat(parentfd)
+        if not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=source_uid or stat.S_IMODE(parent.st_mode)!=0o700: fail('s0_source_owner_unbound')
+        identity=lambda v:(v.st_dev,v.st_ino,v.st_uid,stat.S_IMODE(v.st_mode))
+        parent_identity=identity(parent)
         def actual_absence(deadline):
             visible=os.stat(directory,follow_symlinks=False)
-            if (visible.st_dev,visible.st_ino)!=parent_identity or stamp(os.fstat(lockfd))!=stamp(st) or stamp(os.stat('operation.lock',dir_fd=parentfd,follow_symlinks=False))!=stamp(st):fail('s0_lock_rejected')
+            if identity(visible)!=parent_identity or identity(os.fstat(parentfd))!=parent_identity or stamp(os.fstat(lockfd))!=stamp(st) or stamp(os.stat('operation.lock',dir_fd=parentfd,follow_symlinks=False))!=stamp(st):fail('s0_lock_rejected')
             helper.failed_inventory_container_absent(deadline)
         baselinefd=os.open(helper.FAILED_INVENTORY_BASELINE,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parentfd)
         try:
             bs=os.fstat(baselinefd)
-            if not stat.S_ISREG(bs.st_mode) or bs.st_uid!=0 or stat.S_IMODE(bs.st_mode)!=0o600 or bs.st_nlink!=1 or not 0<bs.st_size<=helper.FAILED_INVENTORY_BASELINE_MAX: fail('s0_baseline_rejected')
+            if not stat.S_ISREG(bs.st_mode) or bs.st_uid!=source_uid or stat.S_IMODE(bs.st_mode)!=0o600 or bs.st_nlink!=1 or not 0<bs.st_size<=helper.FAILED_INVENTORY_BASELINE_MAX: fail('s0_baseline_rejected')
             with os.fdopen(baselinefd,'rb',closefd=False) as stream: baseline_raw=stream.read(helper.FAILED_INVENTORY_BASELINE_MAX+1)
             if sha(baseline_raw)!=a['baseline_sha256'] or stamp(os.fstat(baselinefd))!=stamp(bs) or stamp(os.stat(helper.FAILED_INVENTORY_BASELINE,dir_fd=parentfd,follow_symlinks=False))!=stamp(bs): fail('s0_baseline_rejected')
             baseline=helper.decode(baseline_raw)
@@ -253,7 +259,7 @@ def remote(a, proof, actual_run, helper, transport):
         if set(baseline)!=keys or baseline['format_version']!=1 or type(baseline['format_version']) is not int or baseline['kind']!='cleanup_only_failed_inventory_baseline' or baseline['original_operation_id']!=OLD_OP or baseline['original_inventory_report']!=helper.FAILED_INVENTORY_REFERENCE or baseline['observing_source_sha']!=a['baseline_observing_source_sha'] or baseline['observing_run_id']!=a['baseline_observing_run_id'] or any(baseline[k] is not False for k in ('inventory_complete','retirement_proof','drop_authority')) or baseline['producer_container_absent'] is not True: fail('s0_baseline_rejected')
         authority={k:a[k] for k in REQUIRED if k not in ('protocol','pin_sha256','helper_sha256','total_seconds')}
         authority['actual_run_id']=actual_run
-        return purge_open(parentfd,output.name,baseline,names,authority,actual_absence,time.monotonic()+a['total_seconds'])
+        return purge_open(parentfd,output.name,baseline,names,authority,actual_absence,time.monotonic()+a['total_seconds'],source_uid=source_uid)
     finally:
         if lockfd is not None: close(lockfd)
         close(parentfd)
@@ -262,9 +268,18 @@ def remote(a, proof, actual_run, helper, transport):
 # Root receives one finite source-bound packet over the original strict-pinned
 # SSH channel. No uploaded remote directory, source file or key is created.
 BOOTSTRAP = r'''
-import base64,hashlib,json,os,sys,types
+import base64,hashlib,json,os,re,sys,types
 try:
- if os.getuid()!=0 or os.geteuid()!=0: raise ValueError()
+ if os.getuid()!=0 or os.geteuid()!=0 or len(sys.argv)!=3: raise ValueError()
+ channel,claimed=sys.argv[1:]
+ if re.fullmatch(r'0|[1-9][0-9]{0,9}',claimed) is None or int(claimed)>=2**32: raise ValueError()
+ if channel=='sudo-user':
+  actual=os.environ.get('SUDO_UID','')
+  if re.fullmatch(r'[1-9][0-9]{0,9}',actual) is None or actual!=claimed: raise ValueError()
+ elif channel=='root-direct':
+  if claimed!='0' or 'SUDO_UID' in os.environ: raise ValueError()
+ else: raise ValueError()
+ source_uid=int(claimed)
  os.environ.pop('SUDO_PASSWORD',None);os.environ.pop('SUDO_ASKPASS',None)
  raw=sys.stdin.buffer.readline(2097153)
  if len(raw)>2097152 or not raw.endswith(b'\n'): raise ValueError()
@@ -277,7 +292,7 @@ try:
   if hashlib.sha256(body).hexdigest()!=expected: raise ValueError()
   m=types.ModuleType('s0_'+name);m.__file__='/nonexistent/s0-'+name+'.py';sys.modules[m.__name__]=m
   exec(compile(body,m.__file__,'exec'),m.__dict__);modules[name]=m
- result=modules['operator'].remote(a,p['proof'],p['actual_run_id'],modules['helper'],modules['transport'])
+ result=modules['operator'].remote(a,p['proof'],p['actual_run_id'],modules['helper'],modules['transport'],source_uid)
  print(json.dumps(result,sort_keys=True,separators=(',',':')))
 except BaseException:
  print('{"protocol":"s0_exact_exit_result_v1","complete":false,"disposition":"unknown_or_refused"}')
@@ -311,7 +326,7 @@ def root_packet_once(packet, helper, control, password):
             previous[number] = signal.getsignal(number)
             signal.signal(number, lambda _n, _f: cancelled.__setitem__(0, True))
         with environment as private:
-            command = ['/usr/bin/python3', '-I', '-c', BOOTSTRAP]
+            command = ['/usr/bin/python3', '-I', '-c', BOOTSTRAP, 'sudo-user' if uid else 'root-direct', str(uid)]
             if uid: command = ['/usr/bin/sudo', '-A' if private else '-n', '--', *command]
             child = subprocess.Popen(command, env=private or {'PATH':'/usr/bin:/bin'},
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
