@@ -3,12 +3,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"testing"
 
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/sys/unix"
 )
@@ -107,4 +110,78 @@ func TestHistoryCLINativeInitialTwoSnapshotInputRounds(t *testing.T) {
 			}
 		})
 	}
+}
+
+// These are real borrowed database scopes, not an imported Q or successful
+// receipt. A zero-value external object must not authorize even the actual
+// terminal business/source fixture, and neither store may retain evidence.
+func TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack(t *testing.T) {
+	testSource(t)
+	pool, client, db, _ := nativeFixture(t, true)
+	closed, err := pool.ExecContext(t.Context(), "UPDATE ai_messaging_admission SET closed=1,revision=revision+1")
+	if err != nil {
+		t.Fatal("owned native admission close")
+	}
+	if rows, e := closed.RowsAffected(); e != nil || rows != 1 {
+		t.Fatal("owned admission singleton missing")
+	}
+	_, _, a := nativeInputs(t, pool, client, db)
+	host, err := openDatabases(t.Context(), a)
+	if err != nil {
+		t.Fatal(safeCategory(err))
+	}
+	defer func() {
+		if host.close() != nil {
+			t.Error("host close")
+		}
+	}()
+	readOriginal := func(name string, filter bson.D) bson.Raw {
+		t.Helper()
+		raw, e := db.Collection(name).FindOne(t.Context(), filter).DecodeBytes()
+		if e != nil {
+			t.Fatal("actual original fixture read")
+		}
+		return append(bson.Raw(nil), raw...)
+	}
+	sheetFilter := bson.D{{Key: "id", Value: uint64(10042)}}
+	sourceFilter := bson.D{{Key: "event_id", Value: "owned-original-submission"}}
+	sheetBefore, sourceBefore := readOriginal("answersheets", sheetFilter), readOriginal("domain_event_outbox", sourceFilter)
+	var operationsBefore, outboxBefore uint64
+	if pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM ai_messaging_operations").Scan(&operationsBefore) != nil || pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM rm_outbox").Scan(&outboxBefore) != nil {
+		t.Fatal("actual SQL baseline read")
+	}
+	j, err := newHistoryWriteJournal(filepath.Join(privateTestDir(t), "missing-ai"), a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if j.dir.Close() != nil {
+			t.Error("journal close")
+		}
+	}()
+	inputs, err := captureHistoryInitialInputs(t.Context(), a, host, j)
+	if err != nil {
+		t.Fatal("actual initial input capture: " + safeCategory(err))
+	}
+	defer func() {
+		if inputs.close() != nil {
+			t.Error("input close")
+		}
+	}()
+	components := inputs.components.Components()
+	if len(components) != 1 || j.sequence != 3 {
+		t.Fatal("actual complete original owner input missing")
+	}
+	sqlStatements, mongoStatement, refs, report, err := host.writeHistoricalComponent(t.Context(), a, inputs, components[0], 0, j, &retirement.AIExternalExecutionQualification{}, &retirement.AICommandPersistenceBatch{})
+	if err == nil || safeCategory(err) != "history_write_qualification_or_statement_failed" || len(sqlStatements) != 0 || mongoStatement != nil || refs != 0 || report.ActualSQLCommitResponse || report.ActualMongoCommitResponse || report.CommitState != "not_attempted" || j.unknown || j.sequence != 4 {
+		t.Fatal("unqualified external input entered effects or cleanup became unknown: " + safeCategory(err))
+	}
+	var operationsAfter, outboxAfter uint64
+	if pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM ai_messaging_operations").Scan(&operationsAfter) != nil || pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM rm_outbox").Scan(&outboxAfter) != nil || operationsAfter != operationsBefore || outboxAfter != outboxBefore || !bytes.Equal(sheetBefore, readOriginal("answersheets", sheetFilter)) || !bytes.Equal(sourceBefore, readOriginal("domain_event_outbox", sourceFilter)) {
+		t.Fatal("rejected native component retained SQL/Mongo effects")
+	}
+	if inputs.sources.ValidateFrozen(t.Context()) != nil || inputs.ai.ValidateFrozen(t.Context()) != nil || a.verifyFullFiles(t.Context()) != nil {
+		t.Fatal("rejected native component changed actual original inputs")
+	}
+	t.Log("actual_fresh_rw_scope=true missing_external_qualification_rejected=true sql_commit_attempts=0 mongo_commit_attempts=0 original_business_source_and_mq_unchanged=true")
 }

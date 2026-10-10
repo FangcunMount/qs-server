@@ -125,7 +125,7 @@ func TestHistoryWriteMaterialManifestFromOriginalClosedSpoolsAndJournals(t *test
 	}
 	raw, _ := os.ReadFile(filepath.Join(j.path, "history.materials.private.json"))
 	var m historyTemporaryMaterialManifest
-	if strictDecode(raw, &m) != nil || rawHash(raw) != hash || m.MaxSpoolBytes != 16<<30 || m.JournalSequence != 2 || len(m.Files) != 4 {
+	if strictDecode(raw, &m) != nil || rawHash(raw) != hash || m.Version != 1 || m.MaxSpoolBytes != 16<<30 || m.JournalSequence != 2 || len(m.Files) != 4 {
 		t.Fatal("actual member manifest")
 	}
 	for _, v := range m.Files {
@@ -140,6 +140,55 @@ func TestHistoryWriteMaterialManifestFromOriginalClosedSpoolsAndJournals(t *test
 	}
 	if strings.Contains(string(raw), "private-body") || strings.Contains(string(raw), "complete") || strings.Contains(string(raw), "permission") {
 		t.Fatal("descriptor exposed body or authority")
+	}
+}
+
+func TestHistoryWriteMaterialManifestUsesSevenInputProtocolOnly(t *testing.T) {
+	for _, kind := range []string{"seven", "six", "mixed"} {
+		t.Run(kind, func(t *testing.T) {
+			testSource(t)
+			j, err := newHistoryWriteJournal(filepath.Join(privateTestDir(t), "write"), &approvedInputs{request: historyRequest{SourceSHA: sourceSHA, OperationID: "100-1", RunID: "101-1"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if j.dir.Close() != nil {
+					t.Error("journal close")
+				}
+			}()
+			fixed := historyInitialInputNames()
+			names := append([]string(nil), fixed[:]...)
+			if kind != "six" {
+				names = append(names, historyInputOwnerSQLName)
+			}
+			if kind == "mixed" {
+				names = append(names, "prepared-mongo-private.bin", "prepared-sql-private.bin")
+			}
+			for _, name := range names {
+				f, e := j.create(name)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if f.Sync() != nil || f.Close() != nil {
+					t.Fatal("original input close")
+				}
+			}
+			if j.record(t.Context(), "initial_inputs_matched", -1, 0, nil) != nil {
+				t.Fatal("original journal")
+			}
+			hash, err := j.snapshotMaterials(t.Context())
+			if kind != "seven" {
+				if err == nil || hash != "" {
+					t.Fatal("partial or mixed producer protocol admitted")
+				}
+				return
+			}
+			raw, err := os.ReadFile(filepath.Join(j.path, "history.materials.private.json"))
+			var manifest historyTemporaryMaterialManifest
+			if err != nil || hash != rawHash(raw) || strictDecode(raw, &manifest) != nil || manifest.Version != 2 || len(manifest.Files) != 8 || manifest.Files[6].Name != historyInputOwnerSQLName || manifest.JournalSequence != 1 {
+				t.Fatal("actual seven-input manifest not bound")
+			}
+		})
 	}
 }
 
@@ -185,5 +234,16 @@ func TestHistoryWriteMaterialManifestRejectsUnregisteredOrReplacedObjects(t *tes
 				t.Fatal("failed source published descriptor")
 			}
 		})
+	}
+}
+
+func TestBoundedHistoryWriterDoesNotOpenScopeFromEmptyPrivateInputs(t *testing.T) {
+	var host historyDatabase
+	if _, report, err := host.writeHistoricalAI(t.Context(), nil, nil); err == nil || report.CommitState != "not_attempted" || report.ActualSQLCommitResponse {
+		t.Fatal("empty AI private capability opened write scope")
+	}
+	sql, mongo, refs, report, err := host.writeHistoricalComponent(t.Context(), nil, nil, nil, 0, nil, nil, nil)
+	if err == nil || len(sql) != 0 || mongo != nil || refs != 0 || report.ActualSQLCommitResponse || report.ActualMongoCommitResponse || report.DropReady || report.CASComplete {
+		t.Fatal("empty fresh component promoted effect or commit")
 	}
 }

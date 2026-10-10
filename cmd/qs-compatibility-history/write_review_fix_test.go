@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -43,7 +42,7 @@ func TestEvidenceWriteMongoNotRequiredNeverCallsClientCommit(t *testing.T) {
 	j := commitUnitJournal(t)
 	s := &commitCallSession{response: errors.New("must not be reached")}
 	p := preparedWriteDiagnostic{ActualSQLCommitResponse: true, MongoCommitRequirement: "not_required"}
-	if err := commitPreparedMongo(t.Context(), s, j, &p); err != nil {
+	if err := commitPreparedMongo(t.Context(), s, j, &p, -1); err != nil {
 		t.Fatal(err)
 	}
 	if s.calls != 0 || p.ActualMongoCommitResponse || p.CommitState != "sql_committed_mongo_not_required" {
@@ -69,7 +68,7 @@ func TestEvidenceWriteMongoRequiredKeepsUnknownAndJournalFailure(t *testing.T) {
 			if kind == "journal_failed" {
 				j.unknown = true
 			}
-			err := commitPreparedMongo(t.Context(), s, j, &p)
+			err := commitPreparedMongo(t.Context(), s, j, &p, -1)
 			if s.calls != 1 || !p.ActualSQLCommitResponse {
 				t.Fatal("actual SQL response hidden or duplicate Mongo commit")
 			}
@@ -107,7 +106,7 @@ func TestEvidenceWriteNotRequiredRejectsEventWorkAndUnknownJournal(t *testing.T)
 			case "journal_unknown":
 				j.unknown = true
 			}
-			if commitPreparedMongo(t.Context(), s, j, &p) == nil || s.calls != 0 {
+			if commitPreparedMongo(t.Context(), s, j, &p, -1) == nil || s.calls != 0 {
 				t.Fatal("contradictory/no-journal skip admitted")
 			}
 		})
@@ -119,7 +118,7 @@ func TestEvidenceWriteCompletionRequiresTrueCommitAndCompleteReadback(t *testing
 	if !evidenceWriteCompleted(ai, nil) || !evidenceWriteCompleted(events, nil) {
 		t.Fatal("real scoped success rejected")
 	}
-	for _, kind := range []string{"fake_mongo", "wrong_state", "missing_ai_readback", "third_origin_failed", "unknown_requirement", "page_missing"} {
+	for _, kind := range []string{"fake_mongo", "wrong_state", "missing_ai_readback", "independent_readback_failed", "unknown_requirement", "page_missing"} {
 		t.Run(kind, func(t *testing.T) {
 			r := ai
 			var err error
@@ -130,8 +129,8 @@ func TestEvidenceWriteCompletionRequiresTrueCommitAndCompleteReadback(t *testing
 				r.CommitState = "both_responses_success_non_atomic"
 			case "missing_ai_readback":
 				r.AICommandPersistenceComplete = false
-			case "third_origin_failed":
-				err = fixedError("history_write_actual_origin_readback_failed")
+			case "independent_readback_failed":
+				err = fixedError("history_write_independent_readback_failed")
 			case "unknown_requirement":
 				r.MongoCommitRequirement = "undetermined"
 			case "page_missing":
@@ -142,12 +141,5 @@ func TestEvidenceWriteCompletionRequiresTrueCommitAndCompleteReadback(t *testing
 				t.Fatal("incomplete/contradictory commit/readback promoted")
 			}
 		})
-	}
-}
-func TestEvidenceWriteOriginReadbackRequiresActualOpaqueSecondEpoch(t *testing.T) {
-	for _, a := range []*retirement.FreshRecheckAnchor{nil, {}} {
-		if verifyWrittenSourceOrigin(t.Context(), &approvedInputs{}, a, &retirement.SQLResponsibilitySnapshot{}, &retirement.MongoResponsibilitySnapshot{}) == nil {
-			t.Fatal("missing native source epoch accepted")
-		}
 	}
 }

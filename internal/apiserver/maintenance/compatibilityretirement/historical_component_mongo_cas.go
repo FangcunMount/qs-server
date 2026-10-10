@@ -167,8 +167,8 @@ func (*MongoHistoricalComponentStatement) String() string {
 	return "private physical Mongo component statement; source/SQL/AI/commit unproven"
 }
 
-func mongoHistoricalComponentMergedPlan(o *MongoHistoricalComponentObservation) (*MongoHistoricalBatchCASPlan, error) {
-	if o == nil || o.component == nil || len(o.frames) != len(o.component.inputs) {
+func mongoHistoricalComponentMergedPlan(o *MongoHistoricalComponentObservation, fresh ...[]mongoCASAttachmentFacts) (*MongoHistoricalBatchCASPlan, error) {
+	if o == nil || o.component == nil || len(o.frames) != len(o.component.inputs) || len(fresh) > 1 {
 		return nil, ErrMongoBatchCAS
 	}
 	read := o.component.inputs[0].mongoRead
@@ -310,10 +310,53 @@ func mongoHistoricalComponentMergedPlan(o *MongoHistoricalComponentObservation) 
 			}
 		}
 	}
-	if len(p.groups) == 0 || len(p.groups) > 512 || len(p.attachments) == 0 || len(p.attachments) > 512 {
+	// Fresh attachments are supplied only by the private genuine component
+	// qualifier below. They never come from a public JSON or planning recipe.
+	if len(fresh) == 1 {
+		for _, a := range fresh[0] {
+			if a.entry.Validate() != nil || a.entry.Source.Database != "mongodb" || !mongoCASHistoryIndex(o.input.metadata, a.collection, a.slot) || register(a) != nil {
+				return nil, ErrMongoBatchCAS
+			}
+			raw, err := mongoCASRow(p.before, a.collection, a.id)
+			if err != nil || raw.Lookup("_id").Type != bson.TypeObjectID {
+				return nil, ErrMongoBatchCAS
+			}
+			key := mongoCASKey(a.collection, a.id) + ":" + a.slot
+			position, exists := groupPositions[key]
+			if !exists {
+				set, err := mongoCASSet(raw, a.slot)
+				if err != nil {
+					return nil, err
+				}
+				position = len(p.groups)
+				p.groups = append(p.groups, mongoCASGroup{collection: a.collection, slot: a.slot, id: a.id, pk: raw.Lookup("_id"), set: set})
+				groupPositions[key] = position
+			}
+			g := &p.groups[position]
+			var priorEntries []evidence.HistoricalReferenceEntryV1
+			if g.set != nil {
+				priorEntries = g.set.Entries
+			}
+			for _, prior := range priorEntries {
+				if prior.EventType != a.entry.EventType || prior.Proof.BusinessBindingSHA256 != a.entry.Proof.BusinessBindingSHA256 || !reflect.DeepEqual(prior.Run, a.entry.Run) {
+					return nil, ErrMongoBatchConflict
+				}
+			}
+			next, err := g.set.Append(a.entry)
+			encoded, marshalErr := bson.Marshal(next)
+			if err != nil || marshalErr != nil || len(encoded) > evidence.HistoricalReferenceMaxBytes {
+				return nil, ErrMongoBatchBounds
+			}
+			g.set, g.entries = next, append(g.entries, a.entry.Clone())
+			p.attachments = append(p.attachments, a)
+		}
+	}
+	if len(p.groups) > 512 || len(p.attachments) > 512 || len(fresh) == 0 && (len(p.groups) == 0 || len(p.attachments) == 0) {
 		return nil, ErrMongoBatchBounds
 	}
-	p.originalSQLRows = mongoOwnerHashParts(sqlRows...)
+	if len(sqlRows) != 0 {
+		p.originalSQLRows = mongoOwnerHashParts(sqlRows...)
+	}
 	return p, nil
 }
 

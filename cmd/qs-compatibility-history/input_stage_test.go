@@ -54,7 +54,7 @@ func TestHistoryInitialInputsClosedMaterialSet(t *testing.T) {
 				t.Fatal(err)
 			}
 			hash, err := j.snapshotMaterials(t.Context())
-			if kind == "foreign" || kind == "partial_input" || kind == "owner_only" {
+			if kind != "input_and_owner" {
 				if err == nil || hash != "" {
 					t.Fatal("partial or foreign members accepted")
 				}
@@ -65,7 +65,7 @@ func TestHistoryInitialInputsClosedMaterialSet(t *testing.T) {
 			}
 			raw, e := os.ReadFile(filepath.Join(j.path, "history.materials.private.json"))
 			var manifest historyTemporaryMaterialManifest
-			if e != nil || json.Unmarshal(raw, &manifest) != nil || len(manifest.Files) != len(selected)+1 {
+			if e != nil || json.Unmarshal(raw, &manifest) != nil || manifest.Version != 2 || len(manifest.Files) != 8 || manifest.Files[6].Name != historyInputOwnerSQLName || manifest.JournalSequence != 1 {
 				t.Fatal("original producer closed list missing")
 			}
 		})

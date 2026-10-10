@@ -11,9 +11,11 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -474,12 +476,15 @@ type HistoricalComponentSourceSummary struct {
 // reads. Its private rows are candidates, never portable write permission.
 // The host owns the existing SQL transaction and Mongo session throughout.
 type HistoricalComponentObservation struct {
-	self    *HistoricalComponentObservation
-	source  *HistoricalComponentSourceObservation
-	ai      *AIReverseSnapshot
-	rows    []qualifiedCASRow
-	expires time.Time
-	seal    string
+	applyMu  sync.Mutex
+	applied  bool
+	self     *HistoricalComponentObservation
+	source   *HistoricalComponentSourceObservation
+	ai       *AIReverseSnapshot
+	rows     []qualifiedCASRow
+	expires  time.Time
+	nativeRW bool
+	seal     string
 }
 
 type HistoricalComponentObservationSummary struct {
@@ -503,7 +508,7 @@ func (o *HistoricalComponentObservation) digest() string {
 	if o == nil || o.source == nil || o.ai == nil || len(o.rows) == 0 {
 		return ""
 	}
-	parts := []string{"historical-fresh-component-candidates/v1", o.source.seal, o.source.rowsSHA, o.ai.report.DataSHA256, o.expires.UTC().Format(time.RFC3339Nano)}
+	parts := []string{"historical-fresh-component-candidates/v1", o.source.seal, o.source.rowsSHA, o.ai.report.DataSHA256, o.expires.UTC().Format(time.RFC3339Nano), strconv.FormatBool(o.nativeRW)}
 	for _, row := range o.rows {
 		if row.sourceObservation != o.source || row.facts == nil || qualifiedCASSourceMatches(row.facts, row.candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
 			return ""
@@ -559,7 +564,9 @@ func PrepareHistoricalComponentObservation(parent context.Context, component *Hi
 	if err != nil {
 		return nil, err
 	}
-	o := &HistoricalComponentObservation{source: source, ai: currentAI, rows: rows, expires: expires}
+	// Each actual SQL constructor above has already verified and sealed this
+	// native mode, including FOR UPDATE of its selected dependency image.
+	o := &HistoricalComponentObservation{source: source, ai: currentAI, rows: rows, expires: expires, nativeRW: writable}
 	o.self, o.seal = o, o.digest()
 	if o.ValidateBorrowedObservation(ctx) != nil {
 		return nil, ErrSourceOriginFresh
@@ -577,6 +584,110 @@ func (o *HistoricalComponentObservation) ValidateBorrowedObservation(parent cont
 		return ErrSourceOriginFresh
 	}
 	return nil
+}
+
+// ApplyQualifiedHistoricalComponent is the only production composition that
+// reaches the lower-level physical adapters. Frozen recipes, reports and
+// serialized receipts cannot enter it. DROP and whole-writer fence remain
+// separate host gates; this proves only actual related component obligations.
+func ApplyQualifiedHistoricalComponent(ctx context.Context, o *HistoricalComponentObservation, external *AIExternalExecutionQualification, persistedAI *AICommandPersistenceBatch) ([]*sqlevaluation.SQLHistoricalComponentStatement, *MongoHistoricalComponentStatement, uint64, error) {
+	if o == nil {
+		return nil, nil, 0, ErrCoordinatorCASQualification
+	}
+	o.applyMu.Lock()
+	defer o.applyMu.Unlock()
+	if o.applied || !o.nativeRW || o.ValidateBorrowedObservation(ctx) != nil || !o.source.sqlNegative || !o.source.mongoNegative {
+		return nil, nil, 0, ErrCoordinatorCASQualification
+	}
+	// Actual native related responsibility/admission and AI producers run before any
+	// evidence preparation and once again immediately before the first effect.
+	if validateHistoricalComponentResponsibilityClosure(ctx, o) != nil || ValidateHistoricalComponentAI(ctx, o, external, persistedAI) != nil {
+		return nil, nil, 0, ErrCoordinatorCASQualification
+	}
+	var sqlAttachments = make([][]sqlevaluation.SQLHistoricalBatchAttachment, len(o.source.sql))
+	var mongoAttachments []mongoCASAttachmentFacts
+	verifiedAt := time.Now().UTC().Truncate(time.Millisecond)
+	for _, row := range o.rows {
+		entry, err := qualifiedCASReferenceEntry(o.source.component.inputs[0].binding, row, verifiedAt, "actual-fresh-owner-component-source-business-related-ai")
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		if row.facts.Source.Database == "mysql" {
+			assessment, outcome, err := qualifiedCASOwnerIDs(row.facts, row.candidate)
+			if err != nil {
+				return nil, nil, 0, err
+			}
+			selected := -1
+			for i, input := range o.source.component.inputs {
+				ids, e := input.sqlRecipe.SourceEventIDs()
+				if e != nil {
+					return nil, nil, 0, e
+				}
+				if slices.Contains(ids, entry.EventID) {
+					view, e := o.source.sql[i].SemanticView(ctx)
+					if e != nil {
+						return nil, nil, 0, e
+					}
+					if _, e = view.OwnerByAssessment(ctx, assessment); e == nil {
+						selected = i
+						break
+					}
+				}
+			}
+			if selected < 0 {
+				return nil, nil, 0, ErrCoordinatorCASQualification
+			}
+			sqlAttachments[selected] = append(sqlAttachments[selected], sqlevaluation.SQLHistoricalBatchAttachment{AssessmentID: assessment, OutcomeID: outcome, Entry: entry, ContentDigest: row.facts.ContentDigest})
+		} else {
+			id, err := strconv.ParseUint(row.candidate.OwnerID, 10, 64)
+			if err != nil || id == 0 {
+				return nil, nil, 0, ErrCoordinatorCASQualification
+			}
+			name, slot := "answersheets", "legacy_submission_evidence"
+			if row.facts.EventType == "interpretation.report.generated" {
+				name, slot = "report_generations", "historical_generated_evidence"
+			} else if row.facts.EventType != "answersheet.submitted" {
+				return nil, nil, 0, ErrSourceEventType
+			}
+			mongoAttachments = append(mongoAttachments, mongoCASAttachmentFacts{collection: name, slot: slot, id: id, entry: entry, content: row.facts.ContentDigest})
+		}
+	}
+	mongoPlan, err := mongoHistoricalComponentMergedPlan(o.source.mongo, mongoAttachments)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	mongoPlan.originalSQLIdentity = o.source.pair.second.sqlIdentity
+	if o.ValidateBorrowedObservation(ctx) != nil || validateHistoricalComponentResponsibilityClosure(ctx, o) != nil || ValidateHistoricalComponentAI(ctx, o, external, persistedAI) != nil {
+		return nil, nil, 0, ErrCoordinatorCASQualification
+	}
+	o.applied = true // Any partial/unknown statement result forbids reuse.
+	var statements []*sqlevaluation.SQLHistoricalComponentStatement
+	for i, attachments := range sqlAttachments {
+		if len(attachments) == 0 {
+			continue
+		}
+		statement, err := o.source.sql[i].ApplyHistoricalAttachments(ctx, attachments)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		statements = append(statements, statement)
+	}
+	var mongoStatement *MongoHistoricalComponentStatement
+	if mongoPlan != nil {
+		o.source.mongo.applyMu.Lock()
+		defer o.source.mongo.applyMu.Unlock()
+		if o.source.mongo.applied || o.source.mongo.validate(ctx) != nil {
+			return nil, nil, 0, ErrMongoHistoricalComponentEpoch
+		}
+		o.source.mongo.applied = true
+		statement, err := mongoPlan.apply(ctx)
+		if err != nil || o.source.mongo.validate(ctx) != nil {
+			return nil, nil, 0, ErrMongoHistoricalComponentEpoch
+		}
+		mongoStatement = &MongoHistoricalComponentStatement{physical: o.source.mongo, statement: statement, expected: mongoCASCloneData(statement.expected)}
+		mongoStatement.self, mongoStatement.seal = mongoStatement, mongoCASHash(mongoStatement.expected, o.source.mongo.metadata)
+	}
+	return statements, mongoStatement, uint64(len(o.rows)), nil
 }
 
 func (o *HistoricalComponentObservation) Summary() HistoricalComponentObservationSummary {
@@ -1413,7 +1524,7 @@ func qualifiedHistoricalComponentBusinessRows(ctx context.Context, o *Historical
 			candidate.ActualOriginalRun, candidate.BusinessBindingSHA256, candidate.LocalQualified = local.OriginalRun, local.BusinessBindingSHA256, true
 			row.bindingSHA = local.BusinessBindingSHA256
 		}
-		candidate.RequiredAdapters = append(candidate.RequiredAdapters, "fresh_component_sql_source_negative_closure", "fresh_component_mongo_owner_source_negative_closure", "fresh_component_writer_fence", "fresh_component_global_current_message_closure", "fresh_component_ai_closure")
+		candidate.RequiredAdapters = append(candidate.RequiredAdapters, "fresh_component_sql_source_negative_closure", "fresh_component_mongo_owner_source_negative_closure", "fresh_component_native_admission_closure", "fresh_component_related_current_message_closure", "fresh_component_related_ai_closure")
 		row.candidate = candidate
 		if qualifiedCASSourceMatches(source, candidate) != nil || !evidence.ValidSHA256(row.bindingSHA) {
 			return nil, ErrCoordinatorCASQualification

@@ -469,6 +469,17 @@ func (p *MongoHistoricalBatchCASPlan) Apply(ctx context.Context) (*MongoHistoric
 	if p == nil || p.db == nil || len(p.groups) == 0 || ctx == nil || time.Now().After(p.expires) {
 		return nil, ErrMongoBatchCAS
 	}
+	return p.apply(ctx)
+}
+
+// The genuine component qualifier also uses this private physical core when
+// its event is stored in SQL: Mongo dependencies still require actual writes
+// to reject a stale snapshot. The public attachment factory and Apply guards
+// retain their original nonempty-evidence requirements.
+func (p *MongoHistoricalBatchCASPlan) apply(ctx context.Context) (*MongoHistoricalBatchCASStatement, error) {
+	if p == nil || p.db == nil || ctx == nil || ctx.Err() != nil || time.Now().After(p.expires) {
+		return nil, ErrMongoBatchCAS
+	}
 	transaction, err := mongoCycleTransaction(ctx, p.db)
 	if err != nil {
 		return nil, err

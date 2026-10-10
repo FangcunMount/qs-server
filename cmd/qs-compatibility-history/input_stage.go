@@ -17,7 +17,7 @@ import (
 )
 
 // This replaces the initial two full reads of the bounded write host. It must
-// not be appended to executePipeline/buildPreparedWriteEpoch. It returns pure
+// replace the old long-transaction evidence writer. It returns pure
 // input only: the root host must independently qualify each fresh component.
 type historyInitialInputs struct {
 	sources      *retirement.HistoricalSourceInputPair
