@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,58 @@ func TestAIExternalRuntimeRequiresActualImmutableSourceAndStableContainer(t *tes
 	if r.matches(in) {
 		t.Fatal("writable protected runtime mount admitted")
 	}
+}
+
+func TestAIExternalRuntimeMountOrderPreservesExactSnapshotSemantics(t *testing.T) {
+	in := AIExternalExecutionInput{RuntimeSourceSHA: strings.Repeat("a", 40), ImageID: "sha256:" + strings.Repeat("b", 64), ContainerID: strings.Repeat("c", 64)}
+	before := aiExternalRuntime{ContainerID: in.ContainerID, ImageID: in.ImageID, Name: "/qs-ai", Status: "running", StartedAt: "2026-10-09T00:00:00Z", Running: true, ReadOnlyRoot: true, Command: []string{"/app/.venv/bin/python", "-m", "qs_ai.bootstrap.server"}, ContainerRevision: in.RuntimeSourceSHA, ImageRevision: in.RuntimeSourceSHA,
+		Mounts: []aiExternalMount{{Type: "tmpfs", Destination: "/tmp", RW: true}, {Type: "bind", Source: "/private/qs-ai.key", Destination: "/run/qs-ai-tls/qs-ai.key"}, {Type: "bind", Source: "/private/ca-chain.crt", Destination: "/run/qs-ai-tls/ca-chain.crt"}}}
+	if err := before.orderMounts(); err != nil || !before.matches(in) {
+		t.Fatal("exact observed runtime rejected")
+	}
+	copyRuntime := func() aiExternalRuntime {
+		v := before
+		v.Mounts = append([]aiExternalMount(nil), before.Mounts...)
+		v.Command = append([]string(nil), before.Command...)
+		return v
+	}
+	after := copyRuntime()
+	after.Mounts[0], after.Mounts[2] = after.Mounts[2], after.Mounts[0]
+	if err := after.orderMounts(); err != nil || !after.matches(in) || !reflect.DeepEqual(before, after) {
+		t.Fatal("unchanged mount set depended on inspect iteration order")
+	}
+	for _, row := range []struct {
+		name   string
+		mutate func(*aiExternalRuntime)
+	}{
+		{"source", func(v *aiExternalRuntime) { v.Mounts[0].Source = "/private/other.crt" }},
+		{"type", func(v *aiExternalRuntime) { v.Mounts[0].Type = "volume" }},
+		{"rw", func(v *aiExternalRuntime) { v.Mounts[0].RW = true }},
+		{"destination", func(v *aiExternalRuntime) { v.Mounts[0].Destination = "/run/qs-ai-tls/qs-ai-fullchain.crt" }},
+		{"container", func(v *aiExternalRuntime) { v.ContainerID = strings.Repeat("d", 64) }},
+		{"image", func(v *aiExternalRuntime) { v.ImageID = "sha256:" + strings.Repeat("e", 64) }},
+		{"started_at", func(v *aiExternalRuntime) { v.StartedAt = "2026-10-09T00:00:01Z" }},
+		{"restart", func(v *aiExternalRuntime) { v.Restarts++ }},
+		{"argv_order", func(v *aiExternalRuntime) { v.Command[0], v.Command[1] = v.Command[1], v.Command[0] }},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			changed := copyRuntime()
+			row.mutate(&changed)
+			if err := changed.orderMounts(); err != nil {
+				t.Fatal("distinct destinations unexpectedly rejected")
+			}
+			if reflect.DeepEqual(before, changed) {
+				t.Fatal("normalization hid an observed runtime change")
+			}
+		})
+	}
+	t.Run("duplicate_destination", func(t *testing.T) {
+		changed := copyRuntime()
+		changed.Mounts = append(changed.Mounts, changed.Mounts[0])
+		if err := changed.orderMounts(); err != ErrAIExternalRuntime || changed.matches(in) {
+			t.Fatal("duplicate mount destination admitted")
+		}
+	})
 }
 
 func TestAIExternalCurrentObservationKeepsSettingsPrivateAndCannotStop(t *testing.T) {

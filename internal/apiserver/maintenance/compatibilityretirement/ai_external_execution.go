@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -141,6 +142,17 @@ type aiExternalRuntime struct {
 	Restarts                                                                        int64
 	Entrypoint, Command                                                             []string
 	Mounts                                                                          []aiExternalMount
+}
+
+func (r *aiExternalRuntime) orderMounts() error {
+	// Docker inspect builds Mounts from a map; only the set has stable meaning.
+	sort.Slice(r.Mounts, func(i, j int) bool { return r.Mounts[i].Destination < r.Mounts[j].Destination })
+	for i := 1; i < len(r.Mounts); i++ {
+		if r.Mounts[i-1].Destination == r.Mounts[i].Destination {
+			return ErrAIExternalRuntime
+		}
+	}
+	return nil
 }
 
 // The only factory performs the real fixed producer call below. A received
@@ -617,6 +629,9 @@ func (d *aiExternalDockerExecutor) inspect(ctx context.Context, id string) (aiEx
 	var imageID string
 	if len(fields) != 2 || json.Unmarshal([]byte(fields[0]), &imageID) != nil || json.Unmarshal([]byte(fields[1]), &r.ImageRevision) != nil || imageID != r.ImageID {
 		return r, ErrAIExternalRuntime
+	}
+	if err := r.orderMounts(); err != nil {
+		return r, err
 	}
 	return r, nil
 }
