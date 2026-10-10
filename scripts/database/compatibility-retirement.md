@@ -126,6 +126,15 @@ conclusions already stored in business records. Missing, conflicting or changed
 references fail. Verification does not apply another CAS, create IDs or resend
 commands. Both borrowed database scopes end before later DDL.
 
+Recovery journal ancestry binds each originally opened directory FD to its
+device/inode, owner and mode, and rechecks each original parent/name without
+following symlinks. Unrelated ancestor siblings may change that ancestor's link
+count; the private journal leaf still checks its original link count on both FD
+and named-path observations. Stored files retain their strict link count,
+physical identity, full content digest and read-after-read checks. The B journal's
+37-entry contract, exact migration filenames, kind validation and original
+recovery responsibilities are unchanged.
+
 Final AI verification has a separate fixed journal. It requires the original
 verify execution to be known successful and independently checks its actual
 Engine/exec identity before starting a fresh final read. An unknown original
@@ -201,10 +210,27 @@ response, driver Abort/EndSession and SQL rollback, then rechecks the original
 window binding and external isolation. This observation cannot serialize into
 an acceptance or full-writer token. The two database epochs are not a globally
 simultaneous snapshot; actual drift is reported. Real loaded broker endpoints,
-authentication/network/subscription and consumer facts, controlled D runtime and
-all eight material scopes still require their own native producers. Existing
-native receipts retain their original source and do not certify this component.
-Lifecycle effects remain closed until the complete original gates are satisfied.
+authentication/network/subscription and consumer facts and all eight material
+scopes still require their own native producers. Existing native receipts retain
+their original source and do not certify this component.
+
+The controlled-runtime hook follows those ledger reads and repeated stopped/fence
+checks. It consumes the retained pre-FIRST-B comparison, then uses the original
+local/D leases and signed existing D channel to resume and read back only the
+approved dependents. It rechecks the B API and external fence, and still ends in
+an explicit missing-producer failure. No successful health or read count can
+create complete acceptance or activate the lifecycle effects.
+
+The D material producer requires that same native controller's actual owned-file
+zero before closing its original child. A private terminal fact then requires
+successful original Wait/ProcessState, a fresh absent process group, closed
+original pipes and the same Window/request/issuer/material owners. Ordinary
+phases still require the original child live; only the dedicated terminal phase
+validates that fact before and after the existing platform/intent checks.
+Unknown exit, unissued/foreign zero, failed cleanup or changed ownership remain
+blocking. This component does not establish the remaining A cleanup, broker,
+full writer isolation or complete eight-scope acceptance. Real Linux/root/SSH
+execution of this combination remains unverified; lifecycle effects stay closed.
 
 The current platform reader independently checks the approved workflow roster,
 current run/job/runner, five unfinished run states and fixed main SHA twice.

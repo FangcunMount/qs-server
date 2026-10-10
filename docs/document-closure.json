@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
+    "sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
     "verified_on": "2026-10-10"
   },
   "status_policy": {
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
+        "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
@@ -11304,7 +11304,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
+        "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
         "verified_on": "2026-10-10"
       },
       "fact_sources": [
@@ -11639,6 +11639,18 @@
         {
           "kind": "source",
           "path": "internal/apiserver/infra/mysql/aibridge/runtime_messaging*.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_controlled_runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_d_terminal.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_recovery_resume.go"
         }
       ],
       "verification": [
@@ -12607,6 +12619,30 @@
           "selector": "func ReadCurrentMessagingOrganization",
           "result": "matched",
           "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_controlled_runtime.go",
+          "selector": "func (h *lifecycleFixedHost) observeControlledAfterDataComparison",
+          "result": "matched",
+          "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-compatibility-retirement/lifecycle_d_terminal.go",
+          "selector": "func (h *lifecycleFixedHost) closePurgedOriginalD",
+          "result": "matched",
+          "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
+          "verified_on": "2026-10-10"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_recovery_resume.go",
+          "selector": "leaf := i == len(dirs)-1",
+          "result": "matched",
+          "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
           "verified_on": "2026-10-10"
         }
       ],
