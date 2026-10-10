@@ -810,6 +810,7 @@ jobs:
           python3 -B scripts/database/test-compatibility-window-tool.py
           python3 -B scripts/database/test-compatibility-platform-fence.py
           python3 -B scripts/database/test-compatibility-platform-window-action.py
+          python3 -B scripts/database/test-compatibility-s0-exact-exit.py
           python3 -B scripts/database/test-compatibility-host-writer-scope.py
           python3 -B scripts/database/test-compatibility-db-writer-census.py
           python3 -B scripts/database/test-compatibility-evidence-write-inputs.py

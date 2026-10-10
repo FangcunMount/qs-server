@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import os
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import time
@@ -149,6 +151,20 @@ class ExactExit(unittest.TestCase):
     def test_empty_real_approval_is_rejected_before_effect(self):
         with self.assertRaises(s0.Rejected):s0.approved(b'{}\n',s0.sha(b'{}\n'),'a'*40)
         self.assertEqual(len(list(self.output.iterdir())),2)
+
+    def test_finite_packet_rejection_does_not_wait_for_control_eof(self):
+        # The real caller keeps stdin open as its native cancellation channel.
+        # Only the fixture child's UID probes are replaced; no remote call runs.
+        program='import os\nos.getuid=lambda:0\nos.geteuid=lambda:0\n'+s0.BOOTSTRAP
+        child=subprocess.Popen([sys.executable,'-I','-c',program],stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        try:
+            child.stdin.write(b'{}\n');child.stdin.flush()
+            self.assertEqual(child.wait(timeout=3),1)
+            self.assertIn(b'unknown_or_refused',child.stdout.read())
+        finally:
+            if child.poll() is None:child.kill();child.wait(timeout=3)
+            for stream in (child.stdin,child.stdout,child.stderr):stream.close()
 
 
 if __name__=='__main__':unittest.main()
