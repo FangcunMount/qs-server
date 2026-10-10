@@ -1,6 +1,7 @@
 package process
 
 import (
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
@@ -11,7 +12,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
+	"github.com/FangcunMount/qs-server/internal/pkg/runtimefacts"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
+	"github.com/FangcunMount/qs-server/pkg/version"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -22,7 +25,8 @@ type server struct {
 	// 优雅关闭管理器
 	gs *shutdown.GracefulShutdown
 	// 配置
-	config *config.Config
+	config       *config.Config
+	runtimeFacts *runtimefacts.Owner
 }
 
 // preparedServer 定义了准备运行的 API 服务器
@@ -30,6 +34,7 @@ type preparedServer struct {
 	startShutdown func() error
 	httpServer    *genericapiserver.GenericAPIServer
 	grpcServer    *grpcpkg.Server
+	runtimeFacts  *runtimefacts.Owner
 }
 
 type resourceHandles struct {
@@ -88,9 +93,14 @@ func createServer(cfg *config.Config) (*server, error) {
 	// 创建一个 GracefulShutdown 实例
 	gs := shutdown.New()
 	gs.AddShutdownManager(posixsignal.NewPosixSignalManager())
+	facts, factsErr := runtimefacts.New("apiserver", version.Get().GitCommit)
+	if factsErr != nil {
+		log.Warn("private runtime facts unavailable")
+	}
 
 	return &server{
-		gs:     gs,
-		config: cfg,
+		gs:           gs,
+		config:       cfg,
+		runtimeFacts: facts,
 	}, nil
 }

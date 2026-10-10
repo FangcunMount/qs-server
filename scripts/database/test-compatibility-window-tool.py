@@ -50,6 +50,12 @@ class WindowToolMetadata(unittest.TestCase):
             with self.subTest(name=name):
                 r=self.request();r[name]=None;a=self.approval(r)
                 with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+    def test_original_run_and_cross_operation_template_cannot_be_reused(self):
+        r=self.request();a=self.approval(r)
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'11-1')
+        for key,value in (('operation_id','99-1'),('original_source_sha','e'*40),('manifest_sha256','e'*64)):
+            q=copy.deepcopy(r);q[key]=value;a['request_template_sha256']=tool.digest(tool.canonical(q))
+            with self.subTest(key=key),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(q),a,'22-3')
     def final_history(self):
         root='/opt/backups/qs-server/compatibility-retirement/12-1/'
         return dict(assets_directory='/opt/qs-server/retirement-assets',runtime_source_sha='a'*40,image_id='sha256:'+'b'*64,container_id='c'*64,runtime_binding_sha256='d'*64,ai_bounds=dict(path=root+'ai.json',sha256='1'*64),peer_bounds=dict(path=root+'peer.json',sha256='2'*64),protection=dict(path=root+'protection.json',sha256='3'*64))
@@ -336,5 +342,122 @@ print('actual-hup-local-terminal')
 """
         result=subprocess.run([sys.executable,'-c',script,str(Path(__file__).with_name('compatibility-window-tool.py')),self.fixture()],capture_output=True,timeout=8,check=True)
         self.assertEqual(result.stdout,b'actual-hup-local-terminal\n')
+
+class RootTemplateStaging(unittest.TestCase):
+    request=WindowToolMetadata.request
+    approval=WindowToolMetadata.approval
+    def test_exact_per_actual_run_intents_derive_only_current_run_and_preserve_originals(self):
+        import io,os,subprocess,tarfile,tempfile
+        from unittest import mock
+        original_uid=os.getuid()
+        with tempfile.TemporaryDirectory() as name:
+            local=Path(name).resolve();local.chmod(0o700)
+            prefix='/opt/backups/qs-server/'
+            def mapped(value):
+                value=str(value)
+                return Path(local/value[len(prefix):]) if value.startswith(prefix) else Path(value)
+            original=mapped(prefix+'compatibility-retirement/12-1');original.mkdir(parents=True,mode=0o700)
+            original.parent.chmod(0o700)
+            r=self.request();r['tool_source_sha']='d'*40;raw=tool.canonical(r);manifest=b'{"frozen":"manifest"}\n';r['manifest_sha256']=tool.digest(manifest);r['recovery']['manifest_sha256']=tool.digest(manifest)
+            raw=tool.canonical(r);a=self.approval(r);a['tool_source_sha']='d'*40;a['manifest_sha256']=tool.digest(manifest)
+            binary=b'private-offline-native-placeholder';a['tool_binary_sha256']={arch:tool.digest(binary) for arch in ('amd64','arm64')}
+            (original/'lifecycle-request-template.json').write_bytes(raw);(original/'lifecycle-request-template.json').chmod(0o600)
+            (original/'manifest.json').write_bytes(manifest);(original/'manifest.json').chmod(0o600)
+            producer_files={f'source-{i}':str(i).encode() for i in range(7)}
+            for asset,body in producer_files.items():
+                (original/asset).write_bytes(body);(original/asset).chmod(0o600)
+            before={p.name:p.read_bytes() for p in original.iterdir()}
+            archive=io.BytesIO()
+            with tarfile.open(fileobj=archive,mode='w:gz') as tar:
+                for member in ('compatibility-window-tool.py','receipt-transport.py','inventory-linux-amd64','inventory-linux-arm64'):
+                    body=binary if member.startswith('inventory-') else b'packaged source'
+                    info=tarfile.TarInfo(member);info.size=len(body);tar.addfile(info,io.BytesIO(body))
+            archive=archive.getvalue();approval=tool.canonical(a)
+            packet={'approval':approval[:-1].decode(),'credentials':{k:'' for k in tool.CREDENTIALS},'tool_directory':'/tmp/qs-independent-window-tool.ABCDEF','tool_program_sha256':'e'*64}
+            arguments=['prepare','12-1','22-3','d'*40,tool.digest(approval),tool.digest(archive),tool.digest(manifest),tool.digest(raw)]
+            native_calls=[]
+            def protected(path,*,create=False):
+                if create:path.mkdir(mode=0o700)
+                self.assertTrue(path.is_dir());self.assertEqual(path.stat().st_mode & 0o777,0o700)
+            def execve(native,argv,env):
+                invocation=mapped(prefix+'compatibility-retirement-invocations/12-1-'+arguments[2])
+                intent=tool.decode((invocation/'native-call.intent.private.json').read_bytes())
+                derived=(invocation/'lifecycle-request.json').read_bytes()
+                self.assertEqual(intent['derived_request_sha256'],tool.digest(derived))
+                self.assertEqual(intent['approved_template_sha256'],tool.digest(raw))
+                self.assertEqual(intent['original_run_id'],'11-1');self.assertEqual(intent['source_uid'],original_uid)
+                self.assertEqual(intent['drop_authority'],False)
+                self.assertEqual(argv[2],'lifecycle-prepare-root-once')
+                self.assertEqual(argv[4],str(invocation/'lifecycle-request.json'))
+                self.assertEqual(argv[6],tool.digest(derived))
+                self.assertEqual(env['QS_RETIREMENT_SOURCE_UID'],str(original_uid))
+                value=tool.decode(derived);expected=copy.deepcopy(r);expected['actual_run_id']=arguments[2];expected['recovery']['actual_run_id']=arguments[2]
+                self.assertEqual(value,expected);native_calls.append((arguments[2],intent,derived))
+                raise ChildProcessError('mocked native boundary')
+            # This test owns real temp files only; privilege and native owner
+            # are explicitly mocked, and never provide Linux/root proof.
+            owner=object();check=[(0,b'd'*40+b'\n')]
+            def run_owned(command,environment,**options):
+                self.assertIs(options['owner'],owner)
+                self.assertEqual(options['control'],tool.sys.stdin.fileno())
+                if command[1]=='--source-sha':return check[0]
+                return execve(command[0],command,environment)
+            with mock.patch.object(tool,'Path',side_effect=mapped),mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool.platform,'system',return_value='Linux'),mock.patch.object(tool.platform,'machine',return_value='aarch64'),mock.patch.object(tool,'protected_directory',side_effect=protected),mock.patch.object(tool,'LinuxChildOwner',return_value=owner),mock.patch.object(tool,'live_control'),mock.patch.object(tool,'owned_process',side_effect=run_owned):
+                arguments[2]='21-1';check[0]=(0,b'e'*40+b'\n')
+                with self.assertRaises(tool.Refused):tool.root_execute(arguments,packet,original_uid,archive)
+                self.assertEqual(native_calls,[])
+                rejected=mapped(prefix+'compatibility-retirement-invocations/12-1-21-1')
+                self.assertTrue((rejected/'native-call.intent.private.json').is_file())
+                self.assertFalse((rejected/'lifecycle-request.json').exists())
+                arguments[2]='22-3';check[0]=(0,b'd'*40+b'\n')
+                with self.assertRaises(ChildProcessError):tool.root_execute(arguments,packet,original_uid,archive)
+                first=native_calls[0][2]
+                with self.assertRaises(FileExistsError):tool.root_execute(arguments,packet,original_uid,archive)
+                self.assertEqual(len(native_calls),1)
+                arguments[2]='23-1'
+                with self.assertRaises(ChildProcessError):tool.root_execute(arguments,packet,original_uid,archive)
+                self.assertEqual(len(native_calls),2)
+                self.assertEqual((mapped(prefix+'compatibility-retirement-invocations/12-1-22-3')/'lifecycle-request.json').read_bytes(),first)
+            self.assertEqual(before,{p.name:p.read_bytes() for p in original.iterdir()})
+    def test_real_exclusive_write_never_overwrites_an_existing_receipt(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as name:
+            path=Path(name)/'request'
+            tool.write_new(path,b'first')
+            with self.assertRaises(FileExistsError):tool.write_new(path,b'second')
+            self.assertEqual(path.read_bytes(),b'first');self.assertEqual(path.stat().st_mode & 0o777,0o600)
+
+class ActualRetirementCLI(unittest.TestCase):
+    """Compile this source and exercise its public gates; the test SHA is metadata.
+
+    No root, DB, Docker or production provenance is inferred from this fixture.
+    """
+    @classmethod
+    def setUpClass(cls):
+        import os,subprocess,tempfile
+        cls.directory=tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.directory.cleanup)
+        cls.native=Path(cls.directory.name)/'retirement-test-cli'
+        cls.environment=dict(os.environ)
+        cls.environment.pop('QS_RETIREMENT_SOURCE_UID',None)
+        cls.environment.update(MYSQL_HOST='invalid-no-connection',MONGODB_HOST='invalid-no-connection',GOWORK='off')
+        subprocess.run(['go','build','-buildvcs=false','-trimpath','-ldflags','-X main.sourceSHA='+('d'*40),'-o',str(cls.native),'./cmd/qs-compatibility-retirement'],cwd=Path(__file__).resolve().parents[2],env=cls.environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=180,check=True)
+    def test_actual_cli_source_sha_flag_reports_its_compiled_test_binding(self):
+        import subprocess
+        result=subprocess.run([str(self.native),'--source-sha'],env=self.environment,capture_output=True,timeout=5,check=True)
+        self.assertEqual(result.stdout,b'd'*40+b'\n');self.assertEqual(result.stderr,b'')
+    def test_actual_effectful_modes_refuse_before_request_or_database_access(self):
+        import subprocess
+        directory=Path(self.directory.name)
+        for stage in ('apply','verify','recover','purge'):
+            with self.subTest(stage=stage):
+                result=subprocess.run([str(self.native),'--mode','lifecycle-'+stage,'--request',str(directory/'nonexistent'),'--request-hash','a'*64,'--operation-id','12-1','--run-id','22-3'],env=self.environment,capture_output=True,timeout=5,check=False)
+                self.assertEqual(result.returncode,1)
+                receipt=tool.decode(result.stdout)
+                self.assertEqual(receipt['operation'],stage);self.assertEqual(receipt['error_category'],'lifecycle_actual_host_adapters_missing')
+                for flag in ('complete','execution_allowed','drop_ready','archive_binding_complete','recovery_attempted','recovery_complete','acceptance_complete','purge_complete','isolated_content_restore_complete'):
+                    self.assertEqual(receipt[flag],False)
+                self.assertEqual(receipt['original_source_sha'],'');self.assertEqual(receipt['manifest_sha256'],'')
+                self.assertFalse((directory/'nonexistent').exists())
 
 if __name__=='__main__':unittest.main()

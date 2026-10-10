@@ -2,27 +2,21 @@
 """Offline transport boundaries only; never invokes sudo/Docker/database."""
 import argparse
 import ast
-import copy
-
-import hashlib
-
-import io
-
-import shutil
-
-import textwrap
-
-import tempfile
-
 import contextlib
+import copy
+import hashlib
+import io
 import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
 import stat
+import shutil
 import sys
 import unittest
+import textwrap
+import tempfile
 from types import SimpleNamespace
 from unittest import mock
 
@@ -40,7 +34,7 @@ class RootPrepareOnceTransport(unittest.TestCase):
         self.assertEqual(command[:5],['sudo','-n','python3','-I','-c'])
         self.assertEqual(command[6:],[args.operation_id,args.run_id,args.actual_source_sha,args.lifecycle_request_hash,'d'*64,args.manifest_hash,'sudo-user'])
         self.assertNotIn(marker,str(command));packet=json.loads(run.call_args.kwargs['input']);self.assertEqual(packet['MYSQL_PASSWORD'],marker)
-        self.assertEqual(run.call_args.kwargs['stderr'],subprocess.DEVNULL)
+        self.assertTrue(run.call_args.kwargs['stderr'].closed);self.assertNotEqual(run.call_args.kwargs['stderr'],subprocess.PIPE)
         self.assertEqual(run.call_args.kwargs['timeout'],91*60)
     def test_real_root_uses_same_once_helper_with_clean_environment_and_private_pipe(self):
         args=self.args();marker='PRIVATE_ROOT_SECRET_NEVER_IN_ARGV'
@@ -289,5 +283,74 @@ if(accepted!==c.accepted)throw new Error('offline_action_validation_mismatch');}
             tool.live_prepare_facts(args)
         directory.assert_not_called();publish.assert_not_called()
 
+
+class RootNativeReceiptDiagnostic(unittest.TestCase):
+    """Actual private FDs with mocked invocation; never invokes native/sudo."""
+    def args(self):
+        return argparse.Namespace(operation='prepare',prepare_mode='host-writer-scope',operation_id='123-1',run_id='456-1',actual_source_sha='a'*40,host_scope_request_hash='b'*64,manifest_hash='')
+    def call(self, code, stdout, stderr=b'', error=None):
+        holders=[]
+        def launch(command, **kwargs):
+            self.assertEqual(command[:4],['/usr/bin/sudo','-n','--','/usr/bin/python3'])
+            self.assertEqual(kwargs['env'],{'PATH':'/usr/bin:/bin'})
+            self.assertEqual(kwargs['input'],b'{}');self.assertEqual(kwargs['timeout'],180)
+            fd=kwargs['stderr'];holders.append(fd)
+            self.assertNotEqual(fd,subprocess.PIPE);self.assertNotEqual(fd,subprocess.DEVNULL)
+            self.assertEqual(stat.S_IMODE(os.fstat(fd.fileno()).st_mode),0o600)
+            fd.write(stderr);fd.flush()
+            if error is not None:raise error
+            return subprocess.CompletedProcess(command,code,stdout)
+        with mock.patch.dict(os.environ,{'RETIREMENT_PACKAGE_SHA256':'d'*64,'MYSQL_PASSWORD':'PRIVATE_CREDENTIAL'},clear=True),mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool.os,'geteuid',return_value=501),mock.patch.object(tool.subprocess,'run',side_effect=launch) as run:
+            try:return tool.root_once_lifecycle_prepare(self.args())
+            finally:
+                run.assert_called_once()
+                self.assertTrue(all(fd.closed for fd in holders if hasattr(fd,'closed')))
+    def test_empty_stdout_reports_actual_exit_and_bounded_stderr_digest(self):
+        secret=b'PRIVATE_CREDENTIAL_NOT_A_PERMISSION_ASSERTION'
+        for code in (0,1,126,-15):
+            with self.subTest(code=code),self.assertRaises(tool.Blocked) as error:self.call(code,b'',secret)
+            self.assertEqual(str(error.exception),'lifecycle_native_receipt_missing')
+            diagnostic=error.exception.native_diagnostic
+            self.assertTrue(diagnostic['process_completed'])
+            self.assertEqual(diagnostic['exit_code'],max(code,0))
+            self.assertEqual(diagnostic['termination_signal'],max(-code,0))
+            self.assertEqual(diagnostic['stdout_bytes'],0)
+            self.assertEqual(diagnostic['stderr_bytes'],len(secret))
+            self.assertEqual(diagnostic['stderr_sample_bytes'],len(secret))
+            self.assertEqual(diagnostic['stderr_sample_sha256'],hashlib.sha256(secret).hexdigest())
+            self.assertFalse(diagnostic['stderr_sample_truncated'])
+            self.assertNotIn(secret.decode(),str(error.exception));self.assertNotIn(secret.decode(),json.dumps(diagnostic))
+    def test_stderr_sample_bound_and_stdout_bound_refuse_without_receipt_decode(self):
+        raw=b'PRIVATE'+b'x'*9000
+        with self.assertRaises(tool.Blocked) as error:self.call(2,b'x'*32769,raw)
+        self.assertEqual(str(error.exception),'lifecycle_native_receipt_invalid')
+        d=error.exception.native_diagnostic
+        self.assertEqual(d['stdout_bytes'],32769);self.assertEqual(d['stderr_bytes'],len(raw))
+        self.assertEqual(d['stderr_sample_bytes'],8192);self.assertTrue(d['stderr_sample_truncated'])
+        self.assertEqual(d['stderr_sample_sha256'],hashlib.sha256(raw[:8192]).hexdigest())
+    def test_launch_and_timeout_classifications_do_not_invent_exit_code(self):
+        for failure,category in ((OSError('PRIVATE_LAUNCH_REASON'),'lifecycle_native_start_failed'),(subprocess.TimeoutExpired(['PRIVATE_COMMAND'],180),'lifecycle_native_receipt_timed_out')):
+            with self.subTest(category=category),self.assertRaises(tool.Blocked) as error:self.call(0,b'',b'PRIVATE_STDERR',failure)
+            self.assertEqual(str(error.exception),category)
+            self.assertFalse(error.exception.native_diagnostic['process_completed'])
+            self.assertEqual(error.exception.native_diagnostic['exit_code'],0)
+            self.assertEqual(error.exception.native_diagnostic['termination_signal'],0)
+            self.assertNotIn('PRIVATE',str(error.exception))
+    def test_complete_native_stdout_keeps_original_code_and_bytes(self):
+        for code in (0,1):
+            raw=b'{"error_category":"host_scope_observation_incomplete","complete":false}\n'
+            with self.subTest(code=code):self.assertEqual(self.call(code,raw,b'PRIVATE_STDERR'),(code,raw))
+        self.assertEqual(self.call(0,b'x'*32768),(0,b'x'*32768))
+    def test_actual_armored_failure_contains_only_fixed_diagnostic_and_no_authority(self):
+        def rejected(_):self.call(1,b'',b'PRIVATE_STDERR_URI_PASSWORD')
+        output=io.StringIO();errors=io.StringIO()
+        argv=['--operation','prepare','--operation-id','123-1','--approved-source-sha','a'*40,'--actual-source-sha','a'*40,'--run-id','456-1','--prepare-mode','host-writer-scope']
+        with mock.patch.object(tool,'execute',side_effect=rejected),contextlib.redirect_stdout(output),contextlib.redirect_stderr(errors):code=tool.main(argv)
+        self.assertEqual(code,42);self.assertEqual(errors.getvalue(),'')
+        receipt=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(receipt['error_category'],'lifecycle_native_receipt_missing')
+        self.assertEqual(receipt['native_diagnostic']['exit_code'],1)
+        self.assertFalse(receipt['complete']);self.assertFalse(receipt['execution_allowed'])
+        self.assertNotIn('PRIVATE',json.dumps(receipt));self.assertNotIn('host_observation_complete',receipt)
 
 if __name__=='__main__':unittest.main()

@@ -37,8 +37,8 @@ type nativeContainer struct {
 	Image  string            `json:"image"`
 	Labels map[string]string `json:"labels"`
 	Mounts []struct {
-		Type, Name, Source, Destination string
-		RW                              bool
+		Type, Name, Source, Destination, Driver, Mode, Propagation string
+		RW                                                         bool
 	} `json:"mounts"`
 	Ports          map[string][]struct{ HostIP, HostPort string } `json:"ports"`
 	RequestedPorts map[string][]struct{ HostIP, HostPort string } `json:"requested_ports"`

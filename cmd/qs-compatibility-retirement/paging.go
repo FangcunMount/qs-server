@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -52,11 +53,15 @@ func (w *boundedSourceWriter) Write(raw []byte) (int, error) {
 	return n, e
 }
 func sourceWriter(f *os.File, limit int) (io.Writer, error) {
+	return sourceWriterTo(f, f, limit)
+}
+
+func sourceWriterTo(f *os.File, dst io.Writer, limit int) (io.Writer, error) {
 	offset, e := f.Seek(0, io.SeekCurrent)
 	if e != nil || offset < 0 || uint64(offset) > uint64(limit) {
 		return nil, category("target_output_byte_bound_exceeded")
 	}
-	return &boundedSourceWriter{dst: f, written: uint64(offset), limit: uint64(limit)}, nil
+	return &boundedSourceWriter{dst: dst, written: uint64(offset), limit: uint64(limit)}, nil
 }
 func outputError(e error) error {
 	if errors.Is(e, errSourceFileBound) {
@@ -715,13 +720,37 @@ func emitMongoTargetDiagnostic(ctx, pageCtx context.Context, phase string, pass,
 	}
 }
 
+const mongoSourceBufferBytes = 256 << 10
+
+// Keep the source durability barrier before the durable page checkpoint. The
+// second pass has no source file; its checkpoint still follows the same path.
+func mongoPageCheckpoint(dir string, pass, page int, token string, s *snapshot, h hash.Hash, source *os.File, buffer *bufio.Writer) error {
+	if source != nil {
+		if buffer == nil {
+			return category("private_output_failed")
+		}
+		if e := buffer.Flush(); e != nil {
+			return outputError(e)
+		}
+		if source.Sync() != nil {
+			return category("private_output_failed")
+		}
+	} else if buffer != nil {
+		return category("private_output_failed")
+	}
+	s.Pages++
+	return checkpoint(dir, "mongodb-domain_event_outbox", pass, page, token, s.Records, s.Bytes, h)
+}
+
 func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary, limits scanLimits, dir string, pass int, f *os.File) (snapshot, error) {
 	s := snapshot{Classification: map[string]uint64{}}
 	h := sha256.New()
 	var sink io.Writer
+	var sourceBuffer *bufio.Writer
 	if f != nil {
 		var e error
-		sink, e = sourceWriter(f, limits.MaxBytes)
+		sourceBuffer = bufio.NewWriterSize(f, mongoSourceBufferBytes)
+		sink, e = sourceWriterTo(f, sourceBuffer, limits.MaxBytes)
 		if e != nil {
 			return s, e
 		}
@@ -820,11 +849,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		if readErr != nil || closeErr != nil {
 			return s, category("mongo_target_read_failed_or_timed_out")
 		}
-		if f != nil && f.Sync() != nil {
-			return s, category("private_output_failed")
-		}
-		s.Pages++
-		if e = checkpoint(dir, "mongodb-domain_event_outbox", pass, page, cursor, s.Records, s.Bytes, h); e != nil {
+		if e = mongoPageCheckpoint(dir, pass, page, cursor, &s, h, f, sourceBuffer); e != nil {
 			return s, e
 		}
 		if n < limits.PageSize {

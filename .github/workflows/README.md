@@ -44,6 +44,7 @@ CI for exact SHA
 
 - workflow input/Variable 只表达服务计划、环境和非敏感参数；数据库、Redis、JWT、委托 key、AI Provider API key、registry token、SSH key 与 TLS private key 必须来自受保护 Secret/目标主机。
 - `scripts/cd/prepare-package.sh` 在每个部署包内生成独立的 `config.prod.env`；日志只允许显示变量名和脱敏 endpoint，不得输出值。
+- CI 的公开镜像读取使用仓库级 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` Secrets，token 只需读取权限。服务容器在步骤执行前通过 `services.credentials` 登录；步骤内启动容器或构建镜像的 job 使用登录 Action，并在 job 结束时退出登录。未配置凭据的运行仍执行相同测试并匿名拉取，可能受到下载限流；凭据不进入构建参数或生产部署包。
 - QS 不再注入模型 API Key；模型凭据由 qs-ai 的部署管理，不得进入 QS 部署包、镜像 build args 或 GitHub Actions 日志。
 - 自动部署必须校验目标 SHA 没有被更新提交取代；手动部署仍须记录调用者、输入、environment 和审批。
 - self-hosted runner 的网络、SSH、Docker 权限和工具版本属于环境前置条件，不能写死为当前事实。

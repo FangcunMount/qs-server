@@ -142,6 +142,8 @@ def validate_workflow_scope(scope, approval):
 def derive_request(raw, approval, current_run):
     """Bind only a newly assigned run; preserve all original facts byte-for-value."""
     token(current_run, RUN)
+    if current_run == approval["original_run_id"]:
+        reject("window_tool_current_run_not_new")
     if digest(raw) != approval["request_template_sha256"]:
         reject("window_tool_template_hash_rejected")
     r = decode(raw)

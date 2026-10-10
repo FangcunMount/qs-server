@@ -38,7 +38,7 @@ on:
         description: 'Observe sources, persist prewindow historical evidence, or diagnose an existing boundary report'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts, window-tool]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts, host-writer-scope, db-writer-census, window-tool]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -93,13 +93,15 @@ jobs:
             const diagnostic = input.prepare_mode === 'report-diagnostic';
             const bootstrap = ['bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds'].includes(input.prepare_mode);
             const prepareFacts = input.prepare_mode === 'prepare-facts';
-            const descriptor = bootstrap || diagnostic || prepareFacts || windowTool;
+            const hostScope = input.prepare_mode === 'host-writer-scope';
+            const dbCensus = input.prepare_mode === 'db-writer-census';
+            const descriptor = bootstrap || diagnostic || prepareFacts || hostScope || dbCensus || windowTool;
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'window-tool'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'host-writer-scope', 'db-writer-census', 'window-tool'].includes(input.prepare_mode) ||
                 (windowTool
                   ? (typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : descriptor
@@ -132,7 +134,7 @@ jobs:
               if (!exact(a, prepare ? keys : [...keys,'workflow_scope']) ||
                   a.format_version !== 1 || a.kind !== 'independent_compatibility_window_tool_approval' || a.dispatcher_source_sha !== context.sha ||
                   !sha(a.tool_source_sha) || (prepare && a.tool_source_sha !== context.sha) || !sha(a.original_source_sha) || a.operation_id !== input.operation_id ||
-                  typeof a.original_run_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.original_run_id) ||
+                  typeof a.original_run_id !== 'string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a.original_run_id) || a.original_run_id === String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT) ||
                   a.stage !== input.operation || a.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' ||
                   a.manifest_sha256 !== input.manifest_sha256 || a.request_template_sha256 !== input.inventory_request_sha256 ||
                   !exact(a.tool_binary_sha256,['amd64','arm64']) || !hash(a.tool_binary_sha256.amd64) || !hash(a.tool_binary_sha256.arm64) ||
@@ -156,6 +158,33 @@ jobs:
               if (!runs.length || runs[0].status !== 'completed' || runs[0].conclusion !== 'success') {reject();}
               toolSource = a.tool_source_sha;
               core.setOutput('tool_source_sha', toolSource);
+            }
+            if (dbCensus) {
+              const reject=()=>{throw new Error('compatibility_retirement_db_census_descriptor_rejected');};
+              const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+              const exact=(v,keys)=>object(v)&&JSON.stringify(Object.keys(v).sort())===JSON.stringify(keys.slice().sort());
+              const canonical=v=>object(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
+              const hash=v=>typeof v==='string'&&/^[0-9a-f]{64}$/.test(v);
+              const sha=v=>typeof v==='string'&&/^[0-9a-f]{40}$/.test(v);
+              let v;try {v=JSON.parse(input.bootstrap_approval_json);}catch {reject();}
+              if (!exact(v,['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','identity_report'])||
+                  v.format_version!==1||v.kind!=='readonly_db_writer_census_descriptor'||v.prepare_mode!=='db-writer-census'||v.source_sha!==context.sha||v.operation_id!==input.operation_id||v.database_scope!=='mysql-and-mongodb'||v.target_hash!=='4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8'||
+                  !exact(v.identity_report,['operation_id','run_id','source_sha','sha256','request_sha256'])||v.identity_report.operation_id!==input.operation_id||!sha(v.identity_report.source_sha)||!hash(v.identity_report.sha256)||!hash(v.identity_report.request_sha256)||typeof v.identity_report.run_id!=='string'||!/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(v.identity_report.run_id)||v.identity_report.run_id===String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT)) {reject();}
+              const line=JSON.stringify(canonical(v));if (line!==input.bootstrap_approval_json||require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex')!==input.bootstrap_approval_sha256) {reject();}
+            }
+            if (hostScope) {
+              const reject = () => {throw new Error('compatibility_retirement_host_scope_descriptor_rejected');};
+              const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+              const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify(keys.slice().sort());
+              let v;
+              try {v = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
+              if (!exact(v,['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','host_role']) ||
+                  v.format_version !== 1 || v.kind !== 'readonly_host_writer_scope_descriptor' || v.prepare_mode !== 'host-writer-scope' ||
+                  v.source_sha !== context.sha || v.operation_id !== input.operation_id || v.host_role !== 'server_a' ||
+                  v.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8') {reject();}
+              const line = JSON.stringify(Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])));
+              if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
+              // A fixed root observer is read only and cannot approve this catalog.
             }
             if (prepareFacts) {
               const reject = () => {throw new Error('compatibility_retirement_prepare_facts_descriptor_rejected');};
@@ -470,6 +499,15 @@ jobs:
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
             tar -czf "$archive" -C "$package_dir" compatibility-window-tool.py receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+          elif [[ "$RETIREMENT_PACKAGE_MODE" == "host-writer-scope" || "$RETIREMENT_PACKAGE_MODE" == "db-writer-census" ]]; then
+            [[ "$RETIREMENT_TOOL_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            [[ "$(git rev-parse HEAD)" == "$RETIREMENT_TOOL_SOURCE_SHA" ]] || exit 1
+            go test ./cmd/qs-compatibility-retirement ./internal/apiserver/maintenance/compatibilityretirementhostscope
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$RETIREMENT_TOOL_SOURCE_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$RETIREMENT_TOOL_SOURCE_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-amd64" ./cmd/qs-compatibility-history
+            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA" -o "$package_dir/history-linux-arm64" ./cmd/qs-compatibility-history
+            tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64
           elif [[ "$RETIREMENT_PACKAGE_MODE" == "report-diagnostic" ]]; then
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py receipt-transport.py
           elif [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-history-metadata" ]]; then
@@ -520,18 +558,18 @@ jobs:
           RETIREMENT_ACTUAL_SHA: ${{ github.sha }}
           RETIREMENT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           RETIREMENT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_HOST || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_HOST || '' }}
-          MYSQL_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_PORT || 3306) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MYSQL_PORT || 3306) || '' }}
-          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
-          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
-          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
-          MONGODB_HOST: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_HOST || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_HOST || '' }}
-          MONGODB_PORT: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MONGODB_PORT || 27017) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MONGODB_PORT || 27017) || '' }}
-          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_USERNAME || '' }}
-          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_PASSWORD || '' }}
-          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_DBNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_DBNAME || '' }}
-          MONGODB_METADATA_ADMIN_USERNAME: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_METADATA_ADMIN_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_METADATA_ADMIN_USERNAME || '' }}
-          MONGODB_METADATA_ADMIN_PASSWORD: ${{ inputs.operation == 'prepare' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_METADATA_ADMIN_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_METADATA_ADMIN_PASSWORD || '' }}
+          MYSQL_HOST: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_HOST || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_HOST || '' }}
+          MYSQL_PORT: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_PORT || 3306) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MYSQL_PORT || 3306) || '' }}
+          MYSQL_USERNAME: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_METADATA_ADMIN_USERNAME || '' }}
+          MYSQL_PASSWORD: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MYSQL_METADATA_ADMIN_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MYSQL_METADATA_ADMIN_PASSWORD || '' }}
+          MYSQL_DATABASE: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME) || '' }}
+          MONGODB_HOST: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_HOST || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_HOST || '' }}
+          MONGODB_PORT: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && (secrets.MONGODB_PORT || 27017) || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && (secrets.MONGODB_PORT || 27017) || '' }}
+          MONGODB_USERNAME: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_USERNAME || '' }}
+          MONGODB_PASSWORD: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_PASSWORD || '' }}
+          MONGODB_DBNAME: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_DBNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_DBNAME || '' }}
+          MONGODB_METADATA_ADMIN_USERNAME: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_METADATA_ADMIN_USERNAME || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_METADATA_ADMIN_USERNAME || '' }}
+          MONGODB_METADATA_ADMIN_PASSWORD: ${{ inputs.operation == 'prepare' && inputs.prepare_mode != 'host-writer-scope' && !startsWith(inputs.prepare_mode, 'bootstrap-') && secrets.MONGODB_METADATA_ADMIN_PASSWORD || inputs.operation == 'prepare' && inputs.prepare_mode == 'bootstrap-history' && secrets.MONGODB_METADATA_ADMIN_PASSWORD || '' }}
         with:
           host: ${{ vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}

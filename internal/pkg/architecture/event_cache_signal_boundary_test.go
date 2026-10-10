@@ -81,8 +81,11 @@ func TestEventSubsystemHasSingleProductionCompositionRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(bootstrap), "configuredEventSubsystem(s.config)") != 1 {
-		t.Fatal("resource bootstrap must select the event subsystem exactly once")
+	composition := string(bootstrap)
+	if strings.Count(composition, "configuredEventSubsystemWithFacts(s.config, s.runtimeFacts)") != 1 ||
+		strings.Count(composition, "configuredEventSubsystemWithFacts(") != 1 ||
+		strings.Contains(composition, "configuredEventSubsystem(") {
+		t.Fatal("resource bootstrap must select the event subsystem exactly once with its original runtime facts owner")
 	}
 }
 

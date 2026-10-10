@@ -46,6 +46,10 @@ ROUTES = {'server_a': ('pinned_svra_retirement', 'server_a'), 'collection': ('pi
 ASSETS = ('action.py', 'inventory.py', 'receipt.py', 'approval.json', 'request.json')
 MAX_REPORT, MAX_PRIVATE, TOTAL_SECONDS = 16 << 20, 1 << 20, 240
 ERRORS = frozenset(('action_input_rejected', 'approval_rejected', 'source_binding_rejected', 'private_file_rejected', 'private_file_changed', 'private_asset_missing', 'private_namespace_conflict', 'private_cleanup_unknown', 'private_manifest_rejected', 'route_rejected', 'host_key_rejected', 'matches_rejected', 'package_rejected', 'inventory_report_rejected', 'inventory_process_failed', 'transport_failed', 'transport_output_rejected', 'transport_timeout', 'transport_budget_exceeded', 'linux_host_required', 'session_observation_rejected', 'session_observation_changed', 'action_fixed_failure'))
+EXECUTION_STAGES = frozenset(('asset_prepare', 'remote_bootstrap', 'asset_upload', 'remote_inventory', 'projection_validate', 'complete'))
+CLEANUP_STATES = frozenset(('not_attempted', 'unknown', 'verified'))
+CLEANUP_FAILURE_STAGES = frozenset(('none', 'remote_cleanup', 'local_cleanup', 'registration_cleanup'))
+DIAGNOSTIC_SCHEMA = {'execution_stage':EXECUTION_STAGES, 'remote_cleanup':CLEANUP_STATES, 'local_cleanup':CLEANUP_STATES, 'registration_cleanup':CLEANUP_STATES, 'cleanup_failure_stage':CLEANUP_FAILURE_STAGES, 'cleanup_error_category':ERRORS | frozenset(('none',))}
 SSH_FIELDS = ('authenticationmethods', 'authorizedkeysfile', 'authorizedkeyscommand', 'authorizedkeyscommanduser', 'authorizedprincipalsfile', 'authorizedprincipalscommand', 'trustedusercakeys', 'passwordauthentication', 'kbdinteractiveauthentication', 'hostbasedauthentication', 'gssapiauthentication', 'pubkeyauthentication', 'permituserenvironment', 'permituserrc', 'permittty', 'disableforwarding', 'forcecommand', 'strictmodes', 'acceptenv', 'allowusers', 'allowgroups', 'denyusers', 'denygroups')
 ALWAYS_UNKNOWN = frozenset(('management_channel_and_request_origin_unproven', 'all_match_contexts_not_enumerated', 'nss_external_subject_coverage_unknown', 'all_writers_and_external_services_unproven', 'historical_refs_reruns_queues_approvals_not_fenced', 'local_runner_bypass_not_fenced', 'existing_sessions_not_drained', 'effective_acl_visibility_unknown', 'systemd_user_socket_and_transient_activation_coverage_unknown', 'ssh_key_option_semantics_and_authentication_unproven'))
 INVENTORY_ERRORS = frozenset(('account_schema_unknown', 'command_denied_or_failed', 'command_executable_changed', 'command_executable_unprotected', 'command_not_in_closed_read_set', 'command_output_budget_exceeded', 'command_timeout', 'command_unavailable', 'cron_directory_budget_exceeded', 'directory_changed_during_read', 'directory_missing', 'directory_permission_unknown', 'directory_read_unknown', 'docker_mount_schema_unknown', 'docker_projection_schema_unknown', 'docker_roster_schema_or_budget_unknown', 'file_budget_exceeded', 'file_changed_during_read', 'file_link_or_type_unsupported', 'file_missing', 'file_path_unsupported', 'file_permission_unknown', 'file_read_unknown', 'file_content_forbidden', 'inventory_deadline_exceeded', 'inventory_input_rejected', 'inventory_request_rejected', 'inventory_fixed_failure', 'linux_host_required', 'process_budget_exceeded', 'process_link_visibility_unknown', 'process_schema_unknown', 'property_projection_schema_unknown', 'session_listing_schema_unknown', 'ssh_authorized_key_schema_unknown', 'ssh_config_syntax_unknown', 'ssh_effective_duplicate_key', 'ssh_effective_projection_incomplete', 'ssh_include_cycle_or_depth_unknown', 'ssh_include_directory_changed', 'ssh_include_path_unsupported', 'systemd_listing_schema_unknown', 'systemd_unit_budget_exceeded'))
@@ -451,7 +455,22 @@ def projection(a, approved, run, req_raw=None, report_raw=None, report=None, cat
 
 PROJECTION_SCHEMA={'protocol':frozenset(('qs_host_inventory_observation_v1','qs_host_inventory_observation_v2')),'source_sha':'sha40','approval_sha256':'hash64','operation_id':'run_id','run_id':'run_id','host_class':frozenset(ROUTES),'inventory_sha256':'hash64','inventory_audited_source_sha':'sha40','wrapper_sha256':'hash64','derived_request_created':'bool','derived_request_sha256':'hash64','status':frozenset(('observed','failed','unsupported')),'cleanup':frozenset(('verified','unknown')),'capabilities':dict.fromkeys(CAPS,'bool'),'report_sha256':'hash64','unknown_count':'uint','unknown_sha256':'hash64','recheck_failed_count':'uint','counts':dict.fromkeys(('accounts','processes','ssh_contexts','containers','units','sessions','files','read_calls'),'uint'),'error_category':ERRORS,'visibility_gap':frozenset(('runner_management_channel_unknown',))}
 
-PROJECTION_SCHEMA.update({'context_mode':frozenset((CONTEXT_MODE,)),'seed_request_sha256':'hash64','session_origin_proven':'bool','partial':'bool','observed_matches_sha256':'hash64','session_identity_sha256':'hash64','session_connection_sha256':'hash64','host_status':frozenset(('numeric_peer_from_usedns_no','host_unobserved')),'usedns':frozenset(('no','yes','unknown'))})
+PROJECTION_SCHEMA.update({'context_mode':frozenset((CONTEXT_MODE,)),'seed_request_sha256':'hash64','session_origin_proven':'bool','partial':'bool','observed_matches_sha256':'hash64','session_identity_sha256':'hash64','session_connection_sha256':'hash64','host_status':frozenset(('numeric_peer_from_usedns_no','host_unobserved')),'usedns':frozenset(('no','yes','unknown')),'diagnostics':DIAGNOSTIC_SCHEMA})
+
+def validate_diagnostics(value, cleanup):
+    exact(value, DIAGNOSTIC_SCHEMA, 'transport_output_rejected')
+    for key, allowed in DIAGNOSTIC_SCHEMA.items():
+        if type(value[key]) is not str or value[key] not in allowed:reject('transport_output_rejected')
+    stages=('remote_cleanup','local_cleanup','registration_cleanup')
+    verified=all(value[k]=='verified' for k in stages)
+    if (cleanup=='verified') != verified:reject('transport_output_rejected')
+    if value['registration_cleanup']!='not_attempted' and any(value[k]!='verified' for k in stages[:2]):reject('transport_output_rejected')
+    failure=value['cleanup_failure_stage'];category=value['cleanup_error_category']
+    if (failure=='none') != (category=='none'):reject('transport_output_rejected')
+    if failure=='none':
+        if any(value[k]=='unknown' for k in stages):reject('transport_output_rejected')
+    elif value[failure]!='unknown':reject('transport_output_rejected')
+    return value
 
 def validate_projection(v,a,approved,run,req_raw):
     base={'protocol','source_sha','approval_sha256','operation_id','run_id','host_class','inventory_sha256','inventory_audited_source_sha','wrapper_sha256','derived_request_created','status','cleanup','capabilities','derived_request_sha256'}
@@ -461,7 +480,11 @@ def validate_projection(v,a,approved,run,req_raw):
         base|={'context_mode','seed_request_sha256','session_origin_proven','partial'}
         observed|={'observed_matches_sha256','session_identity_sha256','session_connection_sha256','host_status','usedns'}
         if type(v) is dict and v.get('derived_request_created') is False:base.discard('derived_request_sha256')
-    if type(v) is not dict or set(v) not in (base|observed,base|{'error_category'}):reject('transport_output_rejected')
+    diagnosed=type(v) is dict and 'diagnostics' in v
+    if diagnosed:base.add('diagnostics')
+    shapes=(base|observed,base|{'error_category'})
+    if diagnosed:shapes+=(base|observed|{'error_category'},)
+    if type(v) is not dict or set(v) not in shapes:reject('transport_output_rejected')
     expected=projection(a,approved,run,req_raw)
     compare=('protocol','source_sha','approval_sha256','operation_id','run_id','host_class','inventory_sha256','inventory_audited_source_sha','wrapper_sha256')
     compare+=(('context_mode','seed_request_sha256','session_origin_proven','partial') if observation else ('derived_request_created','derived_request_sha256'))
@@ -472,7 +495,13 @@ def validate_projection(v,a,approved,run,req_raw):
         if v['derived_request_created']:digest(v['derived_request_sha256'])
         if v['status']=='observed' and v['derived_request_created'] is not True:reject('transport_output_rejected')
     caps(v['capabilities'])
-    if v['status'] not in ('observed','failed') or v['cleanup']!='unknown' or (v['status']=='observed')!=(set(v)==base|observed):reject('transport_output_rejected')
+    if v['status'] not in ('observed','failed') or v['cleanup'] not in ('unknown','verified'):reject('transport_output_rejected')
+    if diagnosed:
+        validate_diagnostics(v['diagnostics'],v['cleanup'])
+        if v['status']=='observed' and (v['diagnostics']['execution_stage']!='complete' or v['cleanup']!='verified'):reject('transport_output_rejected')
+    elif v['cleanup']!='unknown':reject('transport_output_rejected')
+    if v['status']=='observed' and set(v)!=base|observed:reject('transport_output_rejected')
+    if v['status']=='failed' and 'error_category' not in v:reject('transport_output_rejected')
     if 'error_category' in v and v['error_category'] not in ERRORS:reject('transport_output_rejected')
     if 'counts' in v:
         exact(v['counts'],PROJECTION_SCHEMA['counts'],'transport_output_rejected')
@@ -681,7 +710,12 @@ def run_action(env,repo,capture_fn=capture):
     directory=state/'assets'
     directory.mkdir(mode=0o700);os.chmod(directory,0o700)
     remote_name='/tmp/qs-host-inventory-'+a['operation_id']+'-'+run+'-'+uuid.uuid4().hex[:24]
-    started=time.monotonic();local_records=None;result=None;cleanup='unknown'
+    started=time.monotonic();local_records=None;result=None
+    diagnostics={'execution_stage':'asset_prepare','remote_cleanup':'not_attempted','local_cleanup':'not_attempted','registration_cleanup':'not_attempted','cleanup_failure_stage':'none','cleanup_error_category':'none'}
+    def cleanup_failure(stage,category):
+        diagnostics[stage]='unknown'
+        if diagnostics['cleanup_failure_stage']=='none':
+            diagnostics['cleanup_failure_stage']=stage;diagnostics['cleanup_error_category']=category
     registration=state/'registration.json'
     write_exclusive(state,registration.name,canonical({'protocol':'qs_host_inventory_private_registration_v1','source_sha':a['source_sha'],'approval_sha256':approved,'run_id':run,'operation_id':a['operation_id'],'local_namespace':str(directory),'remote_namespace':remote_name,'cleanup':'unknown'}))
     registration_raw,registration_stamp=read_private(registration)
@@ -704,39 +738,58 @@ def run_action(env,repo,capture_fn=capture):
         local_records=records_for(directory)
         ssh=['/usr/bin/ssh','-F',str(directory/'ssh.config'),'qs-host-inventory']
         bootstrap=('import os,stat,json\np='+repr(remote_name)+'\nos.mkdir(p,0o700)\nos.chmod(p,0o700)\ns=os.stat(p,follow_symlinks=False)\nassert stat.S_ISDIR(s.st_mode) and s.st_uid==os.geteuid() and stat.S_IMODE(s.st_mode)==0o700\nprint("{\\\"created\\\":true}")\n').encode()
+        diagnostics['execution_stage']='remote_bootstrap'
         if decode(call(ssh+['python3 -'],stdin=bootstrap))!={'created':True}:reject('transport_output_rejected')
+        diagnostics['execution_stage']='asset_upload'
         call(['/usr/bin/scp','-F',str(directory/'ssh.config'),*[str(directory/n) for n in (*ASSETS,'manifest.json')],'qs-host-inventory:'+remote_name+'/'])
         remote_command='python3 '+remote_name+'/action.py remote --asset-dir '+remote_name+' --approval-sha '+approved+' --run '+run+' --package-sha '+package_hash
+        diagnostics['execution_stage']='remote_inventory'
         out=call(ssh+[remote_command],cap=MAX_PRIVATE)
+        diagnostics['execution_stage']='projection_validate'
         result=validate_projection(decode(out),a,approved,run,reqraw)
+        diagnostics['execution_stage']='complete' if result['status']=='observed' else 'remote_inventory'
+        diagnostics['remote_cleanup']='unknown'
         cleanup_out=call(ssh+['python3 '+remote_name+'/action.py cleanup --asset-dir '+remote_name+' --package-sha '+package_hash])
         if decode(cleanup_out)!={'cleanup':'verified'}:reject('private_cleanup_unknown')
-        cleanup='verified'
+        diagnostics['remote_cleanup']='verified'
     except Rejected as e:
-        result=projection(a,approved,run,reqraw,category=str(e))
+        primary=result.get('error_category') if result is not None else None
+        result=projection(a,approved,run,reqraw,category=primary or str(e))
+        if diagnostics['remote_cleanup']=='unknown':cleanup_failure('remote_cleanup',str(e))
     finally:
         # No name-based remote rm fallback after interrupted upload or absent registry.
         if local_records is not None:
-            try:clean_namespace(directory,local_records)
-            except Rejected:cleanup='unknown'
-        else:
-            cleanup='unknown'
+            diagnostics['local_cleanup']='unknown'
+            try:
+                clean_namespace(directory,local_records)
+                diagnostics['local_cleanup']='verified'
+            except Rejected as e:cleanup_failure('local_cleanup',str(e))
+            except OSError:cleanup_failure('local_cleanup','private_cleanup_unknown')
     if result is None:reject('action_fixed_failure')
-    if cleanup=='verified':
-        current,current_stamp=read_private(registration)
-        if current!=registration_raw or current_stamp!=registration_stamp:cleanup='unknown'
-        else:
+    if diagnostics['remote_cleanup']=='verified' and diagnostics['local_cleanup']=='verified':
+        diagnostics['registration_cleanup']='unknown'
+        try:
+            current,current_stamp=read_private(registration)
+            if current!=registration_raw or current_stamp!=registration_stamp:reject('private_cleanup_unknown')
             os.unlink(registration)
-            state_fd=os.open(state,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW);os.fsync(state_fd);os.close(state_fd)
-            if os.path.lexists(registration):cleanup='unknown'
-            else:
-                os.rmdir(state)
-                base_fd=os.open(base,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW);os.fsync(base_fd);os.close(base_fd)
-                if os.path.lexists(state):cleanup='unknown'
-    result['cleanup']=cleanup
-    if cleanup!='verified':
-        result['status']='failed';result['error_category']='private_cleanup_unknown'
-        # Observations remain diagnostic, but unknown cleanup cannot be success.
+            state_fd=os.open(state,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+            try:os.fsync(state_fd)
+            finally:os.close(state_fd)
+            if os.path.lexists(registration):reject('private_cleanup_unknown')
+            os.rmdir(state)
+            base_fd=os.open(base,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+            try:os.fsync(base_fd)
+            finally:os.close(base_fd)
+            if os.path.lexists(state):reject('private_cleanup_unknown')
+            diagnostics['registration_cleanup']='verified'
+        except Rejected as e:cleanup_failure('registration_cleanup',str(e))
+        except OSError:cleanup_failure('registration_cleanup','private_cleanup_unknown')
+    result['cleanup']='verified' if all(diagnostics[k]=='verified' for k in ('remote_cleanup','local_cleanup','registration_cleanup')) else 'unknown'
+    result['diagnostics']=diagnostics
+    if result['cleanup']!='verified':
+        result['status']='failed'
+        result.setdefault('error_category','private_cleanup_unknown')
+        # Preserve the primary fixed error. Cleanup facts never create authority.
     return result
 
 def emit(v,transport):

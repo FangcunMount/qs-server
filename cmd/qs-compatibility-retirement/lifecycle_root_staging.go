@@ -16,13 +16,13 @@ import (
 
 const lifecycleInvocationBase = "/opt/backups/qs-server/compatibility-retirement-invocations"
 
-func lifecycleInvocationBatch(operation, run string) string {
-	return filepath.Join(lifecycleInvocationBase, operation+"-"+run)
-}
-
 const lifecycleRootPrepareBase = "/opt/backups/qs-server/compatibility-retirement-root-prepare"
 
 var lifecycleSourceNames = []string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json", "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson", "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes"}
+
+func lifecycleInvocationBatch(operation, run string) string {
+	return filepath.Join(lifecycleInvocationBase, operation+"-"+run)
+}
 
 func lifecycleRootBatch(operation, run string) string {
 	return filepath.Join(lifecycleRootPrepareBase, operation+"-"+run)
@@ -176,8 +176,8 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	metadataUID := uint32(uid64)
 	metadataRoot := original
 	if path == filepath.Join(lifecycleInvocationBatch(operation, actualRun), "lifecycle-request.json") {
-		// The fixed root template caller produces only this per-run immutable
-		// request/manifest. Original source-body owner remains the actual sudo user.
+		// Only the exact current-run metadata is root-owned. The original
+		// producer and all seven source bodies retain their source UID binding.
 		metadataUID, metadataRoot = 0, lifecycleInvocationBatch(operation, actualRun)
 	} else if path != filepath.Join(original, "lifecycle-request.json") {
 		return "", lifecycleError("lifecycle_staging_path_rejected")

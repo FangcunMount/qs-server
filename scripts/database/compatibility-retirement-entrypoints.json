@@ -200,6 +200,7 @@
       "classification": "controlled_inventory_historical_evidence_and_temporary_restore_preparation",
       "source": [
         "scripts/database/compatibility-retirement.py",
+        "scripts/database/compatibility-window-tool.py",
         "cmd/qs-compatibility-retirement/main.go",
         "cmd/qs-compatibility-retirement/prepare_facts.go",
         "cmd/qs-compatibility-retirement/lifecycle.go",
@@ -214,7 +215,7 @@
         "cmd/qs-compatibility-retirement/lifecycle_service_ssh.go",
         "internal/apiserver/maintenance/compatibilityretirementfence/ssh_key_file.go"
       ],
-      "reason": "Only the exact approved main SHA, operation and independently bound request use the existing production credential paths. Inventory/report diagnostics read originals; prepare-facts hashes seven source files in place and observes ordered Mongo schema, fixed-socket image identities and filesystem capacities without granting capture, CAS, DROP or deployment authority; prewindow historical evidence uses separately qualified locked CAS; lifecycle preparation captures exact four-target temporary assets and performs actual isolated network-none restores through the fixed root-once caller. Preparation grants no DROP/fence/window authority. A apply/verify/recover/purge remain unavailable before input/database access. All phases share production-deploy. Source-only A/B integration retains prepare-facts and adds only same-dispatcher window-tool prepare with empty B fields; original Window/D/partial lease and root key-file primitives do not grant full-writer fence, Q, B deployment, acceptance or purge.",
+      "reason": "Only the exact approved main SHA, operation and independently bound request use the existing production credential paths. Inventory/report diagnostics read originals; prepare-facts hashes seven source files in place and observes ordered Mongo schema, fixed-socket image identities and filesystem capacities without granting capture, CAS, DROP or deployment authority; prewindow historical evidence uses separately qualified locked CAS; lifecycle preparation captures exact four-target temporary assets and performs actual isolated network-none restores through the fixed root-once caller. Preparation grants no DROP/fence/window authority. A apply/verify/recover/purge remain unavailable before input/database access. All phases share production-deploy. Integrated tooling retains prepare-facts, readonly host-writer-scope and db-writer-census observations. Window-tool prepare uses the approved current-main tool with empty B fields; effectful stages require separately approved tool/image/program/workflow scope and native adapters. Original Window/D/partial lease and root key-file primitives do not prove the full-writer fence; missing actual host adapters and unproven writer scopes fail closed before DROP, Q, B deployment, acceptance or purge.",
       "fence_action": "Allow only approved main SHA/op/request or frozen manifest; no unsupported phase may return success."
     },
     {

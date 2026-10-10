@@ -199,6 +199,7 @@ class Tests(unittest.TestCase):
   with mock.patch.object(Path,'home',return_value=home):v=m.run_action(self.env,repo,capture_fn=transport)
   self.assertEqual(v['cleanup'],'verified');self.assertEqual(v['status'],'observed');self.assertFalse(any(v['capabilities'].values()));self.assertEqual(len(calls),4)
   self.assertFalse(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
+  self.assertEqual(v['diagnostics'],{'execution_stage':'complete','remote_cleanup':'verified','local_cleanup':'verified','registration_cleanup':'verified','cleanup_failure_stage':'none','cleanup_error_category':'none'});self.assert_closed_diagnostics(v)
  def test_transport_stderr_secret_is_not_published_unknown_remote_not_deleted(self):
   home,repo=self.setup_local();calls=[]
   def transport(argv,**kw):
@@ -206,7 +207,7 @@ class Tests(unittest.TestCase):
    if 'python3 -' in argv:return 0,b'{"created":true}\n',b''
    return 1,b'PRIVATE_SECRET',b'PRIVATE_PASSWORD'
   with mock.patch.object(Path,'home',return_value=home):v=m.run_action(self.env,repo,capture_fn=transport)
-  self.assertEqual(v['cleanup'],'unknown');self.assertEqual(v['error_category'],'private_cleanup_unknown');self.assertNotIn('PRIVATE',json.dumps(v));self.assertFalse(any('cleanup' in a[-1] for a in calls));self.assertTrue(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
+  self.assertEqual(v['cleanup'],'unknown');self.assertEqual(v['error_category'],'transport_failed');self.assertEqual(v['diagnostics']['execution_stage'],'asset_upload');self.assertEqual(v['diagnostics']['remote_cleanup'],'not_attempted');self.assertEqual(v['diagnostics']['local_cleanup'],'verified');self.assertEqual(v['diagnostics']['registration_cleanup'],'not_attempted');self.assertNotIn('PRIVATE',json.dumps(v));self.assertFalse(any('cleanup' in a[-1] for a in calls));self.assertTrue(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
  def test_same_run_registration_is_never_overwritten(self):
   home,repo=self.setup_local()
   with mock.patch.object(Path,'home',return_value=home):
@@ -273,6 +274,98 @@ class Tests(unittest.TestCase):
    return original(src,dst,**kwargs)
   with mock.patch.object(m.os,'rename',side_effect=replace):self.rejected('private_cleanup_unknown',lambda:m.clean_namespace(d,records))
   unknown=list(d.glob('.cleanup-*/asset'));self.assertEqual(len(unknown),1);self.assertEqual(unknown[0].read_bytes(),b'PRIVATE_UNKNOWN');self.assertTrue((self.root/'original.private').exists())
+ def assert_closed_diagnostics(self,value):
+  self.assertFalse(any(value['capabilities'].values()))
+  self.assertNotIn('PRIVATE',json.dumps(value))
+  transport=load(TRANSPORT,'closed_cleanup_diagnostics_transport')
+  armor=transport.encode_armored_receipt(value,schema=m.PROJECTION_SCHEMA)
+  self.assertEqual(json.loads(transport.decode_armored_receipt(armor)),value)
+  self.assertEqual(m.validate_projection(value,self.a,self.approved,self.run,self.req),value)
+ def test_early_package_rejection_preserves_primary_without_claiming_cleanup(self):
+  home,repo=self.setup_local();self.put(repo/'scripts/database/compatibility-retirement-host-inventory.py',b'PRIVATE_BAD_PACKAGE')
+  with mock.patch.object(Path,'home',return_value=home):
+   v=m.run_action(self.env,repo,capture_fn=lambda *a,**kw:(_ for _ in ()).throw(AssertionError('no transport')))
+  self.assertEqual(v['error_category'],'package_rejected');self.assertEqual(v['cleanup'],'unknown')
+  self.assertEqual(v['diagnostics'],{'execution_stage':'asset_prepare','remote_cleanup':'not_attempted','local_cleanup':'not_attempted','registration_cleanup':'not_attempted','cleanup_failure_stage':'none','cleanup_error_category':'none'})
+  self.assertTrue(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
+  self.assert_closed_diagnostics(v)
+ def test_real_remote_cleanup_rejection_preserves_stage_and_unknown_asset(self):
+  home,repo=self.setup_local();raw=m.canonical(self.report());d,pkg=self.remote_assets()
+  def transport(argv,**kw):
+   if 'python3 -' in argv:return 0,b'{"created":true}\n',b''
+   if argv[0]=='/usr/bin/scp':return 0,b'',b''
+   if ' cleanup ' in argv[-1]:
+    self.put(d/'unknown.private',b'PRIVATE_UNKNOWN_REMOTE')
+    try:m.remote_cleanup(d,pkg)
+    except m.Rejected as e:
+     self.assertEqual(str(e),'private_cleanup_unknown')
+     return 1,m.canonical({'error_category':str(e)}),b''
+    self.fail('unknown remote file must reject cleanup')
+   return 0,m.canonical(m.remote(d,self.approved,self.run,pkg)),b''
+  with mock.patch.object(Path,'home',return_value=home),mock.patch.object(m,'remote_directory',return_value=d),mock.patch.object(m,'capture',return_value=(0,raw,b'')):
+   v=m.run_action(self.env,repo,capture_fn=transport)
+  self.assertEqual(v['error_category'],'transport_failed');self.assertEqual(v['status'],'failed');self.assertEqual(v['cleanup'],'unknown')
+  self.assertEqual(v['diagnostics']['execution_stage'],'complete');self.assertEqual(v['diagnostics']['remote_cleanup'],'unknown');self.assertEqual(v['diagnostics']['local_cleanup'],'verified');self.assertEqual(v['diagnostics']['registration_cleanup'],'not_attempted')
+  self.assertEqual(v['diagnostics']['cleanup_failure_stage'],'remote_cleanup');self.assertEqual(v['diagnostics']['cleanup_error_category'],'transport_failed')
+  self.assertEqual((d/'unknown.private').read_bytes(),b'PRIVATE_UNKNOWN_REMOTE');self.assertTrue((d/'registry.json').exists())
+  self.assert_closed_diagnostics(v)
+ def test_remote_primary_failure_survives_additional_cleanup_failure(self):
+  home,repo=self.setup_local();d,pkg=self.remote_assets()
+  def transport(argv,**kw):
+   if 'python3 -' in argv:return 0,b'{"created":true}\n',b''
+   if argv[0]=='/usr/bin/scp':return 0,b'',b''
+   if ' cleanup ' in argv[-1]:
+    self.put(d/'unknown.private',b'PRIVATE_UNKNOWN_REMOTE')
+    try:m.remote_cleanup(d,pkg)
+    except m.Rejected:return 1,b'',b''
+    self.fail('unknown remote file must reject cleanup')
+   return 0,m.canonical(m.remote(d,self.approved,self.run,pkg)),b''
+  with mock.patch.object(Path,'home',return_value=home),mock.patch.object(m,'remote_directory',return_value=d),mock.patch.object(m,'capture',return_value=(1,b'PRIVATE_REPORT_ERROR',b'PRIVATE_STDERR')):
+   v=m.run_action(self.env,repo,capture_fn=transport)
+  self.assertEqual(v['error_category'],'inventory_process_failed');self.assertEqual(v['diagnostics']['execution_stage'],'remote_inventory')
+  self.assertEqual(v['diagnostics']['cleanup_error_category'],'transport_failed');self.assertTrue((d/'unknown.private').exists())
+  self.assert_closed_diagnostics(v)
+ def test_real_local_cleanup_rejection_retains_unknown_assets_and_observation(self):
+  home,repo=self.setup_local();report=self.report();raw=m.canonical(report);local=None
+  def transport(argv,**kw):
+   nonlocal local
+   if 'python3 -' in argv:
+    local=Path(argv[argv.index('-F')+1]).parent
+    self.put(local/'unknown.private',b'PRIVATE_UNKNOWN_LOCAL')
+    return 0,b'{"created":true}\n',b''
+   if argv[0]=='/usr/bin/scp':return 0,b'',b''
+   if ' cleanup ' in argv[-1]:return 0,b'{"cleanup":"verified"}\n',b''
+   return 0,m.canonical(m.projection(self.a,self.approved,self.run,self.req,raw,report)),b''
+  with mock.patch.object(Path,'home',return_value=home):v=m.run_action(self.env,repo,capture_fn=transport)
+  self.assertEqual(v['error_category'],'private_cleanup_unknown');self.assertEqual(v['status'],'failed');self.assertIn('report_sha256',v)
+  self.assertEqual(v['diagnostics']['remote_cleanup'],'verified');self.assertEqual(v['diagnostics']['local_cleanup'],'unknown');self.assertEqual(v['diagnostics']['registration_cleanup'],'not_attempted')
+  self.assertEqual(v['diagnostics']['cleanup_failure_stage'],'local_cleanup');self.assertEqual(v['diagnostics']['cleanup_error_category'],'private_cleanup_unknown')
+  self.assertEqual((local/'unknown.private').read_bytes(),b'PRIVATE_UNKNOWN_LOCAL');self.assertTrue((local.parent/'registration.json').exists())
+  self.assert_closed_diagnostics(v)
+ def test_registration_identity_drift_is_separate_unknown_cleanup(self):
+  home,repo=self.setup_local();report=self.report();raw=m.canonical(report);state=None
+  def transport(argv,**kw):
+   nonlocal state
+   if 'python3 -' in argv:return 0,b'{"created":true}\n',b''
+   if argv[0]=='/usr/bin/scp':return 0,b'',b''
+   if ' cleanup ' in argv[-1]:
+    state=Path(argv[argv.index('-F')+1]).parent.parent
+    p=state/'registration.json';body=p.read_bytes();p.rename(state/'original.private');self.put(p,body)
+    return 0,b'{"cleanup":"verified"}\n',b''
+   return 0,m.canonical(m.projection(self.a,self.approved,self.run,self.req,raw,report)),b''
+  with mock.patch.object(Path,'home',return_value=home):v=m.run_action(self.env,repo,capture_fn=transport)
+  self.assertEqual(v['error_category'],'private_cleanup_unknown');self.assertEqual(v['cleanup'],'unknown')
+  self.assertEqual(v['diagnostics']['remote_cleanup'],'verified');self.assertEqual(v['diagnostics']['local_cleanup'],'verified');self.assertEqual(v['diagnostics']['registration_cleanup'],'unknown')
+  self.assertEqual(v['diagnostics']['cleanup_failure_stage'],'registration_cleanup');self.assertTrue((state/'original.private').exists());self.assertTrue((state/'registration.json').exists())
+  self.assert_closed_diagnostics(v)
+ def test_closed_cleanup_diagnostics_reject_unknown_keys_false_verified_and_category(self):
+  v=m.projection(self.a,self.approved,self.run,self.req,category='transport_failed')
+  v['diagnostics']={'execution_stage':'remote_bootstrap','remote_cleanup':'not_attempted','local_cleanup':'verified','registration_cleanup':'not_attempted','cleanup_failure_stage':'none','cleanup_error_category':'none'}
+  self.assert_closed_diagnostics(v)
+  changes=[lambda x:x['diagnostics'].__setitem__('unknown','PRIVATE_SECRET'),lambda x:x['diagnostics'].__setitem__('execution_stage','PRIVATE_ACCOUNT'),lambda x:x['diagnostics'].__setitem__('registration_cleanup','verified'),lambda x:x['diagnostics'].__setitem__('cleanup_error_category','PRIVATE_STDERR'),lambda x:x['diagnostics'].__setitem__('remote_cleanup','unknown'),lambda x:x.__setitem__('cleanup','verified')]
+  for change in changes:
+   bad=copy.deepcopy(v);change(bad)
+   self.rejected('transport_output_rejected',lambda:m.validate_projection(bad,self.a,self.approved,self.run,self.req))
  def test_emit_pinned_transport_projection_only(self):
   import io
   v=m.projection(self.a,self.approved,self.run,self.req,category='inventory_process_failed')
@@ -401,6 +494,7 @@ class ObservationActionTests(unittest.TestCase):
   with mock.patch.object(Path,'home',side_effect=AssertionError('v2 must not discover registered Matches')):
    result=m.run_action(self.env,repo,capture_fn=transport)
   self.assertEqual(result['cleanup'],'verified');self.assertEqual(result['status'],'observed');self.assertEqual(len(calls),4)
+  self.assertEqual(m.validate_projection(result,self.a,self.approved,self.run,self.seed),result)
   self.assertFalse(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
  def test_v2_mac_runner_refuses_without_session_or_credentials(self):
   self.bind2();a=dict(self.a,host_class='runner',route='runner_no_linux_channel');env=dict(self.env,HOST_INVENTORY_APPROVAL_JSON=m.canonical(a).decode().rstrip('\n'),HOST_INVENTORY_APPROVAL_SHA256=m.sha(m.canonical(a)))

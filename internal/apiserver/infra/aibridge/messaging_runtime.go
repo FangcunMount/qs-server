@@ -14,6 +14,7 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 	opts "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/runtimefacts"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdk "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -40,6 +41,7 @@ type MessagingRuntime struct {
 	relayCancel, handlerCancel context.CancelFunc
 	relayDone                  chan struct{}
 	observations               *messagingCollector
+	facts                      *runtimefacts.Owner
 }
 type rawMessagingKey struct{}
 type fixedHandoff struct {
@@ -69,6 +71,38 @@ func NewMessagingRuntime(o opts.AIWorkflowMessagingOptions, db *sql.DB, s *store
 	return &MessagingRuntime{Options: o, DB: db, Store: s, Receiver: r}, nil
 }
 
+// BindRuntimeFacts attaches the host's observation owner before Start. It never
+// starts a second transport or reads configuration outside this runtime.
+func (r *MessagingRuntime) BindRuntimeFacts(facts *runtimefacts.Owner) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.started || r.stopping || (r.facts != nil && r.facts != facts) {
+		return errors.New("AI MQ runtime facts binding unavailable")
+	}
+	r.facts = facts
+	return nil
+}
+
+const aiConsumerFactsID = "api-ai-events"
+const aiPublisherFactsID = "api-ai-publisher"
+
+func (r *MessagingRuntime) declareConsumerFacts(cfg *driver.Config) {
+	if r.facts == nil {
+		return
+	}
+	cfg.ClientID = r.facts.ClientID(aiConsumerFactsID)
+	addresses, httpAddresses := make([]string, 0, len(r.Options.NSQD)), make([]string, 0, len(r.Options.NSQD))
+	pairs := make([]runtimefacts.NSQDPair, 0, len(r.Options.NSQD))
+	for tcp, httpAddress := range r.Options.NSQD {
+		addresses = append(addresses, tcp)
+		httpAddresses = append(httpAddresses, httpAddress)
+		pairs = append(pairs, runtimefacts.NSQDPair{TCPAddress: tcp, HTTPAddress: httpAddress})
+	}
+	if err := r.facts.Declare(runtimefacts.Transport{ID: aiConsumerFactsID, Provider: "nsq", Direction: "consumer", NSQDTCPAddresses: addresses, NSQDHTTPAddresses: httpAddresses, NSQDPairs: pairs, ClientID: cfg.ClientID, Hostname: cfg.Hostname}); err != nil {
+		r.facts.MarkIncomplete(aiConsumerFactsID)
+	}
+}
+
 func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -78,6 +112,12 @@ func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 	if r.started {
 		return nil
 	}
+	defer func() {
+		if resultErr != nil && r.facts != nil {
+			r.facts.MarkIncomplete(aiConsumerFactsID)
+			r.facts.MarkIncomplete(aiPublisherFactsID)
+		}
+	}()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -106,6 +146,7 @@ func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 	cfg.WriteTimeout = 5 * time.Second
 	cfg.ReadTimeout = 5 * time.Second
 	cfg.HeartbeatInterval = time.Second
+	r.declareConsumerFacts(cfg)
 	failedTopic := legacy.FailedHandoffTopic(app.EventsTopic, "qs-server.ai-events.v1")
 	var err error
 	if r.failure, err = driver.NewConsumer(failedTopic, legacy.FailedHandoffChannel, cfg); err != nil {
@@ -171,7 +212,15 @@ func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 			return err
 		}
 	}
-	r.publisher, err = sdk.NewManagedPublisher(sdk.ManagedPublisherConfig{Address: addresses[0], Driver: cfg, MaxInFlight: 1})
+	publisherConfig := *cfg
+	if r.facts != nil {
+		publisherConfig.ClientID = r.facts.ClientID(aiPublisherFactsID)
+		httpAddress := r.Options.NSQD[addresses[0]]
+		if err := r.facts.Declare(runtimefacts.Transport{ID: aiPublisherFactsID, Provider: "nsq", Direction: "publisher", NSQDTCPAddresses: []string{addresses[0]}, NSQDHTTPAddresses: []string{httpAddress}, NSQDPairs: []runtimefacts.NSQDPair{{TCPAddress: addresses[0], HTTPAddress: httpAddress}}, ClientID: publisherConfig.ClientID, Hostname: publisherConfig.Hostname}); err != nil {
+			r.facts.MarkIncomplete(aiPublisherFactsID)
+		}
+	}
+	r.publisher, err = sdk.NewManagedPublisher(sdk.ManagedPublisherConfig{Address: addresses[0], Driver: &publisherConfig, MaxInFlight: 1})
 	if err != nil {
 		return err
 	}
@@ -203,6 +252,17 @@ func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 		}
 	}()
 	r.started = true
+	if r.facts != nil {
+		if err := r.facts.MarkSubscribed(aiConsumerFactsID, runtimefacts.Subscription{Topic: app.EventsTopic, Channel: "qs-server.ai-events.v1", FailureTopic: failedTopic, FailureChannel: legacy.FailedHandoffChannel}); err != nil {
+			r.facts.MarkIncomplete(aiConsumerFactsID)
+		}
+		if err := r.facts.MarkStarted(aiConsumerFactsID); err != nil {
+			r.facts.MarkIncomplete(aiConsumerFactsID)
+		}
+		if err := r.facts.MarkStarted(aiPublisherFactsID); err != nil {
+			r.facts.MarkIncomplete(aiPublisherFactsID)
+		}
+	}
 	return nil
 }
 
@@ -212,6 +272,10 @@ func (r *MessagingRuntime) Stop(ctx context.Context) error {
 	return r.stop(ctx)
 }
 func (r *MessagingRuntime) stop(ctx context.Context) error {
+	if r.facts != nil {
+		r.facts.MarkStopped(aiConsumerFactsID)
+		r.facts.MarkStopped(aiPublisherFactsID)
+	}
 	r.stopping = true
 	if r.relayCancel != nil {
 		r.relayCancel()
