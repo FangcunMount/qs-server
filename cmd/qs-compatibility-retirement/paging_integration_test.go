@@ -46,11 +46,11 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		}
 	}()
 	col := db.Collection("domain_event_outbox")
-	const rows = 10000
+	const rows = 25005
 	for start := 1; start <= rows; start += 1000 {
 		docs := make([]any, 0, 1000)
 		for n := start; n < start+1000 && n <= rows; n++ {
-			docs = append(docs, bson.D{{Key: "_id", Value: int64(n)}, {Key: "payload", Value: bytes.Repeat([]byte{byte(n)}, 1536)}, {Key: "status", Value: "published"}})
+			docs = append(docs, bson.D{{Key: "_id", Value: int64(n)}, {Key: "payload", Value: bytes.Repeat([]byte{byte(n)}, 2048)}, {Key: "status", Value: "published"}})
 		}
 		if _, e := col.InsertMany(ctx, docs); e != nil {
 			t.Fatal(e)

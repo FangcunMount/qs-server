@@ -1395,7 +1395,14 @@ coverage; both live Python and Go entrypoints reject V1 before connecting.
 V2 retains the exact scope, separately approved source/operation, identity hashes
 and expected clean heads. Its immutable per-target profile is
 `query_seconds=30`, `total_seconds=1500`, `max_records=1000000`,
-`max_bytes=2147483648`, `page_size=1000`, `max_pages=1001`.
+`max_bytes=2147483648`, `page_size=10000`, `max_pages=1001`.
+The fixed page size reduces repeated queries and durable checkpoints after the
+previous 1,000-row profile exhausted the total deadline. Both full passes,
+fixed BSON upper bounds, source byte equality, EOF and all resource limits still
+apply. This changes no historical receipt: older approved profiles retain their
+original limits, and new source-bound approvals are required before a live run.
+The owned database CI compares 1,000- and 10,000-row pages; its timings do not
+establish production throughput.
 The fixed read-only inventory container uses 2 CPUs and 512 MiB of memory;
 these are implementation bounds, with no caller override. The larger CPU budget
 does not establish production throughput or a ten-minute completion guarantee.

@@ -348,7 +348,7 @@ class FailedInventoryCleanupContracts(unittest.TestCase):
         with mock.patch.object(tool.os,'read',side_effect=changing),self.assertRaisesRegex(tool.Blocked,'failed_inventory_file_changed'):self.execute()
 
     def test_cleanup_scope_rejects_unapproved_limits_or_other_run(self):
-        unapproved=copy.deepcopy(self.request);unapproved['limits']['page_size']=10000
+        unapproved=copy.deepcopy(self.request);unapproved['limits']['page_size']=2000
         with self.assertRaisesRegex(tool.Blocked,'inventory_request_limits_invalid'):
             tool.validate_v2_request(unapproved,self.operation,self.reference['source_sha'],boundary=False)
         self.approval['inventory_report']['run_id']='38025045552-1';self.approve()

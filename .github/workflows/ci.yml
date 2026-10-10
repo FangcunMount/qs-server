@@ -358,6 +358,31 @@ jobs:
             sleep 2
           done
 
+      - name: Verify inventory page sizes preserve original BSON and complete EOF
+        env:
+          QS_RETIREMENT_LOCAL_INTEGRATION: '1'
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_DATABASE: qs_retirement_inventory_test
+          MONGODB_HOST: 127.0.0.1
+          MONGODB_PORT: '27017'
+          MONGODB_DBNAME: qs_retirement_inventory_test
+          MONGODB_USERNAME: qs_inventory_page_fixture
+          MONGODB_PASSWORD: inventory-page-fixture
+        run: |
+          set -euo pipefail
+          docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval '
+            const a = db.getSiblingDB("admin");
+            if (a.getUser("qs_inventory_page_fixture") !== null) throw new Error("owned fixture user already exists");
+            a.createUser({user:"qs_inventory_page_fixture",pwd:"inventory-page-fixture",roles:[{role:"readWriteAnyDatabase",db:"admin"}]});'
+          cleanup_inventory_page_user() {
+            docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval 'if (!db.getSiblingDB("admin").dropUser("qs_inventory_page_fixture")) throw new Error("owned fixture user cleanup failed");'
+          }
+          trap cleanup_inventory_page_user EXIT
+          go test -tags=integration -count=1 -timeout=3m -v ./cmd/qs-compatibility-retirement \
+            -run '^TestOwnedMongoPageSizePreservesSourceAndBothEOF$' | tee "${RUNNER_TEMP}/qs-inventory-page-size.log"
+          grep -Eq '^--- PASS: TestOwnedMongoPageSizePreservesSourceAndBothEOF \(' "${RUNNER_TEMP}/qs-inventory-page-size.log"
+          if grep -Eq -- '--- SKIP:|--- FAIL:' "${RUNNER_TEMP}/qs-inventory-page-size.log"; then exit 1; fi
+
       - name: Verify window-tool root-once capture, restore and owned-process cancellation
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}

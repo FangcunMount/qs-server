@@ -322,7 +322,7 @@ func publicCLICleanupEngines(root, archive, source, operation, run, manifest str
 }
 
 const (
-	publicCLIInventoryPageSize = 1000
+	publicCLIInventoryPageSize = 10000
 	publicCLIInventoryMaxPages = 1001
 )
 
