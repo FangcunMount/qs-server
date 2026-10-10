@@ -227,10 +227,11 @@ jobs:
               const canonical = value => Array.isArray(value) ? value.map(canonical) : object(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
               let approval;
               try {approval = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
-              const inventoryReport = object(approval) && approval.kind === 'readonly_existing_inventory_report_approval';
+              const failedCleanup = object(approval) && approval.kind === 'cleanup_only_failed_inventory_baseline_approval';
+              const inventoryReport = failedCleanup || (object(approval) && approval.kind === 'readonly_existing_inventory_report_approval');
               const referenceKey = inventoryReport ? 'inventory_report' : 'boundary_report';
               if (!exact(approval, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope',referenceKey]) ||
-                  approval.format_version !== 1 || approval.kind !== (inventoryReport ? 'readonly_existing_inventory_report_approval' : 'readonly_existing_boundary_report_approval') || approval.prepare_mode !== 'report-diagnostic' ||
+                  approval.format_version !== 1 || approval.kind !== (failedCleanup ? 'cleanup_only_failed_inventory_baseline_approval' : inventoryReport ? 'readonly_existing_inventory_report_approval' : 'readonly_existing_boundary_report_approval') || approval.prepare_mode !== 'report-diagnostic' ||
                   approval.source_sha !== input.approved_source_sha || approval.operation_id !== input.operation_id ||
                   approval.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || approval.database_scope !== 'mysql-and-mongodb') {reject();}
               const report = approval[referenceKey];
@@ -240,6 +241,7 @@ jobs:
                   typeof report.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(report.sha256) ||
                   typeof report.request_sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(report.request_sha256) ||
                   !/^[0-9]{1,20}-[0-9]{1,4}$/.test(currentRun) || report.run_id === currentRun) {reject();}
+              if (failedCleanup && (approval.operation_id !== '38019009876-1' || report.run_id !== '38025045551-1' || report.source_sha !== 'ae807219ffee37c1f060f1bfca25dd7c408ef9fd' || report.request_sha256 !== 'e5d29b674698dbfe4d8f85932fad0d8bba445e3b6823028cd78db4a150f16962' || report.sha256 !== '3983779a5fab8be6e027390491a3c9215cdf1270c03316ed8ebcc614793777c8')) {reject();}
               const line = JSON.stringify(canonical(approval));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
             }

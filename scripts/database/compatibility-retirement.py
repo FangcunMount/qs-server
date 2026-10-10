@@ -1408,6 +1408,8 @@ def report_diagnostic(args):
     raw = canonical_bytes(value)
     if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
         fail("report_diagnostic_approval_hash_invalid")
+    if type(value) is dict and value.get("kind") == "cleanup_only_failed_inventory_baseline_approval":
+        return failed_inventory_cleanup_baseline(args, value)
     if type(value) is dict and value.get("kind") == "readonly_existing_inventory_report_approval":
         return inventory_report_diagnostic(args, value)
     fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
@@ -1522,6 +1524,153 @@ def inventory_report_diagnostic(args, value):
             "inventory_private_report_hash": report_hash, "inventory_request_hash": reference["request_sha256"],
             "inventory_database_error_categories": categories,
             "error_category": "existing_report_diagnostic_only", "capabilities": {key: False for key in CAPABILITIES}}
+
+
+# One failed, already terminal producer only. This is temporary-file disposition,
+# never an alternate inventory parser, history proof, or DROP capability.
+FAILED_INVENTORY_OPERATION = "38019009876-1"
+FAILED_INVENTORY_REFERENCE = {
+    "source_sha": "ae807219ffee37c1f060f1bfca25dd7c408ef9fd",
+    "run_id": "38025045551-1",
+    "request_sha256": "e5d29b674698dbfe4d8f85932fad0d8bba445e3b6823028cd78db4a150f16962",
+    "sha256": "3983779a5fab8be6e027390491a3c9215cdf1270c03316ed8ebcc614793777c8",
+}
+FAILED_INVENTORY_LIMITS = dict(INVENTORY_V2_LIMITS, page_size=1000)
+FAILED_INVENTORY_MONGO_PAGES = 281
+FAILED_INVENTORY_BASELINE = "failed-inventory-cleanup-baseline.json"
+FAILED_INVENTORY_BASELINE_MAX = 3 * 1024 * 1024
+
+
+def failed_inventory_container_absent(deadline):
+    # Check both the exact prospective name and any original op/run-labelled
+    # producer. An inspect error is never interpreted as container absence.
+    filters = (("name=^/qs-compatibility-inventory-" + FAILED_INVENTORY_REFERENCE["run_id"] + "$",),
+               ("label=qs.compatibility-retirement.operation=" + FAILED_INVENTORY_OPERATION,
+                "label=qs.compatibility-retirement.run=" + FAILED_INVENTORY_REFERENCE["run_id"]))
+    for selection in filters:
+        command = ["sudo", "-n", "docker", "container", "ls", "--all", "--no-trunc"]
+        for condition in selection: command.extend(("--filter", condition))
+        command.extend(("--format", "{{.ID}}"))
+        code, raw = capture_fixed(command, timeout=min(15, max(0.01, deadline-time.monotonic())))
+        if code or raw.strip() or time.monotonic() >= deadline:
+            fail("failed_inventory_producer_not_absent")
+
+
+def failed_inventory_stat(st):
+    return [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns,
+            st.st_uid, stat.S_IMODE(st.st_mode), st.st_nlink]
+
+
+def failed_inventory_file(dirfd, name, deadline, *, decode_json=False):
+    # Names come only from the closed original producer list below. Hold the
+    # actual file FD while hashing; no source body enters a JSON receipt.
+    try: fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
+    except OSError: fail("failed_inventory_file_unavailable")
+    try:
+        before = os.fstat(fd)
+        maximum = MAX_JSON if decode_json else FAILED_INVENTORY_LIMITS["max_bytes"]
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid() or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1 or not 0 <= before.st_size <= maximum:
+            fail("failed_inventory_file_not_private")
+        digest = hashlib.sha256(); chunks = []
+        while True:
+            if time.monotonic() >= deadline: fail("failed_inventory_cleanup_timeout")
+            chunk = os.read(fd, 128 * 1024)
+            if not chunk: break
+            digest.update(chunk)
+            if decode_json: chunks.append(chunk)
+        after = os.fstat(fd)
+        visible = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
+        if failed_inventory_stat(before) != failed_inventory_stat(after) or failed_inventory_stat(after) != failed_inventory_stat(visible):
+            fail("failed_inventory_file_changed")
+        return {"sha256": digest.hexdigest(), "stat": failed_inventory_stat(after)}, decode(b"".join(chunks)) if decode_json else None
+    finally: os.close(fd)
+
+
+def failed_inventory_inputs(args):
+    directory = operation_directory(args.root, FAILED_INVENTORY_OPERATION)
+    ref = FAILED_INVENTORY_REFERENCE
+    request, _ = read_private(directory, "inventory-request.json", ref["request_sha256"])
+    if request.get("limits") != FAILED_INVENTORY_LIMITS or any(type(v) is not int for v in request["limits"].values()):
+        fail("failed_inventory_old_profile_mismatch")
+    # Validate all other existing request semantics without permitting the old
+    # profile in the ordinary/current inventory entry points.
+    validate_v2_request(dict(request, limits=dict(INVENTORY_V2_LIMITS)), FAILED_INVENTORY_OPERATION, ref["source_sha"], boundary=False)
+    output = private_directory(directory / ("inventory-" + ref["run_id"]))
+    report, _ = read_private(output, "inventory.private.json", ref["sha256"])
+    if report.get("kind") != "readonly_compatibility_inventory" or report.get("format_version") != 2 or report.get("source_sha") != ref["source_sha"] or report.get("operation_id") != FAILED_INVENTORY_OPERATION or report.get("run_id") != ref["run_id"] or report.get("request_hash") != ref["request_sha256"] or report.get("target_hash") != TARGET_HASH or report.get("complete") is not False or report.get("drop_ready") is not False or report.get("diagnostic_only") is not True:
+        fail("failed_inventory_report_mismatch")
+    targets = report.get("targets")
+    if type(targets) is not list or len(targets) != 4 or [tuple(i.get(k) for k in ("database","name","kind")) for i in targets] != list(TARGETS):
+        fail("failed_inventory_report_mismatch")
+    names = set(SOURCE_FILENAMES.values()) | ASSET_FILENAMES | {"inventory.private.json", "entrypoints.private.json", "mysql-metadata.private.json"}
+    checkpoints = {}
+    for item in targets[:3]:
+        for key in ("records", "pages", "equal_full_passes"): uint(item.get(key))
+        if item.get("complete") is not True or item["equal_full_passes"] != 2 or item.get("error_category") != "none" or item["pages"] % 2 or item["pages"] > 2002:
+            fail("failed_inventory_sql_checkpoint_scope_invalid")
+        for pass_id in (1,2):
+            for page in range(1, item["pages"]//2+1):
+                checkpoints[f"mysql-{item['name']}-pass-{pass_id}-page-{page:06d}.checkpoint.json"] = (pass_id,page)
+    if targets[3].get("complete") is not False or targets[3].get("equal_full_passes") != 0:
+        fail("failed_inventory_mongo_incomplete_mismatch")
+    for page in range(1, FAILED_INVENTORY_MONGO_PAGES+1):
+        checkpoints[f"mongodb-domain_event_outbox-pass-1-page-{page:06d}.checkpoint.json"] = (1,page)
+    names.update(checkpoints)
+    return directory, output, request, names, checkpoints
+
+
+def failed_inventory_cleanup_baseline(args, value):
+    fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id",
+                   "target_hash", "database_scope", "inventory_report"))
+    if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "cleanup_only_failed_inventory_baseline_approval" or value["prepare_mode"] != "report-diagnostic" or value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb" or value["operation_id"] != FAILED_INVENTORY_OPERATION or value["inventory_report"] != FAILED_INVENTORY_REFERENCE:
+        fail("failed_inventory_cleanup_approval_invalid")
+    validate_binding(value, args.operation_id, args.actual_source_sha)
+    if args.run_id == FAILED_INVENTORY_REFERENCE["run_id"]: fail("report_diagnostic_origin_invalid")
+    directory, output, request, names, checkpoints = failed_inventory_inputs(args)
+    deadline = time.monotonic()+100
+    with locked_operation(directory):
+        failed_inventory_container_absent(deadline)
+        dirfd = os.open(output, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            st = os.fstat(dirfd)
+            if st.st_uid != os.getuid() or stat.S_IMODE(st.st_mode) != 0o700:
+                fail("failed_inventory_directory_not_private")
+            if set(os.listdir(dirfd)) != names: fail("failed_inventory_unknown_or_missing_member")
+            entries = {}
+            for name in sorted(names):
+                item, content = failed_inventory_file(dirfd, name, deadline, decode_json=name.endswith(".json") and name != "mysql-metadata.private.json")
+                if name == "inventory.private.json" and item["sha256"] != FAILED_INVENTORY_REFERENCE["sha256"]:
+                    fail("failed_inventory_report_mismatch")
+                if name in checkpoints:
+                    fields(content, ("format_version","kind","source_sha","pass","page","cursor_token","records","source_bytes","prefix_hash","diagnostic_only","resume_existing_file_allowed"))
+                    pass_id,page = checkpoints[name]
+                    if content["format_version"] != 1 or type(content["format_version"]) is not int or content["kind"] != "readonly_inventory_page_checkpoint" or content["source_sha"] != FAILED_INVENTORY_REFERENCE["source_sha"] or type(content["pass"]) is not int or type(content["page"]) is not int or (content["pass"],content["page"]) != (pass_id,page) or content["diagnostic_only"] is not True or content["resume_existing_file_allowed"] is not False or type(content["cursor_token"]) is not str or len(content["cursor_token"]) > 2048:
+                        fail("failed_inventory_checkpoint_mismatch")
+                    uint(content["records"]); uint(content["source_bytes"]); token(content["prefix_hash"], HASH)
+                elif name in ASSET_FILENAMES:
+                    filename = name.removesuffix(".asset.json")
+                    target = next(target for target,path in SOURCE_FILENAMES.items() if path == filename)
+                    boundary = request["approved_boundaries"][next(i for i,t in enumerate(TARGETS) if t[:2] == target)]
+                    expected = {"format_version":1,"kind":"temporary_inventory_source_copy","filename":filename,"source_sha":FAILED_INVENTORY_REFERENCE["source_sha"],"operation_id":FAILED_INVENTORY_OPERATION,"run_id":FAILED_INVENTORY_REFERENCE["run_id"],"request_hash":FAILED_INVENTORY_REFERENCE["request_sha256"],"protocol":"mysql_cast_binary_columns_pk_order_v2" if target[0] == "mysql" else "mongodb_server_bson_pk_order_v2","boundary":boundary,"contains_original_body":True,"retirement_proof":False,"purge_required_after_acceptance":True,"resume_existing_file_allowed":False}
+                    if content != expected: fail("failed_inventory_asset_mismatch")
+                elif name == "entrypoints.private.json":
+                    fields(content, ("format_version","kind","source_sha","operation_id","run_id","request_hash","catalog_hash","live_fence_proven","catalog"))
+                    if content["format_version"] != 1 or type(content["format_version"]) is not int or content["kind"] != "source_only_production_entrypoint_catalog" or content["source_sha"] != FAILED_INVENTORY_REFERENCE["source_sha"] or content["operation_id"] != FAILED_INVENTORY_OPERATION or content["run_id"] != FAILED_INVENTORY_REFERENCE["run_id"] or content["request_hash"] != FAILED_INVENTORY_REFERENCE["request_sha256"] or content["live_fence_proven"] is not False:
+                        fail("failed_inventory_catalog_mismatch")
+                    token(content["catalog_hash"], HASH)
+                entries[name] = item
+            failed_inventory_container_absent(deadline)
+            if set(os.listdir(dirfd)) != names or os.stat(output, follow_symlinks=False).st_ino != st.st_ino or os.stat(output, follow_symlinks=False).st_dev != st.st_dev:
+                fail("failed_inventory_directory_changed")
+            read_private(directory, "inventory-request.json", FAILED_INVENTORY_REFERENCE["request_sha256"])
+            # These are current observed bytes/inodes, NOT original source hash
+            # proof. The hard-coded producer disposition is the narrow scope.
+            baseline = {"format_version":1,"kind":"cleanup_only_failed_inventory_baseline","original_operation_id":FAILED_INVENTORY_OPERATION,"original_inventory_report":FAILED_INVENTORY_REFERENCE.copy(),"observing_source_sha":args.actual_source_sha,"observing_run_id":args.run_id,"approval_sha256":args.bootstrap_approval_hash,"directory_identity":[st.st_dev,st.st_ino,st.st_uid,stat.S_IMODE(st.st_mode)],"files":entries,"inventory_complete":False,"retirement_proof":False,"drop_authority":False,"producer_container_absent":True}
+            raw = canonical_bytes(baseline)
+            if len(raw) > FAILED_INVENTORY_BASELINE_MAX: fail("failed_inventory_baseline_bound_exceeded")
+            create_bootstrap_file(directory, FAILED_INVENTORY_BASELINE, raw)
+        finally: os.close(dirfd)
+    return {"format_version":1,"operation":"prepare","prepare_mode":"report-diagnostic","source_sha":args.actual_source_sha,"run_id":args.run_id,"operation_id":args.operation_id,"target_hash":TARGET_HASH,"target_count":4,"complete":False,"execution_allowed":False,"drop_ready":False,"diagnostic_only":True,"inventory_complete":False,"cleanup_only":True,"cleanup_baseline_complete":True,"cleanup_baseline_sha256":hashlib.sha256(raw).hexdigest(),"cleanup_file_count":len(entries),"cleanup_source_file_bytes":sum(entries[n]["stat"][2] for n in SOURCE_FILENAMES.values()),"observed_inventory_report":FAILED_INVENTORY_REFERENCE.copy(),"original_content_verified":False,"purge_executed":False,"error_category":"failed_inventory_cleanup_baseline_only","capabilities":{key:False for key in CAPABILITIES}}
 
 
 LIFECYCLE_ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback",
