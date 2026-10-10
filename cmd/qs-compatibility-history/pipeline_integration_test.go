@@ -39,11 +39,124 @@ import (
 
 func requireNative(t *testing.T) {
 	t.Helper()
+	if os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") == "1" {
+		if os.Getenv("QS_HISTORY_CLI_LOCAL_INTEGRATION") != "" || os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_JOB") != "runtime-closure-e2e" || os.Getenv("MYSQL_HOST") != "127.0.0.1" || os.Getenv("MYSQL_PORT") != "3306" || os.Getenv("MONGODB_HOST") != "127.0.0.1" || os.Getenv("MONGODB_PORT") != "27017" || os.Getenv("QS_HISTORY_MONGO_REPLICA_SET") != "rs0" {
+			t.Fatal("actual CI job database routes required")
+		}
+		for _, kind := range []string{"MYSQL", "MONGO"} {
+			id := os.Getenv("QS_HISTORY_CI_" + kind + "_CONTAINER")
+			if !hashPattern.MatchString(id) {
+				t.Fatal("actual CI job database container ID required")
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			raw, err := exec.CommandContext(ctx, "docker", "--host", "unix:///var/run/docker.sock", "inspect", id).Output()
+			cancel()
+			if err != nil || !historyCIFixtureMatches(raw, id, kind) {
+				t.Fatal("actual CI job database inspection rejected")
+			}
+		}
+		return
+	}
 	if os.Getenv("QS_HISTORY_CLI_LOCAL_INTEGRATION") != "1" {
 		t.Skip("owned CLI native fixtures not selected")
 	}
 	if os.Getenv("MYSQL_HOST") != "127.0.0.1" || os.Getenv("MYSQL_PORT") != "34306" || os.Getenv("MONGODB_HOST") != "127.0.0.1" || os.Getenv("QS_HISTORY_FIXTURE_OWNERSHIP_VERIFIED") != "1" || !hashPattern.MatchString(os.Getenv("QS_HISTORY_MONGO_FIXTURE_ID")) || os.Getenv("QS_HISTORY_MONGO_REPLICA_SET") != "qs_history_cli_native" {
 		t.Fatal("independently verified owned loopback fixtures required")
+	}
+}
+
+// Only the actual job containers may supply this test-only route. Local
+// native fixtures retain their separate port, authentication and replica guards.
+func historyCIFixtureMatches(raw []byte, id, kind string) bool {
+	var rows []struct {
+		ID     string `json:"Id"`
+		Name   string
+		Config struct {
+			Image string
+			Cmd   []string
+		}
+		State struct {
+			Running bool
+			Health  struct{ Status string }
+		}
+		Mounts     []struct{ Type string }
+		HostConfig struct {
+			PortBindings map[string][]struct{ HostIP, HostPort string }
+		}
+		NetworkSettings struct {
+			Ports map[string][]struct{ HostIP, HostPort string }
+		}
+	}
+	if !hashPattern.MatchString(id) || json.Unmarshal(raw, &rows) != nil || len(rows) != 1 || rows[0].ID != id || !rows[0].State.Running {
+		return false
+	}
+	port := "3306"
+	switch kind {
+	case "MYSQL":
+		if rows[0].Config.Image != "mysql:8.4" || rows[0].State.Health.Status != "healthy" {
+			return false
+		}
+	case "MONGO":
+		port = "27017"
+		if rows[0].Config.Image != "mongo:7.0" || rows[0].Name != "/qs-runtime-closure-e2e-mongo" || strings.Join(rows[0].Config.Cmd, "\x00") != "--replSet\x00rs0\x00--bind_ip_all\x00--setParameter\x00ttlMonitorSleepSecs=1" {
+			return false
+		}
+	default:
+		return false
+	}
+	for _, mount := range rows[0].Mounts {
+		if mount.Type != "volume" {
+			return false
+		}
+	}
+	requested := rows[0].HostConfig.PortBindings[port+"/tcp"]
+	actual := rows[0].NetworkSettings.Ports[port+"/tcp"]
+	if len(requested) != 1 || requested[0].HostPort != port || requested[0].HostIP != "" && requested[0].HostIP != "0.0.0.0" || len(actual) < 1 || len(actual) > 2 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, binding := range actual {
+		if binding.HostPort != port || binding.HostIP != "0.0.0.0" && binding.HostIP != "::" || seen[binding.HostIP] {
+			return false
+		}
+		seen[binding.HostIP] = true
+	}
+	return seen["0.0.0.0"]
+}
+
+func TestHistoryCIFixtureRequiresActualJobContainers(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	for _, kind := range []string{"MYSQL", "MONGO"} {
+		port, image, name, command := "3306", "mysql:8.4", "job-service", []string{}
+		if kind == "MONGO" {
+			port, image, name, command = "27017", "mongo:7.0", "qs-runtime-closure-e2e-mongo", []string{"--replSet", "rs0", "--bind_ip_all", "--setParameter", "ttlMonitorSleepSecs=1"}
+		}
+		cmd, err := json.Marshal(command)
+		if err != nil {
+			t.Fatal("fixture command encode")
+		}
+		valid := `[{"Id":"` + id + `","Name":"/` + name + `","Config":{"Image":"` + image + `","Cmd":` + string(cmd) + `},"State":{"Running":true,"Health":{"Status":"healthy"}},"HostConfig":{"PortBindings":{"` + port + `/tcp":[{"HostIp":"","HostPort":"` + port + `"}]}},"NetworkSettings":{"Ports":{"` + port + `/tcp":[{"HostIp":"0.0.0.0","HostPort":"` + port + `"},{"HostIp":"::","HostPort":"` + port + `"}]}}}]`
+		if !historyCIFixtureMatches([]byte(valid), id, kind) {
+			t.Fatal("actual job fixture route rejected")
+		}
+		for key, raw := range map[string]string{
+			"container": strings.Replace(valid, `"Id":"`+id, `"Id":"`+strings.Repeat("b", 64), 1),
+			"image":     strings.Replace(valid, image, "other:latest", 1),
+			"stopped":   strings.Replace(valid, `"Running":true`, `"Running":false`, 1),
+			"port":      strings.Replace(valid, `"HostPort":"`+port+`"`, `"HostPort":"34306"`, 1),
+			"host":      strings.Replace(valid, `"HostIp":"0.0.0.0"`, `"HostIp":"192.0.2.1"`, 1),
+			"duplicate": strings.TrimSuffix(valid, "]") + "," + strings.TrimPrefix(valid, "["),
+			"bind":      strings.Replace(valid, `"State":`, `"Mounts":[{"Type":"bind"}],"State":`, 1),
+		} {
+			t.Run(kind+"/"+key, func(t *testing.T) {
+				if historyCIFixtureMatches([]byte(raw), id, kind) {
+					t.Fatal("unbound job fixture accepted")
+				}
+			})
+		}
+		if kind == "MYSQL" && historyCIFixtureMatches([]byte(strings.Replace(valid, "healthy", "starting", 1)), id, kind) || kind == "MONGO" && (historyCIFixtureMatches([]byte(strings.Replace(valid, "rs0", "other", 1)), id, kind) || historyCIFixtureMatches([]byte(strings.Replace(valid, name, "other", 1)), id, kind)) {
+			t.Fatal("actual job health/name/replica command rejected incorrectly")
+		}
 	}
 }
 func nativeToken(t *testing.T) string {
@@ -74,7 +187,7 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 	c.User = os.Getenv("MYSQL_USERNAME")
 	c.Passwd = os.Getenv("MYSQL_PASSWORD")
 	c.Net = "tcp"
-	c.Addr = "127.0.0.1:34306"
+	c.Addr = "127.0.0.1:" + os.Getenv("MYSQL_PORT")
 	c.ParseTime = true
 	c.Loc = time.UTC
 	c.MultiStatements = true
@@ -119,10 +232,28 @@ func nativeFixture(t *testing.T, nonempty bool) (*sql.DB, *mongo.Client, *mongo.
 	if e != nil || mongoPort < 1024 || mongoPort > 65535 || mongoPort == 33317 {
 		t.Fatal("independently owned Mongo port required")
 	}
-	adminOptions := options.Client().SetHosts([]string{"127.0.0.1:" + strconv.Itoa(mongoPort)}).SetReplicaSet("qs_history_cli_native").SetAuth(options.Credential{Username: os.Getenv("QS_HISTORY_MONGO_ADMIN_USERNAME"), Password: os.Getenv("QS_HISTORY_MONGO_ADMIN_PASSWORD"), AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second)
+	adminOptions := options.Client().SetHosts([]string{"127.0.0.1:" + strconv.Itoa(mongoPort)}).SetReplicaSet(os.Getenv("QS_HISTORY_MONGO_REPLICA_SET")).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second)
+	if os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") != "1" {
+		adminOptions.SetAuth(options.Credential{Username: os.Getenv("QS_HISTORY_MONGO_ADMIN_USERNAME"), Password: os.Getenv("QS_HISTORY_MONGO_ADMIN_PASSWORD"), AuthSource: "admin"})
+	}
 	adminMongo, err := mongo.Connect(t.Context(), adminOptions)
 	if err != nil || adminMongo.Ping(t.Context(), readpref.Primary()) != nil {
 		t.Fatal("owned Mongo connect failed")
+	}
+	if os.Getenv("QS_HISTORY_CLI_CI_INTEGRATION") == "1" {
+		var hello struct {
+			SetName string `bson:"setName"`
+			Primary bool   `bson:"isWritablePrimary"`
+		}
+		var config struct {
+			Config struct {
+				ID      string `bson:"_id"`
+				Members []struct{ Host string }
+			}
+		}
+		if adminMongo.Database("admin").RunCommand(t.Context(), bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil || hello.SetName != "rs0" || !hello.Primary || adminMongo.Database("admin").RunCommand(t.Context(), bson.D{{Key: "replSetGetConfig", Value: 1}}).Decode(&config) != nil || config.Config.ID != "rs0" || len(config.Config.Members) != 1 || config.Config.Members[0].Host != "127.0.0.1:27017" {
+			t.Fatal("actual CI Mongo replica configuration rejected")
+		}
 	}
 	db := adminMongo.Database(namespace)
 	role, user, password := "qs_history_cli_role_"+token, "qs_history_cli_user_"+token, nativeToken(t)+nativeToken(t)
