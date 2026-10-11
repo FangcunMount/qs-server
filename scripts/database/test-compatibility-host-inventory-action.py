@@ -264,17 +264,24 @@ class Tests(unittest.TestCase):
   self.assertEqual(sorted(x.name for x in self.root.iterdir()),['home'])
  def test_fake_transport_private_config_and_clean_result(self):
   home,repo=self.setup_local();report=self.report();report_raw=m.canonical(report);calls=[]
+  expected_key=self.env['HOST_INVENTORY_SSH_KEY'].encode()
   def transport(argv,**kw):
    calls.append((argv,kw))
    self.assertNotIn('PRIVATE_HOST',' '.join(argv));self.assertNotIn('PRIVATE_USER',' '.join(argv));self.assertNotIn('PRIVATE_SECRET',' '.join(argv))
+   key=Path(argv[2]).parent/'ssh.key'
+   self.assertEqual(key.read_bytes(),expected_key);self.assertEqual(stat.S_IMODE(key.stat().st_mode),0o600)
    if 'python3 -' in argv:return 0,b'{"created":true}\n',b''
    if argv[0]=='/usr/bin/scp':return 0,b'',b''
    if ' cleanup ' in argv[-1]:return 0,b'{"cleanup":"verified"}\n',b''
    return 0,m.canonical(m.projection(self.a,self.approved,self.run,self.req,report_raw,report)),b''
-  with mock.patch.object(Path,'home',return_value=home):v=m.run_action(self.env,repo,capture_fn=transport)
-  self.assertEqual(v['cleanup'],'verified');self.assertEqual(v['status'],'observed');self.assertFalse(any(v['capabilities'].values()));self.assertEqual(len(calls),4)
-  self.assertFalse(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
-  self.assertEqual(v['diagnostics'],{'execution_stage':'complete','remote_cleanup':'verified','local_cleanup':'verified','registration_cleanup':'verified','cleanup_failure_stage':'none','cleanup_error_category':'none'});self.assert_closed_diagnostics(v)
+  for variant,key in [('lf',expected_key.decode()),('no_final_lf',expected_key[:-1].decode()),('crlf',expected_key.decode().replace('\n','\r\n'))]:
+   with self.subTest(variant=variant):
+    calls=[];env=dict(self.env,HOST_INVENTORY_SSH_KEY=key)
+    with mock.patch.object(Path,'home',return_value=home):v=m.run_action(env,repo,capture_fn=transport)
+    self.assertEqual(v['cleanup'],'verified');self.assertEqual(v['status'],'observed');self.assertFalse(any(v['capabilities'].values()));self.assertEqual(len(calls),4)
+    self.assertFalse(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
+    self.assertEqual(v['diagnostics'],{'execution_stage':'complete','remote_cleanup':'verified','local_cleanup':'verified','registration_cleanup':'verified','cleanup_failure_stage':'none','cleanup_error_category':'none'});self.assert_closed_diagnostics(v)
+  self.rejected('route_rejected',lambda:m.route_file(dict(self.env,HOST_INVENTORY_SSH_KEY=expected_key.decode().replace('\n','\r'))))
  def test_transport_stderr_secret_is_not_published_unknown_remote_not_deleted(self):
   import io
   home,repo=self.setup_local();calls=[]

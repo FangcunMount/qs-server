@@ -58,7 +58,7 @@ jobs:
             if(typeof a.failed_inventory_operation_id!=='string'||!Object.hasOwn(origins,a.failed_inventory_operation_id)||a.failed_inventory_operation_id!==process.env.S0_FAILED_INVENTORY_OPERATION_ID)fail();
             const origin=origins[a.failed_inventory_operation_id];
             for(const k of keys){if(k.endsWith('_sha256')&&!/^[0-9a-f]{64}$/.test(a[k]))fail();if(k.endsWith('_source_sha')&&!/^[0-9a-f]{40}$/.test(a[k]))fail();if(k.endsWith('_run_id')&&!/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(a[k]))fail();}
-            if(!Number.isSafeInteger(a.producer_workflow_id)||a.producer_workflow_id<1||!Number.isSafeInteger(a.completion_job_id)||a.completion_job_id<1||a.total_seconds!==600||a.pin_sha256!=='984b437e6cf15c9a80f1633cc9dddcb59f8443c818e1a0ab6f54e47b7e3314b1')fail();
+            if(!Number.isSafeInteger(a.producer_workflow_id)||a.producer_workflow_id<1||!Number.isSafeInteger(a.completion_job_id)||a.completion_job_id<1||a.total_seconds!==600||a.pin_sha256!=='f1bb15434230a266299f4dc71572c5babaa33f3f66ee0099926e4b16d69fd855')fail();
             const main=await github.rest.repos.getBranch({...context.repo,branch:'main'});
             if(main.data.commit.sha!==context.sha)fail();
             for(const [p,k] of [['scripts/database/compatibility-s0-exact-exit.py','operator_sha256'],['scripts/database/compatibility-retirement.py','helper_sha256'],['scripts/database/compatibility-host-inventory-action.py','pin_sha256']]){if(digest(fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE,p)))!==a[k])fail();}
