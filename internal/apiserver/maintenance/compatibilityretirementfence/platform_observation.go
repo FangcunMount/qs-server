@@ -291,7 +291,7 @@ func readPlatformQuarantine(ctx context.Context, client HTTPDoer, s RunnerWorkfl
 			if row.Path != WorkflowPath || row.State != "active" {
 				return 0, ErrPlatformObservation
 			}
-		} else if row.State == "active" {
+		} else if row.State == "active" && !isManagedAnalysisWorkflow(row) {
 			return 0, ErrPlatformObservation
 		}
 		workflows[row.ID] = row
@@ -343,6 +343,22 @@ func readPlatformQuarantine(ctx context.Context, client HTTPDoer, s RunnerWorkfl
 	sort.Strings(hashes)
 	result.digest, result.count = digest([]byte(strings.Join(hashes, "\n"))), len(workflows)
 	return result, nil
+}
+
+// These exact GitHub-managed analysis identities belong to this repository,
+// whose identity is checked above. Only their catalog active state is exempt;
+// they remain in the complete catalog and every nonterminal run is refused.
+func isManagedAnalysisWorkflow(row githubWorkflow) bool {
+	switch row.ID {
+	case 214640618:
+		return row.Path == "dynamic/dependabot/update-graph" && row.Name == "Dependency Graph"
+	case 264440496:
+		return row.Path == "dynamic/github-code-scanning/codeql" && row.Name == "CodeQL"
+	case 343442498:
+		return row.Path == "dynamic/github-code-quality/codeql" && row.Name == "CodeQL - Code Quality"
+	default:
+		return false
+	}
 }
 
 func readPlatformList(read func(string, any) error, path, rowKey string, consume func(json.RawMessage) (int64, error)) error {
