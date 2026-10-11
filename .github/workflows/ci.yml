@@ -328,29 +328,35 @@ jobs:
 
       - name: Start Mongo Replica Set
         run: |
-          docker run --detach --rm \
+          set -euo pipefail
+          mongo_cid="$(docker run --detach \
             --name qs-runtime-closure-e2e-mongo \
             --publish 27017:27017 \
-            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1 --setParameter enableTestCommands=1
+            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1 --setParameter enableTestCommands=1)"
+          [[ "$mongo_cid" =~ ^[0-9a-f]{64}$ ]]
+          printf 'QS_RUNTIME_CLOSURE_MONGO_CONTAINER=%s\n' "$mongo_cid" >> "$GITHUB_ENV"
+          mongo_startup_diagnostics() {
+            docker inspect --format 'status={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} error={{json .State.Error}}' "$mongo_cid" || true
+            docker logs "$mongo_cid" || true
+          }
+          trap 'mongo_exit=$?; if [ "$mongo_exit" -ne 0 ]; then mongo_startup_diagnostics; fi' EXIT
           for attempt in $(seq 1 30); do
-            if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
+            if docker exec "$mongo_cid" mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
             fi
             if [ "$attempt" -eq 30 ]; then
-              docker logs qs-runtime-closure-e2e-mongo
               exit 1
             fi
             sleep 2
           done
-          docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval \
+          docker exec "$mongo_cid" mongosh --quiet --eval \
             'rs.initiate({_id: "rs0", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
           for attempt in $(seq 1 30); do
-            if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval \
+            if docker exec "$mongo_cid" mongosh --quiet --eval \
               'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
               exit 0
             fi
             if [ "$attempt" -eq 30 ]; then
-              docker logs qs-runtime-closure-e2e-mongo
               exit 1
             fi
             sleep 2
@@ -843,7 +849,12 @@ jobs:
 
       - name: Stop Mongo Replica Set
         if: always()
-        run: docker stop qs-runtime-closure-e2e-mongo || true
+        run: |
+          set -euo pipefail
+          mongo_cid="${QS_RUNTIME_CLOSURE_MONGO_CONTAINER:-}"
+          if [ -z "$mongo_cid" ]; then exit 0; fi
+          [[ "$mongo_cid" =~ ^[0-9a-f]{64}$ ]]
+          docker rm --force --volumes "$mongo_cid"
 
   lint:
     name: Lint Code
