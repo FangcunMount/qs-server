@@ -198,7 +198,7 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	}()
 	paired := mongo.NewSessionContext(hostmysql.WithTx(q, g), session)
 	borrowed := backup.BorrowedSources{SQL: tx, Mongo: h.owner.originalDB}
-	if e = backup.VerifyHostOriginalSources(paired, a, borrowed); e != nil {
+	if e = backup.VerifyHostOriginalSnapshotSources(paired, a, borrowed); e != nil {
 		return e
 	}
 	if h.aiStopped == nil || h.aiStopped.CheckStopped(paired) != nil {

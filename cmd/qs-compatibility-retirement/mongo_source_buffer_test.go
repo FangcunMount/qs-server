@@ -56,9 +56,9 @@ func openMongoSpoolFile(t testing.TB, dir string) *os.File {
 	return f
 }
 
-func TestMongoSourceBufferPreservesRawBytesAndDurablePageCheckpoints(t *testing.T) {
+func TestMongoSourceBufferPreservesRawBytesAndDiagnosticPageCheckpoints(t *testing.T) {
 	// The last short logical page and the boundary at an exact 1000 rows use
-	// the same byte framing, digest, BSON token and durability sequence.
+	// the same byte framing, digest, BSON token and final durability barrier.
 	docs := mongoSpoolDocuments(t, 2001)
 	dir := t.TempDir()
 	f := openMongoSpoolFile(t, dir)
@@ -90,7 +90,7 @@ func TestMongoSourceBufferPreservesRawBytesAndDurablePageCheckpoints(t *testing.
 		if tokenErr != nil {
 			t.Fatal(tokenErr)
 		}
-		if e = mongoPageCheckpoint(dir, 1, page, token, &s, h, f, buffer); e != nil {
+		if e = mongoPageCheckpoint(dir, 1, page, token, &s, h, f, buffer, nil); e != nil {
 			t.Fatal(e)
 		}
 		if buffer.Buffered() != 0 || s.Pages != uint64(page) {
@@ -108,10 +108,20 @@ func TestMongoSourceBufferPreservesRawBytesAndDurablePageCheckpoints(t *testing.
 			Records    uint64 `json:"records"`
 			Bytes      uint64 `json:"source_bytes"`
 			PrefixHash string `json:"prefix_hash"`
+			Diagnostic bool   `json:"diagnostic_only"`
+			Resume     bool   `json:"resume_existing_file_allowed"`
 		}
-		if readErr != nil || json.Unmarshal(raw, &checkpointBody) != nil || checkpointBody.Cursor != token || checkpointBody.Records != s.Records || checkpointBody.Bytes != s.Bytes || checkpointBody.PrefixHash != hex.EncodeToString(h.Sum(nil)) {
-			t.Fatal("durable checkpoint changed source identity")
+		st, statErr := os.Stat(checkpointPath)
+		if readErr != nil || statErr != nil || st.Mode().Perm() != 0600 || json.Unmarshal(raw, &checkpointBody) != nil || checkpointBody.Cursor != token || checkpointBody.Records != s.Records || checkpointBody.Bytes != s.Bytes || checkpointBody.PrefixHash != hex.EncodeToString(h.Sum(nil)) || !checkpointBody.Diagnostic || checkpointBody.Resume {
+			t.Fatal("diagnostic checkpoint changed source identity or private ownership")
 		}
+		probe := s
+		if e = mongoPageCheckpoint(dir, 1, page, token, &probe, h, f, buffer, nil); e == nil || e.Error() != "private_output_exists_or_unavailable" {
+			t.Fatal("diagnostic checkpoint was overwritten")
+		}
+	}
+	if e = mongoFinishSource(f); e != nil {
+		t.Fatal(e)
 	}
 }
 
@@ -128,7 +138,7 @@ func assertNoMongoCheckpoint(t *testing.T, dir string, s snapshot) {
 	t.Helper()
 	entries, e := os.ReadDir(dir)
 	if e != nil || len(entries) != 1 || entries[0].Name() != "source.bsonframes" || s.Pages != 0 {
-		t.Fatal("failed source durability advanced a page checkpoint")
+		t.Fatal("failed source output advanced a page checkpoint")
 	}
 }
 
@@ -155,7 +165,7 @@ func TestMongoSourceBufferFlushFailureDoesNotAdvanceCheckpoint(t *testing.T) {
 		t.Fatal("test did not retain bytes until actual flush")
 	}
 	s := snapshot{Records: 1}
-	if e = mongoPageCheckpoint(dir, 1, 1, "", &s, h, f, buffer); e == nil || e.Error() != "private_output_failed" {
+	if e = mongoPageCheckpoint(dir, 1, 1, "", &s, h, f, buffer, nil); e == nil || e.Error() != "private_output_failed" {
 		t.Fatal("actual flush failure was accepted")
 	}
 	assertNoMongoCheckpoint(t, dir, s)
@@ -165,7 +175,7 @@ func TestMongoSourceBufferFlushFailureDoesNotAdvanceCheckpoint(t *testing.T) {
 	}
 }
 
-func TestMongoSourceBufferSyncFailureDoesNotAdvanceCheckpoint(t *testing.T) {
+func TestMongoSourceBufferFinalSyncFailureKeepsOnlyDiagnosticCheckpoint(t *testing.T) {
 	dir := t.TempDir()
 	f := openMongoSpoolFile(t, dir)
 	buffer := bufio.NewWriterSize(f, mongoSourceBufferBytes)
@@ -174,14 +184,29 @@ func TestMongoSourceBufferSyncFailureDoesNotAdvanceCheckpoint(t *testing.T) {
 		t.Fatal(e)
 	}
 	h := sha256.New()
-	if e = writeMongoSpoolFrame(sink, h, mongoSpoolDocuments(t, 1)[0]); e != nil || buffer.Flush() != nil || f.Close() != nil {
-		t.Fatal("could not prepare actual sync failure")
+	if e = writeMongoSpoolFrame(sink, h, mongoSpoolDocuments(t, 1)[0]); e != nil {
+		t.Fatal(e)
 	}
 	s := snapshot{Records: 1}
-	if e = mongoPageCheckpoint(dir, 1, 1, "", &s, h, f, buffer); e == nil || e.Error() != "private_output_failed" {
-		t.Fatal("actual sync failure was accepted")
+	if e = mongoPageCheckpoint(dir, 1, 1, "", &s, h, f, buffer, nil); e != nil || s.Pages != 1 || f.Close() != nil {
+		t.Fatal("could not prepare final sync failure after an actual diagnostic page")
 	}
-	assertNoMongoCheckpoint(t, dir, s)
+	probe := snapshot{Records: 1}
+	if e = mongoPageCheckpoint(dir, 1, 2, "", &probe, h, f, buffer, nil); e == nil || e.Error() != "private_output_failed" || probe.Pages != 0 {
+		t.Fatal("closed source advanced a diagnostic checkpoint")
+	}
+	// This is the same final Sync+Close function used before production pass 2;
+	// the real closed descriptor makes Sync fail without a mocked filesystem.
+	if e = mongoFinishSource(f); e == nil || e.Error() != "private_output_failed" {
+		t.Fatal("actual final sync failure was accepted")
+	}
+	entries, e := os.ReadDir(dir)
+	if e != nil || len(entries) != 2 {
+		t.Fatal("failed final durability changed diagnostic material ownership")
+	}
+	if _, e = os.Stat(filepath.Join(dir, "mongodb-domain_event_outbox-pass-1-page-000002.checkpoint.json")); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("closed source created a second checkpoint")
+	}
 	raw, e := os.ReadFile(f.Name())
 	if e != nil || len(raw) == 0 {
 		t.Fatal("unknown source durability discarded actual written bytes")
@@ -215,7 +240,7 @@ func TestMongoSourceBufferSecondPassCheckpointNeedsNoSourceFile(t *testing.T) {
 	dir := t.TempDir()
 	h := sha256.New()
 	s := snapshot{Records: 1000, Bytes: 10000}
-	if e := mongoPageCheckpoint(dir, 2, 1, "", &s, h, nil, nil); e != nil || s.Pages != 1 {
+	if e := mongoPageCheckpoint(dir, 2, 1, "", &s, h, nil, nil, nil); e != nil || s.Pages != 1 {
 		t.Fatal("second pass acquired a source file dependency")
 	}
 	entries, e := os.ReadDir(dir)
@@ -275,7 +300,7 @@ func BenchmarkMongoSourceSpool(b *testing.B) {
 						s.Bytes += uint64(len(raw))
 					}
 					if buffered {
-						e = mongoPageCheckpoint(dir, 1, page, "", &s, h, f, buffer)
+						e = mongoPageCheckpoint(dir, 1, page, "", &s, h, f, buffer, nil)
 					} else {
 						if f.Sync() != nil {
 							b.Fatal("baseline source sync failed")
@@ -287,8 +312,8 @@ func BenchmarkMongoSourceSpool(b *testing.B) {
 						b.Fatal(e)
 					}
 				}
-				if f.Close() != nil {
-					b.Fatal("source close failed")
+				if mongoFinishSource(f) != nil {
+					b.Fatal("final source sync or close failed")
 				}
 				writes += counter.writes
 			}

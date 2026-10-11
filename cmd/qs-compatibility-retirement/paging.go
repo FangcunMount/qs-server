@@ -724,28 +724,67 @@ func emitMongoTargetDiagnostic(ctx, pageCtx context.Context, phase string, pass,
 
 const mongoSourceBufferBytes = 256 << 10
 
-// Keep the source durability barrier before the durable page checkpoint. The
-// second pass has no source file; its checkpoint still follows the same path.
-func mongoPageCheckpoint(dir string, pass, page int, token string, s *snapshot, h hash.Hash, source *os.File, buffer *bufio.Writer) error {
+type mongoPageDurations struct {
+	find, next, processing, flush, checkpoint time.Duration
+}
+
+// Checkpoints are diagnostic only and cannot resume a crashed scan. The source
+// is flushed per page and synchronized once before the second complete pass.
+func mongoPageCheckpoint(dir string, pass, page int, token string, s *snapshot, h hash.Hash, source *os.File, buffer *bufio.Writer, timing *mongoPageDurations) error {
 	if source != nil {
 		if buffer == nil {
 			return category("private_output_failed")
 		}
-		if e := buffer.Flush(); e != nil {
+		started := time.Now()
+		e := buffer.Flush()
+		if timing != nil {
+			timing.flush += time.Since(started)
+		}
+		if e != nil {
 			return outputError(e)
 		}
-		if source.Sync() != nil {
+		if _, e = source.Stat(); e != nil {
 			return category("private_output_failed")
 		}
 	} else if buffer != nil {
 		return category("private_output_failed")
 	}
+	started := time.Now()
+	defer func() {
+		if timing != nil {
+			timing.checkpoint += time.Since(started)
+		}
+	}()
 	s.Pages++
-	return checkpoint(dir, "mongodb-domain_event_outbox", pass, page, token, s.Records, s.Bytes, h)
+	f, e := os.OpenFile(filepath.Join(dir, fmt.Sprintf("mongodb-domain_event_outbox-pass-%d-page-%06d.checkpoint.json", pass, page)), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if e != nil {
+		return category("private_output_exists_or_unavailable")
+	}
+	encodeErr := json.NewEncoder(f).Encode(map[string]any{"format_version": 1, "kind": "readonly_inventory_page_checkpoint", "source_sha": sourceSHA, "pass": pass, "page": page, "cursor_token": token, "records": s.Records, "source_bytes": s.Bytes, "prefix_hash": hex.EncodeToString(h.Sum(nil)), "diagnostic_only": true, "resume_existing_file_allowed": false})
+	closeErr := f.Close()
+	if encodeErr != nil {
+		return category("private_output_failed")
+	}
+	if closeErr != nil {
+		return category("private_output_close_failed")
+	}
+	return nil
+}
+
+func mongoFinishSource(f *os.File) error {
+	if f == nil || f.Sync() != nil || f.Close() != nil {
+		return category("private_output_failed")
+	}
+	return nil
 }
 
 func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary, limits scanLimits, dir string, pass int, f *os.File) (snapshot, error) {
 	s := snapshot{Classification: map[string]uint64{}}
+	var timing mongoPageDurations
+	eof := 0
+	defer func() {
+		_, _ = fmt.Fprintf(os.Stderr, "QS_MONGO_SCAN_TIMING pass=%d eof=%d pages=%d records=%d source_bytes=%d find_ms=%d next_ms=%d processing_ms=%d flush_ms=%d checkpoint_ms=%d\n", pass, eof, s.Pages, s.Records, s.Bytes, timing.find.Milliseconds(), timing.next.Milliseconds(), timing.processing.Milliseconds(), timing.flush.Milliseconds(), timing.checkpoint.Milliseconds())
+	}()
 	h := sha256.New()
 	// The approved page size is an upper bound. Keep each actual cursor small
 	// enough to finish inside the unchanged whole-query deadline.
@@ -762,6 +801,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 	}
 	if b.Empty {
 		s.DataHash = hex.EncodeToString(h.Sum(nil))
+		eof = 1
 		return s, nil
 	}
 	upperRaw, e := base64.StdEncoding.Strict().DecodeString(b.UpperToken)
@@ -791,7 +831,9 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		}
 		pageStarted := time.Now()
 		q, cancel := scopedQuery(ctx, limits)
-		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(pageSize)).SetBatchSize(512).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
+		findStarted := time.Now()
+		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(pageSize)).SetBatchSize(1024).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
+		timing.find += time.Since(findStarted)
 		if e != nil {
 			emitMongoTargetDiagnostic(ctx, q, "find", pass, page, s, pageStarted, e)
 			cancel()
@@ -810,9 +852,13 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 				cancel()
 				return s, category("mongo_target_read_failed_or_timed_out")
 			}
-			if !cur.Next(q) {
+			nextStarted := time.Now()
+			more := cur.Next(q)
+			timing.next += time.Since(nextStarted)
+			if !more {
 				break
 			}
+			processingStarted := time.Now()
 			raw := cur.Current
 			if raw.Validate() != nil {
 				_ = cur.Close(q)
@@ -855,6 +901,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 			s.Records++
 			n++
 			cursor = next
+			timing.processing += time.Since(processingStarted)
 		}
 		readErr := cur.Err()
 		if readErr == nil {
@@ -874,7 +921,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		if ctx.Err() != nil {
 			return s, category("mongo_target_read_failed_or_timed_out")
 		}
-		if e = mongoPageCheckpoint(dir, pass, page, cursor, &s, h, f, sourceBuffer); e != nil {
+		if e = mongoPageCheckpoint(dir, pass, page, cursor, &s, h, f, sourceBuffer, &timing); e != nil {
 			return s, e
 		}
 		if n < pageSize {
@@ -885,6 +932,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		return s, category("mongo_target_read_failed_or_timed_out")
 	}
 	s.DataHash = hex.EncodeToString(h.Sum(nil))
+	eof = 1
 	return s, nil
 }
 func mongoTargetV2(ctx context.Context, db *mongo.Database, collections map[string]bson.Raw, defs map[string]any, dir string, r request) (snapshot, error) {
@@ -959,8 +1007,8 @@ func mongoTargetV2(ctx context.Context, db *mongo.Database, collections map[stri
 	if e != nil {
 		return s, e
 	}
-	if f.Sync() != nil || f.Close() != nil {
-		return s, category("private_output_failed")
+	if e = mongoFinishSource(f); e != nil {
+		return s, e
 	}
 	currentType, e := mongoIDType(ctx, db.Collection(name), r.Limits)
 	if e != nil {

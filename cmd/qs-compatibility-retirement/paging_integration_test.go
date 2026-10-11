@@ -51,11 +51,13 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		}
 	}()
 	col := db.Collection("domain_event_outbox")
-	const rows = 25005
+	// One capped page exceeds MongoDB's 16 MiB response boundary, forcing real
+	// getMore even with batchSize 1024. This is smaller than the old 25005-row fixture.
+	const rows = 2049
 	for start := 1; start <= rows; start += 1000 {
 		docs := make([]any, 0, 1000)
 		for n := start; n < start+1000 && n <= rows; n++ {
-			docs = append(docs, bson.D{{Key: "_id", Value: int64(n)}, {Key: "payload", Value: bytes.Repeat([]byte{byte(n)}, 2048)}, {Key: "status", Value: "published"}})
+			docs = append(docs, bson.D{{Key: "_id", Value: int64(n)}, {Key: "payload", Value: bytes.Repeat([]byte{byte(n)}, 17<<10)}, {Key: "status", Value: "published"}})
 		}
 		if _, e := col.InsertMany(ctx, docs); e != nil {
 			t.Fatal(e)
@@ -70,7 +72,7 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		t.Fatal(e)
 	}
 	var wireMu sync.Mutex
-	var actualPage, queryMillis int64
+	var actualPage, queryMillis, returned int64
 	var commandDelay time.Duration
 	var findRequests, getMoreRequests int
 	var delayedRequests int
@@ -85,16 +87,21 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 			MaxTimeMS int64 `bson:"maxTimeMS"`
 		}
 		wireMu.Lock()
-		if bson.Unmarshal(ev.Command, &command) != nil || command.BatchSize != 512 {
+		if bson.Unmarshal(ev.Command, &command) != nil {
 			wireRejected = true
 		}
 		if ev.CommandName == "find" {
 			findRequests++
-			if command.Limit != actualPage || command.MaxTimeMS != queryMillis {
+			returned = 0
+			if command.Limit != actualPage || command.MaxTimeMS != queryMillis || command.BatchSize != 1024 {
 				wireRejected = true
 			}
 		} else {
 			getMoreRequests++
+			// The driver reduces getMore's batch size to the remaining limit.
+			if command.BatchSize != int32(min(int64(1024), actualPage-returned)) || command.BatchSize <= 0 {
+				wireRejected = true
+			}
 		}
 		delay := commandDelay
 		if delay != 0 {
@@ -102,10 +109,30 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		}
 		wireMu.Unlock()
 		// Simulate client-side command latency without consuming the server's
-		// maxTimeMS. An uncapped 10000-row cursor needs at least 20 such
-		// commands at batch 512 and exceeds the same two-second query budget.
+		// maxTimeMS. The actual capped page's find/getMore pair remains inside
+		// the unchanged query budget, while the complete scan lasts longer.
 		if delay != 0 {
 			time.Sleep(delay)
+		}
+	}, Succeeded: func(_ context.Context, ev *event.CommandSucceededEvent) {
+		if ev.CommandName != "find" && ev.CommandName != "getMore" {
+			return
+		}
+		var reply struct {
+			Cursor struct {
+				FirstBatch []bson.Raw `bson:"firstBatch"`
+				NextBatch  []bson.Raw `bson:"nextBatch"`
+			} `bson:"cursor"`
+		}
+		wireMu.Lock()
+		defer wireMu.Unlock()
+		if bson.Unmarshal(ev.Reply, &reply) != nil {
+			wireRejected = true
+			return
+		}
+		returned += int64(len(reply.Cursor.FirstBatch) + len(reply.Cursor.NextBatch))
+		if returned > actualPage {
+			wireRejected = true
 		}
 	}}
 	port, e := envPort("MONGODB_PORT", 27017)
@@ -155,11 +182,7 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 			_ = file.Close()
 			t.Fatal(e)
 		}
-		if e = file.Sync(); e != nil {
-			_ = file.Close()
-			t.Fatal(e)
-		}
-		if e = file.Close(); e != nil {
+		if e = mongoFinishSource(file); e != nil {
 			t.Fatal(e)
 		}
 		second, e := mongoPagedPass(ctx, pagedCol, bound, limits, dir, 2, nil)

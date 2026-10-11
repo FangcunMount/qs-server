@@ -489,7 +489,7 @@ jobs:
         with:
           ref: ${{ needs.validate.outputs.tool_source_sha || github.sha }}
       - name: Set up Go for immutable read-only inventory
-        if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic'
+        if: inputs.prepare_mode != 'bootstrap-history-metadata' && inputs.prepare_mode != 'bootstrap-history-parent' && inputs.prepare_mode != 'report-diagnostic' && inputs.prepare_mode != 'bootstrap-bounds' && inputs.prepare_mode != 'bootstrap-inventory'
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -540,7 +540,14 @@ jobs:
           trap 'rm -f -- "$package_dir/compatibility-retirement.py" "$package_dir/compatibility-window-tool.py" "$package_dir/preload-image.tar.gz" "$package_dir/compatibility-retirement-entrypoints.json" "$package_dir/receipt-transport.py" "$package_dir/inventory-linux-amd64" "$package_dir/inventory-linux-arm64" "$package_dir/history-linux-amd64" "$package_dir/history-linux-arm64" "$package_dir/compatibility-history-prepare.py" "$package_dir/compatibility-history-parent.py" "$package_dir/compatibility-ai-history-prepare.py" "$package_dir/qs-ai-retirement-readonly-host.py" "$package_dir/qs-ai-retirement-readonly-verifier.py" "$package_dir/qs-ai-retirement-readonly-observer.py" "$package_dir/qs-ai-retirement-0040-layout.py"; rmdir -- "$package_dir"' EXIT
           cp scripts/database/compatibility-retirement.py scripts/database/compatibility-history-prepare.py scripts/database/compatibility-retirement-entrypoints.json scripts/dbops/receipt-transport.py "$package_dir/"
           archive="qs-compatibility-retirement-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
-          if [[ "$RETIREMENT_PACKAGE_MODE" == "window-tool" ]]; then
+          if [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-bounds" || "$RETIREMENT_PACKAGE_MODE" == "bootstrap-inventory" ]]; then
+            tar -czf "$archive" -C "$package_dir" compatibility-retirement.py receipt-transport.py
+          elif [[ "$RETIREMENT_PACKAGE_MODE" == "identity" || "$RETIREMENT_PACKAGE_MODE" == "bounds" || "$RETIREMENT_PACKAGE_MODE" == "inventory" ]]; then
+            go test ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
+            CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
+            tar -czf "$archive" -C "$package_dir" compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+          elif [[ "$RETIREMENT_PACKAGE_MODE" == "window-tool" ]]; then
             [[ "$RETIREMENT_TOOL_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
             [[ "$(git rev-parse HEAD)" == "$RETIREMENT_TOOL_SOURCE_SHA" ]] || exit 1
             cp scripts/database/compatibility-window-tool.py "$package_dir/"
@@ -713,14 +720,34 @@ jobs:
               rmdir -- "$tool_dir"
             }
             trap cleanup_tools EXIT
-            tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64
             chmod 0700 "$tool_dir"
-            chmod 0600 "$tool_dir/compatibility-history-prepare.py" "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
-            chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64" "$tool_dir/history-linux-amd64" "$tool_dir/history-linux-arm64"
-            case "$(uname -m)" in
-              x86_64) inventory_binary="$tool_dir/inventory-linux-amd64"; history_binary="$tool_dir/history-linux-amd64" ;;
-              aarch64|arm64) inventory_binary="$tool_dir/inventory-linux-arm64"; history_binary="$tool_dir/history-linux-arm64" ;;
-              *) exit 1 ;;
+            inventory_binary=""
+            history_binary=""
+            case "$RETIREMENT_PREPARE_MODE" in
+              bootstrap-bounds|bootstrap-inventory)
+                tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py receipt-transport.py
+                chmod 0600 "$tool_dir/compatibility-retirement.py" "$tool_dir/receipt-transport.py"
+                ;;
+              identity|bounds|inventory)
+                tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
+                chmod 0600 "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
+                chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64"
+                case "$(uname -m)" in
+                  x86_64) inventory_binary="$tool_dir/inventory-linux-amd64" ;;
+                  aarch64|arm64) inventory_binary="$tool_dir/inventory-linux-arm64" ;;
+                  *) exit 1 ;;
+                esac
+                ;;
+              *)
+                tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-history-prepare.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64 history-linux-amd64 history-linux-arm64
+                chmod 0600 "$tool_dir/compatibility-history-prepare.py" "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
+                chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64" "$tool_dir/history-linux-amd64" "$tool_dir/history-linux-arm64"
+                case "$(uname -m)" in
+                  x86_64) inventory_binary="$tool_dir/inventory-linux-amd64"; history_binary="$tool_dir/history-linux-amd64" ;;
+                  aarch64|arm64) inventory_binary="$tool_dir/inventory-linux-arm64"; history_binary="$tool_dir/history-linux-arm64" ;;
+                  *) exit 1 ;;
+                esac
+                ;;
             esac
             python3 -B "$tool_dir/compatibility-retirement.py" \
               --operation "$RETIREMENT_OPERATION" \
