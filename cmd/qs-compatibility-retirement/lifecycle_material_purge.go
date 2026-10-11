@@ -57,7 +57,6 @@ type lifecycleMaterialScope uint8
 
 const (
 	lifecycleOriginalInventoryMaterials lifecycleMaterialScope = iota
-	lifecycleFullSourceCASMaterials
 	lifecycleRootStagingMaterials
 	lifecycleAPIJournalMaterials
 	lifecycleLocalServiceMaterials
@@ -254,19 +253,10 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		return e
 	}
 	c.scopes[lifecycleAPIJournalMaterials] = struct{}{}
-	if h.inventoryMaterials == nil || h.inventoryMaterials.checkComplete(false) != nil || h.rootStagingMaterials == nil || h.rootStagingMaterials.checkComplete(false) != nil || h.historicalWriteMaterials == nil || h.historicalWriteMaterials.checkComplete(false) != nil || h.archiveMaterials == nil || h.archiveMaterials.checkComplete(false) != nil {
+	if h.inventoryMaterials == nil || h.inventoryMaterials.checkComplete(false) != nil || h.rootStagingMaterials == nil || h.rootStagingMaterials.checkComplete(false) != nil || h.archiveMaterials == nil || h.archiveMaterials.checkComplete(false) != nil {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
-	var operation *lifecycleMaterialDirectory
-	operationPath := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID)
-	for _, d := range h.historicalWritePreviousMaterials {
-		if d != nil && d.path == operationPath {
-			if operation != nil {
-				return lifecycleError("lifecycle_material_registration_rejected")
-			}
-			operation = d
-		}
-	}
+	operation := h.originalOperationMaterials
 	invocation, e := decodeLifecycleAPIInvocationIntent(intentRaw)
 	if e != nil {
 		return lifecycleError("lifecycle_material_registration_rejected")
@@ -276,12 +266,16 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		return e
 	}
 	c.directories = append(c.directories, c.census)
-	if e = completeLifecycleOriginalOperationMaterials(ctx, r, operation, h.inventoryMaterials, h.historicalWriteMaterials, h.historicalWriteRegistrationMaterials, h.historicalWritePreviousMaterials, h.archiveMaterials, invocation.SourceUID); e != nil {
+	facts, e := openLifecycleOriginalPrepareFactsMaterials(ctx, r, operation, h.inventoryMaterials, invocation.SourceUID)
+	if e != nil {
+		return e
+	}
+	c.directories = append(c.directories, facts)
+	if e = completeLifecycleOriginalOperationMaterials(ctx, r, operation, h.inventoryMaterials, h.archiveMaterials, invocation.SourceUID); e != nil {
 		return e
 	}
 	c.directories = append(c.directories, operation, h.rootStagingMaterials)
 	c.scopes[lifecycleOriginalInventoryMaterials] = struct{}{}
-	c.scopes[lifecycleFullSourceCASMaterials] = struct{}{}
 	if h.preparationInvocationMaterials != nil {
 		if e = h.preparationInvocationMaterials.checkComplete(false); e != nil {
 			return e
@@ -334,9 +328,6 @@ func lifecycleMaterialPathsMatch(c *lifecycleBatchMaterials, r lifecycleRequest)
 		run := strings.TrimPrefix(filepath.Base(root), r.OperationID+"-")
 		allowed[root] = true
 		allowed[lifecycleInvocationBatch(r.OperationID, run)] = true
-	}
-	if lifecycleHistoricalWriteReferenceValid(r) {
-		allowed[filepath.Dir(r.HistoricalWriteReport.Path)] = true
 	}
 	for _, d := range c.directories {
 		if d == nil || !allowed[d.path] || d.path == c.archive.path {

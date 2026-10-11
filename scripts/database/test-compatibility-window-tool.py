@@ -12,7 +12,7 @@ tool=importlib.util.module_from_spec(spec);spec.loader.exec_module(tool)
 
 class WindowToolMetadata(unittest.TestCase):
     def request(self):
-        return {'format_version':1,'kind':'compatibility_retirement_lifecycle_request','tool_source_sha':'a'*40,'original_source_sha':'b'*40,
+        return {'format_version':1,'kind':'compatibility_retirement_lifecycle_request','history_policy':'discard_legacy_history_keep_current_responsibility_v1','tool_source_sha':'a'*40,'original_source_sha':'b'*40,
                 'operation_id':'12-1','actual_run_id':'','manifest_sha256':'c'*64,'archive_directory':'/approved/archive','window_directory':'/approved/window','journal_directory':'/approved/journal',
                 'archive_approval':{'InventorySHA256':'1'*64,'SQLMetadataSHA256':'2'*64,'MongoMetadataSHA256':'3'*64,'OrderedMongoSchemaSHA256':'4'*64,'SourceSHA':'b'*40,'OperationID':'12-1','RunID':'11-1','RequestHash':'5'*64},
                 'recovery':{'source_sha':'b'*40,'operation_id':'12-1','original_run_id':'11-1','actual_run_id':'','manifest_sha256':'c'*64,'archive_sha256':'','mysql_non_target_sha256':'','mongodb_non_target_sha256':'6'*64,'mysql_head':99,'mongodb_head':38}}
@@ -47,6 +47,11 @@ class WindowToolMetadata(unittest.TestCase):
         self.assertEqual(value,expected);self.assertEqual(tool.decode(raw),r)
         self.assertNotEqual(tool.digest(derived),a['request_template_sha256'])
         self.assertEqual(value['archive_approval'],r['archive_approval']);self.assertEqual(value['recovery']['original_run_id'],'11-1')
+        for policy in (None, '', 'skip_history', True):
+            r=self.request();r['history_policy']=policy;a=self.approval(r)
+            with self.subTest(policy=policy),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        r=self.request();del r['history_policy'];a=self.approval(r)
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
     def test_prepare_forbids_effect_fields_including_null(self):
         for name in ('resume','resume_kind','service_control','deployment_control','final_history'):
             with self.subTest(name=name):
@@ -117,7 +122,7 @@ class WindowToolMetadata(unittest.TestCase):
     def test_historical_material_report_preserves_exact_original_reference_only(self):
         value=dict(path='/opt/backups/qs-server/compatibility-retirement/12-1/history-write-20-1/history.write.json',sha256='7'*64)
         r=self.request();r['historical_write_report']=value;a=self.approval(r,'apply')
-        self.assertEqual(tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))['historical_write_report'],value)
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
         r=self.request();r['historical_write_report']=value;a=self.approval(r,'prepare')
         with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
         for bad in (None,dict(value,complete=True),dict(value,sha256='main'),dict(value,path='/tmp/history.write.json'),dict(value,path=value['path'].replace('/12-1/','/13-1/')),dict(value,path=value['path'].replace('20-1','22-3'))):

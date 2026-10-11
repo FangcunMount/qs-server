@@ -583,7 +583,8 @@ jobs:
               [[ -f "$image" ]] && gzip -t "$image" || exit 1
               cp scripts/database/compatibility-window-tool.py "$package_dir/"
               cp "$image" "$package_dir/preload-image.tar.gz"
-              members+=(compatibility-window-tool.py preload-image.tar.gz)
+              cp scripts/database/qs-ai-retirement-readonly-{host,verifier,observer}.py scripts/database/qs-ai-retirement-0040-layout.py "$package_dir/"
+              members+=(compatibility-window-tool.py preload-image.tar.gz qs-ai-retirement-readonly-host.py qs-ai-retirement-readonly-verifier.py qs-ai-retirement-readonly-observer.py qs-ai-retirement-0040-layout.py)
             fi
             tar -czf "$archive" -C "$package_dir" "${members[@]}"
             if [[ "$RETIREMENT_PACKAGE_MODE" == "prepare-facts" ]]; then rm -- "$image" "$package_dir/preload-image.tar.gz"; fi

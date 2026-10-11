@@ -363,6 +363,10 @@ func TestAIReverseUnknownProtoFieldsDoNotDisappear(t *testing.T) {
 	}
 }
 func TestAIReverseLimitsAndOpaqueZero(t *testing.T) {
+	if ValidateCurrentAICommandResponsibilities(context.Background(), strings.Repeat("a", 64), 99, DefaultAIReverseLimits()) == nil {
+		t.Fatal("metadata and context minted current native responsibility")
+	}
+
 	if (AIReverseLimits{}).valid() || !DefaultAIReverseLimits().valid() {
 		t.Fatal("limits")
 	}
@@ -507,11 +511,32 @@ func TestAIReverseLegacyResponsibilityMovesOnlyWithExactMapping(t *testing.T) {
 				box.observation.Held, box.observation.Unfinished = true, true
 			}
 			s.reverse()
+			currentErr := s.currentCommandResponsibilities()
+			if (which == "mapped" || which == "held_current") != (currentErr == nil) {
+				t.Fatal("discard-history changed or lost current responsibility", which, currentErr)
+			}
 			s.classify(&aiReverseScope{relatedRequests: map[string]bool{aiFixtureRequestID: true}, relatedIDs: map[string]bool{}, identityConflicts: map[string]bool{}})
 			if which == "mapped" {
 				if old.delivered || old.observation.Unfinished || old.observation.Invalid || s.report.Blocking != 0 {
 					t.Fatal("exact handoff invented delivery or retained old transport pending", s.report.BlockingReasons)
 				}
+				retained := &aiReverseNode{id: strings.Repeat("e", 64), observation: AIReverseObservation{Invalid: true, Reasons: []string{"quarantine_owner_and_authentication_unknown"}}}
+				s.byTable["ai_messaging_quarantine"][retained.id] = retained
+				s.nodes = append(s.nodes, retained)
+				t.Run("retained_current_quarantine_not_required_empty", func(t *testing.T) {
+					if s.currentCommandResponsibilities() != nil || s.byTable["ai_messaging_quarantine"][retained.id] != retained {
+						t.Fatal("retained current quarantine was cleared or required empty")
+					}
+				})
+				t.Run("matching_wire_reject", func(t *testing.T) {
+					if box.wireHash == "" {
+						t.Fatal("actual mapped outbox lost its original wire hash")
+					}
+					s.byTable["ai_messaging_quarantine"][box.wireHash] = &aiReverseNode{id: box.wireHash, observation: retained.observation}
+					if s.currentCommandResponsibilities() == nil {
+						t.Fatal("matching quarantined original wire was treated as closed responsibility")
+					}
+				})
 			} else if which == "held_current" {
 				if old.observation.Unfinished || !box.observation.Held || !box.observation.Unfinished || s.report.Blocking == 0 {
 					t.Fatal("handoff erased current hold/pending responsibility")

@@ -22,10 +22,14 @@ import (
 	binding "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/aimessagingbinding"
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
 	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	jose "github.com/go-jose/go-jose/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // A facts request authorizes observations, not approval of those observations.
@@ -72,6 +76,8 @@ type prepareFactsProtection struct {
 	ContainerSHA256 string `json:"container_id_sha256"`
 }
 type prepareFactsReceipt struct {
+	AIBoundsSHA256            string                                   `json:"observed_ai_bounds_sha256,omitempty"`
+	PeerBoundsSHA256          string                                   `json:"observed_peer_bounds_sha256,omitempty"`
 	Protection                *prepareFactsProtection                  `json:"observed_ai_message_protection,omitempty"`
 	FormatVersion             int                                      `json:"format_version"`
 	Kind                      string                                   `json:"kind"`
@@ -478,21 +484,84 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 	if e = observePrepareFactsIdentity(ctx, owner, req, inventory); e != nil {
 		return receipt, e
 	}
-	if e = owner.closeHandles(ctx); e != nil {
-		return receipt, e
-	}
-	owner = nil
 	aiRuntime, e := retirement.ObserveAIExternalCurrentRuntime(ctx, false)
 	if e != nil {
 		return receipt, lifecycleError("prepare_facts_ai_runtime_unproven")
 	}
 	receipt.AIRuntime = &aiRuntime
-	if ctx.Err() != nil {
-		return receipt, lifecycleError("prepare_facts_read_budget_exceeded")
+	peer := retirement.AIExternalPeerConnection{Host: os.Getenv("MYSQL_HOST"), Database: os.Getenv("MYSQL_DATABASE"), Username: os.Getenv("MYSQL_USERNAME"), Password: os.Getenv("MYSQL_PASSWORD")}
+	if peer.Port, e = envPort("MYSQL_PORT", 3306); e != nil {
+		return receipt, e
 	}
+	tx, e := owner.originalSQL.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if e != nil {
+		return receipt, lifecycleError("prepare_facts_sql_read_failed")
+	}
+	boundsErr := func() (result error) {
+		defer func() {
+			if e := tx.Rollback(); e != nil && e != sql.ErrTxDone {
+				result = errors.Join(result, e)
+			}
+		}()
+		g, e := gorm.Open(gormmysql.New(gormmysql.Config{Conn: tx, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true, SkipDefaultTransaction: true, Logger: logger.Default.LogMode(logger.Silent)})
+		if e != nil {
+			return e
+		}
+		var sections [2]retirement.SourceCopyExpectation
+		for i := range sections {
+			v := inventory.Targets[i+1]
+			sections[i] = retirement.SourceCopyExpectation{Boundary: retirement.SourceBoundary{Database: v.Database, Name: v.Name, Present: v.Present}, Records: v.Records, Bytes: v.Bytes, DataHash: v.DataHash}
+		}
+		o, e := retirement.ObserveAIExternalInventoryBounds(hostmysql.WithTx(ctx, g), retirement.HistoricalCoordinatorBinding{SourceSHA: r.Inventory.SourceSHA, OperationID: op}, retirement.AIResolverBinding{SourceSHA: r.Inventory.SourceSHA, OperationID: op, DatabaseIdentityHash: req.Identities["mysql"], MigrationVersion: req.Migrations["mysql"]}, sections, retirement.AIExternalBoundsInput{OperationDirectory: original, AssetsDirectory: lifecycleRootBatch(op, run), RunID: strings.Split(run, "-")[0], RuntimeSourceSHA: aiRuntime.SourceSHA, ImageID: aiRuntime.ImageID, ContainerID: aiRuntime.ContainerID, ApprovedAIRuntimeBindingSHA256: aiRuntime.BindingSHA256, PeerConnection: peer}, run)
+		if e != nil {
+			return e
+		}
+		ai, peer, e := o.PrivatePackets()
+		if e != nil {
+			return e
+		}
+		for i, body := range [][]byte{ai, peer} {
+			name := []string{"ai-bounds-", "peer-bounds-"}[i] + run + ".json"
+			f, e := os.OpenFile(filepath.Join(original, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0600)
+			if e != nil {
+				return e
+			}
+			n, we := f.Write(body)
+			ce := f.Chown(int(uid64), -1)
+			se := f.Sync()
+			closeErr := f.Close()
+			if n != len(body) || we != nil || ce != nil || se != nil || closeErr != nil {
+				return lifecycleError("prepare_facts_ai_bounds_write_failed")
+			}
+		}
+		receipt.AIBoundsSHA256, receipt.PeerBoundsSHA256 = digestRaw(ai), digestRaw(peer)
+		d, e := os.Open(original)
+		if e != nil {
+			return e
+		}
+		se := d.Sync()
+		ce := d.Close()
+		if se != nil || ce != nil {
+			return lifecycleError("prepare_facts_ai_bounds_write_failed")
+		}
+		return nil
+	}()
+	if boundsErr != nil {
+		return receipt, lifecycleError("prepare_facts_ai_bounds_unproven")
+	}
+	if e = observePrepareFactsIdentity(ctx, owner, req, inventory); e != nil {
+		return receipt, e
+	}
+	if e = owner.closeHandles(ctx); e != nil {
+		return receipt, e
+	}
+	owner = nil
 	receipt.Protection, e = prepareFactsMessageProtection(ctx, docker, op, uint32(uid64))
 	if e != nil {
 		return receipt, e
+	}
+	if ctx.Err() != nil {
+		return receipt, lifecycleError("prepare_facts_read_budget_exceeded")
 	}
 	receipt.OrderedMongoSchemaSHA256 = ordered.SHA256()
 	receipt.RestoreEngines = r.RestoreEngines

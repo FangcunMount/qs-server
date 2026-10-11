@@ -149,6 +149,56 @@ func TestHistoricalEventProvenanceIsNotCurrentMessageVerification(t *testing.T) 
 	if got := classifyDrifts(base, time.Now()); !containsMismatch(got, mismatchCommittedOutboxMismatch) {
 		t.Fatal("historical class hid a binding conflict")
 	}
+
+	unsupported := base
+	unsupported.outbox = &evaluationconsistency.CommittedOutboxEvidence{OutcomeID: outcome.ID, RunID: outcome.RunID, LegacyCanonicalAbsent: true, InvalidReason: "canonical outcome lacks classified committed event evidence"}
+	unsupportedKind := mismatchKind("committed_event_audit_unsupported")
+	if got := classifyDrifts(unsupported, time.Now()); len(got) != 1 || got[0].Kind != unsupportedKind || got[0].Severity != severityLow || got[0].RecommendedAction == "" {
+		t.Fatalf("unclassified provenance must remain explicit unsupported coverage, got %#v", got)
+	}
+	batch := evaluationconsistency.Batch{Items: []evaluationconsistency.AssessmentEvidence{{AssessmentID: 42, Status: string(unsupported.status), Outcome: unsupported.outcome, Run: unsupported.run, Projection: unsupported.projection, Outbox: unsupported.outbox}}}
+	if got := SummarizeReadOnlyBatch(batch, time.Now()); got.Detected != 1 || got.HistoricalGaps != 0 {
+		t.Fatalf("unsupported coverage became message verification or retained provenance: %#v", got)
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*evaluationconsistency.CommittedOutboxEvidence)
+	}{
+		{"canonical ID or evidence present", func(v *evaluationconsistency.CommittedOutboxEvidence) { v.LegacyCanonicalAbsent = false }},
+		{"standard row present", func(v *evaluationconsistency.CommittedOutboxEvidence) { v.RowCount = 1 }},
+		{"damaged evidence", func(v *evaluationconsistency.CommittedOutboxEvidence) {
+			v.InvalidReason = "standard fingerprint damaged"
+		}},
+		{"standard class", func(v *evaluationconsistency.CommittedOutboxEvidence) { v.Class = eventevidence.StandardReferenceClass }},
+		{"different outcome", func(v *evaluationconsistency.CommittedOutboxEvidence) { v.OutcomeID = "other" }},
+		{"different run", func(v *evaluationconsistency.CommittedOutboxEvidence) { v.RunID = "other" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := unsupported
+			outbox := *v.outbox
+			v.outbox = &outbox
+			tc.mutate(v.outbox)
+			got := classifyDrifts(v, time.Now())
+			if containsMismatch(got, unsupportedKind) || !containsMismatch(got, mismatchCommittedOutboxMismatch) {
+				t.Fatal("unsupported coverage concealed a current-message conflict", got)
+			}
+		})
+	}
+	missingRun := unsupported
+	missingRun.run = nil
+	if got := classifyDrifts(missingRun, time.Now()); !containsMismatch(got, unsupportedKind) || !containsMismatch(got, mismatchRunOutcomeReferenceMismatch) {
+		t.Fatal("unsupported message coverage hid the actual missing Run", got)
+	}
+	missingProjection := unsupported
+	missingProjection.projection = nil
+	if got := classifyDrifts(missingProjection, time.Now()); !containsMismatch(got, unsupportedKind) || !containsMismatch(got, mismatchProjectionMissing) {
+		t.Fatal("unsupported message coverage hid the actual missing projection", got)
+	}
+	terminalConflict := unsupported
+	terminalConflict.status = domainassessment.StatusFailed
+	if got := classifyDrifts(terminalConflict, time.Now()); !containsMismatch(got, unsupportedKind) || !containsMismatch(got, mismatchTerminalConflict) {
+		t.Fatal("unsupported message coverage hid the actual terminal conflict", got)
+	}
 }
 
 func TestMissingRunAuditAcceptsOnlyReaderVerifiedHistoricalGap(t *testing.T) {

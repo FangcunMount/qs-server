@@ -130,7 +130,7 @@ func lifecycleFinalExternalInput(r lifecycleRequest) (*retirement.AIExternalExec
 }
 
 func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecycleRequest, a *backup.Archive) (result error) {
-	if h == nil || h.dataBaseline != nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.owner.originalDB == nil || h.services == nil || !h.services.managementReady || h.services.window == nil || !h.services.identity.matches(r) || ctx == nil || ctx.Err() != nil {
+	if r.HistoryPolicy != lifecycleDiscardHistoryPolicy || h == nil || h.dataBaseline != nil || h.owner == nil || h.owner.originalConn == nil || h.owner.originalMongo == nil || h.owner.originalDB == nil || h.services == nil || !h.services.managementReady || h.services.window == nil || !h.services.identity.matches(r) || ctx == nil || ctx.Err() != nil {
 		return lifecycleError("lifecycle_final_historical_scope_rejected")
 	}
 	q, c, e := h.services.window.ForwardContext(ctx)
@@ -161,14 +161,6 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	}
 	if binding.SourceSHA != r.OriginalSourceSHA || binding.OperationID != r.OperationID || binding.SQLHead != r.Recovery.SQLHead || binding.MongoHead != r.Recovery.MongoHead {
 		return lifecycleError("lifecycle_final_historical_scope_rejected")
-	}
-	copies, e := sources.Copies(q)
-	if e != nil {
-		return e
-	}
-	external, e := lifecycleFinalExternalInput(r)
-	if e != nil {
-		return e
 	}
 	// Borrow the already owned dedicated connection. Do not ask the max-one
 	// pool for another connection and do not return a transaction to DDL code.
@@ -212,17 +204,15 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	if h.aiStopped == nil || h.aiStopped.CheckStopped(paired) != nil {
 		return lifecycleError("lifecycle_ai_original_stopped_runtime_unproven")
 	}
-	o, e := retirement.PrepareFinalHistoricalEOF(paired, retirement.FinalHistoricalInput{Binding: retirement.HistoricalCoordinatorBinding{SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID}, SQLIdentity: binding.SQLIdentitySHA256, SQLHead: binding.SQLHead, MongoDatabase: h.owner.originalDB, MongoConfig: retirement.MongoOwnerConfig{ExpectedIdentityHash: binding.MongoIdentitySHA256, ExpectedMigrationVersion: int64(binding.MongoHead)}, Copies: copies, External: external, StoppedExternal: h.aiStopped})
-	if e != nil {
+	// Discard legacy history without generating event evidence or new IDs.
+	// A real mapped current operation owns every old command responsibility;
+	// unmapped or conflicting IDs reject before any DROP plan is prepared.
+	if e = retirement.ValidateCurrentAICommandResponsibilities(paired, binding.SQLIdentitySHA256, binding.SQLHead, retirement.DefaultAIReverseLimits()); e != nil {
 		return e
 	}
-	if e = o.ValidateBorrowedSnapshot(paired); e != nil {
-		return e
-	}
-	if e = backup.VerifyHostOriginalSources(paired, a, borrowed); e != nil {
-		return e
-	}
-	baseline, e := backup.CaptureCompleteNonTargetData(paired, a, borrowed, o)
+	// These checks only read the same snapshot; the full source verification
+	// above remains valid without a historical CAS to change its contents.
+	baseline, e := backup.CaptureCompleteNonTargetData(paired, a, borrowed)
 	if e != nil {
 		return e
 	}

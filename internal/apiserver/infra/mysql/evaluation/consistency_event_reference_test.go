@@ -70,6 +70,20 @@ func TestCommittedReferenceChecksWireBusinessAndImmutableIdentity(t *testing.T) 
 	if err := verifyCommittedStandard(row, record); err == nil {
 		t.Fatal("cross-organization reference accepted")
 	}
+	row.Scope = "org:7"
+	po = outcomeToPO(record)
+	po.CommittedEventID, po.CommittedEventEvidence = nil, nil
+	unsupported, err := outcomeFromPO(po)
+	if err != nil {
+		t.Fatalf("ordinary business record without message provenance: %v", err)
+	}
+	if err := verifyCommittedStandard(row, unsupported); err == nil {
+		t.Fatal("an actual standard message was accepted without canonical standard provenance")
+	}
+	po.CommittedEventID = &row.MessageID
+	if _, err := outcomeFromPO(po); err == nil {
+		t.Fatal("a retained original event ID was accepted without its evidence")
+	}
 	po = outcomeToPO(record)
 	po.PayloadJSON = `{"result":"different"}`
 	if _, err := outcomeFromPO(po); err == nil {

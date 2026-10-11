@@ -106,12 +106,8 @@ func nonTargetEpochSame(a, b nonTargetDataEpoch) bool {
 // CaptureCompleteNonTargetData borrows actual original handles only. The
 // caller ends both RO scopes before DDL. Complete metadata equality fixes the
 // approved range: no missing/foreign/unsupported store is silently excluded.
-func CaptureCompleteNonTargetData(ctx context.Context, a *Archive, b BorrowedSources, final *retirement.FinalHistoricalObservation) (*NonTargetDataBaseline, error) {
-	if ctx == nil || ctx.Err() != nil || a == nil || final == nil || final.ValidateBorrowedSnapshot(ctx) != nil || b.SQL == nil || b.Mongo == nil || a.data.Inventory.Bindings["mysql"].Version != 99 || a.data.Inventory.Bindings["mongodb"].Version != 38 {
-		return nil, ErrNonTargetData
-	}
-	facts := final.Summary()
-	if facts.SourceSHA != a.data.Approval.SourceSHA || facts.OperationID != a.data.Approval.OperationID {
+func CaptureCompleteNonTargetData(ctx context.Context, a *Archive, b BorrowedSources) (*NonTargetDataBaseline, error) {
+	if ctx == nil || ctx.Err() != nil || a == nil || b.SQL == nil || b.Mongo == nil || a.data.Inventory.Bindings["mysql"].Version != 99 || a.data.Inventory.Bindings["mongodb"].Version != 38 {
 		return nil, ErrNonTargetData
 	}
 	if _, e := sqlState(ctx, b.SQL, a.data.Inventory.Bindings["mysql"]); e != nil {
@@ -137,7 +133,7 @@ func CaptureCompleteNonTargetData(ctx context.Context, a *Archive, b BorrowedSou
 		return nil, e
 	}
 	end, e := nonTargetEpoch(ctx, b)
-	if e != nil || !nonTargetEpochSame(epoch, end) || final.ValidateBorrowedSnapshot(ctx) != nil {
+	if e != nil || !nonTargetEpochSame(epoch, end) {
 		return nil, ErrNonTargetData
 	}
 	// Metadata commands are reread after every body reached real EOF. They

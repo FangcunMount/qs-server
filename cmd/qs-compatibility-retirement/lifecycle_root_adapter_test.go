@@ -84,7 +84,16 @@ func TestLifecycleRootCopyAcceptsActualEmptyRawSource(t *testing.T) {
 	}
 }
 func TestLifecycleRootRequestKeepsOriginalAndToolSeparate(t *testing.T) {
-	for _, raw := range []string{`{"original_source_sha":"a","tool_source_sha":"b","source_file_sha256":{"x":"y"}}`, `{"original_source_sha":"a","tool_source_sha":"b","restore_engines":{"mysql_image_id":"a","mongodb_image_id":"b","architecture":"arm64"}}`} {
+	for _, policy := range []string{`null`, `true`, `""`, `"skip_history"`} {
+		if _, e := decodeLifecycleStagingRequest([]byte(`{"history_policy":` + policy + `}`)); e == nil {
+			t.Fatal("unknown discard policy accepted")
+		}
+	}
+	if _, e := decodeLifecycleStagingRequest([]byte(`{}`)); e == nil {
+		t.Fatal("missing explicit discard policy accepted")
+	}
+
+	for _, raw := range []string{`{"history_policy":"discard_legacy_history_keep_current_responsibility_v1","original_source_sha":"a","tool_source_sha":"b","source_file_sha256":{"x":"y"}}`, `{"history_policy":"discard_legacy_history_keep_current_responsibility_v1","original_source_sha":"a","tool_source_sha":"b","restore_engines":{"mysql_image_id":"a","mongodb_image_id":"b","architecture":"arm64"}}`} {
 		r, e := decodeLifecycleStagingRequest([]byte(raw))
 		if e != nil || r.OriginalSourceSHA != "a" || r.ToolSourceSHA != "b" {
 			t.Fatal("binding collapsed")
@@ -245,7 +254,7 @@ func TestLifecycleNativeRunReuseRejectedBeforeLaterGates(t *testing.T) {
 	operation, original, current := stamp+"-1", stamp+"-2", stamp+"-3"
 	originalRoot := filepath.Join("/opt/backups/qs-server/compatibility-retirement", operation)
 	request := func(run string) lifecycleRequest {
-		r := lifecycleRequest{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", ToolSourceSHA: sourceSHA,
+		r := lifecycleRequest{HistoryPolicy: lifecycleDiscardHistoryPolicy, FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", ToolSourceSHA: sourceSHA,
 			OriginalSourceSHA: strings.Repeat("b", 40), OperationID: operation, ActualRunID: run, ManifestSHA256: strings.Repeat("c", 64),
 			ArchiveDirectory: filepath.Join(originalRoot, "archive"), WindowDirectory: filepath.Join(originalRoot, "window"), JournalDirectory: filepath.Join(originalRoot, "journal"),
 			SourceDirectory: filepath.Join(originalRoot, "inventory-"+original), RestoreEngines: &lifecycleRestoreEngines{MySQLImageID: "sha256:" + strings.Repeat("d", 64), MongoImageID: "sha256:" + strings.Repeat("e", 64), Architecture: runtime.GOARCH},
@@ -448,7 +457,7 @@ func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, 
 	}
 	originalRoot := filepath.Join("/opt/backups/qs-server/compatibility-retirement", approval.OperationID)
 	manifest := []byte("offline frozen manifest")
-	r := lifecycleRequest{FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", OriginalSourceSHA: approval.SourceSHA, ToolSourceSHA: strings.Repeat("d", 40), OperationID: approval.OperationID, ActualRunID: "789-1", ManifestSHA256: digestRaw(manifest), Approval: approval, ArchiveDirectory: filepath.Join(originalRoot, "archive"), SourceDirectory: filepath.Join(originalRoot, "inventory-"+approval.RunID), SourceFileSHA256: hashes,
+	r := lifecycleRequest{HistoryPolicy: lifecycleDiscardHistoryPolicy, FormatVersion: 1, Kind: "compatibility_retirement_lifecycle_request", OriginalSourceSHA: approval.SourceSHA, ToolSourceSHA: strings.Repeat("d", 40), OperationID: approval.OperationID, ActualRunID: "789-1", ManifestSHA256: digestRaw(manifest), Approval: approval, ArchiveDirectory: filepath.Join(originalRoot, "archive"), SourceDirectory: filepath.Join(originalRoot, "inventory-"+approval.RunID), SourceFileSHA256: hashes,
 		RestoreEngines: &lifecycleRestoreEngines{MySQLImageID: "sha256:" + strings.Repeat("6", 64), MongoImageID: "sha256:" + strings.Repeat("7", 64), Architecture: runtime.GOARCH},
 		Recovery:       backup.TargetRecoveryRequest{SourceSHA: approval.SourceSHA, OperationID: approval.OperationID, OriginalRunID: approval.RunID, ActualRunID: "789-1"}}
 	if writeJSON(filepath.Join(root, "lifecycle-request.json"), r) != nil {

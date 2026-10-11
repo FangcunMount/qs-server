@@ -1262,6 +1262,7 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	}
 	recovery := TargetRecoveryRequest{SourceSHA: source, OperationID: op, OriginalRunID: invRun, ManifestSHA256: manifestHash, MongoNonTargetSHA256: report.Bindings["mongodb"].NonTargetHash, SQLHead: 99, MongoHead: 38}
 	template := map[string]any{"format_version": 1, "kind": "compatibility_retirement_lifecycle_request", "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "actual_run_id": "", "manifest_sha256": manifestHash, "archive_directory": archive, "source_directory": sourceDir, "window_directory": filepath.Join(opDir, "window"), "journal_directory": filepath.Join(opDir, "journal"), "archive_approval": approval, "recovery": recovery, "restore_engines": map[string]string{"mysql_image_id": mysqlRoot.Image, "mongodb_image_id": mongoRoot.Image, "architecture": runtime.GOARCH}, "source_file_sha256": hashes}
+	template["history_policy"] = "discard_legacy_history_keep_current_responsibility_v1"
 	templateHash := nativeJSON(t, filepath.Join(opDir, "lifecycle-request-template.json"), template)
 	// The expected current request changes only the two approved run fields.
 	// Normalize the original struct-containing map into JSON objects before the

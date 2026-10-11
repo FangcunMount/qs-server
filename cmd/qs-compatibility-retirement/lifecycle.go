@@ -20,7 +20,10 @@ import (
 // This descriptor supplies expected bindings only. A physical archive, root
 // Window, actual isolated restore, writer lease and original native journal
 // are produced or inspected separately; no imported completion flag is used.
+const lifecycleDiscardHistoryPolicy = "discard_legacy_history_keep_current_responsibility_v1"
+
 type lifecycleRequest struct {
+	HistoryPolicy          string                               `json:"history_policy"`
 	FormatVersion          int                                  `json:"format_version"`
 	Kind                   string                               `json:"kind"`
 	ToolSourceSHA          string                               `json:"tool_source_sha"`
@@ -40,7 +43,7 @@ type lifecycleRequest struct {
 	SourceFileSHA256       map[string]string                    `json:"source_file_sha256,omitempty"`
 	SourceCopyIntent       *lifecycleFinalFileBinding           `json:"source_copy_intent,omitempty"`
 	PreparationRestoreZero *lifecycleFinalFileBinding           `json:"preparation_restore_zero,omitempty"`
-	HistoricalWriteReport  *lifecycleFinalFileBinding           `json:"historical_write_report,omitempty"`
+	HistoricalWriteReport  *lifecycleFinalFileBinding           `json:"-"`
 	ServiceControl         *lifecycleServiceControl             `json:"service_control,omitempty"`
 	DeploymentControl      *lifecycleAPIDeploymentControl       `json:"deployment_control,omitempty"`
 	FinalHistory           *lifecycleFinalHistoryInput          `json:"final_history,omitempty"`
@@ -313,7 +316,7 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	staged := root == stagedRoot && stage == "prepare" && r.Recovery.ArchiveSHA256 == "" && r.RestoreEngines.valid()
 	invocationRoot := lifecycleInvocationBatch(operation, actualRun)
 	if (stage == "prepare" && !staged || stage != "prepare" && root != wantRoot && root != invocationRoot) || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" ||
-		r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
+		r.HistoryPolicy != lifecycleDiscardHistoryPolicy || r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
 		!hashRE.MatchString(r.ManifestSHA256) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation ||
 		recovery.SourceSHA != r.OriginalSourceSHA || recovery.OperationID != operation || recovery.OriginalRunID != r.Approval.RunID ||
 		actualRun == r.Approval.RunID || actualRun == recovery.OriginalRunID ||
@@ -337,7 +340,7 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	if r.PreparationRestoreZero != nil && (stage == "prepare" || !lifecyclePreparationRestoreReferenceValid(r)) {
 		return r, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
 	}
-	if r.HistoricalWriteReport != nil && (stage == "prepare" || !lifecycleHistoricalWriteReferenceValid(r)) {
+	if r.HistoricalWriteReport != nil {
 		return r, nil, lifecycleError("lifecycle_history_original_material_rejected")
 	}
 	if stage == "prepare" && !r.RestoreEngines.valid() {

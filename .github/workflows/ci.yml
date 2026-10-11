@@ -406,7 +406,7 @@ jobs:
             --tag "qs-retirement-ai-native:$ai_source" .retirement-ai-native-source
           docker pull nsqio/nsq:v1.3.0
 
-      - name: Verify retained historical evidence persistence on real databases
+      - name: Verify current command responsibility and database snapshot checks
         env:
           QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           QS_HISTORY_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
@@ -485,56 +485,32 @@ jobs:
           trap 'exit 143' TERM
           sudo -n /usr/bin/python3 -I -c "$opt_fixture_program" protect \
             "$opt_uid" "$opt_gid" "$opt_mode" "$opt_dev" "$opt_inode"
-          sql_component_log="${RUNNER_TEMP}/qs-historical-component-sql-native.log"
-          owner_fragment_log="${RUNNER_TEMP}/qs-historical-owner-fragments-native.log"
-          cli_input_log="${RUNNER_TEMP}/qs-historical-cli-input-native.log"
+          sql_component_log="${RUNNER_TEMP}/qs-current-reference-native.log"
+          owner_fragment_log="${RUNNER_TEMP}/qs-current-command-responsibility-native.log"
           QS_HISTORY_CI_MONGO_CONTAINER="$(docker --host unix:///var/run/docker.sock inspect --format '{{.Id}}' qs-runtime-closure-e2e-mongo)"
           QS_HISTORY_GO="$(command -v go)"
           export QS_HISTORY_CI_MONGO_CONTAINER QS_HISTORY_GO
-          go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds|TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback|TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent|TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack)$' | tee "$cli_input_log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative' | tee "$sql_component_log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
-          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log" "$cli_input_log"; then
-            echo 'Actual historical owner component proof skipped or failed' >&2
+          go test -race -tags=integration -count=1 -timeout=3m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$' | tee "$sql_component_log"
+          go test -race -tags=integration -count=1 -timeout=3m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility$' | tee "$owner_fragment_log"
+          if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log"; then
+            echo 'Current reference or command responsibility proof skipped or failed' >&2
             exit 1
           fi
           for marker in \
-            'TestSQLHistoricalComponentNativeSourceOwnerSelectors' \
-            'TestSQLHistoricalComponentNativeAbsentOwnerSelector' \
-            'TestSQLHistoricalComponentNativeMixedPresentAbsentSelectors' \
-            'TestSQLHistoricalComponentNativeOwnerPlanningRecipes' \
-            'TestSQLHistoricalComponentNativeFreshNegativeClosureAndCrossOrganization' \
-            'TestSQLHistoricalComponentNativeFreshSemanticView' \
-            'TestSQLHistoricalComponentNativeSemanticViewRejectsDatabaseSwitch' \
-            'TestSQLHistoricalComponentNativeBoundedRWCommitReadbackAndRollback' \
-            'TestSQLHistoricalComponentNativeExpiryAndReplayWholePair'; do
+            'TestSQLHistoricalMissingOriginalRunPolicyNative' \
+            'TestSQLHistoricalOriginalRunGlobalAbsenceNative'; do
             grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$sql_component_log"
           done
           for marker in \
-            'TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback' \
-            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice' \
-            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/two_actual_assessments' \
-            'TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice/actual_assessment_and_empty_sheet' \
-            'TestHistoricalSourceInputNativeTwoFullDiskEpochsAndSourceDrift' \
-            'TestHistoricalSourceInputNativeBudgetAndOriginalMetadataFailure' \
-            'TestHistoricalSourceInputNativeIndependentUnchangedSnapshotAndReusedUUID' \
-            'TestHistoricalSourceInputNativeOwnerComponentPlanner' \
-            'TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs' \
-            'TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD' \
-            'TestMongoHistoricalComponentNativeFreshTransactionsAndServerReread' \
-            'TestMongoHistoricalComponentNativeRejectsNewNegativeRangeDescendant' \
-            'TestMongoHistoricalComponentNativeRejectsChangedRowSnapshotModeAndBudget'; do
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/settled_mapping' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/budget_reset' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/original_time_conflict' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/raw_payload_conflict' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/unmapped' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/current_pending' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility/current_held'; do
             grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$owner_fragment_log"
-          done
-          for marker in \
-            'TestHistoryCIFixtureRequiresActualJobContainers' \
-            'TestHistoryCLINativeInitialTwoSnapshotInputRounds' \
-            'TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback' \
-            'TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent' \
-            'TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack' \
-            'TestHistoryCLINativeInitialTwoSnapshotInputRounds/false' \
-            'TestHistoryCLINativeInitialTwoSnapshotInputRounds/true'; do
-            grep -Eq "^[[:space:]]*--- PASS: ${marker} \\(" "$cli_input_log"
           done
           go test -race -tags=integration -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirementbackup -run '^(TestNonTargetDataNativePagingDriftAndBSONIdentity|TestMongoMetadataSnapshotNative)$'
           go test -race -tags=integration -count=1 -timeout=2m -v ./cmd/qs-compatibility-retirement -run '^TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown$' | tee "${RUNNER_TEMP}/qs-comparison-mongo-abort-native.log"
