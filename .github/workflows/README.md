@@ -11,17 +11,12 @@
 | `cd.yml` | 计划服务、构建/交付镜像、生成部署包、按依赖顺序部署、逐实例验证 | 成功结果必须记录 exact SHA、image digest、effective config 与环境 |
 | `ping-runner.yml` | 周期/手动执行目标环境连通与服务探针 | 只证明该时点、该检查项；不证明业务全链和数据一致性 |
 | `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验；不输出凭据 |
-| `compatibility-retirement.yml` | 兼容链 prepare/apply/verify/recover/purge 入口，绑定批准 SHA、操作 ID、库身份及清单 | prepare 的平台权限只读；窗口专用 job 持有工作流隔离权限，执行结果未知时保留隔离与身份材料；完整删除门禁仍须通过 |
 | `attention-reconcile-audit.yml` | 受控 Attention reconciliation 审计 | 不得把 dry-run 自动升级为 apply |
 | `compatibility-observation.yml` | 只读兼容流量/指标观察 | 无指标、零值、无命中和证据缺失必须区分 |
 | `authz-production-matrix.yml` | 使用生产主体执行只读 IAM AuthZ v3 精确 12 项矩阵 | 覆盖角色与 origin、缺属性、错误属性类型及 force_retry；IAM 快照复核角色，不写角色或业务数据 |
 | `authz-production-matrix-provision.yml` | 显式创建隔离的 evaluator 与 plan manager 矩阵主体 | 仅手工触发并要求固定确认词；幂等创建无登录凭据/联系方式/外部身份的 IAM 用户及单一角色 assignment，不修改现有用户 |
 
-兼容链历史核验在现有 MySQL/MongoDB 集成步骤中必须执行全部 `TestFinalHistoricalEOFNative` 测试，覆盖已保存、缺失、冲突和旧源删除，并验证非空答卷与报告生成证据及恢复原始记录后的再次核验。测试仅使用自身创建的临时命名空间；完整 AI 核验、生产写入隔离和恢复预算需要另外验证。
-
-同一步骤还必跑 `TestNonTargetDataNativePagingDriftAndBSONIdentity` 和 `TestMongoMetadataSnapshotNative`，验证完整数据读取器的 SQL/BSON 分页，以及元数据读取与原正文快照事务的隔离。元数据读取保留原 deadline、取消和宿主绑定，仅移除 Mongo session；正文和迁移 head 仍用原 snapshot。缺少真实 Replica Set 等前置条件必须失败，不能 SKIP。
-
-同一步骤要求 `TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown` 的原 session 成功回执、取消拒绝和服务器回执被截断三个子场景。`pipefail`、SKIP 拒绝及父／子 PASS 标记共同防止零测试或只执行部分场景被算作成功。完整非目标比较必须在第一次 B 启动前结束，并取得实际 Mongo abort ACK、结束 session、回滚 SQL 和核对连接已回到非事务状态；普通 driver 本地状态或健康探针不能替代这些结论。验收范围及剩余门禁见[退役运行说明](../../scripts/database/compatibility-retirement.md#final-historical-readback-and-temporary-material-cleanup)。
+R4 源码退出候选移除两个专用退役工作流及其打包、恢复夹具和临时运行观察检查。CI 保留标准事务证据、当前 MQ、退休 ID 防护、迁移与正常启动保护；普通构建和部署保留原交付入口。四对象的实际生产验收和材料零剩余仍需独立回执，见[退役工具退出说明](../../scripts/database/compatibility-retirement.md)。
 
 删除、重命名或改变触发关系时，必须同步 `scripts/cd` 契约测试和文档门禁。历史 run 只进入证据台账，不回写本页。
 

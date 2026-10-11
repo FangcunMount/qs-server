@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
-	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"gorm.io/gorm"
 )
@@ -27,12 +26,7 @@ func TestConsistencyHistoricalReferencesPhysicalNullAcceptanceNative(t *testing.
 	appendOld := func(id string, class evidence.Class) {
 		t.Helper()
 		if err := db.Transaction(func(tx *gorm.DB) error {
-			ctx := hostmysql.WithTx(t.Context(), tx)
-			baseline, err := PrepareOutcomeHistoricalReferences(ctx, 9001, run)
-			if err != nil {
-				return err
-			}
-			binding, err := baseline.BindingSHA256("evaluation.outcome.committed", &run)
+			binding, err := historicalFixtureBinding(tx, "evaluation_outcome", 9001, "evaluation.outcome.committed", &run)
 			if err != nil {
 				return err
 			}
@@ -41,7 +35,7 @@ func TestConsistencyHistoricalReferencesPhysicalNullAcceptanceNative(t *testing.
 			if class == evidence.Unverifiable {
 				entry.Proof.Verification.Reason = "full original body comparison unavailable"
 			}
-			return AppendOutcomeHistoricalReferences(ctx, baseline, entry)
+			return appendHistoricalFixture(tx, "evaluation_outcome", "historical_committed_evidence", 9001, entry)
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -132,17 +126,12 @@ func attachLifecycleHistory(t *testing.T, db *gorm.DB, id uint64, sourceID strin
 	t.Helper()
 	var entry evidence.HistoricalReferenceEntryV1
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		ctx := hostmysql.WithTx(t.Context(), tx)
-		baseline, err := PrepareAssessmentHistoricalReferences(ctx, id)
-		if err != nil {
-			return err
-		}
-		binding, err := baseline.BindingSHA256("evaluation.requested", nil)
+		binding, err := historicalFixtureBinding(tx, "assessment", id, "evaluation.requested", nil)
 		if err != nil {
 			return err
 		}
 		entry = nativeHistoricalEntry(sourceID, "evaluation.requested", binding, nil)
-		return AppendAssessmentHistoricalReferences(ctx, baseline, entry)
+		return appendHistoricalFixture(tx, "assessment", "historical_lifecycle_evidence", id, entry)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -200,12 +189,7 @@ func TestConsistencyHistoricalReferencesStrictSourceAndSetNative(t *testing.T) {
 	second.Source.Digest = evidence.SourceDigest("mysql-original-source-row-v1", []byte(second.EventID))
 	second.Proof.Digest = second.Source.Digest
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		ctx := hostmysql.WithTx(t.Context(), tx)
-		baseline, err := PrepareAssessmentHistoricalReferences(ctx, 42)
-		if err != nil {
-			return err
-		}
-		return AppendAssessmentHistoricalReferences(ctx, baseline, second)
+		return appendHistoricalFixture(tx, "assessment", "historical_lifecycle_evidence", 42, second)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -247,16 +231,11 @@ func TestConsistencyHistoricalReferencesOutcomeOriginalGraphNative(t *testing.T)
 	}
 	run := evidence.HistoricalRunReferenceV1{RunID: "42:1", Attempt: 1}
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		ctx := hostmysql.WithTx(t.Context(), tx)
-		baseline, err := PrepareOutcomeHistoricalReferences(ctx, 9001, run)
+		binding, err := historicalFixtureBinding(tx, "evaluation_outcome", 9001, "evaluation.outcome.committed", &run)
 		if err != nil {
 			return err
 		}
-		binding, err := baseline.BindingSHA256("evaluation.outcome.committed", &run)
-		if err != nil {
-			return err
-		}
-		return AppendOutcomeHistoricalReferences(ctx, baseline, nativeHistoricalEntry("old-outcome-a", "evaluation.outcome.committed", binding, &run), nativeHistoricalEntry("old-outcome-b", "evaluation.outcome.committed", binding, &run))
+		return appendHistoricalFixture(tx, "evaluation_outcome", "historical_committed_evidence", 9001, nativeHistoricalEntry("old-outcome-a", "evaluation.outcome.committed", binding, &run), nativeHistoricalEntry("old-outcome-b", "evaluation.outcome.committed", binding, &run))
 	}); err != nil {
 		t.Fatal(err)
 	}

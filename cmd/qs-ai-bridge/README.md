@@ -30,14 +30,6 @@ Existing isolated evidence covers separate-process command/receipt/final-ACK los
 
 The production review must explicitly include the read-only `/qsai.workflow.v1.MessagePayloads/Get` permission for the qs-ai workload, host key/network/topology mounts and schema ownership. Actual production ACL/configuration readiness must be verified independently; local mTLS service tests do not prove it. Host main merge/automatic deployment requires separate review. SDK prerelease approval is not host production authorization.
 
-## Historical command handoff boundary
-
-Migration 093 adds immutable source evidence. `MessagingLegacyHandoff.StageSingle` borrows an active maintenance transaction, after both relays and new intake have stopped. It validates the first legacy typed payload/hash and original request binding, stages one new immutable wire and operation, and records original JSON bytes/business hash/retry state in that same transaction. It never changes legacy `delivered`, request version/status, frozen evidence or source payload. Nullable perimeter indexes may be filled only from the verified immutable request; unknown creation time remains unknown.
-
-Old Start identity uses request_id; old answer/cancel identities use command_id. Known UTC request creation time is represented in UTC+8 with original precision. A Change has no stored original submission time, so its envelope retains an empty value instead of using retry available_at or the migration clock. Previous attempts and retry availability are carried forward; an exhausted historical budget is technically held and does not receive new retries. Already delivered history is not requeued. Duplicate handoff reuses first wire with no resealing.
-
-An aggregate with multiple unowned pending commands is refused: the old schema does not retain sufficient immutable commit ordering. Such rows stay untouched in the maintenance inventory until an explicit ordering/evidence disposition is reviewed. This API therefore does not claim universal historical migration completion. The maintenance transaction must roll back on any error; the API does not commit, create a transaction or close resources. The runtime no longer contains the old scanner; switching off MQ is not a rollback to old gRPC writes.
-
 ## 现用 MQ 只读数据库清单
 
 `cmd/qs-ai-messaging-audit` 是维护核查工具，不是消息服务。仅借用显式 DSN 建立宿主拥有的连接，用 MySQL READ ONLY / REPEATABLE READ 事务执行固定 SELECT；不加载密钥、不连接 NSQ、不记录正文、不执行迁移/移交/重投/清理或模型调用。二进制由独立 AI bridge CI 构建并记录源码 SHA。
@@ -91,11 +83,11 @@ MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop
 
 ## 隔离 CLI 与正式入口
 
-`qs-ai-bridge` 仅保留原历史投影读取与 runtime-index-backfill 维护，不提供用户认证。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。维护清单、门禁与移交分别由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control`、`qs-ai-messaging-handoff` 执行，默认服务入口不改变。
+`qs-ai-bridge` 仅保留原历史投影读取与 runtime-index-backfill 维护，不提供用户认证。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。现用消息审计与门禁由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control` 执行，默认服务入口不改变。
 
 ## MQ 发布绑定与离线预检
 
-正常 qs-apiserver 镜像现在包含 audit/control/handoff/preflight 四个维护入口，默认入口仍为 qs-apiserver。`qs-ai-messaging-preflight` 显式运行：`--source-sha` 仅输出完整构建提交；`--binding` 校验固定 `/run/qs-server-jose` 角色、kid、P-256、公私钥、用途及权限；可同时指定 `--base-config` 和 `--output-config`，只替换 ai_workflow.messaging，拒绝覆盖已存在文件，不读取环境凭证，不连接数据库、Broker 或模型。
+正常 qs-apiserver 镜像现在包含 audit/control/preflight 三个维护入口，默认入口仍为 qs-apiserver。`qs-ai-messaging-preflight` 显式运行：`--source-sha` 仅输出完整构建提交；`--binding` 校验固定 `/run/qs-server-jose` 角色、kid、P-256、公私钥、用途及权限；可同时指定 `--base-config` 和 `--output-config`，只替换 ai_workflow.messaging，拒绝覆盖已存在文件，不读取环境凭证，不连接数据库、Broker 或模型。
 
 首发由受控操作准备 `/data/infra/qs-server-messaging/current.json` 的非秘密绑定描述及 `versions/<binding_revision>/` 下的独立密钥。密钥和描述不进入仓库、镜像或工作流变量。原角色 kid 可无版本后缀，轮换保留旧解密／验签映射，不重封装历史 wire。
 
