@@ -135,7 +135,7 @@ func lifecycleMongoClient(ctx context.Context, prefix string) (*mongo.Client, *m
 	if err != nil {
 		return nil, nil, lifecycleError("lifecycle_connection_input_rejected")
 	}
-	opts := options.Client().SetHosts([]string{net.JoinHostPort(host, strconv.Itoa(port))}).SetAuth(options.Credential{Username: user, Password: password, AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second).SetSocketTimeout(30 * time.Second).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority())
+	opts := options.Client().SetHosts([]string{net.JoinHostPort(host, strconv.Itoa(port))}).SetAuth(options.Credential{Username: user, Password: password, AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second).SetSocketTimeout(30 * time.Second).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority()).SetCompressors([]string{"zstd", "snappy"})
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, nil, lifecycleError("lifecycle_mongo_connect_failed")
