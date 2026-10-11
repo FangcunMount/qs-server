@@ -9,8 +9,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
-	"go.mongodb.org/mongo-driver/bson"
 	"hash"
 	"io"
 	"reflect"
@@ -18,6 +16,9 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const metadataBudget = 32 << 20
@@ -215,11 +216,14 @@ func supportedColumns(index int, columns retirement.SQLColumns) bool {
 	return true
 }
 func newRawReader(ctx context.Context, r io.Reader, index int, expected SourceSnapshot, columns retirement.SQLColumns) (*rawReader, error) {
+	return rawReaderForPass(ctx, r, index, expected, columns, 2)
+}
+func rawReaderForPass(ctx context.Context, r io.Reader, index int, expected SourceSnapshot, columns retirement.SQLColumns, passes int) (*rawReader, error) {
 	if ctx == nil || ctx.Err() != nil || readerMissing(r) || index < 0 || index > 3 {
 		return nil, ErrSource
 	}
 	b := expected.Boundary
-	if !expected.Present || !expected.Complete || expected.NextCycle || expected.Passes != 2 || !b.Present || b.Empty != (expected.Records == 0) || expected.Records > retirement.MaxSourceRecords || expected.Bytes > retirement.MaxSourceBytes || !hashPattern.MatchString(expected.DataHash) || b.IdentityHash != expected.IdentityHash || b.SchemaHash != expected.SchemaHash || (b.Empty && (b.UpperToken != "" || expected.Bytes != 0)) || (!b.Empty && b.UpperToken == "") {
+	if !expected.Present || !expected.Complete || expected.NextCycle || expected.Passes != passes || !b.Present || b.Empty != (expected.Records == 0) || expected.Records > retirement.MaxSourceRecords || expected.Bytes > retirement.MaxSourceBytes || !hashPattern.MatchString(expected.DataHash) || b.IdentityHash != expected.IdentityHash || b.SchemaHash != expected.SchemaHash || (b.Empty && (b.UpperToken != "" || expected.Bytes != 0)) || (!b.Empty && b.UpperToken == "") {
 		return nil, ErrSource
 	}
 	x := &rawReader{ctx: ctx, index: index, expected: expected, columns: columns, input: r, hash: sha256.New()}

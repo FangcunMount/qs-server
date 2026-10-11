@@ -1138,13 +1138,16 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	toolMaterial := map[string]bool{"compatibility-window-tool.py": true, "receipt-transport.py": true}
 	manifestHash := ""
 	approval := Approval{}
+	var storageOriginal *Archive
+	var storageApproval *StorageApproval
+	storageRun := stamp + "-8"
+	storageRequestHash := ""
 	opMaterial := map[string]bool{"inventory-cli": true, "boundary-request.json": true, "inventory-request.json": true, "manifest.json": true, "lifecycle-request-template.json": true, "operation.lock": true, "archive": true, "bounds-" + boundRun: true, "inventory-" + invRun: true}
-	rootMaterial := map[string]bool{"restore-native": true, "tool.intent.private.json": true, "source-copy.intent.private.json": true, "manifest.json": true, "lifecycle-request.json": true, "lifecycle-restore-" + actualRun + ".registration.private.json": true, "inventory-" + invRun: true}
+	rootMaterial := map[string]bool{"restore-native": true, "tool.intent.private.json": true, "source-copy.intent.private.json": true, "manifest.json": true, "lifecycle-request.json": true, "lifecycle-restore-" + actualRun + ".registration.private.json": true}
 	zeroName := "lifecycle-restore-" + actualRun + ".zero.private.json"
 	rootMaterial[zeroName] = true // Exact preparation producer member, not a glob.
 	for _, name := range append([]string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"}, sourceNames[:]...) {
 		opMaterial[filepath.Join("inventory-"+invRun, name)] = true
-		rootMaterial[filepath.Join("inventory-"+invRun, name)] = true
 	}
 	for _, name := range []string{"boundary.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"} {
 		opMaterial[filepath.Join("bounds-"+boundRun, name)] = true
@@ -1180,7 +1183,13 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 			return
 		}
 		if entries, readErr := os.ReadDir(archive); readErr == nil && len(entries) != 0 {
-			if PurgeRegistered(archive, approval) != nil {
+			var purgeErr error
+			if storageApproval == nil {
+				purgeErr = PurgeRegistered(archive, approval)
+			} else {
+				purgeErr = PurgeStorageRegistered(archive, *storageApproval)
+			}
+			if purgeErr != nil {
 				retainFixture()
 				t.Error("public_cli_native_fixture_archive_cleanup_unresolved")
 				return
@@ -1235,6 +1244,219 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	}
 	var report inventory
 	approval, report = publicCLIInventory(t, cli, opDir, source, op, boundRun, invRun, env, db, mdb)
+	t.Run("storage_backup_v2", func(t *testing.T) {
+		for _, empty := range []bool{false, true} {
+			caseName := "nonempty"
+			if empty {
+				caseName = "empty"
+			}
+			t.Run(caseName, func(t *testing.T) {
+				db, mdb, report, approval, opDir, op, invRun := db, mdb, report, approval, opDir, op, invRun
+				if empty {
+					emptyName := "qs_storage_empty_" + primitive.NewObjectID().Hex()
+					nativeExec(t, admin, "CREATE DATABASE "+quote(emptyName)+" CHARACTER SET utf8mb4")
+					defer func() {
+						if _, e := admin.ExecContext(context.Background(), "DROP DATABASE "+quote(emptyName)); e != nil {
+							t.Error("owned empty storage SQL cleanup")
+						}
+					}()
+					db, mdb = nativeSQL(t, env, emptyName), client.Database(emptyName)
+					defer func() {
+						if mdb.Drop(context.Background()) != nil {
+							t.Error("owned empty storage Mongo cleanup")
+						}
+					}()
+					nativeSourceSchemas(t, db, mdb)
+					op, invRun = stamp+"-5", stamp+"-7"
+					opDir = filepath.Join(base, op)
+					if os.Mkdir(opDir, 0700) != nil {
+						t.Fatal("owned empty storage operation")
+					}
+					emptyEnv := map[string]string{}
+					for k, v := range env {
+						emptyEnv[k] = v
+					}
+					emptyEnv["MYSQL_DATABASE"], emptyEnv["MONGODB_DBNAME"] = emptyName, emptyName
+					approval, report = publicCLIInventory(t, cli, opDir, source, op, stamp+"-6", invRun, emptyEnv, db, mdb)
+					defer func() {
+						members, err := publicCLIInventoryMaterialPaths(report, invRun)
+						if err != nil || t.Failed() {
+							retainFixture()
+							return
+						}
+						for _, name := range []string{"boundary-request.json", "inventory-request.json", "bounds-" + stamp + "-6", "inventory-" + invRun} {
+							members[name] = true
+						}
+						for _, name := range []string{"boundary.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"} {
+							members[filepath.Join("bounds-"+stamp+"-6", name)] = true
+						}
+						for _, name := range []string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"} {
+							members[filepath.Join("inventory-"+invRun, name)] = true
+						}
+						if publicCLIMaterialsKnown(opDir, members) != nil || os.RemoveAll(opDir) != nil {
+							t.Error("owned empty storage exact materials cleanup")
+						}
+					}()
+				}
+				storageDir := filepath.Join(private, "storage-archive-"+caseName)
+				if !empty {
+					wrapper := filepath.Join(opDir, "storage-backup-"+storageRun)
+					if os.Mkdir(wrapper, 0700) != nil {
+						t.Fatal("owned storage producer directory")
+					}
+					storageDir = filepath.Join(wrapper, "archive")
+					opMaterial[filepath.Base(wrapper)] = true
+					opMaterial[filepath.Join(filepath.Base(wrapper), "archive")] = true
+					for _, name := range append(storageNames(), "assets.private.json") {
+						opMaterial[filepath.Join(filepath.Base(wrapper), "archive", name)] = true
+					}
+				}
+				if os.Mkdir(storageDir, 0700) != nil {
+					t.Fatal("storage archive directory")
+				}
+				sqlRaw, e := os.ReadFile(filepath.Join(opDir, "inventory-"+invRun, "mysql-metadata.private.json"))
+				if e != nil {
+					t.Fatal("storage SQL metadata")
+				}
+				mongoRaw, e := os.ReadFile(filepath.Join(opDir, "inventory-"+invRun, "mongodb-metadata.private.json"))
+				if e != nil {
+					t.Fatal("storage Mongo metadata")
+				}
+				approved := StorageApproval{OriginalSourceSHA: source, ToolSourceSHA: source, OperationID: op, RunID: invRun, RequestHash: approval.RequestHash, TargetHash: report.TargetHash, SQLMetadataSHA256: approval.SQLMetadataSHA256, MongoMetadataSHA256: approval.MongoMetadataSHA256, OrderedMongoSchemaSHA256: approval.OrderedMongoSchemaSHA256, Bindings: report.Bindings}
+				if !empty {
+					approved.RunID = storageRun
+					boundaryRequest, err := os.ReadFile(filepath.Join(opDir, "boundary-request.json"))
+					if err != nil {
+						t.Fatal("storage original boundary request")
+					}
+					reference := map[string]any{"run_id": boundRun, "source_sha": source, "sha256": report.BoundaryHash, "request_sha256": sha(boundaryRequest)}
+					descriptor, err := json.Marshal(map[string]any{"format_version": 1, "kind": "readonly_storage_backup_approval", "prepare_mode": "storage-backup", "source_sha": source, "original_source_sha": source, "operation_id": op, "target_hash": report.TargetHash, "database_scope": "mysql-and-mongodb", "inventory_request_sha256": approval.RequestHash, "boundary_report": reference})
+					if err != nil {
+						t.Fatal("storage metadata-only approval")
+					}
+					reference["operation_id"] = op
+					name := "storage-backup-request-" + storageRun + ".json"
+					storageRequestHash = nativeJSON(t, filepath.Join(opDir, name), map[string]any{"format_version": 1, "kind": "readonly_storage_backup_request", "source_sha": source, "original_source_sha": source, "operation_id": op, "actual_run_id": storageRun, "target_hash": report.TargetHash, "observation_approval_sha256": sha(append(descriptor, '\n')), "inventory_request_sha256": approval.RequestHash, "boundary_report": reference})
+					opMaterial[name] = true
+				}
+				for i, s := range report.Targets {
+					approved.Targets[i] = StorageTarget{Database: s.Database, Name: s.Name, Kind: s.Kind, IdentityHash: s.IdentityHash, SchemaHash: s.SchemaHash, Boundary: s.Boundary}
+				}
+				tx, e := db.BeginTx(t.Context(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+				if e != nil {
+					t.Fatal("storage RRRO")
+				}
+				a, captureErr := CaptureStorage(t.Context(), BorrowedSources{SQL: tx, Mongo: mdb}, approved, StorageInputs{SQLMetadata: bytes.NewReader(sqlRaw), MongoMetadata: bytes.NewReader(mongoRaw)}, storageDir)
+				closeErr := tx.Rollback()
+				if captureErr != nil || closeErr != nil {
+					t.Fatal("actual storage capture", captureErr)
+				}
+				baseline, e := a.StorageBaseline(t.Context())
+				if e != nil || baseline.Kind != "storage_backup_v1" || baseline.DropReady || len(baseline.Targets) != 4 {
+					t.Fatal("storage actual baseline")
+				}
+				for i, target := range baseline.Targets {
+					if target.Passes != 1 || !target.Complete || target.Records != report.Targets[i].Records || target.DataHash != report.Targets[i].DataHash {
+						t.Fatal("storage original bytes differ")
+					}
+				}
+				baseline.StorageApproval.Bindings["mysql"] = Binding{}
+				if _, e = a.StorageBaseline(t.Context()); e != nil {
+					t.Fatal("storage baseline projection aliases opaque archive")
+				}
+				if !empty {
+					storageOriginal, storageApproval = a, &approved
+				}
+				if _, e = validateInventory(a.data.InventoryRaw, a.data.Approval); e == nil {
+					t.Fatal("storage accepted as legacy inventory")
+				}
+				opened, e := OpenArchive(t.Context(), storageDir, a.digest)
+				if e != nil {
+					t.Fatal("storage actual archive reopen", e)
+				}
+				if empty {
+					restoreName := "qs_storage_restore_" + primitive.NewObjectID().Hex()
+					nativeExec(t, admin, "CREATE DATABASE "+quote(restoreName)+" CHARACTER SET utf8mb4")
+					defer func() {
+						if _, e := admin.ExecContext(context.Background(), "DROP DATABASE "+quote(restoreName)); e != nil {
+							t.Error("owned storage SQL cleanup")
+						}
+					}()
+					restoreDB := nativeSQL(t, env, restoreName)
+					conn, e := restoreDB.Conn(t.Context())
+					if e != nil {
+						t.Fatal("storage restore connection")
+					}
+					sqlProof, restoreErr := RestoreSQL(t.Context(), conn, opened)
+					closeErr = conn.Close()
+					if restoreErr != nil || closeErr != nil || !sqlProof.Summary().ContentEqual || sqlProof.Summary().TargetCount != 3 {
+						t.Fatal("storage actual SQL restore", restoreErr)
+					}
+					// This original is the already owned random source replica set; the
+					// isolated destination is the exact different shared CI Mongo process.
+					ports := mongoRoot.Ports["27017/tcp"]
+					hasRoute := false
+					for _, p := range ports {
+						if (p.HostIP == "127.0.0.1" || p.HostIP == "0.0.0.0") && p.HostPort == "27017" {
+							hasRoute = true
+						}
+					}
+					if !hasRoute {
+						t.Fatal("storage actual isolated Mongo route")
+					}
+					restoreClient := nativeMongo(t, map[string]string{"MONGODB_HOST": "127.0.0.1", "MONGODB_PORT": "27017"})
+					restoreMongo := restoreClient.Database(restoreName)
+					defer func() {
+						if restoreMongo.Drop(context.Background()) != nil {
+							t.Error("owned storage Mongo cleanup")
+						}
+					}()
+					mongoProof, restoreErr := RestoreMongoWithOriginal(t.Context(), mdb, restoreMongo, opened)
+					if restoreErr != nil || !mongoProof.Summary().ContentEqual || mongoProof.Summary().TargetCount != 1 {
+						t.Fatal("storage actual Mongo restore", restoreErr)
+					}
+				}
+				// A retained extra member and a changed original asset never become a
+				// successful reopen. Restore the fixture bytes solely for exact cleanup.
+				unknown := filepath.Join(storageDir, "not-registered.private")
+				if writePrivate(unknown, []byte("owned fixture")) != nil {
+					t.Fatal("storage extra fixture")
+				}
+				if _, e = OpenArchive(t.Context(), storageDir, a.digest); e == nil {
+					t.Fatal("storage extra member accepted")
+				}
+				if PurgeStorageRegistered(storageDir, approved) == nil {
+					t.Fatal("storage extra member purged")
+				}
+				if os.Remove(unknown) != nil {
+					t.Fatal("storage extra cleanup")
+				}
+				path := filepath.Join(storageDir, sourceNames[0])
+				original, e := os.ReadFile(path)
+				if e != nil {
+					t.Fatal("storage original fixture")
+				}
+				if os.WriteFile(path, original[:len(original)-1], 0600) != nil {
+					t.Fatal("storage partial fixture")
+				}
+				if _, e = OpenArchive(t.Context(), storageDir, a.digest); e == nil {
+					t.Fatal("storage partial source accepted")
+				}
+				if os.WriteFile(path, original, 0600) != nil {
+					t.Fatal("storage fixture restore")
+				}
+				if empty {
+					if PurgeStorageRegistered(storageDir, approved) != nil {
+						t.Fatal("storage exact material purge")
+					}
+					if entries, e := os.ReadDir(storageDir); e != nil || len(entries) != 0 {
+						t.Fatal("storage temporary assets remain")
+					}
+				}
+				t.Logf("storage_actual_capture=true storage_single_eof=true archive_reopen=true actual_sql_and_mongo_backend_restore=%t legacy_inventory_protocol_rejected=true drop_ready=false", empty)
+			})
+		}
+	})
 	inventoryMaterials, materialErr := publicCLIInventoryMaterialPaths(report, invRun)
 	if materialErr != nil {
 		t.Fatal("public_cli_native_inventory_material_registration_failed")
@@ -1242,27 +1464,41 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	for path := range inventoryMaterials {
 		opMaterial[path] = true
 	}
+	if storageOriginal == nil || storageApproval == nil || !hashPattern.MatchString(storageRequestHash) {
+		t.Fatal("public_cli_native_actual_storage_origin_missing")
+	}
+	storageBaseline, e := storageOriginal.StorageBaseline(t.Context())
+	if e != nil || storageBaseline.DropReady || len(storageBaseline.Targets) != 4 {
+		t.Fatal("public_cli_native_actual_storage_baseline_rejected")
+	}
+	approval = storageBaseline.Approval
+	invRun = storageRun
 	bindings := map[string]any{}
-	for database, b := range report.Bindings {
+	for database, b := range storageBaseline.StorageApproval.Bindings {
 		bindings[database] = map[string]any{"identity_hash": b.IdentityHash, "migration_version": b.Version, "migration_dirty": b.Dirty, "catalog_hash": b.CatalogHash, "non_target_schema_hash": b.NonTargetHash}
 	}
 	objects := []any{}
-	for _, s := range report.Targets {
+	for _, s := range storageBaseline.Targets {
 		objects = append(objects, map[string]any{"database": s.Database, "name": s.Name, "kind": s.Kind, "identity_hash": s.IdentityHash, "schema_hash": s.SchemaHash, "data_hash": s.DataHash, "records": s.Records})
 	}
 	manifestHash = nativeJSON(t, filepath.Join(opDir, "manifest.json"), map[string]any{"format_version": 1, "operation_id": op, "source_sha": source, "target_hash": report.TargetHash, "database_bindings": bindings, "targets": objects, "evidence": map[string]any{}, "maintenance": map[string]int{"max_seconds": 1800, "forward_stop_seconds": 1200, "rollback_seconds": 600}})
-	sourceDir := filepath.Join(opDir, "inventory-"+invRun)
+	sourceDir := storageOriginal.dir
 	hashes := map[string]string{}
-	for _, name := range append([]string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"}, sourceNames[:]...) {
+	for _, name := range append(storageNames(), "assets.private.json") {
 		raw, e := os.ReadFile(filepath.Join(sourceDir, name))
 		if e != nil {
 			t.Fatal("public_cli_native_exact_source_missing")
 		}
 		hashes[name] = sha(raw)
 	}
-	recovery := TargetRecoveryRequest{SourceSHA: source, OperationID: op, OriginalRunID: invRun, ManifestSHA256: manifestHash, MongoNonTargetSHA256: report.Bindings["mongodb"].NonTargetHash, SQLHead: 99, MongoHead: 38}
+	recoveryBaseline, e := HostArchiveRecoveryBaseline(storageOriginal)
+	if e != nil {
+		t.Fatal("public_cli_native_storage_recovery_baseline_missing")
+	}
+	recovery := TargetRecoveryRequest{SourceSHA: source, OperationID: op, OriginalRunID: invRun, ManifestSHA256: manifestHash, ArchiveSHA256: storageBaseline.ArchiveSHA256, SQLNonTargetSHA256: recoveryBaseline, MongoNonTargetSHA256: report.Bindings["mongodb"].NonTargetHash, SQLHead: 99, MongoHead: 38}
 	template := map[string]any{"format_version": 1, "kind": "compatibility_retirement_lifecycle_request", "tool_source_sha": source, "original_source_sha": source, "operation_id": op, "actual_run_id": "", "manifest_sha256": manifestHash, "archive_directory": archive, "source_directory": sourceDir, "window_directory": filepath.Join(opDir, "window"), "journal_directory": filepath.Join(opDir, "journal"), "archive_approval": approval, "recovery": recovery, "restore_engines": map[string]string{"mysql_image_id": mysqlRoot.Image, "mongodb_image_id": mongoRoot.Image, "architecture": runtime.GOARCH}, "source_file_sha256": hashes}
 	template["history_policy"] = "discard_legacy_history_keep_current_responsibility_v1"
+	template["storage_backup"] = map[string]any{"kind": "storage_backup_v1", "tool_source_sha": source, "run_id": storageRun, "archive_sha256": storageBaseline.ArchiveSHA256, "request_sha256": storageRequestHash}
 	templateHash := nativeJSON(t, filepath.Join(opDir, "lifecycle-request-template.json"), template)
 	// The expected current request changes only the two approved run fields.
 	// Normalize the original struct-containing map into JSON objects before the
@@ -1380,7 +1616,7 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 		t.Fatal("public_cli_native_original_catalog_or_content_changed")
 	}
 	for name, expected := range hashes {
-		for _, directory := range []string{sourceDir, filepath.Join(root, "inventory-"+invRun)} {
+		for _, directory := range []string{sourceDir, archive} {
 			actual, readErr := os.ReadFile(filepath.Join(directory, name))
 			if readErr != nil || sha(actual) != expected {
 				t.Fatal("public_cli_native_exact_original_or_staged_source_changed")
@@ -1444,7 +1680,7 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 			}
 		}
 	}
-	if e = PurgeRegistered(archive, approval); e != nil {
+	if e = PurgeStorageRegistered(archive, *storageApproval); e != nil {
 		t.Fatal("public_cli_native_fixture_archive_cleanup_failed")
 	}
 	entries, e := os.ReadDir(archive)
@@ -1454,10 +1690,13 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 	if final := nativeNamespaceOriginalDigest(t, db, mdb); final != before {
 		t.Fatal("public_cli_native_final_source_baseline_changed")
 	}
+	if e = PurgeStorageRegistered(sourceDir, *storageApproval); e != nil {
+		t.Fatal("public_cli_native_fixture_original_storage_cleanup_failed")
+	}
 	cleanupComplete = true
 	fixtureCleanupAllowed = true
 	t.Logf("public_cli_native_source_sha=%s operation_id=%s actual_run_id=%s manifest_sha256=%s request_sha256=%s archive_sha256=%s original_source_baseline_sha256=%s final_source_baseline_sha256=%s", source, op, actualRun, manifestHash, requestHash, hash, before, after)
-	t.Logf("public_cli_native_prepare_complete=true actual_window_tool=true actual_template_run_derivation=true actual_root_once=true actual_inventory_eof=true actual_stdio_restore=true target_count=4 combined_restore_millis=%d public_call_millis=%d original_catalog_and_content_equal=true engines_remaining=0 volumes_remaining=0 archive_assets_remaining=0 production_drop=false production_purge=false", int64(elapsed), time.Since(started).Milliseconds())
+	t.Logf("public_cli_native_prepare_complete=true actual_window_tool=true actual_template_run_derivation=true actual_root_once=true actual_inventory_eof=true actual_storage_origin=true actual_root_eight_member_copy=true actual_stdio_restore=true target_count=4 combined_restore_millis=%d public_call_millis=%d original_catalog_and_content_equal=true engines_remaining=0 volumes_remaining=0 archive_assets_remaining=0 production_drop=false production_purge=false", int64(elapsed), time.Since(started).Milliseconds())
 }
 
 func writeLifecycleFixtureBinary(path string, raw []byte) error {

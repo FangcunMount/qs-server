@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type BorrowedSources struct {
@@ -33,12 +34,13 @@ type mongoMetadata struct {
 	Version        string          `json:"version"`
 }
 type registration struct {
-	Version                int      `json:"version"`
-	Approval               Approval `json:"approval"`
-	Files                  []string `json:"files"`
-	ContainsOriginalBodies bool     `json:"contains_original_bodies"`
-	PurgeAfterAcceptance   bool     `json:"purge_after_acceptance"`
-	ResumeAllowed          bool     `json:"resume_allowed"`
+	Version                int              `json:"version"`
+	Approval               Approval         `json:"approval"`
+	Files                  []string         `json:"files"`
+	ContainsOriginalBodies bool             `json:"contains_original_bodies"`
+	PurgeAfterAcceptance   bool             `json:"purge_after_acceptance"`
+	ResumeAllowed          bool             `json:"resume_allowed"`
+	StorageApproval        *StorageApproval `json:"storage_approval,omitempty"`
 }
 
 func privateDirectory(dir string) error {
@@ -340,7 +342,7 @@ func OpenArchive(ctx context.Context, dir, expected string) (*Archive, error) {
 		return nil, ErrPrivate
 	}
 	var m manifest
-	if exactJSON(raw, &m) != nil || m.Version != 1 || !approvalValid(m.Approval) || m.OrderedMongoSchemaHash != m.Approval.OrderedMongoSchemaSHA256 || jsonSHA(m.Mongo) != m.OrderedMongoSchemaHash || sha(m.InventoryRaw) != m.Approval.InventorySHA256 || m.SQLMetadataHash != m.Approval.SQLMetadataSHA256 || m.MongoMetadataHash != m.Approval.MongoMetadataSHA256 {
+	if exactJSON(raw, &m) != nil || (m.Version != 1 && m.Version != 2) || !approvalValid(m.Approval) || m.OrderedMongoSchemaHash != m.Approval.OrderedMongoSchemaSHA256 || jsonSHA(m.Mongo) != m.OrderedMongoSchemaHash || sha(m.InventoryRaw) != m.Approval.InventorySHA256 || m.SQLMetadataHash != m.Approval.SQLMetadataSHA256 || m.MongoMetadataHash != m.Approval.MongoMetadataSHA256 {
 		return nil, ErrPrivate
 	}
 	// Older version 1 framing did not carry the recovery projection. Only B
@@ -348,9 +350,13 @@ func OpenArchive(ctx context.Context, dir, expected string) (*Archive, error) {
 	if m.SQLRecoveryNonTargetHash != "" && !hashPattern.MatchString(m.SQLRecoveryNonTargetHash) {
 		return nil, ErrPrivate
 	}
-	original, e := validateInventory(m.InventoryRaw, m.Approval)
-	if e != nil || !reflect.DeepEqual(original, m.Inventory) {
-		return nil, ErrApproval
+	if m.Version == 1 {
+		original, e := validateInventory(m.InventoryRaw, m.Approval)
+		if e != nil || m.StorageApproval != nil || !reflect.DeepEqual(original, m.Inventory) {
+			return nil, ErrApproval
+		}
+	} else if e = validateStorageManifest(m); e != nil {
+		return nil, e
 	}
 	for i, structure := range m.SQL {
 		normalized := increment.ReplaceAllString(structure.DDL, "")
@@ -363,6 +369,11 @@ func OpenArchive(ctx context.Context, dir, expected string) (*Archive, error) {
 		return nil, e
 	}
 	a := &Archive{dir: dir, digest: expected, data: m}
+	if m.Version == 2 {
+		if _, e = storageFiles(ctx, a); e != nil {
+			return nil, e
+		}
+	}
 	if e = a.verifyAssets(ctx); e != nil {
 		return nil, e
 	}
@@ -371,6 +382,11 @@ func OpenArchive(ctx context.Context, dir, expected string) (*Archive, error) {
 func (a *Archive) verifyAssets(ctx context.Context) error {
 	if a == nil || privateDirectory(a.dir) != nil {
 		return ErrPrivate
+	}
+	if a.data.Version == 2 {
+		if _, e := storageFiles(ctx, a); e != nil {
+			return e
+		}
 	}
 	for i, asset := range a.data.Assets {
 		if asset.Filename != sourceNames[i] || !hashPattern.MatchString(asset.SHA256) || asset.Bytes < 0 {
@@ -385,7 +401,7 @@ func (a *Archive) verifyAssets(ctx context.Context) error {
 		if i < 3 {
 			columns = a.data.SQL[i].Columns
 		}
-		r, e := newRawReader(ctx, io.TeeReader(f, h), i, a.data.Inventory.Targets[i], columns)
+		r, e := a.sourceReader(ctx, io.TeeReader(f, h), i, columns)
 		if e == nil {
 			for {
 				_, e = r.next()
@@ -416,7 +432,7 @@ func PurgeRegistered(dir string, approval Approval) error {
 	raw, e := readPrivate(f, metadataBudget)
 	ce := f.Close()
 	var reg registration
-	if e != nil || ce != nil || exactJSON(raw, &reg) != nil || reg.Version != 1 || !reflect.DeepEqual(reg.Approval, approval) || !reflect.DeepEqual(reg.Files, registrationNames()) || reg.ResumeAllowed || !reg.ContainsOriginalBodies || !reg.PurgeAfterAcceptance {
+	if e != nil || ce != nil || exactJSON(raw, &reg) != nil || reg.Version != 1 || reg.StorageApproval != nil || !reflect.DeepEqual(reg.Approval, approval) || !reflect.DeepEqual(reg.Files, registrationNames()) || reg.ResumeAllowed || !reg.ContainsOriginalBodies || !reg.PurgeAfterAcceptance {
 		return ErrPrivate
 	}
 	allowed := map[string]bool{"assets.private.json": true}
@@ -449,6 +465,345 @@ func PurgeRegistered(dir string, approval Approval) error {
 	}
 	// Retain the origin-bound registry through every partial cleanup. Remove
 	// it only after all raw assets are durably gone; there is no resume writer.
+	if os.Remove(filepath.Join(dir, "assets.private.json")) != nil {
+		return ErrPrivate
+	}
+	return syncDirectory(dir)
+}
+
+func storageNames() []string {
+	return append(append([]string(nil), registrationNames()...), "mysql-metadata.private.json", "mongodb-metadata.private.json")
+}
+func storageApprovalValid(a StorageApproval) bool {
+	if !sourcePattern.MatchString(a.OriginalSourceSHA) || !sourcePattern.MatchString(a.ToolSourceSHA) || !runPattern.MatchString(a.OperationID) || !runPattern.MatchString(a.RunID) || len(a.Bindings) != 2 {
+		return false
+	}
+	for _, value := range []string{a.RequestHash, a.TargetHash, a.SQLMetadataSHA256, a.MongoMetadataSHA256, a.OrderedMongoSchemaSHA256} {
+		if !hashPattern.MatchString(value) {
+			return false
+		}
+	}
+	fixed := [4][3]string{{"mysql", targetNames[0], "base_table"}, {"mysql", targetNames[1], "base_table"}, {"mysql", targetNames[2], "base_table"}, {"mongodb", targetNames[3], "collection"}}
+	if a.TargetHash != jsonSHA(fixed) {
+		return false
+	}
+	for i, target := range a.Targets {
+		if target.Database != fixed[i][0] || target.Name != fixed[i][1] || target.Kind != fixed[i][2] || !hashPattern.MatchString(target.IdentityHash) || !hashPattern.MatchString(target.SchemaHash) {
+			return false
+		}
+		b := target.Boundary
+		if b.Database != target.Database || b.Name != target.Name || b.Kind != target.Kind || b.IdentityHash != target.IdentityHash || b.SchemaHash != target.SchemaHash || !b.Present || (b.Empty && b.UpperToken != "") || (!b.Empty && b.UpperToken == "") || (i == 0 && b.PKType != "uint64") || (i > 0 && i < 3 && b.PKType != "ascii_string") {
+			return false
+		}
+	}
+	for database, binding := range a.Bindings {
+		if database != "mysql" && database != "mongodb" {
+			return false
+		}
+		if !hashPattern.MatchString(binding.IdentityHash) || !hashPattern.MatchString(binding.AnchorHash) || !hashPattern.MatchString(binding.CatalogHash) || !hashPattern.MatchString(binding.NonTargetHash) || binding.Version == 0 || binding.Dirty || !binding.HeadMatch || !binding.IdentityMatch || !binding.MetadataComplete || binding.ErrorCategory != "none" {
+			return false
+		}
+		if database == "mysql" && (binding.AnchorHash != binding.IdentityHash || binding.GenerationHash != "") {
+			return false
+		}
+		if database == "mongodb" && (!hashPattern.MatchString(binding.GenerationHash) || (binding.NamespaceAnchor != nil && (binding.NamespaceAnchor.Validate() != nil || binding.NamespaceAnchor.Hash != binding.AnchorHash))) {
+			return false
+		}
+	}
+	return true
+}
+
+// storageMetadata observes only structure/identity, both before and after the
+// one content capture. No caller-provided count/hash can reach this function.
+func storageMetadata(ctx context.Context, borrowed BorrowedSources, approved StorageApproval, sqlBytes, mongoBytes []byte) (manifest, error) {
+	var m manifest
+	var sm sqlMetadata
+	var mm mongoMetadata
+	if exactJSON(sqlBytes, &sm) != nil || exactJSON(mongoBytes, &mm) != nil || jsonSHA(sm.Schema) != approved.Bindings["mysql"].CatalogHash || jsonSHA(mm.Schema) != approved.Bindings["mongodb"].CatalogHash || !strings.HasPrefix(mm.Version, "7.") {
+		return m, ErrStructure
+	}
+	if _, e := sqlState(ctx, borrowed.SQL, approved.Bindings["mysql"]); e != nil {
+		return m, e
+	}
+	grants, e := readSQL(ctx, borrowed.SQL, "SHOW GRANTS FOR CURRENT_USER")
+	if e != nil || jsonSHA(grants) != sm.GrantsHash {
+		return m, ErrIdentity
+	}
+	defs, e := readSQLCatalog(ctx, borrowed.SQL)
+	if e != nil || jsonSHA(defs) != jsonSHA(sm.Schema) {
+		return m, ErrStructure
+	}
+	namespace, e := readSQL(ctx, borrowed.SQL, "SELECT DATABASE()")
+	if e != nil || len(namespace) != 1 || len(namespace[0]) != 1 || cell(namespace[0], 0) == "" {
+		return m, ErrIdentity
+	}
+	m.SQLRecoveryNonTargetHash, e = targetSQLNonTarget(defs, cell(namespace[0], 0))
+	if e != nil {
+		return m, e
+	}
+	if triggers, ok := defs["triggers"].([][]*string); ok {
+		for _, row := range triggers {
+			for _, name := range targetNames[:3] {
+				if cell(row, 1) == name {
+					return m, ErrStructure
+				}
+			}
+		}
+	}
+	for i, target := range approved.Targets[:3] {
+		m.SQL[i], e = sqlStructure(ctx, borrowed.SQL, i)
+		if e != nil {
+			return m, e
+		}
+		normalized := increment.ReplaceAllString(m.SQL[i].DDL, "")
+		if jsonSHA([][]*string{{&targetNames[i], &normalized}}) != target.SchemaHash || parts("mysql-object-v1", target.Name, target.SchemaHash) != target.IdentityHash {
+			return m, ErrStructure
+		}
+	}
+	collections, defsMongo, e := mongoCatalog(ctx, borrowed.Mongo)
+	if e != nil || jsonSHA(defsMongo) != jsonSHA(mm.Schema) {
+		return m, ErrStructure
+	}
+	if _, e = mongoState(ctx, borrowed.Mongo, approved.Bindings["mongodb"], collections); e != nil {
+		return m, e
+	}
+	ordered, e := ReadOrderedMongoSchema(ctx, borrowed.Mongo)
+	if e != nil || ordered.digest != approved.OrderedMongoSchemaSHA256 {
+		return m, ErrStructure
+	}
+	if e = verifyMongoObject(ordered.data, SourceSnapshot{SchemaHash: approved.Targets[3].SchemaHash, IdentityHash: approved.Targets[3].IdentityHash}); e != nil {
+		return m, e
+	}
+	var hello bson.Raw
+	if borrowed.Mongo.Client().Database("admin").RunCommand(mongoMetadataContext(ctx), bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil {
+		return m, ErrIdentity
+	}
+	process, ok := hello.Lookup("topologyVersion", "processId").ObjectIDOK()
+	if !ok || process.IsZero() {
+		return m, ErrIdentity
+	}
+	m.Mongo, m.SourceMongoNamespace, m.SourceMongoProcessID = ordered.data, borrowed.Mongo.Name(), process.Hex()
+	m.SQLMetadataHash, m.MongoMetadataHash, m.OrderedMongoSchemaHash = sha(sqlBytes), sha(mongoBytes), ordered.digest
+	return m, nil
+}
+
+// CaptureStorage reads each original target once into its original binary/BSON
+// framing. It approves no history, writer fence, restore or DROP. The host owns
+// both database handles and the SQL read transaction throughout the capture.
+func CaptureStorage(ctx context.Context, borrowed BorrowedSources, approved StorageApproval, in StorageInputs, dir string) (*Archive, error) {
+	if ctx == nil || ctx.Err() != nil || borrowed.SQL == nil || borrowed.Mongo == nil || !storageApprovalValid(approved) || privateDirectory(dir) != nil {
+		return nil, ErrApproval
+	}
+	entries, e := os.ReadDir(dir)
+	if e != nil || len(entries) != 0 {
+		return nil, ErrPrivate
+	}
+	// Detach all metadata expectations from mutable caller maps/pointers.
+	approvalRaw, e := json.Marshal(approved)
+	var detached StorageApproval
+	if e != nil || exactJSON(approvalRaw, &detached) != nil {
+		return nil, ErrApproval
+	}
+	approved = detached
+	ctx, cancel := context.WithTimeout(ctx, 1500*time.Second)
+	defer cancel()
+	sqlBytes, e := readPrivate(in.SQLMetadata, metadataBudget)
+	if e != nil || sha(sqlBytes) != approved.SQLMetadataSHA256 {
+		return nil, ErrApproval
+	}
+	mongoBytes, e := readPrivate(in.MongoMetadata, metadataBudget)
+	if e != nil || sha(mongoBytes) != approved.MongoMetadataSHA256 {
+		return nil, ErrApproval
+	}
+	m, e := storageMetadata(ctx, borrowed, approved, sqlBytes, mongoBytes)
+	if e != nil {
+		return nil, e
+	}
+	m.Version, m.StorageApproval = 2, &approved
+	m.Approval = approved.archiveApproval()
+	reg := registration{Version: 2, Approval: m.Approval, StorageApproval: &approved, Files: storageNames(), ContainsOriginalBodies: true, PurgeAfterAcceptance: true}
+	raw, e := json.Marshal(reg)
+	if e != nil || writePrivate(filepath.Join(dir, "assets.private.json"), raw) != nil {
+		return nil, ErrPrivate
+	}
+	for i, data := range [][]byte{sqlBytes, mongoBytes} {
+		if writePrivate(filepath.Join(dir, storageNames()[5+i]), data) != nil {
+			return nil, ErrPrivate
+		}
+	}
+	r := inventory{Format: 1, Kind: "storage_backup_v1", SourceSHA: approved.OriginalSourceSHA, OperationID: approved.OperationID, RunID: approved.RunID, RequestHash: approved.RequestHash, TargetHash: approved.TargetHash, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Bindings: approved.Bindings, Protocol: "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2", Semantics: "single_full_storage_capture_eof_metadata_before_after_no_writer_fence", ErrorCategory: "none", Diagnostic: true, BoundaryHash: jsonSHA(approved.Targets)}
+	for i, target := range approved.Targets {
+		s := SourceSnapshot{Database: target.Database, Name: target.Name, Kind: target.Kind, Present: true, SchemaHash: target.SchemaHash, IdentityHash: target.IdentityHash, SourceFile: sourceNames[i], ErrorCategory: "none", Passes: 1}
+		s.Boundary = target.Boundary
+		if i < 3 {
+			s, m.Assets[i], e = captureStorageSQL(ctx, borrowed.SQL, dir, i, m.SQL[i], s)
+		} else {
+			s, m.Assets[i], e = captureStorageMongo(ctx, borrowed.Mongo, dir, s)
+		}
+		if e != nil {
+			return nil, e
+		}
+		r.Targets = append(r.Targets, s)
+	}
+	end, e := storageMetadata(ctx, borrowed, approved, sqlBytes, mongoBytes)
+	if e != nil {
+		return nil, e
+	}
+	if !reflect.DeepEqual(m.SQL, end.SQL) || !reflect.DeepEqual(m.Mongo, end.Mongo) || m.SourceMongoProcessID != end.SourceMongoProcessID || m.SourceMongoNamespace != end.SourceMongoNamespace || m.SQLRecoveryNonTargetHash != end.SQLRecoveryNonTargetHash || ctx.Err() != nil {
+		return nil, ErrStructure
+	}
+	r.Complete = true
+	m.Inventory, m.InventoryRaw = r, nil
+	m.InventoryRaw, e = json.Marshal(r)
+	if e != nil {
+		return nil, ErrPrivate
+	}
+	m.Approval.InventorySHA256 = sha(m.InventoryRaw)
+	if e = validateStorageManifest(m); e != nil {
+		return nil, e
+	}
+	raw, e = json.Marshal(m)
+	if e != nil || writePrivate(filepath.Join(dir, "archive.private.json"), raw) != nil || ctx.Err() != nil {
+		return nil, ErrPrivate
+	}
+	return &Archive{dir: dir, digest: sha(raw), data: m}, nil
+}
+
+func validateStorageManifest(m manifest) error {
+	if m.Version != 2 || m.StorageApproval == nil || !storageApprovalValid(*m.StorageApproval) || !approvalValid(m.Approval) {
+		return ErrApproval
+	}
+	a, r := *m.StorageApproval, m.Inventory
+	want := a.archiveApproval()
+	want.InventorySHA256 = sha(m.InventoryRaw)
+	var raw inventory
+	if m.Approval != want || exactJSON(m.InventoryRaw, &raw) != nil || !reflect.DeepEqual(raw, r) || r.Format != 1 || r.Kind != "storage_backup_v1" || r.SourceSHA != a.OriginalSourceSHA || r.OperationID != a.OperationID || r.RunID != a.RunID || r.RequestHash != a.RequestHash || r.TargetHash != a.TargetHash || r.BoundaryHash != jsonSHA(a.Targets) || !reflect.DeepEqual(r.Bindings, a.Bindings) || !r.Complete || r.DropReady || !r.Diagnostic || r.ErrorCategory != "none" || r.Protocol != "mysql_cast_binary_columns_pk_order_v2+mongodb_server_bson_pk_order_v2" || r.Semantics != "single_full_storage_capture_eof_metadata_before_after_no_writer_fence" || len(r.Targets) != 4 {
+		return ErrApproval
+	}
+	for i, s := range r.Targets {
+		t := a.Targets[i]
+		b := s.Boundary
+		if s.Database != t.Database || s.Name != t.Name || s.Kind != t.Kind || s.IdentityHash != t.IdentityHash || s.SchemaHash != t.SchemaHash || !reflect.DeepEqual(b, t.Boundary) || s.SourceFile != sourceNames[i] || s.Passes != 1 || s.Pages != 1 || !s.Present || !s.Complete || s.NextCycle || s.ErrorCategory != "none" || !hashPattern.MatchString(s.DataHash) || s.Records > 1000000 || s.Bytes > 2<<30 || b.Empty != (s.Records == 0) || (b.Empty && s.Bytes != 0) {
+			return ErrSource
+		}
+	}
+	return nil
+}
+
+func storageFiles(ctx context.Context, a *Archive) ([2]Asset, error) {
+	var assets [2]Asset
+	if ctx == nil || ctx.Err() != nil || a == nil || validateStorageManifest(a.data) != nil || privateDirectory(a.dir) != nil {
+		return assets, ErrApproval
+	}
+	entries, e := os.ReadDir(a.dir)
+	allowed := map[string]bool{"assets.private.json": true}
+	for _, name := range storageNames() {
+		allowed[name] = true
+	}
+	if e != nil || len(entries) != len(allowed) {
+		return assets, ErrPrivate
+	}
+	for _, entry := range entries {
+		if !allowed[entry.Name()] {
+			return assets, ErrPrivate
+		}
+	}
+	f, e := openPrivateFile(filepath.Join(a.dir, "archive.private.json"))
+	if e != nil {
+		return assets, e
+	}
+	raw, e := readPrivate(f, metadataBudget)
+	ce := f.Close()
+	if e != nil || ce != nil || sha(raw) != a.digest {
+		return assets, ErrPrivate
+	}
+	f, e = openPrivateFile(filepath.Join(a.dir, "assets.private.json"))
+	if e != nil {
+		return assets, e
+	}
+	raw, e = readPrivate(f, metadataBudget)
+	ce = f.Close()
+	var reg registration
+	approval := a.data.Approval
+	approval.InventorySHA256 = ""
+	if e != nil || ce != nil || exactJSON(raw, &reg) != nil || reg.Version != 2 || reg.Approval != approval || reg.StorageApproval == nil || !reflect.DeepEqual(*reg.StorageApproval, *a.data.StorageApproval) || !reflect.DeepEqual(reg.Files, storageNames()) || reg.ResumeAllowed || !reg.ContainsOriginalBodies || !reg.PurgeAfterAcceptance {
+		return assets, ErrPrivate
+	}
+	for i, expected := range []string{approval.SQLMetadataSHA256, approval.MongoMetadataSHA256} {
+		name := storageNames()[5+i]
+		f, e = openPrivateFile(filepath.Join(a.dir, name))
+		if e != nil {
+			return assets, e
+		}
+		raw, e = readPrivate(f, metadataBudget)
+		ce = f.Close()
+		if e != nil || ce != nil || sha(raw) != expected {
+			return assets, ErrPrivate
+		}
+		assets[i] = Asset{Filename: name, SHA256: expected, Bytes: int64(len(raw))}
+	}
+	return assets, nil
+}
+
+func (a *Archive) StorageBaseline(ctx context.Context) (StorageBaseline, error) {
+	var out StorageBaseline
+	metadata, e := storageFiles(ctx, a)
+	if e != nil {
+		return out, e
+	}
+	if e = a.verifyAssets(ctx); e != nil {
+		return out, e
+	}
+	// Detached report projections never alias the opaque archive's private data.
+	raw, e := json.Marshal(StorageBaseline{Kind: "storage_backup_v1", ArchiveSHA256: a.digest, Approval: a.data.Approval, StorageApproval: *a.data.StorageApproval, Targets: a.data.Inventory.Targets, MetadataAssets: metadata, SourceAssets: a.data.Assets})
+	if e != nil || exactJSON(raw, &out) != nil {
+		return StorageBaseline{}, ErrPrivate
+	}
+	return out, nil
+}
+
+// PurgeStorageRegistered addresses only this new producer's eight exact files.
+// It also works for registered partial captures; the host supplies retention
+// authority, and an extra member always blocks cleanup.
+func PurgeStorageRegistered(dir string, approved StorageApproval) error {
+	if !storageApprovalValid(approved) || privateDirectory(dir) != nil {
+		return ErrPrivate
+	}
+	f, e := openPrivateFile(filepath.Join(dir, "assets.private.json"))
+	if e != nil {
+		return e
+	}
+	raw, e := readPrivate(f, metadataBudget)
+	ce := f.Close()
+	var reg registration
+	if e != nil || ce != nil || exactJSON(raw, &reg) != nil || reg.Version != 2 || reg.Approval != approved.archiveApproval() || reg.StorageApproval == nil || !reflect.DeepEqual(*reg.StorageApproval, approved) || !reflect.DeepEqual(reg.Files, storageNames()) || reg.ResumeAllowed || !reg.ContainsOriginalBodies || !reg.PurgeAfterAcceptance {
+		return ErrPrivate
+	}
+	allowed := map[string]bool{"assets.private.json": true}
+	for _, name := range reg.Files {
+		allowed[name] = true
+	}
+	entries, e := os.ReadDir(dir)
+	if e != nil {
+		return ErrPrivate
+	}
+	for _, entry := range entries {
+		if !allowed[entry.Name()] {
+			return ErrPrivate
+		}
+		f, e = openPrivateFile(filepath.Join(dir, entry.Name()))
+		if e != nil {
+			return e
+		}
+		if f.Close() != nil {
+			return ErrPrivate
+		}
+	}
+	for _, entry := range entries {
+		if entry.Name() != "assets.private.json" && (os.Remove(filepath.Join(dir, entry.Name())) != nil || syncDirectory(dir) != nil) {
+			return ErrPrivate
+		}
+	}
 	if os.Remove(filepath.Join(dir, "assets.private.json")) != nil {
 		return ErrPrivate
 	}

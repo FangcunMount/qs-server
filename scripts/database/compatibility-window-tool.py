@@ -156,7 +156,7 @@ def derive_request(raw, approval, current_run):
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
     required = ("format_version", "kind", "history_policy", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
-    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")
+    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero", "storage_backup")
     exact(r, required, optional)
     if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["history_policy"] != "discard_legacy_history_keep_current_responsibility_v1" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
@@ -168,10 +168,20 @@ def derive_request(raw, approval, current_run):
     exact(q, ("source_sha", "operation_id", "original_run_id", "actual_run_id", "manifest_sha256", "archive_sha256", "mysql_non_target_sha256", "mongodb_non_target_sha256", "mysql_head", "mongodb_head"))
     if q["source_sha"] != approval["original_source_sha"] or q["operation_id"] != approval["operation_id"] or q["original_run_id"] != approval["original_run_id"] or q["manifest_sha256"] != approval["manifest_sha256"] or type(q["mysql_head"]) is not int or type(q["mongodb_head"]) is not int or q["mysql_head"] != 99 or q["mongodb_head"] != 38:
         reject("window_tool_original_binding_rejected")
+    if "storage_backup" in r:
+        storage = r["storage_backup"]
+        exact(storage, ("kind", "tool_source_sha", "run_id", "archive_sha256", "request_sha256"))
+        token(storage["tool_source_sha"], SHA)
+        token(storage["run_id"], RUN)
+        for key in ("archive_sha256", "request_sha256"):
+            token(storage[key], HASH)
+        token(q["mysql_non_target_sha256"], HASH)
+        if storage["kind"] != "storage_backup_v1" or storage["tool_source_sha"] != approval["tool_source_sha"] or storage["run_id"] != approval["original_run_id"] or storage["archive_sha256"] != q["archive_sha256"]:
+            reject("window_tool_storage_backup_binding_rejected")
     result = copy.deepcopy(r)
     result["actual_run_id"] = current_run
     if approval["stage"] == "prepare":
-        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")) or q["archive_sha256"] != "":
+        if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")) or ("storage_backup" not in r and q["archive_sha256"] != ""):
             reject("window_tool_prepare_effect_fields_rejected")
     if "historical_write_report" in r:
         reject("window_tool_history_policy_rejected")

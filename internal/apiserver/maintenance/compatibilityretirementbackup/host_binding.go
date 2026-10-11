@@ -2,6 +2,7 @@ package compatibilityretirementbackup
 
 import (
 	"context"
+	"io"
 	"reflect"
 )
 
@@ -101,7 +102,15 @@ func verifyHostOriginalSources(ctx context.Context, a *Archive, borrowed Borrowe
 				return ErrStructure
 			}
 			if snapshot == nil || pass == 0 {
-				if e = verifySQLContent(ctx, borrowed.SQL, a.data.SQL[i], a.data.Inventory.Targets[i], i); e != nil {
+				if a.data.Version == 2 {
+					actual, err := storageSQLRows(ctx, borrowed.SQL, i, a.data.SQL[i], a.data.Inventory.Targets[i], io.Discard)
+					if err != nil {
+						return err
+					}
+					if actual.Records != a.data.Inventory.Targets[i].Records || actual.Bytes != a.data.Inventory.Targets[i].Bytes || actual.DataHash != a.data.Inventory.Targets[i].DataHash {
+						return ErrContent
+					}
+				} else if e = verifySQLContent(ctx, borrowed.SQL, a.data.SQL[i], a.data.Inventory.Targets[i], i); e != nil {
 					return e
 				}
 			}
@@ -118,7 +127,15 @@ func verifyHostOriginalSources(ctx context.Context, a *Archive, borrowed Borrowe
 			return ErrStructure
 		}
 		if snapshot == nil || pass == 0 {
-			if e = verifyMongoContent(ctx, borrowed.Mongo, a.data.Inventory.Targets[3]); e != nil {
+			if a.data.Version == 2 {
+				actual, err := storageMongoRows(ctx, borrowed.Mongo, a.data.Inventory.Targets[3], io.Discard)
+				if err != nil {
+					return err
+				}
+				if actual.Records != a.data.Inventory.Targets[3].Records || actual.Bytes != a.data.Inventory.Targets[3].Bytes || actual.DataHash != a.data.Inventory.Targets[3].DataHash {
+					return ErrContent
+				}
+			} else if e = verifyMongoContent(ctx, borrowed.Mongo, a.data.Inventory.Targets[3]); e != nil {
 				return e
 			}
 		}

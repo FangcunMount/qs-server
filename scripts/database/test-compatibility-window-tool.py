@@ -57,6 +57,19 @@ class WindowToolMetadata(unittest.TestCase):
             with self.subTest(name=name):
                 r=self.request();r[name]=None;a=self.approval(r)
                 with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        r=self.request();r['recovery']['archive_sha256']='e'*64;a=self.approval(r)
+        with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        r['storage_backup']=dict(kind='storage_backup_v1',tool_source_sha=r['tool_source_sha'],run_id='11-1',archive_sha256='e'*64,request_sha256='f'*64)
+        r['recovery']['mysql_non_target_sha256']='0'*64
+        for stage in ('prepare','apply'):
+            value=copy.deepcopy(r);a=self.approval(value,stage)
+            derived=tool.decode(tool.derive_request(tool.canonical(value),a,'22-3'))
+            expected=copy.deepcopy(value);expected['actual_run_id']='22-3';expected['recovery']['actual_run_id']='22-3'
+            self.assertEqual(derived,expected)
+            self.assertNotEqual(derived['storage_backup']['request_sha256'],derived['archive_approval']['RequestHash'])
+        for mutate in (lambda v:v.update(storage_backup=None),lambda v:v['storage_backup'].update(kind='readonly_compatibility_inventory'),lambda v:v['storage_backup'].update(tool_source_sha='f'*40),lambda v:v['storage_backup'].update(run_id='22-3'),lambda v:v['storage_backup'].update(archive_sha256='f'*64),lambda v:v['storage_backup'].update(request_sha256=''),lambda v:v['storage_backup'].update(drop_ready=True),lambda v:v['recovery'].update(archive_sha256=''),lambda v:v['recovery'].update(mysql_non_target_sha256=''),lambda v:v.update(final_history=None)):
+            value=copy.deepcopy(r);mutate(value);a=self.approval(value)
+            with self.subTest(value=value),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(value),a,'22-3')
     def test_original_run_and_cross_operation_template_cannot_be_reused(self):
         r=self.request();a=self.approval(r)
         with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'11-1')

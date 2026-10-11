@@ -2258,7 +2258,7 @@ def live_lifecycle(args, directory):
     fields(request, ("format_version", "kind", "history_policy", "tool_source_sha", "original_source_sha",
         "operation_id", "actual_run_id", "manifest_sha256", "archive_directory",
         "window_directory", "journal_directory", "archive_approval", "recovery"),
-        ("source_directory", "restore_engines", "source_file_sha256"))
+        ("source_directory", "restore_engines", "source_file_sha256", "storage_backup"))
     token(request["original_source_sha"], SHA)
     if (request["format_version"] != 1 or request["kind"] != "compatibility_retirement_lifecycle_request" or
         request["history_policy"] != "discard_legacy_history_keep_current_responsibility_v1" or request["tool_source_sha"] != args.actual_source_sha or request["operation_id"] != args.operation_id or
@@ -2348,7 +2348,7 @@ def prepare_facts_request(args):
     if text.encode("ascii") != raw[:-1] or hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
         fail("prepare_facts_descriptor_hash_invalid")
     fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "operation_id", "target_hash",
-        "database_scope", "inventory_report", "restore_engines", "archive_directory"))
+        "database_scope", "inventory_report", "restore_engines", "archive_directory"), ("storage_backup",))
     if (type(value["format_version"]) is not int or value["format_version"] != 1 or
         value["kind"] != "readonly_prepare_facts_observation_descriptor" or value["prepare_mode"] != "prepare-facts" or
         value["source_sha"] != args.actual_source_sha or value["operation_id"] != args.operation_id or
@@ -2360,6 +2360,11 @@ def prepare_facts_request(args):
     token(producer["sha256"], HASH); token(producer["request_sha256"], HASH)
     if producer["operation_id"] != args.operation_id or producer["run_id"] == args.run_id:
         fail("prepare_facts_producer_rejected")
+    storage = value.get("storage_backup")
+    if "storage_backup" in value:
+        fields(storage, ("kind", "tool_source_sha", "run_id", "archive_sha256", "request_sha256"))
+        if storage["kind"] != "storage_backup_v1" or storage["tool_source_sha"] != args.actual_source_sha or storage["run_id"] != producer["run_id"]: fail("prepare_facts_storage_binding_rejected")
+        token(storage["archive_sha256"], HASH); token(storage["request_sha256"], HASH)
     engines = value["restore_engines"]
     fields(engines, ("mysql_image_id", "mongodb_image_id", "architecture"))
     image = re.compile(r"sha256:[0-9a-f]{64}")
@@ -2371,12 +2376,14 @@ def prepare_facts_request(args):
     if (type(path) is not str or not 1 <= len(path) <= 1024 or any(v in path for v in ("\x00", "\r", "\n")) or
         not Path(path).is_absolute() or ".." in Path(path).parts or str(Path(path)) != path or
         not Path(path).is_relative_to(root) or Path(path) == root or
-        Path(path).is_relative_to(root / ("inventory-" + producer["run_id"]))):
+        Path(path).is_relative_to(root / ("inventory-" + producer["run_id"])) or
+        (storage is not None and Path(path).is_relative_to(root / ("storage-backup-" + producer["run_id"])))):
         fail("prepare_facts_archive_path_rejected")
     return {"format_version": 1, "kind": "readonly_prepare_facts_request", "source_sha": args.actual_source_sha,
         "operation_id": args.operation_id, "actual_run_id": args.run_id, "target_hash": TARGET_HASH,
         "database_scope": "mysql-and-mongodb", "observation_approval_sha256": args.bootstrap_approval_hash,
-        "inventory_report": producer, "restore_engines": engines, "archive_directory": path}
+        "inventory_report": producer, "restore_engines": engines, "archive_directory": path,
+        **({"storage_backup": storage} if storage is not None else {})}
 
 
 
@@ -2385,7 +2392,7 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         "request_sha256", "observation_approval_sha256", "target_hash", "complete", "prepare_facts_observation_complete",
         "diagnostic_only", "execution_allowed", "drop_ready", "observed_inventory_producer", "prepare_source_files",
         "observed_ordered_mongo_schema_sha256", "observed_filesystems", "observed_socket_kind",
-        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime", "observed_ai_message_protection", "observed_ai_bounds_sha256", "observed_peer_bounds_sha256"))
+        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime", "observed_ai_message_protection", "observed_ai_bounds_sha256", "observed_peer_bounds_sha256", "storage_backup"))
     if (type(result["format_version"]) is not int or result["format_version"] != 1 or
         result["kind"] != "readonly_prepare_facts_observation" or result["operation"] != "prepare" or
         result["prepare_mode"] != "prepare-facts" or result["source_sha"] != args.actual_source_sha or
@@ -2406,12 +2413,15 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         for key in ("container_id", "binding_sha256"): token(ai_runtime[key], HASH)
         fields(ai_runtime["stop_constraints"], ("settings_sha256", "network_id"))
         for value in ai_runtime["stop_constraints"].values(): token(value, HASH)
+    storage = request.get("storage_backup")
+    if result.get("storage_backup") != storage or ("storage_backup" in result) != (storage is not None): fail("prepare_facts_storage_binding_rejected")
+    names = STORAGE_BACKUP_FILES if storage is not None else PREPARE_SOURCE_NAMES
     files = result["prepare_source_files"]
-    if type(files) is not list or len(files) > 7:
+    if type(files) is not list or len(files) > len(names):
         fail("prepare_facts_native_files_rejected")
     for index, value in enumerate(files):
         fields(value, ("name", "sha256", "bytes"))
-        if value["name"] != PREPARE_SOURCE_NAMES[index]: fail("prepare_facts_native_files_rejected")
+        if value["name"] != names[index]: fail("prepare_facts_native_files_rejected")
         token(value["sha256"], HASH); uint(value["bytes"])
     capacity = result["observed_filesystems"]
     scopes = ("source", "staging", "archive", "docker")
@@ -2425,8 +2435,8 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
     if result["prepare_facts_observation_complete"]:
         token(result["observed_ordered_mongo_schema_sha256"], HASH)
         token(result.get("prepare_facts_private_observation_sha256"), HASH)
-        if (ai_runtime is None or len(files) != 7 or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
-            result["observed_socket_kind"] != "fixed_root_owned_unix_docker" or files[0]["sha256"] != request["inventory_report"]["sha256"]):
+        if (ai_runtime is None or len(files) != len(names) or len(capacity) != 4 or result.get("observed_restore_engines") != request["restore_engines"] or
+            result["observed_socket_kind"] != "fixed_root_owned_unix_docker" or (files[6]["sha256"] != storage["archive_sha256"] if storage is not None else files[0]["sha256"] != request["inventory_report"]["sha256"])):
             fail("prepare_facts_native_incomplete")
     else:
         token(result["observed_ordered_mongo_schema_sha256"], re.compile(r"(?:[0-9a-f]{64})?"))
@@ -2600,6 +2610,120 @@ def live_db_census(args):
     return validate_db_census_result(decode(native),args,request,request_hash,code)
 
 
+STORAGE_BACKUP_FILES = ("mysql-metadata.private.json", "mongodb-metadata.private.json",
+    "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson",
+    "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes",
+    "archive.private.json", "assets.private.json")
+
+
+def storage_backup_request(args, directory):
+    raw = (args.bootstrap_approval_json + "\n").encode("ascii")
+    if hashlib.sha256(raw).hexdigest() != args.bootstrap_approval_hash:
+        fail("storage_backup_approval_hash_rejected")
+    value = decode(raw)
+    fields(value, ("format_version", "kind", "prepare_mode", "source_sha", "original_source_sha",
+                   "operation_id", "target_hash", "database_scope", "inventory_request_sha256", "boundary_report"))
+    validate_binding(value, args.operation_id, args.actual_source_sha)
+    if type(value["format_version"]) is not int or value["format_version"] != 1 or value["kind"] != "readonly_storage_backup_approval" or value["prepare_mode"] != "storage-backup" or value["target_hash"] != TARGET_HASH or value["database_scope"] != "mysql-and-mongodb":
+        fail("storage_backup_approval_rejected")
+    token(value["original_source_sha"], SHA); token(value["inventory_request_sha256"], HASH)
+    reference = value["boundary_report"]
+    fields(reference, ("run_id", "source_sha", "sha256", "request_sha256"))
+    for key, pattern in (("run_id", RUN), ("source_sha", SHA), ("sha256", HASH), ("request_sha256", HASH)):
+        token(reference[key], pattern)
+    if reference["source_sha"] != value["original_source_sha"] or reference["run_id"] == args.run_id:
+        fail("storage_backup_origin_rejected")
+    original, _ = read_private(directory, "inventory-request.json", value["inventory_request_sha256"])
+    validate_v2_request(original, args.operation_id, value["original_source_sha"], boundary=False)
+    validate_approved_boundary_file(original, directory)
+    if original["boundary_run_id"] != reference["run_id"] or original["boundary_report_hash"] != reference["sha256"] or original["expected_migrations"] != {"mysql": 99, "mongodb": 38}:
+        fail("storage_backup_origin_rejected")
+    observed, _ = read_private(private_directory(directory / ("bounds-" + reference["run_id"])), "boundary.private.json", reference["sha256"])
+    if observed["request_hash"] != reference["request_sha256"]:
+        fail("storage_backup_origin_rejected")
+    # Original request/report hashes remain unchanged. This distinct request
+    # binds the current native tool and producer without importing content.
+    return {"format_version": 1, "kind": "readonly_storage_backup_request", "source_sha": args.actual_source_sha,
+        "original_source_sha": value["original_source_sha"], "operation_id": args.operation_id,
+        "actual_run_id": args.run_id, "target_hash": TARGET_HASH, "observation_approval_sha256": args.bootstrap_approval_hash,
+        "inventory_request_sha256": value["inventory_request_sha256"], "boundary_report": dict(reference, operation_id=args.operation_id)}
+
+
+def validate_storage_backup_result(result, args, request, request_hash, code):
+    fields(result, ("format_version", "kind", "operation", "prepare_mode", "source_sha", "original_source_sha", "operation_id", "run_id", "request_sha256", "inventory_request_sha256", "observation_approval_sha256", "target_hash", "complete", "diagnostic_only", "execution_allowed", "drop_ready", "storage_backup_complete", "storage_source_files", "error_category"),
+           ("storage_archive_sha256", "archive_approval", "storage_backup", "mysql_recovery_non_target_sha256", "inventory_manifest_seed"))
+    if result["format_version"] != 1 or type(result["format_version"]) is not int or result["kind"] != "readonly_storage_backup_result" or result["operation"] != "prepare" or result["prepare_mode"] != "storage-backup" or result["source_sha"] != args.actual_source_sha or result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or result["run_id"] != args.run_id or result["request_sha256"] != request_hash or result["inventory_request_sha256"] != request["inventory_request_sha256"] or result["observation_approval_sha256"] != args.bootstrap_approval_hash or result["target_hash"] != TARGET_HASH or result["diagnostic_only"] is not True or any(result[k] is not False for k in ("complete", "execution_allowed", "drop_ready")) or type(result["storage_backup_complete"]) is not bool or result["error_category"] not in ("none", "storage_backup_failed", "storage_backup_incomplete"):
+        fail("storage_backup_native_binding_rejected")
+    if code != 0 or not result["storage_backup_complete"] or result["error_category"] != "none":
+        fail("storage_backup_native_failed")
+    files = result["storage_source_files"]
+    if type(files) is not list or len(files) != 8 or [f.get("name") for f in files if type(f) is dict] != list(STORAGE_BACKUP_FILES):
+        fail("storage_backup_files_rejected")
+    for f in files:
+        fields(f, ("name", "sha256", "bytes")); token(f["sha256"], HASH); uint(f["bytes"])
+        if f["bytes"] > 16 << 30: fail("storage_backup_files_rejected")
+    token(result.get("storage_archive_sha256"), HASH); token(result.get("mysql_recovery_non_target_sha256"), HASH)
+    approval = result.get("archive_approval")
+    fields(approval, ("InventorySHA256", "SQLMetadataSHA256", "MongoMetadataSHA256", "OrderedMongoSchemaSHA256", "SourceSHA", "OperationID", "RunID", "RequestHash"))
+    for name in ("InventorySHA256", "SQLMetadataSHA256", "MongoMetadataSHA256", "OrderedMongoSchemaSHA256"): token(approval[name], HASH)
+    if approval["SourceSHA"] != request["original_source_sha"] or approval["OperationID"] != args.operation_id or approval["RunID"] != args.run_id or approval["RequestHash"] != request["inventory_request_sha256"] or approval["SQLMetadataSHA256"] != files[0]["sha256"] or approval["MongoMetadataSHA256"] != files[1]["sha256"] or result["storage_archive_sha256"] != files[6]["sha256"]:
+        fail("storage_backup_baseline_rejected")
+    reference = result.get("storage_backup")
+    fields(reference, ("kind", "tool_source_sha", "run_id", "archive_sha256", "request_sha256"))
+    if reference != {"kind": "storage_backup_v1", "tool_source_sha": args.actual_source_sha, "run_id": args.run_id, "archive_sha256": result["storage_archive_sha256"], "request_sha256": request_hash}:
+        fail("storage_backup_baseline_rejected")
+    seed = result.get("inventory_manifest_seed")
+    validate_manifest(seed, args.operation_id, request["original_source_sha"])
+    if seed["evidence"] != {}: fail("storage_backup_baseline_rejected")
+    result["archive_approval"] = {public: approval[native] for public, native in (("inventory_sha256","InventorySHA256"),("sql_metadata_sha256","SQLMetadataSHA256"),("mongo_metadata_sha256","MongoMetadataSHA256"),("ordered_mongo_schema_sha256","OrderedMongoSchemaSHA256"),("source_sha","SourceSHA"),("operation_id","OperationID"),("run_id","RunID"),("request_hash","RequestHash"))}
+    for item in result["storage_source_files"]: item["name"] = item["name"].replace(".", "_")
+    result["capabilities"] = {key: False for key in CAPABILITIES}
+    return result
+
+
+def live_storage_backup(args):
+    directory = operation_directory(args.root, args.operation_id)
+    request = storage_backup_request(args, directory)
+    raw = canonical_bytes(request); request_hash = hashlib.sha256(raw).hexdigest()
+    binary = Path(args.inventory_binary)
+    info = binary.lstat()
+    if not binary.is_absolute() or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        fail("inventory_binary_invalid")
+    code, native = capture_fixed([str(binary), "--source-sha"], timeout=5, maximum=128)
+    if code or native.decode("ascii", errors="strict").strip() != args.actual_source_sha:
+        fail("inventory_binary_source_mismatch")
+    values = inventory_connection_values(os.environ)
+    docker = ["sudo", "-n", "docker"]
+    code, native = capture_fixed([*docker, "image", "inspect", "mysql:8.0", "--format", "{{.Id}}"], timeout=15, maximum=256)
+    image = native.decode("ascii", errors="strict").strip()
+    if code or re.fullmatch(r"sha256:[0-9a-f]{64}", image) is None: fail("inventory_runtime_image_unavailable")
+    code, _ = capture_fixed([*docker, "network", "inspect", "infra-network"], timeout=15)
+    if code: fail("inventory_network_unavailable")
+    with locked_operation(directory):
+        name = "storage-backup-request-" + args.run_id + ".json"
+        create_bootstrap_file(directory, name, raw)
+        output = directory / ("storage-backup-" + args.run_id)
+        try: output.mkdir(mode=0o700)
+        except OSError: fail("storage_backup_output_exists_or_unknown")
+        parent = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try: os.fsync(parent)
+        finally: os.close(parent)
+        with tempfile.TemporaryDirectory(prefix="qs-compatibility-env-") as temporary:
+            os.chmod(temporary, 0o700)
+            env = Path(temporary) / "storage.env"
+            fd = os.open(env, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as stream:
+                stream.write("".join(key + "=" + value + "\n" for key, value in values.items())); stream.flush(); os.fsync(stream.fileno())
+            command = [*docker, "run", "--rm", "--name", "qs-compatibility-storage-backup-" + args.run_id, "--pull=never", "--network", "infra-network", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2", "--memory=512m", "--pids-limit=64", "--user", str(os.getuid()) + ":" + str(os.getgid()),
+                "--label", "qs.compatibility-retirement.operation=" + args.operation_id, "--label", "qs.compatibility-retirement.run=" + args.run_id,
+                "--label", "qs.compatibility-retirement.source=" + args.actual_source_sha, "--label", "qs.compatibility-retirement.request=" + request_hash,
+                "--mount", "type=bind,source=" + str(binary) + ",target=/inventory-tool,readonly", "--mount", "type=bind,source=" + str(directory) + ",target=/operation,readonly",
+                "--mount", "type=bind,source=" + str(output) + ",target=/inventory", "--env-file", str(env), "--entrypoint", "/inventory-tool", image,
+                "--mode", "storage-backup", "--request", "/operation/" + name, "--request-hash", request_hash, "--operation-id", args.operation_id, "--run-id", args.run_id, "--output-directory", "/inventory"]
+            code, native = capture_fixed(command, timeout=1530, maximum=MAX_JSON)
+    return validate_storage_backup_result(decode(native), args, request, request_hash, code)
+
+
 def execute(args):
     if args.operation not in OPERATIONS:
         fail("operation_unsupported")
@@ -2620,6 +2744,10 @@ def execute(args):
         return live_lifecycle(args, operation_directory(args.root, args.operation_id))
     if mode == "lifecycle":
         fail("lifecycle_request_approval_missing")
+    if mode == "storage-backup":
+        if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash:
+            fail("input_classes_mixed")
+        return live_storage_backup(args)
     if mode == "db-writer-census":
         if args.operation != "prepare" or args.manifest_hash or identity_request or inventory_request or not bootstrap_json or not bootstrap_hash: fail("input_classes_mixed")
         return live_db_census(args)
@@ -2728,15 +2856,19 @@ def main(argv=None):
     schema = {"format_version": "uint", "complete": "bool", "execution_allowed": "bool",
               "operation": OPERATIONS, "source_sha": "sha40", "run_id": "run_id", "operation_id": "run_id",
               "manifest_hash": "hash64", "target_hash": "hash64", "target_count": "uint",
-              "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation", "readonly_host_writer_scope_observation", "readonly_db_writer_census_observation"}),
+              "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation", "readonly_host_writer_scope_observation", "readonly_db_writer_census_observation", "readonly_storage_backup_result"}),
               "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
               "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64", "source_copy_intent_sha256": "hash64", "preparation_restore_zero_sha256": "hash64",
+              "storage_backup_complete": "bool", "storage_archive_sha256": "hash64",
+              "archive_approval": {**{key: "hash64" for key in ("inventory_sha256", "sql_metadata_sha256", "mongo_metadata_sha256", "ordered_mongo_schema_sha256", "request_hash")}, "source_sha": "sha40", "operation_id": "run_id", "run_id": "run_id"},
+              "storage_backup": {"kind": frozenset({"storage_backup_v1"}), "tool_source_sha": "sha40", "run_id": "run_id", "archive_sha256": "hash64", "request_sha256": "hash64"},
+              "storage_source_files": [{"name": frozenset(name.replace(".", "_") for name in STORAGE_BACKUP_FILES), "sha256": "hash64", "bytes": "uint"}],
               "archive_binding_complete": "bool", "recovery_attempted": "bool", "recovery_complete": "bool",
               "acceptance_complete": "bool", "purge_complete": "bool", "required_adapters": [LIFECYCLE_ADAPTERS],
               "recovery_error_category": frozenset({receipt.get("recovery_error_category", "none")}),
               "prepare_facts_private_observation_sha256": "hash64", "prepare_facts_observation_complete": "bool", "observation_approval_sha256": "hash64_or_empty",
               "observed_inventory_producer": {"operation_id": "run_id", "run_id": "run_id", "source_sha": "sha40", "sha256": "hash64", "request_sha256": "hash64"},
-              "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in PREPARE_SOURCE_NAMES), "sha256": "hash64", "bytes": "uint"}],
+              "prepare_source_files": [{"name": frozenset(name.replace(".", "_") for name in (*PREPARE_SOURCE_NAMES, *STORAGE_BACKUP_FILES)), "sha256": "hash64", "bytes": "uint"}],
               "observed_ai_message_protection": {"sha256":"hash64", "decrypt_key_count":"uint", "trusted_signer_count":"uint", "source_binding_sha256":"hash64", "source_sha":"sha40", "image_id_sha256":"hash64", "container_id_sha256":"hash64"},
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
@@ -2758,7 +2890,7 @@ def main(argv=None):
               "cleanup_only": "bool", "cleanup_baseline_complete": "bool", "cleanup_baseline_sha256": "hash64",
               "cleanup_file_count": "uint", "cleanup_source_file_bytes": "uint",
               "original_content_verified": "bool", "purge_executed": "bool",
-              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts", "host-writer-scope", "db-writer-census"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
+              "prepare_mode": frozenset({"identity", "bounds", "inventory", "report-diagnostic", "prepare-facts", "host-writer-scope", "db-writer-census", "storage-backup"}) | BOOTSTRAP_MODES, "diagnostic_only": "bool", "drop_ready": "bool",
               "request_bootstrap_complete": "bool", "bootstrap_approval_sha256": "hash64", "derived_request_sha256": "hash64", "request_created_run_id": "run_id",
               "history_metadata_complete": "bool", "history_metadata_process_budget_proven": "bool",
               "metadata_private_report_sha256": "hash64", "metadata_created_run_id": "run_id",
@@ -2836,7 +2968,7 @@ def main(argv=None):
         # Fixed ASCII fallback contains no input and cannot be mistaken for a
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
-    diagnostic_complete = ((receipt.get("prepare_mode") == "prepare-facts" and receipt.get("prepare_facts_observation_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
+    diagnostic_complete = ((receipt.get("prepare_mode") == "storage-backup" and receipt.get("storage_backup_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "prepare-facts" and receipt.get("prepare_facts_observation_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
         (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("error_category") == "failed_inventory_cleanup_baseline_only" and
          receipt.get("cleanup_only") is True and receipt.get("cleanup_baseline_complete") is True and
          receipt.get("inventory_complete") is False and receipt.get("original_content_verified") is False and

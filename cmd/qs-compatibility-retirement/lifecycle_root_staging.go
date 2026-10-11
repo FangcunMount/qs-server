@@ -27,6 +27,33 @@ const lifecycleRootPrepareBase = "/opt/backups/qs-server/compatibility-retiremen
 
 var lifecycleSourceNames = []string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json", "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson", "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes"}
 
+var lifecycleStorageNames = []string{"mysql-metadata.private.json", "mongodb-metadata.private.json", "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson", "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes", "archive.private.json", "assets.private.json"}
+
+func lifecycleStorageSourcePath(r lifecycleRequest) string {
+	return filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "storage-backup-"+r.Approval.RunID, "archive")
+}
+
+func lifecycleOriginalSourcePath(r lifecycleRequest) string {
+	if r.StorageBackup != nil {
+		return lifecycleStorageSourcePath(r)
+	}
+	return filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "inventory-"+r.Approval.RunID)
+}
+
+func lifecycleSourceMembers(r lifecycleRequest) []string {
+	if r.StorageBackup != nil {
+		return lifecycleStorageNames
+	}
+	return lifecycleSourceNames
+}
+
+func lifecycleStagingSourcePath(root string, r lifecycleRequest) string {
+	if r.StorageBackup != nil {
+		return r.ArchiveDirectory
+	}
+	return filepath.Join(root, "inventory-"+r.Approval.RunID)
+}
+
 func lifecycleInvocationBatch(operation, run string) string {
 	return filepath.Join(lifecycleInvocationBase, operation+"-"+run)
 }
@@ -197,7 +224,12 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	if e != nil {
 		return "", e
 	}
-	if !runRE.MatchString(r.Approval.RunID) || actualRun == r.Approval.RunID || actualRun == r.Recovery.OriginalRunID || !shaRE.MatchString(r.OriginalSourceSHA) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" || r.HistoryPolicy != lifecycleDiscardHistoryPolicy || r.OperationID != operation || r.ActualRunID != actualRun || r.ToolSourceSHA != sourceSHA || r.Recovery.ArchiveSHA256 != "" || !r.RestoreEngines.valid() || r.SourceDirectory != filepath.Join(original, "inventory-"+r.Approval.RunID) || len(r.SourceFileSHA256) != 7 {
+	storage := r.StorageBackup != nil
+	sourcePath := filepath.Join(original, "inventory-"+r.Approval.RunID)
+	if storage {
+		sourcePath = lifecycleStorageSourcePath(r)
+	}
+	if !runRE.MatchString(r.Approval.RunID) || actualRun == r.Approval.RunID || actualRun == r.Recovery.OriginalRunID || !shaRE.MatchString(r.OriginalSourceSHA) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" || r.HistoryPolicy != lifecycleDiscardHistoryPolicy || r.OperationID != operation || r.ActualRunID != actualRun || r.ToolSourceSHA != sourceSHA || (!storage && r.Recovery.ArchiveSHA256 != "") || (storage && (!r.StorageBackup.valid(r) || !hashRE.MatchString(r.Recovery.SQLNonTargetSHA256))) || !r.RestoreEngines.valid() || r.SourceDirectory != sourcePath || len(r.SourceFileSHA256) != len(lifecycleSourceMembers(r)) {
 		return "", lifecycleError("lifecycle_staging_binding_rejected")
 	}
 	// Ordered raw BSON schema requires its distinct approval from an actual
@@ -205,12 +237,12 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	if !hashRE.MatchString(r.Approval.OrderedMongoSchemaSHA256) {
 		return "", lifecycleError("lifecycle_ordered_mongo_schema_approval_missing")
 	}
-	for _, name := range lifecycleSourceNames {
+	for _, name := range lifecycleSourceMembers(r) {
 		if !hashRE.MatchString(r.SourceFileSHA256[name]) {
 			return "", lifecycleError("lifecycle_staging_source_hash_missing")
 		}
 	}
-	if r.SourceFileSHA256[lifecycleSourceNames[0]] != r.Approval.InventorySHA256 || r.SourceFileSHA256[lifecycleSourceNames[1]] != r.Approval.SQLMetadataSHA256 || r.SourceFileSHA256[lifecycleSourceNames[2]] != r.Approval.MongoMetadataSHA256 {
+	if (!storage && r.SourceFileSHA256[lifecycleSourceNames[0]] != r.Approval.InventorySHA256) || r.SourceFileSHA256["mysql-metadata.private.json"] != r.Approval.SQLMetadataSHA256 || r.SourceFileSHA256["mongodb-metadata.private.json"] != r.Approval.MongoMetadataSHA256 || (storage && r.SourceFileSHA256["archive.private.json"] != r.StorageBackup.ArchiveSHA256) {
 		return "", lifecycleError("lifecycle_staging_metadata_binding_rejected")
 	}
 	manifest, e := readLifecycleOwnedBytes(filepath.Join(metadataRoot, "manifest.json"), r.ManifestSHA256, metadataUID, 256<<10)
@@ -240,7 +272,7 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	// Root bootstrap has already installed only the approved binary here. No
 	// original owner/path is modified. The exact per-run source-copy intent is
 	// durable before even the first copied body, including partial failures.
-	intent := map[string]any{"format_version": 1, "kind": "root_once_exact_source_copy_intent", "original_source_sha": r.OriginalSourceSHA, "tool_source_sha": r.ToolSourceSHA, "operation_id": operation, "actual_run_id": actualRun, "original_run_id": r.Approval.RunID, "request_sha256": expected, "manifest_sha256": r.ManifestSHA256, "source_file_sha256": r.SourceFileSHA256, "targets": targets, "source_uid": uid64, "archive_directory": r.ArchiveDirectory, "source_staging_directory": filepath.Join(root, "inventory-"+r.Approval.RunID), "drop_authority": false, "purge_after_acceptance_required": true}
+	intent := map[string]any{"format_version": 1, "kind": "root_once_exact_source_copy_intent", "original_source_sha": r.OriginalSourceSHA, "tool_source_sha": r.ToolSourceSHA, "operation_id": operation, "actual_run_id": actualRun, "original_run_id": r.Approval.RunID, "request_sha256": expected, "manifest_sha256": r.ManifestSHA256, "source_file_sha256": r.SourceFileSHA256, "targets": targets, "source_uid": uid64, "archive_directory": r.ArchiveDirectory, "source_staging_directory": lifecycleStagingSourcePath(root, r), "drop_authority": false, "purge_after_acceptance_required": true}
 	// The original approved root caller passes only its actual write-time hashes.
 	// These transient inputs bind files; they never import a native capability.
 	basisHash, resultHash := os.Getenv("QS_LIFECYCLE_BUDGET_KEY_DESCRIPTOR_SHA256"), os.Getenv("QS_LIFECYCLE_BUDGET_KEY_RESULT_SHA256")
@@ -268,17 +300,23 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	}
 	// Archive stays at the exact approved path: a new root-owned leaf only.
 	// Original operation/source directories and files keep their original owners.
-	if os.MkdirAll(r.ArchiveDirectory, 0700) != nil || privateDir(r.ArchiveDirectory) != nil {
+	var mkdirErr error
+	if storage {
+		mkdirErr = os.Mkdir(r.ArchiveDirectory, 0700)
+	} else {
+		mkdirErr = os.MkdirAll(r.ArchiveDirectory, 0700)
+	}
+	if mkdirErr != nil || privateDir(r.ArchiveDirectory) != nil {
 		return "", lifecycleError("lifecycle_staging_archive_directory_rejected")
 	}
-	srcDir := filepath.Join(root, "inventory-"+r.Approval.RunID)
-	if os.Mkdir(srcDir, 0700) != nil || privateDir(srcDir) != nil {
+	srcDir := lifecycleStagingSourcePath(root, r)
+	if (!storage && os.Mkdir(srcDir, 0700) != nil) || privateDir(srcDir) != nil {
 		return "", lifecycleError("lifecycle_staging_directory_rejected")
 	}
 	if writeLifecycleRaw(filepath.Join(root, "manifest.json"), manifest, 0600) != nil {
 		return "", lifecycleError("lifecycle_staging_manifest_copy_failed")
 	}
-	for _, name := range lifecycleSourceNames {
+	for _, name := range lifecycleSourceMembers(r) {
 		if e = copyLifecycleRootSource(filepath.Join(r.SourceDirectory, name), filepath.Join(srcDir, name), r.SourceFileSHA256[name], uint32(uid64)); e != nil {
 			return "", e
 		}
@@ -365,6 +403,25 @@ func openLifecycleOriginalInventoryMaterials(ctx context.Context, r lifecycleReq
 	if a.Summary().ArchiveSHA256 != r.Recovery.ArchiveSHA256 || !hashRE.MatchString(r.Recovery.ArchiveSHA256) {
 		return nil, lifecycleError("lifecycle_material_registration_rejected")
 	}
+	if r.StorageBackup != nil {
+		hashes, e := lifecycleStorageFileHashes(ctx, r, a)
+		if e != nil || !reflect.DeepEqual(r.SourceFileSHA256, hashes) {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		d, e := openLifecycleMaterialDirectory(lifecycleStorageSourcePath(r), uid)
+		if e != nil {
+			return nil, e
+		}
+		for _, name := range lifecycleStorageNames {
+			if e = d.registerWithMaximum(name, hashes[name], uid, 0600, 16<<30); e != nil {
+				return nil, errors.Join(e, d.close())
+			}
+		}
+		if e = d.checkComplete(false); e != nil {
+			return nil, errors.Join(e, d.close())
+		}
+		return d, nil
+	}
 	hashes := map[string]string{lifecycleSourceNames[0]: r.Approval.InventorySHA256, lifecycleSourceNames[1]: r.Approval.SQLMetadataSHA256, lifecycleSourceNames[2]: r.Approval.MongoMetadataSHA256}
 	for i, asset := range a.TemporarySourceAssets() {
 		if asset.Filename != lifecycleSourceNames[3+i] || !hashRE.MatchString(asset.SHA256) || asset.Bytes < 0 || asset.Bytes > 2<<30 {
@@ -377,6 +434,34 @@ func openLifecycleOriginalInventoryMaterials(ctx context.Context, r lifecycleReq
 	}
 	path := filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "inventory-"+r.Approval.RunID)
 	return openLifecycleInventoryMaterialFiles(ctx, path, uid, r.Approval, hashes)
+}
+
+// Hashes come from the already opened, verified root copy of the actual v2
+// archive. The deploy input and the current request cannot mint these facts.
+func lifecycleStorageFileHashes(ctx context.Context, r lifecycleRequest, a *backup.Archive) (map[string]string, error) {
+	if !r.StorageBackup.valid(r) || a == nil {
+		return nil, lifecycleError("lifecycle_storage_archive_binding_rejected")
+	}
+	b, e := a.StorageBaseline(ctx)
+	if e != nil || b.Approval != r.Approval || b.ArchiveSHA256 != r.StorageBackup.ArchiveSHA256 || b.StorageApproval.ToolSourceSHA != r.ToolSourceSHA {
+		return nil, lifecycleError("lifecycle_storage_archive_binding_rejected")
+	}
+	hashes := map[string]string{"archive.private.json": b.ArchiveSHA256}
+	for _, asset := range b.MetadataAssets {
+		hashes[asset.Filename] = asset.SHA256
+	}
+	for _, asset := range b.SourceAssets {
+		hashes[asset.Filename] = asset.SHA256
+	}
+	f, _, e := hashPrepareFactsFile(ctx, filepath.Join(r.ArchiveDirectory, "assets.private.json"), 0, 256<<10, false)
+	if e != nil {
+		return nil, e
+	}
+	hashes[f.Name] = f.SHA256
+	if len(hashes) != len(lifecycleStorageNames) {
+		return nil, lifecycleError("lifecycle_storage_archive_binding_rejected")
+	}
+	return hashes, nil
 }
 
 // The complete name set comes from the approved producer report and its exact
@@ -814,7 +899,7 @@ func openLifecycleOriginalRootStaging(ctx context.Context, r lifecycleRequest, i
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	hashes := map[string]string{}
-	for _, name := range lifecycleSourceNames {
+	for _, name := range lifecycleSourceMembers(r) {
 		if inventory.files[name] == nil {
 			return nil, nil, lifecycleError("lifecycle_material_registration_rejected")
 		}
@@ -830,7 +915,7 @@ func openLifecycleOriginalRootStaging(ctx context.Context, r lifecycleRequest, i
 // final host holds new RO FDs to the unchanged original objects after the
 // original preparation process has exited; no FD is fabricated from a report.
 func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation string, r lifecycleRequest, hashes map[string]string, sourceUID, rootUID uint32) (owned, companion *lifecycleMaterialDirectory, result error) {
-	if ctx == nil || ctx.Err() != nil || r.SourceCopyIntent == nil || r.SourceCopyIntent.Path != filepath.Join(root, "source-copy.intent.private.json") || len(hashes) != 7 {
+	if ctx == nil || ctx.Err() != nil || r.SourceCopyIntent == nil || r.SourceCopyIntent.Path != filepath.Join(root, "source-copy.intent.private.json") || len(hashes) != len(lifecycleSourceMembers(r)) {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	d, err := openLifecycleMaterialDirectory(root, rootUID)
@@ -851,7 +936,7 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 	if err != nil {
 		return nil, nil, err
 	}
-	if decodeLifecycleSourceCopyIntent(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != filepath.Join(root, "inventory-"+i.OriginalRunID) || i.DropAuthority || !i.PurgeRequired {
+	if decodeLifecycleSourceCopyIntent(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != lifecycleStagingSourcePath(root, r) || i.DropAuthority || !i.PurgeRequired {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	if err = registerLifecyclePreparationBudgetMaterials(ctx, d, i, rootUID); err != nil {
@@ -902,7 +987,7 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 		return nil, nil, err
 	}
 	original, err = decodeLifecycleStagingRequest(requestBytes)
-	if err != nil || original.FormatVersion != 1 || original.Kind != "compatibility_retirement_lifecycle_request" || original.HistoryPolicy != r.HistoryPolicy || original.HistoryPolicy != lifecycleDiscardHistoryPolicy || original.OperationID != i.OperationID || original.ActualRunID != i.ActualRunID || original.OriginalSourceSHA != i.OriginalSourceSHA || original.ToolSourceSHA != i.ToolSourceSHA || original.ManifestSHA256 != i.ManifestSHA256 || original.Approval != r.Approval || original.Recovery.ArchiveSHA256 != "" || original.Recovery.SourceSHA != i.OriginalSourceSHA || original.Recovery.OperationID != i.OperationID || original.Recovery.OriginalRunID != i.OriginalRunID || original.Recovery.ActualRunID != i.ActualRunID || original.ArchiveDirectory != i.ArchiveDirectory || original.SourceDirectory != filepath.Join("/opt/backups/qs-server/compatibility-retirement", i.OperationID, "inventory-"+i.OriginalRunID) || !reflect.DeepEqual(original.SourceFileSHA256, hashes) {
+	if err != nil || original.FormatVersion != 1 || original.Kind != "compatibility_retirement_lifecycle_request" || original.HistoryPolicy != r.HistoryPolicy || original.HistoryPolicy != lifecycleDiscardHistoryPolicy || original.OperationID != i.OperationID || original.ActualRunID != i.ActualRunID || original.OriginalSourceSHA != i.OriginalSourceSHA || original.ToolSourceSHA != i.ToolSourceSHA || original.ManifestSHA256 != i.ManifestSHA256 || original.Approval != r.Approval || ((r.StorageBackup == nil && original.Recovery.ArchiveSHA256 != "") || (r.StorageBackup != nil && (!original.StorageBackup.valid(original) || !reflect.DeepEqual(original.StorageBackup, r.StorageBackup)))) || original.Recovery.SourceSHA != i.OriginalSourceSHA || original.Recovery.OperationID != i.OperationID || original.Recovery.OriginalRunID != i.OriginalRunID || original.Recovery.ActualRunID != i.ActualRunID || original.ArchiveDirectory != i.ArchiveDirectory || original.SourceDirectory != lifecycleOriginalSourcePath(r) || !reflect.DeepEqual(original.SourceFileSHA256, hashes) {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	// The standalone producer's native engines are already removed. Its receipt
@@ -935,21 +1020,24 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 	if _, err = registerLifecyclePreparationRestoreMetadata(ctx, d, &zero, nativeHash, original.RestoreEngines.Architecture, rootUID, nil); err != nil {
 		return nil, nil, err
 	}
-	child, err := openLifecycleMaterialDirectory(i.SourceStagingDirectory, rootUID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err = d.registerChild(child); err != nil {
-		return nil, nil, errors.Join(err, child.close())
-	}
-	for _, name := range lifecycleSourceNames {
-		if ctx.Err() != nil {
-			return nil, nil, ctx.Err()
-		}
-		if err = child.register(name, hashes[name], rootUID, 0600); err != nil {
+	if r.StorageBackup == nil {
+		child, err := openLifecycleMaterialDirectory(i.SourceStagingDirectory, rootUID)
+		if err != nil {
 			return nil, nil, err
 		}
+		if err = d.registerChild(child); err != nil {
+			return nil, nil, errors.Join(err, child.close())
+		}
+		for _, name := range lifecycleSourceNames {
+			if ctx.Err() != nil {
+				return nil, nil, ctx.Err()
+			}
+			if err = child.register(name, hashes[name], rootUID, 0600); err != nil {
+				return nil, nil, err
+			}
+		}
 	}
+
 	if windowTool {
 		peer, err = openLifecycleMaterialDirectory(invocation, rootUID)
 		if err != nil {
@@ -1494,12 +1582,29 @@ func completeLifecycleOriginalOperationMaterials(ctx context.Context, r lifecycl
 	if e := registerLifecycleOriginalOperationLock(parent, uid); e != nil {
 		return e
 	}
+	if r.StorageBackup != nil {
+		var request storageBackupRequest
+		raw, e := readLifecycleProducerJSON(parent, "storage-backup-request-"+r.Approval.RunID+".json", r.StorageBackup.RequestSHA256, uid, 256<<10, &request)
+		if e != nil || decodePrepareFacts(raw, &request) != nil || request.SourceSHA != r.StorageBackup.ToolSourceSHA || request.OriginalSourceSHA != r.OriginalSourceSHA || request.OperationID != r.OperationID || request.ActualRunID != r.Approval.RunID || request.InventoryRequestSHA256 != r.Approval.RequestHash || request.TargetHash != digest(targets) || !hashRE.MatchString(request.ObservationApprovalSHA256) {
+			return lifecycleError("lifecycle_original_operation_material_rejected")
+		}
+		wrapper, e := openLifecycleMaterialDirectory(filepath.Dir(inventory.path), uid)
+		if e != nil {
+			return e
+		}
+		if wrapper.path != filepath.Join(parent.path, "storage-backup-"+r.Approval.RunID) || wrapper.registerChild(inventory) != nil || wrapper.checkComplete(false) != nil {
+			return errors.Join(lifecycleError("lifecycle_original_operation_material_rejected"), wrapper.close())
+		}
+		if e = parent.registerChild(wrapper); e != nil {
+			return errors.Join(e, wrapper.close())
+		}
+	}
 	for _, d := range []*lifecycleMaterialDirectory{inventory, archive} {
 		if d == nil || d == parent {
 			continue
 		}
 		if filepath.Dir(d.path) != parent.path {
-			if d.externalArchive {
+			if d.externalArchive || (r.StorageBackup != nil && d == inventory) {
 				continue
 			}
 			return lifecycleError("lifecycle_original_operation_material_rejected")
@@ -1760,6 +1865,13 @@ func completeLifecycleOriginalInventoryInputs(ctx context.Context, r lifecycleRe
 	originalIdentity, e := originalMaterialReference(bootstrap["identity_report"], r.OriginalSourceSHA, true)
 	if e != nil || originalIdentity != identityRef || originalMaterialText(bootstrap, "created_run_id") == identityRef.RunID {
 		return lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	if r.StorageBackup != nil {
+		for name, hash := range map[string]string{"mysql-metadata.private.json": r.Approval.SQLMetadataSHA256, "mongodb-metadata.private.json": r.Approval.MongoMetadataSHA256} {
+			if e = bounds.registerWithMaximum(name, hash, uid, 0600, 16<<20); e != nil {
+				return e
+			}
+		}
 	}
 	bounds.files["boundary.private.json"].retained = true
 	return bounds.checkComplete(false)
@@ -2118,7 +2230,7 @@ func openLifecycleOriginalCensusMaterials(ctx context.Context, r lifecycleReques
 // Follow the actual facts producer selected by both approved bounds filenames.
 // This owns only its fixed root batch and original request, never a history parent.
 func openLifecycleOriginalPrepareFactsMaterials(ctx context.Context, r lifecycleRequest, parent, inventory *lifecycleMaterialDirectory, uid uint32) (*lifecycleMaterialDirectory, error) {
-	if ctx == nil || ctx.Err() != nil || r.FinalHistory == nil || !r.FinalHistory.valid(r) || parent == nil || inventory == nil || inventory.files["inventory.private.json"] == nil {
+	if ctx == nil || ctx.Err() != nil || r.FinalHistory == nil || !r.FinalHistory.valid(r) || parent == nil || inventory == nil || (r.StorageBackup == nil && inventory.files["inventory.private.json"] == nil) || (r.StorageBackup != nil && inventory.files["archive.private.json"] == nil) {
 		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
 	}
 	run := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(r.FinalHistory.AIBounds.Path), "ai-bounds-"), ".json")
@@ -2133,7 +2245,7 @@ func openLifecycleOriginalPrepareFactsMaterials(ctx context.Context, r lifecycle
 	reject := func(e error) (*lifecycleMaterialDirectory, error) { _ = d.close(); return nil, e }
 	var facts prepareFactsReceipt
 	raw, e := readLifecycleProducerJSON(d, "prepare-facts.private.json", "", 0, 256<<10, &facts)
-	if e != nil || decodePrepareFacts(raw, &facts) != nil || facts.FormatVersion != 1 || facts.Kind != "readonly_prepare_facts_observation" || facts.SourceSHA != r.ToolSourceSHA || facts.OperationID != r.OperationID || facts.RunID != run || facts.RequestSHA256 == "" || !hashRE.MatchString(facts.RequestSHA256) || facts.Complete || facts.ExecutionAllowed || facts.DropReady || !facts.DiagnosticOnly || !facts.FactsObservationComplete || facts.ErrorCategory != "none" || facts.Producer.OperationID != r.OperationID || facts.Producer.SourceSHA != r.OriginalSourceSHA || facts.Producer.RunID != r.Approval.RunID || facts.Producer.RequestSHA256 != r.Approval.RequestHash || facts.Producer.ReportSHA256 != inventory.files["inventory.private.json"].hash || facts.AIBoundsSHA256 != r.FinalHistory.AIBounds.SHA256 || facts.PeerBoundsSHA256 != r.FinalHistory.PeerBounds.SHA256 || facts.AIRuntime == nil || facts.AIRuntime.SourceSHA != r.FinalHistory.RuntimeSourceSHA || facts.AIRuntime.ImageID != r.FinalHistory.ImageID || facts.AIRuntime.ContainerID != r.FinalHistory.ContainerID || facts.AIRuntime.BindingSHA256 != r.FinalHistory.RuntimeBindingSHA256 || facts.Protection == nil || facts.Protection.SHA256 != r.FinalHistory.Protection.SHA256 {
+	if e != nil || decodePrepareFacts(raw, &facts) != nil || facts.FormatVersion != 1 || facts.Kind != "readonly_prepare_facts_observation" || facts.SourceSHA != r.ToolSourceSHA || facts.OperationID != r.OperationID || facts.RunID != run || facts.RequestSHA256 == "" || !hashRE.MatchString(facts.RequestSHA256) || facts.Complete || facts.ExecutionAllowed || facts.DropReady || !facts.DiagnosticOnly || !facts.FactsObservationComplete || facts.ErrorCategory != "none" || facts.Producer.OperationID != r.OperationID || facts.Producer.SourceSHA != r.OriginalSourceSHA || facts.Producer.RunID != r.Approval.RunID || facts.Producer.RequestSHA256 != r.Approval.RequestHash || facts.Producer.ReportSHA256 != r.Approval.InventorySHA256 || !reflect.DeepEqual(facts.StorageBackup, r.StorageBackup) || facts.AIBoundsSHA256 != r.FinalHistory.AIBounds.SHA256 || facts.PeerBoundsSHA256 != r.FinalHistory.PeerBounds.SHA256 || facts.AIRuntime == nil || facts.AIRuntime.SourceSHA != r.FinalHistory.RuntimeSourceSHA || facts.AIRuntime.ImageID != r.FinalHistory.ImageID || facts.AIRuntime.ContainerID != r.FinalHistory.ContainerID || facts.AIRuntime.BindingSHA256 != r.FinalHistory.RuntimeBindingSHA256 || facts.Protection == nil || facts.Protection.SHA256 != r.FinalHistory.Protection.SHA256 {
 		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
 	}
 	var tool lifecycleOriginalRootToolIntent
@@ -2144,7 +2256,7 @@ func openLifecycleOriginalPrepareFactsMaterials(ctx context.Context, r lifecycle
 	}
 	var q prepareFactsRequest
 	raw, e = readLifecycleProducerJSON(parent, filepath.Base(requestPath), facts.RequestSHA256, uid, 256<<10, &q)
-	if e != nil || decodePrepareFacts(raw, &q) != nil || validatePrepareFactsRequest(q, r.OperationID, run) != nil || q.Inventory != facts.Producer {
+	if e != nil || decodePrepareFacts(raw, &q) != nil || validatePrepareFactsRequest(q, r.OperationID, run) != nil || q.Inventory != facts.Producer || !reflect.DeepEqual(q.StorageBackup, r.StorageBackup) {
 		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
 	}
 	if e = d.register("restore-native", tool.NativeSHA256, 0, 0700); e != nil {

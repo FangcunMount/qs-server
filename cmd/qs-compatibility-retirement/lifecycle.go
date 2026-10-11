@@ -23,6 +23,7 @@ import (
 const lifecycleDiscardHistoryPolicy = "discard_legacy_history_keep_current_responsibility_v1"
 
 type lifecycleRequest struct {
+	StorageBackup          *lifecycleStorageBackup              `json:"storage_backup,omitempty"`
 	HistoryPolicy          string                               `json:"history_policy"`
 	FormatVersion          int                                  `json:"format_version"`
 	Kind                   string                               `json:"kind"`
@@ -50,6 +51,20 @@ type lifecycleRequest struct {
 	WriterControl          *lifecycleWriterControl              `json:"writer_control,omitempty"`
 	requestSHA256          string                               `json:"-"`
 	prepareRoot            string                               `json:"-"`
+}
+
+// This reference names an actual storage producer and its sealed bytes. Only
+// OpenArchive and StorageBaseline establish the native archive origin.
+type lifecycleStorageBackup struct {
+	Kind          string `json:"kind"`
+	ToolSourceSHA string `json:"tool_source_sha"`
+	RunID         string `json:"run_id"`
+	ArchiveSHA256 string `json:"archive_sha256"`
+	RequestSHA256 string `json:"request_sha256"`
+}
+
+func (s *lifecycleStorageBackup) valid(r lifecycleRequest) bool {
+	return s != nil && s.Kind == "storage_backup_v1" && s.ToolSourceSHA == r.ToolSourceSHA && shaRE.MatchString(s.ToolSourceSHA) && s.RunID == r.Approval.RunID && runRE.MatchString(s.RunID) && hashRE.MatchString(s.ArchiveSHA256) && s.ArchiveSHA256 == r.Recovery.ArchiveSHA256 && hashRE.MatchString(s.RequestSHA256)
 }
 
 type lifecycleFrozenManifest struct {
@@ -313,7 +328,7 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	wantRoot := filepath.Join("/opt/backups/qs-server/compatibility-retirement", operation)
 	recovery := r.Recovery
 	stagedRoot := lifecycleRootBatch(operation, actualRun)
-	staged := root == stagedRoot && stage == "prepare" && r.Recovery.ArchiveSHA256 == "" && r.RestoreEngines.valid()
+	staged := root == stagedRoot && stage == "prepare" && (r.Recovery.ArchiveSHA256 == "" || r.StorageBackup.valid(r)) && r.RestoreEngines.valid()
 	invocationRoot := lifecycleInvocationBatch(operation, actualRun)
 	if (stage == "prepare" && !staged || stage != "prepare" && root != wantRoot && root != invocationRoot) || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" ||
 		r.HistoryPolicy != lifecycleDiscardHistoryPolicy || r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
@@ -347,11 +362,12 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 		return r, nil, lifecycleError("lifecycle_restore_engine_approval_missing")
 	}
 	capture := recovery.ArchiveSHA256 == ""
-	if capture && (stage != "prepare" || r.SourceDirectory != filepath.Join(wantRoot, "inventory-"+r.Approval.RunID) || r.Resume != nil) || !capture && (r.SourceDirectory != "" || !hashRE.MatchString(recovery.SQLNonTargetSHA256)) {
+	storagePrepare := r.StorageBackup != nil && stage == "prepare"
+	if r.StorageBackup != nil && (!r.StorageBackup.valid(r) || capture) || storagePrepare && (r.SourceDirectory != lifecycleStorageSourcePath(r) || r.Resume != nil) || capture && (stage != "prepare" || r.SourceDirectory != filepath.Join(wantRoot, "inventory-"+r.Approval.RunID) || r.Resume != nil) || !capture && ((!storagePrepare && r.SourceDirectory != "") || !hashRE.MatchString(recovery.SQLNonTargetSHA256)) {
 		return r, nil, lifecycleError("lifecycle_capture_binding_rejected")
 	}
 	paths := []string{r.ArchiveDirectory, r.WindowDirectory, r.JournalDirectory}
-	if capture {
+	if capture || storagePrepare {
 		paths = append(paths, r.SourceDirectory)
 	}
 	for i, p := range paths {
@@ -407,7 +423,9 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 		translate := func(p string) string { rel, _ := filepath.Rel(wantRoot, p); return filepath.Join(root, rel) }
 		// Preserve the exact approved archive/recovery paths. Only immutable
 		// input bytes move into the root-owned once staging tree.
-		r.SourceDirectory = translate(r.SourceDirectory)
+		if !storagePrepare {
+			r.SourceDirectory = translate(r.SourceDirectory)
+		}
 	}
 	if stage == "prepare" {
 		if err := verifyLifecycleRestoreImages(ctx, r.RestoreEngines); err != nil {
@@ -423,6 +441,12 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	}
 	if err != nil {
 		return r, nil, err
+	}
+	if r.StorageBackup != nil {
+		baseline, e := a.StorageBaseline(ctx)
+		if e != nil || baseline.StorageApproval.ToolSourceSHA != r.StorageBackup.ToolSourceSHA || baseline.StorageApproval.OriginalSourceSHA != r.OriginalSourceSHA || baseline.StorageApproval.OperationID != operation || baseline.StorageApproval.RunID != r.Approval.RunID || baseline.Approval != r.Approval || baseline.ArchiveSHA256 != r.StorageBackup.ArchiveSHA256 {
+			return r, nil, lifecycleError("lifecycle_storage_archive_binding_rejected")
+		}
 	}
 	if capture {
 		r.Recovery.ArchiveSHA256 = a.Summary().ArchiveSHA256
@@ -688,7 +712,7 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 			if err = host.PurgeTemporaryCopies(forward, r); err != nil {
 				return receipt, err
 			}
-			if err = backup.PurgeRegistered(r.ArchiveDirectory, r.Approval); err != nil {
+			if err = purgeLifecycleArchive(forward, r, archive); err != nil {
 				return receipt, err
 			}
 			if err = host.VerifyTemporaryMaterialsZero(forward, r); err != nil {
@@ -766,7 +790,7 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	if err = host.PurgeTemporaryCopies(forward, r); err != nil {
 		return receipt, err
 	}
-	if err = backup.PurgeRegistered(r.ArchiveDirectory, r.Approval); err != nil {
+	if err = purgeLifecycleArchive(forward, r, archive); err != nil {
 		return receipt, err
 	}
 	if err = host.VerifyTemporaryMaterialsZero(forward, r); err != nil {
@@ -779,4 +803,18 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	receipt.Complete = true
 	receipt.RequiredAdapters = []string{}
 	return receipt, nil
+}
+
+func purgeLifecycleArchive(ctx context.Context, r lifecycleRequest, a *backup.Archive) error {
+	if r.StorageBackup == nil {
+		return backup.PurgeRegistered(r.ArchiveDirectory, r.Approval)
+	}
+	if !r.StorageBackup.valid(r) || a == nil {
+		return lifecycleError("lifecycle_storage_archive_binding_rejected")
+	}
+	b, e := a.StorageBaseline(ctx)
+	if e != nil || b.Approval != r.Approval || b.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || b.StorageApproval.ToolSourceSHA != r.ToolSourceSHA {
+		return lifecycleError("lifecycle_storage_archive_binding_rejected")
+	}
+	return backup.PurgeStorageRegistered(r.ArchiveDirectory, b.StorageApproval)
 }
