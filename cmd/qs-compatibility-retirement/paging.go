@@ -786,7 +786,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		}
 		pageStarted := time.Now()
 		q, cancel := scopedQuery(ctx, limits)
-		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(limits.PageSize)).SetBatchSize(int32(limits.PageSize)).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
+		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(limits.PageSize)).SetBatchSize(128).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
 		if e != nil {
 			emitMongoTargetDiagnostic(ctx, q, "find", pass, page, s, pageStarted, e)
 			cancel()
