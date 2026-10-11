@@ -1,4 +1,28 @@
-# Exact compatibility retirement: qualified evidence write and lifecycle barrier
+# Exact compatibility retirement: current scope and lifecycle barrier
+
+## Current approved scope (2026-10-11)
+
+The latest user decision cancels historical event migration, evidence backfill,
+message compatibility and replay. It supersedes the historical prerequisites in
+the older implementation notes below. Keep current atomic event writes, standard
+audits, genuine current command handoffs, inherited budgets and retired-ID/late
+receipt guards. Exact temporary backup, actual isolated restoration, writer
+isolation, the 30-minute window, B runtime acceptance and batch-only material/tool
+exit remain required. A partial source scan is not a complete backup receipt.
+Full historical body classification and duplicate source inventories are no
+longer deletion prerequisites. Check actual dependency retirement, retain exact
+temporary backups and prove restoration, then delete the fixed objects in the
+controlled window. No additional query-performance diagnostic is introduced.
+
+The shortened preparation route captures each fixed object once and derives its
+content baseline from the actual temporary backup. It does not require a complete
+historical inventory before capture. Its explicit storage origin records one EOF
+pass; it must never impersonate the older two-pass inventory. Preparation then
+seals the exact captured files, opens their actual archive digest and performs
+the real isolated restore. Neither the capture receipt nor its derived manifest
+alone authorizes deletion. This route is not yet production-validated.
+
+## Historical implementation notes
 
 The accepted four-object operation has a qualified historical-evidence write
 caller and preparation callers for exact temporary backup and isolated content
@@ -1799,4 +1823,5 @@ and these same entry generators with a manifest of actual identity and complete
 inventory facts; an empty `evidence` object makes no historical or recovery
 claim. Prepare and window native binaries use the same build flags. This permits
 limited installation before remote image preload; the real B image/program pair,
-historical CAS, restore and writer-fence gates still require their own results.
+restore and writer-fence gates still require their own results. Historical CAS is
+not required by the latest approved scope.
