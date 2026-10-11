@@ -347,16 +347,22 @@ if(accepted!==c.accepted)throw new Error('offline_action_validation_mismatch');}
             ast.unparse(node.test)=='preload_program is not None')
         selected=compile(ast.Module(body=[selection],type_ignores=[]),'sealed-network-module-selection','exec')
         invoked=compile(ast.Module(body=[calls],type_ignores=[]),'sealed-network-native-call','exec')
-        module_body=b"def database_network_command(argv):\n return ['fixture-private-namespace',*argv]\n"
+        module_body=b"def database_network_command(argv,environment):\n return ['fixture-private-namespace',*argv] if environment['MONGODB_HOST']=='mongo' else argv\n"
         class Package:
             def extractfile(self,_):return io.BytesIO(module_body)
         original=['/private/native','--mode','db-writer-census-root-once','--request','/original/request']
         for stage in ('host-writer-scope','prepare-facts','db-writer-census','lifecycle'):
-            scope={'stage':stage,'members':[SimpleNamespace(name='compatibility-window-tool.py',size=len(module_body))],
-                'tar':Package(),'preload_program':None,'stop':lambda:self.fail('valid sealed module rejected'),
-                'native_argv':original.copy()}
-            exec(selected,scope);exec(invoked,scope)
-            self.assertEqual(scope['native_argv'],original if stage=='host-writer-scope' else ['fixture-private-namespace',*original])
+            for host in ('mongo','127.0.0.1','localhost','db.example.test'):
+                with self.subTest(stage=stage,host=host):
+                    credentials={'MONGODB_HOST':host,'MONGODB_PORT':'27017','MONGODB_DBNAME':'qs','MONGODB_PASSWORD':'offline fixture'}
+                    before=credentials.copy()
+                    scope={'stage':stage,'members':[SimpleNamespace(name='compatibility-window-tool.py',size=len(module_body))],
+                        'tar':Package(),'preload_program':None,'stop':lambda:self.fail('valid sealed module rejected'),
+                        'native_argv':original.copy(),'credentials':credentials}
+                    exec(selected,scope);exec(invoked,scope)
+                    self.assertEqual(scope['native_argv'],original if stage=='host-writer-scope' or host!='mongo' else ['fixture-private-namespace',*original])
+                    self.assertIs(scope['credentials'],credentials)
+                    self.assertEqual(credentials,before)
     def test_actual_run_path_tokens_are_checked_before_any_private_publication(self):
         args,_=self.args();args.run_id='../790-1'
         with mock.patch.object(tool,'operation_directory') as directory,mock.patch.object(tool,'create_bootstrap_file') as publish,self.assertRaises(tool.Blocked):

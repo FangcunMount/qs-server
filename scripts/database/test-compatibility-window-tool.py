@@ -467,10 +467,17 @@ class DatabaseNetworkExecution(unittest.TestCase):
             with self.subTest(mutation=mutation):self.assertEqual(self.execute(mutation)[1],[])
     def test_command_factory_requires_actual_linux_root_and_does_not_rewrite_endpoints(self):
         from unittest import mock
-        with mock.patch.object(tool.os,'getuid',return_value=1),self.assertRaises(tool.Refused):tool.database_network_command(['/approved/native'])
+        with mock.patch.object(tool.os,'getuid',return_value=1),self.assertRaises(tool.Refused):tool.database_network_command(['/approved/native'],{'MONGODB_HOST':'mongo'})
         with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool.platform,'system',return_value='Linux'):
             argv=['/approved/native','--request','/original/request']
-            self.assertEqual(tool.database_network_command(argv),['/usr/bin/python3','-I','-c',tool.DATABASE_NETWORK_EXEC,*argv])
+            for host in ('mongo','127.0.0.1','localhost','db.example.test'):
+                with self.subTest(host=host):
+                    environment={'MONGODB_HOST':host,'MONGODB_PORT':'27017','MONGODB_DBNAME':'qs','MONGODB_PASSWORD':'offline fixture'}
+                    original=environment.copy()
+                    command=tool.database_network_command(argv,environment)
+                    self.assertEqual(command,['/usr/bin/python3','-I','-c',tool.DATABASE_NETWORK_EXEC,*argv] if host=='mongo' else argv)
+                    if host!='mongo':self.assertIs(command,argv)
+                    self.assertEqual(environment,original)
             self.assertEqual(argv,['/approved/native','--request','/original/request'])
 
 

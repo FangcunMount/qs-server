@@ -107,9 +107,13 @@ os.execvpe(sys.argv[1],sys.argv[1:],os.environ)
 """
 
 
-def database_network_command(command):
+def database_network_command(command, environment):
     if os.getuid() != 0 or os.geteuid() != 0 or platform.system() != "Linux":
         reject("window_tool_actual_root_required")
+    # Only this approved Docker DNS seed needs the fixed proxy namespace.
+    # Other original endpoints keep the host route and native identity checks.
+    if environment.get("MONGODB_HOST") != "mongo":
+        return command
     return ["/usr/bin/python3", "-I", "-c", DATABASE_NETWORK_EXEC, *command]
 
 
@@ -913,7 +917,7 @@ def root_execute(arguments, packet, source_uid, archive_raw):
     # manager imports no completion/permit or guessed production authority.
     command = [str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
                "--request-hash", digest(derived), "--operation-id", operation, "--run-id", current_run]
-    code, raw = owned_process(database_network_command(command), environment, control=sys.stdin.fileno(), owner=owner)
+    code, raw = owned_process(database_network_command(command, environment), environment, control=sys.stdin.fileno(), owner=owner)
     context=globals().get('_fixed_entry_context')
     if context is not None and stage in ('apply','purge') and code==0:
         revoke_fixed_entries_after_native(raw,code,a,current_run,digest(derived),context)

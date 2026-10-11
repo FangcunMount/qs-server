@@ -1936,7 +1936,7 @@ try:
     if preload_program is not None:
         module={'__name__':'approved_database_network_caller'}
         exec(compile(preload_program,'approved-package-database-network-caller','exec'),module)
-        native_argv=module['database_network_command'](native_argv)
+        native_argv=module['database_network_command'](native_argv,credentials)
     if stage=='prepare-facts':
         for asset,body in sealed_assets.items():
             fd=os.open(batch/asset,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
