@@ -1210,7 +1210,7 @@ func main() {
 		return
 	}
 	if *mode == "storage-backup" {
-		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
 		r, e := runStorageBackup(ctx, *req, *hash, *op, *runID, *out)
 		cancel()
 		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {

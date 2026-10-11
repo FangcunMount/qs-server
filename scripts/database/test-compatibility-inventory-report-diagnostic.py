@@ -410,6 +410,19 @@ class StorageBackupResultContracts(unittest.TestCase):
         result=dict(format_version=1,kind='readonly_storage_backup_result',operation='prepare',prepare_mode='storage-backup',source_sha=args.actual_source_sha,original_source_sha=request['original_source_sha'],operation_id=args.operation_id,run_id=args.run_id,request_sha256='e'*64,inventory_request_sha256=request['inventory_request_sha256'],observation_approval_sha256=args.bootstrap_approval_hash,target_hash=tool.TARGET_HASH,complete=False,diagnostic_only=True,execution_allowed=False,drop_ready=False,storage_backup_complete=True,error_category='none',storage_archive_sha256='d'*64,archive_approval=approval,mysql_recovery_non_target_sha256='f'*64,storage_backup=dict(kind='storage_backup_v1',tool_source_sha=args.actual_source_sha,run_id=args.run_id,archive_sha256='d'*64,request_sha256='e'*64),storage_source_files=[dict(name=name,sha256='d'*64,bytes=1) for name in tool.STORAGE_BACKUP_FILES],inventory_manifest_seed=seed)
         return args,request,result
 
+    def failure_fixture(self, category='storage_backup_timeout'):
+        args,request,result=self.fixture()
+        for key in ('storage_archive_sha256','archive_approval','storage_backup','mysql_recovery_non_target_sha256','inventory_manifest_seed'):
+            del result[key]
+        result.update(storage_backup_complete=False,error_category=category,storage_source_files=[])
+        return args,request,result
+
+    def armored(self,args,projected):
+        output=io.StringIO()
+        with mock.patch.object(tool,'execute',return_value=projected),contextlib.redirect_stdout(output):
+            code=tool.main(['--operation','prepare','--operation-id',args.operation_id,'--approved-source-sha',args.actual_source_sha,'--actual-source-sha',args.actual_source_sha,'--run-id',args.run_id,'--prepare-mode','storage-backup'])
+        return code,json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+
     def test_storage_receipt_closed_projection_has_no_retirement_authority(self):
         args,request,result=self.fixture()
         projected=tool.validate_storage_backup_result(result,args,request,'e'*64,0)
@@ -429,6 +442,81 @@ class StorageBackupResultContracts(unittest.TestCase):
             with self.assertRaises(tool.Blocked):tool.validate_storage_backup_result(result,args,request,'e'*64,0)
         args,request,result=self.fixture()
         with self.assertRaises(tool.Blocked):tool.validate_storage_backup_result(result,args,request,'e'*64,1)
+
+    def test_bound_fixed_failures_are_armored_but_remain_failed_without_assets_or_manifest(self):
+        categories=('storage_backup_incomplete','storage_backup_failed','storage_backup_timeout','storage_backup_cancelled','storage_backup_budget_exceeded','storage_backup_read_failed','storage_backup_content_rejected','storage_backup_structure_rejected','storage_backup_permission_denied')
+        for category in categories:
+            with self.subTest(category=category):
+                args,request,result=self.failure_fixture(category)
+                projected=tool.validate_storage_backup_result(result,args,request,'e'*64,1)
+                code,decoded=self.armored(args,projected)
+                self.assertEqual(code,42);self.assertEqual(decoded['error_category'],category)
+                self.assertFalse(decoded['storage_backup_complete'])
+                self.assertEqual(decoded['storage_source_files'],[])
+                self.assertFalse(decoded['complete']);self.assertFalse(decoded['execution_allowed']);self.assertFalse(decoded['drop_ready'])
+                self.assertTrue(all(value is False for value in decoded['capabilities'].values()))
+                for key in ('storage_archive_sha256','archive_approval','storage_backup','mysql_recovery_non_target_sha256','inventory_manifest_seed'):
+                    self.assertNotIn(key,decoded)
+                for key in ('source_sha','original_source_sha','operation_id','run_id','request_sha256','inventory_request_sha256','observation_approval_sha256','target_hash'):
+                    self.assertEqual(decoded[key],result[key])
+
+    def test_failure_binding_body_extra_and_contradictory_success_are_rejected(self):
+        mutations=(lambda r:r.update(source_sha='f'*40),lambda r:r.update(original_source_sha='f'*40),
+            lambda r:r.update(operation_id='999-1'),lambda r:r.update(run_id='999-1'),
+            lambda r:r.update(request_sha256='f'*64),lambda r:r.update(inventory_request_sha256='f'*64),
+            lambda r:r.update(observation_approval_sha256='f'*64),lambda r:r.update(target_hash='f'*64),
+            lambda r:r.update(body='PRIVATE_BODY'),lambda r:r.update(capabilities={}),
+            lambda r:r.update(error_category='PRIVATE_CONNECTION'),lambda r:r.update(error_category={'private':'PRIVATE_BODY'}),
+            lambda r:r.update(error_category='none'),lambda r:r.update(storage_backup_complete=True),
+            lambda r:r.update(complete=True),lambda r:r.update(execution_allowed=True),lambda r:r.update(drop_ready=True),
+            lambda r:r.update(storage_source_files=[dict(name=tool.STORAGE_BACKUP_FILES[0],sha256='d'*64,bytes=1)]))
+        for mutate in mutations:
+            args,request,result=self.failure_fixture();mutate(result)
+            with self.subTest(mutate=mutate),self.assertRaises(tool.Blocked):
+                tool.validate_storage_backup_result(result,args,request,'e'*64,1)
+        for key in ('storage_archive_sha256','archive_approval','storage_backup','mysql_recovery_non_target_sha256','inventory_manifest_seed'):
+            args,request,result=self.failure_fixture();result[key]=None
+            with self.subTest(key=key),self.assertRaises(tool.Blocked):
+                tool.validate_storage_backup_result(result,args,request,'e'*64,1)
+        for exit_code in (0,True,'1'):
+            args,request,result=self.failure_fixture()
+            with self.subTest(exit_code=exit_code),self.assertRaises(tool.Blocked):
+                tool.validate_storage_backup_result(result,args,request,'e'*64,exit_code)
+
+    def test_live_storage_capture_has_one_hour_budget_with_existing_container_limits(self):
+        args,request,result=self.fixture()
+        with base.tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary);binary=directory/'native'
+            binary.write_bytes(b'synthetic-not-executable');binary.chmod(0o700)
+            args.root=directory;args.inventory_binary=str(binary)
+            commands=[]
+            def capture(command,**options):
+                if command==[str(binary),'--source-sha']:return 0,args.actual_source_sha.encode('ascii')
+                if command[:4]==['sudo','-n','docker','image']:return 0,('sha256:'+'c'*64).encode('ascii')
+                if command[:4]==['sudo','-n','docker','network']:return 0,b'fixed-network'
+                self.assertEqual(command[:4],['sudo','-n','docker','run'])
+                self.assertEqual(options['timeout'],3630);commands.append(command)
+                result['request_sha256']=hashlib.sha256(tool.canonical_bytes(request)).hexdigest()
+                result['storage_backup']['request_sha256']=result['request_sha256']
+                return 0,json.dumps(result).encode('ascii')
+            with mock.patch.object(tool,'operation_directory',return_value=directory),mock.patch.object(tool,'storage_backup_request',return_value=request),mock.patch.object(tool,'locked_operation',side_effect=lambda _:contextlib.nullcontext()),mock.patch.object(tool,'create_bootstrap_file'),mock.patch.object(tool,'inventory_connection_values',return_value={'MYSQL_HOST':'synthetic'}),mock.patch.object(tool,'capture_fixed',side_effect=capture):
+                projected=tool.live_storage_backup(args)
+            self.assertTrue(projected['storage_backup_complete']);self.assertEqual(len(commands),1)
+            for option in ('--cpus=2','--memory=512m','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit=64'):
+                self.assertIn(option,commands[0])
+            self.assertNotIn('--privileged',commands[0])
+
+    def test_workflow_storage_budget_does_not_change_other_stage_budgets(self):
+        workflow=(base.SCRIPT.parents[2]/'.github/workflows/compatibility-retirement.yml').read_text()
+        self.assertIn("timeout-minutes: ${{ inputs.prepare_mode == 'storage-backup' && 75 || (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}",workflow)
+        self.assertIn("command_timeout: ${{ inputs.prepare_mode == 'storage-backup' && '65m' || (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}",workflow)
+        if not base.shutil.which('node'):self.skipTest('Node evaluator unavailable')
+        controlled=workflow.split('  controlled-stage:',1)[1].split('    permissions:',1)[0]
+        expressions=[re.search(r'timeout-minutes: \$\{\{ (.+) \}\}',controlled).group(1),re.search(r'command_timeout: \$\{\{ (.+) \}\}',workflow).group(1)]
+        for mode,minutes,ssh in (('storage-backup',75,'65m'),('inventory',40,'35m'),('bounds',40,'35m'),('lifecycle',115,'100m'),('prepare-facts',115,'100m'),('window-tool',115,'35m')):
+            script='const inputs='+json.dumps({'prepare_mode':mode})+';console.log(JSON.stringify(['+','.join(expressions)+']));'
+            actual=subprocess.run(['node','-e',script],text=True,capture_output=True,check=True)
+            with self.subTest(mode=mode):self.assertEqual(json.loads(actual.stdout),[minutes,ssh])
 
 if __name__=='__main__':
     unittest.main()

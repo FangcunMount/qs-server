@@ -2614,6 +2614,12 @@ STORAGE_BACKUP_FILES = ("mysql-metadata.private.json", "mongodb-metadata.private
     "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson",
     "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes",
     "archive.private.json", "assets.private.json")
+STORAGE_BACKUP_FAILURES = frozenset(("storage_backup_incomplete", "storage_backup_failed",
+    "storage_backup_timeout", "storage_backup_cancelled", "storage_backup_budget_exceeded",
+    "storage_backup_read_failed", "storage_backup_content_rejected", "storage_backup_structure_rejected",
+    "storage_backup_permission_denied"))
+STORAGE_BACKUP_SUCCESS_FIELDS = ("storage_archive_sha256", "archive_approval", "storage_backup",
+    "mysql_recovery_non_target_sha256", "inventory_manifest_seed")
 
 
 def storage_backup_request(args, directory):
@@ -2651,9 +2657,16 @@ def storage_backup_request(args, directory):
 
 def validate_storage_backup_result(result, args, request, request_hash, code):
     fields(result, ("format_version", "kind", "operation", "prepare_mode", "source_sha", "original_source_sha", "operation_id", "run_id", "request_sha256", "inventory_request_sha256", "observation_approval_sha256", "target_hash", "complete", "diagnostic_only", "execution_allowed", "drop_ready", "storage_backup_complete", "storage_source_files", "error_category"),
-           ("storage_archive_sha256", "archive_approval", "storage_backup", "mysql_recovery_non_target_sha256", "inventory_manifest_seed"))
-    if result["format_version"] != 1 or type(result["format_version"]) is not int or result["kind"] != "readonly_storage_backup_result" or result["operation"] != "prepare" or result["prepare_mode"] != "storage-backup" or result["source_sha"] != args.actual_source_sha or result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or result["run_id"] != args.run_id or result["request_sha256"] != request_hash or result["inventory_request_sha256"] != request["inventory_request_sha256"] or result["observation_approval_sha256"] != args.bootstrap_approval_hash or result["target_hash"] != TARGET_HASH or result["diagnostic_only"] is not True or any(result[k] is not False for k in ("complete", "execution_allowed", "drop_ready")) or type(result["storage_backup_complete"]) is not bool or result["error_category"] not in ("none", "storage_backup_failed", "storage_backup_incomplete"):
+           STORAGE_BACKUP_SUCCESS_FIELDS)
+    if result["format_version"] != 1 or type(result["format_version"]) is not int or result["kind"] != "readonly_storage_backup_result" or result["operation"] != "prepare" or result["prepare_mode"] != "storage-backup" or result["source_sha"] != args.actual_source_sha or result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or result["run_id"] != args.run_id or result["request_sha256"] != request_hash or result["inventory_request_sha256"] != request["inventory_request_sha256"] or result["observation_approval_sha256"] != args.bootstrap_approval_hash or result["target_hash"] != TARGET_HASH or result["diagnostic_only"] is not True or any(result[k] is not False for k in ("complete", "execution_allowed", "drop_ready")) or type(result["storage_backup_complete"]) is not bool or type(result["error_category"]) is not str or result["error_category"] not in STORAGE_BACKUP_FAILURES | {"none"} or type(code) is not int:
         fail("storage_backup_native_binding_rejected")
+    # A bound failure remains a failed diagnostic. It carries no partial
+    # source assets or successful manifest that a later stage could consume.
+    if not result["storage_backup_complete"]:
+        if code == 0 or result["error_category"] not in STORAGE_BACKUP_FAILURES or type(result["storage_source_files"]) is not list or result["storage_source_files"] != [] or any(key in result for key in STORAGE_BACKUP_SUCCESS_FIELDS):
+            fail("storage_backup_native_failed")
+        result["capabilities"] = {key: False for key in CAPABILITIES}
+        return result
     if code != 0 or not result["storage_backup_complete"] or result["error_category"] != "none":
         fail("storage_backup_native_failed")
     files = result["storage_source_files"]
@@ -2720,7 +2733,7 @@ def live_storage_backup(args):
                 "--mount", "type=bind,source=" + str(binary) + ",target=/inventory-tool,readonly", "--mount", "type=bind,source=" + str(directory) + ",target=/operation,readonly",
                 "--mount", "type=bind,source=" + str(output) + ",target=/inventory", "--env-file", str(env), "--entrypoint", "/inventory-tool", image,
                 "--mode", "storage-backup", "--request", "/operation/" + name, "--request-hash", request_hash, "--operation-id", args.operation_id, "--run-id", args.run_id, "--output-directory", "/inventory"]
-            code, native = capture_fixed(command, timeout=1530, maximum=MAX_JSON)
+            code, native = capture_fixed(command, timeout=3630, maximum=MAX_JSON)
     return validate_storage_backup_result(decode(native), args, request, request_hash, code)
 
 

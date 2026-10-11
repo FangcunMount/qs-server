@@ -482,7 +482,7 @@ jobs:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
     environment: production
-    timeout-minutes: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}
+    timeout-minutes: ${{ inputs.prepare_mode == 'storage-backup' && 75 || (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts' || inputs.prepare_mode == 'window-tool') && 115 || 40 }}
     permissions:
       contents: read
       packages: read
@@ -722,7 +722,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: ${{ (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
+          command_timeout: ${{ inputs.prepare_mode == 'storage-backup' && '65m' || (inputs.prepare_mode == 'lifecycle' || inputs.prepare_mode == 'prepare-facts') && '100m' || '35m' }}
           envs: RETIREMENT_OPERATION,RETIREMENT_OPERATION_ID,RETIREMENT_MANIFEST_SHA256,RETIREMENT_INVENTORY_REQUEST_SHA256,RETIREMENT_LIFECYCLE_REQUEST_SHA256,RETIREMENT_PREPARE_MODE,RETIREMENT_IDENTITY_REQUEST_SHA256,RETIREMENT_BOOTSTRAP_APPROVAL_JSON,RETIREMENT_BOOTSTRAP_APPROVAL_SHA256,RETIREMENT_APPROVED_SHA,RETIREMENT_ACTUAL_SHA,RETIREMENT_RUN_ID,RETIREMENT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MONGODB_METADATA_ADMIN_USERNAME,MONGODB_METADATA_ADMIN_PASSWORD,SUDO_PASSWORD,RETIREMENT_FIXED_HOST_ENTRY_SHA256,RETIREMENT_FIXED_PREPARE_ENTRY_SHA256
           script: |
             set -Eeuo pipefail

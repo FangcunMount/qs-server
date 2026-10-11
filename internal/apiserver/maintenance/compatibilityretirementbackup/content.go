@@ -428,7 +428,7 @@ func storageMongoRows(ctx context.Context, db *mongo.Database, s SourceSnapshot,
 	if !s.Boundary.Empty {
 		filter = bson.D{{Key: "_id", Value: bson.D{{Key: "$lte", Value: upper}}}}
 	}
-	cur, e := db.Collection(s.Name).Find(ctx, filter, options.Find().SetHint("_id_").SetSort(bson.D{{Key: "_id", Value: 1}}).SetCollation(&options.Collation{Locale: "simple"}).SetBatchSize(1024))
+	cur, e := db.Collection(s.Name).Find(ctx, filter, options.Find().SetHint("_id_").SetSort(bson.D{{Key: "_id", Value: 1}}).SetCollation(&options.Collation{Locale: "simple"}).SetBatchSize(10000))
 	if e != nil {
 		return s, ErrRead
 	}

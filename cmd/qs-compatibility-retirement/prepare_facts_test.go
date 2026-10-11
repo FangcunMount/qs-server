@@ -7,7 +7,10 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
+	"fmt"
 	aibridge "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
+	backup "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementbackup"
 	opts "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	jose "github.com/go-jose/go-jose/v4"
 	"os"
@@ -17,6 +20,7 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 )
 
 func prepareFactsRequestFixture(t *testing.T) prepareFactsRequest {
@@ -107,6 +111,72 @@ func TestStorageBackupRequestSeparatesOriginalMetadataFromCaptureTool(t *testing
 	facts.StorageBackup.ToolSourceSHA = facts.Inventory.SourceSHA
 	if validatePrepareFactsRequest(facts, "123-1", "789-1") == nil {
 		t.Fatal("capture tool mismatch accepted")
+	}
+}
+
+func TestStorageBackupFailureRetainsBindingsAndClearsSuccessProof(t *testing.T) {
+	deadline, stopDeadline := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer stopDeadline()
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+		err  error
+		want string
+	}{
+		{"parent deadline masks read", deadline, backup.ErrRead, "storage_backup_timeout"},
+		{"parent cancellation masks budget", cancelled, backup.ErrBudget, "storage_backup_cancelled"},
+		{"parent cancellation precedes returned timeout", cancelled, context.DeadlineExceeded, "storage_backup_cancelled"},
+		{"wrapped timeout", context.Background(), fmt.Errorf("PRIVATE_NATIVE_MESSAGE: %w", context.DeadlineExceeded), "storage_backup_timeout"},
+		{"wrapped cancellation", context.Background(), fmt.Errorf("PRIVATE_NATIVE_MESSAGE: %w", context.Canceled), "storage_backup_cancelled"},
+		{"wrapped budget", context.Background(), fmt.Errorf("PRIVATE_NATIVE_MESSAGE: %w", backup.ErrBudget), "storage_backup_budget_exceeded"},
+		{"wrapped read", context.Background(), fmt.Errorf("PRIVATE_NATIVE_MESSAGE: %w", backup.ErrRead), "storage_backup_read_failed"},
+		{"wrapped content", context.Background(), fmt.Errorf("PRIVATE_NATIVE_MESSAGE: %w", backup.ErrContent), "storage_backup_content_rejected"},
+		{"wrapped structure", context.Background(), fmt.Errorf("PRIVATE_NATIVE_MESSAGE: %w", backup.ErrStructure), "storage_backup_structure_rejected"},
+		{"wrapped permission", context.Background(), &os.PathError{Op: "open", Path: "PRIVATE_NATIVE_MESSAGE", Err: os.ErrPermission}, "storage_backup_permission_denied"},
+		{"private rejection is not permission", context.Background(), backup.ErrPrivate, "storage_backup_failed"},
+		{"unmapped approval", context.Background(), backup.ErrApproval, "storage_backup_failed"},
+		{"unmapped source", context.Background(), backup.ErrSource, "storage_backup_failed"},
+		{"unknown error", context.Background(), errors.New("PRIVATE_NATIVE_MESSAGE"), "storage_backup_failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := storageBackupReceipt{FormatVersion: 1, Kind: "readonly_storage_backup_result", Operation: "prepare", PrepareMode: "storage-backup", SourceSHA: strings.Repeat("a", 40), OriginalSourceSHA: strings.Repeat("b", 40), OperationID: "123-1", RunID: "789-1", RequestSHA256: strings.Repeat("c", 64), InventoryRequestSHA256: strings.Repeat("d", 64), ObservationApprovalSHA256: strings.Repeat("e", 64), TargetHash: digest(targets), Complete: true, ExecutionAllowed: true, DropReady: true, StorageBackupComplete: true, ArchiveSHA256: strings.Repeat("f", 64), ArchiveApproval: &backup.Approval{}, StorageBackup: &lifecycleStorageBackup{}, SQLRecoveryBaselineSHA256: strings.Repeat("1", 64), Files: []prepareFactsFile{{Name: "PRIVATE_NATIVE_MESSAGE"}}, Manifest: &lifecycleFrozenManifest{}, ErrorCategory: "none"}
+			bindings := r
+			r.setStorageBackupFailure(tc.ctx, tc.err)
+			if r.ErrorCategory != tc.want || r.Complete || r.ExecutionAllowed || r.DropReady || r.StorageBackupComplete || !r.DiagnosticOnly {
+				t.Fatalf("unsafe failure state: category=%s", r.ErrorCategory)
+			}
+			if r.SourceSHA != bindings.SourceSHA || r.OriginalSourceSHA != bindings.OriginalSourceSHA || r.OperationID != bindings.OperationID || r.RunID != bindings.RunID || r.RequestSHA256 != bindings.RequestSHA256 || r.InventoryRequestSHA256 != bindings.InventoryRequestSHA256 || r.ObservationApprovalSHA256 != bindings.ObservationApprovalSHA256 || r.TargetHash != bindings.TargetHash {
+				t.Fatal("failure lost original producer/request bindings")
+			}
+			raw, err := json.Marshal(r)
+			var public map[string]json.RawMessage
+			if err != nil || json.Unmarshal(raw, &public) != nil || bytes.Contains(raw, []byte("PRIVATE_NATIVE_MESSAGE")) || string(public["storage_source_files"]) != "[]" {
+				t.Fatal("failure disclosed private content or retained partial files")
+			}
+			for _, name := range []string{"storage_archive_sha256", "archive_approval", "storage_backup", "mysql_recovery_non_target_sha256", "inventory_manifest_seed"} {
+				if _, ok := public[name]; ok {
+					t.Fatalf("failure retained success field %s", name)
+				}
+			}
+		})
+	}
+}
+
+func TestStorageBackupDeferredFailureAndNonfailureCategories(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r, err := runStorageBackup(ctx, "unapproved-path", strings.Repeat("a", 64), "123-1", "789-1", "unapproved-output")
+	if err == nil || r.ErrorCategory != "storage_backup_cancelled" || r.StorageBackupComplete || len(r.Files) != 0 {
+		t.Fatal("actual rejection defer did not retain cancellation")
+	}
+	for _, category := range []string{"none", "storage_backup_incomplete"} {
+		r := storageBackupReceipt{ErrorCategory: category, StorageBackupComplete: category == "none", Files: []prepareFactsFile{}}
+		r.setStorageBackupFailure(context.Background(), nil)
+		if r.ErrorCategory != category || r.StorageBackupComplete != (category == "none") {
+			t.Fatal("nonfailure state changed")
+		}
 	}
 }
 

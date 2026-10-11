@@ -140,11 +140,7 @@ func storageManifest(a backup.StorageBaseline) (*lifecycleFrozenManifest, error)
 func runStorageBackup(ctx context.Context, path, expected, op, run, output string) (receipt storageBackupReceipt, result error) {
 	receipt = storageBackupReceipt{FormatVersion: 1, Kind: "readonly_storage_backup_result", Operation: "prepare", PrepareMode: "storage-backup", SourceSHA: sourceSHA, OperationID: op, RunID: run, RequestSHA256: expected, TargetHash: digest(targets), DiagnosticOnly: true, Files: []prepareFactsFile{}, ErrorCategory: "storage_backup_incomplete"}
 	defer func() {
-		if result != nil {
-			receipt.StorageBackupComplete = false
-			receipt.Manifest = nil
-			receipt.ErrorCategory = "storage_backup_failed"
-		}
+		receipt.setStorageBackupFailure(ctx, result)
 	}()
 	// These are the supervisor's two exact mounts, not caller-selected DB or
 	// archive paths. Neither this process nor CaptureStorage executes DDL.
@@ -263,6 +259,42 @@ func runStorageBackup(ctx context.Context, path, expected, op, run, output strin
 	receipt.StorageBackup = &lifecycleStorageBackup{Kind: "storage_backup_v1", ToolSourceSHA: sourceSHA, RunID: run, ArchiveSHA256: b.ArchiveSHA256, RequestSHA256: expected}
 	receipt.StorageBackupComplete, receipt.ErrorCategory = true, "none"
 	return receipt, nil
+}
+
+func (r *storageBackupReceipt) setStorageBackupFailure(ctx context.Context, err error) {
+	if err == nil {
+		return
+	}
+	r.Complete, r.ExecutionAllowed, r.DropReady, r.StorageBackupComplete = false, false, false, false
+	r.DiagnosticOnly = true
+	r.ArchiveSHA256, r.SQLRecoveryBaselineSHA256 = "", ""
+	r.ArchiveApproval, r.StorageBackup, r.Manifest = nil, nil, nil
+	r.Files = []prepareFactsFile{}
+	// Only fixed categories cross the public receipt boundary. Capture helpers
+	// may replace a context failure with a backup sentinel, so check the parent
+	// context before the returned error and never include its text.
+	cause := ctx.Err()
+	if cause == nil {
+		cause = err
+	}
+	switch {
+	case errors.Is(cause, context.DeadlineExceeded):
+		r.ErrorCategory = "storage_backup_timeout"
+	case errors.Is(cause, context.Canceled):
+		r.ErrorCategory = "storage_backup_cancelled"
+	case errors.Is(err, backup.ErrBudget):
+		r.ErrorCategory = "storage_backup_budget_exceeded"
+	case errors.Is(err, backup.ErrRead):
+		r.ErrorCategory = "storage_backup_read_failed"
+	case errors.Is(err, backup.ErrContent):
+		r.ErrorCategory = "storage_backup_content_rejected"
+	case errors.Is(err, backup.ErrStructure):
+		r.ErrorCategory = "storage_backup_structure_rejected"
+	case errors.Is(err, os.ErrPermission):
+		r.ErrorCategory = "storage_backup_permission_denied"
+	default:
+		r.ErrorCategory = "storage_backup_failed"
+	}
 }
 
 type prepareFactsFS struct {

@@ -605,7 +605,7 @@ func CaptureStorage(ctx context.Context, borrowed BorrowedSources, approved Stor
 		return nil, ErrApproval
 	}
 	approved = detached
-	ctx, cancel := context.WithTimeout(ctx, 1500*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3600*time.Second)
 	defer cancel()
 	sqlBytes, e := readPrivate(in.SQLMetadata, metadataBudget)
 	if e != nil || sha(sqlBytes) != approved.SQLMetadataSHA256 {
