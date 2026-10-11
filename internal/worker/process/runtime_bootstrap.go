@@ -49,10 +49,9 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		return runtimeOutput{}, err
 	}
 	subscriberConfig := s.loadedSubscriberConfig()
-	subscriber, err := eventtransport.NewSDKDeliverySubscriberWithFacts(
+	subscriber, err := eventtransport.NewSDKDeliverySubscriber(
 		subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
 		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder),
-		s.runtimeFacts, "worker-events",
 	)
 	if err != nil {
 		_ = deadLetterRecorder.Close()
@@ -91,7 +90,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	if s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled {
 		var publisher io.Closer
 		var holdReplayer *messagingintegration.RetryEventHoldReplayer
-		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisherWithFacts(s.config.Messaging, s.runtimeFacts)
+		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
 		if publishErr == nil {
 			publisher = wirePublisher
 			holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)

@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 47,
+      "expected_count": 46,
       "budgeted": false
     }
   },
@@ -333,38 +333,9 @@
         {
           "kind": "source",
           "path": ".github/workflows/ci.yml"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-platform-window-action.py"
         }
       ],
-      "verification": [
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestMongoMetadataSnapshotNative",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-platform-window-action.py",
-          "selector": "def disposition(window, transport, raw, exit_code, approval, run):",
-          "result": "matched",
-          "source_sha": "0f5f441da99084eb9f61e2ae641c89dd50adea17",
-          "verified_on": "2026-10-10"
-        }
-      ],
+      "verification": [],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -381,6 +352,13 @@
           "severity": "medium",
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+        },
+        {
+          "id": "r4-source-exit-document-update",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
+          "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
         }
       ]
     },
@@ -7582,7 +7560,7 @@
       "path": "docs/03-基础设施/event/30-Outbox可靠出站链路.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "69ab7bf1e328adb168845f3a12bd8208df12cb7a",
         "verified_on": "2026-10-10"
@@ -7660,13 +7638,6 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=1 -count=1 -json ./internal/pkg/runtimefacts ./internal/pkg/eventing/transport ./internal/pkg/messagingruntime ./internal/pkg/messagingruntime/testsupport ./internal/worker/integration/messaging ./internal/worker/process ./internal/apiserver/process ./internal/apiserver/infra/aibridge ./internal/apiserver/container/modules/interpretation ./internal/collection-server/process",
-          "result": "passed",
-          "source_sha": "be823648e1b43518a7d5846cc8bf39246921eab3",
-          "verified_on": "2026-10-10"
         }
       ],
       "production_evidence": {
@@ -7699,6 +7670,13 @@
           "severity": "high",
           "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
           "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
+        },
+        {
+          "id": "r4-source-exit-document-update",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "R4 candidate removes the registered one-time retirement implementations. This active document still requires a source-grounded rewrite; expired command and selector evidence is retained in the original B Git snapshot, not re-labelled as current verification. Runtime and production acceptance remain unknown.",
+          "exit_criteria": "Rewrite the document against the retained permanent source and the actual five production exit receipts; preserve historical evidence separately and obtain a fresh document source review."
         }
       ]
     },
@@ -7935,7 +7913,7 @@
       "path": "docs/03-基础设施/event/60-Signal一次性信令.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "69ab7bf1e328adb168845f3a12bd8208df12cb7a",
         "verified_on": "2026-10-10"
@@ -8017,13 +7995,6 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=1 -count=1 -json ./internal/pkg/runtimefacts ./internal/pkg/eventing/transport ./internal/pkg/messagingruntime ./internal/pkg/messagingruntime/testsupport ./internal/worker/integration/messaging ./internal/worker/process ./internal/apiserver/process ./internal/apiserver/infra/aibridge ./internal/apiserver/container/modules/interpretation ./internal/collection-server/process",
-          "result": "passed",
-          "source_sha": "be823648e1b43518a7d5846cc8bf39246921eab3",
-          "verified_on": "2026-10-10"
         }
       ],
       "production_evidence": {
@@ -8056,6 +8027,13 @@
           "severity": "medium",
           "summary": "Current exact-SHA Signal topology and Redis delivery evidence is absent.",
           "exit_criteria": "Attach deployed SHA, effective Redis topology, subscriber observations, and an observation timestamp."
+        },
+        {
+          "id": "r4-source-exit-document-update",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "R4 candidate removes the registered one-time retirement implementations. This active document still requires a source-grounded rewrite; expired command and selector evidence is retained in the original B Git snapshot, not re-labelled as current verification. Runtime and production acceptance remain unknown.",
+          "exit_criteria": "Rewrite the document against the retained permanent source and the actual five production exit receipts; preserve historical evidence separately and obtain a fresh document source review."
         }
       ]
     },
@@ -11064,36 +11042,6 @@
       ]
     },
     {
-      "path": "cmd/qs-ai-messaging-handoff/README.md",
-      "class": "sidecar",
-      "owner": "runtime",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "AI-MQ-HANDOFF-PRODUCTION",
-          "kind": "verification",
-          "severity": "high",
-          "summary": "Native isolated maintenance validation does not prove production ownership or cutover.",
-          "exit_criteria": "Bind final assets, review current production inventory and verify controlled handoff and MQ-compatible rollback."
-        }
-      ]
-    },
-    {
       "path": "scripts/cd/README-AI-MQ-PREFLIGHT.md",
       "class": "sidecar",
       "owner": "tooling",
@@ -11324,1449 +11272,22 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "scripts/database/compatibility-retirement.py"
+          "path": "cmd/qs-ai-messaging-audit/main.go"
         },
         {
           "kind": "source",
-          "path": "scripts/database/compatibility-retirement-entrypoints.json"
+          "path": "internal/pkg/eventing/evidence/evidence.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/*.go"
+          "path": "internal/pkg/migration/retirement_transition.go"
         },
         {
           "kind": "source",
-          "path": ".github/workflows/compatibility-retirement.yml"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/cd.yml"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/db-ops.yml"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/authz-production-matrix-provision.yml"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-history/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/eventing/subsystem/standard_profiles_m4_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/standardoutbox/governance.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/standardoutbox/status.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/standardoutbox/governance.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/standardoutbox/replay.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/standardoutbox/status.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/process/standard_outbox_preflight_m4.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/process/standard_event_profile_retirement_m4_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/transport/grpc/service/plan_entry.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/cd/runtime-evidence.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/cd/test-runtime-evidence.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/cd/runtime-evidence-integration.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-history-prepare.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-history-prepare.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-history-parent.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-history-parent.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-history-parent-action.py"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/*.go"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/compatibility-host-inventory.yml"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-host-inventory-action.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-host-inventory-action.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-retirement-host-inventory.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-retirement-host-inventory.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-retirement-host-install.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-retirement-host-install.py"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/ci.yml"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/databaseidentity/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/evaluation/historical_batch_cas*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/evaluation/consistency_historical_reference.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/application/evaluation/scheduler/audit*.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-namespace-anchor.py"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/evaluation/historical_batch_bindings.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/qs-ai-retirement-readonly-host.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_host.py"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-history/host_ai_external.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-history/host_ai_external_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-history/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_execution.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-ai-history-prepare.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-ai-history-prepare.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/mongo_index_diagnostic_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-retirement.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-evidence-write-inputs.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-inventory-report-diagnostic.py"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/bootstrap/database.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/migration/retirement_pair.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/migration/retirement_driver.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/options/migration_options.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/evaluation/historical_references_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/mongo_resolver_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_readonly_resolver_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_reverse_snapshot_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/historical_a99_fixture_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/integration/runtimeclosure/runtime_closure_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-mongo-target-diagnostic.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-root-prepare.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-window-tool.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test-compatibility-window-tool.py"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementstop/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/ssh_key_file*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/mongo_metadata_context.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_mongo_abort.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_pre_b_comparison.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_fixed_host.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/lifecycle.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-platform-window-action.py"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/aibridge/runtime_messaging*.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_controlled_runtime.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_d_terminal.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_recovery_resume.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementhostscope/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementdbcensus/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/runtimefacts/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/eventing/transport/sdk_delivery_subscriber.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/messagingruntime/nsq_wire_publisher.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/worker/process/runtime_bootstrap.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/process/resource_bootstrap.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/process/container_bootstrap.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/process/standard_event_subsystem_m4.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/aibridge/messaging_runtime.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/collection-server/process/root.go"
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
         }
       ],
-      "verification": [
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race ./cmd/qs-compatibility-retirement",
-          "result": "passed",
-          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/compatibility-retirement-integration.py",
-          "result": "passed",
-          "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "5e1365e8533f473933094a95e9a69d81162ae4a3",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "37a5abcc1f0830f4f1a47730c9f059c469ec24cd",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "go test -json -race -count=1 ./cmd/qs-compatibility-history",
-          "result": "passed",
-          "source_sha": "510b1b5e5b0724c6450c63a370c1146fe75baf29",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=3 ./cmd/qs-compatibility-retirement -count=1",
-          "result": "passed",
-          "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
-          "result": "passed",
-          "source_sha": "f37c39b5064201fc46ee7a66a9433c0da62fb3b5",
-          "verified_on": "2026-10-08"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/cd/test-runtime-evidence.py",
-          "result": "passed",
-          "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/cd/runtime-evidence-integration.py",
-          "result": "passed",
-          "source_sha": "c98d6aa28df5867231fa3c12fa109ecbd52eecf5",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "c8c16ecf534cd18bf5f326dbb7ccee41e50ca121",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
-          "result": "passed",
-          "source_sha": "c8c16ecf534cd18bf5f326dbb7ccee41e50ca121",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
-          "result": "passed",
-          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-parent.py",
-          "result": "passed",
-          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-parent-action.py",
-          "result": "passed",
-          "source_sha": "51a78bfa54c472e8ec2b1d9250bacc70ba618882",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/compare_api_docs.py",
-          "result": "passed",
-          "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window.go",
-          "selector": "BudgetOnly: true",
-          "result": "matched",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window_linux.go",
-          "selector": "unix.CLOCK_BOOTTIME",
-          "result": "matched",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/compare_api_docs.py",
-          "result": "passed",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=3 -json ./internal/apiserver/maintenance/compatibilityretirementbackup -count=1 -timeout=10m",
-          "result": "passed",
-          "source_sha": "113e12b5178dad72ca16cfe993780a4c76ead63e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_recovery_prepare.go",
-          "selector": "func RecoverTargets(ctx context.Context, p *TargetRecoveryPlan)",
-          "result": "matched",
-          "source_sha": "113e12b5178dad72ca16cfe993780a4c76ead63e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_recovery_integration_test.go",
-          "selector": "func TestTargetRecoveryNative(t *testing.T)",
-          "result": "matched",
-          "source_sha": "113e12b5178dad72ca16cfe993780a4c76ead63e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=3 -parallel=3 -count=1 -json ./internal/apiserver/maintenance/compatibilityretirement",
-          "result": "passed",
-          "source_sha": "523250d83e520531a211dd19c9849f12fd161b69",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=3 -parallel=3 -count=1 -json ./cmd/qs-compatibility-history",
-          "result": "passed",
-          "source_sha": "523250d83e520531a211dd19c9849f12fd161b69",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-host-inventory-action.py -v",
-          "result": "passed",
-          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-retirement-host-inventory.py -v",
-          "result": "passed",
-          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-retirement-host-install.py -v",
-          "result": "passed",
-          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-retirement.py -v",
-          "result": "passed",
-          "source_sha": "3ecc5922d30229c18a036936f6b665b62033a0f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -count=1 -timeout=300s -p=3 ./internal/apiserver/maintenance/compatibilityretirement ./cmd/qs-compatibility-history",
-          "result": "passed",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/pipeline_ai_reverse_integration_test.go",
-          "selector": "func TestHistoryAIReverseNativeFirstHandleSurvivesRollbackAndRejectsRealDrift(t *testing.T)",
-          "result": "matched",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-history-prepare.py",
-          "result": "passed",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/database/test-compatibility-retirement-host-inventory.py",
-          "result": "passed",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/compare_api_docs.py",
-          "result": "passed",
-          "source_sha": "ad458f8a6580890be033d1dd0736e2136713a616",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -p=1 -count=1 -timeout=10m ./internal/apiserver/maintenance/compatibilityretirement ./internal/apiserver/application/evaluation/scheduler",
-          "result": "passed",
-          "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -p=1 -count=1 -timeout=10m ./cmd/qs-compatibility-retirement ./cmd/qs-compatibility-history",
-          "result": "passed",
-          "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
-          "result": "passed",
-          "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-namespace-anchor.py",
-          "result": "passed",
-          "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "19224794d20a352044c272fee62539da6a9c39f6",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/coordinator_cas_qualified.go",
-          "selector": "func (c *HistoricalCoordinator) PrepareQualifiedHistoricalCAS(",
-          "result": "matched",
-          "verified_on": "2026-10-09",
-          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/whole_source_joint_replay.go",
-          "selector": "func (c *HistoricalCoordinator) ReplayWholeSourceJointPage(",
-          "result": "matched",
-          "verified_on": "2026-10-09",
-          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_command_handoff.go",
-          "selector": "func (p *AICommandHandoffBatch) Record(",
-          "result": "matched",
-          "verified_on": "2026-10-09",
-          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement.py",
-          "selector": "def expand_approved_namespace_anchor(approval, binding):",
-          "result": "matched",
-          "verified_on": "2026-10-09",
-          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_lifecycle.go",
-          "selector": "func ResumeTargetRecovery(",
-          "result": "matched",
-          "verified_on": "2026-10-09",
-          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_operation_reconcile.go",
-          "selector": "func ReconcileTargetRecovery(",
-          "result": "matched",
-          "verified_on": "2026-10-09",
-          "source_sha": "c5b60d02f912485f791001e78abced00bc601cea"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement.py",
-          "selector": "def report_diagnostic(args):",
-          "result": "matched",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/write_pipeline.go",
-          "selector": "func executeHistoricalEvidenceWrite(",
-          "result": "matched",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/historical_cas_spool.go",
-          "selector": "func (s *HistoricalCASSpool) FinishReadback(",
-          "result": "matched",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_modes.go",
-          "selector": "func ObserveAIExternalExecLifecycle(",
-          "result": "matched",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
-          "result": "passed",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-parent.py",
-          "result": "passed",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-parent-action.py",
-          "result": "passed",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-namespace-anchor.py",
-          "result": "passed",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test_qs_ai_retirement_readonly_host.py",
-          "result": "passed",
-          "source_sha": "5196893331a34891183b81bd7b6196d2696fca2d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/host_ai_external_test.go",
-          "selector": "func TestAIHostCLIExactModesAndArguments(t *testing.T)",
-          "result": "matched",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence_test.go",
-          "selector": "func TestAIExecQuiescenceActualInspectorOverridesSavedCompletion(t *testing.T)",
-          "result": "matched",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-ai-history-prepare.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test_qs_ai_retirement_readonly_host.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-prepare.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-parent.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-history-parent-action.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-namespace-anchor.py",
-          "result": "passed",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/host_ai_external.go",
-          "selector": "func runAIHostCLI(ctx context.Context, args []string)",
-          "result": "matched",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/ai_external_exec_quiescence.go",
-          "selector": "func RequireAIExternalExecQuiescence(",
-          "result": "matched",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-ai-history-prepare.py",
-          "selector": "def prepare(args, t):",
-          "result": "matched",
-          "source_sha": "743f4afefdbd0f92155f127d9b9ee91cfd1a655e",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -count=1 -json ./cmd/qs-compatibility-retirement",
-          "result": "passed",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-retirement.py -v",
-          "result": "passed",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/main.go",
-          "selector": "func mongoIndexDiagnosticLine(phase, namespace string, elapsed time.Duration, err error) string",
-          "result": "matched",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/mongo_index_diagnostic_test.go",
-          "selector": "func TestMongoIndexDiagnosticClassifiesActualTypedErrorsWithoutErrorText(t *testing.T)",
-          "result": "matched",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement.py",
-          "selector": "def _forward_mongo_index_diagnostic(raw):",
-          "result": "matched",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/migration/retirement_pair.go",
-          "selector": "func PreflightCompatibilityPair(",
-          "result": "matched",
-          "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_b_reconcile.go",
-          "selector": "func targetBArchiveSQLRecoveryBaseline(",
-          "result": "matched",
-          "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/contract.go",
-          "selector": "sql_recovery_non_target_schema_hash,omitempty",
-          "result": "matched",
-          "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -count=1 -json ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/maintenance/compatibilityretirement",
-          "result": "passed",
-          "source_sha": "be2b74d080dfc06eb8b574f114c5e75554e56fd0",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/infra/mysql/evaluation/historical_references_integration_test.go",
-          "selector": "err := instance.Migrate(99)",
-          "result": "matched",
-          "source_sha": "be2b74d080dfc06eb8b574f114c5e75554e56fd0",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirement/historical_a99_fixture_integration_test.go",
-          "selector": "err := instance.Migrate(99)",
-          "result": "matched",
-          "source_sha": "be2b74d080dfc06eb8b574f114c5e75554e56fd0",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go",
-          "selector": "func TestRuntimeClosureCompiledSourceIdentity(",
-          "result": "matched",
-          "source_sha": "ff05fbecba16842547da13ff73f60bb3deb19c6f",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go",
-          "selector": "func runtimeClosurePristinePair(",
-          "result": "matched",
-          "source_sha": "ff05fbecba16842547da13ff73f60bb3deb19c6f",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/integration/runtimeclosure/runtime_closure_integration_test.go",
-          "selector": "pair := runtimeClosurePristinePair(",
-          "result": "matched",
-          "source_sha": "ff05fbecba16842547da13ff73f60bb3deb19c6f",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "-ldflags \"-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)\"",
-          "result": "matched",
-          "source_sha": "ff05fbecba16842547da13ff73f60bb3deb19c6f",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B -m unittest discover -s scripts/database -p test_qs_ai_retirement_readonly_verifier.py -v",
-          "result": "passed",
-          "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json ./cmd/qs-compatibility-history ./internal/apiserver/maintenance/compatibilityretirement",
-          "result": "passed",
-          "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B -m unittest discover -s scripts/database -p test_qs_ai_retirement_readonly_host.py -v",
-          "result": "passed",
-          "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/write_cli.go",
-          "selector": "func runEvidenceWriteCLI(ctx context.Context, args []string)",
-          "result": "matched",
-          "source_sha": "23bacb7d4a05bd711e353655eca85219514edb49",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/write_pipeline.go",
-          "selector": "retirement.PrepareHistoricalComponentObservation(paired, component, inputs.sources, inputs.ai, d.mongo, 20*time.Second, true)",
-          "result": "matched",
-          "source_sha": "1cbb13e5d6bf6514cd0c244ec43fcf65b7f19133",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-history/write_pipeline.go",
-          "selector": "!actual.TransactionInProgress()",
-          "result": "matched",
-          "source_sha": "23bacb7d4a05bd711e353655eca85219514edb49",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement.py",
-          "selector": "def inventory_report_diagnostic(args, value):",
-          "result": "matched",
-          "source_sha": "23bacb7d4a05bd711e353655eca85219514edb49",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-evidence-write-inputs.py",
-          "result": "passed",
-          "source_sha": "23bacb7d4a05bd711e353655eca85219514edb49",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-inventory-report-diagnostic.py",
-          "result": "passed",
-          "source_sha": "23bacb7d4a05bd711e353655eca85219514edb49",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/integration/runtimeclosure/runtime_closure_integration_test.go",
-          "selector": "func assertRetiredRuntimeNamespacesAbsent(",
-          "result": "matched",
-          "source_sha": "894804a98ce73a179ad57946db52739195969d26",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go",
-          "selector": "func TestRuntimeClosureCompiledSourceIdentity(",
-          "result": "matched",
-          "source_sha": "894804a98ce73a179ad57946db52739195969d26",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/paging.go",
-          "selector": "func mongoTargetDiagnosticLine(",
-          "result": "matched",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle.go",
-          "selector": "func runLifecycleCLI(",
-          "result": "matched",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_prepare.go",
-          "selector": "func (o *lifecyclePreparationOwner) finishPreparation()",
-          "result": "matched",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_root_staging.go",
-          "selector": "func stageLifecycleRootInputs(",
-          "result": "matched",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement.py",
-          "selector": "def root_once_lifecycle_prepare(args):",
-          "result": "matched",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-mongo-target-diagnostic.py",
-          "result": "passed",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test-compatibility-root-prepare.py",
-          "result": "passed",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func publicCLIRunProcessGroup(cmd *exec.Cmd)",
-          "result": "matched",
-          "source_sha": "a4e7bc77bfd00268f2ddfc028cab89080380ba2b",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "ci_fixture_opt_parent_original",
-          "result": "matched",
-          "source_sha": "9458c1cdbaf91d5c2aed31ec15eb21ae6e009ec7",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func publicCLIFixedParentRole(path string) string",
-          "result": "matched",
-          "source_sha": "9458c1cdbaf91d5c2aed31ec15eb21ae6e009ec7",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func TestLifecyclePublicCLIRestoreIntentRegistryShape(t *testing.T)",
-          "result": "matched",
-          "source_sha": "787ccb4efa0d4c959e90b98508c4132b4e89fa23",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func publicCLIInventoryMaterialPaths(report inventory, run string) (map[string]bool, error)",
-          "result": "matched",
-          "source_sha": "8514a3318b114139287965fa66745a1dea7eed21",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func TestLifecyclePublicCLIInventoryMaterialDirectory(t *testing.T)",
-          "result": "matched",
-          "source_sha": "8514a3318b114139287965fa66745a1dea7eed21",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/prepare_facts.go",
-          "selector": "func runPrepareFacts(ctx context.Context, path, expected, op, run string) (receipt prepareFactsReceipt, result error)",
-          "result": "matched",
-          "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/prepare_facts.go",
-          "selector": "func prepareFactsBoundRequestPath(path, operation, run string) bool",
-          "result": "matched",
-          "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/mongo_metadata_context.go",
-          "selector": "func mongoMetadataContext(ctx context.Context) context.Context",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_mongo_abort.go",
-          "selector": "func lifecycleAbortComparisonMongo(ctx context.Context, client *mongo.Client, original mongo.Session) error",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_pre_b_comparison.go",
-          "selector": "func (h *lifecycleFixedHost) compareCompleteDataBeforeB(",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_fixed_host.go",
-          "selector": "h.preBComparison, e = h.compareCompleteDataBeforeB(q, r, p, w)",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle.go",
-          "selector": "func lifecycleRequireParentWindowBudget(ctx context.Context) error",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestMongoMetadataSnapshotNative",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestComparisonMongoAbortNativeOriginalSessionResponseAndUnknown/actual-server-reply-withheld-is-unknown",
-          "result": "matched",
-          "source_sha": "c4c7a9ed433f05bcc2411f4205f198edb7f02cd4",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-platform-window-action.py",
-          "selector": "def disposition(window, transport, raw, exit_code, approval, run):",
-          "result": "matched",
-          "source_sha": "0f5f441da99084eb9f61e2ae641c89dd50adea17",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_runtime_ledger.go",
-          "selector": "func (h *lifecycleFixedHost) observeRuntimeLedgers",
-          "result": "matched",
-          "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/application/evaluation/scheduler/audit.go",
-          "selector": "func SummarizeReadOnlyBatch",
-          "result": "matched",
-          "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/infra/mysql/aibridge/runtime_messaging_observation.go",
-          "selector": "func ReadCurrentMessagingOrganization",
-          "result": "matched",
-          "source_sha": "edb57ffe03b5ec8c3d8c5b7784fdf9738b3ab5a0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_controlled_runtime.go",
-          "selector": "func (h *lifecycleFixedHost) observeControlledAfterDataComparison",
-          "result": "matched",
-          "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_d_terminal.go",
-          "selector": "func (h *lifecycleFixedHost) closePurgedOriginalD",
-          "result": "matched",
-          "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/target_recovery_resume.go",
-          "selector": "leaf := i == len(dirs)-1",
-          "result": "matched",
-          "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-window-tool.py",
-          "selector": "def derive_request(raw, approval, current_run):",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-window-tool.py",
-          "selector": "class LinuxChildOwner:",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-window-tool.py",
-          "selector": "def root_execute(arguments, packet, source_uid, archive_raw):",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-compatibility-retirement/lifecycle_root_staging.go",
-          "selector": "func lifecycleInvocationBatch(operation, run string) string",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T)",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementbackup/lifecycle_public_cli_integration_test.go",
-          "selector": "func TestLifecyclePublicCLILinuxRootControlLossReapsDetachedDescendants(t *testing.T)",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "Verify window-tool root-once capture, restore and owned-process cancellation",
-          "result": "matched",
-          "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementhostscope/observe.go",
-          "selector": "func Observe(ctx context.Context, b Binding) (Observation, error)",
-          "result": "matched",
-          "source_sha": "fb8c5c957dcc34edd57814c8008101050595eda1",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementdbcensus/observe.go",
-          "selector": "func Observe(ctx context.Context, borrowedSQL *sql.DB, borrowedMongo *mongo.Client) (Catalog, error)",
-          "result": "matched",
-          "source_sha": "fb8c5c957dcc34edd57814c8008101050595eda1",
-          "verified_on": "2026-10-10"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=1 -count=1 -json ./internal/pkg/runtimefacts ./internal/pkg/eventing/transport ./internal/pkg/messagingruntime ./internal/pkg/messagingruntime/testsupport ./internal/worker/integration/messaging ./internal/worker/process ./internal/apiserver/process ./internal/apiserver/infra/aibridge ./internal/apiserver/container/modules/interpretation ./internal/collection-server/process",
-          "result": "passed",
-          "source_sha": "be823648e1b43518a7d5846cc8bf39246921eab3",
-          "verified_on": "2026-10-10"
-        }
-      ],
+      "verification": [],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -12830,6 +11351,13 @@
               "verified_on": "2026-10-09"
             }
           ]
+        },
+        {
+          "id": "r4-source-exit-document-update",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
+          "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
         }
       ]
     },
@@ -12845,114 +11373,18 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/*.go"
+          "path": ".github/workflows/cd.yml"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/cmd/qs-retirement-fence/*.go"
+          "path": ".github/workflows/db-ops.yml"
         },
         {
           "kind": "source",
-          "path": "scripts/database/compatibility-retirement-entrypoints.json"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/compatibility-host-inventory.yml"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-host-inventory-action.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/compatibility-retirement-host-inventory.py"
+          "path": "internal/pkg/migration/retirement_transition.go"
         }
       ],
-      "verification": [
-        {
-          "kind": "command",
-          "command": "go test -race -count=1 -json ./internal/apiserver/maintenance/compatibilityretirementfence/...",
-          "result": "passed",
-          "source_sha": "d94ba54ce870328f7ea324a2a6bfa8673e0b7b7d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/authorize.go",
-          "selector": "ReplayProtectionUnproven: true",
-          "result": "matched",
-          "source_sha": "d94ba54ce870328f7ea324a2a6bfa8673e0b7b7d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/compare_api_docs.py",
-          "result": "passed",
-          "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/challenge_store.go",
-          "selector": "anchor == \"/\" || protectedPath.MatchString(anchor)",
-          "result": "matched",
-          "source_sha": "b3c546f0bdd5d79b4d69d42130a813f6937e1b9d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window.go",
-          "selector": "BudgetOnly: true",
-          "result": "matched",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/maintenance/compatibilityretirementfence/maintenance_window_linux.go",
-          "selector": "unix.CLOCK_BOOTTIME",
-          "result": "matched",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/compare_api_docs.py",
-          "result": "passed",
-          "source_sha": "d252d11fd80bf42ea23d9eb5c5d2a92f8eb57cc2",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement-entrypoints.json",
-          "selector": "controlled_inventory_historical_evidence_and_temporary_restore_preparation",
-          "result": "matched",
-          "source_sha": "54eca96239071eaeee0573dca529cd4cca77098c",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/compatibility-retirement-entrypoints.json",
-          "selector": "cmd/qs-compatibility-retirement/prepare_facts.go",
-          "result": "matched",
-          "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
-          "verified_on": "2026-10-10"
-        }
-      ],
+      "verification": [],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -12993,6 +11425,13 @@
               "verified_on": "2026-10-10"
             }
           ]
+        },
+        {
+          "id": "r4-source-exit-document-update",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
+          "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
         }
       ]
     },
@@ -13000,7 +11439,7 @@
       "path": "scripts/database/qs-ai-retirement-readonly-plan.md",
       "class": "sidecar",
       "owner": "tooling",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
         "verified_on": "2026-10-09"
@@ -13008,104 +11447,18 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py"
+          "path": "cmd/qs-ai-messaging-audit/main.go"
         },
         {
           "kind": "source",
-          "path": "scripts/database/qs-ai-retirement-readonly-observer.py"
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
         },
         {
           "kind": "source",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_observer.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/database/qs-ai-retirement-0040-layout.py"
+          "path": "internal/pkg/eventing/evidence/evidence.go"
         }
       ],
-      "verification": [
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
-          "selector": "\"diagnostic_only\": True, \"drop_ready\": False, \"retirement_proven\": False,",
-          "result": "matched",
-          "source_sha": "26b6b709bf0ac5e3fc6fa9ee54329534562aca3f",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
-          "selector": "fail(\"original_snapshots_must_end_before_recheck\")",
-          "result": "matched",
-          "source_sha": "26b6b709bf0ac5e3fc6fa9ee54329534562aca3f",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test_qs_ai_retirement_readonly_observer.py",
-          "result": "passed",
-          "source_sha": "51ac84a0e0cd220dc5e7cb5b553cd3dcaee884e5",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/database/test_qs_ai_retirement_readonly_verifier.py",
-          "result": "passed",
-          "source_sha": "51ac84a0e0cd220dc5e7cb5b553cd3dcaee884e5",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
-          "selector": "def _original_execution_scope(ai, peer, originals, known_handoffs=()):",
-          "result": "matched",
-          "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/qs-ai-retirement-readonly-verifier.py",
-          "selector": "reverse = _reverse(ai, peer, originals, mapped)",
-          "result": "matched",
-          "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py",
-          "selector": "def test_original_unknown_provider_and_unbound_scope_remain_blocked(self):",
-          "result": "matched",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py",
-          "selector": "def test_unknown_provider_orphan_cross_session_and_fake_owner_block(self):",
-          "result": "matched",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/database/test_qs_ai_retirement_readonly_verifier.py",
-          "selector": "async def test_unrelated_evaluation_unknown_keeps_real_typed_evidence_validation(self):",
-          "result": "matched",
-          "source_sha": "7e39ed4f7790917db67919e2bf765080031dc83d",
-          "verified_on": "2026-10-09"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B -m unittest discover -s scripts/database -p test_qs_ai_retirement_readonly_verifier.py -v",
-          "result": "passed",
-          "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-          "verified_on": "2026-10-09"
-        }
-      ],
+      "verification": [],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -13122,6 +11475,13 @@
           "severity": "high",
           "summary": "Full original execution and MQ ledger verification is implemented and locally tested; current source derives target scope from both independently approved full-EOF legacy AI sources, validates the actual request/session/org/run graph, and reports unrelated unknown provider work only after complete owner/typed evaluation integrity checks. Target unknown/held/pending responsibility, orphan/cross-owner/duplicate/hash conflicts remain blockers. This source calibration is not new production verification; production identity, runtime source, historical trusted keys, broker and writer-fence bindings remain unproven. Current mixed history writer source 4dfdfd519e7a7e040e3bfd32759ff904df329f73 passed 914 ordinary race test actions, 74 configured Python ordinary tests (18 native cases skipped), integration-tag compile and both scoped lint modes. Native storage and full external-qualified production write remain unverified; public production mutation modes are still disabled.",
           "exit_criteria": "Bind actual qs-ai and qs-server databases/runtime sources, original message keys, frozen broker responsibility and writer fencing; verify all original command IDs and persist minimal retirement records before DROP."
+        },
+        {
+          "id": "r4-source-exit-document-update",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
+          "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
         }
       ]
     }

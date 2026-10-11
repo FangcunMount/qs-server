@@ -15,17 +15,7 @@ cat >"$FAKE_DOCKER" <<'EOF'
 set -Eeuo pipefail
 
 case "${1:-}" in
-  buildx)
-    printf '%s\n' "$@" >"$FAKE_DOCKER_ROOT/build-arguments"
-    ;;
-  image)
-    [ "${2:-}" = inspect ] || exit 2
-    ;;
   pull)
-    if [ "${FAKE_DOCKER_MODE:-}" = preload ]; then
-      touch "$FAKE_DOCKER_ROOT/preload-pulled"
-      exit 2
-    fi
     if [ "${FAKE_DOCKER_MODE:-serialize}" = "retry" ]; then
       if mkdir "$FAKE_DOCKER_ROOT/first-pull" 2>/dev/null; then
         exit 1
@@ -136,22 +126,3 @@ if compgen -G "${output}.tmp.*" >/dev/null; then
 fi
 rm "$FAKE_BIN/gzip"
 echo "compression failure preserves prior artifact and releases lock"
-
-preload_ref=qs-retirement/qs-apiserver:0123456789abcdef0123456789abcdef01234567
-env "${COMMON_ENV[@]}" FAKE_DOCKER_MODE=preload SERVICE=apiserver \
-  RETIREMENT_PRELOAD_REF="$preload_ref" DEPLOY_REF=main WWW_UID=2000 WWW_GID=2000 \
-  "$SCRIPT_DIR/build-image.sh" >/dev/null
-for argument in --load linux/amd64 org.opencontainers.image.revision=0123456789abcdef0123456789abcdef01234567 "$preload_ref"; do
-  grep -Fx -- "$argument" "$TEST_ROOT/build-arguments" >/dev/null || exit 1
-done
-if grep -Fx -- --push "$TEST_ROOT/build-arguments" >/dev/null || grep -F -- :latest "$TEST_ROOT/build-arguments" >/dev/null; then
-  echo "retirement preload published a runtime tag" >&2; exit 1
-fi
-env "${COMMON_ENV[@]}" FAKE_DOCKER_MODE=preload SERVICE=apiserver \
-  RETIREMENT_PRELOAD_REF="$preload_ref" DEPLOY_IMAGE_PACKAGE="$TEST_ROOT/preload.tar.gz" \
-  "$SCRIPT_DIR/export-image.sh" >/dev/null
-[ ! -e "$TEST_ROOT/preload-pulled" ] && gzip -t "$TEST_ROOT/preload.tar.gz"
-if env "${COMMON_ENV[@]}" SERVICE=worker RETIREMENT_PRELOAD_REF="$preload_ref" DEPLOY_REF=main WWW_UID=2000 WWW_GID=2000 "$SCRIPT_DIR/build-image.sh" >/dev/null 2>&1; then
-  echo "retirement preload accepted another service" >&2;exit 1
-fi
-echo "retirement exact cached build/export contract passed"

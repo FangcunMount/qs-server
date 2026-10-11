@@ -58,7 +58,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /build/bin/qs-ai-bridge ./cmd/qs-ai-bridge
 
 # Explicit, offline/maintenance entrypoints; the normal server entrypoint is unchanged.
-RUN for command in audit control handoff preflight; do \
+RUN for command in audit control preflight; do \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
     -ldflags "-s -w -X main.sourceSHA=${GIT_COMMIT}" \
     -o "/build/bin/qs-ai-messaging-${command}" "./cmd/qs-ai-messaging-${command}"; \

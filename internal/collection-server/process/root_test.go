@@ -20,14 +20,4 @@ func TestCreateCollectionServerKeepsRootState(t *testing.T) {
 	if server.config != cfg {
 		t.Fatalf("config = %#v, want %#v", server.config, cfg)
 	}
-	if server.runtimeFacts == nil {
-		t.Fatal("Collection runtime facts owner missing")
-	}
-	snapshot := server.runtimeFacts.Snapshot()
-	if len(snapshot.Transports) != 1 || snapshot.Transports[0].Direction != "no_local_mq" || snapshot.BrokerConnectionsVerified || snapshot.ObservationComplete {
-		t.Fatal("Collection fabricated a local MQ consumer or live observation")
-	}
-	if err := server.runtimeFacts.Close(); err != nil {
-		t.Fatal(err)
-	}
 }

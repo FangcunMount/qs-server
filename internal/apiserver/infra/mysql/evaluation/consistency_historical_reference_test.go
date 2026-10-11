@@ -1,6 +1,7 @@
 package evaluation
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
@@ -33,8 +34,8 @@ func TestHistoricalAnchorSeparatesStableIdentityFromCASFacts(t *testing.T) {
 			changed[name] = evidence.String("")
 		}
 		got, err := historicalStableBinding("server", "database", "assessment", "evaluation.requested", changed, nil)
-		if err != nil || got != want || historicalSameFacts(base, changed, "history") {
-			t.Fatal("stable anchor and exact CAS conflated", name, err)
+		if err != nil || got != want || reflect.DeepEqual(base, changed) {
+			t.Fatal("stable anchor and mutable facts conflated", name, err)
 		}
 	}
 	for _, name := range []string{"id", "org_id", "testee_id", "answer_sheet_id", "questionnaire_code", "questionnaire_version", "evaluation_model_code", "origin_id"} {
