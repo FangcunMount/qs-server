@@ -276,13 +276,49 @@ class Tests(unittest.TestCase):
   self.assertFalse(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
   self.assertEqual(v['diagnostics'],{'execution_stage':'complete','remote_cleanup':'verified','local_cleanup':'verified','registration_cleanup':'verified','cleanup_failure_stage':'none','cleanup_error_category':'none'});self.assert_closed_diagnostics(v)
  def test_transport_stderr_secret_is_not_published_unknown_remote_not_deleted(self):
+  import io
   home,repo=self.setup_local();calls=[]
   def transport(argv,**kw):
    calls.append(argv)
    if 'python3 -' in argv:return 0,b'{"created":true}\n',b''
    return 1,b'PRIVATE_SECRET',b'PRIVATE_PASSWORD'
-  with mock.patch.object(Path,'home',return_value=home):v=m.run_action(self.env,repo,capture_fn=transport)
+  output=io.StringIO()
+  with mock.patch.object(Path,'home',return_value=home),mock.patch.object(sys,'stderr',output):v=m.run_action(self.env,repo,capture_fn=transport)
   self.assertEqual(v['cleanup'],'unknown');self.assertEqual(v['error_category'],'transport_failed');self.assertEqual(v['diagnostics']['execution_stage'],'asset_upload');self.assertEqual(v['diagnostics']['remote_cleanup'],'not_attempted');self.assertEqual(v['diagnostics']['local_cleanup'],'verified');self.assertEqual(v['diagnostics']['registration_cleanup'],'not_attempted');self.assertNotIn('PRIVATE',json.dumps(v));self.assertFalse(any('cleanup' in a[-1] for a in calls));self.assertTrue(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
+  prefix='QS_HOST_INVENTORY_TRANSPORT_DIAGNOSTIC '
+  self.assertEqual(output.getvalue(),prefix+m.canonical({'execution_stage':'asset_upload','exit_code':1,'stdout_bytes':14,'stderr_bytes':16,'stderr_nonempty':True,'reason':'other_or_unknown'}).decode())
+  self.assert_closed_diagnostics(v)
+  original_root=self.root
+  cases=[(0,b'{"created":true}\n',b'PRIVATE_WARNING','stderr_on_zero_exit'),
+         (255,b'PRIVATE_SECRET',b'PRIVATE_USER@PRIVATE_HOST: Permission denied (publickey).\n','publickey_authentication_denied'),
+         (255,b'',b'Host key verification failed.\n','host_key_rejected'),
+         (255,b'',b'ssh: connect to host PRIVATE_HOST port 22: Connection timed out\n','connection_timeout'),
+         (255,b'',b'ssh: connect to host PRIVATE_HOST port 22: Connection refused\n','connection_refused'),
+         (255,b'',b'ssh: Could not resolve hostname PRIVATE_HOST: Name or service not known\n','name_resolution_failed'),
+         (1,b'',b'Traceback (most recent call last):\n  File "<stdin>", line 2, in <module>\nFileExistsError: PRIVATE_PATH\n','remote_python_failed'),
+         (-15,b'PRIVATE_SECRET',b'PRIVATE_UNKNOWN Permission denied (publickey). trailing','other_or_unknown'),
+         (m.Rejected('transport_timeout'),None,None,'other_or_unknown'),
+         (OSError('PRIVATE_CAPTURE'),None,None,'other_or_unknown')]
+  for index,(code,out,err,reason) in enumerate(cases):
+   with self.subTest(reason=reason,exit_type=type(code).__name__):
+    self.root=original_root/('case-'+str(index));self.root.mkdir(mode=0o700)
+    home,repo=self.setup_local();env=dict(self.env,RUNNER_TEMP=str(self.root));calls=[];output=io.StringIO()
+    def transport(argv,**kw):
+     calls.append(argv)
+     if isinstance(code,Exception):raise code
+     return code,out,err
+    with mock.patch.object(Path,'home',return_value=home),mock.patch.object(sys,'stderr',output):
+     if isinstance(code,OSError):
+      with self.assertRaises(OSError) as raised:m.run_action(env,repo,capture_fn=transport)
+      self.assertIs(raised.exception,code)
+     else:
+      v=m.run_action(env,repo,capture_fn=transport)
+      self.assertEqual(v['error_category'],'transport_timeout' if isinstance(code,m.Rejected) else 'transport_failed')
+      self.assertEqual(v['cleanup'],'unknown');self.assertEqual(v['diagnostics']['execution_stage'],'remote_bootstrap');self.assertEqual(v['diagnostics']['remote_cleanup'],'not_attempted');self.assert_closed_diagnostics(v)
+    lines=output.getvalue().splitlines();self.assertEqual(len(lines),1);self.assertTrue(lines[0].startswith(prefix))
+    diagnostic=json.loads(lines[0][len(prefix):]);self.assertEqual(set(diagnostic),{'execution_stage','exit_code','stdout_bytes','stderr_bytes','stderr_nonempty','reason'})
+    self.assertEqual(diagnostic,{'execution_stage':'remote_bootstrap','exit_code':'unknown' if isinstance(code,Exception) else code,'stdout_bytes':'unknown' if out is None else len(out),'stderr_bytes':'unknown' if err is None else len(err),'stderr_nonempty':'unknown' if err is None else bool(err),'reason':reason})
+    self.assertNotIn('PRIVATE',output.getvalue());self.assertEqual(len(calls),1);self.assertFalse(any('cleanup' in a[-1] for a in calls));self.assertTrue(any(x.name.startswith('qs-host-inventory-registration') for x in self.root.iterdir()))
  def test_same_run_registration_is_never_overwritten(self):
   home,repo=self.setup_local()
   with mock.patch.object(Path,'home',return_value=home):
