@@ -391,6 +391,93 @@ func dbCensusSessionPipeline(stage string) mongo.Pipeline {
 	projection := bson.D{{Key: "_id", Value: 1}, {Key: "opid", Value: 1}, {Key: "host", Value: 1}, {Key: "client", Value: 1}, {Key: "connectionId", Value: 1}, {Key: "active", Value: 1}, {Key: "type", Value: 1}, {Key: "op", Value: 1}, {Key: "ns", Value: 1}, {Key: "lsid", Value: 1}, {Key: "effectiveUsers", Value: 1}, {Key: "user", Value: 1}, {Key: "users", Value: 1}, {Key: "lastUse", Value: 1}}
 	return mongo.Pipeline{bson.D{{Key: stage, Value: value}}, bson.D{{Key: "$project", Value: projection}}}
 }
+func dbCensusMongoErrorCategory(err error) string {
+	if err == nil {
+		return "none"
+	}
+	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
+		var code int32
+		switch command := cause.(type) {
+		case mongo.CommandError:
+			code = command.Code
+		case *mongo.CommandError:
+			if command == nil {
+				return "db_census_mongo_query_failed_or_bounded"
+			}
+			code = command.Code
+		default:
+			// Only whole, existing internal literals may become public categories.
+			// CommandError message, name and raw response never enter this switch.
+			switch cause.Error() {
+			case "db_census_borrowed_mongo_missing":
+				return "db_census_borrowed_mongo_missing"
+			case "db_census_command_byte_budget_exceeded":
+				return "db_census_command_byte_budget_exceeded"
+			case "db_census_row_budget_exceeded":
+				return "db_census_row_budget_exceeded"
+			case "db_census_byte_budget_exceeded":
+				return "db_census_byte_budget_exceeded"
+			case "db_census_total_byte_budget_exceeded":
+				return "db_census_total_byte_budget_exceeded"
+			case "db_census_cursor_schema_rejected":
+				return "db_census_cursor_schema_rejected"
+			case "db_census_mongo_array_rejected":
+				return "db_census_mongo_array_rejected"
+			case "db_census_mongo_record_rejected":
+				return "db_census_mongo_record_rejected"
+			case "db_census_mongo_projection_rejected":
+				return "db_census_mongo_projection_rejected"
+			case "db_census_mongo_privilege_schema_rejected":
+				return "db_census_mongo_privilege_schema_rejected"
+			case "db_census_mongo_all_users_privilege_unproven":
+				return "db_census_mongo_all_users_privilege_unproven"
+			case "db_census_user_duplicate_identity":
+				return "db_census_user_duplicate_identity"
+			case "db_census_user_expansion_membership_changed":
+				return "db_census_user_expansion_membership_changed"
+			case "db_census_user_expansion_identity_changed":
+				return "db_census_user_expansion_identity_changed"
+			case "db_census_user_expansion_byte_budget_exceeded":
+				return "db_census_user_expansion_byte_budget_exceeded"
+			case "db_census_user_private_body_returned":
+				return "db_census_user_private_body_returned"
+			case "db_census_user_identity_schema_rejected":
+				return "db_census_user_identity_schema_rejected"
+			case "db_census_user_role_schema_rejected":
+				return "db_census_user_role_schema_rejected"
+			case "db_census_user_expansion_schema_rejected":
+				return "db_census_user_expansion_schema_rejected"
+			}
+			continue
+		}
+		switch code {
+		case 2:
+			return "db_census_mongo_command_code_2"
+		case 9:
+			return "db_census_mongo_command_code_9"
+		case 13:
+			return "db_census_mongo_command_code_13"
+		case 18:
+			return "db_census_mongo_command_code_18"
+		case 20:
+			return "db_census_mongo_command_code_20"
+		case 26:
+			return "db_census_mongo_command_code_26"
+		case 50:
+			return "db_census_mongo_command_code_50"
+		case 59:
+			return "db_census_mongo_command_code_59"
+		case 72:
+			return "db_census_mongo_command_code_72"
+		case 115:
+			return "db_census_mongo_command_code_115"
+		case 40324:
+			return "db_census_mongo_command_code_40324"
+		}
+		return "db_census_mongo_query_failed_or_bounded"
+	}
+	return "db_census_mongo_query_failed_or_bounded"
+}
 func dbCensusMongoSnapshot(ctx context.Context, run dbCensusMongoCommand, aggregate dbCensusMongoAggregate) (map[string][]bson.M, []Section, []string) {
 	out := map[string][]bson.M{}
 	totalBytes := 0
@@ -406,7 +493,7 @@ func dbCensusMongoSnapshot(ctx context.Context, run dbCensusMongoCommand, aggreg
 			}
 		}
 		if e != nil {
-			s.ErrorCategory = "db_census_mongo_query_failed_or_bounded"
+			s.ErrorCategory = dbCensusMongoErrorCategory(e)
 			gaps = append(gaps, s.Name+"_unread")
 		} else {
 			out[name] = rows

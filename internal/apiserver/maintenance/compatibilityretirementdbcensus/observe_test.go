@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -238,5 +239,121 @@ func TestDBWriterCensusMongoEmptyNoAllSessionPermission(t *testing.T) {
 				t.Fatal("empty filtered query became full coverage")
 			}
 		}
+	}
+}
+
+func TestDBWriterCensusMongoFixedCommandErrorCategories(t *testing.T) {
+	for _, code := range []int32{2, 9, 13, 18, 20, 26, 50, 59, 72, 115, 40324} {
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			command := mongo.CommandError{Code: code, Name: "private-error-name", Message: "private-error-body", Raw: bson.Raw("private-error-raw")}
+			for _, err := range []error{command, &command, fmt.Errorf("private-wrapper: %w", command), fmt.Errorf("private-wrapper: %w", &command)} {
+				want := fmt.Sprintf("db_census_mongo_command_code_%d", code)
+				if got := dbCensusMongoErrorCategory(err); got != want {
+					t.Fatalf("category = %q, want %q", got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestDBWriterCensusMongoFixedInternalErrorCategories(t *testing.T) {
+	for _, literal := range []string{
+		"db_census_borrowed_mongo_missing",
+		"db_census_command_byte_budget_exceeded",
+		"db_census_row_budget_exceeded",
+		"db_census_byte_budget_exceeded",
+		"db_census_total_byte_budget_exceeded",
+		"db_census_cursor_schema_rejected",
+		"db_census_mongo_array_rejected",
+		"db_census_mongo_record_rejected",
+		"db_census_mongo_projection_rejected",
+		"db_census_mongo_privilege_schema_rejected",
+		"db_census_mongo_all_users_privilege_unproven",
+		"db_census_user_duplicate_identity",
+		"db_census_user_expansion_membership_changed",
+		"db_census_user_expansion_identity_changed",
+		"db_census_user_expansion_byte_budget_exceeded",
+		"db_census_user_private_body_returned",
+		"db_census_user_identity_schema_rejected",
+		"db_census_user_role_schema_rejected",
+		"db_census_user_expansion_schema_rejected",
+	} {
+		t.Run(literal, func(t *testing.T) {
+			for _, err := range []error{errors.New(literal), fmt.Errorf("private-wrapper: %w", errors.New(literal))} {
+				if got := dbCensusMongoErrorCategory(err); got != literal {
+					t.Fatalf("category = %q, want %q", got, literal)
+				}
+			}
+		})
+	}
+	var nilCommand *mongo.CommandError
+	for _, err := range []error{
+		nilCommand,
+		fmt.Errorf("private-wrapper: %w", nilCommand),
+		mongo.CommandError{Code: 99999, Name: "private-error-name", Message: "db_census_mongo_array_rejected", Wrapped: errors.New("db_census_mongo_array_rejected")},
+		errors.New("private-error-body"),
+		errors.New("db_census_mongo_array_rejected: private-error-body"),
+		errors.New("db_census_startup_authentication_configuration_unread"),
+		context.Canceled,
+		context.DeadlineExceeded,
+	} {
+		if got := dbCensusMongoErrorCategory(err); got != "db_census_mongo_query_failed_or_bounded" {
+			t.Fatalf("unknown/startup category = %q", got)
+		}
+	}
+	if got := dbCensusMongoErrorCategory(nil); got != "none" {
+		t.Fatalf("nil category = %q", got)
+	}
+}
+
+func TestDBWriterCensusMongoFailureCategorySurvivesSecondRead(t *testing.T) {
+	for _, tc := range []struct{ name, category string }{
+		{"users", "db_census_mongo_command_code_9"},
+		{"connections_and_idle_operations", "db_census_mongo_command_code_40324"},
+		{"authentication_parameters", "db_census_mongo_projection_rejected"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, first, _ := dbCensusMongoSnapshot(context.Background(), censusMongoRunFixture, censusMongoAggregateFixture)
+			rows, second, gaps := dbCensusMongoSnapshot(context.Background(), func(ctx context.Context, db string, q bson.D) (bson.M, error) {
+				if tc.name == "users" && q[0].Key == "usersInfo" {
+					return nil, fmt.Errorf("private-wrapper: %w", mongo.CommandError{Code: 9, Message: "private-error-body"})
+				}
+				if tc.name == "authentication_parameters" && q[0].Key == "getParameter" {
+					return bson.M{}, nil
+				}
+				return censusMongoRunFixture(ctx, db, q)
+			}, func(ctx context.Context, db, col string, p mongo.Pipeline) ([]bson.M, error) {
+				if tc.name == "connections_and_idle_operations" && p[0][0].Key == "$currentOp" {
+					return nil, &mongo.CommandError{Code: 40324, Message: "private-error-body"}
+				}
+				return censusMongoAggregateFixture(ctx, db, col, p)
+			})
+			if _, ok := rows[tc.name]; ok {
+				t.Fatal("failed section retained rows")
+			}
+			if !strings.Contains(strings.Join(gaps, ","), "mongodb_"+tc.name+"_unread") {
+				t.Fatal("failed section lost unread gap")
+			}
+			found := false
+			for _, section := range dbCensusFinishSections(first, second) {
+				if section.Name == "mongodb_"+tc.name {
+					found = true
+					if section.EnumerationComplete || section.RecheckEqual || section.ErrorCategory != tc.category {
+						t.Fatal("second read error lost its fixed category or claimed complete")
+					}
+				}
+			}
+			if !found {
+				t.Fatal("failed section omitted")
+			}
+			encoded, err := json.Marshal(struct {
+				Rows     map[string][]bson.M
+				Sections []Section
+				Gaps     []string
+			}{rows, second, gaps})
+			if err != nil || strings.Contains(string(encoded), "private-error") {
+				t.Fatal("error body entered snapshot")
+			}
+		})
 	}
 }

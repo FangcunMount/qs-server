@@ -68,6 +68,16 @@ class DBCensusTest(unittest.TestCase):
         args,request,rh=self.prepared();r=self.receipt(args,request,rh);r['db_census_observation_complete']=False;r['error_category']='db_census_catalog_or_session_permissions_incomplete';r['observed_sections'][0]['enumeration_complete']=False;r['observed_sections'][0]['error_category']='db_census_mongo_query_failed_or_bounded'
         accepted=api.validate_db_census_result(r,args,request,rh,1);self.assertFalse(accepted['db_census_observation_complete']);self.assertEqual(accepted['db_census_private_catalog_sha256'],'4'*64)
         with self.assertRaises(api.Blocked):api.validate_db_census_result(self.receipt(args,request,rh),args,request,rh,1)
+    def test_fixed_mongo_error_categories_remain_incomplete_and_reject_dynamic_body(self):
+        args,request,rh=self.prepared()
+        for category in ('db_census_mongo_command_code_13','db_census_user_expansion_schema_rejected','db_census_cursor_schema_rejected'):
+            r=self.receipt(args,request,rh);r.update(db_census_observation_complete=False,error_category='db_census_catalog_or_session_permissions_incomplete')
+            section=next(s for s in r['observed_sections'] if s['name']=='mongodb_users');section.update(enumeration_complete=False,error_category=category)
+            accepted=api.validate_db_census_result(r,args,request,rh,1)
+            self.assertFalse(accepted['db_census_observation_complete']);self.assertFalse(any(accepted['capabilities'].values()))
+        r=self.receipt(args,request,rh);r.update(db_census_observation_complete=False,error_category='db_census_catalog_or_session_permissions_incomplete')
+        r['observed_sections'][0].update(enumeration_complete=False,error_category='private-server-error-body')
+        with self.assertRaises(api.Blocked):api.validate_db_census_result(r,args,request,rh,1)
     def test_closed_partial_pre_identity_fields_and_credential_pipe(self):
         args,request,rh=self.prepared();r=self.receipt(args,request,rh);r.update(db_census_observation_complete=False,mysql_all_connections_permission_proven=False,mongodb_local_all_sessions_permission_proven=False,error_category='db_census_original_identity_read_rejected',observed_sections=[],observed_identity_producer={k:'' for k in request['identity_report']},mysql_migration_version=0,mongodb_migration_version=0)
         self.assertFalse(api.validate_db_census_result(r,args,request,rh,1)['db_census_observation_complete'])
