@@ -194,6 +194,84 @@ func censusMongoAggregateFixture(ctx context.Context, db, col string, p mongo.Pi
 	}
 	return []bson.M{{"connectionId": int32(42), "active": false, "type": "idleSession"}}, nil
 }
+
+func TestDBWriterCensusObserverPrivilegesIgnoreOnlySetOrder(t *testing.T) {
+	var first []Section
+	for round := 0; round < 2; round++ {
+		cluster := bson.M{"resource": bson.M{"cluster": true, "preserved": true}, "actions": bson.A{"inprog", "listSessions", "inprog"}, "preserved": "value"}
+		database := bson.M{"resource": bson.M{"db": "actual-db", "collection": ""}, "actions": bson.A{"find", "insert"}}
+		privileges := bson.A{cluster, database, database}
+		if round == 1 {
+			cluster["actions"] = bson.A{"listSessions", "inprog", "inprog"}
+			database["actions"] = bson.A{"insert", "find"}
+			privileges = bson.A{database, database, cluster}
+		}
+		before := checksum(privileges)
+		catalog, sections, _ := dbCensusMongoSnapshot(context.Background(), func(ctx context.Context, db string, q bson.D) (bson.M, error) {
+			if q[0].Key == "connectionStatus" {
+				return bson.M{"authInfo": bson.M{"authenticatedUserPrivileges": privileges}}, nil
+			}
+			return censusMongoRunFixture(ctx, db, q)
+		}, censusMongoAggregateFixture)
+		if checksum(privileges) != before || len(catalog["observer_privileges"]) != 3 {
+			t.Fatal("observer normalization mutated input or discarded duplicates")
+		}
+		if round == 0 {
+			first = sections
+		} else {
+			for _, s := range dbCensusFinishSections(first, sections) {
+				if s.Name == "mongodb_observer_privileges" && (!s.EnumerationComplete || !s.RecheckEqual || s.Items != 3 || s.ErrorCategory != "none") {
+					t.Fatal("equivalent observer privilege order changed the section", s)
+				}
+			}
+		}
+	}
+}
+
+func TestDBWriterCensusObserverPrivilegeChangesRemainUnequal(t *testing.T) {
+	for _, change := range []string{"action", "resource", "resource-extra", "privilege-extra", "action-duplicate", "privilege-duplicate"} {
+		t.Run(change, func(t *testing.T) {
+			var first []Section
+			for round := 0; round < 2; round++ {
+				resource := bson.M{"cluster": true}
+				privilege := bson.M{"resource": resource, "actions": bson.A{"inprog", "listSessions"}}
+				privileges := bson.A{privilege}
+				if round == 1 {
+					switch change {
+					case "action":
+						privilege["actions"] = bson.A{"inprog", "listSessions", "killop"}
+					case "resource":
+						resource["cluster"] = false
+					case "resource-extra":
+						resource["extra"] = true
+					case "privilege-extra":
+						privilege["extra"] = true
+					case "action-duplicate":
+						privilege["actions"] = bson.A{"inprog", "listSessions", "inprog"}
+					case "privilege-duplicate":
+						privileges = append(privileges, privilege)
+					}
+				}
+				_, sections, _ := dbCensusMongoSnapshot(context.Background(), func(ctx context.Context, db string, q bson.D) (bson.M, error) {
+					if q[0].Key == "connectionStatus" {
+						return bson.M{"authInfo": bson.M{"authenticatedUserPrivileges": privileges}}, nil
+					}
+					return censusMongoRunFixture(ctx, db, q)
+				}, censusMongoAggregateFixture)
+				if round == 0 {
+					first = sections
+				} else {
+					for _, s := range dbCensusFinishSections(first, sections) {
+						if s.Name == "mongodb_observer_privileges" && s.RecheckEqual {
+							t.Fatal("changed observer privilege set accepted")
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestDBWriterCensusMongoNativeAccountScopeAndPrivacy(t *testing.T) {
 	roleDBs := map[string]bool{}
 	stages := map[string]bson.D{}

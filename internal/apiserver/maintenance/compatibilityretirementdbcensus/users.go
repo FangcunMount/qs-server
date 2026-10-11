@@ -143,23 +143,27 @@ func dbCensusUserRows(rows []bson.M, expanded bool) ([]bson.M, error) {
 		row["roles"] = dbCensusUserSet(row["roles"])
 		if expanded {
 			row["inheritedRoles"] = dbCensusUserSet(row["inheritedRoles"])
-			privileges := dbCensusUserSet(row["inheritedPrivileges"]).(bson.A)
-			for i, value := range privileges {
-				if privilege, ok := value.(bson.M); ok {
-					copy := bson.M{}
-					for key, value := range privilege {
-						copy[key] = value
-					}
-					if actions, found := copy["actions"]; found {
-						copy["actions"] = dbCensusUserSet(actions)
-					}
-					privileges[i] = copy
-				}
-			}
-			row["inheritedPrivileges"] = dbCensusUserSet(privileges)
+			row["inheritedPrivileges"] = dbCensusPrivilegeSet(row["inheritedPrivileges"])
 		}
 	}
 	return dbCensusProject(projected, fields, []string{"user", "db", "roles"})
+}
+
+func dbCensusPrivilegeSet(value any) bson.A {
+	privileges := dbCensusUserSet(value).(bson.A)
+	for i, value := range privileges {
+		if privilege, ok := value.(bson.M); ok {
+			copy := bson.M{}
+			for key, value := range privilege {
+				copy[key] = value
+			}
+			if actions, found := copy["actions"]; found {
+				copy["actions"] = dbCensusUserSet(actions)
+			}
+			privileges[i] = copy
+		}
+	}
+	return dbCensusUserSet(privileges).(bson.A)
 }
 
 // Mongo reports roles and privileges from sets. Normalize only their ordering;
