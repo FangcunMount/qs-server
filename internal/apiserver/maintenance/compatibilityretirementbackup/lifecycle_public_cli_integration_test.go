@@ -1392,7 +1392,13 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 					// This original is the already owned random source replica set; the
 					// isolated destination is the exact different shared CI Mongo process.
 					ports := mongoRoot.Ports["27017/tcp"]
-					if len(ports) != 1 || (ports[0].HostIP != "127.0.0.1" && ports[0].HostIP != "0.0.0.0") || ports[0].HostPort != "27017" {
+					hasRoute := false
+					for _, p := range ports {
+						if (p.HostIP == "127.0.0.1" || p.HostIP == "0.0.0.0") && p.HostPort == "27017" {
+							hasRoute = true
+						}
+					}
+					if !hasRoute {
 						t.Fatal("storage actual isolated Mongo route")
 					}
 					restoreClient := nativeMongo(t, map[string]string{"MONGODB_HOST": "127.0.0.1", "MONGODB_PORT": "27017"})

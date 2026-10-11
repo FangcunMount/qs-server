@@ -328,7 +328,7 @@ func storageSQLRows(ctx context.Context, db sqlReader, index int, structure SQLS
 	if e != nil {
 		return s, ErrRead
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	h := sha256.New()
 	frame(h, []byte(jsonSHA(structure.Columns)), false)
 	var last []byte
@@ -432,7 +432,7 @@ func storageMongoRows(ctx context.Context, db *mongo.Database, s SourceSnapshot,
 	if e != nil {
 		return s, ErrRead
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	h := sha256.New()
 	var last bson.RawValue
 	s.Records, s.Bytes, s.Complete = 0, 0, false
