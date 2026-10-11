@@ -517,6 +517,13 @@ func dbCensusMongoSnapshot(ctx context.Context, run dbCensusMongoCommand, aggreg
 			if e != nil {
 				statusErr = e
 			} else {
+				values := make(bson.A, len(privilege))
+				for i, row := range privilege {
+					values[i] = row
+				}
+				for i, row := range dbCensusPrivilegeSet(values) {
+					privilege[i] = row.(bson.M)
+				}
 				out["observer_privileges"] = privilege
 			}
 		}
