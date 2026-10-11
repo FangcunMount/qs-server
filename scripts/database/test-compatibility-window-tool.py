@@ -67,9 +67,19 @@ class WindowToolMetadata(unittest.TestCase):
             expected=copy.deepcopy(value);expected['actual_run_id']='22-3';expected['recovery']['actual_run_id']='22-3'
             self.assertEqual(derived,expected)
             self.assertNotEqual(derived['storage_backup']['request_sha256'],derived['archive_approval']['RequestHash'])
-        for mutate in (lambda v:v.update(storage_backup=None),lambda v:v['storage_backup'].update(kind='readonly_compatibility_inventory'),lambda v:v['storage_backup'].update(tool_source_sha='f'*40),lambda v:v['storage_backup'].update(run_id='22-3'),lambda v:v['storage_backup'].update(archive_sha256='f'*64),lambda v:v['storage_backup'].update(request_sha256=''),lambda v:v['storage_backup'].update(drop_ready=True),lambda v:v['recovery'].update(archive_sha256=''),lambda v:v['recovery'].update(mysql_non_target_sha256=''),lambda v:v.update(final_history=None)):
+        for mutate in (lambda v:v.update(storage_backup=None),lambda v:v['storage_backup'].update(kind='readonly_compatibility_inventory'),lambda v:v['storage_backup'].update(tool_source_sha='main'),lambda v:v['storage_backup'].update(run_id='22-3'),lambda v:v['storage_backup'].update(archive_sha256='f'*64),lambda v:v['storage_backup'].update(request_sha256=''),lambda v:v['storage_backup'].update(drop_ready=True),lambda v:v['recovery'].update(archive_sha256=''),lambda v:v['recovery'].update(mysql_non_target_sha256=''),lambda v:v.update(final_history=None)):
             value=copy.deepcopy(r);mutate(value);a=self.approval(value)
             with self.subTest(value=value),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(value),a,'22-3')
+    def test_approved_older_storage_producer_is_preserved_under_current_template(self):
+        r=self.request();r['recovery'].update(archive_sha256='e'*64,mysql_non_target_sha256='0'*64)
+        r['storage_backup']=dict(kind='storage_backup_v1',tool_source_sha='f'*40,run_id='11-1',archive_sha256='e'*64,request_sha256='9'*64)
+        a=self.approval(r)
+        out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
+        self.assertEqual(out['tool_source_sha'],a['tool_source_sha'])
+        self.assertEqual(out['storage_backup'],r['storage_backup'])
+        for change in (lambda v:v['storage_backup'].update(tool_source_sha='e'*40),lambda v:v.update(tool_source_sha='f'*40)):
+            bad=copy.deepcopy(r);change(bad)
+            with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(bad),a,'22-3')
     def test_original_run_and_cross_operation_template_cannot_be_reused(self):
         r=self.request();a=self.approval(r)
         with self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'11-1')
@@ -459,6 +469,141 @@ print('actual-hup-local-terminal')
         self.assertEqual(result.stdout,b'actual-hup-local-terminal\n')
 
 class ImagePreloadBoundary(unittest.TestCase):
+    def image_archive(self, *, classic=False, nested=False, change=None):
+        import gzip,io,tarfile
+        a=WindowToolMetadata().approval(WindowToolMetadata().request())
+        # Two real layers exercise both gzip and plain-tar descriptor semantics.
+        plain=[]
+        for name,body in [('first',b'first layer'),('second',b'second layer')]:
+            stream=io.BytesIO()
+            with tarfile.open(fileobj=stream,mode='w') as tar:
+                member=tarfile.TarInfo(name);member.size=len(body);tar.addfile(member,io.BytesIO(body))
+            plain.append(stream.getvalue())
+        config=dict(os='linux',architecture='amd64',config=dict(Labels={'org.opencontainers.image.revision':a['tool_source_sha']}),rootfs=dict(type='layers',diff_ids=['sha256:'+tool.digest(v) for v in plain]))
+        if change:change('config',config)
+        config_raw=tool.canonical(config);config_id='sha256:'+tool.digest(config_raw)
+        config_name=config_id[7:]+'.json' if classic else 'blobs/sha256/'+config_id[7:]
+        encoded=plain if classic else [gzip.compress(plain[0],mtime=0),plain[1]]
+        if change:change('encoded',encoded)
+        layer_names=[str(i)+'/layer.tar' for i in range(2)] if classic else ['blobs/sha256/'+tool.digest(v) for v in encoded]
+        files={config_name:config_raw,**dict(zip(layer_names,encoded))}
+        docker=dict(Config=config_name,RepoTags=['qs-retirement/qs-apiserver:'+a['tool_source_sha']],Layers=layer_names[:])
+        if change:change('docker',docker)
+        files['manifest.json']=tool.canonical([docker])
+        ids={config_id}
+        manifest_name=None
+        if not classic:
+            manifest=dict(schemaVersion=2,mediaType='application/vnd.oci.image.manifest.v1+json',config=dict(mediaType='application/vnd.oci.image.config.v1+json',digest=config_id,size=len(config_raw)),layers=[dict(mediaType='application/vnd.oci.image.layer.v1.tar+gzip' if i==0 else 'application/vnd.oci.image.layer.v1.tar',digest='sha256:'+tool.digest(v),size=len(v)) for i,v in enumerate(encoded)])
+            if change:change('manifest',manifest)
+            manifest_raw=tool.canonical(manifest);manifest_id='sha256:'+tool.digest(manifest_raw)
+            manifest_name='blobs/sha256/'+manifest_id[7:];files[manifest_name]=manifest_raw;ids.add(manifest_id)
+            descriptor=dict(mediaType=manifest['mediaType'],digest=manifest_id,size=len(manifest_raw))
+            if nested:
+                child=dict(schemaVersion=2,mediaType='application/vnd.oci.image.index.v1+json',manifests=[descriptor])
+                child_raw=tool.canonical(child);child_id='sha256:'+tool.digest(child_raw)
+                files['blobs/sha256/'+child_id[7:]]=child_raw;ids.add(child_id)
+                descriptor=dict(mediaType=child['mediaType'],digest=child_id,size=len(child_raw))
+            index=dict(schemaVersion=2,mediaType='application/vnd.oci.image.index.v1+json',manifests=[descriptor])
+            if change:change('index',index)
+            files['index.json']=tool.canonical(index);ids.add('sha256:'+tool.digest(files['index.json']))
+            files['oci-layout']=tool.canonical(dict(imageLayoutVersion='1.0.0'))
+        return a,files,config_id,frozenset(ids),manifest_name,layer_names
+    def packed(self,files,duplicate=None):
+        import io,tarfile
+        raw=io.BytesIO()
+        with tarfile.open(fileobj=raw,mode='w:gz') as tar:
+            for name,body in list(files.items())+([duplicate] if duplicate else []):
+                member=tarfile.TarInfo(name);member.size=len(body);tar.addfile(member,io.BytesIO(body))
+        return raw.getvalue()
+    def test_archive_identity_accepts_classic_config_and_only_connected_oci_ids(self):
+        for classic,nested in ((True,False),(False,False),(False,True)):
+            a,files,config_id,ids,_,_=self.image_archive(classic=classic,nested=nested)
+            with self.subTest(classic=classic,nested=nested):
+                self.assertEqual(tool.preload_archive_identity(self.packed(files),a),(config_id,ids))
+                self.assertNotIn('sha256:'+'0'*64,ids)
+    def test_archive_identity_rejects_unrelated_ambiguous_and_corrupted_content(self):
+        changes=[
+            ('wrong-config-digest',lambda kind,v:v['config'].update(digest='sha256:'+'0'*64) if kind=='manifest' else None),
+            ('wrong-config-size',lambda kind,v:v['config'].update(size=v['config']['size']+1) if kind=='manifest' else None),
+            ('wrong-layer-size',lambda kind,v:v['layers'][0].update(size=1) if kind=='manifest' else None),
+            ('wrong-diff-id',lambda kind,v:v['rootfs']['diff_ids'].__setitem__(0,'sha256:'+'0'*64) if kind=='config' else None),
+            ('wrong-layer-order',lambda kind,v:v['Layers'].reverse() if kind=='docker' else None),
+            ('unknown-compression',lambda kind,v:v['layers'][0].update(mediaType='application/vnd.oci.image.layer.v1.tar+zstd') if kind=='manifest' else None),
+            ('invalid-gzip-bytes',lambda kind,v:v.__setitem__(0,b'invalid gzip layer') if kind=='encoded' else None),
+            ('ambiguous-index',lambda kind,v:v['manifests'].append(copy.deepcopy(v['manifests'][0])) if kind=='index' else None),
+            ('incorrect-architecture',lambda kind,v:v.update(architecture='arm64') if kind=='config' else None),
+            ('incorrect-revision',lambda kind,v:v['config']['Labels'].update({'org.opencontainers.image.revision':'b'*40}) if kind=='config' else None),
+        ]
+        for name,change in changes:
+            a,files,_,_,_,_=self.image_archive(change=change)
+            with self.subTest(name=name),self.assertRaises(tool.Refused):tool.preload_archive_identity(self.packed(files),a)
+        for name in ('config-bytes','layer-bytes','unrelated-manifest','duplicate-entry'):
+            a,files,config_id,_,manifest,layers=self.image_archive()
+            duplicate=None
+            if name=='config-bytes':files['blobs/sha256/'+config_id[7:]]+=b' '
+            elif name=='layer-bytes':files[layers[0]]+=b'bad'
+            elif name=='unrelated-manifest':
+                extra=files[manifest]+b' ';files['blobs/sha256/'+tool.digest(extra)]=extra
+            else:duplicate=('manifest.json',files['manifest.json'])
+            with self.subTest(name=name),self.assertRaises(tool.Refused):tool.preload_archive_identity(self.packed(files,duplicate),a)
+    def invoke_preloader(self,files,a,image_id,*,drift=False,probe_image=None):
+        import os,stat,tempfile
+        from types import SimpleNamespace
+        from unittest import mock
+        calls=[];inspection=[0];cid='4'*64;run='22-3'
+        program=b'offline program-copy fixture'
+        with tempfile.TemporaryDirectory() as name:
+            local=Path(name);batch=local/'batch';batch.mkdir(mode=0o700)
+            docker=local/'docker';docker.write_bytes(b'offline executable placeholder');docker.chmod(0o700)
+            sock=local/'socket';sock.write_bytes(b'')
+            path_stat=Path.stat;fd_stat=os.fstat
+            def root_stat(value,*,socket=False):
+                keys=('st_dev','st_ino','st_uid','st_mode','st_nlink','st_size','st_mtime_ns','st_ctime_ns')
+                result={k:getattr(value,k) for k in keys};result['st_uid']=0
+                if socket:result['st_mode']=stat.S_IFSOCK|0o600
+                return SimpleNamespace(**result)
+            def path_stamp(path,*args,**kwargs):return root_stat(path_stat(path,*args,**kwargs),socket=path==sock)
+            def mapped(value):return docker if str(value)=='/usr/bin/docker' else sock if str(value)=='/run/docker.sock' else Path(value)
+            def fake_command(argv,**kwargs):
+                self.assertEqual(kwargs['stdin'],tool.subprocess.DEVNULL)
+                args=argv[3:];calls.append(args)
+                if args[0]=='load':
+                    intent=tool.decode((batch/'image-preload'/'intent.json').read_bytes())
+                    self.assertEqual(intent['image_id'],'sha256:'+tool.digest(files[tool.decode(files['manifest.json'])[0]['Config']]))
+                    output=b''
+                elif args[:2]==['image','inspect']:
+                    inspection[0]+=1
+                    actual='sha256:'+'0'*64 if drift and inspection[0]>1 else image_id
+                    output=tool.canonical(dict(id=actual,os='linux',architecture='amd64',revision=a['tool_source_sha']))
+                elif args[0]=='create':
+                    self.assertEqual(args[-1],image_id);output=(cid+'\n').encode()
+                elif args[0]=='inspect':
+                    output=tool.canonical(dict(id=cid,name='/qs-retirement-preload-'+a['operation_id']+'-'+run,image=probe_image or image_id,running=False,pid=0,network='none',mounts=[]))
+                elif args[0]=='cp':
+                    path=Path(args[-1]);path.write_bytes(program);path.chmod(0o644);output=b''
+                elif args[0] in ('rm','ps'):output=b''
+                else:self.fail('unexpected offline Docker operation')
+                return SimpleNamespace(returncode=0,stdout=output)
+            with mock.patch.object(tool,'Path',side_effect=mapped),mock.patch.object(Path,'stat',path_stamp),mock.patch.object(tool.os,'fstat',side_effect=lambda fd:root_stat(fd_stat(fd))),mock.patch.object(tool.platform,'machine',return_value='x86_64'),mock.patch.object(tool,'protected_directory',side_effect=lambda path,create=False:path.mkdir(mode=0o700)),mock.patch.object(tool.subprocess,'run',side_effect=fake_command):
+                observed=tool.preload_api_image(self.packed(files),a,run,batch,None)
+            self.assertFalse((batch/'image-preload').exists())
+            self.assertEqual(observed['program_sha256'],tool.digest(program))
+            self.assertTrue(observed['probe_absent']);self.assertTrue(observed['temporary_files_zero'])
+            self.assertEqual(observed['capabilities'],dict(deployment=False,writer_fence=False,drop=False))
+            return observed,calls
+    def test_preloader_binds_create_probe_public_and_cleanup_to_actual_archive_id(self):
+        for classic,nested in ((True,False),(False,False),(False,True)):
+            a,files,_,ids,_,_=self.image_archive(classic=classic,nested=nested)
+            for image_id in ids:
+                with self.subTest(classic=classic,nested=nested,image_id=image_id):
+                    observed,calls=self.invoke_preloader(files,a,image_id)
+                    self.assertEqual(observed['image_id'],image_id)
+                    self.assertEqual([c[0] for c in calls],['load','image','create','inspect','cp','image','inspect','rm','ps'])
+    def test_preloader_rejects_unknown_id_probe_mismatch_and_repeat_inspect_drift(self):
+        a,files,config_id,_,manifest,_=self.image_archive()
+        manifest_id='sha256:'+Path(manifest).name
+        for image_id,options in (('sha256:'+'0'*64,{}),(manifest_id,dict(probe_image=config_id)),(manifest_id,dict(drift=True))):
+            with self.subTest(image_id=image_id,options=options),self.assertRaises(tool.Refused):self.invoke_preloader(files,a,image_id,**options)
     def test_closed_observation_keeps_actual_source_and_no_runtime_authority(self):
         r=WindowToolMetadata().request();a=WindowToolMetadata().approval(r)
         value=dict(kind="native_cached_api_image_observation",tool_source_sha=a["tool_source_sha"],original_source_sha=a["original_source_sha"],operation_id=a["operation_id"],actual_run_id="22-3",image_archive_sha256="1"*64,image_id="sha256:"+"2"*64,os="linux",architecture="amd64",revision=a["tool_source_sha"],program_sha256="3"*64,probe_id="4"*64,probe_absent=True,temporary_files_zero=True,capabilities=dict(deployment=False,writer_fence=False,drop=False))

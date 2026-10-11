@@ -64,7 +64,7 @@ type lifecycleStorageBackup struct {
 }
 
 func (s *lifecycleStorageBackup) valid(r lifecycleRequest) bool {
-	return s != nil && s.Kind == "storage_backup_v1" && s.ToolSourceSHA == r.ToolSourceSHA && shaRE.MatchString(s.ToolSourceSHA) && s.RunID == r.Approval.RunID && runRE.MatchString(s.RunID) && hashRE.MatchString(s.ArchiveSHA256) && s.ArchiveSHA256 == r.Recovery.ArchiveSHA256 && hashRE.MatchString(s.RequestSHA256)
+	return s != nil && s.Kind == "storage_backup_v1" && shaRE.MatchString(s.ToolSourceSHA) && s.RunID == r.Approval.RunID && runRE.MatchString(s.RunID) && hashRE.MatchString(s.ArchiveSHA256) && s.ArchiveSHA256 == r.Recovery.ArchiveSHA256 && hashRE.MatchString(s.RequestSHA256)
 }
 
 type lifecycleFrozenManifest struct {
@@ -813,7 +813,7 @@ func purgeLifecycleArchive(ctx context.Context, r lifecycleRequest, a *backup.Ar
 		return lifecycleError("lifecycle_storage_archive_binding_rejected")
 	}
 	b, e := a.StorageBaseline(ctx)
-	if e != nil || b.Approval != r.Approval || b.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || b.StorageApproval.ToolSourceSHA != r.ToolSourceSHA {
+	if e != nil || b.Approval != r.Approval || b.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || b.StorageApproval.ToolSourceSHA != r.StorageBackup.ToolSourceSHA {
 		return lifecycleError("lifecycle_storage_archive_binding_rejected")
 	}
 	return backup.PurgeStorageRegistered(r.ArchiveDirectory, b.StorageApproval)

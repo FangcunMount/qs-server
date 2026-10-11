@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -139,7 +140,7 @@ func runDBWriterCensus(ctx context.Context, path, expected, op, run string) (rec
 	receipt.MongoVersion = 38
 	owner, e := openLifecyclePreparationOwner(ctx, lifecycleRequest{})
 	if e != nil {
-		receipt.ErrorCategory = "db_census_original_connection_failed"
+		receipt.ErrorCategory = dbCensusOriginalConnectionCategory(e)
 		return receipt, e
 	}
 	defer func() {
@@ -207,4 +208,17 @@ func runDBWriterCensus(ctx context.Context, path, expected, op, run string) (rec
 	}
 	receipt.ErrorCategory = "none"
 	return receipt, nil
+}
+
+func dbCensusOriginalConnectionCategory(err error) string {
+	switch {
+	case errors.Is(err, lifecycleError("lifecycle_sql_connect_failed")):
+		return "db_census_original_sql_connection_failed"
+	case errors.Is(err, lifecycleError("lifecycle_mongo_connect_failed")):
+		return "db_census_original_mongo_connection_failed"
+	case errors.Is(err, lifecycleError("lifecycle_connection_input_rejected")):
+		return "db_census_original_connection_input_rejected"
+	default:
+		return "db_census_original_connection_failed"
+	}
 }

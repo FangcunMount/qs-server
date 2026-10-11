@@ -108,9 +108,46 @@ func TestStorageBackupRequestSeparatesOriginalMetadataFromCaptureTool(t *testing
 	if validatePrepareFactsRequest(facts, "123-1", "789-1") != nil {
 		t.Fatal("storage origin rejected")
 	}
-	facts.StorageBackup.ToolSourceSHA = facts.Inventory.SourceSHA
-	if validatePrepareFactsRequest(facts, "123-1", "789-1") == nil {
-		t.Fatal("capture tool mismatch accepted")
+	// Reuse preserves the actual older capture producer; it does not become
+	// the current observer or the original metadata producer.
+	facts.StorageBackup.ToolSourceSHA = strings.Repeat("f", 40)
+	if validatePrepareFactsRequest(facts, "123-1", "789-1") != nil || facts.StorageBackup.ToolSourceSHA == facts.SourceSHA || facts.StorageBackup.ToolSourceSHA == facts.Inventory.SourceSHA {
+		t.Fatal("separate storage producer rejected or relabeled")
+	}
+	baseline := backup.StorageBaseline{Kind: "storage_backup_v1", ArchiveSHA256: facts.StorageBackup.ArchiveSHA256,
+		Approval:        backup.Approval{SourceSHA: facts.Inventory.SourceSHA, OperationID: facts.OperationID, RunID: facts.Inventory.RunID, InventorySHA256: facts.Inventory.ReportSHA256, RequestHash: facts.Inventory.RequestSHA256},
+		StorageApproval: backup.StorageApproval{ToolSourceSHA: facts.StorageBackup.ToolSourceSHA, RunID: facts.StorageBackup.RunID}}
+	if !prepareFactsStorageBaselineMatches(facts, baseline) {
+		t.Fatal("actual older storage baseline rejected")
+	}
+	for _, mutate := range []func(*backup.StorageBaseline){
+		func(v *backup.StorageBaseline) { v.StorageApproval.ToolSourceSHA = facts.SourceSHA },
+		func(v *backup.StorageBaseline) { v.StorageApproval.RunID = facts.ActualRunID },
+		func(v *backup.StorageBaseline) { v.ArchiveSHA256 = strings.Repeat("9", 64) },
+		func(v *backup.StorageBaseline) { v.Approval.RequestHash = strings.Repeat("9", 64) },
+		func(v *backup.StorageBaseline) { v.Approval.InventorySHA256 = strings.Repeat("9", 64) },
+		func(v *backup.StorageBaseline) { v.DropReady = true },
+	} {
+		got := baseline
+		mutate(&got)
+		if prepareFactsStorageBaselineMatches(facts, got) {
+			t.Fatal("different native storage producer or bytes accepted")
+		}
+	}
+	for _, mutate := range []func(*prepareFactsRequest){
+		func(v *prepareFactsRequest) { v.SourceSHA = v.StorageBackup.ToolSourceSHA },
+		func(v *prepareFactsRequest) { v.StorageBackup.ToolSourceSHA = "unknown" },
+		func(v *prepareFactsRequest) { v.StorageBackup.RunID = v.ActualRunID },
+		func(v *prepareFactsRequest) { v.StorageBackup.RequestSHA256 = "" },
+		func(v *prepareFactsRequest) { v.StorageBackup.ArchiveSHA256 = "" },
+	} {
+		got := facts
+		storage := *facts.StorageBackup
+		got.StorageBackup = &storage
+		mutate(&got)
+		if validatePrepareFactsRequest(got, "123-1", "789-1") == nil {
+			t.Fatal("invalid current observer or producer reference accepted")
+		}
 	}
 }
 

@@ -121,6 +121,46 @@ class SafetyContracts(unittest.TestCase):
                 "MONGODB_HOST": "synthetic-mongo", "MONGODB_USERNAME": "synthetic-app-user",
                 "MONGODB_PASSWORD": "synthetic-app-secret", "MONGODB_DBNAME": "synthetic-business"}
 
+    def test_prepare_facts_preserves_independently_approved_storage_producer(self):
+        storage = {"kind": "storage_backup_v1", "tool_source_sha": "c" * 40,
+                   "run_id": "111-1", "archive_sha256": "d" * 64, "request_sha256": "e" * 64}
+        descriptor = {"format_version": 1, "kind": "readonly_prepare_facts_observation_descriptor",
+                      "prepare_mode": "prepare-facts", "source_sha": SOURCE, "operation_id": OPERATION,
+                      "target_hash": tool.TARGET_HASH, "database_scope": "mysql-and-mongodb",
+                      "inventory_report": {"operation_id": OPERATION, "run_id": "111-1", "source_sha": "b" * 40,
+                                           "sha256": "f" * 64, "request_sha256": "1" * 64},
+                      "restore_engines": {"mysql_image_id": "sha256:" + "2" * 64,
+                                          "mongodb_image_id": "sha256:" + "3" * 64, "architecture": "amd64"},
+                      "archive_directory": "/opt/backups/qs-server/compatibility-retirement/" + OPERATION + "/root-copy",
+                      "storage_backup": storage}
+        args = self.arguments()
+        raw = tool.canonical_bytes(descriptor)
+        args.bootstrap_approval_json = raw[:-1].decode("ascii")
+        args.bootstrap_approval_hash = hashlib.sha256(raw).hexdigest()
+        request = tool.prepare_facts_request(args)
+        self.assertEqual(request["source_sha"], SOURCE)
+        self.assertEqual(request["storage_backup"], storage)
+        self.assertNotEqual(storage["tool_source_sha"], request["source_sha"])
+        for mutate in (lambda v: v["storage_backup"].update(tool_source_sha="unknown"),
+                       lambda v: v["storage_backup"].update(run_id="222-1"),
+                       lambda v: v["storage_backup"].update(archive_sha256="unknown"),
+                       lambda v: v["storage_backup"].update(request_sha256=""),
+                       lambda v: v.update(source_sha="c" * 40)):
+            altered = copy.deepcopy(descriptor)
+            mutate(altered)
+            changed = tool.canonical_bytes(altered)
+            args.bootstrap_approval_json = changed[:-1].decode("ascii")
+            args.bootstrap_approval_hash = hashlib.sha256(changed).hexdigest()
+            with self.assertRaises(tool.Blocked):
+                tool.prepare_facts_request(args)
+        # A valid but different producer cannot bypass the exact approved bytes.
+        altered = copy.deepcopy(descriptor)
+        altered["storage_backup"]["tool_source_sha"] = "9" * 40
+        args.bootstrap_approval_json = tool.canonical_bytes(altered)[:-1].decode("ascii")
+        args.bootstrap_approval_hash = hashlib.sha256(raw).hexdigest()
+        with self.assertRaises(tool.Blocked):
+            tool.prepare_facts_request(args)
+
     def test_inventory_legacy_mongo_pair_and_port_defaults(self):
         values = tool.inventory_connection_values(self.connection_environment())
         self.assertEqual(values["MONGODB_USERNAME"], "synthetic-app-user")

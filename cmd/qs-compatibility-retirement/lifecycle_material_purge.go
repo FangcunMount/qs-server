@@ -104,7 +104,7 @@ func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleReque
 	var storage *backup.StorageBaseline
 	if r.StorageBackup != nil {
 		baseline, err := a.StorageBaseline(ctx)
-		if err != nil || !r.StorageBackup.valid(r) || baseline.Kind != "storage_backup_v1" || baseline.DropReady || baseline.Approval != r.Approval || baseline.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || baseline.StorageApproval.OriginalSourceSHA != r.OriginalSourceSHA || baseline.StorageApproval.ToolSourceSHA != r.ToolSourceSHA || baseline.StorageApproval.OperationID != r.OperationID || baseline.StorageApproval.RunID != r.Approval.RunID || baseline.StorageApproval.RequestHash != r.Approval.RequestHash {
+		if err != nil || !r.StorageBackup.valid(r) || baseline.Kind != "storage_backup_v1" || baseline.DropReady || baseline.Approval != r.Approval || baseline.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || baseline.StorageApproval.OriginalSourceSHA != r.OriginalSourceSHA || baseline.StorageApproval.ToolSourceSHA != r.StorageBackup.ToolSourceSHA || baseline.StorageApproval.OperationID != r.OperationID || baseline.StorageApproval.RunID != r.Approval.RunID || baseline.StorageApproval.RequestHash != r.Approval.RequestHash {
 			return nil, lifecycleError("lifecycle_material_registration_rejected")
 		}
 		storage = &baseline
