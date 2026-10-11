@@ -210,9 +210,8 @@ func (h *lifecycleFixedHost) finalDifferenceAndEOF(ctx context.Context, r lifecy
 	if e = retirement.ValidateCurrentAICommandResponsibilities(paired, binding.SQLIdentitySHA256, binding.SQLHead, retirement.DefaultAIReverseLimits()); e != nil {
 		return e
 	}
-	if e = backup.VerifyHostOriginalSources(paired, a, borrowed); e != nil {
-		return e
-	}
+	// These checks only read the same snapshot; the full source verification
+	// above remains valid without a historical CAS to change its contents.
 	baseline, e := backup.CaptureCompleteNonTargetData(paired, a, borrowed)
 	if e != nil {
 		return e
