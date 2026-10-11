@@ -38,7 +38,7 @@ on:
         description: 'Observe sources, persist prewindow historical evidence, or diagnose an existing boundary report'
         required: false
         type: choice
-        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts, host-writer-scope, db-writer-census, window-tool]
+        options: [identity, bootstrap-bounds, bounds, bootstrap-inventory, inventory, bootstrap-history, bootstrap-history-metadata, bootstrap-history-parent, bootstrap-ai-bounds, bootstrap-ai-verify, historical-evidence-write, historical-ai-bounds, report-diagnostic, lifecycle, prepare-facts, host-writer-scope, db-writer-census, storage-backup, window-tool]
         default: inventory
       identity_request_sha256:
         description: 'Prepare identity only: independently computed canonical request SHA256'
@@ -95,13 +95,14 @@ jobs:
             const prepareFacts = input.prepare_mode === 'prepare-facts';
             const hostScope = input.prepare_mode === 'host-writer-scope';
             const dbCensus = input.prepare_mode === 'db-writer-census';
-            const descriptor = bootstrap || diagnostic || prepareFacts || hostScope || dbCensus || windowTool;
+            const storageBackup = input.prepare_mode === 'storage-backup';
+            const descriptor = bootstrap || diagnostic || prepareFacts || hostScope || dbCensus || storageBackup || windowTool;
             if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
                 !['prepare', 'apply', 'verify', 'recover', 'purge'].includes(input.operation) ||
                 input.database !== 'mysql-and-mongodb' ||
                 !/^[0-9a-f]{40}$/.test(input.approved_source_sha) ||
                 !/^[0-9]{1,20}-[0-9]{1,4}$/.test(input.operation_id) ||
-                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'host-writer-scope', 'db-writer-census', 'window-tool'].includes(input.prepare_mode) ||
+                !['identity', 'bounds', 'inventory', 'bootstrap-bounds', 'bootstrap-inventory', 'bootstrap-history', 'bootstrap-history-metadata', 'bootstrap-history-parent', 'bootstrap-ai-bounds', 'bootstrap-ai-verify', 'historical-evidence-write', 'historical-ai-bounds', 'report-diagnostic', 'lifecycle', 'prepare-facts', 'host-writer-scope', 'db-writer-census', 'storage-backup', 'window-tool'].includes(input.prepare_mode) ||
                 (windowTool
                   ? (typeof input.bootstrap_approval_json !== 'string' || !/^[\x20-\x7e]{1,4096}$/.test(input.bootstrap_approval_json) || !/^[0-9a-f]{64}$/.test(input.bootstrap_approval_sha256))
                   : descriptor
@@ -174,6 +175,19 @@ jobs:
                   !exact(v.identity_report,['operation_id','run_id','source_sha','sha256','request_sha256'])||v.identity_report.operation_id!==input.operation_id||!sha(v.identity_report.source_sha)||!hash(v.identity_report.sha256)||!hash(v.identity_report.request_sha256)||typeof v.identity_report.run_id!=='string'||!/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(v.identity_report.run_id)||v.identity_report.run_id===String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT)) {reject();}
               const line=JSON.stringify(canonical(v));if (line!==input.bootstrap_approval_json||require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex')!==input.bootstrap_approval_sha256) {reject();}
             }
+            if (storageBackup) {
+              const reject = () => {throw new Error('compatibility_retirement_storage_backup_approval_rejected');};
+              const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+              const exact = (v, keys) => object(v) && JSON.stringify(Object.keys(v).sort()) === JSON.stringify(keys.slice().sort());
+              const canonical = v => object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+              const hash = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+              const sha = v => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v);
+              let v; try {v = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
+              if (!exact(v,['format_version','kind','prepare_mode','source_sha','original_source_sha','operation_id','target_hash','database_scope','inventory_request_sha256','boundary_report']) || v.format_version!==1 || v.kind!=='readonly_storage_backup_approval' || v.prepare_mode!=='storage-backup' || v.source_sha!==context.sha || !sha(v.original_source_sha) || v.operation_id!==input.operation_id || v.target_hash!=='4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || v.database_scope!=='mysql-and-mongodb' || !hash(v.inventory_request_sha256)) {reject();}
+              const b=v.boundary_report;
+              if (!exact(b,['run_id','source_sha','sha256','request_sha256']) || b.source_sha!==v.original_source_sha || !hash(b.sha256) || !hash(b.request_sha256) || typeof b.run_id!=='string' || !/^[1-9][0-9]{0,19}-[1-9][0-9]{0,3}$/.test(b.run_id) || b.run_id===String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT)) {reject();}
+              const line=JSON.stringify(canonical(v)); if (line!==input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex')!==input.bootstrap_approval_sha256) {reject();}
+            }
             if (hostScope) {
               const reject = () => {throw new Error('compatibility_retirement_host_scope_descriptor_rejected');};
               const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -195,10 +209,12 @@ jobs:
               const canonical = v => Array.isArray(v) ? v.map(canonical) : object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
               let v;
               try {v = JSON.parse(input.bootstrap_approval_json);} catch {reject();}
-              if (!exact(v, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','inventory_report','restore_engines','archive_directory']) ||
+              const storage = Object.hasOwn(v ?? {}, 'storage_backup');
+              if (!exact(v, ['format_version','kind','prepare_mode','source_sha','operation_id','target_hash','database_scope','inventory_report','restore_engines','archive_directory', ...(storage ? ['storage_backup'] : [])]) ||
                   v.format_version !== 1 || v.kind !== 'readonly_prepare_facts_observation_descriptor' || v.prepare_mode !== 'prepare-facts' ||
                   v.source_sha !== input.approved_source_sha || v.operation_id !== input.operation_id ||
                   v.target_hash !== '4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8' || v.database_scope !== 'mysql-and-mongodb') {reject();}
+              if (storage && (!exact(v.storage_backup, ['kind','tool_source_sha','run_id','archive_sha256','request_sha256']) || v.storage_backup.kind!=='storage_backup_v1' || v.storage_backup.tool_source_sha!==context.sha || v.storage_backup.run_id!==v.inventory_report?.run_id || !/^[0-9a-f]{64}$/.test(v.storage_backup.archive_sha256 ?? '') || !/^[0-9a-f]{64}$/.test(v.storage_backup.request_sha256 ?? ''))) {reject();}
               const p = v.inventory_report, e = v.restore_engines;
               const currentRun = String(context.runId)+'-'+String(process.env.GITHUB_RUN_ATTEMPT);
               if (!exact(p, ['operation_id','run_id','source_sha','sha256','request_sha256']) || p.operation_id !== v.operation_id ||
@@ -215,6 +231,7 @@ jobs:
               if (typeof path !== 'string' || path.length > 1024 || !path.startsWith(root) || path.length <= root.length ||
                   /[\u0000\r\n]/.test(path) || path.endsWith('/') || path.split('/').some((part,i) => i > 0 && (!part || part === '.' || part === '..')) ||
                   path === root+'inventory-'+p.run_id || path.startsWith(root+'inventory-'+p.run_id+'/')) {reject();}
+              if (storage && (path === root+'storage-backup-'+p.run_id || path.startsWith(root+'storage-backup-'+p.run_id+'/'))) {reject();}
               const line = JSON.stringify(canonical(v));
               if (line !== input.bootstrap_approval_json || require('crypto').createHash('sha256').update(line+'\n','ascii').digest('hex') !== input.bootstrap_approval_sha256) {reject();}
               // Returned BSON/image/capacity facts require separate review. This
@@ -542,7 +559,7 @@ jobs:
           archive="qs-compatibility-retirement-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
           if [[ "$RETIREMENT_PACKAGE_MODE" == "bootstrap-bounds" || "$RETIREMENT_PACKAGE_MODE" == "bootstrap-inventory" ]]; then
             tar -czf "$archive" -C "$package_dir" compatibility-retirement.py receipt-transport.py
-          elif [[ "$RETIREMENT_PACKAGE_MODE" == "identity" || "$RETIREMENT_PACKAGE_MODE" == "bounds" || "$RETIREMENT_PACKAGE_MODE" == "inventory" ]]; then
+          elif [[ "$RETIREMENT_PACKAGE_MODE" == "identity" || "$RETIREMENT_PACKAGE_MODE" == "bounds" || "$RETIREMENT_PACKAGE_MODE" == "inventory" || "$RETIREMENT_PACKAGE_MODE" == "storage-backup" ]]; then
             go test ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-amd64" ./cmd/qs-compatibility-retirement
             CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.sourceSHA=$GITHUB_SHA -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o "$package_dir/inventory-linux-arm64" ./cmd/qs-compatibility-retirement
@@ -728,7 +745,7 @@ jobs:
                 tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py receipt-transport.py
                 chmod 0600 "$tool_dir/compatibility-retirement.py" "$tool_dir/receipt-transport.py"
                 ;;
-              identity|bounds|inventory)
+              identity|bounds|inventory|storage-backup)
                 tar -xzf "$archive" -C "$tool_dir" --no-same-owner compatibility-retirement.py compatibility-retirement-entrypoints.json receipt-transport.py inventory-linux-amd64 inventory-linux-arm64
                 chmod 0600 "$tool_dir/compatibility-retirement.py" "$tool_dir/compatibility-retirement-entrypoints.json" "$tool_dir/receipt-transport.py"
                 chmod 0700 "$tool_dir/inventory-linux-amd64" "$tool_dir/inventory-linux-arm64"

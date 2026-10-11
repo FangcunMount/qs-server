@@ -94,12 +94,20 @@ type lifecycleBatchMaterials struct {
 	localSealed                      bool
 }
 
-// The fixed backup producer registered exactly these six files before copying
-// any body. Reopening them consumes the native Archive's verified immutable
+// The fixed backup producer registered six v1 or eight storage-v2 files before
+// copying any body. Reopening them consumes the native Archive's verified immutable
 // assets; ReadDir may reject extras but cannot expand this deletion scope.
 func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleRequest, a *backup.Archive) (owned *lifecycleMaterialDirectory, result error) {
 	if ctx == nil || ctx.Err() != nil || a == nil || backup.VerifyHostArchiveBinding(ctx, a, r.Approval) != nil || a.Summary().ArchiveSHA256 != r.Recovery.ArchiveSHA256 {
 		return nil, lifecycleError("lifecycle_material_registration_rejected")
+	}
+	var storage *backup.StorageBaseline
+	if r.StorageBackup != nil {
+		baseline, err := a.StorageBaseline(ctx)
+		if err != nil || !r.StorageBackup.valid(r) || baseline.Kind != "storage_backup_v1" || baseline.DropReady || baseline.Approval != r.Approval || baseline.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || baseline.StorageApproval.OriginalSourceSHA != r.OriginalSourceSHA || baseline.StorageApproval.ToolSourceSHA != r.ToolSourceSHA || baseline.StorageApproval.OperationID != r.OperationID || baseline.StorageApproval.RunID != r.Approval.RunID || baseline.StorageApproval.RequestHash != r.Approval.RequestHash {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+		storage = &baseline
 	}
 	d, err := openLifecycleMaterialDirectory(r.ArchiveDirectory, 0)
 	if err != nil {
@@ -112,6 +120,9 @@ func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleReque
 	}()
 	d.externalArchive = true // The existing exact backup backend removes it.
 	assets := a.TemporarySourceAssets()
+	if storage != nil {
+		assets = storage.SourceAssets
+	}
 	names := []string{}
 	for index, asset := range assets {
 		if ctx.Err() != nil || asset.Filename != lifecycleSourceNames[index+3] {
@@ -129,21 +140,47 @@ func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleReque
 	if err = d.register("archive.private.json", r.Recovery.ArchiveSHA256, 0, 0600); err != nil {
 		return nil, err
 	}
-	// This exact order and schema match backup.registration's original writer.
-	registration := struct {
-		Version                int             `json:"version"`
-		Approval               backup.Approval `json:"approval"`
-		Files                  []string        `json:"files"`
-		ContainsOriginalBodies bool            `json:"contains_original_bodies"`
-		PurgeAfterAcceptance   bool            `json:"purge_after_acceptance"`
-		ResumeAllowed          bool            `json:"resume_allowed"`
-	}{1, r.Approval, names, true, true, false}
-	raw, err := json.Marshal(registration)
-	if err != nil {
-		return nil, err
+	if storage != nil {
+		for index, asset := range storage.MetadataAssets {
+			if ctx.Err() != nil || asset.Filename != lifecycleSourceNames[index+1] {
+				return nil, lifecycleError("lifecycle_material_registration_rejected")
+			}
+			if err = d.register(asset.Filename, asset.SHA256, 0, 0600); err != nil {
+				return nil, err
+			}
+			if d.files[asset.Filename].info.Size() != asset.Bytes {
+				return nil, lifecycleError("lifecycle_material_registration_rejected")
+			}
+			names = append(names, asset.Filename)
+		}
 	}
-	if err = d.register("assets.private.json", digestRaw(raw), 0, 0600); err != nil {
-		return nil, err
+	// This exact order and schema match backup.registration's original writer.
+	type archiveRegistration struct {
+		Version                int                     `json:"version"`
+		Approval               backup.Approval         `json:"approval"`
+		Files                  []string                `json:"files"`
+		ContainsOriginalBodies bool                    `json:"contains_original_bodies"`
+		PurgeAfterAcceptance   bool                    `json:"purge_after_acceptance"`
+		ResumeAllowed          bool                    `json:"resume_allowed"`
+		StorageApproval        *backup.StorageApproval `json:"storage_approval,omitempty"`
+	}
+	registration := archiveRegistration{Version: 1, Approval: r.Approval, Files: names, ContainsOriginalBodies: true, PurgeAfterAcceptance: true}
+	if storage != nil {
+		registration.Version = 2
+		registration.Approval.InventorySHA256 = "" // The durable registry precedes content capture.
+		registration.StorageApproval = &storage.StorageApproval
+		var actual archiveRegistration
+		if _, err = readLifecycleProducerJSON(d, "assets.private.json", "", 0, 4<<20, &actual); err != nil || !reflect.DeepEqual(actual, registration) {
+			return nil, lifecycleError("lifecycle_material_registration_rejected")
+		}
+	} else {
+		raw, err := json.Marshal(registration)
+		if err != nil {
+			return nil, err
+		}
+		if err = d.register("assets.private.json", digestRaw(raw), 0, 0600); err != nil {
+			return nil, err
+		}
 	}
 	if err = d.checkComplete(false); err != nil {
 		return nil, err

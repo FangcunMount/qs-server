@@ -9,12 +9,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
-	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 	"hash"
 	"io"
 	"regexp"
 	"time"
+
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
+	identitymeta "github.com/FangcunMount/qs-server/internal/pkg/databaseidentity"
 )
 
 type Error string
@@ -53,6 +54,65 @@ type Approval struct {
 type Inputs struct {
 	Inventory, SQLMetadata, MongoMetadata io.Reader
 	Sources                               [4]io.Reader
+}
+
+// StorageApproval approves only metadata and origin. Content/counts are never
+// supplied by this caller; CaptureStorage observes them from the originals.
+type StorageApproval struct {
+	OriginalSourceSHA        string             `json:"original_source_sha"`
+	ToolSourceSHA            string             `json:"tool_source_sha"`
+	OperationID              string             `json:"operation_id"`
+	RunID                    string             `json:"run_id"`
+	RequestHash              string             `json:"request_hash"`
+	TargetHash               string             `json:"target_hash"`
+	SQLMetadataSHA256        string             `json:"sql_metadata_sha256"`
+	MongoMetadataSHA256      string             `json:"mongo_metadata_sha256"`
+	OrderedMongoSchemaSHA256 string             `json:"ordered_mongo_schema_sha256"`
+	Bindings                 map[string]Binding `json:"database_bindings"`
+	Targets                  [4]StorageTarget   `json:"targets"`
+}
+type StorageTarget struct {
+	Database     string                    `json:"database"`
+	Name         string                    `json:"name"`
+	Kind         string                    `json:"kind"`
+	IdentityHash string                    `json:"identity_hash"`
+	SchemaHash   string                    `json:"schema_hash"`
+	Boundary     retirement.SourceBoundary `json:"boundary"`
+}
+
+func (a *StorageApproval) UnmarshalJSON(raw []byte) error {
+	if a == nil {
+		return ErrApproval
+	}
+	type plain StorageApproval
+	var value plain
+	var fields map[string]json.RawMessage
+	var targets []json.RawMessage
+	if exactJSON(raw, &value) != nil || json.Unmarshal(raw, &fields) != nil || json.Unmarshal(fields["targets"], &targets) != nil || len(targets) != 4 {
+		return ErrApproval
+	}
+	*a = StorageApproval(value)
+	return nil
+}
+func (a StorageApproval) archiveApproval() Approval {
+	return Approval{SourceSHA: a.OriginalSourceSHA, OperationID: a.OperationID, RunID: a.RunID, RequestHash: a.RequestHash, SQLMetadataSHA256: a.SQLMetadataSHA256, MongoMetadataSHA256: a.MongoMetadataSHA256, OrderedMongoSchemaSHA256: a.OrderedMongoSchemaSHA256}
+}
+
+type StorageInputs struct {
+	SQLMetadata, MongoMetadata io.Reader
+}
+
+// StorageBaseline is an observation of an actual opaque archive, not a
+// retirement, writer-fence or acceptance capability. All assets remain private.
+type StorageBaseline struct {
+	Kind            string           `json:"kind"`
+	ArchiveSHA256   string           `json:"archive_sha256"`
+	Approval        Approval         `json:"approval"`
+	StorageApproval StorageApproval  `json:"storage_approval"`
+	Targets         []SourceSnapshot `json:"targets"`
+	MetadataAssets  [2]Asset         `json:"metadata_assets"`
+	SourceAssets    [4]Asset         `json:"source_assets"`
+	DropReady       bool             `json:"drop_ready"`
 }
 type SourceSnapshot struct {
 	Database       string                    `json:"database"`
@@ -149,12 +209,13 @@ type manifest struct {
 	SourceMongoNamespace string `json:"source_mongo_namespace"`
 	SourceMongoProcessID string `json:"source_mongo_process_id"`
 
-	Version   int             `json:"version"`
-	Approval  Approval        `json:"approval"`
-	Inventory inventory       `json:"inventory"`
-	SQL       [3]SQLStructure `json:"sql"`
-	Mongo     MongoStructure  `json:"mongo"`
-	Assets    [4]Asset        `json:"assets"`
+	Version         int              `json:"version"`
+	Approval        Approval         `json:"approval"`
+	Inventory       inventory        `json:"inventory"`
+	StorageApproval *StorageApproval `json:"storage_approval,omitempty"`
+	SQL             [3]SQLStructure  `json:"sql"`
+	Mongo           MongoStructure   `json:"mongo"`
+	Assets          [4]Asset         `json:"assets"`
 	// Capture derives this recovery projection from the actual approved SQL
 	// catalog. Inventory's different projection retains target-owned FK rows.
 	// Version 1 archives without this field may still open, but cannot resume B.

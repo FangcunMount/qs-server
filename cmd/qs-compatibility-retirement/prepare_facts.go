@@ -53,12 +53,218 @@ type prepareFactsRequest struct {
 	Inventory                 prepareFactsProducer     `json:"inventory_report"`
 	RestoreEngines            *lifecycleRestoreEngines `json:"restore_engines"`
 	ArchiveDirectory          string                   `json:"archive_directory"`
+	StorageBackup             *lifecycleStorageBackup  `json:"storage_backup,omitempty"`
 }
 type prepareFactsFile struct {
 	Name   string `json:"name"`
 	SHA256 string `json:"sha256"`
 	Bytes  uint64 `json:"bytes"`
 }
+
+// This request approves metadata and an original bounded read scope, never
+// supplied content hashes, a manifest, a writer fence or deletion authority.
+type storageBackupRequest struct {
+	FormatVersion             int                  `json:"format_version"`
+	Kind                      string               `json:"kind"`
+	SourceSHA                 string               `json:"source_sha"`
+	OriginalSourceSHA         string               `json:"original_source_sha"`
+	OperationID               string               `json:"operation_id"`
+	ActualRunID               string               `json:"actual_run_id"`
+	TargetHash                string               `json:"target_hash"`
+	ObservationApprovalSHA256 string               `json:"observation_approval_sha256"`
+	InventoryRequestSHA256    string               `json:"inventory_request_sha256"`
+	BoundaryReport            prepareFactsProducer `json:"boundary_report"`
+}
+type storageBackupReceipt struct {
+	FormatVersion             int                      `json:"format_version"`
+	Kind                      string                   `json:"kind"`
+	Operation                 string                   `json:"operation"`
+	PrepareMode               string                   `json:"prepare_mode"`
+	SourceSHA                 string                   `json:"source_sha"`
+	OriginalSourceSHA         string                   `json:"original_source_sha"`
+	OperationID               string                   `json:"operation_id"`
+	RunID                     string                   `json:"run_id"`
+	RequestSHA256             string                   `json:"request_sha256"`
+	InventoryRequestSHA256    string                   `json:"inventory_request_sha256"`
+	ObservationApprovalSHA256 string                   `json:"observation_approval_sha256"`
+	TargetHash                string                   `json:"target_hash"`
+	Complete                  bool                     `json:"complete"`
+	DiagnosticOnly            bool                     `json:"diagnostic_only"`
+	ExecutionAllowed          bool                     `json:"execution_allowed"`
+	DropReady                 bool                     `json:"drop_ready"`
+	StorageBackupComplete     bool                     `json:"storage_backup_complete"`
+	ArchiveSHA256             string                   `json:"storage_archive_sha256,omitempty"`
+	ArchiveApproval           *backup.Approval         `json:"archive_approval,omitempty"`
+	StorageBackup             *lifecycleStorageBackup  `json:"storage_backup,omitempty"`
+	SQLRecoveryBaselineSHA256 string                   `json:"mysql_recovery_non_target_sha256,omitempty"`
+	Files                     []prepareFactsFile       `json:"storage_source_files"`
+	Manifest                  *lifecycleFrozenManifest `json:"inventory_manifest_seed,omitempty"`
+	ErrorCategory             string                   `json:"error_category"`
+}
+
+func validateStorageBackupRequest(r storageBackupRequest, op, run string) error {
+	b := r.BoundaryReport
+	if r.FormatVersion != 1 || r.Kind != "readonly_storage_backup_request" || r.SourceSHA != sourceSHA || !shaRE.MatchString(r.SourceSHA) || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != op || !runRE.MatchString(op) || r.ActualRunID != run || !runRE.MatchString(run) || r.TargetHash != digest(targets) || !hashRE.MatchString(r.ObservationApprovalSHA256) || !hashRE.MatchString(r.InventoryRequestSHA256) || b.OperationID != op || !runRE.MatchString(b.RunID) || b.RunID == run || b.SourceSHA != r.OriginalSourceSHA || !hashRE.MatchString(b.ReportSHA256) || !hashRE.MatchString(b.RequestSHA256) {
+		return lifecycleError("storage_backup_binding_rejected")
+	}
+	return nil
+}
+
+func storageManifest(a backup.StorageBaseline) (*lifecycleFrozenManifest, error) {
+	bindings := map[string]any{}
+	for _, name := range []string{"mysql", "mongodb"} {
+		b, ok := a.StorageApproval.Bindings[name]
+		if !ok || b.Dirty || !b.MetadataComplete || !b.IdentityMatch || !b.HeadMatch {
+			return nil, lifecycleError("storage_backup_baseline_rejected")
+		}
+		bindings[name] = map[string]any{"identity_hash": b.IdentityHash, "migration_version": b.Version, "migration_dirty": b.Dirty, "catalog_hash": b.CatalogHash, "non_target_schema_hash": b.NonTargetHash}
+	}
+	objects := make([]map[string]any, 0, 4)
+	if a.Kind != "storage_backup_v1" || a.DropReady || len(a.Targets) != 4 {
+		return nil, lifecycleError("storage_backup_baseline_rejected")
+	}
+	for i, s := range a.Targets {
+		if s.Database != targets[i][0] || s.Name != targets[i][1] || s.Kind != targets[i][2] || !s.Present || !s.Complete || s.Passes != 1 || s.NextCycle || !hashRE.MatchString(s.DataHash) {
+			return nil, lifecycleError("storage_backup_baseline_rejected")
+		}
+		objects = append(objects, map[string]any{"database": s.Database, "name": s.Name, "kind": s.Kind, "identity_hash": s.IdentityHash, "schema_hash": s.SchemaHash, "data_hash": s.DataHash, "records": s.Records})
+	}
+	raw, err := json.Marshal(map[string]any{"format_version": 1, "operation_id": a.StorageApproval.OperationID, "source_sha": a.StorageApproval.OriginalSourceSHA, "target_hash": digest(targets), "database_bindings": bindings, "targets": objects, "evidence": map[string]any{}, "maintenance": map[string]int{"max_seconds": 1800, "forward_stop_seconds": 1200, "rollback_seconds": 600}})
+	var m lifecycleFrozenManifest
+	if err != nil || decodePrepareFacts(raw, &m) != nil {
+		return nil, lifecycleError("storage_backup_baseline_rejected")
+	}
+	return &m, nil
+}
+
+func runStorageBackup(ctx context.Context, path, expected, op, run, output string) (receipt storageBackupReceipt, result error) {
+	receipt = storageBackupReceipt{FormatVersion: 1, Kind: "readonly_storage_backup_result", Operation: "prepare", PrepareMode: "storage-backup", SourceSHA: sourceSHA, OperationID: op, RunID: run, RequestSHA256: expected, TargetHash: digest(targets), DiagnosticOnly: true, Files: []prepareFactsFile{}, ErrorCategory: "storage_backup_incomplete"}
+	defer func() {
+		if result != nil {
+			receipt.StorageBackupComplete = false
+			receipt.Manifest = nil
+			receipt.ErrorCategory = "storage_backup_failed"
+		}
+	}()
+	// These are the supervisor's two exact mounts, not caller-selected DB or
+	// archive paths. Neither this process nor CaptureStorage executes DDL.
+	if path != "/operation/storage-backup-request-"+run+".json" || output != "/inventory" || privateDir(output) != nil {
+		return receipt, lifecycleError("storage_backup_path_rejected")
+	}
+	uid := uint32(os.Getuid())
+	raw, err := readLifecycleOwnedBytes(path, expected, uid, 256<<10)
+	var r storageBackupRequest
+	if err != nil {
+		return receipt, err
+	}
+	if err = decodePrepareFacts(raw, &r); err != nil {
+		return receipt, err
+	}
+	if err = validateStorageBackupRequest(r, op, run); err != nil {
+		return receipt, err
+	}
+	receipt.OriginalSourceSHA, receipt.InventoryRequestSHA256, receipt.ObservationApprovalSHA256 = r.OriginalSourceSHA, r.InventoryRequestSHA256, r.ObservationApprovalSHA256
+	raw, err = readLifecycleOwnedBytes("/operation/inventory-request.json", r.InventoryRequestSHA256, uid, 256<<10)
+	var q request
+	if err != nil {
+		return receipt, err
+	}
+	if decodePrepareFacts(raw, &q) != nil || q.SourceSHA != r.OriginalSourceSHA || q.OperationID != op || q.TargetHash != digest(targets) || q.DatabaseScope != "mysql-and-mongodb" || len(q.Identities) != 2 || len(q.Migrations) != 2 || q.Migrations["mysql"] != 99 || q.Migrations["mongodb"] != 38 || !hashRE.MatchString(q.Identities["mysql"]) || !hashRE.MatchString(q.Identities["mongodb"]) || q.Identities["mysql"] == q.Identities["mongodb"] || q.BoundaryRunID != r.BoundaryReport.RunID || q.BoundaryReportHash != r.BoundaryReport.ReportSHA256 || validateV2Request(q, "/operation/inventory-request.json") != nil {
+		return receipt, lifecycleError("storage_backup_original_request_rejected")
+	}
+	base := filepath.Join("/operation", "bounds-"+q.BoundaryRunID)
+	raw, err = readLifecycleOwnedBytes(filepath.Join(base, "boundary.private.json"), q.BoundaryReportHash, uid, 256<<10)
+	var observed report
+	if err != nil {
+		return receipt, err
+	}
+	if decodePrepareFacts(raw, &observed) != nil || observed.RequestHash != r.BoundaryReport.RequestSHA256 || observed.ErrorCategory != "none" {
+		return receipt, lifecycleError("storage_backup_original_request_rejected")
+	}
+	var metadata [2][]byte
+	approved := backup.StorageApproval{OriginalSourceSHA: r.OriginalSourceSHA, ToolSourceSHA: sourceSHA, OperationID: op, RunID: run, RequestHash: r.InventoryRequestSHA256, TargetHash: digest(targets), Bindings: map[string]backup.Binding{}}
+	for i, name := range []string{"mysql", "mongodb"} {
+		_, metadata[i], err = hashPrepareFactsFile(ctx, filepath.Join(base, name+"-metadata.private.json"), uid, 16<<20, true)
+		if err != nil {
+			return receipt, err
+		}
+		encoded, e := json.Marshal(observed.DatabaseBindings[name])
+		var b backup.Binding
+		if e != nil || json.Unmarshal(encoded, &b) != nil {
+			return receipt, lifecycleError("storage_backup_metadata_rejected")
+		}
+		approved.Bindings[name] = b
+	}
+	approved.SQLMetadataSHA256, approved.MongoMetadataSHA256 = digestRaw(metadata[0]), digestRaw(metadata[1])
+	for i, b := range q.Boundaries {
+		encoded, e := json.Marshal(b)
+		var boundary retirement.SourceBoundary
+		if e != nil || json.Unmarshal(encoded, &boundary) != nil {
+			return receipt, lifecycleError("storage_backup_metadata_rejected")
+		}
+		approved.Targets[i] = backup.StorageTarget{Database: b.Database, Name: b.Name, Kind: b.Kind, IdentityHash: b.IdentityHash, SchemaHash: b.SchemaHash, Boundary: boundary}
+	}
+	owner := &lifecyclePreparationOwner{}
+	defer func() {
+		if e := owner.Close(); result == nil && e != nil {
+			result = e
+		}
+	}()
+	owner.originalSQL, err = lifecycleSQLPool(ctx, "")
+	if err != nil {
+		return receipt, err
+	}
+	owner.originalMongo, owner.originalDB, err = lifecycleMongoClient(ctx, "")
+	if err != nil {
+		return receipt, err
+	}
+	ordered, err := backup.ReadOrderedMongoSchema(ctx, owner.originalDB)
+	if err != nil {
+		return receipt, err
+	}
+	approved.OrderedMongoSchemaSHA256 = ordered.SHA256()
+	tx, err := owner.originalSQL.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return receipt, lifecycleError("storage_backup_read_epoch_failed")
+	}
+	defer func() {
+		if e := tx.Rollback(); result == nil && e != nil && e != sql.ErrTxDone {
+			result = lifecycleError("storage_backup_epoch_close_failed")
+		}
+	}()
+	dir := filepath.Join(output, "archive")
+	if os.Mkdir(dir, 0700) != nil || syncLifecycleDirectory(output) != nil {
+		return receipt, lifecycleError("storage_backup_output_exists_or_unknown")
+	}
+	a, err := backup.CaptureStorage(ctx, backup.BorrowedSources{SQL: tx, Mongo: owner.originalDB}, approved, backup.StorageInputs{SQLMetadata: bytes.NewReader(metadata[0]), MongoMetadata: bytes.NewReader(metadata[1])}, dir)
+	if err != nil {
+		return receipt, err
+	}
+	b, err := a.StorageBaseline(ctx)
+	if err != nil {
+		return receipt, err
+	}
+	receipt.Manifest, err = storageManifest(b)
+	if err != nil {
+		return receipt, err
+	}
+	for _, name := range []string{"mysql-metadata.private.json", "mongodb-metadata.private.json", "mysql-domain_event_outbox.source.ndjson", "mysql-ai_bridge_commands.source.ndjson", "mysql-ai_messaging_legacy_commands.source.ndjson", "mongodb-domain_event_outbox.source.bsonframes", "archive.private.json", "assets.private.json"} {
+		f, _, e := hashPrepareFactsFile(ctx, filepath.Join(dir, name), uid, 16<<30, false)
+		if e != nil {
+			return receipt, e
+		}
+		receipt.Files = append(receipt.Files, f)
+	}
+	receipt.ArchiveSHA256, receipt.ArchiveApproval = b.ArchiveSHA256, &b.Approval
+	receipt.SQLRecoveryBaselineSHA256, err = backup.HostArchiveRecoveryBaseline(a)
+	if err != nil {
+		return receipt, err
+	}
+	receipt.StorageBackup = &lifecycleStorageBackup{Kind: "storage_backup_v1", ToolSourceSHA: sourceSHA, RunID: run, ArchiveSHA256: b.ArchiveSHA256, RequestSHA256: expected}
+	receipt.StorageBackupComplete, receipt.ErrorCategory = true, "none"
+	return receipt, nil
+}
+
 type prepareFactsFS struct {
 	Scope          string `json:"scope"`
 	PathSHA256     string `json:"path_sha256"`
@@ -76,6 +282,7 @@ type prepareFactsProtection struct {
 	ContainerSHA256 string `json:"container_id_sha256"`
 }
 type prepareFactsReceipt struct {
+	StorageBackup             *lifecycleStorageBackup                  `json:"storage_backup,omitempty"`
 	AIBoundsSHA256            string                                   `json:"observed_ai_bounds_sha256,omitempty"`
 	PeerBoundsSHA256          string                                   `json:"observed_peer_bounds_sha256,omitempty"`
 	Protection                *prepareFactsProtection                  `json:"observed_ai_message_protection,omitempty"`
@@ -120,6 +327,9 @@ func decodePrepareFacts(raw []byte, dst any) error {
 func validatePrepareFactsRequest(r prepareFactsRequest, op, run string) error {
 	original := filepath.Join("/opt/backups/qs-server/compatibility-retirement", op)
 	if r.FormatVersion != 1 || r.Kind != "readonly_prepare_facts_request" || r.SourceSHA != sourceSHA || !shaRE.MatchString(sourceSHA) || r.OperationID != op || r.ActualRunID != run || !runRE.MatchString(op) || !runRE.MatchString(run) || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || !hashRE.MatchString(r.ObservationApprovalSHA256) || r.Inventory.OperationID != op || !runRE.MatchString(r.Inventory.RunID) || r.Inventory.RunID == run || !shaRE.MatchString(r.Inventory.SourceSHA) || !hashRE.MatchString(r.Inventory.ReportSHA256) || !hashRE.MatchString(r.Inventory.RequestSHA256) || !r.RestoreEngines.valid() || r.RestoreEngines.MySQLImageID == r.RestoreEngines.MongoImageID || !lifecycleOwnedPath(original, r.ArchiveDirectory) || r.ArchiveDirectory == filepath.Join(original, "inventory-"+r.Inventory.RunID) || lifecycleOwnedPath(filepath.Join(original, "inventory-"+r.Inventory.RunID), r.ArchiveDirectory) {
+		return lifecycleError("prepare_facts_binding_rejected")
+	}
+	if r.StorageBackup != nil && (r.StorageBackup.Kind != "storage_backup_v1" || r.StorageBackup.ToolSourceSHA != r.SourceSHA || r.StorageBackup.RunID != r.Inventory.RunID || !hashRE.MatchString(r.StorageBackup.ArchiveSHA256) || !hashRE.MatchString(r.StorageBackup.RequestSHA256) || r.ArchiveDirectory == filepath.Join(original, "storage-backup-"+r.Inventory.RunID) || lifecycleOwnedPath(filepath.Join(original, "storage-backup-"+r.Inventory.RunID), r.ArchiveDirectory)) {
 		return lifecycleError("prepare_facts_binding_rejected")
 	}
 	return nil
@@ -391,6 +601,7 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 	}
 	receipt.ObservationApprovalSHA256 = r.ObservationApprovalSHA256
 	receipt.Producer = r.Inventory
+	receipt.StorageBackup = r.StorageBackup
 	original := filepath.Join("/opt/backups/qs-server/compatibility-retirement", op)
 	source := filepath.Join(original, "inventory-"+r.Inventory.RunID)
 	raw, e = readLifecycleOwnedBytes(filepath.Join(original, "inventory-request.json"), r.Inventory.RequestSHA256, uint32(uid64), 256<<10)
@@ -402,16 +613,45 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 		return receipt, e
 	}
 	var inventory report
-	raw, e = readLifecycleOwnedBytes(filepath.Join(source, lifecycleSourceNames[0]), r.Inventory.ReportSHA256, uint32(uid64), 256<<10)
-	if e != nil {
-		return receipt, e
+	if r.StorageBackup != nil {
+		source = filepath.Join(original, "storage-backup-"+r.Inventory.RunID, "archive")
+		a, err := backup.OpenArchive(ctx, source, r.StorageBackup.ArchiveSHA256)
+		if err != nil {
+			return receipt, err
+		}
+		b, err := a.StorageBaseline(ctx)
+		if err != nil || b.StorageApproval.ToolSourceSHA != sourceSHA || b.Approval.SourceSHA != r.Inventory.SourceSHA || b.Approval.OperationID != op || b.Approval.RunID != r.Inventory.RunID || b.Approval.InventorySHA256 != r.Inventory.ReportSHA256 || b.Approval.RequestHash != r.Inventory.RequestSHA256 {
+			return receipt, lifecycleError("prepare_facts_storage_binding_rejected")
+		}
+		if e = validateV2Request(req, filepath.Join(original, "inventory-request.json")); e != nil {
+			return receipt, e
+		}
+		inventory = report{FormatVersion: 1, Kind: "storage_backup_v1", SourceSHA: b.Approval.SourceSHA, OperationID: op, RunID: b.Approval.RunID, RequestHash: b.Approval.RequestHash, TargetHash: digest(targets), Complete: true, ErrorCategory: "none", DatabaseBindings: map[string]databaseInventory{}}
+		for db, binding := range b.StorageApproval.Bindings {
+			encoded, err := json.Marshal(binding)
+			var v databaseInventory
+			if err != nil || json.Unmarshal(encoded, &v) != nil {
+				return receipt, lifecycleError("prepare_facts_storage_binding_rejected")
+			}
+			inventory.DatabaseBindings[db] = v
+		}
+		encoded, err := json.Marshal(b.Targets)
+		if err != nil || json.Unmarshal(encoded, &inventory.Targets) != nil {
+			return receipt, lifecycleError("prepare_facts_storage_binding_rejected")
+		}
+	} else {
+		raw, e = readLifecycleOwnedBytes(filepath.Join(source, lifecycleSourceNames[0]), r.Inventory.ReportSHA256, uint32(uid64), 256<<10)
+		if e != nil {
+			return receipt, e
+		}
+		if e = decodePrepareFacts(raw, &inventory); e != nil {
+			return receipt, e
+		}
+		if e = validatePrepareFactsInventory(r, req, inventory); e != nil {
+			return receipt, e
+		}
 	}
-	if e = decodePrepareFacts(raw, &inventory); e != nil {
-		return receipt, e
-	}
-	if e = validatePrepareFactsInventory(r, req, inventory); e != nil {
-		return receipt, e
-	}
+
 	if e = verifyLifecycleRestoreImages(ctx, r.RestoreEngines); e != nil {
 		return receipt, e
 	}
@@ -451,27 +691,29 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 	if e != nil {
 		return receipt, lifecycleError("prepare_facts_ordered_schema_read_failed")
 	}
-	for i, name := range lifecycleSourceNames {
-		maximum := int64(16 << 30)
-		keep := false
-		if i == 0 {
-			maximum = 256 << 10
-			keep = true
+	names := lifecycleSourceNames
+	if r.StorageBackup != nil {
+		names = lifecycleStorageNames
+	}
+	for _, name := range names {
+		maximum, keep := int64(16<<30), false
+		if name == "inventory.private.json" {
+			maximum, keep = 256<<10, true
 		}
-		if i == 1 || i == 2 {
-			maximum = 16 << 20
-			keep = true
+		if name == "mysql-metadata.private.json" || name == "mongodb-metadata.private.json" {
+			maximum, keep = 16<<20, true
 		}
 		fact, body, e := hashPrepareFactsFile(ctx, filepath.Join(source, name), uint32(uid64), maximum, keep)
 		if e != nil {
 			return receipt, e
 		}
-		if i == 0 && fact.SHA256 != r.Inventory.ReportSHA256 {
+		if name == "inventory.private.json" && fact.SHA256 != r.Inventory.ReportSHA256 || name == "archive.private.json" && fact.SHA256 != r.StorageBackup.ArchiveSHA256 {
 			return receipt, lifecycleError("prepare_facts_source_changed")
 		}
-		if i == 1 || i == 2 {
+		if keep && name != "inventory.private.json" {
 			var metadata map[string]any
-			if rejectDuplicateJSON(body) != nil || json.Unmarshal(body, &metadata) != nil || metadata["schema"] == nil || digest(metadata["schema"]) != inventory.DatabaseBindings[[]string{"mysql", "mongodb"}[i-1]].CatalogHash {
+			db := strings.TrimSuffix(name, "-metadata.private.json")
+			if rejectDuplicateJSON(body) != nil || json.Unmarshal(body, &metadata) != nil || metadata["schema"] == nil || digest(metadata["schema"]) != inventory.DatabaseBindings[db].CatalogHash {
 				return receipt, lifecycleError("prepare_facts_metadata_binding_rejected")
 			}
 		}

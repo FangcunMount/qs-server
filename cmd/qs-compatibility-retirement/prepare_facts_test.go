@@ -72,6 +72,44 @@ func TestPrepareFactsKeepsOriginalProducerAndRejectsAuthorityFields(t *testing.T
 	}
 }
 
+func TestStorageBackupRequestSeparatesOriginalMetadataFromCaptureTool(t *testing.T) {
+	facts := prepareFactsRequestFixture(t)
+	r := storageBackupRequest{FormatVersion: 1, Kind: "readonly_storage_backup_request", SourceSHA: sourceSHA, OriginalSourceSHA: facts.Inventory.SourceSHA, OperationID: "123-1", ActualRunID: "789-1", TargetHash: digest(targets), ObservationApprovalSHA256: strings.Repeat("a", 64), InventoryRequestSHA256: facts.Inventory.RequestSHA256, BoundaryReport: facts.Inventory}
+	if validateStorageBackupRequest(r, "123-1", "789-1") != nil {
+		t.Fatal("actual original/tool separation rejected")
+	}
+	raw, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, extra := range []string{`"manifest_sha256":"approved"`, `"complete":true`, `"source_file_sha256":{}`} {
+		var got storageBackupRequest
+		if decodePrepareFacts(append(append([]byte(nil), raw[:len(raw)-1]...), []byte(","+extra+"}")...), &got) == nil {
+			t.Fatal("supplied completion or content accepted")
+		}
+	}
+	for _, mutate := range []func(*storageBackupRequest){
+		func(v *storageBackupRequest) { v.SourceSHA = v.OriginalSourceSHA },
+		func(v *storageBackupRequest) { v.BoundaryReport.SourceSHA = v.SourceSHA },
+		func(v *storageBackupRequest) { v.BoundaryReport.RunID = v.ActualRunID },
+		func(v *storageBackupRequest) { v.InventoryRequestSHA256 = "unknown" },
+	} {
+		got := r
+		mutate(&got)
+		if validateStorageBackupRequest(got, "123-1", "789-1") == nil {
+			t.Fatal("origin conflict accepted")
+		}
+	}
+	facts.StorageBackup = &lifecycleStorageBackup{Kind: "storage_backup_v1", ToolSourceSHA: sourceSHA, RunID: facts.Inventory.RunID, ArchiveSHA256: strings.Repeat("b", 64), RequestSHA256: strings.Repeat("c", 64)}
+	if validatePrepareFactsRequest(facts, "123-1", "789-1") != nil {
+		t.Fatal("storage origin rejected")
+	}
+	facts.StorageBackup.ToolSourceSHA = facts.Inventory.SourceSHA
+	if validatePrepareFactsRequest(facts, "123-1", "789-1") == nil {
+		t.Fatal("capture tool mismatch accepted")
+	}
+}
+
 func TestPrepareFactsHashesPrivateBytesWithoutCopyOrDisclosure(t *testing.T) {
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {

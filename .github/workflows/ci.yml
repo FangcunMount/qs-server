@@ -625,6 +625,8 @@ jobs:
             exit 1
           fi
           grep -q -- '--- PASS: TestLifecyclePublicCLINativeWindowToolPrepareRootOnce' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
+          grep -q -- '--- PASS: TestLifecyclePublicCLINativeWindowToolPrepareRootOnce/storage_backup_v2/nonempty' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
+          grep -q -- '--- PASS: TestLifecyclePublicCLINativeWindowToolPrepareRootOnce/storage_backup_v2/empty' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
           grep -q -- '--- PASS: TestLifecyclePublicCLILinuxRootControlLossReapsDetachedDescendants' "${RUNNER_TEMP}/qs-lifecycle-public-cli.log"
 
       - name: Run retirement and retry persistence integration tests

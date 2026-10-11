@@ -9,14 +9,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
-	"go.mongodb.org/mongo-driver/bson"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	retirement "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirement"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func testPtr(v string) *string { return &v }
@@ -133,6 +134,17 @@ func TestEmptyPresentSQLCopyStillRequiresRealHeaderAndEOF(t *testing.T) {
 	if _, e = r.next(); e != io.EOF || !r.done {
 		t.Fatal("zero-row proof missing")
 	}
+	s.Passes = 1
+	if _, e = newRawReader(context.Background(), bytes.NewReader(data), 2, s, cols); e == nil {
+		t.Fatal("single storage EOF accepted as legacy two-pass inventory")
+	}
+	r, e = rawReaderForPass(context.Background(), bytes.NewReader(data), 2, s, cols, 1)
+	if e != nil {
+		t.Fatal("storage framing rejected")
+	}
+	if _, e = r.next(); e != io.EOF || !r.done {
+		t.Fatal("storage framing did not reach EOF")
+	}
 	s.Present = false
 	if _, e = newRawReader(context.Background(), bytes.NewReader(data), 2, s, cols); e == nil {
 		t.Fatal("absence mistaken for present empty")
@@ -163,6 +175,15 @@ func TestStrictJSONRejectsDuplicateAliasUnknownAndTrailing(t *testing.T) {
 		if exactJSON([]byte(raw), &v) == nil {
 			t.Fatal("ambiguous JSON accepted")
 		}
+	}
+	var storage StorageApproval
+	for _, raw := range []string{`{"targets":[{},{},{}]}`, `{"targets":[{},{},{},{},{}]}`, `{"Targets":[{},{},{},{}]}`} {
+		if exactJSON([]byte(raw), &storage) == nil {
+			t.Fatal("storage target count or alias accepted")
+		}
+	}
+	if exactJSON([]byte(`{"targets":[{},{},{},{}]}`), &storage) != nil {
+		t.Fatal("fixed storage target shape rejected")
 	}
 }
 func TestPrivateAssetsNeverOverwriteOrFollowSymlink(t *testing.T) {
@@ -198,6 +219,12 @@ func TestPrivateSummaryCannotAdvertiseDropOrProductionProof(t *testing.T) {
 	}
 	if _, e = json.Marshal(&Archive{}); !errors.Is(e, ErrSerialization) {
 		t.Fatal("private archive serializable")
+	}
+	if _, e = (&Archive{}).StorageBaseline(context.Background()); e == nil {
+		t.Fatal("caller-created storage archive accepted")
+	}
+	if _, e = CaptureStorage(context.Background(), BorrowedSources{}, StorageApproval{}, StorageInputs{}, t.TempDir()); e == nil {
+		t.Fatal("metadata cannot manufacture capture")
 	}
 }
 func TestCancelledReadIsNotComplete(t *testing.T) {
@@ -346,5 +373,58 @@ func TestPurgeKeepsOriginAndAssetsWhenPrivateDirectoryContainsUnregisteredFile(t
 	}
 	if entries, e := os.ReadDir(dir); e != nil || len(entries) != 0 {
 		t.Fatal("registered raw assets remain")
+	}
+	// The new producer records metadata-only origin before any body. Its
+	// partial cleanup uses a separate exact eight-member protocol, never v1.
+	storage := StorageApproval{OriginalSourceSHA: a.SourceSHA, ToolSourceSHA: strings.Repeat("1", 40), OperationID: a.OperationID, RunID: a.RunID, RequestHash: a.RequestHash, SQLMetadataSHA256: a.SQLMetadataSHA256, MongoMetadataSHA256: a.MongoMetadataSHA256, OrderedMongoSchemaSHA256: a.OrderedMongoSchemaSHA256}
+	fixed := [4][3]string{{"mysql", targetNames[0], "base_table"}, {"mysql", targetNames[1], "base_table"}, {"mysql", targetNames[2], "base_table"}, {"mongodb", targetNames[3], "collection"}}
+	storage.TargetHash = jsonSHA(fixed)
+	storage.Bindings = map[string]Binding{}
+	for _, database := range []string{"mysql", "mongodb"} {
+		binding := Binding{IdentityHash: strings.Repeat("a", 64), AnchorHash: strings.Repeat("a", 64), CatalogHash: strings.Repeat("b", 64), NonTargetHash: strings.Repeat("c", 64), Version: 99, IdentityMatch: true, HeadMatch: true, MetadataComplete: true, ErrorCategory: "none"}
+		if database == "mongodb" {
+			binding.GenerationHash = strings.Repeat("d", 64)
+			binding.Version = 38
+		}
+		storage.Bindings[database] = binding
+	}
+	for i, target := range fixed {
+		pk := "ascii_string"
+		if i == 0 {
+			pk = "uint64"
+		}
+		if i == 3 {
+			pk = ""
+		}
+		boundary := retirement.SourceBoundary{Database: target[0], Name: target[1], Kind: target[2], IdentityHash: strings.Repeat("a", 64), SchemaHash: strings.Repeat("b", 64), Present: true, Empty: true, PKType: pk}
+		storage.Targets[i] = StorageTarget{Database: target[0], Name: target[1], Kind: target[2], IdentityHash: boundary.IdentityHash, SchemaHash: boundary.SchemaHash, Boundary: boundary}
+	}
+	if !storageApprovalValid(storage) {
+		t.Fatal("metadata-only storage fixture")
+	}
+	storageReg := registration{Version: 2, Approval: storage.archiveApproval(), StorageApproval: &storage, Files: storageNames(), ContainsOriginalBodies: true, PurgeAfterAcceptance: true}
+	b, e = json.Marshal(storageReg)
+	if e != nil || writePrivate(filepath.Join(dir, "assets.private.json"), b) != nil {
+		t.Fatal("storage partial registry")
+	}
+	if writePrivate(filepath.Join(dir, sourceNames[0]), []byte("partial original")) != nil || writePrivate(unknown, []byte("unknown")) != nil {
+		t.Fatal("storage partial source")
+	}
+	if PurgeRegistered(dir, a) == nil || PurgeStorageRegistered(dir, storage) == nil {
+		t.Fatal("storage unknown/legacy cleanup accepted")
+	}
+	if os.Remove(unknown) != nil {
+		t.Fatal("storage owned extra cleanup")
+	}
+	wrongStorage := storage
+	wrongStorage.ToolSourceSHA = strings.Repeat("2", 40)
+	if PurgeStorageRegistered(dir, wrongStorage) == nil {
+		t.Fatal("wrong storage tool source cleaned")
+	}
+	if PurgeStorageRegistered(dir, storage) != nil {
+		t.Fatal("registered storage partial cleanup refused")
+	}
+	if entries, e := os.ReadDir(dir); e != nil || len(entries) != 0 {
+		t.Fatal("storage partial assets remain")
 	}
 }

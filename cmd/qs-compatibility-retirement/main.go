@@ -1209,6 +1209,15 @@ func main() {
 		}
 		return
 	}
+	if *mode == "storage-backup" {
+		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Second)
+		r, e := runStorageBackup(ctx, *req, *hash, *op, *runID, *out)
+		cancel()
+		if json.NewEncoder(os.Stdout).Encode(r) != nil || e != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if *mode == "lifecycle-prepare-root-once" {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 		staged, e := stageLifecycleRootInputs(ctx, *req, *hash, *op, *runID)

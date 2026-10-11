@@ -400,5 +400,35 @@ class SecondFailedInventoryCleanupContracts(FailedInventoryCleanupContracts):
                 tool.failed_inventory_profile(operation)
 
 
+class StorageBackupResultContracts(unittest.TestCase):
+    def fixture(self):
+        args=argparse.Namespace(actual_source_sha=base.SOURCE,operation_id=base.OPERATION,run_id='789-1',bootstrap_approval_hash='a'*64)
+        request={'original_source_sha':'b'*40,'inventory_request_sha256':'c'*64}
+        seed=base.manifest();seed['source_sha']=request['original_source_sha']
+        approval={key:'d'*64 for key in ('InventorySHA256','SQLMetadataSHA256','MongoMetadataSHA256','OrderedMongoSchemaSHA256')}
+        approval.update(SourceSHA=request['original_source_sha'],OperationID=args.operation_id,RunID=args.run_id,RequestHash=request['inventory_request_sha256'])
+        result=dict(format_version=1,kind='readonly_storage_backup_result',operation='prepare',prepare_mode='storage-backup',source_sha=args.actual_source_sha,original_source_sha=request['original_source_sha'],operation_id=args.operation_id,run_id=args.run_id,request_sha256='e'*64,inventory_request_sha256=request['inventory_request_sha256'],observation_approval_sha256=args.bootstrap_approval_hash,target_hash=tool.TARGET_HASH,complete=False,diagnostic_only=True,execution_allowed=False,drop_ready=False,storage_backup_complete=True,error_category='none',storage_archive_sha256='d'*64,archive_approval=approval,mysql_recovery_non_target_sha256='f'*64,storage_backup=dict(kind='storage_backup_v1',tool_source_sha=args.actual_source_sha,run_id=args.run_id,archive_sha256='d'*64,request_sha256='e'*64),storage_source_files=[dict(name=name,sha256='d'*64,bytes=1) for name in tool.STORAGE_BACKUP_FILES],inventory_manifest_seed=seed)
+        return args,request,result
+
+    def test_storage_receipt_closed_projection_has_no_retirement_authority(self):
+        args,request,result=self.fixture()
+        projected=tool.validate_storage_backup_result(result,args,request,'e'*64,0)
+        output=io.StringIO()
+        with mock.patch.object(tool,'execute',return_value=projected),contextlib.redirect_stdout(output):
+            code=tool.main(['--operation','prepare','--operation-id',args.operation_id,'--approved-source-sha',args.actual_source_sha,'--actual-source-sha',args.actual_source_sha,'--run-id',args.run_id,'--prepare-mode','storage-backup'])
+        self.assertEqual(code,0)
+        decoded=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertFalse(decoded['complete']);self.assertFalse(decoded['execution_allowed']);self.assertFalse(decoded['drop_ready'])
+        self.assertTrue(all(v is False for v in decoded['capabilities'].values()))
+        self.assertEqual(decoded['inventory_manifest_seed']['evidence'],{})
+        self.assertEqual(len(decoded['storage_source_files']),8)
+
+    def test_storage_receipt_rejects_incomplete_foreign_origin_and_body(self):
+        for mutate in (lambda r:r.update(complete=True),lambda r:r.update(storage_backup_complete=False),lambda r:r.update(original_source_sha='a'*40),lambda r:r.update(body='secret'),lambda r:r['storage_backup'].update(request_sha256='c'*64),lambda r:r['storage_source_files'].append(dict(name='unapproved',sha256='d'*64,bytes=1)),lambda r:r['inventory_manifest_seed']['evidence'].update(history={})):
+            args,request,result=self.fixture();mutate(result)
+            with self.assertRaises(tool.Blocked):tool.validate_storage_backup_result(result,args,request,'e'*64,0)
+        args,request,result=self.fixture()
+        with self.assertRaises(tool.Blocked):tool.validate_storage_backup_result(result,args,request,'e'*64,1)
+
 if __name__=='__main__':
     unittest.main()
