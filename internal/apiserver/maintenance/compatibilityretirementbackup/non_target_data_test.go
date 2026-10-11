@@ -165,8 +165,8 @@ func TestNonTargetDTOOrBudgetWindowCannotMintAcceptance(t *testing.T) {
 			t.Fatal("summary/unissued plan produced actual complete readback")
 		}
 	}
-	if v, e := CaptureCompleteNonTargetData(context.Background(), new(Archive), BorrowedSources{}, nil); e == nil || v != nil {
-		t.Fatal("missing genuine historical/paired epoch produced full data baseline")
+	if v, e := CaptureCompleteNonTargetData(context.Background(), new(Archive), BorrowedSources{}); e == nil || v != nil {
+		t.Fatal("missing genuine paired epoch produced full data baseline")
 	}
 }
 

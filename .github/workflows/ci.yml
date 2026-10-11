@@ -493,7 +493,7 @@ jobs:
           export QS_HISTORY_CI_MONGO_CONTAINER QS_HISTORY_GO
           go test -race -tags=integration -count=1 -timeout=10m -v ./cmd/qs-compatibility-history -run '^(TestHistoryCIFixtureRequiresActualJobContainers|TestHistoryCLINativeInitialTwoSnapshotInputRounds|TestHistoryCLINativeQualifiedEvidenceWriteActualExternalAndDualCommitReadback|TestHistoryCLINativeGenuineAIQualificationCannotWriteFromReadonlyComponent|TestHistoryCLINativeFreshComponentMissingAIQualificationRollsBack)$' | tee "$cli_input_log"
           go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/infra/mysql/evaluation -run '^TestSQLCASProvenanceNative|^TestSQLHistoricalMissingOriginalRunPolicyNative$|^TestSQLHistoricalOriginalRunGlobalAbsenceNative$|^TestSQLHistoricalComponentNative' | tee "$sql_component_log"
-          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$' | tee "$owner_fragment_log"
+          go test -race -tags=integration -count=1 -timeout=10m -v ./internal/apiserver/maintenance/compatibilityretirement -run '^(TestHistoricalCASPersistenceNative|TestQualifiedHistoricalCASNative|TestFinalHistoricalEOFNative|TestHistoricalSourceInputNative|TestAIHistoricalInputNative|TestMongoHistoricalComponentNative)|^TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD$|^TestWholeSourceJointNativeOwnerComponentsSplitPageWithoutConsumingTwice$|^TestHistoricalCASSpoolNativeTwoPagesCommitAndFinalRawReadback$|^TestHistoricalCIMySQLFixtureRequiresActualJobService$|^TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility$' | tee "$owner_fragment_log"
           if grep -Eq -- '--- SKIP:|--- FAIL:|DATA RACE' "$sql_component_log" "$owner_fragment_log" "$cli_input_log"; then
             echo 'Actual historical owner component proof skipped or failed' >&2
             exit 1
@@ -520,6 +520,7 @@ jobs:
             'TestHistoricalSourceInputNativeIndependentUnchangedSnapshotAndReusedUUID' \
             'TestHistoricalSourceInputNativeOwnerComponentPlanner' \
             'TestAIHistoricalInputNativeTwoSourceBoundFullDiskEpochs' \
+            'TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility' \
             'TestMongoBatchNativeSnapshotInputOwnerFootprintMatchesOriginalFD' \
             'TestMongoHistoricalComponentNativeFreshTransactionsAndServerReread' \
             'TestMongoHistoricalComponentNativeRejectsNewNegativeRangeDescendant' \

@@ -498,7 +498,7 @@ func aiReverseNativeMappedSource(t *testing.T, pool *sql.DB) {
 	aiNativeExec(t, pool, "INSERT INTO ai_messaging_legacy_commands VALUES(?,?,?,?,?,?,?,?,?,?)", aiFixtureRequestID, aiFixtureRequestID, "start", actual, string(old[4]), 3, string(old[7]), "", hash, "2026-10-08 11:12:14.123456")
 }
 func TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility(t *testing.T) {
-	for _, which := range []string{"settled_mapping", "budget_reset", "original_time_conflict", "raw_payload_conflict", "unmapped", "current_pending"} {
+	for _, which := range []string{"settled_mapping", "budget_reset", "original_time_conflict", "raw_payload_conflict", "unmapped", "current_pending", "current_held"} {
 		t.Run(which, func(t *testing.T) {
 			db, pool := aiReverseNativeDatabase(t)
 			aiReverseNativeGraph(t, pool)
@@ -512,15 +512,22 @@ func TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility(t *test
 				aiNativeExec(t, pool, "UPDATE ai_messaging_legacy_commands SET source_payload=CONCAT(source_payload,CHAR(10))")
 			case "unmapped":
 				aiNativeExec(t, pool, "DELETE FROM ai_messaging_legacy_commands")
-			case "current_pending":
+			case "current_pending", "current_held":
 				aiNativeExec(t, pool, "UPDATE ai_messaging_operations SET decision='',code='',receipt_id=NULL,receipt=NULL,decided_at=NULL")
 				aiNativeExec(t, pool, "UPDATE ai_messaging_outbox SET stage='awaiting_receipt',confirmed_at=NULL WHERE message_id=?", aiFixtureRequestID)
 				aiNativeExec(t, pool, "DELETE FROM ai_messaging_failures")
 				aiNativeExec(t, pool, "DELETE FROM ai_messaging_inbox WHERE kind=?", int(pb.MessagingKind_COMMAND_RECEIPT))
 				aiNativeExec(t, pool, "DELETE FROM ai_messaging_outbox WHERE message_id=?", "80000000-0000-4000-8000-000000000001")
+				if which == "current_held" {
+					aiNativeExec(t, pool, "UPDATE ai_messaging_outbox SET stage='held',attempts=8,error_code='legacy_delivery_budget_exhausted' WHERE message_id=?", aiFixtureRequestID)
+				}
 			}
 			s, ctx, tx := aiReverseNativePrepare(t, db)
 			defer aiReverseNativeEnd(t, tx)
+			currentErr := ValidateCurrentAICommandResponsibilities(ctx, s.Summary().DatabaseIdentitySHA256, 99, DefaultAIReverseLimits())
+			if (which == "settled_mapping" || which == "current_pending" || which == "current_held") != (currentErr == nil) {
+				t.Fatal("current native closure lost original mapping/budget/held responsibility", which, currentErr)
+			}
 			copies := aiReverseNativeCopies(t, pool)
 			if which == "raw_payload_conflict" {
 				if c, e := PrepareHistoricalCoordinator(ctx, coordinatorBinding(), copies.inputs(), DefaultHistoricalCoordinatorLimits()); e == nil || c != nil {
@@ -539,10 +546,10 @@ func TestAIReverseNativeExactMappedUndeliveredAndInheritedResponsibility(t *test
 				if r.Blocking != 0 || old.delivered || old.observation.Unfinished || old.observation.Invalid {
 					t.Fatal("actual exact handoff retained obsolete pending or invented gRPC delivery", r.BlockingReasons)
 				}
-			} else if which == "current_pending" {
+			} else if which == "current_pending" || which == "current_held" {
 				op := s.byTable["ai_messaging_operations"][aiFixtureRequestID]
 				box := s.byTable["ai_messaging_outbox"][aiFixtureRequestID]
-				if old.observation.Unfinished || op.observation.Invalid || !op.observation.Unfinished || !box.observation.Unfinished || r.Blocking == 0 {
+				if old.observation.Unfinished || op.observation.Invalid || !op.observation.Unfinished || !box.observation.Unfinished || r.Blocking == 0 || which == "current_held" && (!box.observation.Held || box.attempts != 8) {
 					t.Fatal("handoff lost actual current pending transport responsibility", r.BlockingReasons)
 				}
 			} else if r.Blocking == 0 || !old.observation.Unfinished {

@@ -155,10 +155,10 @@ def derive_request(raw, approval, current_run):
     if digest(raw) != approval["request_template_sha256"]:
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
-    required = ("format_version", "kind", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
+    required = ("format_version", "kind", "history_policy", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
     optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")
     exact(r, required, optional)
-    if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
+    if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["history_policy"] != "discard_legacy_history_keep_current_responsibility_v1" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
     a = r["archive_approval"]
     exact(a, ("InventorySHA256", "SQLMetadataSHA256", "MongoMetadataSHA256", "OrderedMongoSchemaSHA256", "SourceSHA", "OperationID", "RunID", "RequestHash"))
@@ -173,6 +173,8 @@ def derive_request(raw, approval, current_run):
     if approval["stage"] == "prepare":
         if any(key in r for key in ("resume", "resume_kind", "service_control", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero")) or q["archive_sha256"] != "":
             reject("window_tool_prepare_effect_fields_rejected")
+    if "historical_write_report" in r:
+        reject("window_tool_history_policy_rejected")
     if "writer_control" in r:
         exact(r["writer_control"], ("workflow_scope_sha256",), ("database_input",))
         token(r["writer_control"]["workflow_scope_sha256"], HASH)

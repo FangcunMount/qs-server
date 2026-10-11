@@ -2215,13 +2215,13 @@ def live_lifecycle(args, directory):
     token(args.lifecycle_request_hash, HASH)
     token(args.manifest_hash, HASH)
     request, request_hash = read_private(directory, "lifecycle-request.json", args.lifecycle_request_hash)
-    fields(request, ("format_version", "kind", "tool_source_sha", "original_source_sha",
+    fields(request, ("format_version", "kind", "history_policy", "tool_source_sha", "original_source_sha",
         "operation_id", "actual_run_id", "manifest_sha256", "archive_directory",
         "window_directory", "journal_directory", "archive_approval", "recovery"),
         ("source_directory", "restore_engines", "source_file_sha256"))
     token(request["original_source_sha"], SHA)
     if (request["format_version"] != 1 or request["kind"] != "compatibility_retirement_lifecycle_request" or
-        request["tool_source_sha"] != args.actual_source_sha or request["operation_id"] != args.operation_id or
+        request["history_policy"] != "discard_legacy_history_keep_current_responsibility_v1" or request["tool_source_sha"] != args.actual_source_sha or request["operation_id"] != args.operation_id or
         request["actual_run_id"] != args.run_id or request["manifest_sha256"] != args.manifest_hash):
         fail("lifecycle_request_binding_rejected")
     manifest, _ = read_private(directory, "manifest.json", args.manifest_hash)

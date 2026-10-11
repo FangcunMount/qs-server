@@ -72,7 +72,7 @@ class RootPrepareOnceTransport(unittest.TestCase):
     def test_both_live_privilege_branches_route_once_and_never_call_unstaged_mode(self):
         for uid in (0,501):
             args=self.args();args.inventory_binary='/tool/private-native'
-            request={'format_version':1,'kind':'compatibility_retirement_lifecycle_request','tool_source_sha':args.actual_source_sha,'original_source_sha':'e'*40,
+            request={'format_version':1,'kind':'compatibility_retirement_lifecycle_request','history_policy':'discard_legacy_history_keep_current_responsibility_v1','tool_source_sha':args.actual_source_sha,'original_source_sha':'e'*40,
                      'operation_id':args.operation_id,'actual_run_id':args.run_id,'manifest_sha256':args.manifest_hash,'archive_directory':'/archive',
                      'window_directory':'/window','journal_directory':'/journal','archive_approval':{},'recovery':{}}
             metadata=SimpleNamespace(st_mode=stat.S_IFREG|0o700,st_nlink=1,st_uid=uid)
@@ -98,7 +98,8 @@ class RootPrepareOnceTransport(unittest.TestCase):
     def test_a_prepare_resume_fields_refuse_before_native_bootstrap(self):
         for extra in ('resume','resume_kind','migration_intent_sha256','drop_ready'):
             args=self.args()
-            value={key:'' for key in ('format_version','kind','tool_source_sha','original_source_sha','operation_id','actual_run_id','manifest_sha256','archive_directory','window_directory','journal_directory','archive_approval','recovery')}
+            value={key:'' for key in ('format_version','kind','history_policy','tool_source_sha','original_source_sha','operation_id','actual_run_id','manifest_sha256','archive_directory','window_directory','journal_directory','archive_approval','recovery')}
+            value['history_policy']='discard_legacy_history_keep_current_responsibility_v1'
             value[extra]=None
             with mock.patch.object(tool,'read_private',return_value=(value,'b'*64)),mock.patch.object(tool.subprocess,'run') as run,self.assertRaises(tool.Blocked):
                 tool.live_lifecycle(args,Path('/nonexistent'))

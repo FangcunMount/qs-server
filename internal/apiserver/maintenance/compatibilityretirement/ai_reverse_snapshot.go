@@ -3267,3 +3267,86 @@ func (s *AIReverseSnapshot) validateHistoricalSnapshot(ctx context.Context) erro
 	}
 	return nil
 }
+
+// ValidateCurrentAICommandResponsibilities borrows the actual pre-DROP RRRO
+// transaction. It generates no history evidence, retirement row or capability.
+// Old IDs must already be mapped to immutable current operations; their known
+// pending/held/manual responsibility and inherited budget remain unchanged.
+func ValidateCurrentAICommandResponsibilities(ctx context.Context, identity string, head uint64, limits AIReverseLimits) error {
+	if ctx == nil || ctx.Err() != nil || !evidenceHash(identity) || head != 99 || !limits.valid() {
+		return ErrAIReverseBinding
+	}
+	tx, err := hostmysql.RequireTx(ctx)
+	if err != nil || tx == nil || tx.Statement == nil || tx.Statement.ConnPool == nil {
+		return ErrAIReverseFresh
+	}
+	if _, err = sdkmysql.BindGORM(tx); err != nil {
+		return ErrAIReverseFresh
+	}
+	s := &AIReverseSnapshot{pool: tx.Statement.ConnPool, head: head, limits: limits, started: time.Now(), byTable: map[string]map[string]*aiReverseNode{}, anchors: map[string]aiReverseAnchor{}}
+	s.self = s
+	s.report.DatabaseIdentitySHA256 = identity
+	work, cancel := context.WithDeadline(ctx, s.started.Add(limits.MaxDuration))
+	defer cancel()
+	native, err := s.historicalTransaction(work, "READ ONLY")
+	if err != nil {
+		return err
+	}
+	for _, spec := range aiReverseSpecs {
+		if err = s.scan(work, spec); err != nil {
+			return err
+		}
+	}
+	if err = s.readAssessmentAnchors(work); err != nil {
+		return err
+	}
+	s.reverse()
+	if err = s.currentCommandResponsibilities(); err != nil {
+		return err
+	}
+	for i, spec := range aiReverseSpecs {
+		meta, e := s.schema(work, spec)
+		if e != nil || !reflect.DeepEqual(meta, s.metadata[i]) {
+			return ErrAIReverseSchema
+		}
+	}
+	if _, hash, e := s.assessmentMetadata(work); e != nil || hash != s.anchorMetadataSHA {
+		return ErrAIReverseSchema
+	}
+	if current, e := s.historicalTransaction(work, "READ ONLY"); e != nil || current != native {
+		return ErrAIReverseFresh
+	}
+	return work.Err()
+}
+
+// Only the old source's responsibility may disappear. Current pending/held
+// rows are valid retained work; invalid, ambiguous or unmapped rows are not.
+func (s *AIReverseSnapshot) currentCommandResponsibilities() error {
+	if s == nil || len(s.structuralReasons) != 0 {
+		return ErrAILocalUnknown
+	}
+	admission := s.byTable["ai_messaging_admission"]["1"]
+	if admission == nil || admission.observation.Invalid || len(admission.observation.Reasons) != 0 || admission.state != "closed" {
+		return ErrAILocalBinding
+	}
+	requests, ids := map[string]bool{}, map[string]bool{}
+	for _, table := range []string{AIBridgeCommandSource, AILegacyCommandSource} {
+		for id, n := range s.byTable[table] {
+			old, mapped := s.byTable[AIBridgeCommandSource][id], s.byTable[AILegacyCommandSource][id]
+			op, box := s.byTable["ai_messaging_operations"][id], s.byTable["ai_messaging_outbox"][id]
+			if old == nil || mapped == nil || op == nil || box == nil || op.retired || old.observation.Unfinished || n.observation.Invalid || len(n.observation.Reasons) != 0 {
+				return ErrAILocalResponsibility
+			}
+			requests[n.request], ids[id] = true, true
+		}
+	}
+	for _, n := range s.nodes {
+		if !requests[n.request] && !requests[n.aggregate] && !ids[n.id] && !ids[n.command] {
+			continue
+		}
+		if n.observation.Invalid || len(n.observation.Reasons) != 0 || n.wireHash != "" && s.byTable["ai_messaging_quarantine"][n.wireHash] != nil {
+			return ErrAILocalResponsibility
+		}
+	}
+	return nil
+}

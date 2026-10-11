@@ -32,6 +32,7 @@ const (
 	mismatchCommittedOutboxWithoutOutcome mismatchKind = "committed_outbox_without_outcome"
 	mismatchCommittedOutboxMissing        mismatchKind = "committed_outbox_missing"
 	mismatchCommittedOutboxMismatch       mismatchKind = "committed_outbox_reference_mismatch"
+	mismatchCommittedEventUnsupported     mismatchKind = "committed_event_audit_unsupported"
 	mismatchRunOutcomeReferenceMismatch   mismatchKind = "run_outcome_reference_mismatch"
 	mismatchHistoricalEventGap            mismatchKind = "historical_event_unverifiable"
 	mismatchReverseOutboxConflict         mismatchKind = "standard_outbox_reverse_conflict"
@@ -212,11 +213,16 @@ func (s *service) classifyReadOnlyBatch(batch evaluationconsistency.Batch, obser
 			item.AssessmentID = evidence.AssessmentID
 			if observe {
 				observeMismatch(item.Kind)
-				observeDisposition(item.Kind, "deferred")
-				log.Warnf(
-					"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
-					item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
-				)
+				if item.Kind == mismatchCommittedEventUnsupported {
+					observeDisposition(item.Kind, "unsupported")
+					log.Infof("evaluation standard-message audit coverage unsupported (assessment_id=%d, kind=%s, action=%s)", item.AssessmentID, item.Kind, item.RecommendedAction)
+				} else {
+					observeDisposition(item.Kind, "deferred")
+					log.Warnf(
+						"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
+						item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
+					)
+				}
 			}
 			detected++
 		}
@@ -283,6 +289,11 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 			// The physical canonical pair is empty and the old owner/run has
 			// qualified retained provenance. Gap findings remain per original ID
 			// below; do not double-count them or claim an SDK message match.
+		case evidence.outbox != nil && evidence.outbox.LegacyCanonicalAbsent && evidence.outbox.Class == "" && evidence.outbox.RowCount == 0 && evidence.outbox.OutcomeID == outcomeID && evidence.outbox.RunID == evidence.outcome.RunID && evidence.outbox.InvalidReason == "canonical outcome lacks classified committed event evidence":
+			// Physical pair absence proves neither historical age nor absence of
+			// current standard messages. Their complete reverse audit still rejects
+			// any real message without canonical standard provenance.
+			add(mismatchCommittedEventUnsupported, severityLow, "retain the business record without claiming original message verification; continue the full standard outbox reverse audit")
 		case evidence.outbox != nil && evidence.outbox.InvalidReason != "":
 			add(mismatchCommittedOutboxMismatch, severityHigh, "investigate classified evidence conflict; never synthesize or resend an event to erase uncertainty")
 		case evidence.outbox != nil && evidence.outbox.Class == eventevidence.Unverifiable:
