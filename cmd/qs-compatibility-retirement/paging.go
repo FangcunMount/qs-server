@@ -37,6 +37,8 @@ type scanLimits struct {
 	MaxPages     int `json:"max_pages,omitempty"`
 }
 
+const mongoInventoryQueryPageSize = 1024
+
 var errSourceFileBound = errors.New("target_output_byte_bound_exceeded")
 
 type boundedSourceWriter struct {
@@ -747,7 +749,7 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 	h := sha256.New()
 	// The approved page size is an upper bound. Keep each actual cursor small
 	// enough to finish inside the unchanged whole-query deadline.
-	pageSize := min(limits.PageSize, 1024)
+	pageSize := min(limits.PageSize, mongoInventoryQueryPageSize)
 	var sink io.Writer
 	var sourceBuffer *bufio.Writer
 	if f != nil {
