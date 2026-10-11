@@ -998,6 +998,36 @@ def _forward_mongo_target_diagnostic(raw):
         print(lines[0].decode("ascii"), file=sys.stderr)
 
 
+MONGO_SCAN_TIMING = re.compile(
+    rb"QS_MONGO_SCAN_TIMING pass=[12] eof=[01] "
+    rb"pages=(?:0|[1-9][0-9]{0,3}) records=(?:0|[1-9][0-9]{0,6}) "
+    rb"source_bytes=(?:0|[1-9][0-9]{0,9}) "
+    rb"find_ms=(?:0|[1-9][0-9]{0,18}) next_ms=(?:0|[1-9][0-9]{0,18}) "
+    rb"processing_ms=(?:0|[1-9][0-9]{0,18}) flush_ms=(?:0|[1-9][0-9]{0,18}) "
+    rb"checkpoint_ms=(?:0|[1-9][0-9]{0,18})")
+
+
+def _forward_mongo_scan_timing(raw):
+    if len(raw) > 8192:
+        return
+    lines, passes = [], set()
+    for line in raw.split(b"\n")[:-1]:
+        if not MONGO_SCAN_TIMING.fullmatch(line):
+            continue
+        fields = {key: int(value) for key, value in
+                  (token.split(b"=", 1) for token in line.split(b" ")[1:])}
+        if (fields[b"pass"] in passes or fields[b"pages"] > 1001 or
+                fields[b"records"] > 1000000 or fields[b"source_bytes"] > 2 << 30 or
+                any(fields[key] > (1 << 63) - 1 for key in
+                    (b"find_ms", b"next_ms", b"processing_ms", b"flush_ms", b"checkpoint_ms"))):
+            return
+        passes.add(fields[b"pass"])
+        lines.append(line)
+    # Timings are observational stderr only, never a receipt or completion fact.
+    for line in lines:
+        print(line.decode("ascii"), file=sys.stderr)
+
+
 def _forward_inventory_diagnostic_fd(private_stderr):
     size = os.fstat(private_stderr.fileno()).st_size
     if size <= 8192:
@@ -1011,6 +1041,7 @@ def _forward_inventory_diagnostic_fd(private_stderr):
         tail = private_stderr.read(8193)
         raw = tail[1:] if tail[:1] == b"\n" else tail[1:].partition(b"\n")[2]
     _forward_mongo_target_diagnostic(raw)
+    _forward_mongo_scan_timing(raw)
 
 
 def capture_fixed(command, *, timeout, maximum=32768, mongo_index_diagnostics=False):
