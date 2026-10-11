@@ -745,6 +745,9 @@ func mongoPageCheckpoint(dir string, pass, page int, token string, s *snapshot, 
 func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary, limits scanLimits, dir string, pass int, f *os.File) (snapshot, error) {
 	s := snapshot{Classification: map[string]uint64{}}
 	h := sha256.New()
+	// The approved page size is an upper bound. Keep each actual cursor small
+	// enough to finish inside the unchanged whole-query deadline.
+	pageSize := min(limits.PageSize, 1024)
 	var sink io.Writer
 	var sourceBuffer *bufio.Writer
 	if f != nil {
@@ -786,14 +789,28 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		}
 		pageStarted := time.Now()
 		q, cancel := scopedQuery(ctx, limits)
-		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(limits.PageSize)).SetBatchSize(128).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
+		cur, e := col.Find(q, bson.D{{Key: "_id", Value: rangeOps}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetCollation(&options.Collation{Locale: "simple"}).SetLimit(int64(pageSize)).SetBatchSize(512).SetMaxTime(time.Duration(limits.QuerySeconds)*time.Second))
 		if e != nil {
 			emitMongoTargetDiagnostic(ctx, q, "find", pass, page, s, pageStarted, e)
 			cancel()
 			return s, category("mongo_target_read_failed_or_timed_out")
 		}
 		n := 0
-		for cur.Next(q) {
+		for {
+			// The driver can return buffered BSON without consulting its context.
+			e = ctx.Err()
+			if e == nil {
+				e = q.Err()
+			}
+			if e != nil {
+				emitMongoTargetDiagnostic(ctx, q, "iterate", pass, page, s, pageStarted, e)
+				_ = cur.Close(q)
+				cancel()
+				return s, category("mongo_target_read_failed_or_timed_out")
+			}
+			if !cur.Next(q) {
+				break
+			}
 			raw := cur.Current
 			if raw.Validate() != nil {
 				_ = cur.Close(q)
@@ -838,6 +855,9 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 			cursor = next
 		}
 		readErr := cur.Err()
+		if readErr == nil {
+			readErr = q.Err()
+		}
 		if readErr != nil {
 			emitMongoTargetDiagnostic(ctx, q, "iterate", pass, page, s, pageStarted, readErr)
 		}
@@ -849,12 +869,18 @@ func mongoPagedPass(ctx context.Context, col *mongo.Collection, b targetBoundary
 		if readErr != nil || closeErr != nil {
 			return s, category("mongo_target_read_failed_or_timed_out")
 		}
+		if ctx.Err() != nil {
+			return s, category("mongo_target_read_failed_or_timed_out")
+		}
 		if e = mongoPageCheckpoint(dir, pass, page, cursor, &s, h, f, sourceBuffer); e != nil {
 			return s, e
 		}
-		if n < limits.PageSize {
+		if n < pageSize {
 			break
 		}
+	}
+	if ctx.Err() != nil {
+		return s, category("mongo_target_read_failed_or_timed_out")
 	}
 	s.DataHash = hex.EncodeToString(h.Sum(nil))
 	return s, nil
