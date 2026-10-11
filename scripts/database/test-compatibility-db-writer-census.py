@@ -20,7 +20,9 @@ class DBCensusTest(unittest.TestCase):
         raw=api.canonical_bytes(approval)
         return argparse.Namespace(operation='prepare',prepare_mode='db-writer-census',operation_id='123-1',run_id='124-1',actual_source_sha='a'*40,approved_source_sha='a'*40,bootstrap_approval_json=raw.decode().strip(),bootstrap_approval_hash=hashlib.sha256(raw).hexdigest(),manifest_hash='',identity_request_hash='',inventory_request_hash='',lifecycle_request_hash='')
     def receipt(self,args,request,rh):
-        return {'format_version':1,'kind':'readonly_db_writer_census_observation','operation':'prepare','prepare_mode':'db-writer-census','source_sha':args.actual_source_sha,'operation_id':args.operation_id,'run_id':args.run_id,'source_uid':1001,'target_hash':api.TARGET_HASH,'request_sha256':rh,'observation_approval_sha256':args.bootstrap_approval_hash,'observed_identity_producer':request['identity_report'],'mysql_identity_sha256':'1'*64,'mongodb_identity_sha256':'2'*64,'mongodb_namespace_anchor_sha256':'3'*64,'mysql_migration_version':99,'mongodb_migration_version':38,'complete':False,'diagnostic_only':True,'execution_allowed':False,'drop_ready':False,'db_census_observation_complete':True,'writer_scope_complete':False,'mysql_all_connections_permission_proven':True,'mongodb_local_all_sessions_permission_proven':True,'all_nodes_sessions_coverage_complete':False,'external_writer_coverage_complete':False,'db_census_private_catalog_sha256':'4'*64,'db_census_catalog_sha256':'5'*64,'observed_sections':[{'name':n,'enumeration_complete':True,'recheck_equal':False,'items':0,'sha256':'6'*64,'error_category':'none'} for n in sorted(api.DB_CENSUS_SECTION_NAMES)],'unknown':['mongodb_other_nodes_sessions_and_external_authentication_unobserved'],'observation_elapsed_millis':12,'error_category':'none'}
+        sections=[{'name':n,'enumeration_complete':True,'recheck_equal':'connections' not in n and 'sessions' not in n,'items':0,'sha256':'6'*64,'error_category':'none'} for n in sorted(api.DB_CENSUS_REQUIRED_SECTION_NAMES)]
+        sections.append({'name':'mongodb_authentication_configuration','enumeration_complete':False,'recheck_equal':False,'items':0,'sha256':'','error_category':'db_census_mongo_query_failed_or_bounded'})
+        return {'format_version':1,'kind':'readonly_db_writer_census_observation','operation':'prepare','prepare_mode':'db-writer-census','source_sha':args.actual_source_sha,'operation_id':args.operation_id,'run_id':args.run_id,'source_uid':1001,'target_hash':api.TARGET_HASH,'request_sha256':rh,'observation_approval_sha256':args.bootstrap_approval_hash,'observed_identity_producer':request['identity_report'],'mysql_identity_sha256':'1'*64,'mongodb_identity_sha256':'2'*64,'mongodb_namespace_anchor_sha256':'3'*64,'mysql_migration_version':99,'mongodb_migration_version':38,'complete':False,'diagnostic_only':True,'execution_allowed':False,'drop_ready':False,'db_census_observation_complete':True,'writer_scope_complete':False,'mysql_all_connections_permission_proven':True,'mongodb_local_all_sessions_permission_proven':True,'all_nodes_sessions_coverage_complete':False,'external_writer_coverage_complete':False,'db_census_private_catalog_sha256':'4'*64,'db_census_catalog_sha256':'5'*64,'observed_sections':sections,'unknown':['mongodb_other_nodes_sessions_and_external_authentication_unobserved','mongodb_authentication_configuration_unread','mongodb_startup_authorization_and_external_provider_configuration_unobserved'],'observation_elapsed_millis':12,'error_category':'none'}
     def prepared(self):
         args=self.args();request=api.db_census_request(args);rh=hashlib.sha256(api.canonical_bytes(request)).hexdigest();return args,request,rh
     def test_actual_original_producer_is_not_relabelled(self):
@@ -34,10 +36,48 @@ class DBCensusTest(unittest.TestCase):
         for key in ('writer_scope_complete','complete','drop_ready','execution_allowed'):
             bad=copy.deepcopy(r);bad[key]=True
             with self.assertRaises(api.Blocked):api.validate_db_census_result(bad,args,request,rh,0)
+    def test_required_section_missing_or_incomplete_is_rejected(self):
+        args,request,rh=self.prepared()
+        for name in sorted(api.DB_CENSUS_REQUIRED_SECTION_NAMES):
+            for missing in (True,False):
+                with self.subTest(name=name,missing=missing):
+                    bad=self.receipt(args,request,rh)
+                    if missing:
+                        bad['observed_sections']=[s for s in bad['observed_sections'] if s['name']!=name]
+                    else:
+                        next(s for s in bad['observed_sections'] if s['name']==name).update(enumeration_complete=False,recheck_equal=False)
+                    with self.assertRaises(api.Blocked):api.validate_db_census_result(bad,args,request,rh,0)
+    def test_static_required_section_must_match_second_read(self):
+        args,request,rh=self.prepared()
+        for name in sorted(api.DB_CENSUS_REQUIRED_SECTION_NAMES):
+            if 'connections' in name or 'sessions' in name:continue
+            with self.subTest(name=name):
+                bad=self.receipt(args,request,rh)
+                next(s for s in bad['observed_sections'] if s['name']==name)['recheck_equal']=False
+                with self.assertRaises(api.Blocked):api.validate_db_census_result(bad,args,request,rh,0)
+    def test_startup_configuration_unknown_cannot_be_omitted_or_claimed(self):
+        args,request,rh=self.prepared()
+        for gap in ('mongodb_authentication_configuration_unread','mongodb_startup_authorization_and_external_provider_configuration_unobserved'):
+            with self.subTest(gap=gap):
+                bad=self.receipt(args,request,rh);bad['unknown'].remove(gap)
+                with self.assertRaises(api.Blocked):api.validate_db_census_result(bad,args,request,rh,0)
+        bad=self.receipt(args,request,rh)
+        next(s for s in bad['observed_sections'] if s['name']=='mongodb_authentication_configuration').update(enumeration_complete=True,recheck_equal=True,sha256='6'*64,error_category='none')
+        with self.assertRaises(api.Blocked):api.validate_db_census_result(bad,args,request,rh,0)
     def test_session_permission_failure_remains_incomplete(self):
         args,request,rh=self.prepared();r=self.receipt(args,request,rh);r['db_census_observation_complete']=False;r['error_category']='db_census_catalog_or_session_permissions_incomplete';r['observed_sections'][0]['enumeration_complete']=False;r['observed_sections'][0]['error_category']='db_census_mongo_query_failed_or_bounded'
         accepted=api.validate_db_census_result(r,args,request,rh,1);self.assertFalse(accepted['db_census_observation_complete']);self.assertEqual(accepted['db_census_private_catalog_sha256'],'4'*64)
         with self.assertRaises(api.Blocked):api.validate_db_census_result(self.receipt(args,request,rh),args,request,rh,1)
+    def test_fixed_mongo_error_categories_remain_incomplete_and_reject_dynamic_body(self):
+        args,request,rh=self.prepared()
+        for category in ('db_census_mongo_command_code_13','db_census_user_expansion_schema_rejected','db_census_cursor_schema_rejected'):
+            r=self.receipt(args,request,rh);r.update(db_census_observation_complete=False,error_category='db_census_catalog_or_session_permissions_incomplete')
+            section=next(s for s in r['observed_sections'] if s['name']=='mongodb_users');section.update(enumeration_complete=False,error_category=category)
+            accepted=api.validate_db_census_result(r,args,request,rh,1)
+            self.assertFalse(accepted['db_census_observation_complete']);self.assertFalse(any(accepted['capabilities'].values()))
+        r=self.receipt(args,request,rh);r.update(db_census_observation_complete=False,error_category='db_census_catalog_or_session_permissions_incomplete')
+        r['observed_sections'][0].update(enumeration_complete=False,error_category='private-server-error-body')
+        with self.assertRaises(api.Blocked):api.validate_db_census_result(r,args,request,rh,1)
     def test_closed_partial_pre_identity_fields_and_credential_pipe(self):
         args,request,rh=self.prepared();r=self.receipt(args,request,rh);r.update(db_census_observation_complete=False,mysql_all_connections_permission_proven=False,mongodb_local_all_sessions_permission_proven=False,error_category='db_census_original_identity_read_rejected',observed_sections=[],observed_identity_producer={k:'' for k in request['identity_report']},mysql_migration_version=0,mongodb_migration_version=0)
         self.assertFalse(api.validate_db_census_result(r,args,request,rh,1)['db_census_observation_complete'])

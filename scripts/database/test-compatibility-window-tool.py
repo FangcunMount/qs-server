@@ -201,6 +201,40 @@ class WindowToolMetadata(unittest.TestCase):
             with self.subTest(changed=changed),self.assertRaises(tool.Refused):tool.pinned_service_known_host(changed,'server-d.example',2222,fingerprint)
         with self.assertRaises(tool.Refused):tool.pinned_service_known_host(raw,'server-d.example',2222,'SHA256:'+'a'*43)
 
+    def test_prepare_service_observation_never_uses_missing_or_partial_credentials(self):
+        from unittest import mock
+        with mock.patch.dict(tool.os.environ,{},clear=True),mock.patch.object(tool,'owned_process') as child:
+            self.assertIsNone(tool.observe_service_channel(self.approval(self.request()),'22-3'))
+            child.assert_not_called()
+        for name in tool.SERVICE_CREDENTIALS:
+            with self.subTest(name=name),mock.patch.dict(tool.os.environ,{name:'fixture'},clear=True),mock.patch.object(tool,'owned_process') as child:
+                with self.assertRaises(tool.Refused):tool.observe_service_channel(self.approval(self.request()),'22-3')
+                child.assert_not_called()
+
+    def test_prepare_service_observation_binds_actual_local_bytes_and_only_emits_digests(self):
+        import base64,hashlib
+        from unittest import mock
+        blob=b'offline public peer fixture'
+        pin='SHA256:'+base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip('=')
+        key='-----BEGIN OPENSSH PRIVATE KEY-----\nfixture-only\n-----END OPENSSH PRIVATE KEY-----\n\n'
+        known=b'[server-d.example]:2222 ssh-ed25519 '+base64.b64encode(blob)+b'\n'
+        env=dict(zip(tool.SERVICE_CREDENTIALS,('server-d.example','deploy','2222',key,pin)))
+        with mock.patch.dict(tool.os.environ,env,clear=True),mock.patch.object(tool,'owned_process',return_value=(0,known)) as child:
+            value=tool.observe_service_channel(self.approval(self.request()),'22-3',control=88)
+        self.assertEqual(value['identity_sha256'],tool.digest((key.rstrip('\n')+'\n').encode('ascii')))
+        self.assertEqual(value['known_hosts_sha256'],tool.digest(known))
+        self.assertEqual(value['ssh_executable_sha256'],tool.digest(Path('/usr/bin/ssh').read_bytes()))
+        self.assertEqual((value['tool_source_sha'],value['operation_id'],value['run_id']),('a'*40,'12-1','22-3'))
+        self.assertTrue(all(value[k] is False for k in ('database_access','service_control_used','execution_allowed','drop_ready')))
+        encoded=tool.canonical(value).decode()
+        for private in ('server-d.example','deploy',key,pin):self.assertNotIn(private,encoded)
+        self.assertEqual(child.call_args.args[0],['/usr/bin/ssh-keyscan','-T','5','-p','2222','-t','ed25519,rsa,ecdsa','server-d.example'])
+        self.assertEqual(child.call_args.args[1],{'PATH':'/usr/bin:/bin'})
+        self.assertEqual(child.call_args.kwargs,{'control':88,'timeout':20})
+        for code,raw in ((1,known),(0,known.replace(b'server-d.example',b'server-a.example'))):
+            with mock.patch.dict(tool.os.environ,env,clear=True),mock.patch.object(tool,'owned_process',return_value=(code,raw)),self.assertRaises(tool.Refused):
+                tool.observe_service_channel(self.approval(self.request()),'22-3')
+
     def test_database_writer_native_census_reference_is_exact_and_not_authority(self):
         r=self.request();a=self.approval(r,'apply')
         file=dict(path='/opt/backups/qs-server/compatibility-retirement-root-prepare/12-1-18-1/db-writer-census.private.json',sha256='a'*64)
