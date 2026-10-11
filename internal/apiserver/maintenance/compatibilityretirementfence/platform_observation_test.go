@@ -14,8 +14,10 @@ import (
 // A private protocol adapter exercises schema/pagination/order only. This is
 // not the native TLS factory, GitHub's identity, root, or a writer-fence proof.
 type platformProtocolFixture struct {
-	base     *fixtureClient
-	mutation string
+	base      *fixtureClient
+	mutation  string
+	workflows []githubWorkflow
+	runs      []githubRun
 }
 
 func platformScopeFixture() (RunnerWorkflowScope, *platformProtocolFixture) {
@@ -27,6 +29,22 @@ func platformScopeFixture() (RunnerWorkflowScope, *platformProtocolFixture) {
 		OriginalRunID: "901-1", ManifestSHA256: strings.Repeat("d", 64), RepositoryID: p.RepositoryID, OwnerID: p.OwnerID,
 		ActorID: p.ActorID, WorkflowID: p.WorkflowID, WorkflowIDs: ids, JobName: "Exact controlled fixture", RunnerID: p.RunnerID}
 	return s, &platformProtocolFixture{base: &fixtureClient{p: p}}
+}
+
+func platformManagedAnalysisFixture() (RunnerWorkflowScope, *platformProtocolFixture) {
+	s, f := platformScopeFixture()
+	// Exact identities observed in the repository's complete workflow catalog.
+	// Keep this fixture independent of the producer's classification function.
+	f.workflows = []githubWorkflow{
+		{ID: 214640618, Path: "dynamic/dependabot/update-graph", Name: "Dependency Graph", State: "active"},
+		{ID: 264440496, Path: "dynamic/github-code-scanning/codeql", Name: "CodeQL", State: "active"},
+		{ID: 343442498, Path: "dynamic/github-code-quality/codeql", Name: "CodeQL - Code Quality", State: "active"},
+	}
+	for _, row := range f.workflows {
+		s.WorkflowIDs = append(s.WorkflowIDs, row.ID)
+	}
+	sort.Slice(s.WorkflowIDs, func(i, j int) bool { return s.WorkflowIDs[i] < s.WorkflowIDs[j] })
+	return s, f
 }
 
 func TestApprovedWorkflowMaterialBindingUsesOriginalScope(t *testing.T) {
@@ -81,6 +99,24 @@ func (f *platformProtocolFixture) Do(req *http.Request) (*http.Response, error) 
 				}
 			}
 		}
+		rows := v["workflows"].([]any)
+		for _, row := range f.workflows {
+			rows = append(rows, row)
+		}
+		v["workflows"] = rows
+		v["total_count"] = v["total_count"].(float64) + float64(len(f.workflows))
+	}
+	if strings.HasSuffix(req.URL.Path, "/actions/runs") {
+		rows := v["workflow_runs"].([]any)
+		added := 0
+		for _, row := range f.runs {
+			if row.Status == req.URL.Query().Get("status") {
+				rows = append(rows, row)
+				added++
+			}
+		}
+		v["workflow_runs"] = rows
+		v["total_count"] = v["total_count"].(float64) + float64(added)
 	}
 	if strings.HasSuffix(req.URL.Path, "/jobs") {
 		for _, item := range v["jobs"].([]any) {
@@ -132,6 +168,96 @@ func TestPlatformQuarantineProtocolRefusedOldAndPending(t *testing.T) {
 				t.Fatal("old or pending platform writer entry accepted")
 			}
 		})
+	}
+}
+
+func TestPlatformQuarantineManagedAnalysisCatalogOnly(t *testing.T) {
+	s, f := platformManagedAnalysisFixture()
+	v, e := readPlatformQuarantinePair(t.Context(), f, s, "900-1")
+	if e != nil || v.count != len(s.WorkflowIDs) || !sha64.MatchString(v.digest) || v.job <= 0 || f.base.snapshots != 2 {
+		t.Fatal("exact managed analysis catalog did not preserve complete two-snapshot observation", e)
+	}
+	for _, name := range []string{"missing_catalog_row", "missing_approved_id", "duplicate_catalog_row", "changing_snapshot", "open_workflow"} {
+		t.Run(name, func(t *testing.T) {
+			s, f := platformManagedAnalysisFixture()
+			switch name {
+			case "missing_catalog_row":
+				f.workflows = f.workflows[1:]
+			case "missing_approved_id":
+				for i, id := range s.WorkflowIDs {
+					if id == f.workflows[0].ID {
+						s.WorkflowIDs = append(s.WorkflowIDs[:i], s.WorkflowIDs[i+1:]...)
+						break
+					}
+				}
+			case "duplicate_catalog_row":
+				f.workflows = append(f.workflows, f.workflows[0])
+			default:
+				f.mutation = name
+			}
+			if _, e := readPlatformQuarantinePair(t.Context(), f, s, "900-1"); e == nil {
+				t.Fatal("managed analysis classification weakened catalog or snapshot closure")
+			}
+		})
+	}
+}
+
+func TestPlatformQuarantineManagedAnalysisRequiresExactIdentity(t *testing.T) {
+	_, initial := platformManagedAnalysisFixture()
+	for index, row := range initial.workflows {
+		for _, field := range []string{"id", "path", "path_prefix", "name"} {
+			t.Run(row.Name+"/"+field, func(t *testing.T) {
+				s, f := platformManagedAnalysisFixture()
+				switch field {
+				case "id":
+					f.workflows[index].ID++
+					for i, id := range s.WorkflowIDs {
+						if id == row.ID {
+							s.WorkflowIDs[i] = f.workflows[index].ID
+						}
+					}
+				case "path":
+					f.workflows[index].Path = ".github/workflows/codeql.yml"
+				case "path_prefix":
+					f.workflows[index].Path += "/other"
+				case "name":
+					f.workflows[index].Name += " "
+				}
+				if _, e := readPlatformQuarantinePair(t.Context(), f, s, "900-1"); e == nil {
+					t.Fatal("partial managed analysis identity accepted as an active catalog exception")
+				}
+			})
+		}
+	}
+}
+
+func TestPlatformQuarantineManagedAnalysisNonterminalRunsRefused(t *testing.T) {
+	_, initial := platformManagedAnalysisFixture()
+	for _, workflow := range initial.workflows {
+		for _, status := range []string{"queued", "in_progress", "waiting", "pending", "requested"} {
+			for _, origin := range []string{"current", "old_ref", "rerun"} {
+				if origin != "current" && status != "in_progress" {
+					continue
+				}
+				t.Run(workflow.Name+"/"+status+"/"+origin, func(t *testing.T) {
+					s, f := platformManagedAnalysisFixture()
+					repo := githubRepository{ID: 100, FullName: Repository}
+					repo.Owner.ID = 200
+					run := githubRun{ID: 902, RunAttempt: 1, WorkflowID: workflow.ID, HeadSHA: s.DispatcherSourceSHA,
+						HeadBranch: "main", Event: "dynamic", Status: status, Path: workflow.Path, Repository: repo, HeadRepository: repo}
+					switch origin {
+					case "old_ref":
+						run.HeadBranch, run.HeadSHA = "old", strings.Repeat("e", 40)
+					case "rerun":
+						run.RunAttempt = 2
+					}
+					f.runs = []githubRun{run}
+					if _, e := readPlatformQuarantinePair(t.Context(), f, s, "900-1"); e == nil {
+						t.Fatal("managed analysis active-state exception admitted a nonterminal run")
+					}
+				})
+			}
+		}
 	}
 }
 
