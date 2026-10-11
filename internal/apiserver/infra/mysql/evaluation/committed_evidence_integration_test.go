@@ -18,7 +18,6 @@ import (
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
-	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/message"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -95,6 +94,7 @@ func openCommittedEvidenceDB(t *testing.T) *gorm.DB {
 	}
 	return db
 }
+
 func stageCommittedTestEvent(ctx context.Context, stager *mysqlstandard.Stager, row committedStandardRow) error {
 	outer, _, err := legacy.Decode(row.Payload)
 	if err != nil {
@@ -107,6 +107,7 @@ func stageCommittedTestEvent(ctx context.Context, stager *mysqlstandard.Stager, 
 	evt := event.Event[json.RawMessage]{BaseEvent: event.BaseEvent{ID: inner.ID, EventTypeValue: inner.EventType, AggregateTypeValue: inner.AggregateType, AggregateIDValue: inner.AggregateID, OccurredAtValue: inner.OccurredAt}, Data: inner.Data}
 	return stager.Stage(ctx, evt)
 }
+
 func TestCommittedEvidenceAtomicNativeMySQL(t *testing.T) {
 	db := openCommittedEvidenceDB(t)
 	record, row := testCommittedReference(t, 9001, 42, "native-committed")
@@ -208,95 +209,4 @@ func TestCommittedEvidenceAtomicNativeMySQL(t *testing.T) {
 		t.Fatalf("tamper=%#v err=%v", proof[42], err)
 	}
 	// No retired table was created anywhere in this fixture.
-}
-func TestCommittedEvidenceBackfillNativeCAS(t *testing.T) {
-	db := openCommittedEvidenceDB(t)
-	record, _ := testCommittedReference(t, 9001, 42, "original-retired")
-	baseline := *outcomeToPO(record)
-	baseline.CommittedEventID = nil
-	baseline.CommittedEventEvidence = nil
-	if err := db.Create(&baseline).Error; err != nil {
-		t.Fatal(err)
-	}
-	// Read the exact database baseline, including normalized driver times.
-	if err := db.First(&baseline, baseline.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	current, err := outcomeFromPO(&baseline)
-	if err != nil {
-		t.Fatal(err)
-	}
-	proof := &eventevidence.EventEvidenceV1{Version: 1, Class: eventevidence.RetiredVerified, EventID: "original-retired", Digest: eventevidence.SourceDigest("mysql_select_binary_source_sha256_v1", []byte("original-source-fixture")), BusinessBindingSHA256: current.BusinessBindingSHA256(), Origin: "mysql.domain_event_outbox", Verification: eventevidence.Verification{Method: "typed-original-business-binding", Version: "v1", OperationID: "native-retirement", VerifiedAt: time.Now().UTC(), BusinessTerminal: true, OwnershipVerified: true, ResponsibilityClosed: true}}
-	if err := BackfillCommittedEventEvidence(t.Context(), baseline, proof); err == nil {
-		t.Fatal("borrowed transaction requirement bypassed")
-	}
-	if err := BackfillCommittedEventEvidence(hostmysql.WithTx(t.Context(), db), baseline, proof); err == nil {
-		t.Fatal("non-transactional pool in context bypassed the real transaction guard")
-	}
-	sentinel := errors.New("rollback verified proof")
-	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := BackfillCommittedEventEvidence(hostmysql.WithTx(t.Context(), tx), baseline, proof); err != nil {
-			return err
-		}
-		return sentinel
-	}); !errors.Is(err, sentinel) {
-		t.Fatal(err)
-	}
-	var unclassified EvaluationOutcomePO
-	if err := db.First(&unclassified, baseline.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if unclassified.CommittedEventEvidence != nil || unclassified.CommittedEventID != nil {
-		t.Fatal("outer rollback left a retirement conclusion")
-	}
-	apply := func(baseline EvaluationOutcomePO, p *eventevidence.EventEvidenceV1) error {
-		return db.Transaction(func(tx *gorm.DB) error {
-			return BackfillCommittedEventEvidence(hostmysql.WithTx(t.Context(), tx), baseline, p)
-		})
-	}
-	observer := db.Begin(&sql.TxOptions{Isolation: sql.LevelRepeatableRead})
-	if observer.Error != nil {
-		t.Fatal(observer.Error)
-	}
-	defer observer.Rollback()
-	var oldSnapshot EvaluationOutcomePO
-	if err := observer.First(&oldSnapshot, baseline.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := apply(baseline, proof); err != nil {
-		t.Fatal(err)
-	}
-	// UPDATE observes the current committed row, so its idempotent readback must
-	// also use a locking current read instead of this transaction's old snapshot.
-	if err := BackfillCommittedEventEvidence(hostmysql.WithTx(t.Context(), observer), baseline, proof); err != nil {
-		t.Fatalf("RR same-proof concurrent commit: %v", err)
-	}
-	if err := observer.Rollback().Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := apply(baseline, proof); err != nil {
-		t.Fatalf("identical retry: %v", err)
-	}
-	conflict := proof.Clone()
-	conflict.Digest.SHA256 = eventevidence.SourceDigest("source", []byte("different")).SHA256
-	if err := apply(baseline, conflict); err == nil {
-		t.Fatal("conflicting conclusion overwritten")
-	}
-	if err := db.Exec("UPDATE evaluation_outcome SET committed_event_id=? WHERE id=?", "wrong-retired-id", baseline.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := apply(baseline, proof); err == nil {
-		t.Fatal("same proof hid a corrupt independently stored event ID")
-	}
-	if err := db.Exec("UPDATE evaluation_outcome SET committed_event_id=? WHERE id=?", proof.EventID, baseline.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	reader := &consistencyReadModel{db: db}
-	got, err := reader.listCommittedOutboxEvidence(t.Context(), []uint64{42})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got[42].Class != eventevidence.RetiredVerified || got[42].RowCount != 0 || got[42].InvalidReason != "" {
-		t.Fatalf("historical=%#v", got[42])
-	}
 }

@@ -10,7 +10,7 @@ from scripts import check_docs_facts, check_docs_hygiene
 
 class DocsFactsHelpersTest(unittest.TestCase):
     def test_python_bytecode_flag_preserves_repository_command_boundary(self) -> None:
-        self.assertTrue(check_docs_facts.command_is_verifiable("python3 -B scripts/database/test-compatibility-retirement.py"))
+        self.assertTrue(check_docs_facts.command_is_verifiable("python3 -B scripts/check_docs_facts.py"))
         self.assertFalse(check_docs_facts.command_is_verifiable("python3 -B -c arbitrary_code"))
         self.assertFalse(check_docs_facts.command_is_verifiable("python3 -B"))
 

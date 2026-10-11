@@ -186,9 +186,7 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 	}
 
 	if recorder == nil {
-		if s.runtimeFacts != nil {
-			s.runtimeFacts.MarkIncomplete("api-authz-events")
-		}
+
 		logger.L(context.Background()).Warnw("IAM authz version subscriber requires durable dead-letter audit", "component", "apiserver")
 		return nil
 	}
@@ -201,9 +199,8 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr,
 		FailedHandoffGroup: handoffGroup,
 	}
-	sdkSubscriber, err := eventtransport.NewSDKDeliverySubscriberWithFacts(
+	sdkSubscriber, err := eventtransport.NewSDKDeliverySubscriber(
 		subscriberConfig, 0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder),
-		s.runtimeFacts, "api-authz-events",
 	)
 	if err == nil {
 		err = iamauth.SubscribeVersionChangesSDK(context.Background(), sdkSubscriber, authzSync.Topic, channel, loader)

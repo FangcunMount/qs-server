@@ -29,11 +29,8 @@ func TestCreateAPIServerKeepsOnlyRootState(t *testing.T) {
 	}
 
 	typ := reflect.TypeOf(*server)
-	if server.runtimeFacts == nil {
-		t.Fatal("runtimeFacts = nil, want process-owned observer")
-	}
-	if typ.NumField() != 3 {
-		t.Fatalf("server field count = %d, want 3", typ.NumField())
+	if typ.NumField() != 2 {
+		t.Fatalf("server field count = %d, want 2", typ.NumField())
 	}
 	if got := typ.Field(0).Name; got != "gs" {
 		t.Fatalf("field[0] = %q, want gs", got)
@@ -41,7 +38,5 @@ func TestCreateAPIServerKeepsOnlyRootState(t *testing.T) {
 	if got := typ.Field(1).Name; got != "config" {
 		t.Fatalf("field[1] = %q, want config", got)
 	}
-	if got := typ.Field(2).Name; got != "runtimeFacts" {
-		t.Fatalf("field[2] = %q, want runtimeFacts", got)
-	}
+
 }
