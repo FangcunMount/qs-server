@@ -767,8 +767,29 @@ def run_action(env,repo,capture_fn=capture):
     def call(argv,stdin=None,cap=MAX_PRIVATE):
         remaining=TOTAL_SECONDS-(time.monotonic()-started)
         if remaining<=0:reject('transport_timeout')
-        code,out,err=capture_fn(argv,stdin=stdin,timeout=min(remaining,150),cap=cap)
-        if err or code!=0:reject('transport_failed')
+        facts={'execution_stage':diagnostics['execution_stage'],'exit_code':'unknown','stdout_bytes':'unknown','stderr_bytes':'unknown','stderr_nonempty':'unknown','reason':'other_or_unknown'}
+        try:code,out,err=capture_fn(argv,stdin=stdin,timeout=min(remaining,150),cap=cap)
+        except Exception:
+            # Capture failure has no returned exit code or buffer-length facts.
+            print('QS_HOST_INVENTORY_TRANSPORT_DIAGNOSTIC '+canonical(facts).decode(),end='',file=sys.stderr)
+            raise
+        if err or code!=0:
+            facts.update({'exit_code':code if type(code) is int and -255<=code<=255 else 'unknown','stdout_bytes':len(out) if type(out) is bytes and len(out)<=cap else 'unknown','stderr_bytes':len(err) if type(err) is bytes and len(err)<=cap else 'unknown','stderr_nonempty':bool(err) if type(err) is bytes else 'unknown'})
+            if code==0 and err:facts['reason']='stderr_on_zero_exit'
+            elif type(err) is bytes:
+                reasons=set()
+                for reason,pattern in (
+                    ('publickey_authentication_denied',rb'(?m)^[^\r\n]+: Permission denied \(publickey\)\.\r?$'),
+                    ('host_key_rejected',rb'(?m)^Host key verification failed\.\r?$'),
+                    ('connection_timeout',rb'(?m)^ssh: connect to host [^\r\n]+ port [0-9]+: Connection timed out\r?$'),
+                    ('connection_refused',rb'(?m)^ssh: connect to host [^\r\n]+ port [0-9]+: Connection refused\r?$'),
+                    ('name_resolution_failed',rb'(?m)^ssh: Could not resolve hostname [^\r\n]+: Name or service not known\r?$'),
+                    ('remote_python_failed',rb'(?m)^Traceback \(most recent call last\):\r?$')):
+                    if re.search(pattern,err):reasons.add(reason)
+                if len(reasons)==1:facts['reason']=next(iter(reasons))
+            # Only closed categories and counts; never captured bytes or route.
+            print('QS_HOST_INVENTORY_TRANSPORT_DIAGNOSTIC '+canonical(facts).decode(),end='',file=sys.stderr)
+            reject('transport_failed')
         return out
     try:
         bodies={'action.py':script.read_bytes(),'inventory.py':(Path(repo)/'scripts/database/compatibility-retirement-host-inventory.py').read_bytes(),'receipt.py':(Path(repo)/'scripts/dbops/receipt-transport.py').read_bytes(),'approval.json':raw,'request.json':reqraw}
