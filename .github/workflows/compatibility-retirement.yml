@@ -1047,6 +1047,7 @@ jobs:
       - name: Hold same-run workflow owner through native acceptance or recovery
         env:
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          RETIREMENT_FIXED_WINDOW_ENTRY_SHA256: ${{ vars.RETIREMENT_FIXED_WINDOW_ENTRY_SHA256 }}
           RETIREMENT_PLATFORM_TOKEN: ${{ github.token }}
           RETIREMENT_OPERATION: ${{ inputs.operation }}
           RETIREMENT_OPERATION_ID: ${{ inputs.operation_id }}

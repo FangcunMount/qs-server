@@ -189,6 +189,7 @@ class RunnerWindowTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", effect)
         self.assertNotIn("appleboy/ssh-action", effect)
         self.assertIn("RETIREMENT_PLATFORM_TOKEN: ${{ github.token }}", effect)
+        self.assertIn("RETIREMENT_FIXED_WINDOW_ENTRY_SHA256: ${{ vars.RETIREMENT_FIXED_WINDOW_ENTRY_SHA256 }}", effect)
         self.assertIn("compatibility-platform-window-action.py", effect)
 
     def test_public_runner_receipt_is_armored_and_contains_no_raw_native_or_credentials(self):
@@ -210,9 +211,56 @@ class RootPasswordClosedTransport(unittest.TestCase):
         import json,subprocess,sys
         for password in (None,42,'fixture\npassword','fixture\rpassword','fixture\x00password','\u00e9'*2049):
             with self.subTest(kind=type(password).__name__):
-                packet={'bindings':['apply','12-1','22-1','d'*40,'c'*64,'e'*64],'approval':'','approval_sha256':'a'*64,'package_sha256':'b'*64,'tool_directory':'/tmp/qs-independent-window-tool.invalid','credentials':{'MYSQL_PASSWORD':'fixture_db_secret'},'sudo_password':password}
+                packet={'bindings':['apply','12-1','22-1','d'*40,'c'*64,'e'*64],'approval':'','approval_sha256':'a'*64,'package_sha256':'b'*64,'tool_directory':'/tmp/qs-independent-window-tool.invalid','credentials':{'MYSQL_PASSWORD':'fixture_db_secret'},'sudo_password':password,'fixed_window_entry_sha256':'f'*64}
                 result=subprocess.run([sys.executable,'-I','-c',A.REMOTE],input=(json.dumps(packet)+'\n').encode(),capture_output=True,timeout=5,check=False)
                 self.assertEqual(result.returncode,125);self.assertEqual(result.stdout,b'');self.assertEqual(result.stderr,b'')
+        for fixed in (None,42,'F'*64,'f'*63,'f'*64+'\n'):
+            with self.subTest(fixed=repr(fixed)):
+                packet.update(sudo_password='',fixed_window_entry_sha256=fixed)
+                result=subprocess.run([sys.executable,'-I','-c',A.REMOTE],input=(json.dumps(packet)+'\n').encode(),capture_output=True,timeout=5,check=False)
+                self.assertEqual(result.returncode,125);self.assertEqual(result.stdout,b'');self.assertEqual(result.stderr,b'')
+
+    def test_actual_remote_pin_reaches_original_limited_caller_with_held_stdin(self):
+        import tarfile,time,uuid
+        fixture=F.WindowToolMetadata();request=fixture.request();approval=fixture.approval(request,'apply')
+        # Actual private tar/FD/pipe staging, with only the privileged child and
+        # its protected inputs substituted. This proves transport, not sudo authority.
+        wrapper=("import importlib.util,json,os,select\nfrom pathlib import Path\nfrom unittest.mock import patch\n"
+                 "def run_window_call(args,raw,approval_hash,package,credentials,*,control):\n"
+                 " assert os.environ['RETIREMENT_FIXED_WINDOW_ENTRY_SHA256']=='f'*64\n"
+                 " assert not select.select([control],[],[],.05)[0]\n"
+                 " assert 'UNRELATED_FIXTURE_ENV' not in os.environ\n"
+                 " spec=importlib.util.spec_from_file_location('original_window',"+repr(W.__file__)+")\n"
+                 " w=importlib.util.module_from_spec(spec);spec.loader.exec_module(w)\n"
+                 " request="+repr(request)+"\n approval="+repr(approval)+"\n"
+                 " fixed=Path('/usr/local/libexec/qs-retirement')/('f'*64+'.py')\n"
+                 " with patch.object(w.os,'getuid',return_value=501),patch.object(w.os,'geteuid',return_value=501),patch.object(w.Path,'resolve',return_value=Path('/tmp/qs-independent-window-tool.abcdef/compatibility-window-tool.py')),patch.object(w,'approve',return_value=approval),patch.object(w,'read_owned',return_value=w.canonical(request)),patch.object(w,'installed_fixed_window_entry',return_value=fixed),patch.object(w,'root_askpass_environment') as askpass,patch.object(w,'owned_process',return_value=(1,b'fixture-refusal')) as child,patch.object(w,'validate_native',side_effect=w.Refused('fixture')),patch.object(w,'emit'):\n"
+                 "  assert w.run_window_call(args,raw,approval_hash,package,credentials,control=control)==1\n"
+                 " askpass.assert_not_called()\n"
+                 " assert child.call_args.args[0]==['/usr/bin/sudo','-n','--','/usr/bin/python3','-I',str(fixed)]\n"
+                 " assert child.call_args.args[1]=={'PATH':'/usr/bin:/bin'}\n"
+                 " assert child.call_args.kwargs['control']==control\n"
+                 " value=w.decode(child.call_args.kwargs['packet'])\n"
+                 " assert value['bindings'][0]=='apply' and value['credentials']==credentials\n"
+                 " assert 'fixed_window_entry_sha256' not in value and 'SUDO_PASSWORD' not in value['credentials']\n"
+                 " print('fixed-no-argument-caller-held-stdin',flush=True)\n return 1\n").encode()
+        run=str(time.time_ns())+'-1';directory=Path('/tmp/qs-independent-window-tool.'+uuid.uuid4().hex[:12]);directory.mkdir(mode=0o700)
+        archive=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz')
+        source=directory/archive.name
+        try:
+            with tarfile.open(source,'x:gz') as package:
+                for name,body in {'compatibility-window-tool.py':wrapper,'receipt-transport.py':b'fixture','inventory-linux-amd64':b'fixture','inventory-linux-arm64':b'fixture'}.items():
+                    member=tarfile.TarInfo(name);member.size=len(body);package.addfile(member,io.BytesIO(body))
+            source.chmod(0o600)
+            packet=dict(bindings=['apply','12-1',run,'d'*40,'c'*64,approval['request_template_sha256']],approval='',approval_sha256='a'*64,package_sha256=A.sha(source.read_bytes()),tool_directory=str(directory),credentials={key:'' for key in W.credential_names('apply')},sudo_password='',fixed_window_entry_sha256='f'*64)
+            with patch.dict(os.environ,{'UNRELATED_FIXTURE_ENV':'must-be-cleared'}):
+                code,output=A.collect_owned([sys.executable,'-I','-c',A.REMOTE],packet=P.canonical(packet),timeout=5)
+            self.assertEqual((code,output),(1,b'fixed-no-argument-caller-held-stdin\n'))
+            self.assertFalse(source.exists());self.assertTrue(archive.exists())
+        finally:
+            for path in (source,directory/'compatibility-window-tool.py',directory/'receipt-transport.py',archive):
+                if path.exists():path.unlink()
+            directory.rmdir()
 
     def test_remote_password_is_separate_from_credentials_and_not_in_root_packet(self):
         import ast
