@@ -8,27 +8,77 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	sqlevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	mysql "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// The owned fixture helper verifies the exact local CID/image/labels/volume and
-// 34306 loopback binding before opening only its new random database. No global
-// instrumentation, accounts, containers, or shared schemas are changed here.
+// CI verifies its actual running job service before creating a random schema;
+// the local route retains its exact CID/image/labels/volume/34306 owned guard.
+// No instrumentation, accounts, containers, or shared schemas are changed here.
 func aiReverseNativeDatabase(t *testing.T) (*gorm.DB, *sql.DB) {
 	t.Helper()
-	pool := aiNativeOwnedMySQL(t)
+	var pool *sql.DB
+	if ciContainer := os.Getenv("QS_HISTORY_CI_MYSQL_CONTAINER"); ciContainer != "" {
+		cfg, err := mysql.ParseDSN(os.Getenv("QS_HISTORY_MYSQL_DSN"))
+		if err != nil || cfg.Net != "tcp" || cfg.Addr != "127.0.0.1:3306" || !validHistoricalCIMySQLID(ciContainer) {
+			t.Fatal("actual CI MySQL service binding required")
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		raw, err := exec.CommandContext(ctx, "docker", "--host", "unix:///var/run/docker.sock", "inspect", ciContainer).Output()
+		if err != nil || !historicalCIMySQLMatches(raw, ciContainer) {
+			t.Fatal("actual CI MySQL service inspection rejected")
+		}
+		cfg.DBName, cfg.MultiStatements, cfg.ParseTime, cfg.Loc = "", true, true, time.UTC
+		admin, err := sql.Open("mysql", cfg.FormatDSN())
+		if err != nil {
+			t.Fatal("actual CI MySQL service open failed")
+		}
+		name := "qs_ai_resolver_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+		if _, err = admin.ExecContext(t.Context(), "CREATE DATABASE `"+name+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"); err != nil {
+			if admin.Close() != nil {
+				t.Error("native admin close failed")
+			}
+			t.Fatal("actual CI owned schema creation failed")
+		}
+		t.Cleanup(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if _, err := admin.ExecContext(ctx, "DROP DATABASE `"+name+"`"); err != nil {
+				t.Error("own schema cleanup failed")
+			}
+			if err := admin.Close(); err != nil {
+				t.Error("native admin close failed")
+			}
+		})
+		cfg.DBName = name
+		pool, err = sql.Open("mysql", cfg.FormatDSN())
+		if err != nil {
+			t.Fatal("actual CI owned schema open failed")
+		}
+		t.Cleanup(func() {
+			if err := pool.Close(); err != nil {
+				t.Error("native owned pool close failed")
+			}
+		})
+	} else {
+		pool = aiNativeOwnedMySQL(t)
+	}
 	var name string
 	if pool.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&name) != nil || !strings.HasPrefix(name, "qs_ai_resolver_") {
 		t.Fatal("random owned namespace binding")
