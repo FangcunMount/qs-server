@@ -1081,6 +1081,47 @@ def pinned_service_known_host(raw, host, port, fingerprint):
     return matches.pop()
 
 
+def observe_service_channel(approval, run, *, control=None):
+    """Observe the actual deploy credential and pinned peer without logging in.
+
+    The original prepare packet still has twelve database credentials. Only
+    digests leave this unprivileged caller; no key file or native authority is
+    created. Offline callers without the ordinary deploy environment omit it.
+    """
+    values = tuple(os.environ.get(name, "") for name in SERVICE_CREDENTIALS)
+    if not any(values):
+        return None
+    if any(not value or len(value) > 8192 or "\x00" in value or "\r" in value or ("\n" in value and name != SERVICE_KEY) for name, value in zip(SERVICE_CREDENTIALS, values)):
+        reject("window_tool_service_route_rejected")
+    host, user, port, key, pin = values
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}", host) is None or ".." in host or re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) is None or re.fullmatch(r"[0-9]{1,5}", port) is None or not 1 <= int(port) <= 65535 or re.fullmatch(r"SHA256:[A-Za-z0-9+/]{43}", pin) is None:
+        reject("window_tool_service_route_rejected")
+    key_raw = key.rstrip("\n").encode("ascii") + b"\n"
+    if not key_raw.startswith(b"-----BEGIN ") or not key_raw.rstrip().endswith(b"-----"):
+        reject("window_tool_service_identity_rejected")
+    ssh = Path("/usr/bin/ssh")
+    identity = lambda v: (v.st_dev, v.st_ino, v.st_uid, v.st_mode, v.st_nlink, v.st_size, v.st_mtime_ns, v.st_ctime_ns)
+    fd = os.open(ssh, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != 0 or before.st_nlink != 1 or before.st_mode & 0o022 or not 0 < before.st_size <= 16 << 20:
+            reject("window_tool_service_identity_rejected")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            executable_hash = digest(stream.read((16 << 20) + 1))
+        if identity(os.fstat(fd)) != identity(before) or identity(ssh.lstat()) != identity(before):
+            reject("window_tool_service_identity_rejected")
+        code, observed = owned_process(["/usr/bin/ssh-keyscan", "-T", "5", "-p", port, "-t", "ed25519,rsa,ecdsa", host], {"PATH": "/usr/bin:/bin"}, control=control, timeout=20)
+        known = pinned_service_known_host(observed, host, int(port), pin)
+        if code or identity(os.fstat(fd)) != identity(before) or identity(ssh.lstat()) != identity(before):
+            reject("window_tool_service_peer_rejected")
+    finally:
+        os.close(fd)
+    return dict(format_version=1, kind="readonly_service_channel_observation", tool_source_sha=approval["tool_source_sha"], operation_id=approval["operation_id"], run_id=run,
+        host_sha256=digest(host.encode("ascii")), user_sha256=digest(user.encode("ascii")), port=int(port), fingerprint_sha256=digest(pin.encode("ascii")),
+        identity_sha256=digest(key_raw), known_hosts_sha256=digest(known), ssh_executable_sha256=executable_hash,
+        database_access=False, service_control_used=False, execution_allowed=False, drop_ready=False)
+
+
 ROOT_BOOTSTRAP = r'''
 import hashlib,io,json,os,re,stat,sys,tarfile
 from pathlib import Path
@@ -1222,6 +1263,9 @@ def emit(result, secrets):
         native_schema["original_source_sha"] = "sha40"
     schema = {"format_version":"uint", "kind":frozenset({"independent_window_tool_call_result"}), "dispatcher_source_sha":"sha40", "tool_source_sha":"sha40",
         "approved_template_sha256":"hash64", "derived_request_sha256":"hash64", "native_result":native_schema,
+        "service_channel_observation":{"format_version":"uint", "kind":frozenset({"readonly_service_channel_observation"}), "tool_source_sha":"sha40", "operation_id":"run_id", "run_id":"run_id",
+            **{k:"hash64" for k in ("host_sha256", "user_sha256", "fingerprint_sha256", "identity_sha256", "known_hosts_sha256", "ssh_executable_sha256")}, "port":"uint",
+            **{k:"bool" for k in ("database_access", "service_control_used", "execution_allowed", "drop_ready")}},
         "complete":"bool", "execution_allowed":"bool", "drop_ready":"bool", "error_category":PUBLIC_ERRORS}
     print(transport.encode_armored_receipt(result, schema=schema, secrets=secrets))
 
@@ -1442,11 +1486,12 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
     function still loads the protected original template and invokes the fixed
     root supervisor/native binary. It accepts no execution result or callback.
     """
-    secrets = (tuple(credentials.values()) if type(credentials) is dict else ()) + (os.environ.get("SUDO_PASSWORD", ""),)
+    secrets = (tuple(credentials.values()) if type(credentials) is dict else ()) + (os.environ.get("SUDO_PASSWORD", ""),) + tuple(os.environ.get(name, "") for name in SERVICE_CREDENTIALS)
     try:
         token(args.run_id, RUN)
         a = approve(raw, approval_hash, args.dispatcher_sha, args.operation, args.operation_id, args.manifest_hash, args.template_hash)
         validate_credentials(credentials, args.operation)
+        service_observation = observe_service_channel(a, args.run_id, control=control) if args.operation == "prepare" else None
         token(package, HASH)
         directory = Path(__file__).resolve(strict=True).parent
         if not re.fullmatch(r"/tmp/qs-independent-window-tool\.[a-zA-Z0-9]{6,16}", str(directory)):
@@ -1481,6 +1526,8 @@ def run_window_call(args, raw, approval_hash, package, credentials, *, control=N
         native = validate_native(native_raw, code, a, args.run_id, derived_hash)
         result = {"format_version": 1, "kind": "independent_window_tool_call_result", "dispatcher_source_sha": args.dispatcher_sha,
                   "tool_source_sha": a["tool_source_sha"], "approved_template_sha256": args.template_hash, "derived_request_sha256": derived_hash, "native_result": native}
+        if service_observation is not None:
+            result["service_channel_observation"] = service_observation
         emit(result, secrets)
         return code
     except (Refused, OSError, ValueError, subprocess.SubprocessError):

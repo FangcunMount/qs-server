@@ -196,16 +196,18 @@ func runDBWriterCensus(ctx context.Context, path, expected, op, run string) (rec
 			receipt.MongoLocalAllSessionsPermissionProven = receipt.MongoLocalAllSessionsPermissionProven && section.EnumerationComplete
 		}
 	}
-	receipt.ObservationComplete = true
-	for _, section := range receipt.Sections {
-		if !section.EnumerationComplete {
-			receipt.ObservationComplete = false
-		}
+	// Startup authentication configuration intentionally remains unknown. Reuse
+	// the same seventeen complete/stable sections required by the writer leaf;
+	// this diagnostic does not prove a whole writer fence or startup settings.
+	if time.Since(started) >= dbcensus.Budget {
+		receipt.ErrorCategory = "db_census_read_budget_exceeded"
+		return receipt, lifecycleError(receipt.ErrorCategory)
 	}
-	if censusErr != nil || !receipt.ObservationComplete {
+	if (censusErr != nil && !errors.Is(censusErr, dbcensus.ErrIncomplete)) || lifecycleDBRequiredSections(actual) != nil {
 		receipt.ErrorCategory = "db_census_catalog_or_session_permissions_incomplete"
 		return receipt, lifecycleError(receipt.ErrorCategory)
 	}
+	receipt.ObservationComplete = true
 	receipt.ErrorCategory = "none"
 	return receipt, nil
 }
