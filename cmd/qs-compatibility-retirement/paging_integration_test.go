@@ -11,16 +11,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 )
 
 // Compare the actual original BSON stream, fixed upper, EOF and both-pass hash
@@ -64,18 +69,64 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 	if _, e := col.InsertOne(ctx, bson.D{{Key: "_id", Value: int64(rows + 1)}, {Key: "payload", Value: "OUTSIDE_APPROVED_UPPER"}}); e != nil {
 		t.Fatal(e)
 	}
+	var wireMu sync.Mutex
+	var logicalPage int64
+	var findRequests, getMoreRequests int
+	var wireRejected bool
+	monitor := &event.CommandMonitor{Started: func(_ context.Context, ev *event.CommandStartedEvent) {
+		if ev.DatabaseName != name || ev.CommandName != "find" && ev.CommandName != "getMore" {
+			return
+		}
+		var command struct {
+			Limit     int64 `bson:"limit"`
+			BatchSize int32 `bson:"batchSize"`
+			MaxTimeMS int64 `bson:"maxTimeMS"`
+		}
+		wireMu.Lock()
+		defer wireMu.Unlock()
+		if bson.Unmarshal(ev.Command, &command) != nil || command.BatchSize != 128 {
+			wireRejected = true
+		}
+		if ev.CommandName == "find" {
+			findRequests++
+			if command.Limit != logicalPage || command.MaxTimeMS != int64(productionLimits().QuerySeconds)*1000 {
+				wireRejected = true
+			}
+		} else {
+			getMoreRequests++
+		}
+	}}
+	port, e := envPort("MONGODB_PORT", 27017)
+	if e != nil {
+		t.Fatal(e)
+	}
+	// The original guarded client owns setup/drop. This second real client only
+	// observes the owned namespace with the same connection/read settings.
+	readClient, e := mongo.Connect(ctx, options.Client().SetHosts([]string{net.JoinHostPort(os.Getenv("MONGODB_HOST"), strconv.Itoa(port))}).SetAuth(options.Credential{Username: os.Getenv("MONGODB_USERNAME"), Password: os.Getenv("MONGODB_PASSWORD"), AuthSource: "admin"}).SetConnectTimeout(10*time.Second).SetServerSelectionTimeout(10*time.Second).SetSocketTimeout(15*time.Second).SetMaxPoolSize(1).SetReadConcern(readconcern.Majority()).SetMonitor(monitor))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() {
+		if e := readClient.Disconnect(context.Background()); e != nil {
+			t.Error(e)
+		}
+	}()
+	pagedCol := readClient.Database(name).Collection("domain_event_outbox")
 	var original snapshot
 	var originalBytes []byte
 	for _, pageSize := range []int{1000, 10000} {
 		limits := productionLimits()
 		limits.PageSize = pageSize
+		wireMu.Lock()
+		logicalPage, findRequests, getMoreRequests, wireRejected = int64(pageSize), 0, 0, false
+		wireMu.Unlock()
 		dir := privateTestDir(t)
 		file, e := os.OpenFile(filepath.Join(dir, "source.bsonframes"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
 		if e != nil {
 			t.Fatal(e)
 		}
 		started := time.Now()
-		first, e := mongoPagedPass(ctx, col, bound, limits, dir, 1, file)
+		first, e := mongoPagedPass(ctx, pagedCol, bound, limits, dir, 1, file)
 		if e != nil {
 			_ = file.Close()
 			t.Fatal(e)
@@ -87,10 +138,16 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		if e = file.Close(); e != nil {
 			t.Fatal(e)
 		}
-		second, e := mongoPagedPass(ctx, col, bound, limits, dir, 2, nil)
+		second, e := mongoPagedPass(ctx, pagedCol, bound, limits, dir, 2, nil)
 		elapsed := time.Since(started)
 		if e != nil || first.Records != rows || second.Records != rows || first.Pages != uint64(rows/pageSize+1) || second.Pages != first.Pages || first.Bytes != second.Bytes || first.DataHash != second.DataHash {
 			t.Fatal("actual fixed-upper stream or complete EOF changed", e)
+		}
+		wireMu.Lock()
+		wireMatched := !wireRejected && findRequests == int(first.Pages+second.Pages) && getMoreRequests > 0
+		wireMu.Unlock()
+		if !wireMatched {
+			t.Fatal("actual wire batch, logical limit or query budget changed")
 		}
 		raw, e := os.ReadFile(file.Name())
 		if e != nil {
