@@ -135,7 +135,7 @@ func lifecycleMongoClient(ctx context.Context, prefix string) (*mongo.Client, *m
 	if err != nil {
 		return nil, nil, lifecycleError("lifecycle_connection_input_rejected")
 	}
-	opts := options.Client().SetHosts([]string{net.JoinHostPort(host, strconv.Itoa(port))}).SetAuth(options.Credential{Username: user, Password: password, AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second).SetSocketTimeout(30 * time.Second).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority()).SetCompressors([]string{"zstd", "snappy"})
+	opts := lifecycleMongoOptions(host, port, user, password)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, nil, lifecycleError("lifecycle_mongo_connect_failed")
@@ -146,6 +146,13 @@ func lifecycleMongoClient(ctx context.Context, prefix string) (*mongo.Client, *m
 	}
 	return client, client.Database(database), nil
 }
+
+func lifecycleMongoOptions(host string, port int, user, password string) *options.ClientOptions {
+	// This temporary CLI uses one approved seed. Replica-set discovery can
+	// otherwise replace it with a Docker-only member name on the root host.
+	return options.Client().SetHosts([]string{net.JoinHostPort(host, strconv.Itoa(port))}).SetDirect(true).SetAuth(options.Credential{Username: user, Password: password, AuthSource: "admin"}).SetConnectTimeout(10 * time.Second).SetServerSelectionTimeout(10 * time.Second).SetSocketTimeout(30 * time.Second).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority()).SetCompressors([]string{"zstd", "snappy"})
+}
+
 func openLifecyclePreparationOwner(ctx context.Context, r lifecycleRequest) (owner *lifecyclePreparationOwner, result error) {
 	if ctx == nil || ctx.Err() != nil || os.Getuid() != 0 || os.Geteuid() != 0 {
 		return nil, lifecycleError("lifecycle_fixed_root_host_required")

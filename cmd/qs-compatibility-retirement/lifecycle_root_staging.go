@@ -443,7 +443,7 @@ func lifecycleStorageFileHashes(ctx context.Context, r lifecycleRequest, a *back
 		return nil, lifecycleError("lifecycle_storage_archive_binding_rejected")
 	}
 	b, e := a.StorageBaseline(ctx)
-	if e != nil || b.Approval != r.Approval || b.ArchiveSHA256 != r.StorageBackup.ArchiveSHA256 || b.StorageApproval.ToolSourceSHA != r.ToolSourceSHA {
+	if e != nil || b.Approval != r.Approval || b.ArchiveSHA256 != r.StorageBackup.ArchiveSHA256 || b.StorageApproval.ToolSourceSHA != r.StorageBackup.ToolSourceSHA {
 		return nil, lifecycleError("lifecycle_storage_archive_binding_rejected")
 	}
 	hashes := map[string]string{"archive.private.json": b.ArchiveSHA256}

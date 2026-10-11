@@ -1942,7 +1942,10 @@ try:
         request=module['decode'](request_raw)
         if request.get('source_sha')!=tool_sha or request.get('operation_id')!=operation or request.get('actual_run_id')!=run: stop()
         approval={'stage':'prepare','tool_source_sha':tool_sha,'original_source_sha':request['inventory_report']['source_sha'],'operation_id':operation}
-        observed=module['preload_api_image'](preload_archive,approval,run,batch,None)
+        try:
+            observed=module['preload_api_image'](preload_archive,approval,run,batch,None)
+        except module['Refused']:
+            stop()
         result=subprocess.run(native_argv,env=credentials,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=85*60,check=False)
         if len(result.stdout)>32768: stop()
         native_result=json.loads(result.stdout,object_pairs_hook=unique_credentials)
@@ -2363,7 +2366,8 @@ def prepare_facts_request(args):
     storage = value.get("storage_backup")
     if "storage_backup" in value:
         fields(storage, ("kind", "tool_source_sha", "run_id", "archive_sha256", "request_sha256"))
-        if storage["kind"] != "storage_backup_v1" or storage["tool_source_sha"] != args.actual_source_sha or storage["run_id"] != producer["run_id"]: fail("prepare_facts_storage_binding_rejected")
+        token(storage["tool_source_sha"], SHA)
+        if storage["kind"] != "storage_backup_v1" or storage["run_id"] != producer["run_id"]: fail("prepare_facts_storage_binding_rejected")
         token(storage["archive_sha256"], HASH); token(storage["request_sha256"], HASH)
     engines = value["restore_engines"]
     fields(engines, ("mysql_image_id", "mongodb_image_id", "architecture"))
@@ -2566,7 +2570,7 @@ def live_host_scope(args):
 DB_CENSUS_SECTION_NAMES = frozenset(('mysql_accounts','mysql_role_edges','mysql_default_roles','mysql_dynamic_grants','mysql_proxy_grants','mysql_observer_grants','mysql_connections','mysql_account_grants','mongodb_observer_privileges','mongodb_users','mongodb_databases','mongodb_stored_role_definitions','mongodb_roles','mongodb_authentication_configuration','mongodb_authentication_parameters','mongodb_connections_and_idle_operations','mongodb_local_logical_sessions','mongodb_persisted_logical_sessions'))
 DB_CENSUS_GAPS = frozenset(name+'_unread' for name in DB_CENSUS_SECTION_NAMES) | frozenset(('mysql_full_process_privilege_unproven','mysql_external_authentication_and_direct_writer_admission_not_fenced','mongodb_other_nodes_sessions_and_external_authentication_unobserved','mongodb_external_direct_writer_admission_not_fenced','mongodb_startup_authorization_and_external_provider_configuration_unobserved'))
 DB_CENSUS_SECTION_ERRORS = frozenset(('none','db_census_sql_query_failed_or_bounded','db_census_sql_account_grants_incomplete','db_census_sql_full_process_permission_unproven','db_census_mongo_query_failed_or_bounded','db_census_second_enumeration_missing'))
-DB_CENSUS_ERRORS = frozenset(('none','db_census_incomplete','db_census_read_budget_exceeded','db_census_root_once_required','db_census_request_read_rejected','db_census_request_binding_rejected','db_census_original_identity_read_rejected','db_census_original_identity_binding_rejected','db_census_original_connection_failed','db_census_owner_close_failed','db_census_actual_identity_rejected','db_census_actual_identity_changed','db_census_original_identity_changed','db_census_private_catalog_write_failed','db_census_catalog_or_session_permissions_incomplete'))
+DB_CENSUS_ERRORS = frozenset(('none','db_census_incomplete','db_census_read_budget_exceeded','db_census_root_once_required','db_census_request_read_rejected','db_census_request_binding_rejected','db_census_original_identity_read_rejected','db_census_original_identity_binding_rejected','db_census_original_connection_failed','db_census_original_sql_connection_failed','db_census_original_mongo_connection_failed','db_census_original_connection_input_rejected','db_census_owner_close_failed','db_census_actual_identity_rejected','db_census_actual_identity_changed','db_census_original_identity_changed','db_census_private_catalog_write_failed','db_census_catalog_or_session_permissions_incomplete'))
 
 def db_census_request(args):
     approval=decode(args.bootstrap_approval_json.encode('ascii')+b'\n')
@@ -2982,6 +2986,9 @@ def main(argv=None):
         # valid framed receipt. Never print a raw protocol/debug alternative.
         print("compatibility_retirement_receipt_transport_failed", file=sys.stderr)
     diagnostic_complete = ((receipt.get("prepare_mode") == "storage-backup" and receipt.get("storage_backup_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "prepare-facts" and receipt.get("prepare_facts_observation_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("report_diagnostic_complete") is True and receipt.get("diagnostic_only") is True and all(value is False for value in receipt.get("capabilities", {}).values())) or
+        (receipt.get("prepare_mode") == "db-writer-census" and receipt.get("db_census_observation_complete") is True and
+         receipt.get("error_category") == "none" and receipt.get("diagnostic_only") is True and
+         all(value is False for value in receipt.get("capabilities", {}).values())) or
         (receipt.get("prepare_mode") == "report-diagnostic" and receipt.get("error_category") == "failed_inventory_cleanup_baseline_only" and
          receipt.get("cleanup_only") is True and receipt.get("cleanup_baseline_complete") is True and
          receipt.get("inventory_complete") is False and receipt.get("original_content_verified") is False and

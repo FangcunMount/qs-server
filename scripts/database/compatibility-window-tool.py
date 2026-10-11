@@ -9,6 +9,7 @@ import argparse
 import base64
 import copy
 import contextlib
+import gzip
 import hashlib
 import io
 import importlib.util
@@ -26,6 +27,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import zlib
 
 SHA = re.compile(r"[0-9a-f]{40}")
 HASH = re.compile(r"[0-9a-f]{64}")
@@ -176,7 +178,9 @@ def derive_request(raw, approval, current_run):
         for key in ("archive_sha256", "request_sha256"):
             token(storage[key], HASH)
         token(q["mysql_non_target_sha256"], HASH)
-        if storage["kind"] != "storage_backup_v1" or storage["tool_source_sha"] != approval["tool_source_sha"] or storage["run_id"] != approval["original_run_id"] or storage["archive_sha256"] != q["archive_sha256"]:
+        # The approved whole template pins the actual producer independently of
+        # this caller's source; preserve that original capture identity.
+        if storage["kind"] != "storage_backup_v1" or storage["run_id"] != approval["original_run_id"] or storage["archive_sha256"] != q["archive_sha256"]:
             reject("window_tool_storage_backup_binding_rejected")
     result = copy.deepcopy(r)
     result["actual_run_id"] = current_run
@@ -549,27 +553,101 @@ def validate_image_preload(value, approval, run):
     return value
 
 
+def preload_archive_identity(raw, approval):
+    """Only content identities in this archive's single config/layer chain."""
+    category = "window_tool_image_preload_rejected"
+    if not raw or len(raw) > 200 << 20: reject(category)
+    reference = "qs-retirement/qs-apiserver:" + approval["tool_source_sha"]
+    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as image_tar:
+        members = image_tar.getmembers()
+        if len(members) > 2048 or len({m.name for m in members}) != len(members) or any(not m.isfile() and not m.isdir() or m.name.startswith("/") or ".." in Path(m.name).parts or m.issym() or m.islnk() for m in members): reject(category)
+        files = {m.name: m for m in members if m.isfile()}
+        def member(name, limit=None):
+            if type(name) is not str or name not in files or (limit is not None and files[name].size > limit): reject(category)
+            return files[name]
+        def contents(name, limit):
+            return image_tar.extractfile(member(name, limit)).read(limit+1)
+        def stream_hash(stream):
+            h = hashlib.sha256()
+            while True:
+                part = stream.read(65536)
+                if not part: return "sha256:"+h.hexdigest()
+                h.update(part)
+        values = decode(contents("manifest.json",65536))
+        if type(values) is not list or len(values) != 1 or type(values[0]) is not dict or values[0].get("RepoTags") != [reference]: reject(category)
+        config_name = values[0].get("Config", "")
+        if type(config_name) is not str or not re.fullmatch(r"(?:blobs/sha256/)?[0-9a-f]{64}(?:\.json)?", config_name): reject(category)
+        config_raw = contents(config_name,1<<20)
+        config = decode(config_raw)
+        config_id = "sha256:"+digest(config_raw)
+        if Path(config_name).name.removesuffix(".json") != config_id[7:] or type(config) is not dict or config.get("os") != "linux" or config.get("architecture") != "amd64" or type(config.get("config")) is not dict or type(config["config"].get("Labels")) is not dict or config["config"]["Labels"].get("org.opencontainers.image.revision") != approval["tool_source_sha"]: reject(category)
+        layers = values[0].get("Layers")
+        rootfs = config.get("rootfs")
+        if type(layers) is not list or any(type(n) is not str for n in layers) or len(layers) != len(set(layers)) or type(rootfs) is not dict or rootfs.get("type") != "layers" or type(rootfs.get("diff_ids")) is not list or len(rootfs["diff_ids"]) != len(layers): reject(category)
+        for diff_id in rootfs["diff_ids"]: token(diff_id,re.compile(r"sha256:[0-9a-f]{64}"))
+        allowed = {config_id}
+        linked = {"manifest.json",config_name,*layers}
+        for name in layers: member(name)
+        layer_types = ["application/vnd.oci.image.layer.v1.tar"]*len(layers)
+        if "index.json" in files:
+            index_types = {"application/vnd.oci.image.index.v1+json","application/vnd.docker.distribution.manifest.list.v2+json"}
+            manifest_types = {"application/vnd.oci.image.manifest.v1+json","application/vnd.docker.distribution.manifest.v2+json"}
+            config_types = {"application/vnd.oci.image.config.v1+json","application/vnd.docker.container.image.v1+json"}
+            def descriptor(value, types, limit=None):
+                exact(value,("mediaType","digest","size"),("annotations","platform"))
+                token(value["digest"],re.compile(r"sha256:[0-9a-f]{64}"))
+                if type(value["mediaType"]) is not str or value["mediaType"] not in types or type(value["size"]) is not int or value["size"] < 0: reject(category)
+                name = "blobs/sha256/"+value["digest"][7:]
+                m = member(name,limit)
+                if m.size != value["size"] or stream_hash(image_tar.extractfile(m)) != value["digest"]: reject(category)
+                linked.add(name)
+                return name
+            if decode(contents("oci-layout",65536)) != {"imageLayoutVersion":"1.0.0"}: reject(category)
+            linked.update(("index.json","oci-layout"))
+            index_raw = contents("index.json",1<<20)
+            current = decode(index_raw)
+            allowed.add("sha256:"+digest(index_raw))
+            for depth in range(4):
+                exact(current,("schemaVersion","mediaType","manifests"),("annotations",))
+                if type(current["schemaVersion"]) is not int or current["schemaVersion"] != 2 or type(current["mediaType"]) is not str or current["mediaType"] not in index_types or type(current["manifests"]) is not list or len(current["manifests"]) != 1: reject(category)
+                value = current["manifests"][0]
+                name = descriptor(value,index_types|manifest_types,1<<20)
+                if value["digest"] in allowed: reject(category)
+                allowed.add(value["digest"])
+                current = decode(contents(name,1<<20))
+                if type(current) is not dict or current.get("mediaType") != value["mediaType"]: reject(category)
+                if value["mediaType"] in manifest_types: break
+            else: reject(category)
+            exact(current,("schemaVersion","mediaType","config","layers"),("annotations",))
+            if type(current["schemaVersion"]) is not int or current["schemaVersion"] != 2 or current["mediaType"] not in manifest_types or type(current["layers"]) is not list or len(current["layers"]) != len(layers): reject(category)
+            if descriptor(current["config"],config_types,1<<20) != config_name or current["config"]["digest"] != config_id: reject(category)
+            layer_media = {"application/vnd.oci.image.layer.v1.tar","application/vnd.oci.image.layer.v1.tar+gzip","application/vnd.docker.image.rootfs.diff.tar","application/vnd.docker.image.rootfs.diff.tar.gzip"}
+            for name, value in zip(layers,current["layers"]):
+                if descriptor(value,layer_media) != name: reject(category)
+            layer_types = [value["mediaType"] for value in current["layers"]]
+            # No unreferenced config, manifest, index or layer can import another
+            # identity through the same Docker load command.
+            if set(files) != linked: reject(category)
+        elif any(name.startswith("blobs/") and name not in linked for name in files): reject(category)
+        for name, media, diff_id in zip(layers,layer_types,rootfs["diff_ids"]):
+            with image_tar.extractfile(member(name)) as layer:
+                if media in {"application/vnd.oci.image.layer.v1.tar+gzip","application/vnd.docker.image.rootfs.diff.tar.gzip"}:
+                    try:
+                        with gzip.GzipFile(fileobj=layer) as inflated:
+                            actual = stream_hash(inflated)
+                    except (OSError,EOFError,zlib.error): reject(category)
+                else: actual = stream_hash(layer)
+            if actual != diff_id: reject(category)
+        return config_id, frozenset(allowed)
+
+
 def preload_api_image(raw, approval, run, batch, owner):
     # Fixed cached-image preparation only. This original root child never starts
     # an API, changes the original container, or grants a Window/writer lease.
     if approval["stage"] != "prepare" or platform.machine() != "x86_64" or not raw or len(raw) > 200 << 20:
         reject("window_tool_image_preload_rejected")
     reference = "qs-retirement/qs-apiserver:" + approval["tool_source_sha"]
-    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as image_tar:
-        members = image_tar.getmembers()
-        if len(members) > 2048 or any(not m.isfile() and not m.isdir() or m.name.startswith("/") or ".." in Path(m.name).parts or m.issym() or m.islnk() for m in members): reject("window_tool_image_preload_rejected")
-        manifest = [m for m in members if m.name == "manifest.json"]
-        if len(manifest) != 1 or manifest[0].size > 65536: reject("window_tool_image_preload_rejected")
-        values = decode(image_tar.extractfile(manifest[0]).read(65537))
-        if type(values) is not list or len(values) != 1 or type(values[0]) is not dict or values[0].get("RepoTags") != [reference]: reject("window_tool_image_preload_rejected")
-        config_name = values[0].get("Config", "")
-        if type(config_name) is not str or not re.fullmatch(r"(?:blobs/sha256/)?[0-9a-f]{64}(?:\.json)?", config_name): reject("window_tool_image_preload_rejected")
-        configs = [m for m in members if m.name == config_name]
-        if len(configs) != 1 or configs[0].size > 1 << 20: reject("window_tool_image_preload_rejected")
-        config_raw = image_tar.extractfile(configs[0]).read((1 << 20)+1)
-        config = decode(config_raw)
-        expected_id = "sha256:"+digest(config_raw)
-        if type(config) is not dict or config.get("os") != "linux" or config.get("architecture") != "amd64" or config.get("config",{}).get("Labels",{}).get("org.opencontainers.image.revision") != approval["tool_source_sha"]: reject("window_tool_image_preload_rejected")
+    config_id, allowed_ids = preload_archive_identity(raw,approval)
     docker = Path("/usr/bin/docker")
     def identity(value): return (value.st_dev,value.st_ino,value.st_uid,value.st_mode,value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
     stamp = docker.stat()
@@ -585,7 +663,7 @@ def preload_api_image(raw, approval, run, batch, owner):
     def put(path, body):
         write_new(path, body)
         files[path] = identity(path.stat(follow_symlinks=False))
-    put(directory / "intent.json",canonical({"source_sha":approval["tool_source_sha"],"image_archive_sha256":digest(raw),"image_id":expected_id,"name":name,"labels":labels,"network":"none","start":False}))
+    put(directory / "intent.json",canonical({"source_sha":approval["tool_source_sha"],"image_archive_sha256":digest(raw),"image_id":config_id,"name":name,"labels":labels,"network":"none","start":False}))
     put(image_path,raw)
     def command(*args):
         if identity(docker.stat()) != docker_identity: reject("window_tool_image_preload_rejected")
@@ -602,6 +680,8 @@ def preload_api_image(raw, approval, run, batch, owner):
     command("load","--input",str(image_path))
     fmt = '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'
     first = decode(command("image","inspect","--format",fmt,reference))
+    expected_id = first.get("id") if type(first) is dict else None
+    if type(expected_id) is not str or expected_id not in allowed_ids: reject("window_tool_image_preload_rejected")
     if first != {"id":expected_id,"os":"linux","architecture":"amd64","revision":approval["tool_source_sha"]}: reject("window_tool_image_preload_rejected")
     create = ["create","--name",name,"--network","none","--read-only","--entrypoint","/app/qs-apiserver"]
     for key in sorted(labels): create.extend(["--label",key+"="+labels[key]])

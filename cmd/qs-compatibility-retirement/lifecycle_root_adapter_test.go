@@ -84,6 +84,23 @@ func TestLifecycleRootCopyAcceptsActualEmptyRawSource(t *testing.T) {
 	}
 }
 func TestLifecycleRootRequestKeepsOriginalAndToolSeparate(t *testing.T) {
+	storage := lifecycleStorageBackup{Kind: "storage_backup_v1", ToolSourceSHA: strings.Repeat("c", 40), RunID: "124-1", ArchiveSHA256: strings.Repeat("d", 64), RequestSHA256: strings.Repeat("e", 64)}
+	r := lifecycleRequest{ToolSourceSHA: strings.Repeat("b", 40), StorageBackup: &storage, Approval: backup.Approval{RunID: storage.RunID}, Recovery: backup.TargetRecoveryRequest{ArchiveSHA256: storage.ArchiveSHA256}}
+	if !storage.valid(r) || storage.ToolSourceSHA == r.ToolSourceSHA {
+		t.Fatal("independently bound original storage producer rejected")
+	}
+	for _, mutate := range []func(*lifecycleStorageBackup){
+		func(v *lifecycleStorageBackup) { v.ToolSourceSHA = "unknown" },
+		func(v *lifecycleStorageBackup) { v.RunID = "125-1" },
+		func(v *lifecycleStorageBackup) { v.ArchiveSHA256 = strings.Repeat("f", 64) },
+		func(v *lifecycleStorageBackup) { v.RequestSHA256 = "" },
+	} {
+		got := storage
+		mutate(&got)
+		if got.valid(r) {
+			t.Fatal("invalid storage origin or archive accepted")
+		}
+	}
 	for _, policy := range []string{`null`, `true`, `""`, `"skip_history"`} {
 		if _, e := decodeLifecycleStagingRequest([]byte(`{"history_policy":` + policy + `}`)); e == nil {
 			t.Fatal("unknown discard policy accepted")

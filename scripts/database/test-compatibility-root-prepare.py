@@ -26,6 +26,19 @@ spec=importlib.util.spec_from_file_location('root_prepare_tool',Path(__file__).w
 tool=importlib.util.module_from_spec(spec);spec.loader.exec_module(tool)
 
 class RootPrepareOnceTransport(unittest.TestCase):
+    def test_image_refusal_uses_fixed_root_receipt_without_traceback(self):
+        tree=ast.parse(tool.ROOT_PREPARE_ONCE)
+        guarded=next(node for node in ast.walk(tree) if isinstance(node,ast.Try) and
+            any(isinstance(child,ast.Assign) and any(isinstance(target,ast.Name) and target.id=='observed' for target in child.targets) for child in node.body))
+        stop=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='stop')
+        code=compile(ast.Module(body=[stop,guarded],type_ignores=[]),'actual-root-preload-refusal','exec')
+        class Refused(Exception):pass
+        def preload(*args):raise Refused('private failure details must not escape')
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output),self.assertRaises(SystemExit) as raised:
+            exec(code,{'module':{'preload_api_image':preload,'Refused':Refused},'preload_archive':b'','approval':{},'run':'456-1','batch':Path('/unused')})
+        self.assertEqual(raised.exception.code,1)
+        self.assertEqual(json.loads(output.getvalue()),{'format_version':1,'complete':False,'execution_allowed':False,'drop_ready':False,'error_category':'lifecycle_root_once_bootstrap_rejected'})
     def args(self):
         return argparse.Namespace(operation='prepare',prepare_mode='lifecycle',operation_id='123-1',run_id='456-1',actual_source_sha='a'*40,lifecycle_request_hash='b'*64,manifest_hash='c'*64)
     def test_same_existing_bindings_bounded_private_credentials_and_fixed_root_once(self):

@@ -60,4 +60,21 @@ class DBCensusTest(unittest.TestCase):
             live.assert_not_called()
         args,request,rh=self.prepared();r=self.receipt(args,request,rh);r['unknown']=['private_account_name']
         with self.assertRaises(api.Blocked):api.validate_db_census_result(r,args,request,rh,0)
+    def test_successful_native_observation_exits_zero_without_granting_drop(self):
+        args,request,rh=self.prepared()
+        for complete,category,expected in ((True,'none',0),(False,'db_census_original_connection_failed',42),(False,'db_census_original_sql_connection_failed',42),(False,'db_census_original_mongo_connection_failed',42),(False,'db_census_original_connection_input_rejected',42)):
+            with self.subTest(category=category):
+                native=self.receipt(args,request,rh)
+                native.update(db_census_observation_complete=complete,error_category=category)
+                if not complete:
+                    native.update(observed_sections=[],mysql_all_connections_permission_proven=False,mongodb_local_all_sessions_permission_proven=False,db_census_private_catalog_sha256='',db_census_catalog_sha256='')
+                validated=api.validate_db_census_result(native,args,request,rh,0 if complete else 1)
+                output=io.StringIO()
+                with mock.patch.object(api,'execute',return_value=validated),mock.patch.dict(api.os.environ,{},clear=True),contextlib.redirect_stdout(output):
+                    code=api.main(['--operation','prepare','--operation-id',args.operation_id,'--approved-source-sha',args.actual_source_sha,'--actual-source-sha',args.actual_source_sha,'--run-id',args.run_id,'--prepare-mode','db-writer-census'])
+                self.assertEqual(code,expected)
+                decoded=json.loads(api.transport().decode_armored_receipt(output.getvalue()))
+                self.assertEqual(decoded['db_census_observation_complete'],complete)
+                self.assertFalse(decoded['complete']);self.assertFalse(decoded['execution_allowed']);self.assertFalse(decoded['drop_ready'])
+                self.assertFalse(any(decoded['capabilities'].values()))
 if __name__=='__main__':unittest.main()

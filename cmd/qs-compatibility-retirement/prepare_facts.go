@@ -356,12 +356,23 @@ func decodePrepareFacts(raw []byte, dst any) error {
 	}
 	return nil
 }
+
+// The observer and capture producer are separately approved. The opaque
+// archive establishes producer facts; the current observer cannot relabel them.
+func prepareFactsStorageBaselineMatches(r prepareFactsRequest, b backup.StorageBaseline) bool {
+	return r.StorageBackup != nil && b.Kind == "storage_backup_v1" && !b.DropReady &&
+		b.StorageApproval.ToolSourceSHA == r.StorageBackup.ToolSourceSHA && b.StorageApproval.RunID == r.StorageBackup.RunID &&
+		b.ArchiveSHA256 == r.StorageBackup.ArchiveSHA256 && b.Approval.SourceSHA == r.Inventory.SourceSHA &&
+		b.Approval.OperationID == r.OperationID && b.Approval.RunID == r.Inventory.RunID &&
+		b.Approval.InventorySHA256 == r.Inventory.ReportSHA256 && b.Approval.RequestHash == r.Inventory.RequestSHA256
+}
+
 func validatePrepareFactsRequest(r prepareFactsRequest, op, run string) error {
 	original := filepath.Join("/opt/backups/qs-server/compatibility-retirement", op)
 	if r.FormatVersion != 1 || r.Kind != "readonly_prepare_facts_request" || r.SourceSHA != sourceSHA || !shaRE.MatchString(sourceSHA) || r.OperationID != op || r.ActualRunID != run || !runRE.MatchString(op) || !runRE.MatchString(run) || r.TargetHash != digest(targets) || r.DatabaseScope != "mysql-and-mongodb" || !hashRE.MatchString(r.ObservationApprovalSHA256) || r.Inventory.OperationID != op || !runRE.MatchString(r.Inventory.RunID) || r.Inventory.RunID == run || !shaRE.MatchString(r.Inventory.SourceSHA) || !hashRE.MatchString(r.Inventory.ReportSHA256) || !hashRE.MatchString(r.Inventory.RequestSHA256) || !r.RestoreEngines.valid() || r.RestoreEngines.MySQLImageID == r.RestoreEngines.MongoImageID || !lifecycleOwnedPath(original, r.ArchiveDirectory) || r.ArchiveDirectory == filepath.Join(original, "inventory-"+r.Inventory.RunID) || lifecycleOwnedPath(filepath.Join(original, "inventory-"+r.Inventory.RunID), r.ArchiveDirectory) {
 		return lifecycleError("prepare_facts_binding_rejected")
 	}
-	if r.StorageBackup != nil && (r.StorageBackup.Kind != "storage_backup_v1" || r.StorageBackup.ToolSourceSHA != r.SourceSHA || r.StorageBackup.RunID != r.Inventory.RunID || !hashRE.MatchString(r.StorageBackup.ArchiveSHA256) || !hashRE.MatchString(r.StorageBackup.RequestSHA256) || r.ArchiveDirectory == filepath.Join(original, "storage-backup-"+r.Inventory.RunID) || lifecycleOwnedPath(filepath.Join(original, "storage-backup-"+r.Inventory.RunID), r.ArchiveDirectory)) {
+	if r.StorageBackup != nil && (r.StorageBackup.Kind != "storage_backup_v1" || !shaRE.MatchString(r.StorageBackup.ToolSourceSHA) || r.StorageBackup.RunID != r.Inventory.RunID || !hashRE.MatchString(r.StorageBackup.ArchiveSHA256) || !hashRE.MatchString(r.StorageBackup.RequestSHA256) || r.ArchiveDirectory == filepath.Join(original, "storage-backup-"+r.Inventory.RunID) || lifecycleOwnedPath(filepath.Join(original, "storage-backup-"+r.Inventory.RunID), r.ArchiveDirectory)) {
 		return lifecycleError("prepare_facts_binding_rejected")
 	}
 	return nil
@@ -652,7 +663,7 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 			return receipt, err
 		}
 		b, err := a.StorageBaseline(ctx)
-		if err != nil || b.StorageApproval.ToolSourceSHA != sourceSHA || b.Approval.SourceSHA != r.Inventory.SourceSHA || b.Approval.OperationID != op || b.Approval.RunID != r.Inventory.RunID || b.Approval.InventorySHA256 != r.Inventory.ReportSHA256 || b.Approval.RequestHash != r.Inventory.RequestSHA256 {
+		if err != nil || !prepareFactsStorageBaselineMatches(r, b) {
 			return receipt, lifecycleError("prepare_facts_storage_binding_rejected")
 		}
 		if e = validateV2Request(req, filepath.Join(original, "inventory-request.json")); e != nil {

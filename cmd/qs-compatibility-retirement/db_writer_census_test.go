@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -29,5 +30,26 @@ func TestDBWriterCensusStrictRequestAndActualRoot(t *testing.T) {
 	receipt, e := runDBWriterCensus(context.Background(), "/tmp/not-approved", strings.Repeat("f", 64), "123-1", "456-1")
 	if e == nil || receipt.Complete || receipt.ObservationComplete || receipt.WriterScopeComplete || receipt.DropReady || receipt.ExecutionAllowed {
 		t.Fatal("fixture/import minted root or writer authority")
+	}
+}
+
+func TestDBWriterCensusConnectionFailureKeepsOnlySafeCategories(t *testing.T) {
+	for _, tc := range []struct {
+		cause, category string
+	}{
+		{"lifecycle_sql_connect_failed", "db_census_original_sql_connection_failed"},
+		{"lifecycle_mongo_connect_failed", "db_census_original_mongo_connection_failed"},
+		{"lifecycle_connection_input_rejected", "db_census_original_connection_input_rejected"},
+		{"unclassified_private_failure", "db_census_original_connection_failed"},
+	} {
+		t.Run(tc.category, func(t *testing.T) {
+			err := fmt.Errorf("private connection detail must not leave: %w", lifecycleError(tc.cause))
+			if got := dbCensusOriginalConnectionCategory(err); got != tc.category {
+				t.Fatalf("safe category = %q, want %q", got, tc.category)
+			}
+		})
+	}
+	if dbCensusOriginalConnectionCategory(fmt.Errorf("lifecycle_sql_connect_failed: private text")) != "db_census_original_connection_failed" {
+		t.Fatal("dynamic driver text was interpreted as an authenticated category")
 	}
 }
