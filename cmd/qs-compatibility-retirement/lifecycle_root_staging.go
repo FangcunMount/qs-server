@@ -2081,7 +2081,7 @@ func openLifecycleOriginalCensusMaterials(ctx context.Context, r lifecycleReques
 	}
 	var tool lifecycleOriginalRootToolIntent
 	raw, e = readLifecycleProducerJSON(d, "tool.intent.private.json", "", 0, 256<<10, &tool)
-	if e != nil || decodeLifecycleClosedProducer(raw, &tool) != nil || tool.FormatVersion != 1 || tool.Kind != "approved_root_once_tool_staging" || tool.Stage != "db-writer-census" || tool.OperationID != r.OperationID || tool.ActualRunID != run || tool.ToolSourceSHA != r.OriginalSourceSHA || tool.RequestPath != filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "db-writer-census-request-"+run+".json") || tool.RequestSHA256 != c.RequestSHA256 || tool.ManifestSHA256 != "" || !hashRE.MatchString(tool.PackageSHA256) || !hashRE.MatchString(tool.NativeSHA256) || tool.SourceUID != uid || tool.DropAuthority || !tool.PurgeRequired {
+	if e != nil || decodeLifecycleClosedProducer(raw, &tool) != nil || tool.FormatVersion != 1 || tool.Kind != "approved_root_once_tool_staging" || tool.Stage != "db-writer-census" || tool.OperationID != r.OperationID || tool.ActualRunID != run || tool.ToolSourceSHA != r.ToolSourceSHA || tool.RequestPath != filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "db-writer-census-request-"+run+".json") || tool.RequestSHA256 != c.RequestSHA256 || tool.ManifestSHA256 != "" || !hashRE.MatchString(tool.PackageSHA256) || !hashRE.MatchString(tool.NativeSHA256) || tool.SourceUID != uid || tool.DropAuthority || !tool.PurgeRequired {
 		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
 	}
 	if e = d.register("restore-native", tool.NativeSHA256, 0, 0700); e != nil {
@@ -2092,7 +2092,7 @@ func openLifecycleOriginalCensusMaterials(ctx context.Context, r lifecycleReques
 	if e == nil {
 		e = json.Unmarshal(raw, &request)
 	}
-	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(request)) != nil || request.FormatVersion != 1 || request.Kind != "readonly_db_writer_census_request" || request.SourceSHA != r.OriginalSourceSHA || request.OperationID != r.OperationID || request.ActualRunID != run || request.TargetHash != digest(targets) || request.Identity != c.IdentityProducer {
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(request)) != nil || request.FormatVersion != 1 || request.Kind != "readonly_db_writer_census_request" || request.SourceSHA != r.ToolSourceSHA || request.OperationID != r.OperationID || request.ActualRunID != run || request.TargetHash != digest(targets) || request.Identity != c.IdentityProducer {
 		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
 	}
 	if e = d.checkComplete(false); e != nil {
@@ -2114,7 +2114,7 @@ func lifecycleOriginalCensusReference(r lifecycleRequest, uid uint32) (lifecycle
 	}
 	raw, e := readLifecycleOwnedBytes(ref.Path, ref.SHA256, uid, 256<<10)
 	var input lifecycleDBWriterInput
-	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(input)) != nil || json.Unmarshal(raw, &input) != nil || !lifecycleDBInputValid(input, r) || input.CensusSourceSHA != r.OriginalSourceSHA {
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(input)) != nil || json.Unmarshal(raw, &input) != nil || !lifecycleDBInputValid(input, r) || input.CensusSourceSHA != r.ToolSourceSHA {
 		return ref, "", lifecycleError("lifecycle_original_operation_material_rejected")
 	}
 	run, native := lifecycleDBInputCensusRun(input.Census.Path, r.OperationID)
@@ -2152,7 +2152,7 @@ func registerLifecycleOriginalDatabaseSourceInput(ctx context.Context, r lifecyc
 	}
 	var q dbCensusRequest
 	raw, e = readLifecycleProducerJSON(parent, "db-writer-census-request-"+run+".json", c.RequestSHA256, uid, 256<<10, &q)
-	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(q)) != nil || q.FormatVersion != 1 || q.Kind != "readonly_db_writer_census_request" || q.SourceSHA != r.OriginalSourceSHA || q.OperationID != r.OperationID || q.ActualRunID != run || q.TargetHash != digest(targets) || q.Identity != c.IdentityProducer {
+	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(q)) != nil || q.FormatVersion != 1 || q.Kind != "readonly_db_writer_census_request" || q.SourceSHA != r.ToolSourceSHA || q.OperationID != r.OperationID || q.ActualRunID != run || q.TargetHash != digest(targets) || q.Identity != c.IdentityProducer {
 		return lifecycleError("lifecycle_original_operation_material_rejected")
 	}
 	return nil

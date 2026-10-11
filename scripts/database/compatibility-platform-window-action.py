@@ -259,13 +259,15 @@ try:
  raw=sys.stdin.buffer.readline(65537)
  if len(raw)>65536 or not raw.endswith(b'\n'): bad()
  packet=json.loads(raw,object_pairs_hook=unique)
- if type(packet)!=dict or set(packet)!={'bindings','approval','approval_sha256','package_sha256','tool_directory','credentials','sudo_password'}: bad()
+ if type(packet)!=dict or set(packet)!={'bindings','approval','approval_sha256','package_sha256','tool_directory','credentials','sudo_password','fixed_window_entry_sha256'}: bad()
  password=packet['sudo_password']
  if type(password)!=str or len(password.encode('utf-8'))>4096 or any(c in password for c in ('\x00','\r','\n')): bad()
+ fixed_entry=packet['fixed_window_entry_sha256']
  bindings=packet['bindings']
  if type(bindings)!=list or len(bindings)!=6 or any(type(v)!=str for v in bindings): bad()
  stage,operation,run,dispatcher,manifest,template=bindings
  import re
+ if type(fixed_entry)!=str or fixed_entry and re.fullmatch(r'[0-9a-f]{64}',fixed_entry) is None: bad()
  if stage not in ('apply','verify','recover','purge') or re.fullmatch(r'[1-9][0-9]{0,19}-[1-9][0-9]{0,3}',run) is None: bad()
  for value in (packet['approval_sha256'],packet['package_sha256']):
   if type(value)!=str or re.fullmatch(r'[0-9a-f]{64}',value) is None: bad()
@@ -310,6 +312,7 @@ try:
  args=types.SimpleNamespace(operation=stage,operation_id=operation,run_id=run,dispatcher_sha=dispatcher,manifest_hash=manifest,template_hash=template)
  # No credential env inheritance. The open SSH stdin is native cancellation.
  os.environ.clear();os.environ['PATH']='/usr/bin:/bin'
+ if fixed_entry: os.environ['RETIREMENT_FIXED_WINDOW_ENTRY_SHA256']=fixed_entry
  if os.getuid()!=0 and password: os.environ['SUDO_PASSWORD']=password
  code=namespace['run_window_call'](args,packet['approval'],packet['approval_sha256'],packet['package_sha256'],packet['credentials'],control=sys.stdin.fileno())
  raise SystemExit(code)
@@ -380,6 +383,9 @@ def run(dispatcher_repo, tool_repo, binary_directory):
     if approval["stage"] == "prepare" or approval["tool_source_sha"] != tool_sha or approval["workflow_scope"]["job_name"] != JOB_NAME:
         fail("platform_window_scope_rejected")
     scope = approval["workflow_scope"]; platform.validate_scope(scope)
+    fixed_entry = env.get("RETIREMENT_FIXED_WINDOW_ENTRY_SHA256", "")
+    if type(fixed_entry) is not str or fixed_entry and re.fullmatch(r"[0-9a-f]{64}", fixed_entry) is None:
+        fail("platform_window_packet_rejected")
     sudo_password = env.get("SUDO_PASSWORD", "")
     if type(sudo_password) is not str or len(sudo_password.encode("utf-8")) > 4096 or any(c in sudo_password for c in ("\x00", "\r", "\n")):
         fail("platform_window_packet_rejected")
@@ -436,7 +442,7 @@ def run(dispatcher_repo, tool_repo, binary_directory):
         fence_dir = state / "workflow-lease"; fence_dir.mkdir(mode=0o700)
         quarantine = platform.open_native_workflow_quarantine(scope, platform.digest(platform.canonical(scope)), fence_dir, token.encode("ascii"), total_seconds=TIMEOUT)
         quarantine.install(); installed = True; quarantine.check()
-        packet = platform.canonical({"sudo_password": sudo_password, "bindings": [approval["stage"], approval["operation_id"], run_id, dispatcher, approval["manifest_sha256"], approval["request_template_sha256"]], "approval": approval_raw, "approval_sha256": approval_sha, "package_sha256": package_sha, "tool_directory": remote_directory, "credentials": credentials})
+        packet = platform.canonical({"sudo_password": sudo_password, "fixed_window_entry_sha256": fixed_entry, "bindings": [approval["stage"], approval["operation_id"], run_id, dispatcher, approval["manifest_sha256"], approval["request_template_sha256"]], "approval": approval_raw, "approval_sha256": approval_sha, "package_sha256": package_sha, "tool_directory": remote_directory, "credentials": credentials})
         if len(packet) > 65536: fail("platform_window_packet_rejected")
         registration.save("native-window.intent.json", {"actual_run_id": run_id, "package_sha256": package_sha, "approval_sha256": approval_sha, "remote_directory": remote_directory})
         command = "/usr/bin/python3 -I -c " + shlex.quote(REMOTE)

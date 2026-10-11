@@ -522,7 +522,7 @@ func TestWriterPreconditionsCannotReuseStoppedOrInstalledOwner(t *testing.T) {
 func TestDatabaseWriterNativeProducerBindsCensusAndOriginalActors(t *testing.T) {
 	v, c := databaseWriterPolicyFixture(t)
 	r := lifecycleRequest{ToolSourceSHA: strings.Repeat("b", 40), OriginalSourceSHA: strings.Repeat("a", 40), OperationID: "12-1", ActualRunID: "22-1", ManifestSHA256: strings.Repeat("c", 64), Recovery: backup.TargetRecoveryRequest{OriginalRunID: "16-1"}}
-	original := dbCensusPrivate{SourceSHA: r.OriginalSourceSHA, OperationID: r.OperationID, RunID: "18-1", RequestSHA256: strings.Repeat("d", 64), IdentityProducer: prepareFactsProducer{OperationID: r.OperationID, RunID: "17-1", SourceSHA: r.OriginalSourceSHA, ReportSHA256: strings.Repeat("e", 64), RequestSHA256: strings.Repeat("f", 64)}}
+	original := dbCensusPrivate{SourceSHA: r.ToolSourceSHA, OperationID: r.OperationID, RunID: "18-1", RequestSHA256: strings.Repeat("d", 64), IdentityProducer: prepareFactsProducer{OperationID: r.OperationID, RunID: "17-1", SourceSHA: r.OriginalSourceSHA, ReportSHA256: strings.Repeat("e", 64), RequestSHA256: strings.Repeat("f", 64)}}
 	file := lifecycleFinalFileBinding{Path: filepath.Join(lifecycleRootBatch(r.OperationID, original.RunID), "db-writer-census.private.json"), SHA256: strings.Repeat("d", 64)}
 	if run, ok := lifecycleDBInputCensusRun(file.Path, r.OperationID); !ok || run != original.RunID || !lifecycleDBCensusProducerValid(original, r, run) {
 		t.Fatal("actual original census source rejected")
@@ -532,15 +532,20 @@ func TestDatabaseWriterNativeProducerBindsCensusAndOriginalActors(t *testing.T) 
 			t.Fatal("non-exact original source path accepted", path)
 		}
 	}
-	bad := original
-	bad.SourceSHA = r.ToolSourceSHA
-	if lifecycleDBCensusProducerValid(bad, r, original.RunID) {
-		t.Fatal("different census source accepted")
-	}
-	bad = original
-	bad.WriterScopeComplete = true
-	if lifecycleDBCensusProducerValid(bad, r, original.RunID) {
-		t.Fatal("census isolation token accepted")
+	for _, change := range []func(*dbCensusPrivate){
+		func(v *dbCensusPrivate) { v.SourceSHA = r.OriginalSourceSHA },
+		func(v *dbCensusPrivate) { v.SourceSHA = strings.Repeat("9", 40) },
+		func(v *dbCensusPrivate) { v.IdentityProducer.SourceSHA = r.ToolSourceSHA },
+		func(v *dbCensusPrivate) { v.IdentityProducer.OperationID = "13-1" },
+		func(v *dbCensusPrivate) { v.IdentityProducer.ReportSHA256 = "" },
+		func(v *dbCensusPrivate) { v.RequestSHA256 = "" },
+		func(v *dbCensusPrivate) { v.WriterScopeComplete = true },
+	} {
+		bad := original
+		change(&bad)
+		if lifecycleDBCensusProducerValid(bad, r, original.RunID) {
+			t.Fatal("different tool/original identity or imported isolation accepted")
+		}
 	}
 	actors := []stop.DatabasePrincipal{
 		{Component: "qs-apiserver", ContainerID: strings.Repeat("1", 64), EnvironmentSHA256: strings.Repeat("2", 64), SQLUser: "app", SQLDatabase: "qs", MongoUser: "app", MongoDatabase: "qs"},
@@ -564,8 +569,15 @@ func TestDatabaseWriterNativeProducerBindsCensusAndOriginalActors(t *testing.T) 
 		return lifecycleProduceDBWriterInput(r, file, original, c, actors, ai, sqlObserver, mongoObserver, "qs", "qs")
 	}
 	in, e := produce(actors, "ai")
-	if e != nil || len(in.SQLPrincipals) != 1 || len(in.MongoPrincipals) != 1 || !reflect.DeepEqual(in.SQLPrincipals[0].Owners, []string{"qs-apiserver", "qs-worker"}) || !reflect.DeepEqual(in.OriginalActors, actors) {
+	if e != nil || in.CensusSourceSHA != r.ToolSourceSHA || len(in.SQLPrincipals) != 1 || len(in.MongoPrincipals) != 1 || !reflect.DeepEqual(in.SQLPrincipals[0].Owners, []string{"qs-apiserver", "qs-worker"}) || !reflect.DeepEqual(in.OriginalActors, actors) {
 		t.Fatal("true original actor ownership not composed", e, in)
+	}
+	for _, source := range []string{r.OriginalSourceSHA, strings.Repeat("9", 40)} {
+		bad := in
+		bad.CensusSourceSHA = source
+		if lifecycleDBInputValid(bad, r) {
+			t.Fatal("different census tool source accepted by explicit writer input")
+		}
 	}
 	for _, tc := range []struct {
 		name   string

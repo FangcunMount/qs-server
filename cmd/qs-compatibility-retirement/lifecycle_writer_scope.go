@@ -564,7 +564,7 @@ func lifecycleDBLiteral(v string) (string, error) {
 	return "'" + strings.ReplaceAll(v, "'", "''") + "'", nil
 }
 func lifecycleDBInputValid(v lifecycleDBWriterInput, r lifecycleRequest) bool {
-	if v.FormatVersion != 1 || v.Kind != "qs_four_target_database_writer_expectations" || v.ToolSourceSHA != r.ToolSourceSHA || v.OriginalSourceSHA != r.OriginalSourceSHA || v.OperationID != r.OperationID || v.OriginalRunID != r.Recovery.OriginalRunID || v.TargetHash != digest(targets) || v.ManifestSHA256 != r.ManifestSHA256 || !shaRE.MatchString(v.CensusSourceSHA) || !runRE.MatchString(v.CensusRunID) || !hashRE.MatchString(v.Census.SHA256) || v.Census.Path != filepath.Join(lifecycleRootBatch(r.OperationID, v.CensusRunID), "db-writer-census.private.json") || len(v.OriginalActors) != 2 || len(v.SQLPrincipals) > 64 || len(v.MongoPrincipals) > 64 {
+	if v.FormatVersion != 1 || v.Kind != "qs_four_target_database_writer_expectations" || v.ToolSourceSHA != r.ToolSourceSHA || v.OriginalSourceSHA != r.OriginalSourceSHA || v.OperationID != r.OperationID || v.OriginalRunID != r.Recovery.OriginalRunID || v.TargetHash != digest(targets) || v.ManifestSHA256 != r.ManifestSHA256 || !shaRE.MatchString(v.CensusSourceSHA) || v.CensusSourceSHA != r.ToolSourceSHA || !runRE.MatchString(v.CensusRunID) || !hashRE.MatchString(v.Census.SHA256) || v.Census.Path != filepath.Join(lifecycleRootBatch(r.OperationID, v.CensusRunID), "db-writer-census.private.json") || len(v.OriginalActors) != 2 || len(v.SQLPrincipals) > 64 || len(v.MongoPrincipals) > 64 {
 		return false
 	}
 	for _, observer := range []lifecycleDBPrincipalExpected{v.SQLObserver, v.MongoObserver} {
@@ -767,7 +767,7 @@ func lifecycleDBInputCensusRun(path, operation string) (string, bool) {
 }
 func lifecycleDBCensusProducerValid(c dbCensusPrivate, r lifecycleRequest, run string) bool {
 	p := c.IdentityProducer
-	return c.SourceSHA == r.OriginalSourceSHA && c.OperationID == r.OperationID && c.RunID == run && hashRE.MatchString(c.RequestSHA256) && !c.WriterScopeComplete && p.OperationID == r.OperationID && p.SourceSHA == r.OriginalSourceSHA && runRE.MatchString(p.RunID) && hashRE.MatchString(p.ReportSHA256) && hashRE.MatchString(p.RequestSHA256)
+	return c.SourceSHA == r.ToolSourceSHA && c.OperationID == r.OperationID && c.RunID == run && hashRE.MatchString(c.RequestSHA256) && !c.WriterScopeComplete && p.OperationID == r.OperationID && p.SourceSHA == r.OriginalSourceSHA && runRE.MatchString(p.RunID) && hashRE.MatchString(p.ReportSHA256) && hashRE.MatchString(p.RequestSHA256)
 }
 
 func (h *lifecycleFixedHost) observeDatabaseMaintenancePrincipals(ctx context.Context) (sqlObserver, mongoObserver lifecycleDBPrincipalExpected, database string, result error) {
@@ -910,7 +910,7 @@ func (h *lifecycleFixedHost) installDatabaseWriterLease(ctx context.Context, r l
 		if !lifecycleOwnedPath(filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID), f.Path) || readLifecyclePrivateAs(f.Path, f.SHA256, &in, 256<<10, intent.SourceUID) != nil || !lifecycleDBInputValid(in, r) {
 			return lifecycleError("lifecycle_database_writer_input_rejected")
 		}
-		if readLifecyclePrivateAs(in.Census.Path, in.Census.SHA256, &original, 64<<20, 0) != nil || original.SourceSHA != in.CensusSourceSHA || original.OperationID != r.OperationID || original.RunID != in.CensusRunID || original.WriterScopeComplete || original.IdentityProducer.OperationID != r.OperationID {
+		if readLifecyclePrivateAs(in.Census.Path, in.Census.SHA256, &original, 64<<20, 0) != nil || original.SourceSHA != in.CensusSourceSHA || !lifecycleDBCensusProducerValid(original, r, in.CensusRunID) {
 			return lifecycleError("lifecycle_database_census_binding_rejected")
 		}
 	}
