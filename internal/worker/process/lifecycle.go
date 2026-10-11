@@ -22,11 +22,7 @@ type lifecycleDeps struct {
 
 func (s *server) registerShutdownCallback(deps lifecycleDeps) {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-		if s.runtimeFacts != nil {
-			if err := s.runtimeFacts.Close(); err != nil {
-				log.Warn("private runtime facts cleanup incomplete")
-			}
-		}
+
 		runWorkerLifecycle(deps)
 		log.Info("🏗️  Worker Server shutdown complete")
 		return nil
@@ -96,23 +92,13 @@ func runWorkerLifecycle(deps lifecycleDeps) {
 }
 
 func (s preparedServer) Run() error {
-	if s.runtimeFacts != nil {
-		defer func() {
-			if err := s.runtimeFacts.Close(); err != nil {
-				log.Warn("private runtime facts cleanup incomplete")
-			}
-		}()
-	}
+
 	if s.startShutdown != nil {
 		if err := s.startShutdown(); err != nil {
 			log.Fatalf("start shutdown manager failed: %s", err.Error())
 		}
 	}
-	if s.runtimeFacts != nil {
-		if err := s.runtimeFacts.Start(); err != nil {
-			log.Warn("private runtime facts unavailable")
-		}
-	}
+
 	log.Info("🚦 Shutdown manager started, worker coming online")
 	log.Info("🚀 Worker started, waiting for events...")
 

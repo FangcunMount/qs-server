@@ -39,7 +39,6 @@ func (r *prepareRunner) run() (preparedServer, string, error) {
 		BuildPrepared: func(*prepareState) preparedServer {
 			return preparedServer{
 				startShutdown: r.server.gs.Start,
-				runtimeFacts:  r.server.runtimeFacts,
 			}
 		},
 	}.Run()

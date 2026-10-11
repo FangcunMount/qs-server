@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/runtimefacts"
 	"github.com/nsqio/go-nsq"
 
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
@@ -25,36 +24,20 @@ type sdkNSQWirePublisher struct {
 	closeOnce sync.Once
 	closed    chan struct{}
 	closeErr  error
-	facts     *runtimefacts.Owner
-	factsID   string
 }
 
 // NewSDKNSQWirePublisher exposes complete wire bytes to the API's NSQ path.
-func NewSDKNSQWirePublisher(address string) (*sdkNSQWirePublisher, error) {
-	return NewSDKNSQWirePublisherWithFacts(address, nil, "", nil)
-}
 
-func NewSDKNSQWirePublisherWithFacts(address string, facts *runtimefacts.Owner, id string, httpEndpoints []string) (*sdkNSQWirePublisher, error) {
+func NewSDKNSQWirePublisher(address string) (*sdkNSQWirePublisher, error) {
 	driverConfig := nsq.NewConfig()
-	if facts != nil {
-		driverConfig.ClientID = facts.ClientID(id)
-		if err := facts.Declare(runtimefacts.Transport{ID: id, Provider: "nsq", Direction: "publisher", NSQDTCPAddresses: []string{address}, NSQDHTTPAddresses: httpEndpoints, ClientID: driverConfig.ClientID, Hostname: driverConfig.Hostname}); err != nil {
-			facts.MarkIncomplete(id)
-		}
-	}
+
 	publisher, err := rmnsq.NewManagedPublisher(rmnsq.ManagedPublisherConfig{Address: address, Driver: driverConfig, MaxInFlight: 64})
 	if err != nil {
-		if facts != nil {
-			facts.MarkIncomplete(id)
-		}
+
 		return nil, err
 	}
-	if facts != nil {
-		if err := facts.MarkStarted(id); err != nil {
-			facts.MarkIncomplete(id)
-		}
-	}
-	return &sdkNSQWirePublisher{publisher: publisher, closed: make(chan struct{}), facts: facts, factsID: id}, nil
+
+	return &sdkNSQWirePublisher{publisher: publisher, closed: make(chan struct{})}, nil
 }
 
 // PublishWire never rebuilds or mutates the caller's envelope. Unknown keeps
@@ -76,9 +59,7 @@ func classifyNSQPublish(topic string, result rmtransport.Result) error {
 
 func (p *sdkNSQWirePublisher) Close() error {
 	p.closeOnce.Do(func() {
-		if p.facts != nil {
-			p.facts.MarkStopped(p.factsID)
-		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		p.closeErr = p.publisher.Close(ctx)
 		cancel()
