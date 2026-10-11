@@ -426,10 +426,13 @@ class FixedFailedInventorySelection(unittest.TestCase):
         return a
 
     def test_approval_only_two_exact_origins_without_default(self):
+        self.assertEqual(s0.PIN_SHA,s0.sha(Path(__file__).with_name('compatibility-host-inventory-action.py').read_bytes()))
         for operation,origin in s0.FAILED_INVENTORY_ORIGINS.items():
             a=self.approval(operation);raw=s0.canonical(a)
             self.assertEqual(s0.approved(raw,s0.sha(raw),'a'*40),a)
             self.assertEqual(s0.failed_inventory_origin(a),(operation,*origin))
+            old_pin=dict(a,pin_sha256='0d64be53c7c692e3d766c2f5495f3fe974a8185b54b0f9b981303515886f41ff');raw=s0.canonical(old_pin)
+            with self.assertRaises(s0.Rejected):s0.approved(raw,s0.sha(raw),'a'*40)
             a['completion_run_id']=origin[0];raw=s0.canonical(a)
             with self.assertRaises(s0.Rejected):s0.approved(raw,s0.sha(raw),'a'*40)
         for operation in ('38019009876-3','../38019009876-2',None,True):
