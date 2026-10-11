@@ -38,7 +38,7 @@ func TestDBWriterCensusLocalSessionReadConcern(t *testing.T) {
 			if actual := command.Command.Lookup("readConcern", "level").StringValue(); actual != item.level {
 				mt.Fatalf("session read concern = %q, want %q", actual, item.level)
 			}
-			if mt.Client.Database(item.db).ReadConcern().GetLevel() != "majority" {
+			if mt.Client.Database(item.db).ReadConcern().Level != "majority" {
 				mt.Fatal("borrowed client's read concern was changed")
 			}
 		})
