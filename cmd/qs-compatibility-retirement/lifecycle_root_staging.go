@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -2107,6 +2108,69 @@ func openLifecycleOriginalCensusMaterials(ctx context.Context, r lifecycleReques
 	}
 	if e != nil || rejectDuplicateJSON(raw) != nil || lifecycleExactJSONNames(raw, reflect.TypeOf(request)) != nil || request.FormatVersion != 1 || request.Kind != "readonly_db_writer_census_request" || request.SourceSHA != r.ToolSourceSHA || request.OperationID != r.OperationID || request.ActualRunID != run || request.TargetHash != digest(targets) || request.Identity != c.IdentityProducer {
 		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	if e = d.checkComplete(false); e != nil {
+		return reject(e)
+	}
+	return d, nil
+}
+
+// Follow the actual facts producer selected by both approved bounds filenames.
+// This owns only its fixed root batch and original request, never a history parent.
+func openLifecycleOriginalPrepareFactsMaterials(ctx context.Context, r lifecycleRequest, parent, inventory *lifecycleMaterialDirectory, uid uint32) (*lifecycleMaterialDirectory, error) {
+	if ctx == nil || ctx.Err() != nil || r.FinalHistory == nil || !r.FinalHistory.valid(r) || parent == nil || inventory == nil || inventory.files["inventory.private.json"] == nil {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	run := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(r.FinalHistory.AIBounds.Path), "ai-bounds-"), ".json")
+	root := lifecycleRootBatch(r.OperationID, run)
+	if !runRE.MatchString(run) || run == r.ActualRunID || r.FinalHistory.AIBounds.Path != filepath.Join(parent.path, "ai-bounds-"+run+".json") || r.FinalHistory.PeerBounds.Path != filepath.Join(parent.path, "peer-bounds-"+run+".json") || r.FinalHistory.AssetsDirectory != root {
+		return nil, lifecycleError("lifecycle_original_operation_material_rejected")
+	}
+	d, e := openLifecycleMaterialDirectory(root, 0)
+	if e != nil {
+		return nil, e
+	}
+	reject := func(e error) (*lifecycleMaterialDirectory, error) { _ = d.close(); return nil, e }
+	var facts prepareFactsReceipt
+	raw, e := readLifecycleProducerJSON(d, "prepare-facts.private.json", "", 0, 256<<10, &facts)
+	if e != nil || decodePrepareFacts(raw, &facts) != nil || facts.FormatVersion != 1 || facts.Kind != "readonly_prepare_facts_observation" || facts.SourceSHA != r.ToolSourceSHA || facts.OperationID != r.OperationID || facts.RunID != run || facts.RequestSHA256 == "" || !hashRE.MatchString(facts.RequestSHA256) || facts.Complete || facts.ExecutionAllowed || facts.DropReady || !facts.DiagnosticOnly || !facts.FactsObservationComplete || facts.ErrorCategory != "none" || facts.Producer.OperationID != r.OperationID || facts.Producer.SourceSHA != r.OriginalSourceSHA || facts.Producer.RunID != r.Approval.RunID || facts.Producer.RequestSHA256 != r.Approval.RequestHash || facts.Producer.ReportSHA256 != inventory.files["inventory.private.json"].hash || facts.AIBoundsSHA256 != r.FinalHistory.AIBounds.SHA256 || facts.PeerBoundsSHA256 != r.FinalHistory.PeerBounds.SHA256 || facts.AIRuntime == nil || facts.AIRuntime.SourceSHA != r.FinalHistory.RuntimeSourceSHA || facts.AIRuntime.ImageID != r.FinalHistory.ImageID || facts.AIRuntime.ContainerID != r.FinalHistory.ContainerID || facts.AIRuntime.BindingSHA256 != r.FinalHistory.RuntimeBindingSHA256 || facts.Protection == nil || facts.Protection.SHA256 != r.FinalHistory.Protection.SHA256 {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	var tool lifecycleOriginalRootToolIntent
+	raw, e = readLifecycleProducerJSON(d, "tool.intent.private.json", "", 0, 256<<10, &tool)
+	requestPath := filepath.Join(parent.path, "prepare-facts-request-"+run+".json")
+	if e != nil || decodeLifecycleClosedProducer(raw, &tool) != nil || tool.FormatVersion != 1 || tool.Kind != "approved_root_once_tool_staging" || tool.Stage != "prepare-facts" || tool.ToolSourceSHA != r.ToolSourceSHA || tool.OperationID != r.OperationID || tool.ActualRunID != run || tool.SourceUID != uid || tool.RequestPath != requestPath || tool.RequestSHA256 != facts.RequestSHA256 || tool.ManifestSHA256 != "" || tool.DropAuthority || !tool.PurgeRequired || !hashRE.MatchString(tool.PackageSHA256) || !hashRE.MatchString(tool.NativeSHA256) {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	var q prepareFactsRequest
+	raw, e = readLifecycleProducerJSON(parent, filepath.Base(requestPath), facts.RequestSHA256, uid, 256<<10, &q)
+	if e != nil || decodePrepareFacts(raw, &q) != nil || validatePrepareFactsRequest(q, r.OperationID, run) != nil || q.Inventory != facts.Producer {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	if e = d.register("restore-native", tool.NativeSHA256, 0, 0700); e != nil {
+		return reject(e)
+	}
+	for _, name := range []string{"qs-ai-retirement-readonly-host.py", "qs-ai-retirement-readonly-verifier.py", "qs-ai-retirement-readonly-observer.py", "qs-ai-retirement-0040-layout.py"} {
+		fact, _, readErr := hashPrepareFactsFile(ctx, filepath.Join(root, name), 0, 1<<20, true)
+		e = readErr
+		if e != nil {
+			return reject(e)
+		}
+		if e = d.registerWithMaximum(name, fact.SHA256, 0, 0600, 1<<20); e != nil {
+			return reject(e)
+		}
+	}
+	fact, raw, e := hashPrepareFactsFile(ctx, filepath.Join(root, "qs-ai-external-bounds.exec.jsonl"), 0, 64<<10, true)
+	if e != nil || validateLifecycleOriginalAIExecMaterial(raw, r) != nil {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	var final lifecycleOriginalAIExecRecord
+	lines := bytes.Split(bytes.TrimSuffix(raw, []byte{'\n'}), []byte{'\n'})
+	if json.Unmarshal(lines[len(lines)-1], &final) != nil || final.Stage != "observed" || final.Running == nil || *final.Running || final.ExitCode == nil || *final.ExitCode != 0 || !final.AttachComplete {
+		return reject(lifecycleError("lifecycle_original_operation_material_rejected"))
+	}
+	if e = d.registerWithMaximum("qs-ai-external-bounds.exec.jsonl", fact.SHA256, 0, 0600, 64<<10); e != nil {
+		return reject(e)
 	}
 	if e = d.checkComplete(false); e != nil {
 		return reject(e)

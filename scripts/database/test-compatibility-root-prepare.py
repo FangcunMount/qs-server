@@ -138,6 +138,7 @@ class PrepareFactsBoundaries(unittest.TestCase):
             'operation_id':args.operation_id,'run_id':args.run_id,'request_sha256':request_hash,'observation_approval_sha256':args.bootstrap_approval_hash,
             'target_hash':tool.TARGET_HASH,'complete':False,'prepare_facts_observation_complete':True,'diagnostic_only':True,'execution_allowed':False,'drop_ready':False,
             'observed_inventory_producer':request['inventory_report'],'prepare_source_files':[{'name':name,'sha256':request['inventory_report']['sha256'] if i==0 else 'e'*64,'bytes':0} for i,name in enumerate(tool.PREPARE_SOURCE_NAMES)],
+            'observed_ai_bounds_sha256':'a'*64,'observed_peer_bounds_sha256':'b'*64,
             'observed_ordered_mongo_schema_sha256':'f'*64,'observed_restore_engines':request['restore_engines'],
             'observed_ai_runtime':{'source_sha':'c'*40,'image_id':'sha256:'+'3'*64,'container_id':'4'*64,'binding_sha256':'5'*64,'stop_constraints':{'settings_sha256':'6'*64,'network_id':'7'*64}},
             'observed_filesystems':[{'scope':scope,'path_sha256':'0'*64,'total_bytes':100,'available_bytes':50,'free_bytes':60} for scope in ('source','staging','archive','docker')],
@@ -193,7 +194,8 @@ class PrepareFactsBoundaries(unittest.TestCase):
         self.assertEqual(result['observed_restore_engines']['mysql_image_id_sha256'],'1'*64)
         self.assertEqual(result['observed_ai_runtime']['image_id_sha256'],'3'*64)
         self.assertEqual(result['observed_ai_runtime']['stop_constraints']['settings_sha256'],'6'*64)
-        mutations=(lambda r:r.update(drop_ready=True),lambda r:r.update(complete=True),lambda r:r.update(observed_ordered_mongo_schema_sha256=''),
+        mutations=(lambda r:r.pop('observed_ai_bounds_sha256'),lambda r:r.pop('observed_peer_bounds_sha256'),
+            lambda r:r.update(observed_ai_bounds_sha256='PRIVATE_BODY'),lambda r:r.update(drop_ready=True),lambda r:r.update(complete=True),lambda r:r.update(observed_ordered_mongo_schema_sha256=''),
             lambda r:r['prepare_source_files'].pop(),lambda r:r['observed_inventory_producer'].update(source_sha=args.actual_source_sha),
             lambda r:r.update(prepare_facts_private_observation_sha256=''),lambda r:r.update(observed_filesystems=[]),
             lambda r:r.pop('observed_ai_runtime'),lambda r:r['observed_ai_runtime'].update(image_id='qs-ai:latest'),
@@ -220,6 +222,8 @@ class PrepareFactsBoundaries(unittest.TestCase):
         self.assertEqual(code,0)
         decoded=json.loads(tool.transport().decode_armored_receipt(output.getvalue().strip()))
         self.assertEqual(decoded['observed_inventory_producer']['source_sha'],'b'*40)
+        self.assertEqual(decoded['observed_ai_bounds_sha256'],'a'*64)
+        self.assertEqual(decoded['observed_peer_bounds_sha256'],'b'*64)
         self.assertEqual(decoded['observed_ordered_mongo_schema_sha256'],'f'*64)
         self.assertEqual(decoded['prepare_source_files'][0]['name'],'inventory_private_json')
         self.assertEqual(decoded['observed_ai_runtime']['source_sha'],'c'*40)

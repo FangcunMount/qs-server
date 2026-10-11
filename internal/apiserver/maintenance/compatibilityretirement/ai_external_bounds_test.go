@@ -40,6 +40,9 @@ func aiDiscoveryFixture(t *testing.T) ([]byte, aiExternalDiscoveryFacts) {
 }
 
 func TestAIExternalBoundsObservationDoesNotAcquireExecutionOrCASAuthority(t *testing.T) {
+	if _, e := ObserveAIExternalInventoryBounds(context.Background(), HistoricalCoordinatorBinding{}, AIResolverBinding{}, [2]SourceCopyExpectation{}, AIExternalBoundsInput{}, "123-1"); e != ErrAIExternalBounds {
+		t.Fatal("unbound inventory diagnostic accepted")
+	}
 	directory, err := filepath.Abs("../../../../scripts/database")
 	if err != nil {
 		t.Fatal(err)

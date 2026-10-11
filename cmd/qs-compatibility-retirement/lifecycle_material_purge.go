@@ -266,6 +266,11 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		return e
 	}
 	c.directories = append(c.directories, c.census)
+	facts, e := openLifecycleOriginalPrepareFactsMaterials(ctx, r, operation, h.inventoryMaterials, invocation.SourceUID)
+	if e != nil {
+		return e
+	}
+	c.directories = append(c.directories, facts)
 	if e = completeLifecycleOriginalOperationMaterials(ctx, r, operation, h.inventoryMaterials, h.archiveMaterials, invocation.SourceUID); e != nil {
 		return e
 	}

@@ -5,10 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 )
 
 const ErrAIExternalBounds SourceError = "ai_external_bounds_discovery_rejected"
@@ -148,14 +153,6 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 	if c.now == nil || c.alive(ctx) != nil || c.authenticated == nil || !c.authenticated.complete || local == nil || local.owner != c || local.validate(ctx) != nil || !aiExternalDiscoveryInputValid(in) {
 		return nil, ErrAIExternalBounds
 	}
-	assets, err := aiExternalAssets(in.AssetsDirectory)
-	if err != nil {
-		return nil, err
-	}
-	release, err := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
-	if err != nil || release.seal != in.ApprovedAIRuntimeBindingSHA256 {
-		return nil, ErrAIExternalRuntime
-	}
 	sections := map[string]aiExternalSection{}
 	for _, index := range []int{1, 2} {
 		e := c.copies[index].Expected
@@ -164,7 +161,77 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 	if len(sections) != 2 || sections[AIBridgeCommandSource].Rows+sections[AILegacyCommandSource].Rows > 10000 {
 		return nil, ErrAIExternalBounds
 	}
-	peerBinding := aiExternalPriorBinding{local.inner.binding.DatabaseIdentityHash, strconv.FormatUint(local.inner.binding.MigrationVersion, 10)}
+	o, err := observeAIExternalBounds(ctx, c.binding, sections, aiExternalPriorBinding{local.inner.binding.DatabaseIdentityHash, strconv.FormatUint(local.inner.binding.MigrationVersion, 10)}, in, c.started.Add(c.limits.MaxDuration), "")
+	if err != nil {
+		return nil, err
+	}
+	if local.validate(ctx) != nil || c.alive(ctx) != nil {
+		return nil, ErrAIExternalChanged
+	}
+	return o, nil
+}
+
+// Only diagnostic bounds are produced. The borrowed native RRRO identity and
+// original inventory sections replace the retired history-parent dependency.
+func ObserveAIExternalInventoryBounds(ctx context.Context, binding HistoricalCoordinatorBinding, peer AIResolverBinding, originals [2]SourceCopyExpectation, in AIExternalBoundsInput, actualRun string) (*AIExternalBoundsObservation, error) {
+	if ctx == nil || ctx.Err() != nil || os.Geteuid() != 0 || os.Getuid() != 0 || !aiOriginalSourceSHA(binding.SourceSHA) || !aiLocalOperationID(binding.OperationID) || !aiExternalDiscoveryInputValid(in) || peer.SourceSHA != binding.SourceSHA || peer.OperationID != binding.OperationID || peer.MigrationVersion != 99 || !evidenceHash(peer.DatabaseIdentityHash) || !strings.HasPrefix(actualRun, in.RunID+"-") || !aiLocalOperationID(actualRun) || in.AssetsDirectory != filepath.Join("/opt/backups/qs-server/compatibility-retirement-root-prepare", binding.OperationID+"-"+actualRun) || in.OperationDirectory != filepath.Join("/opt/backups/qs-server/compatibility-retirement", binding.OperationID) {
+		return nil, ErrAIExternalBounds
+	}
+	tx, err := hostmysql.RequireTx(ctx)
+	if err != nil || tx == nil || tx.Statement == nil || tx.Statement.ConnPool == nil {
+		return nil, ErrAIReverseFresh
+	}
+	if _, err = sdkmysql.BindGORM(tx); err != nil {
+		return nil, ErrAIReverseFresh
+	}
+	work, cancel := context.WithTimeout(ctx, 1500*time.Second)
+	defer cancel()
+	ctx = work
+	s := &AIReverseSnapshot{pool: tx.Statement.ConnPool, head: 99, limits: DefaultAIReverseLimits(), started: time.Now()}
+	s.limits.MaxDuration = 1500 * time.Second
+	s.self = s
+	s.report.DatabaseIdentitySHA256 = peer.DatabaseIdentityHash
+	native, err := s.historicalTransaction(ctx, "READ ONLY")
+	if err != nil {
+		return nil, err
+	}
+	sections := map[string]aiExternalSection{}
+	for i, name := range []string{AIBridgeCommandSource, AILegacyCommandSource} {
+		e := originals[i]
+		if e.Boundary.Database != "mysql" || e.Boundary.Name != name || !e.Boundary.Present || !evidenceHash(e.DataHash) || e.Records > 10000 || e.Bytes > MaxSourceBytes {
+			return nil, ErrAIExternalBounds
+		}
+		sections[name] = aiExternalSection{e.Records, e.Bytes, e.DataHash}
+	}
+	if originals[0].Records+originals[1].Records > 10000 {
+		return nil, ErrAIExternalBounds
+	}
+	uid, err := aiExternalReleaseOwnerUIDValue(os.Geteuid(), os.Getenv("QS_RETIREMENT_SOURCE_UID"))
+	if err != nil {
+		return nil, err
+	}
+	if err = RequireAIExternalExecQuiescence(ctx, AIExternalExecQuiescenceInput{OperationDirectory: in.OperationDirectory, SourceSHA: binding.SourceSHA, OperationID: binding.OperationID, RuntimeSourceSHA: in.RuntimeSourceSHA, ImageID: in.ImageID, ContainerID: in.ContainerID, SudoDocker: in.SudoDocker, SourceUID: &uid}); err != nil {
+		return nil, err
+	}
+	o, err := observeAIExternalBounds(ctx, binding, sections, aiExternalPriorBinding{peer.DatabaseIdentityHash, "99"}, in, time.Now().Add(1520*time.Second), in.AssetsDirectory)
+	if err != nil {
+		return nil, err
+	}
+	if now, e := s.historicalTransaction(ctx, "READ ONLY"); e != nil || now != native {
+		return nil, ErrAIExternalChanged
+	}
+	return o, nil
+}
+
+func observeAIExternalBounds(ctx context.Context, binding HistoricalCoordinatorBinding, sections map[string]aiExternalSection, peerBinding aiExternalPriorBinding, in AIExternalBoundsInput, deadline time.Time, journalDirectory string) (*AIExternalBoundsObservation, error) {
+	assets, err := aiExternalAssets(in.AssetsDirectory)
+	if err != nil {
+		return nil, err
+	}
+	release, err := aiExternalReadRelease(in.RuntimeSourceSHA, in.ImageID)
+	if err != nil || release.seal != in.ApprovedAIRuntimeBindingSHA256 {
+		return nil, ErrAIExternalRuntime
+	}
 	packet := struct {
 		Protocol       string                       `json:"protocol"`
 		SourceSHA      string                       `json:"source_sha"`
@@ -180,12 +247,11 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 		ExpectedAI     aiExternalPriorBinding       `json:"expected_ai"`
 		ExpectedPeer   aiExternalPriorBinding       `json:"expected_peer"`
 		Modules        map[string]string            `json:"modules"`
-	}{"qs-ai-readonly-bounds-discovery-input/v1", c.binding.SourceSHA, c.binding.OperationID, in.RunID, in.RuntimeSourceSHA, release.seal, release.messaging, in.ImageID, in.ContainerID, sections, aiExternalPeerConnectionWire(in.PeerConnection), aiExternalPriorBinding{in.ExpectedAIIdentityHash, in.ExpectedAIHead}, peerBinding, assets.modules}
+	}{"qs-ai-readonly-bounds-discovery-input/v1", binding.SourceSHA, binding.OperationID, in.RunID, in.RuntimeSourceSHA, release.seal, release.messaging, in.ImageID, in.ContainerID, sections, aiExternalPeerConnectionWire(in.PeerConnection), aiExternalPriorBinding{in.ExpectedAIIdentityHash, in.ExpectedAIHead}, peerBinding, assets.modules}
 	raw, err := json.Marshal(packet)
 	if err != nil || len(raw) > aiExternalInputLimit {
 		return nil, ErrAIExternalBounds
 	}
-	deadline := c.started.Add(c.limits.MaxDuration)
 	if d := time.Now().Add(1520 * time.Second); d.Before(deadline) {
 		deadline = d
 	}
@@ -200,7 +266,28 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 	if err != nil || !before.matches(runtimeInput) || !release.matchesMounts(before.Mounts) {
 		return nil, ErrAIExternalRuntime
 	}
-	result, err := aiExternalExecuteMode(work, docker, in.OperationDirectory, aiExternalBoundsMode, c.binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
+	var result []byte
+	if journalDirectory == "" {
+		result, err = aiExternalExecuteMode(work, docker, in.OperationDirectory, aiExternalBoundsMode, binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
+	} else {
+		b, e := aiExternalExecModeBinding(work, aiExternalBoundsMode, binding, in.RunID, in.RuntimeSourceSHA, in.ImageID, in.ContainerID, assets.host, raw)
+		if e != nil {
+			return nil, e
+		}
+		j, e := aiExecOpenJournal(filepath.Join(journalDirectory, "qs-ai-external-bounds.exec.jsonl"), b, true)
+		if e != nil {
+			return nil, e
+		}
+		defer func() { _ = j.Close() }()
+		observed, e := aiExternalExecTracked(work, docker, j, assets.host, raw)
+		if e != nil {
+			return nil, e
+		}
+		result, err = observed.actualOutput(work)
+		if e = j.Close(); e != nil {
+			return nil, e
+		}
+	}
 	if err != nil {
 		return nil, ErrAIExternalBounds
 	}
@@ -213,7 +300,7 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 		return nil, ErrAIExternalRuntime
 	}
 	facts, ai, peer, err := aiExternalDecodeDiscovery(result)
-	if err != nil || facts.SourceSHA != c.binding.SourceSHA || facts.OperationID != c.binding.OperationID || facts.RunID != in.RunID || facts.RuntimeSourceSHA != in.RuntimeSourceSHA || facts.RuntimeBindingSHA != release.seal || facts.ImageID != in.ImageID || facts.ContainerID != in.ContainerID || !reflect.DeepEqual(facts.Sections, sections) {
+	if err != nil || facts.SourceSHA != binding.SourceSHA || facts.OperationID != binding.OperationID || facts.RunID != in.RunID || facts.RuntimeSourceSHA != in.RuntimeSourceSHA || facts.RuntimeBindingSHA != release.seal || facts.ImageID != in.ImageID || facts.ContainerID != in.ContainerID || !reflect.DeepEqual(facts.Sections, sections) {
 		return nil, ErrAIExternalBounds
 	}
 	var peerPacket struct {
@@ -221,7 +308,7 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 		Head     string `json:"head"`
 		Source   string `json:"source_sha"`
 	}
-	if json.Unmarshal(peer, &peerPacket) != nil || peerPacket.Identity != peerBinding.Identity || peerPacket.Head != peerBinding.Head || peerPacket.Source != c.binding.SourceSHA {
+	if json.Unmarshal(peer, &peerPacket) != nil || peerPacket.Identity != peerBinding.Identity || peerPacket.Head != peerBinding.Head || peerPacket.Source != binding.SourceSHA {
 		return nil, ErrAIExternalChanged
 	}
 	var aiPacket struct {
@@ -231,7 +318,7 @@ func (c *HistoricalCoordinator) ObserveAIExternalBounds(ctx context.Context, loc
 	if json.Unmarshal(ai, &aiPacket) != nil || aiPacket.Identity == peerBinding.Identity || facts.Bounds["ai"].PriorMatched != (in.ExpectedAIIdentityHash != "") || in.ExpectedAIIdentityHash != "" && (aiPacket.Identity != in.ExpectedAIIdentityHash || aiPacket.Head != in.ExpectedAIHead) {
 		return nil, ErrAIExternalChanged
 	}
-	if local.validate(ctx) != nil || c.alive(ctx) != nil {
+	if ctx.Err() != nil {
 		return nil, ErrAIExternalChanged
 	}
 	o := &AIExternalBoundsObservation{facts: facts, ai: ai, peer: peer}

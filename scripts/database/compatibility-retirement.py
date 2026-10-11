@@ -1855,12 +1855,17 @@ try:
         binary=tar.extractfile(selected[0]).read((64<<20)+1)
         if not binary or len(binary)>64<<20: stop()
         preload_program=preload_archive=None
+        sealed_assets={}
         if stage=='prepare-facts':
             programs=[m for m in members if m.name=='compatibility-window-tool.py']
             images=[m for m in members if m.name=='preload-image.tar.gz']
             if len(programs)!=1 or programs[0].size>1<<20 or len(images)!=1: stop()
             preload_program=tar.extractfile(programs[0]).read((1<<20)+1)
             preload_archive=tar.extractfile(images[0]).read((200<<20)+1)
+            for asset in ('qs-ai-retirement-readonly-host.py','qs-ai-retirement-readonly-verifier.py','qs-ai-retirement-readonly-observer.py','qs-ai-retirement-0040-layout.py'):
+                selected_asset=[m for m in members if m.name==asset]
+                if len(selected_asset)!=1 or selected_asset[0].size>1<<20: stop()
+                sealed_assets[asset]=tar.extractfile(selected_asset[0]).read((1<<20)+1)
     base=Path('/opt/backups/qs-server/compatibility-retirement-root-prepare')
     try: base.mkdir(mode=0o700)
     except FileExistsError: pass
@@ -1896,6 +1901,10 @@ try:
     native_mode = stage+'-root-once' if stage != 'lifecycle' else 'lifecycle-prepare-root-once'
     native_argv=[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run]
     if stage=='prepare-facts':
+        for asset,body in sealed_assets.items():
+            fd=os.open(batch/asset,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            with os.fdopen(fd,'wb') as f: f.write(body); f.flush(); os.fsync(f.fileno())
+        fd=os.open(batch,os.O_RDONLY|os.O_DIRECTORY);os.fsync(fd);os.close(fd)
         module={'__name__':'approved_cached_image_preparation'}
         exec(compile(preload_program,'approved-package-cached-image-caller','exec'),module)
         request_raw=module['read_owned'](Path(request_path),source_uid,request_hash,256<<10)
@@ -2345,7 +2354,7 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         "request_sha256", "observation_approval_sha256", "target_hash", "complete", "prepare_facts_observation_complete",
         "diagnostic_only", "execution_allowed", "drop_ready", "observed_inventory_producer", "prepare_source_files",
         "observed_ordered_mongo_schema_sha256", "observed_filesystems", "observed_socket_kind",
-        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime", "observed_ai_message_protection"))
+        "observation_elapsed_millis", "error_category"), ("observed_restore_engines", "prepare_facts_private_observation_sha256", "observed_ai_runtime", "observed_ai_message_protection", "observed_ai_bounds_sha256", "observed_peer_bounds_sha256"))
     if (type(result["format_version"]) is not int or result["format_version"] != 1 or
         result["kind"] != "readonly_prepare_facts_observation" or result["operation"] != "prepare" or
         result["prepare_mode"] != "prepare-facts" or result["source_sha"] != args.actual_source_sha or
@@ -2402,6 +2411,9 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         for key in ("decrypt_key_count", "trusted_signer_count"):
             uint(protection[key])
             if not 1 <= protection[key] <= 8: fail("prepare_facts_native_protection_rejected")
+    for key in ("observed_ai_bounds_sha256", "observed_peer_bounds_sha256"):
+        if key in result: token(result[key], HASH)
+        if result["prepare_facts_observation_complete"] and key not in result: fail("prepare_facts_native_bounds_rejected")
     if result["prepare_facts_observation_complete"] and protection is None:
         fail("prepare_facts_native_protection_rejected")
     # Only allowlisted tokens go through the existing armored public transport.
@@ -2698,6 +2710,7 @@ def main(argv=None):
               "observed_ordered_mongo_schema_sha256": "hash64_or_empty",
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
               "observed_cached_api_image": {"image_id_sha256":"hash64","program_sha256":"hash64","source_sha":"sha40","original_source_sha":"sha40","operation_id":"run_id","run_id":"run_id","image_archive_sha256":"hash64","probe_id":"hash64","probe_absent":"bool","temporary_files_zero":"bool","os":frozenset({"linux"}),"architecture":frozenset({"amd64"})},
+              "observed_ai_bounds_sha256":"hash64", "observed_peer_bounds_sha256":"hash64",
               "observed_ai_runtime": {"source_sha": "sha40", "image_id_sha256": "hash64", "container_id": "hash64", "binding_sha256": "hash64", "stop_constraints": {"settings_sha256": "hash64", "network_id": "hash64"}},
               "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
               "db_census_observation_complete":"bool", "mysql_all_connections_permission_proven":"bool", "mongodb_local_all_sessions_permission_proven":"bool", "all_nodes_sessions_coverage_complete":"bool", "external_writer_coverage_complete":"bool", "db_census_private_catalog_sha256":"hash64_or_empty", "db_census_catalog_sha256":"hash64_or_empty",
