@@ -685,7 +685,7 @@ func (v *lifecycleAPITransition) verifyOriginalRuntimeVersion(ctx context.Contex
 	if e != nil {
 		return e
 	}
-	address, e := lifecycleAPIReadAddress(before)
+	address, e := lifecycleAPIReadAddress(before, v.original)
 	if e != nil {
 		return e
 	}

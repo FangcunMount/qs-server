@@ -323,6 +323,76 @@ func TestMaterialRegistrationRejectsAliasesWrongHashAndUnsafeMetadata(t *testing
 		})
 	}
 }
+func TestOriginalOperationTemplateIsBoundBeforeEffectsAndPurged(t *testing.T) {
+	for _, mutation := range []string{"none", "missing", "wrong-template-hash", "derived-request-hash", "too-large", "changed-after-registration", "foreign-template"} {
+		t.Run(mutation, func(t *testing.T) {
+			d := materialTestDirectory(t, filepath.Join(t.TempDir(), "operation"))
+			path := filepath.Join(d.path, "lifecycle-request-template.json")
+			raw := []byte("{\"actual_run_id\":\"\",\"kind\":\"lifecycle\"}\n")
+			if mutation == "too-large" {
+				raw = []byte(strings.Repeat("x", (256<<10)+1))
+			}
+			if mutation != "missing" {
+				if err := os.WriteFile(path, raw, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			i := lifecycleAPIInvocationIntent{TemplateSHA256: digestRaw(raw), DerivedSHA256: digestRaw([]byte("{\"actual_run_id\":\"125-1\"}\n")), SourceUID: uint32(os.Getuid())}
+			if mutation == "wrong-template-hash" {
+				i.TemplateSHA256 = digestRaw([]byte("different template"))
+			}
+			if mutation == "derived-request-hash" {
+				i.TemplateSHA256 = i.DerivedSHA256
+			}
+			h := &lifecycleFixedHost{originalOperationMaterials: d}
+			err := h.registerOriginalOperationTemplate(i)
+			if mutation == "missing" || mutation == "wrong-template-hash" || mutation == "derived-request-hash" || mutation == "too-large" {
+				if err == nil || len(d.files) != 0 {
+					t.Fatal("missing, unbound or oversized template admitted")
+				}
+				if mutation != "missing" {
+					if after, readErr := os.ReadFile(path); readErr != nil || string(after) != string(raw) {
+						t.Fatal("failed registration changed source bytes")
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			v := d.files["lifecycle-request-template.json"]
+			if v == nil || v.file == nil || v.retained || v.hash != i.TemplateSHA256 || v.hash == i.DerivedSHA256 {
+				t.Fatal("source template was omitted, retained or confused with derived request")
+			}
+			if mutation == "changed-after-registration" {
+				if err := os.WriteFile(path, []byte("changed source"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mutation == "foreign-template" {
+				if err := os.WriteFile(filepath.Join(d.path, "lifecycle-request-template.prepare.json"), raw, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mutation != "none" {
+				if d.purge(t.Context()) == nil {
+					t.Fatal("changed or foreign template admitted to purge")
+				}
+				if _, err := os.Lstat(path); err != nil {
+					t.Fatal("rejected preflight deleted source template")
+				}
+				return
+			}
+			if err := d.purge(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) || d.checkComplete(true) != nil || !v.removed {
+				t.Fatal("registered source template survived required purge")
+			}
+		})
+	}
+}
+
 func TestMaterialBatchRequiresArchiveZeroAndClosesAllSourceFDs(t *testing.T) {
 	c := materialTestBatch(t)
 	materialTestFile(t, c.directories[0], "source", "source body")

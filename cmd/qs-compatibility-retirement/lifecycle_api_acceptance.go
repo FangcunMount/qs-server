@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"time"
 
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
@@ -32,26 +33,31 @@ func (*lifecycleAPIRuntimeObservation) MarshalJSON() ([]byte, error) {
 	return nil, lifecycleError("lifecycle_private_runtime_serialization_forbidden")
 }
 
-func lifecycleAPIReadAddress(v lifecycleAPIInspection) (string, error) {
+func lifecycleAPIReadAddress(v, original lifecycleAPIInspection) (string, error) {
 	var ports map[string]json.RawMessage
-	if json.Unmarshal(v.Config["ExposedPorts"], &ports) != nil || ports["8080/tcp"] == nil || len(v.NetworkSettings.Networks) != 1 {
+	var network, actualNetwork string
+	if json.Unmarshal(v.Config["ExposedPorts"], &ports) != nil || ports["8080/tcp"] == nil ||
+		json.Unmarshal(original.HostConfig["NetworkMode"], &network) != nil || network == "" || len(network) > 128 || strings.ContainsAny(network, "\x00\r\n") ||
+		json.Unmarshal(v.HostConfig["NetworkMode"], &actualNetwork) != nil || actualNetwork != network ||
+		len(v.NetworkSettings.Networks) != len(original.NetworkSettings.Networks) {
 		return "", lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
 	}
-	for _, raw := range v.NetworkSettings.Networks {
-		var actual struct {
-			IPAddress string
-			NetworkID string
-		}
-		if rejectDuplicateJSON(raw) != nil || json.Unmarshal(raw, &actual) != nil || !hashRE.MatchString(actual.NetworkID) {
-			return "", lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
-		}
-		ip := net.ParseIP(actual.IPAddress)
-		if ip == nil || ip.To4() == nil || !ip.IsPrivate() {
-			return "", lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
-		}
-		return net.JoinHostPort(ip.String(), "8080"), nil
+	// The approved runtime selects the route. Other attached networks retain
+	// their full configuration checks; their addresses are never candidates.
+	approvedRaw, approvedPresent := original.NetworkSettings.Networks[network]
+	actualRaw, actualPresent := v.NetworkSettings.Networks[network]
+	var approved struct{ NetworkID string }
+	var actual struct{ IPAddress, NetworkID string }
+	if !approvedPresent || !actualPresent || rejectDuplicateJSON(approvedRaw) != nil || rejectDuplicateJSON(actualRaw) != nil ||
+		json.Unmarshal(approvedRaw, &approved) != nil || json.Unmarshal(actualRaw, &actual) != nil ||
+		approved.NetworkID == "" || len(approved.NetworkID) > 128 || strings.ContainsAny(approved.NetworkID, "\x00\r\n") || actual.NetworkID != approved.NetworkID {
+		return "", lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
 	}
-	return "", lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
+	ip := net.ParseIP(actual.IPAddress)
+	if ip == nil || ip.To4() == nil || !ip.IsPrivate() {
+		return "", lifecycleError("lifecycle_actual_api_fixed_read_route_unproven")
+	}
+	return net.JoinHostPort(ip.String(), "8080"), nil
 }
 
 func lifecycleAPIReadEndpoint(ctx context.Context, client *http.Client, address, path string) ([]byte, error) {
@@ -124,7 +130,7 @@ func (v *lifecycleAPITransition) observeAcceptance(ctx context.Context, r lifecy
 	if e != nil || !lifecycleAPIExpectedRuntime(actual, v.original, r.DeploymentControl.BImageID, digestRaw(body), body) || actual.State.Health.Status != "healthy" {
 		return lifecycleError("lifecycle_actual_api_runtime_unproven")
 	}
-	address, e := lifecycleAPIReadAddress(actual)
+	address, e := lifecycleAPIReadAddress(actual, v.original)
 	if e != nil {
 		return e
 	}
@@ -164,7 +170,7 @@ func (v *lifecycleAPITransition) observeAcceptance(ctx context.Context, r lifecy
 		return lifecycleError("lifecycle_actual_api_runtime_unproven")
 	}
 	after, e := lifecycleAPIInspect(ctx, v.engine, v.bCID)
-	afterAddress, routeErr := lifecycleAPIReadAddress(after)
+	afterAddress, routeErr := lifecycleAPIReadAddress(after, v.original)
 	if e != nil || routeErr != nil || afterAddress != address || after.State.StartedAt != actual.State.StartedAt || after.State.PID != actual.State.PID || after.State.Health.Status != "healthy" || !lifecycleAPIExpectedRuntime(after, v.original, r.DeploymentControl.BImageID, digestRaw(body), body) {
 		return lifecycleError("lifecycle_actual_api_runtime_unproven")
 	}

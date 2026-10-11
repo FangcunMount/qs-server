@@ -16,21 +16,72 @@ import (
 )
 
 func TestAPIAcceptanceFixedReadRouteRequiresActualUnambiguousContainerNetwork(t *testing.T) {
-	v := lifecycleAPIInspection{Config: map[string]json.RawMessage{"ExposedPorts": json.RawMessage(`{"8080/tcp":{},"8443/tcp":{}}`)}}
+	v := lifecycleAPIInspection{Config: map[string]json.RawMessage{"ExposedPorts": json.RawMessage(`{"8080/tcp":{},"8443/tcp":{}}`)}, HostConfig: map[string]json.RawMessage{"NetworkMode": json.RawMessage(`"approved"`)}}
 	v.NetworkSettings.Networks = map[string]json.RawMessage{"approved": json.RawMessage(`{"IPAddress":"172.20.0.2","NetworkID":"` + strings.Repeat("a", 64) + `"}`)}
-	if address, e := lifecycleAPIReadAddress(v); e != nil || address != "172.20.0.2:8080" {
+	original := v
+	original.NetworkSettings.Networks = map[string]json.RawMessage{"approved": append(json.RawMessage(nil), v.NetworkSettings.Networks["approved"]...)}
+	if address, e := lifecycleAPIReadAddress(v, original); e != nil || address != "172.20.0.2:8080" {
 		t.Fatalf("actual fixed native route lost: %q %v", address, e)
 	}
 	for _, raw := range []string{`{"IPAddress":"127.0.0.1","NetworkID":"` + strings.Repeat("a", 64) + `"}`, `{"IPAddress":"8.8.8.8","NetworkID":"` + strings.Repeat("a", 64) + `"}`, `{"IPAddress":"172.20.0.2","NetworkID":"unbound"}`} {
 		v.NetworkSettings.Networks["approved"] = json.RawMessage(raw)
-		if _, e := lifecycleAPIReadAddress(v); e == nil {
+		if _, e := lifecycleAPIReadAddress(v, original); e == nil {
 			t.Fatal("unproven network route accepted")
 		}
 	}
 	v.NetworkSettings.Networks["approved"] = json.RawMessage(`{"IPAddress":"172.20.0.2","NetworkID":"` + strings.Repeat("a", 64) + `"}`)
 	v.NetworkSettings.Networks["second"] = v.NetworkSettings.Networks["approved"]
-	if _, e := lifecycleAPIReadAddress(v); e == nil {
+	if _, e := lifecycleAPIReadAddress(v, original); e == nil {
 		t.Fatal("ambiguous networks were guessed")
+	}
+}
+
+func TestAPIAcceptanceReadRouteUsesApprovedNetworkWithOpaqueID(t *testing.T) {
+	fixture := func() lifecycleAPIInspection {
+		v := lifecycleAPIInspection{
+			Config:     map[string]json.RawMessage{"ExposedPorts": json.RawMessage(`{"8080/tcp":{}}`)},
+			HostConfig: map[string]json.RawMessage{"NetworkMode": json.RawMessage(`"infra-network"`)},
+		}
+		v.NetworkSettings.Networks = map[string]json.RawMessage{
+			"infra-network": json.RawMessage(`{"IPAddress":"10.0.1.3","NetworkID":"m3tfd5h9sp5d1xmzht0ey0oql","Aliases":["qs-apiserver"]}`),
+			"qs-network":    json.RawMessage(`{"IPAddress":"172.20.0.2","NetworkID":"` + strings.Repeat("b", 64) + `","Aliases":["qs-apiserver"]}`),
+		}
+		return v
+	}
+	original, actual := fixture(), fixture()
+	before := digest(actual.spec())
+	if address, e := lifecycleAPIReadAddress(actual, original); e != nil || address != "10.0.1.3:8080" || digest(actual.spec()) != before {
+		t.Fatalf("approved multi-network route lost or configuration changed: %q %v", address, e)
+	}
+	for name, change := range map[string]func(*lifecycleAPIInspection, *lifecycleAPIInspection){
+		"wrong-id": func(v, _ *lifecycleAPIInspection) {
+			v.NetworkSettings.Networks["infra-network"] = json.RawMessage(`{"IPAddress":"10.0.1.3","NetworkID":"different-network"}`)
+		},
+		"missing-network": func(v, _ *lifecycleAPIInspection) { delete(v.NetworkSettings.Networks, "infra-network") },
+		"missing-mode":    func(_, o *lifecycleAPIInspection) { delete(o.HostConfig, "NetworkMode") },
+		"empty-mode":      func(_, o *lifecycleAPIInspection) { o.HostConfig["NetworkMode"] = json.RawMessage(`""`) },
+		"wrong-mode":      func(v, _ *lifecycleAPIInspection) { v.HostConfig["NetworkMode"] = json.RawMessage(`"qs-network"`) },
+		"unbound-mode": func(v, o *lifecycleAPIInspection) {
+			v.HostConfig["NetworkMode"], o.HostConfig["NetworkMode"] = json.RawMessage(`"missing"`), json.RawMessage(`"missing"`)
+		},
+		"empty-id": func(v, o *lifecycleAPIInspection) {
+			v.NetworkSettings.Networks["infra-network"], o.NetworkSettings.Networks["infra-network"] = json.RawMessage(`{"IPAddress":"10.0.1.3","NetworkID":""}`), json.RawMessage(`{"NetworkID":""}`)
+		},
+		"oversized-id": func(v, o *lifecycleAPIInspection) {
+			raw := json.RawMessage(`{"IPAddress":"10.0.1.3","NetworkID":"` + strings.Repeat("x", 129) + `"}`)
+			v.NetworkSettings.Networks["infra-network"], o.NetworkSettings.Networks["infra-network"] = raw, raw
+		},
+		"ambiguous-endpoint": func(v, _ *lifecycleAPIInspection) {
+			v.NetworkSettings.Networks["infra-network"] = json.RawMessage(`{"IPAddress":"10.0.1.3","NetworkID":"m3tfd5h9sp5d1xmzht0ey0oql","NetworkID":"different-network"}`)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			v, o := fixture(), fixture()
+			change(&v, &o)
+			if _, e := lifecycleAPIReadAddress(v, o); e == nil {
+				t.Fatal("unbound or ambiguous approved route accepted")
+			}
+		})
 	}
 }
 
