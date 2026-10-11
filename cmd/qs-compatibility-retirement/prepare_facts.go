@@ -357,6 +357,16 @@ func decodePrepareFacts(raw []byte, dst any) error {
 	return nil
 }
 
+func validatePrepareFactsOriginalRequest(r request, path string, uid uint32) error {
+	return validateV2RequestWithReader(r, path, func(path, expected string, dst any) error {
+		raw, err := readLifecycleOwnedBytes(path, expected, uid, 256<<10)
+		if err != nil {
+			return err
+		}
+		return decodePrepareFacts(raw, dst)
+	})
+}
+
 // The observer and capture producer are separately approved. The opaque
 // archive establishes producer facts; the current observer cannot relabel them.
 func prepareFactsStorageBaselineMatches(r prepareFactsRequest, b backup.StorageBaseline) bool {
@@ -657,6 +667,9 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 	}
 	var inventory report
 	if r.StorageBackup != nil {
+		if e = validatePrepareFactsOriginalRequest(req, filepath.Join(original, "inventory-request.json"), uint32(uid64)); e != nil {
+			return receipt, e
+		}
 		source = filepath.Join(original, "storage-backup-"+r.Inventory.RunID, "archive")
 		a, err := backup.OpenArchive(ctx, source, r.StorageBackup.ArchiveSHA256)
 		if err != nil {
@@ -665,9 +678,6 @@ func runPrepareFacts(ctx context.Context, path, expected, op, run string) (recei
 		b, err := a.StorageBaseline(ctx)
 		if err != nil || !prepareFactsStorageBaselineMatches(r, b) {
 			return receipt, lifecycleError("prepare_facts_storage_binding_rejected")
-		}
-		if e = validateV2Request(req, filepath.Join(original, "inventory-request.json")); e != nil {
-			return receipt, e
 		}
 		inventory = report{FormatVersion: 1, Kind: "storage_backup_v1", SourceSHA: b.Approval.SourceSHA, OperationID: op, RunID: b.Approval.RunID, RequestHash: b.Approval.RequestHash, TargetHash: digest(targets), Complete: true, ErrorCategory: "none", DatabaseBindings: map[string]databaseInventory{}}
 		for db, binding := range b.StorageApproval.Bindings {

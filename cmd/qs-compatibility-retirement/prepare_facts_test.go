@@ -34,6 +34,152 @@ func prepareFactsRequestFixture(t *testing.T) prepareFactsRequest {
 		RestoreEngines: &lifecycleRestoreEngines{MySQLImageID: "sha256:" + strings.Repeat("1", 64), MongoImageID: "sha256:" + strings.Repeat("2", 64), Architecture: runtime.GOARCH}, ArchiveDirectory: "/opt/backups/qs-server/compatibility-retirement/123-1/temporary-archive"}
 }
 
+func prepareFactsOriginalBoundaryFixture(t *testing.T) (request, report, string) {
+	t.Helper()
+	r := v2Request("readonly_inventory_request")
+	r.BoundaryRunID = "456-1"
+	r.SourceSHA = strings.Repeat("c", 40)
+	observed := report{FormatVersion: 2, Kind: "readonly_inventory_boundaries", SourceSHA: r.SourceSHA,
+		OperationID: r.OperationID, RunID: r.BoundaryRunID, TargetHash: r.TargetHash, Complete: true,
+		DiagnosticOnly: true, DatabaseBindings: map[string]databaseInventory{}}
+	for _, db := range []string{"mysql", "mongodb"} {
+		observed.DatabaseBindings[db] = databaseInventory{IdentityHash: r.Identities[db], Version: r.Migrations[db],
+			MetadataComplete: true, ExpectedIdentityMatch: true, ExpectedMigrationMatch: true}
+	}
+	for _, target := range targets {
+		b := targetBoundary{Database: target[0], Name: target[1], Kind: target[2], SchemaHash: strings.Repeat("6", 64), IdentityHash: strings.Repeat("7", 64)}
+		r.Boundaries = append(r.Boundaries, b)
+		observed.Targets = append(observed.Targets, snapshot{Complete: true, ErrorCategory: "none", Boundary: &b})
+	}
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	return r, observed, filepath.Join(dir, "inventory-request.json")
+}
+
+func writePrepareFactsOriginalBoundary(t *testing.T, r *request, observed report, requestPath string) string {
+	t.Helper()
+	dir := filepath.Join(filepath.Dir(requestPath), "bounds-"+r.BoundaryRunID)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(observed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "boundary.private.json")
+	if err = os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	r.BoundaryReportHash = digestRaw(raw)
+	return path
+}
+
+func TestPrepareFactsOriginalBoundaryUsesExactSourceOwner(t *testing.T) {
+	r, observed, requestPath := prepareFactsOriginalBoundaryFixture(t)
+	path := writePrepareFactsOriginalBoundary(t, &r, observed, requestPath)
+	uid := uint32(os.Getuid())
+	if uid == 0 {
+		uid = 1002
+		for _, p := range []string{filepath.Dir(path), path} {
+			if err := os.Chown(p, int(uid), -1); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := validatePrepareFactsOriginalRequest(r, requestPath, uid); err != nil {
+		t.Fatal("bound source owner rejected", err)
+	}
+	if err := validatePrepareFactsOriginalRequest(r, requestPath, uid+1); err == nil {
+		t.Fatal("source owner substituted with a different UID")
+	}
+	if err := validateV2Request(r, requestPath); (err == nil) != (uid == uint32(os.Getuid())) {
+		t.Fatal("default reader no longer enforces caller ownership", err)
+	}
+}
+
+func TestPrepareFactsOriginalBoundaryPreservesReportSemantics(t *testing.T) {
+	for _, change := range []string{"incomplete", "authority", "source", "operation", "run", "identity", "dirty", "boundary"} {
+		t.Run(change, func(t *testing.T) {
+			r, observed, requestPath := prepareFactsOriginalBoundaryFixture(t)
+			switch change {
+			case "incomplete":
+				observed.Complete = false
+			case "authority":
+				observed.DropReady = true
+			case "source":
+				observed.SourceSHA = strings.Repeat("d", 40)
+			case "operation":
+				observed.OperationID = "999-1"
+			case "run":
+				observed.RunID = "999-1"
+			case "identity", "dirty":
+				binding := observed.DatabaseBindings["mongodb"]
+				binding.Dirty = change == "dirty"
+				if change == "identity" {
+					binding.IdentityHash = strings.Repeat("d", 64)
+				}
+				observed.DatabaseBindings["mongodb"] = binding
+			case "boundary":
+				observed.Targets[0].Boundary.SchemaHash = strings.Repeat("d", 64)
+			}
+			writePrepareFactsOriginalBoundary(t, &r, observed, requestPath)
+			if err := validatePrepareFactsOriginalRequest(r, requestPath, uint32(os.Getuid())); err == nil {
+				t.Fatal("changed original report accepted")
+			}
+		})
+	}
+}
+
+func TestPrepareFactsOriginalBoundaryKeepsOwnedReaderProtection(t *testing.T) {
+	for _, change := range []string{"hash", "permissions", "symlink", "hardlink", "case-alias", "duplicate", "unknown-field"} {
+		t.Run(change, func(t *testing.T) {
+			r, observed, requestPath := prepareFactsOriginalBoundaryFixture(t)
+			path := writePrepareFactsOriginalBoundary(t, &r, observed, requestPath)
+			var err error
+			switch change {
+			case "hash":
+				r.BoundaryReportHash = strings.Repeat("e", 64)
+			case "permissions":
+				err = os.Chmod(path, 0644)
+			case "symlink":
+				err = os.Rename(path, path+".original")
+				if err == nil {
+					err = os.Symlink(path+".original", path)
+				}
+			case "hardlink":
+				err = os.Link(path, path+".alias")
+			default:
+				var raw []byte
+				raw, err = os.ReadFile(path)
+				if change == "case-alias" {
+					raw = bytes.Replace(raw, []byte(`"source_sha"`), []byte(`"Source_SHA"`), 1)
+				} else {
+					field := `"unexpected":true`
+					if change == "duplicate" {
+						field = `"format_version":2`
+					}
+					raw = append(raw[:len(raw)-1], []byte(","+field+"}")...)
+				}
+				if err == nil {
+					err = os.WriteFile(path, raw, 0600)
+				}
+				r.BoundaryReportHash = digestRaw(raw)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = validatePrepareFactsOriginalRequest(r, requestPath, uint32(os.Getuid())); err == nil {
+				t.Fatal("unsafe original boundary accepted")
+			}
+		})
+	}
+}
+
 func TestPrepareFactsKeepsOriginalProducerAndRejectsAuthorityFields(t *testing.T) {
 	r := prepareFactsRequestFixture(t)
 	if r.SourceSHA == r.Inventory.SourceSHA || validatePrepareFactsRequest(r, "123-1", "789-1") != nil {
