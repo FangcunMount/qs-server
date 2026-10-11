@@ -98,8 +98,8 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 			}
 		} else {
 			getMoreRequests++
-			// The driver reduces getMore's batch size to the remaining limit.
-			if command.BatchSize != int32(min(int64(1024), actualPage-returned)) || command.BatchSize <= 0 {
+			// Modern MongoDB enforces the limit; the driver's request keeps batchSize.
+			if command.BatchSize != 1024 || command.BatchSize <= 0 {
 				wireRejected = true
 			}
 		}
@@ -197,7 +197,7 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		}
 		wireMu.Unlock()
 		if !wireMatched {
-			t.Fatal("actual wire batch, bounded query limit, latency or query budget changed")
+			t.Fatalf("actual wire contract rejected page_cap=%d finds=%d get_mores=%d delayed=%d rejected=%t elapsed_ms=%d", actualPage, findRequests, getMoreRequests, delayedRequests, wireRejected, elapsed.Milliseconds())
 		}
 		raw, e := os.ReadFile(file.Name())
 		if e != nil {
