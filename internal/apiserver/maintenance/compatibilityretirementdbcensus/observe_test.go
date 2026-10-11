@@ -10,7 +10,40 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 )
+
+func TestDBWriterCensusLocalSessionReadConcern(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock).CreateCollection(false).
+		ClientOptions(options.Client().SetReadConcern(readconcern.Majority())))
+	for _, item := range []struct {
+		stage, db, collection, level string
+	}{
+		{"$currentOp", "admin", "", "local"},
+		{"$listLocalSessions", "admin", "", "local"},
+		{"$listSessions", "config", "system.sessions", "majority"},
+	} {
+		mt.Run(item.stage, func(mt *mtest.T) {
+			mt.AddMockResponses(mtest.CreateCursorResponse(0, item.db+"."+item.collection, mtest.FirstBatch))
+			rows, err := dbCensusMongoCursor(context.Background(), mt.Client, item.db, item.collection, dbCensusSessionPipeline(item.stage))
+			if err != nil || len(rows) != 0 {
+				mt.Fatalf("bounded session cursor failed: %v", err)
+			}
+			command := mt.GetStartedEvent()
+			if command == nil || command.CommandName != "aggregate" || command.DatabaseName != item.db {
+				mt.Fatal("session aggregation was not observed")
+			}
+			if actual := command.Command.Lookup("readConcern", "level").StringValue(); actual != item.level {
+				mt.Fatalf("session read concern = %q, want %q", actual, item.level)
+			}
+			if mt.Client.Database(item.db).ReadConcern().Level != "majority" {
+				mt.Fatal("borrowed client's read concern was changed")
+			}
+		})
+	}
+}
 
 func censusPtr(v string) *string { return &v }
 func censusSQLFixture(ctx context.Context, q string) ([][]*string, error) {

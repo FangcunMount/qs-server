@@ -89,6 +89,79 @@ func TestDBWriterCensusUsersLegalEnumerationAndBoundedExpansion(t *testing.T) {
 	}
 }
 
+func TestDBWriterCensusUsersRoleAndPrivilegeOrderDoesNotChangeIdentityOrSnapshot(t *testing.T) {
+	var first []bson.M
+	for round := 0; round < 2; round++ {
+		calls := 0
+		_, expanded, err := dbCensusMongoUsers(context.Background(), censusUserFixture(1, func(index int, rows bson.A) (bson.A, error) {
+			row := rows[0].(bson.M)
+			read := bson.M{"role": "read", "db": "actual-db", "preserved": "value"}
+			write := bson.M{"role": "readWrite", "db": "another-db"}
+			row["roles"] = bson.A{read, write}
+			if (index < 0) == (round == 0) {
+				row["roles"] = bson.A{write, read}
+			}
+			if index >= 0 {
+				row["inheritedRoles"] = bson.A{read, write}
+				find := bson.M{"resource": bson.M{"db": "actual-db", "collection": "one"}, "actions": bson.A{"find", "insert"}}
+				remove := bson.M{"resource": bson.M{"db": "actual-db", "collection": "two"}, "actions": bson.A{"remove", "update"}}
+				row["inheritedPrivileges"] = bson.A{find, remove}
+				if round == 1 {
+					row["inheritedRoles"] = bson.A{write, read}
+					find["actions"] = bson.A{"insert", "find"}
+					remove["actions"] = bson.A{"update", "remove"}
+					row["inheritedPrivileges"] = bson.A{remove, find}
+				}
+			}
+			return rows, nil
+		}, &calls))
+		if err != nil || len(expanded) != 1 || calls != 1 {
+			t.Fatalf("equivalent role order rejected: round=%d calls=%d error=%v", round, calls, err)
+		}
+		if round == 0 {
+			first = expanded
+		} else if checksum(first) != checksum(expanded) {
+			t.Fatal("equivalent inherited role/action order changed the snapshot")
+		}
+	}
+}
+
+func TestDBWriterCensusUsersRoleNormalizationPreservesIdentityChanges(t *testing.T) {
+	for _, change := range []string{"role", "role-db", "role-extra-field", "role-duplicate", "_id", "userId", "mechanisms"} {
+		t.Run(change, func(t *testing.T) {
+			calls := 0
+			_, expanded, err := dbCensusMongoUsers(context.Background(), censusUserFixture(1, func(index int, rows bson.A) (bson.A, error) {
+				row := rows[0].(bson.M)
+				row["_id"] = "actual-db.user-0"
+				role := bson.M{"role": "read", "db": "actual-db"}
+				row["roles"] = bson.A{role}
+				if index >= 0 {
+					switch change {
+					case "role":
+						role["role"] = "readWrite"
+					case "role-db":
+						role["db"] = "another-db"
+					case "role-extra-field":
+						role["unexpected"] = true
+					case "role-duplicate":
+						row["roles"] = bson.A{role, role}
+					case "_id":
+						row["_id"] = "different-user-id"
+					case "userId":
+						row["userId"] = primitive.Binary{Subtype: 4, Data: []byte{255}}
+					case "mechanisms":
+						row["mechanisms"] = bson.A{"SCRAM-SHA-1"}
+					}
+				}
+				return rows, nil
+			}, &calls))
+			if err == nil || err.Error() != "db_census_user_expansion_identity_changed" || expanded != nil {
+				t.Fatalf("identity change accepted: %s error=%v", change, err)
+			}
+		})
+	}
+}
+
 func TestDBWriterCensusUsersExpansionFailureNeverCompletes(t *testing.T) {
 	for _, failure := range []string{"denied", "missing", "extra", "duplicate", "cross-db", "user-recreated", "roles-changed", "restriction-missing", "custom-data", "credentials", "byte-budget", "duplicate-enumeration", "unsupported-version"} {
 		t.Run(failure, func(t *testing.T) {

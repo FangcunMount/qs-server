@@ -134,6 +134,10 @@ func privateJSON(path string, expected string, dst any) error {
 	return nil
 }
 func validateV2Request(r request, path string) error {
+	return validateV2RequestWithReader(r, path, privateJSON)
+}
+
+func validateV2RequestWithReader(r request, path string, readReport func(string, string, any) error) error {
 	if r.FormatVersion != 2 || r.Limits != productionLimits() {
 		return category("request_limits_invalid")
 	}
@@ -147,7 +151,7 @@ func validateV2Request(r request, path string) error {
 		return category("request_class_invalid")
 	}
 	var observed report
-	if e := privateJSON(filepath.Join(filepath.Dir(path), "bounds-"+r.BoundaryRunID, "boundary.private.json"), r.BoundaryReportHash, &observed); e != nil {
+	if e := readReport(filepath.Join(filepath.Dir(path), "bounds-"+r.BoundaryRunID, "boundary.private.json"), r.BoundaryReportHash, &observed); e != nil {
 		return e
 	}
 	if observed.FormatVersion != 2 || observed.Kind != "readonly_inventory_boundaries" || !observed.Complete || observed.DropReady || !observed.DiagnosticOnly || observed.SourceSHA != r.SourceSHA || observed.OperationID != r.OperationID || observed.RunID != r.BoundaryRunID || observed.TargetHash != r.TargetHash || len(observed.Targets) != 4 {
