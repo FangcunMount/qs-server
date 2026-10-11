@@ -1290,6 +1290,9 @@ func TestLifecyclePublicCLINativeWindowToolPrepareRootOnce(t *testing.T) {
 						for _, name := range []string{"boundary.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"} {
 							members[filepath.Join("bounds-"+stamp+"-6", name)] = true
 						}
+						for _, name := range []string{"inventory.private.json", "mysql-metadata.private.json", "mongodb-metadata.private.json"} {
+							members[filepath.Join("inventory-"+invRun, name)] = true
+						}
 						if publicCLIMaterialsKnown(opDir, members) != nil || os.RemoveAll(opDir) != nil {
 							t.Error("owned empty storage exact materials cleanup")
 						}
