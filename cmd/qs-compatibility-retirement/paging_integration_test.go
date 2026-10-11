@@ -70,8 +70,10 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		t.Fatal(e)
 	}
 	var wireMu sync.Mutex
-	var logicalPage int64
+	var actualPage, queryMillis int64
+	var commandDelay time.Duration
 	var findRequests, getMoreRequests int
+	var delayedRequests int
 	var wireRejected bool
 	monitor := &event.CommandMonitor{Started: func(_ context.Context, ev *event.CommandStartedEvent) {
 		if ev.DatabaseName != name || ev.CommandName != "find" && ev.CommandName != "getMore" {
@@ -83,17 +85,27 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 			MaxTimeMS int64 `bson:"maxTimeMS"`
 		}
 		wireMu.Lock()
-		defer wireMu.Unlock()
-		if bson.Unmarshal(ev.Command, &command) != nil || command.BatchSize != 128 {
+		if bson.Unmarshal(ev.Command, &command) != nil || command.BatchSize != 512 {
 			wireRejected = true
 		}
 		if ev.CommandName == "find" {
 			findRequests++
-			if command.Limit != logicalPage || command.MaxTimeMS != int64(productionLimits().QuerySeconds)*1000 {
+			if command.Limit != actualPage || command.MaxTimeMS != queryMillis {
 				wireRejected = true
 			}
 		} else {
 			getMoreRequests++
+		}
+		delay := commandDelay
+		if delay != 0 {
+			delayedRequests++
+		}
+		wireMu.Unlock()
+		// Simulate client-side command latency without consuming the server's
+		// maxTimeMS. An uncapped 10000-row cursor needs at least 20 such
+		// commands at batch 512 and exceeds the same two-second query budget.
+		if delay != 0 {
+			time.Sleep(delay)
 		}
 	}}
 	port, e := envPort("MONGODB_PORT", 27017)
@@ -117,8 +129,20 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 	for _, pageSize := range []int{1000, 10000} {
 		limits := productionLimits()
 		limits.PageSize = pageSize
+		pageCap := pageSize
+		if pageCap > 1024 {
+			pageCap = 1024
+		}
+		if pageSize == 10000 {
+			limits.QuerySeconds = 2
+		}
 		wireMu.Lock()
-		logicalPage, findRequests, getMoreRequests, wireRejected = int64(pageSize), 0, 0, false
+		actualPage, queryMillis = int64(pageCap), int64(limits.QuerySeconds)*1000
+		commandDelay = 0
+		if pageSize == 10000 {
+			commandDelay = 250 * time.Millisecond
+		}
+		findRequests, getMoreRequests, delayedRequests, wireRejected = 0, 0, 0, false
 		wireMu.Unlock()
 		dir := privateTestDir(t)
 		file, e := os.OpenFile(filepath.Join(dir, "source.bsonframes"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
@@ -140,14 +164,17 @@ func TestOwnedMongoPageSizePreservesSourceAndBothEOF(t *testing.T) {
 		}
 		second, e := mongoPagedPass(ctx, pagedCol, bound, limits, dir, 2, nil)
 		elapsed := time.Since(started)
-		if e != nil || first.Records != rows || second.Records != rows || first.Pages != uint64(rows/pageSize+1) || second.Pages != first.Pages || first.Bytes != second.Bytes || first.DataHash != second.DataHash {
+		if e != nil || first.Records != rows || second.Records != rows || first.Pages != uint64(rows/pageCap+1) || second.Pages != first.Pages || first.Bytes != second.Bytes || first.DataHash != second.DataHash {
 			t.Fatal("actual fixed-upper stream or complete EOF changed", e)
 		}
 		wireMu.Lock()
 		wireMatched := !wireRejected && findRequests == int(first.Pages+second.Pages) && getMoreRequests > 0
+		if pageSize == 10000 {
+			wireMatched = wireMatched && delayedRequests == findRequests+getMoreRequests && elapsed > time.Duration(limits.QuerySeconds)*time.Second
+		}
 		wireMu.Unlock()
 		if !wireMatched {
-			t.Fatal("actual wire batch, logical limit or query budget changed")
+			t.Fatal("actual wire batch, bounded query limit, latency or query budget changed")
 		}
 		raw, e := os.ReadFile(file.Name())
 		if e != nil {

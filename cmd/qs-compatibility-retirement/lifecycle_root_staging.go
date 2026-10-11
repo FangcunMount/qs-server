@@ -418,8 +418,12 @@ func openLifecycleInventoryMaterialFiles(ctx context.Context, path string, uid u
 		if s.Database != targets[i][0] || s.Name != targets[i][1] || s.Kind != targets[i][2] || s.SourceFile != lifecycleSourceNames[3+i] || s.Boundary == nil || !s.Present || !s.Complete || s.Passes != 2 || !hashRE.MatchString(s.DataHash) || s.Records > uint64(limits.MaxRecords) || s.Bytes > uint64(limits.MaxBytes) || s.Pages%2 != 0 {
 			return nil, lifecycleError("lifecycle_material_registration_rejected")
 		}
+		pageSize := limits.PageSize
+		if s.Database == "mongodb" {
+			pageSize = min(pageSize, mongoInventoryQueryPageSize)
+		}
 		pages := s.Pages / 2
-		wantPages := s.Records/uint64(limits.PageSize) + 1
+		wantPages := s.Records/uint64(pageSize) + 1
 		if s.Boundary.Empty {
 			wantPages = 0
 			if s.Records != 0 || s.Bytes != 0 {
@@ -452,7 +456,7 @@ func openLifecycleInventoryMaterialFiles(ctx context.Context, path string, uid u
 					return nil, e
 				}
 				p := pair[pass-1]
-				records := min(uint64(page)*uint64(limits.PageSize), s.Records)
+				records := min(uint64(page)*uint64(pageSize), s.Records)
 				if p.FormatVersion != 1 || p.Kind != "readonly_inventory_page_checkpoint" || p.SourceSHA != approval.SourceSHA || p.Pass != pass || p.Page != page || p.Records != records || p.SourceBytes > s.Bytes || p.SourceBytes < previous.SourceBytes || !hashRE.MatchString(p.PrefixHash) || !p.DiagnosticOnly || p.ResumeExisting || p.Cursor == "" || uint64(page) == pages && (p.Records != s.Records || p.SourceBytes != s.Bytes || p.PrefixHash != s.DataHash) {
 					return nil, lifecycleError("lifecycle_material_registration_rejected")
 				}

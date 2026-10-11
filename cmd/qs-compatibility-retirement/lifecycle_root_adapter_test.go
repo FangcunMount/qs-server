@@ -356,6 +356,9 @@ func originalInventoryMaterialFixture(t *testing.T, records uint64) (string, bac
 	for i, v := range targets {
 		b := targetBoundary{Database: v[0], Name: v[1], Kind: v[2], Present: true, Empty: records == 0}
 		pageSize := uint64(productionLimits().PageSize)
+		if v[0] == "mongodb" {
+			pageSize = min(pageSize, uint64(1024))
+		}
 		pages := records/pageSize + 1
 		if records == 0 {
 			pages = 0
@@ -394,7 +397,8 @@ func originalInventoryMaterialFixture(t *testing.T, records uint64) (string, bac
 }
 func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources(t *testing.T) {
 	pageSize := uint64(productionLimits().PageSize)
-	for _, records := range []uint64{0, 1, pageSize, pageSize + 1} {
+	mongoPageSize := min(pageSize, uint64(1024))
+	for _, records := range []uint64{0, 1, mongoPageSize - 1, mongoPageSize, mongoPageSize + 1, 2 * mongoPageSize, pageSize, pageSize + 1} {
 		t.Run(fmt.Sprint(records), func(t *testing.T) {
 			dir, a, hashes := originalInventoryMaterialFixture(t, records)
 			d, e := openLifecycleInventoryMaterialFiles(context.Background(), dir, uint32(os.Getuid()), a, hashes)
@@ -402,11 +406,12 @@ func TestOriginalInventoryMaterialHandoffIncludesAssetsBothPassesAndEmptySources
 				t.Fatal(e)
 			}
 			defer func(close func() error) { _ = close() }(d.close)
-			pages := records/pageSize + 1
+			sqlPages := records/pageSize + 1
+			mongoPages := records/mongoPageSize + 1
 			if records == 0 {
-				pages = 0
+				sqlPages, mongoPages = 0, 0
 			}
-			if len(d.files) != 11+int(8*pages) || len(d.children) != 0 {
+			if len(d.files) != 11+2*int(3*sqlPages+mongoPages) || len(d.children) != 0 {
 				t.Fatal("original members were omitted")
 			}
 			for name, v := range d.files {

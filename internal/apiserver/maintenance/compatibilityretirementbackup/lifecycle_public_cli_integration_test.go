@@ -326,8 +326,9 @@ func publicCLICleanupEngines(root, archive, source, operation, run, manifest str
 }
 
 const (
-	publicCLIInventoryPageSize = 10000
-	publicCLIInventoryMaxPages = 1001
+	publicCLIInventoryPageSize  = 10000
+	publicCLIMongoQueryPageSize = 1024
+	publicCLIInventoryMaxPages  = 1001
 )
 
 // These paths describe only successful output from the fixed v2 inventory
@@ -340,8 +341,10 @@ func publicCLIInventoryMaterialPaths(report inventory, run string) (map[string]b
 	paths := map[string]bool{directory: true}
 	for i, s := range report.Targets {
 		database, kind := "mysql", "base_table"
+		pageSize := uint64(publicCLIInventoryPageSize)
 		if i == 3 {
 			database, kind = "mongodb", "collection"
+			pageSize = publicCLIMongoQueryPageSize
 		}
 		if s.Database != database || s.Name != targetNames[i] || s.Kind != kind || !s.Present || !s.Complete || s.ErrorCategory != "none" || s.NextCycle || s.Passes != 2 || s.SourceFile != sourceNames[i] || s.Records > 1000000 || s.Boundary.Database != database || s.Boundary.Name != targetNames[i] || s.Boundary.Kind != kind || !s.Boundary.Present {
 			return nil, ErrSource
@@ -354,7 +357,7 @@ func publicCLIInventoryMaterialPaths(report inventory, run string) (map[string]b
 				return nil, ErrSource
 			}
 		} else {
-			pagesPerPass = s.Records/publicCLIInventoryPageSize + 1
+			pagesPerPass = s.Records/pageSize + 1
 		}
 		if pagesPerPass > publicCLIInventoryMaxPages || s.Pages != 2*pagesPerPass {
 			return nil, ErrSource
@@ -380,44 +383,52 @@ func publicCLIMaterialRelativeKnown(path, name string, allowed map[string]bool) 
 
 func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 	for _, tc := range []struct {
-		name                  string
-		records, pagesPerPass uint64
-		empty                 bool
+		name                            string
+		records, mysqlPages, mongoPages uint64
+		empty                           bool
 	}{
-		{"approved_empty", 0, 0, true},
-		{"nonempty_bound_zero_records", 0, 1, false},
-		{"partial_page", publicCLIInventoryPageSize - 1, 1, false},
-		{"one_full_page_plus_empty_eof", publicCLIInventoryPageSize, 2, false},
-		{"multi_page", publicCLIInventoryPageSize + 1, 2, false},
-		{"two_full_pages_plus_empty_eof", 2 * publicCLIInventoryPageSize, 3, false},
-		{"maximum_records_and_eof", 1000000, 1000000/publicCLIInventoryPageSize + 1, false},
+		{"approved_empty", 0, 0, 0, true},
+		{"nonempty_bound_zero_records", 0, 1, 1, false},
+		{"partial_page", publicCLIInventoryPageSize - 1, 1, 10, false},
+		{"one_full_page_plus_empty_eof", publicCLIInventoryPageSize, 2, 10, false},
+		{"multi_page", publicCLIInventoryPageSize + 1, 2, 10, false},
+		{"two_full_pages_plus_empty_eof", 2 * publicCLIInventoryPageSize, 3, 20, false},
+		{"mongo_partial_page", publicCLIMongoQueryPageSize - 1, 1, 1, false},
+		{"mongo_full_page_plus_empty_eof", publicCLIMongoQueryPageSize, 1, 2, false},
+		{"mongo_multi_page", publicCLIMongoQueryPageSize + 1, 1, 2, false},
+		{"mongo_two_full_pages_plus_empty_eof", 2 * publicCLIMongoQueryPageSize, 1, 3, false},
+		{"maximum_records_and_eof", 1000000, 101, 977, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			report := publicCLIInventoryMaterialTestReport(tc.records, tc.pagesPerPass, tc.empty)
+			report := publicCLIInventoryMaterialTestReport(tc.records, tc.mysqlPages, tc.mongoPages, tc.empty)
 			paths, e := publicCLIInventoryMaterialPaths(report, report.RunID)
-			if e != nil || len(paths) != 9+int(tc.pagesPerPass)*8 {
+			if e != nil || len(paths) != 9+2*int(3*tc.mysqlPages+tc.mongoPages) {
 				t.Fatal("public_cli_inventory_material_boundary_rejected")
 			}
 			for _, s := range report.Targets {
 				directory := "inventory-" + report.RunID
+				pagesPerPass := tc.mysqlPages
+				if s.Database == "mongodb" {
+					pagesPerPass = tc.mongoPages
+				}
 				if !paths[filepath.Join(directory, s.SourceFile+".asset.json")] {
 					t.Fatal("public_cli_inventory_source_asset_missing")
 				}
 				for pass := 1; pass <= 2; pass++ {
 					prefix := s.Database + "-" + s.Name
-					if tc.pagesPerPass > 0 && !paths[filepath.Join(directory, fmt.Sprintf("%s-pass-%d-page-%06d.checkpoint.json", prefix, pass, tc.pagesPerPass))] {
+					if pagesPerPass > 0 && !paths[filepath.Join(directory, fmt.Sprintf("%s-pass-%d-page-%06d.checkpoint.json", prefix, pass, pagesPerPass))] {
 						t.Fatal("public_cli_inventory_last_eof_page_missing")
 					}
-					if paths[filepath.Join(directory, fmt.Sprintf("%s-pass-%d-page-%06d.checkpoint.json", prefix, pass, tc.pagesPerPass+1))] {
+					if paths[filepath.Join(directory, fmt.Sprintf("%s-pass-%d-page-%06d.checkpoint.json", prefix, pass, pagesPerPass+1))] {
 						t.Fatal("public_cli_inventory_extra_page_allowed")
 					}
 				}
 			}
 		})
 	}
-	for _, name := range []string{"odd_pages", "missing_eof_page", "extra_pages", "empty_with_records", "source_path_escape", "wrong_passes", "wrong_database", "incomplete_report"} {
+	for _, name := range []string{"odd_pages", "missing_eof_page", "extra_pages", "mongo_missing_eof_page", "mongo_extra_pages", "mongo_mysql_page_count", "empty_with_records", "source_path_escape", "wrong_passes", "wrong_database", "incomplete_report"} {
 		t.Run(name, func(t *testing.T) {
-			report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, false)
+			report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, 10, false)
 			switch name {
 			case "odd_pages":
 				report.Targets[0].Pages = 3
@@ -425,6 +436,12 @@ func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 				report.Targets[0].Pages = 2
 			case "extra_pages":
 				report.Targets[0].Pages = 6
+			case "mongo_missing_eof_page":
+				report.Targets[3].Pages = 18
+			case "mongo_extra_pages":
+				report.Targets[3].Pages = 22
+			case "mongo_mysql_page_count":
+				report.Targets[3].Pages = 4
 			case "empty_with_records":
 				report.Targets[0].Boundary.Empty = true
 			case "source_path_escape":
@@ -443,12 +460,14 @@ func TestLifecyclePublicCLIInventoryMaterialBoundaries(t *testing.T) {
 	}
 }
 
-func publicCLIInventoryMaterialTestReport(records, pagesPerPass uint64, empty bool) inventory {
+func publicCLIInventoryMaterialTestReport(records, mysqlPages, mongoPages uint64, empty bool) inventory {
 	report := inventory{RunID: "100-3", Complete: true, ErrorCategory: "none"}
 	for i := 0; i < 4; i++ {
 		database, kind := "mysql", "base_table"
+		pagesPerPass := mysqlPages
 		if i == 3 {
 			database, kind = "mongodb", "collection"
+			pagesPerPass = mongoPages
 		}
 		s := SourceSnapshot{Database: database, Name: targetNames[i], Kind: kind, Present: true, Complete: true, ErrorCategory: "none", Records: records, SourceFile: sourceNames[i], Passes: 2, Pages: 2 * pagesPerPass}
 		s.Boundary.Database, s.Boundary.Name, s.Boundary.Kind = database, targetNames[i], kind
@@ -459,7 +478,7 @@ func publicCLIInventoryMaterialTestReport(records, pagesPerPass uint64, empty bo
 }
 
 func TestLifecyclePublicCLIInventoryMaterialDirectory(t *testing.T) {
-	report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, false)
+	report := publicCLIInventoryMaterialTestReport(publicCLIInventoryPageSize, 2, 10, false)
 	allowed, e := publicCLIInventoryMaterialPaths(report, report.RunID)
 	if e != nil {
 		t.Fatal("public_cli_inventory_material_test_plan_rejected")
