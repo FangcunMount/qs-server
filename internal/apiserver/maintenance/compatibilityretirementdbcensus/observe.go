@@ -17,6 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 )
 
 const dbCensusQueryBudget = 15 * time.Second
@@ -129,7 +130,9 @@ func dbCensusMongoCursor(ctx context.Context, c *mongo.Client, db, collection st
 	var cursor *mongo.Cursor
 	var e error
 	if collection == "" {
-		cursor, e = c.Database(db).Aggregate(bounded, pipeline, options.Aggregate().SetBatchSize(1000))
+		// $currentOp and $listLocalSessions read node-local state and reject
+		// majority read concern. Keep the borrowed client's data reads unchanged.
+		cursor, e = c.Database(db, options.Database().SetReadConcern(readconcern.Local())).Aggregate(bounded, pipeline, options.Aggregate().SetBatchSize(1000))
 	} else {
 		cursor, e = c.Database(db).Collection(collection).Aggregate(bounded, pipeline, options.Aggregate().SetBatchSize(1000))
 	}
