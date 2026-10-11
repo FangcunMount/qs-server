@@ -721,7 +721,7 @@ def route_file(env):
     if any(type(env.get(k)) is not str or not env[k] for k in required):reject('route_rejected')
     host,user,port,key,pin=(env[k] for k in required)
     if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,253}',host) or host.startswith('-') or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',user) or not port.isdigit() or not 1<=int(port)<=65535 or not re.fullmatch(r'SHA256:[A-Za-z0-9+/]{43}',pin) or len(key)>65536 or '\x00' in key:reject('route_rejected')
-    if not key.startswith('-----BEGIN ') or not key.rstrip().endswith('-----'):reject('route_rejected')
+    if not key.startswith('-----BEGIN ') or not key.rstrip().endswith('-----') or '\r' in key.replace('\r\n','\n'):reject('route_rejected')
     return {'host':host,'username':user,'port':port,'key':key,'fingerprint':pin}
 
 def source_binding(env,a):
@@ -796,7 +796,10 @@ def run_action(env,repo,capture_fn=capture):
         if sha(bodies['inventory.py'])!=INVENTORY_SHA or sha(bodies['receipt.py'])!=TRANSPORT_SHA:reject('package_rejected')
         for name,body in bodies.items():write_exclusive(directory,name,body)
         manifest=canonical({k:sha(v) for k,v in bodies.items()});write_exclusive(directory,'manifest.json',manifest);package_hash=sha(manifest)
-        private_route={k:v for k,v in route.items() if k!='key'};write_exclusive(directory,'route.json',canonical(private_route));write_exclusive(directory,'ssh.key',route['key'].encode())
+        private_route={k:v for k,v in route.items() if k!='key'};write_exclusive(directory,'route.json',canonical(private_route))
+        key_bytes=route['key'].replace('\r\n','\n').encode()
+        if not key_bytes.endswith(b'\n'):key_bytes+=b'\n'
+        write_exclusive(directory,'ssh.key',key_bytes)
         command='/usr/bin/python3 '+str(directory/'action.py')+' known-host --route-file '+str(directory/'route.json')+' --key-type %t --key-blob %K'
         # Quoted private paths only; no interpolation of untrusted source into commands.
         if any(c.isspace() or c in '\"\'`$\\' for c in str(directory)):reject('private_file_rejected')
