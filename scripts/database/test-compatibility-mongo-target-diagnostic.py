@@ -23,6 +23,8 @@ TARGET = (b"QS_MONGO_TARGET_DIAGNOSTIC phase=find kind=server code=50 "
           b"page_elapsed_ms=2000 run_elapsed_ms=10000 mysql_elapsed_ms=6000")
 INDEX = (b"QS_MONGO_INDEX_DIAGNOSTIC phase=list kind=server code=13 "
          b"namespace_sha256=" + b"a" * 64 + b" elapsed_ms=25")
+TIMING = (b"QS_MONGO_SCAN_TIMING pass=1 eof=0 pages=284 records=290816 source_bytes=460835287 "
+          b"find_ms=100 next_ms=200 processing_ms=300 flush_ms=400 checkpoint_ms=500")
 
 
 class MongoTargetDiagnosticTransport(unittest.TestCase):
@@ -124,6 +126,55 @@ class MongoTargetDiagnosticTransport(unittest.TestCase):
         with mock.patch.object(tool.subprocess, "run", return_value=subprocess.CompletedProcess(["fixed-tool"], 0, stdout=b"fixed\n")) as child:
             self.assertEqual(tool.capture_fixed(["fixed-tool"], timeout=5), (0, b"fixed\n"))
         self.assertEqual(child.call_args.kwargs["stderr"], subprocess.DEVNULL)
+
+    def test_scan_timing_accepts_exact_two_passes_and_numeric_boundaries(self):
+        second = TIMING.replace(b"pass=1 eof=0", b"pass=2 eof=1")
+        raw = TIMING + b"\n" + second + b"\n"
+        self.assertEqual(self.through_private_fd(raw), raw.decode("ascii"))
+        boundary = TIMING.replace(b"pages=284", b"pages=1001").replace(b"records=290816", b"records=1000000")
+        boundary = boundary.replace(b"source_bytes=460835287", b"source_bytes=2147483648")
+        for key, value in ((b"find_ms", b"100"), (b"next_ms", b"200"), (b"processing_ms", b"300"),
+                           (b"flush_ms", b"400"), (b"checkpoint_ms", b"500")):
+            boundary = boundary.replace(key + b"=" + value, key + b"=9223372036854775807")
+        self.assertEqual(self.through_private_fd(boundary + b"\n"), boundary.decode("ascii") + "\n")
+        zero = b"QS_MONGO_SCAN_TIMING pass=1 eof=1 pages=0 records=0 source_bytes=0 find_ms=0 next_ms=0 processing_ms=0 flush_ms=0 checkpoint_ms=0\n"
+        self.assertEqual(self.through_private_fd(zero), zero.decode("ascii"))
+
+    def test_scan_timing_rejects_noncanonical_numbers_private_fields_and_same_pass_duplicates(self):
+        replacements = ((b"pass=1", b"pass=3"), (b"eof=0", b"eof=2"), (b"pages=284", b"pages=1002"),
+                        (b"records=290816", b"records=1000001"), (b"source_bytes=460835287", b"source_bytes=2147483649"),
+                        (b"find_ms=100", b"find_ms=-1"), (b"next_ms=200", b"next_ms=0200"),
+                        (b"processing_ms=300", b"processing_ms=3.5"), (b"flush_ms=400", b"flush_ms=PRIVATE_BODY"))
+        for old, new in replacements:
+            with self.subTest(new=new):
+                self.assertEqual(self.through_private_fd(TIMING.replace(old, new) + b"\n"), "")
+        for key, value in ((b"find_ms", b"100"), (b"next_ms", b"200"), (b"processing_ms", b"300"),
+                           (b"flush_ms", b"400"), (b"checkpoint_ms", b"500")):
+            self.assertEqual(self.through_private_fd(TIMING.replace(key + b"=" + value, key + b"=9223372036854775808") + b"\n"), "")
+        for raw in (TIMING + b" token=PRIVATE_TOKEN\n", b"PRIVATE_PREFIX " + TIMING + b"\n", TIMING + b"\r\n", TIMING,
+                    TIMING + b"\n" + TIMING + b"\n", TIMING + b"\n" + TIMING.replace(b"eof=0", b"eof=1") + b"\n"):
+            self.assertEqual(self.through_private_fd(raw), "")
+
+    def test_scan_timing_bounded_tail_never_promotes_a_private_suffix(self):
+        private = b"PRIVATE_URI_BODY_TOKEN" * 1000 + b"\n" + TIMING + b"\n"
+        self.assertEqual(self.through_private_fd(private), TIMING.decode("ascii") + "\n")
+        suffix = TIMING + b"\n" + b"Z" * (8192 - len(TIMING) - 2) + b"\n"
+        self.assertEqual(len(suffix), 8192)
+        self.assertEqual(self.through_private_fd(b"X" * 9000 + b"q" + suffix), "")
+        self.assertEqual(self.through_private_fd(b"X" * 9000 + b"\n" + suffix), TIMING.decode("ascii") + "\n")
+
+    def test_real_child_timing_is_opt_in_and_preserves_primary_stdout_and_exit(self):
+        primary = b'{"complete":false,"drop_ready":false,"error_category":"inventory_incomplete"}\n'
+        private = b"PRIVATE_URI_BODY_TOKEN\n" + TARGET + b"\n" + TIMING + b"\n"
+        program = "import os;os.write(2," + repr(private) + ");os.write(1," + repr(primary) + ");raise SystemExit(7)"
+        for enabled in (False, True):
+            output = io.StringIO()
+            with contextlib.redirect_stderr(output):
+                code, raw = tool.capture_fixed([sys.executable, "-I", "-c", program], timeout=5, mongo_index_diagnostics=enabled)
+            self.assertEqual((code, raw), (7, primary))
+            self.assertEqual(hashlib.sha256(raw).digest(), hashlib.sha256(primary).digest())
+            self.assertEqual(output.getvalue(), (TARGET + b"\n" + TIMING + b"\n").decode("ascii") if enabled else "")
+            self.assertNotIn("PRIVATE", output.getvalue())
 
 
 if __name__ == "__main__":

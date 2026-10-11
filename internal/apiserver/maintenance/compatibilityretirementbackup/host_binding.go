@@ -65,6 +65,22 @@ func HostArchiveRecoveryBaseline(a *Archive) (string, error) {
 // VerifyHostOriginalSources observes actual current originals with host-owned
 // read handles. It does not close the SQL epoch or manufacture a writer fence.
 func VerifyHostOriginalSources(ctx context.Context, a *Archive, borrowed BorrowedSources) error {
+	return verifyHostOriginalSources(ctx, a, borrowed, nil)
+}
+
+// VerifyHostOriginalSnapshotSources borrows the host's actual paired RR-RO and
+// Mongo snapshot transactions. One complete content pass suffices within that
+// same epoch; metadata is still compared both before and after the pass.
+// This neither closes either scope nor establishes a writer fence.
+func VerifyHostOriginalSnapshotSources(ctx context.Context, a *Archive, borrowed BorrowedSources) error {
+	epoch, e := nonTargetEpoch(ctx, borrowed)
+	if e != nil {
+		return e
+	}
+	return verifyHostOriginalSources(ctx, a, borrowed, &epoch)
+}
+
+func verifyHostOriginalSources(ctx context.Context, a *Archive, borrowed BorrowedSources, snapshot *nonTargetDataEpoch) error {
 	if ctx == nil || ctx.Err() != nil || a == nil || len(a.data.Inventory.Targets) != 4 || len(a.data.Inventory.Bindings) != 2 || borrowed.SQL == nil || borrowed.Mongo == nil {
 		return ErrApproval
 	}
@@ -84,8 +100,10 @@ func VerifyHostOriginalSources(ctx context.Context, a *Archive, borrowed Borrowe
 			if e != nil || !reflect.DeepEqual(structure, a.data.SQL[i]) {
 				return ErrStructure
 			}
-			if e = verifySQLContent(ctx, borrowed.SQL, a.data.SQL[i], a.data.Inventory.Targets[i], i); e != nil {
-				return e
+			if snapshot == nil || pass == 0 {
+				if e = verifySQLContent(ctx, borrowed.SQL, a.data.SQL[i], a.data.Inventory.Targets[i], i); e != nil {
+					return e
+				}
 			}
 		}
 		collections, mdefs, e := mongoCatalog(ctx, borrowed.Mongo)
@@ -99,8 +117,16 @@ func VerifyHostOriginalSources(ctx context.Context, a *Archive, borrowed Borrowe
 		if e != nil || ordered.digest != a.data.OrderedMongoSchemaHash {
 			return ErrStructure
 		}
-		if e = verifyMongoContent(ctx, borrowed.Mongo, a.data.Inventory.Targets[3]); e != nil {
-			return e
+		if snapshot == nil || pass == 0 {
+			if e = verifyMongoContent(ctx, borrowed.Mongo, a.data.Inventory.Targets[3]); e != nil {
+				return e
+			}
+		}
+	}
+	if snapshot != nil {
+		end, e := nonTargetEpoch(ctx, borrowed)
+		if e != nil || !nonTargetEpochSame(*snapshot, end) {
+			return ErrNonTargetData
 		}
 	}
 	return nil
