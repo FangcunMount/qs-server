@@ -40,6 +40,82 @@ READ_TOKEN = "GITHUB_READ_TOKEN"
 SERVICE_CREDENTIALS = ("RETIREMENT_SERVICE_SSH_HOST", "RETIREMENT_SERVICE_SSH_USERNAME", "RETIREMENT_SERVICE_SSH_PORT", "RETIREMENT_SERVICE_SSH_KEY", "RETIREMENT_SERVICE_SSH_FINGERPRINT")
 SERVICE_KEY = "RETIREMENT_SERVICE_SSH_KEY"
 
+# Only the native child changes namespaces; its existing supervisor stays on
+# the host. This fixed infrastructure proxy is never a stopped QS entrypoint.
+DATABASE_NETWORK_EXEC = r"""
+import ctypes, http.client, json, os, re, socket, stat, sys
+from pathlib import Path
+def need(value):
+    if not value: raise SystemExit(1)
+def stamp(v):
+    return (v.st_dev,v.st_ino,v.st_uid,v.st_gid,v.st_mode,v.st_nlink,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
+def protected(path):
+    for item in (path,*path.parents):
+        v=item.lstat()
+        need(stat.S_ISDIR(v.st_mode) and v.st_uid==0 and not v.st_mode&0o022)
+class LocalDocker(http.client.HTTPConnection):
+    def connect(self):
+        self.sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+        self.sock.settimeout(self.timeout); self.sock.connect('/run/docker.sock')
+def inspect():
+    protected(Path('/run'))
+    s=Path('/run/docker.sock').lstat()
+    need(stat.S_ISSOCK(s.st_mode) and s.st_uid==0 and s.st_nlink==1)
+    c=LocalDocker('localhost',timeout=5)
+    try:
+        c.request('GET','/containers/mysql-rds-proxy/json')
+        response=c.getresponse(); raw=response.read((4<<20)+1)
+        need(response.status==200 and 0<len(raw)<=4<<20)
+        v=json.loads(raw); state=v['State']; networks=v['NetworkSettings']['Networks']
+        need(v['Id']=='bb7d2b5ea969638f8a23debcb17f0971c73c010b1f79c9e93f0773a86b41482d' and v['Name']=='/mysql-rds-proxy')
+        need(state['Running'] is True and all(state[k] is False for k in ('Paused','Restarting','Dead')) and type(state['Pid']) is int and state['Pid']>0)
+        need('infra-network' in networks and networks['infra-network']['NetworkID']=='m3tfd5h9sp5d1xmzht0ey0oql' and re.fullmatch(r'sha256:[0-9a-f]{64}',v['Image']))
+        return (v['Id'],state['Pid'],state['StartedAt'],v['Image'],networks,v['ResolvConfPath'])
+    finally: c.close()
+need(os.getuid()==os.geteuid()==0 and sys.platform=='linux' and len(sys.argv)>1)
+before=inspect(); resolver=Path(before[5])
+need(resolver.is_absolute() and str(resolver)==os.path.normpath(str(resolver)))
+protected(resolver.parent)
+net_path='/proc/'+str(before[1])+'/ns/net'
+net_fd=os.open(net_path,os.O_RDONLY|os.O_CLOEXEC)
+resolver_fd=os.open(resolver,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+try:
+    ns=os.fstat(net_fd); original=os.fstat(resolver_fd)
+    need(stat.S_ISREG(original.st_mode) and original.st_uid==0 and original.st_nlink==1 and not original.st_mode&0o022 and 0<original.st_size<=4096)
+    body=os.read(resolver_fd,4097); need(len(body)==original.st_size and stamp(os.fstat(resolver_fd))==stamp(original))
+    protected(Path('/etc'))
+    target=Path('/etc/resolv.conf').resolve(strict=True)
+    protected(target.parent); target_info=target.lstat()
+    need(stat.S_ISREG(target_info.st_mode) and target_info.st_uid==0 and not target_info.st_mode&0o022)
+    c=ctypes.CDLL(None,use_errno=True)
+    c.unshare.argtypes=[ctypes.c_int]; c.unshare.restype=ctypes.c_int
+    c.mount.argtypes=[ctypes.c_char_p,ctypes.c_char_p,ctypes.c_char_p,ctypes.c_ulong,ctypes.c_void_p]; c.mount.restype=ctypes.c_int
+    c.setns.argtypes=[ctypes.c_int,ctypes.c_int]; c.setns.restype=ctypes.c_int
+    need(c.unshare(0x00020000)==0)
+    need(c.mount(None,b'/',None,(1<<18)|16384,None)==0)
+    need(stamp(resolver.lstat())==stamp(original))
+    need(c.mount(os.fsencode(resolver),b'/etc/resolv.conf',None,4096,None)==0)
+    bound=os.stat('/etc/resolv.conf'); need((bound.st_dev,bound.st_ino)==(original.st_dev,original.st_ino))
+    need(c.mount(None,b'/etc/resolv.conf',None,4096|32|1,None)==0)
+    need(c.setns(net_fd,0x40000000)==0)
+    need(inspect()==before and (os.stat(net_path).st_dev,os.stat(net_path).st_ino)==(ns.st_dev,ns.st_ino))
+    os.lseek(resolver_fd,0,os.SEEK_SET)
+    need(os.read(resolver_fd,4097)==body and stamp(os.fstat(resolver_fd))==stamp(original) and stamp(resolver.lstat())==stamp(original))
+finally:
+    os.close(resolver_fd); os.close(net_fd)
+os.execvpe(sys.argv[1],sys.argv[1:],os.environ)
+"""
+
+
+def database_network_command(command, environment):
+    if os.getuid() != 0 or os.geteuid() != 0 or platform.system() != "Linux":
+        reject("window_tool_actual_root_required")
+    # Only this approved Docker DNS seed needs the fixed proxy namespace.
+    # Other original endpoints keep the host route and native identity checks.
+    if environment.get("MONGODB_HOST") != "mongo":
+        return command
+    return ["/usr/bin/python3", "-I", "-c", DATABASE_NETWORK_EXEC, *command]
+
 
 def credential_names(stage):
     if stage not in STAGES:
@@ -839,8 +915,9 @@ def root_execute(arguments, packet, source_uid, archive_raw):
         environment["QS_LIFECYCLE_BUDGET_KEY_RESULT_SHA256"] = budget_result_hash
     # The real native process owns every later connection/Window/proof. This
     # manager imports no completion/permit or guessed production authority.
-    code, raw = owned_process([str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
-               "--request-hash", digest(derived), "--operation-id", operation, "--run-id", current_run], environment, control=sys.stdin.fileno(), owner=owner)
+    command = [str(native), "--mode", mode, "--request", str(invocation / "lifecycle-request.json"),
+               "--request-hash", digest(derived), "--operation-id", operation, "--run-id", current_run]
+    code, raw = owned_process(database_network_command(command, environment), environment, control=sys.stdin.fileno(), owner=owner)
     context=globals().get('_fixed_entry_context')
     if context is not None and stage in ('apply','purge') and code==0:
         revoke_fixed_entries_after_native(raw,code,a,current_run,digest(derived),context)

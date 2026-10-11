@@ -1887,11 +1887,13 @@ try:
         if not binary or len(binary)>64<<20: stop()
         preload_program=preload_archive=None
         sealed_assets={}
-        if stage=='prepare-facts':
+        if stage in ('prepare-facts','db-writer-census','lifecycle'):
             programs=[m for m in members if m.name=='compatibility-window-tool.py']
-            images=[m for m in members if m.name=='preload-image.tar.gz']
-            if len(programs)!=1 or programs[0].size>1<<20 or len(images)!=1: stop()
+            if len(programs)!=1 or programs[0].size>1<<20: stop()
             preload_program=tar.extractfile(programs[0]).read((1<<20)+1)
+        if stage=='prepare-facts':
+            images=[m for m in members if m.name=='preload-image.tar.gz']
+            if len(images)!=1: stop()
             preload_archive=tar.extractfile(images[0]).read((200<<20)+1)
             for asset in ('qs-ai-retirement-readonly-host.py','qs-ai-retirement-readonly-verifier.py','qs-ai-retirement-readonly-observer.py','qs-ai-retirement-0040-layout.py'):
                 selected_asset=[m for m in members if m.name==asset]
@@ -1931,13 +1933,15 @@ try:
     credentials['QS_RETIREMENT_SOURCE_UID']=str(source_uid)
     native_mode = stage+'-root-once' if stage != 'lifecycle' else 'lifecycle-prepare-root-once'
     native_argv=[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run]
+    if preload_program is not None:
+        module={'__name__':'approved_database_network_caller'}
+        exec(compile(preload_program,'approved-package-database-network-caller','exec'),module)
+        native_argv=module['database_network_command'](native_argv,credentials)
     if stage=='prepare-facts':
         for asset,body in sealed_assets.items():
             fd=os.open(batch/asset,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
             with os.fdopen(fd,'wb') as f: f.write(body); f.flush(); os.fsync(f.fileno())
         fd=os.open(batch,os.O_RDONLY|os.O_DIRECTORY);os.fsync(fd);os.close(fd)
-        module={'__name__':'approved_cached_image_preparation'}
-        exec(compile(preload_program,'approved-package-cached-image-caller','exec'),module)
         request_raw=module['read_owned'](Path(request_path),source_uid,request_hash,256<<10)
         request=module['decode'](request_raw)
         if request.get('source_sha')!=tool_sha or request.get('operation_id')!=operation or request.get('actual_run_id')!=run: stop()
@@ -1951,7 +1955,7 @@ try:
         native_result=json.loads(result.stdout,object_pairs_hook=unique_credentials)
         print(json.dumps({'native_receipt':native_result,'image_preload':observed},sort_keys=True,separators=(',',':')))
         raise SystemExit(result.returncode)
-    os.execve(native,[str(native),'--mode',native_mode,'--request',request_path,'--request-hash',request_hash,'--operation-id',operation,'--run-id',run],credentials)
+    os.execve(native_argv[0],native_argv,credentials)
 except (OSError,ValueError,KeyError,tarfile.TarError,subprocess.SubprocessError):
     stop()
 """
@@ -2163,7 +2167,7 @@ def fixed_prepare_entry_program(operation, source, native_hashes, wrapper_hash, 
     program = program.replace("member.size<=64<<20", "member.size<=(200<<20 if request['stage']=='prepare-facts' and member.name=='preload-image.tar.gz' else 64<<20)")
     program = program.replace("names=set(); matched=False", "names=set(); matched=False; wrapper_matched=False")
     program = program.replace("if member.name=='inventory-linux-'+arch:", "if member.name=='compatibility-window-tool.py':\n                    wrapper=tar.extractfile(member).read((1<<20)+1)\n                    if len(wrapper)>1<<20 or hashlib.sha256(wrapper).hexdigest()!=POLICY['wrapper_sha256']: reject()\n                    wrapper_matched=True\n                if member.name=='inventory-linux-'+arch:")
-    program = program.replace("if not matched: reject()", "if not matched or (request['stage']=='prepare-facts' and not wrapper_matched): reject()")
+    program = program.replace("if not matched: reject()", "if not matched or not wrapper_matched: reject()")
     program = program.replace("request['package_sha256'],'','sudo-user','host-writer-scope']", "request['package_sha256'],request['manifest_sha256'],'sudo-user']\n    if request['stage']!='lifecycle': sys.argv.append(request['stage'])")
     program = program.replace("io.BytesIO(b'{}')", "io.BytesIO(json.dumps(request['credentials'],separators=(',',':')).encode())")
     program = program.replace("request['stage']=='lifecycle' and not re.fullmatch(r'[0-9a-f]{64}',request['manifest_sha256'])","request['stage']=='lifecycle' and request['manifest_sha256']!="+repr(manifest_hash))

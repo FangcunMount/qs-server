@@ -260,6 +260,17 @@ class PrepareFactsBoundaries(unittest.TestCase):
             cases.append({'input':invalid,'accepted':False})
         for key,content in (('operation','apply'),('manifest_sha256','4'*64),('eleventh_input','unexpected')):
             invalid=copy.deepcopy(input);invalid[key]=content;cases.append({'input':invalid,'accepted':False})
+        saved=copy.deepcopy(value)
+        saved['storage_backup']={'kind':'storage_backup_v1','tool_source_sha':'c'*40,
+            'run_id':saved['inventory_report']['run_id'],'archive_sha256':'d'*64,'request_sha256':'e'*64}
+        self.set_descriptor(args,saved)
+        saved_input=copy.deepcopy(input)
+        saved_input.update(bootstrap_approval_json=args.bootstrap_approval_json,bootstrap_approval_sha256=args.bootstrap_approval_hash)
+        cases.append({'input':saved_input,'accepted':True})
+        for key,content in (('tool_source_sha','not-a-commit'),('run_id','999-1'),('archive_sha256','bad'),('request_sha256','bad')):
+            changed=copy.deepcopy(saved);changed['storage_backup'][key]=content;self.set_descriptor(args,changed)
+            invalid=copy.deepcopy(input);invalid.update(bootstrap_approval_json=args.bootstrap_approval_json,bootstrap_approval_sha256=args.bootstrap_approval_hash)
+            cases.append({'input':invalid,'accepted':False})
         program="""const fs=require('fs'); const x=JSON.parse(fs.readFileSync(0,'utf8'));
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 (async()=>{for(const c of x.cases){let accepted=false;try{await new AsyncFunction('context','github','require','process',x.script)(
@@ -268,7 +279,7 @@ const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 if(accepted!==c.accepted)throw new Error('offline_action_validation_mismatch');}process.stdout.write(JSON.stringify({cases:x.cases.length,complete:true})+'\\n');})().catch(()=>process.exit(1));"""
         done=subprocess.run([node,'-e',program],input=json.dumps({'script':script,'cases':cases}).encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10,check=False)
         self.assertEqual(done.returncode,0,done.stderr.decode())
-        self.assertEqual(json.loads(done.stdout),{'cases':6,'complete':True})
+        self.assertEqual(json.loads(done.stdout),{'cases':11,'complete':True})
     def test_failed_observation_then_new_run_keeps_old_request_and_same_inventory(self):
         args,_=self.args()
         with tempfile.TemporaryDirectory(prefix='prepare-facts-offline-') as temporary:
@@ -322,9 +333,36 @@ if(accepted!==c.accepted)throw new Error('offline_action_validation_mismatch');}
         self.assertEqual(ast.unparse(registry.values[keys.index('request_path')]),'request_path')
         self.assertEqual(ast.unparse(registry.values[keys.index('request_sha256')]),'request_hash')
         execution=next(node for node in ast.walk(tree) if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and node.func.attr=='execve')
-        argv=execution.args[1].elts
+        self.assertEqual(ast.unparse(execution.args[0]),'native_argv[0]')
+        self.assertEqual(ast.unparse(execution.args[1]),'native_argv')
+        argv=next(node.value.elts for node in assignments if len(node.targets)==1 and
+            isinstance(node.targets[0],ast.Name) and node.targets[0].id=='native_argv' and isinstance(node.value,ast.List))
         position=next(i for i,item in enumerate(argv) if isinstance(item,ast.Constant) and item.value=='--request')
         self.assertEqual(ast.unparse(argv[position+1]),'request_path')
+    def test_database_network_caller_preserves_host_scope_and_original_credentials(self):
+        tree=ast.parse(tool.ROOT_PREPARE_ONCE)
+        selection=next(node for node in ast.walk(tree) if isinstance(node,ast.If) and
+            ast.unparse(node.test)=="stage in ('prepare-facts', 'db-writer-census', 'lifecycle')")
+        calls=next(node for node in ast.walk(tree) if isinstance(node,ast.If) and
+            ast.unparse(node.test)=='preload_program is not None')
+        selected=compile(ast.Module(body=[selection],type_ignores=[]),'sealed-network-module-selection','exec')
+        invoked=compile(ast.Module(body=[calls],type_ignores=[]),'sealed-network-native-call','exec')
+        module_body=b"def database_network_command(argv,environment):\n return ['fixture-private-namespace',*argv] if environment['MONGODB_HOST']=='mongo' else argv\n"
+        class Package:
+            def extractfile(self,_):return io.BytesIO(module_body)
+        original=['/private/native','--mode','db-writer-census-root-once','--request','/original/request']
+        for stage in ('host-writer-scope','prepare-facts','db-writer-census','lifecycle'):
+            for host in ('mongo','127.0.0.1','localhost','db.example.test'):
+                with self.subTest(stage=stage,host=host):
+                    credentials={'MONGODB_HOST':host,'MONGODB_PORT':'27017','MONGODB_DBNAME':'qs','MONGODB_PASSWORD':'offline fixture'}
+                    before=credentials.copy()
+                    scope={'stage':stage,'members':[SimpleNamespace(name='compatibility-window-tool.py',size=len(module_body))],
+                        'tar':Package(),'preload_program':None,'stop':lambda:self.fail('valid sealed module rejected'),
+                        'native_argv':original.copy(),'credentials':credentials}
+                    exec(selected,scope);exec(invoked,scope)
+                    self.assertEqual(scope['native_argv'],original if stage=='host-writer-scope' or host!='mongo' else ['fixture-private-namespace',*original])
+                    self.assertIs(scope['credentials'],credentials)
+                    self.assertEqual(credentials,before)
     def test_actual_run_path_tokens_are_checked_before_any_private_publication(self):
         args,_=self.args();args.run_id='../790-1'
         with mock.patch.object(tool,'operation_directory') as directory,mock.patch.object(tool,'create_bootstrap_file') as publish,self.assertRaises(tool.Blocked):
@@ -562,7 +600,7 @@ class FixedDeployHostEntry(unittest.TestCase):
         return scope,program
 
     @contextlib.contextmanager
-    def archive(self, content):
+    def archive(self, content, wrapper=None):
         run=str(time.time_ns())+'-1'
         path=Path('/tmp/qs-compatibility-retirement-'+run+'.tar.gz')
         fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -571,6 +609,9 @@ class FixedDeployHostEntry(unittest.TestCase):
                 for arch in ('amd64','arm64'):
                     member=tarfile.TarInfo('inventory-linux-'+arch);member.size=len(content)
                     tar.addfile(member,io.BytesIO(content))
+                if wrapper is not None:
+                    member=tarfile.TarInfo('compatibility-window-tool.py');member.size=len(wrapper)
+                    tar.addfile(member,io.BytesIO(wrapper))
             yield path,{'operation_id':'123-1','run_id':run,'source_sha':'a'*40,'request_sha256':'b'*64,'package_sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
         finally:path.unlink()
 
@@ -630,22 +671,32 @@ class FixedDeployHostEntry(unittest.TestCase):
 
 
 class FixedPrepareEntry(unittest.TestCase):
+    wrapper=b'approved pinned wrapper'
     def scope(self):
-        raw=tool.fixed_prepare_entry_program('123-1','a'*40,{arch:hashlib.sha256(b'approved fixture bytes').hexdigest() for arch in ('amd64','arm64')},'d'*64,'c'*64)
+        raw=tool.fixed_prepare_entry_program('123-1','a'*40,{arch:hashlib.sha256(b'approved fixture bytes').hexdigest() for arch in ('amd64','arm64')},hashlib.sha256(self.wrapper).hexdigest(),'c'*64)
         tree=ast.parse(raw);setup=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom,ast.Assign,ast.FunctionDef))]
         scope={};exec(compile(ast.Module(body=setup,type_ignores=[]),'fixed-prepare-gate','exec'),scope)
         return scope,raw
     def test_closed_stage_manifest_and_credentials_schema_before_original_bootstrap(self):
         scope,raw=self.scope();fixture=FixedDeployHostEntry()
-        with fixture.archive(b'approved fixture bytes') as (_,request):
+        with fixture.archive(b'approved fixture bytes',self.wrapper) as (_,request):
             request|=dict(stage='lifecycle',manifest_sha256='c'*64,credentials={})
             actual,owner=fixture.authorize(scope,request)
             self.assertEqual(actual,request);self.assertEqual(owner,os.getuid())
             for change in ({'stage':'apply'},{'manifest_sha256':'e'*64},{'credentials':[]},{'source_sha':'f'*40}):
                 with self.subTest(change=change),contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit): fixture.authorize(scope,request|change)
             request|=dict(stage='prepare-facts',manifest_sha256='')
-            with contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):fixture.authorize(scope,request)
-        self.assertIn("'wrapper_sha256': '"+'d'*64+"'",raw.decode())
+            self.assertEqual(fixture.authorize(scope,request)[0],request)
+            request|=dict(stage='db-writer-census')
+            self.assertEqual(fixture.authorize(scope,request)[0],request)
+        self.assertIn("'wrapper_sha256': '"+hashlib.sha256(self.wrapper).hexdigest()+"'",raw.decode())
+    def test_all_database_stages_reject_missing_or_unapproved_network_code(self):
+        scope,_=self.scope();fixture=FixedDeployHostEntry()
+        for stage in ('lifecycle','prepare-facts','db-writer-census'):
+            for wrapper in (None,b'unapproved network launcher'):
+                with self.subTest(stage=stage,wrapper_present=wrapper is not None),fixture.archive(b'approved fixture bytes',wrapper) as (_,request):
+                    request|=dict(stage=stage,manifest_sha256='c'*64 if stage=='lifecycle' else '',credentials={})
+                    with contextlib.redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):fixture.authorize(scope,request)
     def test_only_prepare_facts_named_image_can_cross_original_64m_member_bound(self):
         # Real gzip/tar data and original hashes. This does not execute Docker.
         fixture=FixedDeployHostEntry();native=b'approved fixture bytes';wrapper=b'approved pinned wrapper'

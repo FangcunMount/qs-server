@@ -387,6 +387,100 @@ const core={setOutput:(k,v)=>outputs[k]=v};process.env.GITHUB_RUN_ATTEMPT='1';
         self.assertTrue(value['accepted']);self.assertEqual(value['outputs'],{})
 
 
+class DatabaseNetworkExecution(unittest.TestCase):
+    # Actual local file FDs, with Docker/root/syscalls explicitly substituted.
+    # This verifies refusal and exec wiring, never production reachability.
+    def execute(self, mutation='none'):
+        import builtins, os, stat, tempfile
+        from pathlib import PurePosixPath
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            resolver=Path(directory)/'resolv.conf';resolver.write_bytes(b'nameserver 127.0.0.11\n');resolver.chmod(0o644)
+            net=Path(directory)/'net';net.write_bytes(b'namespace fixture')
+            source='/var/lib/docker/containers/proxy/resolv.conf';net_path='/proc/123/ns/net'
+            events=[];bound=[False];calls=[0];executed=[]
+            def root_stat(v):
+                keys=('st_dev','st_ino','st_uid','st_gid','st_mode','st_nlink','st_size','st_mtime_ns','st_ctime_ns')
+                result={k:getattr(v,k) for k in keys};result['st_uid']=0
+                if mutation=='unsafe-resolver' and v.st_ino==resolver.stat().st_ino:result['st_mode']|=0o020
+                return SimpleNamespace(**result)
+            class FakePath:
+                def __init__(self,path):self.path=PurePosixPath(path)
+                def __str__(self):return str(self.path)
+                def __fspath__(self):return str(self)
+                @property
+                def parent(self):return FakePath(str(self.path.parent))
+                @property
+                def parents(self):return tuple(FakePath(str(p)) for p in self.path.parents)
+                def is_absolute(self):return self.path.is_absolute()
+                def resolve(self,strict=False):return self
+                def lstat(self):
+                    if str(self)==source or str(self)=='/etc/resolv.conf':return root_stat(resolver.stat())
+                    return SimpleNamespace(st_mode=(stat.S_IFSOCK|0o660) if str(self)=='/run/docker.sock' else stat.S_IFDIR|0o755,st_uid=0,st_nlink=1)
+            def open_file(path,flags):return os.open(net if str(path)==net_path else resolver,flags)
+            def stat_path(path):
+                if str(path)=='/etc/resolv.conf':self.assertTrue(bound[0]);return root_stat(resolver.stat())
+                return root_stat(net.stat())
+            environment={'PATH':'/usr/bin:/bin','MONGODB_HOST':'mongo','MYSQL_HOST':'localhost','MYSQL_PASSWORD':'offline fixture'}
+            def exec_native(path,argv,env):executed.append((path,argv,env));events.append('exec')
+            fake_os=SimpleNamespace(getuid=lambda:0,geteuid=lambda:0,path=os.path,open=open_file,fstat=lambda fd:root_stat(os.fstat(fd)),read=os.read,lseek=os.lseek,close=os.close,stat=stat_path,fsencode=os.fsencode,execvpe=exec_native,environ=environment,O_RDONLY=os.O_RDONLY,O_CLOEXEC=os.O_CLOEXEC,O_NOFOLLOW=os.O_NOFOLLOW,O_NONBLOCK=os.O_NONBLOCK,SEEK_SET=os.SEEK_SET)
+            value={'Id':'bb7d2b5ea969638f8a23debcb17f0971c73c010b1f79c9e93f0773a86b41482d','Name':'/mysql-rds-proxy','Image':'sha256:'+'a'*64,'State':dict(Pid=123,StartedAt='original start',Running=True,Paused=False,Restarting=False,Dead=False),'NetworkSettings':{'Networks':{'infra-network':{'NetworkID':'m3tfd5h9sp5d1xmzht0ey0oql'}}},'ResolvConfPath':source}
+            class HTTP:
+                def __init__(self,*args,**kwargs):pass
+                def request(self,method,path):self.assertion=(method,path)
+                def getresponse(self):
+                    self_outer.assertEqual(self.assertion,('GET','/containers/mysql-rds-proxy/json'))
+                    calls[0]+=1;v=copy.deepcopy(value)
+                    if mutation=='wrong-id':v['Id']='c'*64
+                    if mutation=='paused':v['State']['Paused']=True
+                    if mutation=='missing-network':v['NetworkSettings']['Networks']={}
+                    if mutation=='wrong-network-id':v['NetworkSettings']['Networks']['infra-network']['NetworkID']='b'*64
+                    if mutation=='proxy-restarted' and calls[0]>1:v['State']['Pid']=124
+                    return SimpleNamespace(status=200,read=lambda maximum:tool.canonical(v))
+                def close(self):pass
+            self_outer=self
+            class Call:
+                def __init__(self,name):self.name=name
+                def __call__(self,*args):
+                    events.append((self.name,args))
+                    if mutation=='unshare-failed' and self.name=='unshare':return -1
+                    if self.name=='mount' and args[0]==source.encode():bound[0]=True
+                    if mutation=='resolver-changed' and self.name=='setns':resolver.write_bytes(b'nameserver 127.0.0.12\n')
+                    return 0
+            libc=SimpleNamespace(unshare=Call('unshare'),mount=Call('mount'),setns=Call('setns'))
+            modules={'os':fake_os,'sys':SimpleNamespace(platform='linux',argv=['-c','/approved/native','--mode','db-writer-census-root-once']),'pathlib':SimpleNamespace(Path=FakePath),'http.client':SimpleNamespace(client=SimpleNamespace(HTTPConnection=HTTP)),'ctypes':SimpleNamespace(CDLL=lambda *a,**k:libc,c_int=int,c_char_p=bytes,c_ulong=int,c_void_p=object)}
+            def imports(name,globals=None,locals=None,fromlist=(),level=0):return modules[name] if name in modules else builtins.__import__(name,globals,locals,fromlist,level)
+            namespace={'__builtins__':dict(vars(builtins),__import__=imports)}
+            try:exec(compile(tool.DATABASE_NETWORK_EXEC,'offline-database-network-exec','exec'),namespace)
+            except SystemExit as e:self.assertNotEqual(e.code,0)
+            return events,executed,environment
+    def test_private_mount_then_fixed_network_exec_preserves_original_argv_and_environment(self):
+        events,executed,environment=self.execute()
+        self.assertEqual(executed,[('/approved/native',['/approved/native','--mode','db-writer-census-root-once'],environment)])
+        self.assertIs(executed[0][2],environment)
+        self.assertEqual([e[0] for e in events[:-1]],['unshare','mount','mount','mount','setns'])
+        self.assertEqual(events[1][1][3],(1<<18)|16384)
+        self.assertEqual(events[3][1][3],4096|32|1)
+        self.assertEqual(events[-1],'exec')
+    def test_unbound_or_changed_proxy_and_resolver_refuse_before_exec(self):
+        for mutation in ('wrong-id','paused','missing-network','wrong-network-id','unsafe-resolver','proxy-restarted','resolver-changed','unshare-failed'):
+            with self.subTest(mutation=mutation):self.assertEqual(self.execute(mutation)[1],[])
+    def test_command_factory_requires_actual_linux_root_and_does_not_rewrite_endpoints(self):
+        from unittest import mock
+        with mock.patch.object(tool.os,'getuid',return_value=1),self.assertRaises(tool.Refused):tool.database_network_command(['/approved/native'],{'MONGODB_HOST':'mongo'})
+        with mock.patch.object(tool.os,'getuid',return_value=0),mock.patch.object(tool.os,'geteuid',return_value=0),mock.patch.object(tool.platform,'system',return_value='Linux'):
+            argv=['/approved/native','--request','/original/request']
+            for host in ('mongo','127.0.0.1','localhost','db.example.test'):
+                with self.subTest(host=host):
+                    environment={'MONGODB_HOST':host,'MONGODB_PORT':'27017','MONGODB_DBNAME':'qs','MONGODB_PASSWORD':'offline fixture'}
+                    original=environment.copy()
+                    command=tool.database_network_command(argv,environment)
+                    self.assertEqual(command,['/usr/bin/python3','-I','-c',tool.DATABASE_NETWORK_EXEC,*argv] if host=='mongo' else argv)
+                    if host!='mongo':self.assertIs(command,argv)
+                    self.assertEqual(environment,original)
+            self.assertEqual(argv,['/approved/native','--request','/original/request'])
+
+
 class ActualOwnedLocalProcess(unittest.TestCase):
     # Real unprivileged local processes/Unix pipes only. No root capability,
     # sudo, SSH, Docker, native Window or database fixture is mocked here.
@@ -750,6 +844,8 @@ class RootTemplateStaging(unittest.TestCase):
             def run_owned(command,environment,**options):
                 self.assertIs(options['owner'],owner)
                 self.assertEqual(options['control'],tool.sys.stdin.fileno())
+                if command[:3]==['/usr/bin/python3','-I','-c']:
+                    self.assertEqual(command[3],tool.DATABASE_NETWORK_EXEC);command=command[4:]
                 if command[1]=='--source-sha':return check[0]
                 if command[0]=='/usr/bin/docker':
                     self.assertEqual(command[1:6],['--host','unix:///run/docker.sock','image','inspect','--format'])

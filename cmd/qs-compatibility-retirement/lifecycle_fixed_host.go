@@ -89,6 +89,9 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 		if err != nil {
 			return nil, errors.Join(err, h.Close())
 		}
+		if err = h.registerOriginalOperationTemplate(i); err != nil {
+			return nil, errors.Join(err, h.Close())
+		}
 		if err = h.originalOperationMaterials.register("inventory-request.json", r.Approval.RequestHash, i.SourceUID, 0600); err != nil {
 			return nil, errors.Join(err, h.Close())
 		}
@@ -115,6 +118,12 @@ func newLifecycleFixedHost(ctx context.Context, r lifecycleRequest, a *backup.Ar
 		return nil, errors.Join(archiveErr, h.Close())
 	}
 	return h, nil
+}
+
+// Hold the approved source template before any restore or window effect. It
+// remains a required purge input, with the derived request separately bound.
+func (h *lifecycleFixedHost) registerOriginalOperationTemplate(i lifecycleAPIInvocationIntent) error {
+	return h.originalOperationMaterials.registerWithMaximum("lifecycle-request-template.json", i.TemplateSHA256, i.SourceUID, 0600, 256<<10)
 }
 
 func (h *lifecycleFixedHost) OpenRecoveryHandles(ctx context.Context, _ lifecycleRequest, _ *backup.Archive) (backup.TargetRecoveryBorrowed, error) {
