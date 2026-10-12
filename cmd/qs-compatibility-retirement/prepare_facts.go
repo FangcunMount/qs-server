@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -897,17 +899,87 @@ type prepareFactsMQContainer struct {
 
 const prepareFactsMQInspect = `{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"user":{{json .Config.User}},"entrypoint":{{json .Config.Entrypoint}},"command":{{json .Config.Cmd}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"mounts":{{json .Mounts}}}`
 
+var prepareFactsVersionedKeyPath = regexp.MustCompile(`^/data/infra/qs-server-messaging/versions/[a-z0-9][a-z0-9-]{0,63}/(?:qs\.sign|qs\.encrypt|ai\.sign|ai\.encrypt)(?:\.[a-z0-9][a-z0-9._-]{0,63})?\.json$`)
+
+func prepareFactsKeyDirectoryAllowed(path, directory string, uid uint32, st os.FileInfo) bool {
+	v, ok := infoStat(st)
+	if st == nil || !st.IsDir() || !ok {
+		return false
+	}
+	// These two shared host ancestors are not managed by the key reader.
+	// Every directory below them and every key retains the original owner gate.
+	if (directory == "/data" || directory == "/data/infra") && prepareFactsVersionedKeyPath.MatchString(path) {
+		return st.Mode().Perm()&0022 == 0
+	}
+	return (v.Uid == 0 || v.Uid == uid) && (st.Mode().Perm()&0022 == 0 || st.Mode()&os.ModeSticky != 0)
+}
+
+func prepareFactsKeyDirectoriesUnchanged(before map[string]os.FileInfo) bool {
+	for path, previous := range before {
+		current, err := os.Lstat(path)
+		a, aOK := infoStat(previous)
+		b, bOK := infoStat(current)
+		if err != nil || current == nil || !current.IsDir() || !aOK || !bOK || a.Dev != b.Dev || a.Ino != b.Ino || a.Uid != b.Uid || a.Gid != b.Gid || a.Mode != b.Mode {
+			return false
+		}
+	}
+	return true
+}
+
+func prepareFactsSameMQInspect(before, after []byte) bool {
+	canonical := func(raw []byte) ([]byte, error) {
+		if err := rejectDuplicateJSON(raw); err != nil {
+			return nil, err
+		}
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		var value map[string]any
+		if err := decoder.Decode(&value); err != nil {
+			return nil, err
+		}
+		mounts, ok := value["mounts"].([]any)
+		if !ok {
+			return nil, errors.New("invalid MQ inspect mounts")
+		}
+		ordered := make([]json.RawMessage, 0, len(mounts))
+		seen := map[string]bool{}
+		for _, item := range mounts {
+			mount, ok := item.(map[string]any)
+			if !ok {
+				return nil, errors.New("invalid MQ inspect mount")
+			}
+			destination, ok := mount["Destination"].(string)
+			if !ok || destination == "" || seen[destination] {
+				return nil, errors.New("ambiguous MQ inspect destination")
+			}
+			seen[destination] = true
+			encoded, err := json.Marshal(mount)
+			if err != nil {
+				return nil, err
+			}
+			ordered = append(ordered, encoded)
+		}
+		sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i], ordered[j]) < 0 })
+		value["mounts"] = ordered
+		return json.Marshal(value)
+	}
+	a, aErr := canonical(before)
+	b, bErr := canonical(after)
+	return aErr == nil && bErr == nil && bytes.Equal(a, b)
+}
+
 func prepareFactsKeyFile(path string, uid uint32, private bool, maximum int64) (f *os.File, raw []byte, result error) {
-	// Existing release assets may be root or the source/deployment account owned.
+	// Existing release assets and keys are root or the actual reader owned.
 	if filepath.Clean(path) != path || !filepath.IsAbs(path) {
 		return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
 	}
+	directories := map[string]os.FileInfo{}
 	for d := filepath.Dir(path); d != "/"; d = filepath.Dir(d) {
 		st, e := os.Lstat(d)
-		v, ok := infoStat(st)
-		if e != nil || st == nil || !st.IsDir() || !ok || (v.Uid != 0 && v.Uid != uid) || (st.Mode().Perm()&0022 != 0 && st.Mode()&os.ModeSticky == 0) {
+		if e != nil || !prepareFactsKeyDirectoryAllowed(path, d, uid, st) {
 			return nil, nil, lifecycleError("prepare_facts_message_protection_rejected")
 		}
+		directories[d] = st
 	}
 	f, result = os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if result != nil {
@@ -928,7 +1000,7 @@ func prepareFactsKeyFile(path string, uid uint32, private bool, maximum int64) (
 	raw, e = io.ReadAll(io.LimitReader(f, maximum+1))
 	after, ae := f.Stat()
 	visible, ve := os.Lstat(path)
-	if e != nil || ae != nil || ve != nil || int64(len(raw)) != st.Size() || !sameLifecycleFile(st, after) || !sameLifecycleFile(after, visible) {
+	if e != nil || ae != nil || ve != nil || int64(len(raw)) != st.Size() || !sameLifecycleFile(st, after) || !sameLifecycleFile(after, visible) || !prepareFactsKeyDirectoriesUnchanged(directories) {
 		return f, nil, lifecycleError("prepare_facts_message_protection_rejected")
 	}
 	return f, raw, nil
@@ -1147,7 +1219,7 @@ func prepareFactsMessageProtection(ctx context.Context, docker, op string, uid u
 		return nil, lifecycleError("prepare_facts_message_protection_reader_changed")
 	}
 	again, e := lifecycleDocker(ctx, docker, "inspect", "--format", prepareFactsMQInspect, container.ID)
-	if e != nil || !bytes.Equal(bytes.TrimSpace(again), bytes.TrimSpace(inspect)) || ctx.Err() != nil {
+	if e != nil || !prepareFactsSameMQInspect(inspect, again) || ctx.Err() != nil {
 		return nil, lifecycleError("prepare_facts_message_protection_runtime_changed")
 	}
 	parent := filepath.Join("/opt/backups/qs-server/compatibility-retirement", op)
