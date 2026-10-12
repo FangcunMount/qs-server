@@ -165,6 +165,14 @@ func TestAIExternalCurrentObservationKeepsSettingsPrivateAndCannotStop(t *testin
 	if err != nil || strings.Contains(string(raw), "synthetic-private-setting") || strings.Contains(string(raw), "drop_ready") || strings.Contains(string(raw), "lease") {
 		t.Fatal("settings or authority escaped observation")
 	}
+	for _, network := range []string{"m3tfd5h9sp5d1xmzht0ey0oql", snap.NetworkID} {
+		current := snap
+		current.NetworkID = network
+		value, err := aiExternalObservationFromSnapshot(in, binding, current)
+		if err != nil || value.StopConstraints.NetworkID != network || !value.StopConstraints.Valid() {
+			t.Fatalf("original approved network rejected or rewritten: %q", network)
+		}
+	}
 	for _, mutate := range []func(*aiStoppedSnapshot){func(v *aiStoppedSnapshot) { v.Runtime.Running = false }, func(v *aiStoppedSnapshot) { v.Runtime.ContainerRevision = strings.Repeat("f", 40) }, func(v *aiStoppedSnapshot) { v.PID = 0 }, func(v *aiStoppedSnapshot) { v.RestartPolicy = "always" }, func(v *aiStoppedSnapshot) { v.NetworkID = "unobserved" }, func(v *aiStoppedSnapshot) { v.ExecIDs = []string{"unsettled-original-exec"} }, func(v *aiStoppedSnapshot) { v.HealthcheckTest = nil }, func(v *aiStoppedSnapshot) { v.Paused = true }, func(v *aiStoppedSnapshot) { v.Settings = nil }} {
 		changed := snap
 		mutate(&changed)

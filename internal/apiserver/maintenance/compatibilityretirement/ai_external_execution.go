@@ -990,7 +990,7 @@ type AIExternalRuntimeObservation struct {
 }
 
 func aiExternalObservationFromSnapshot(in AIExternalExecutionInput, binding string, snap aiStoppedSnapshot) (AIExternalRuntimeObservation, error) {
-	if !aiOriginalSourceSHA(in.RuntimeSourceSHA) || !aiExternalImageID(in.ImageID) || !evidenceHash(in.ContainerID) || !evidenceHash(binding) || !snap.Runtime.matches(in) || snap.RestartPolicy != "unless-stopped" || snap.PID <= 0 || snap.OOM || snap.Dead || snap.Paused || snap.Restarting || len(snap.ExecIDs) != 0 || !aiStoppedHealthcheck(snap.HealthcheckTest) || !evidenceHash(snap.NetworkID) || len(snap.Settings) == 0 {
+	if !aiOriginalSourceSHA(in.RuntimeSourceSHA) || !aiExternalImageID(in.ImageID) || !evidenceHash(in.ContainerID) || !evidenceHash(binding) || !snap.Runtime.matches(in) || snap.RestartPolicy != "unless-stopped" || snap.PID <= 0 || snap.OOM || snap.Dead || snap.Paused || snap.Restarting || len(snap.ExecIDs) != 0 || !aiStoppedHealthcheck(snap.HealthcheckTest) || !aiStoppedNetworkIDValid(snap.NetworkID) || len(snap.Settings) == 0 {
 		return AIExternalRuntimeObservation{}, ErrAIExternalRuntime
 	}
 	return AIExternalRuntimeObservation{SourceSHA: in.RuntimeSourceSHA, ImageID: in.ImageID, ContainerID: in.ContainerID, BindingSHA256: binding, StopConstraints: AIStoppedRuntimeConstraints{SettingsSHA256: sourceSHA(aiJSONBytes(snap.Settings)), NetworkID: snap.NetworkID}}, nil

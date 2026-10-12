@@ -1106,22 +1106,6 @@ type lifecycleHistoricalMaterialManifest struct {
 	Files           []lifecycleHistoricalMaterial `json:"files"`
 }
 
-func lifecycleHistoricalWriteReferenceValid(r lifecycleRequest) bool {
-	if r.HistoricalWriteReport == nil || !hashRE.MatchString(r.HistoricalWriteReport.SHA256) || filepath.Base(r.HistoricalWriteReport.Path) != "history.write.json" {
-		return false
-	}
-	dir := filepath.Dir(r.HistoricalWriteReport.Path)
-	run := strings.TrimPrefix(filepath.Base(dir), "history-write-")
-	return runRE.MatchString(run) && run != r.ActualRunID && r.HistoricalWriteReport.Path == filepath.Join("/opt/backups/qs-server/compatibility-retirement", r.OperationID, "history-write-"+run, "history.write.json")
-}
-
-func openLifecycleOriginalHistoricalWriteMaterials(ctx context.Context, r lifecycleRequest, uid uint32) (*lifecycleMaterialDirectory, error) {
-	if !lifecycleHistoricalWriteReferenceValid(r) {
-		return nil, lifecycleError("lifecycle_history_original_material_rejected")
-	}
-	return openLifecycleHistoricalWriteMaterialFiles(ctx, filepath.Dir(r.HistoricalWriteReport.Path), r, uid)
-}
-
 func openLifecycleHistoricalWriteMaterialFiles(ctx context.Context, path string, r lifecycleRequest, uid uint32) (owned *lifecycleMaterialDirectory, result error) {
 	if ctx == nil || ctx.Err() != nil || r.HistoricalWriteReport == nil || r.HistoricalWriteReport.Path != filepath.Join(path, "history.write.json") {
 		return nil, lifecycleError("lifecycle_history_original_material_rejected")
@@ -1412,12 +1396,6 @@ func lifecycleHistoricalRequestMatches(q lifecycleHistoricalRequestMaterial, r l
 		}
 	}
 	return true
-}
-func openLifecycleOriginalHistoricalWriteInputs(ctx context.Context, r lifecycleRequest, writer, inventory *lifecycleMaterialDirectory, uid uint32) (*lifecycleMaterialDirectory, []*lifecycleMaterialDirectory, error) {
-	if !lifecycleHistoricalWriteReferenceValid(r) || writer == nil || writer.path != filepath.Dir(r.HistoricalWriteReport.Path) {
-		return nil, nil, lifecycleError("lifecycle_history_original_material_rejected")
-	}
-	return openLifecycleHistoricalWriteInputFiles(ctx, r, writer, inventory, filepath.Dir(writer.path), uid)
 }
 
 // The operation parent is deliberately partial. Its three original inputs are

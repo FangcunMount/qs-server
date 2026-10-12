@@ -1,12 +1,15 @@
 package retirement
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +21,133 @@ import (
 
 	fence "github.com/FangcunMount/qs-server/internal/apiserver/maintenance/compatibilityretirementfence"
 )
+
+// The existing Docker dial-stdio reader consumes synthetic HTTP replies only.
+func TestAIStoppedNetworkDockerReply(t *testing.T) {
+	marker := -1
+	for i, value := range os.Args {
+		if value == "--ai-network-fixture" {
+			marker = i
+			break
+		}
+	}
+	if marker < 0 {
+		return
+	}
+	raw, err := base64.RawStdEncoding.DecodeString(os.Args[marker+1])
+	var fixture map[string]string
+	if err != nil || json.Unmarshal(raw, &fixture) != nil {
+		os.Exit(2)
+	}
+	args := os.Args[marker+2:]
+	if len(args) > 0 && args[0] == "inspect" {
+		if _, err := fmt.Fprintln(os.Stdout, fixture["inspect"]); err != nil {
+			os.Exit(2)
+		}
+	} else if len(args) > 0 && args[0] == "image" {
+		if _, err := fmt.Fprintln(os.Stdout, fixture["image"]); err != nil {
+			os.Exit(2)
+		}
+	} else {
+		request, err := http.ReadRequest(bufio.NewReader(os.Stdin))
+		if err != nil || request.Method != http.MethodGet {
+			os.Exit(2)
+		}
+		body := fixture["network"]
+		if strings.Contains(request.URL.Path, "/containers/") {
+			body = fixture["container"]
+		}
+		if _, err := fmt.Fprintf(os.Stdout, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(body), body); err != nil {
+			os.Exit(2)
+		}
+	}
+	os.Exit(0)
+}
+
+func aiStoppedNetworkFixtureProtocol(t *testing.T, fixture map[string]string) *aiStoppedDocker {
+	t.Helper()
+	raw, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	docker := &aiExternalDockerExecutor{executable: os.Args[0], prefix: []string{"-test.run=^TestAIStoppedNetworkDockerReply$", "--", "--ai-network-fixture", base64.RawStdEncoding.EncodeToString(raw)}}
+	return &aiStoppedDocker{docker: docker, wire: &aiExecDockerProtocol{docker: docker}}
+}
+
+func TestAIStoppedNetworkReaderAcceptsExactInfraAndKeepsBridgeContract(t *testing.T) {
+	infra := map[string]any{"Id": "m3tfd5h9sp5d1xmzht0ey0oql", "Driver": "overlay", "Scope": "swarm", "Attachable": true, "Internal": false}
+	for _, metadata := range []map[string]any{infra, {"Id": strings.Repeat("a", 64), "Driver": "bridge", "Scope": "local"}} {
+		p := aiStoppedNetworkFixtureProtocol(t, map[string]string{"network": string(aiJSONBytes(metadata))})
+		if err := p.network(context.Background(), metadata["Id"].(string)); err != nil {
+			t.Fatalf("observed network metadata rejected: %v", err)
+		}
+	}
+	for _, field := range []string{"Id", "Driver", "Scope", "Attachable", "Internal"} {
+		values := []any{nil}
+		switch field {
+		case "Id":
+			values = append(values, "n3tfd5h9sp5d1xmzht0ey0oql")
+		case "Driver":
+			values = append(values, "bridge")
+		case "Scope":
+			values = append(values, "local")
+		case "Attachable":
+			values = append(values, false, "true")
+		case "Internal":
+			values = append(values, true, "false")
+		}
+		for _, value := range values {
+			metadata := map[string]any{}
+			for name, original := range infra {
+				metadata[name] = original
+			}
+			metadata[field] = value
+			p := aiStoppedNetworkFixtureProtocol(t, map[string]string{"network": string(aiJSONBytes(metadata))})
+			if err := p.network(context.Background(), infra["Id"].(string)); err == nil {
+				t.Fatalf("changed/null network field admitted: %s", field)
+			}
+			delete(metadata, field)
+			p = aiStoppedNetworkFixtureProtocol(t, map[string]string{"network": string(aiJSONBytes(metadata))})
+			if err := p.network(context.Background(), infra["Id"].(string)); err == nil {
+				t.Fatalf("missing network field admitted: %s", field)
+			}
+		}
+	}
+	for _, id := range []string{"", "infra-network", "n3tfd5h9sp5d1xmzht0ey0oql", "m3tfd5h9sp5d1xmzht0ey0oql\n"} {
+		if (AIStoppedRuntimeConstraints{SettingsSHA256: strings.Repeat("a", 64), NetworkID: id}).Valid() {
+			t.Fatalf("unapproved network constraint admitted: %q", id)
+		}
+	}
+}
+
+func TestAIStoppedSnapshotKeepsActualNetworkIDAndRejectsMultipleNetworks(t *testing.T) {
+	cid, image, source := strings.Repeat("c", 64), "sha256:"+strings.Repeat("d", 64), strings.Repeat("a", 40)
+	started := "2026-10-09T00:00:00Z"
+	quote := func(value any) string { return string(aiJSONBytes(value)) }
+	projection := strings.Join([]string{quote(cid), quote(image), quote("/qs-ai"), quote("running"), quote(started), "true", "0", quote(source), "true", "null", quote([]string{"/app/.venv/bin/python", "-m", "qs_ai.bootstrap.server"}), "[]"}, "|")
+	for _, network := range []string{"m3tfd5h9sp5d1xmzht0ey0oql", strings.Repeat("b", 64)} {
+		metadata := map[string]any{"Id": cid, "Config": map[string]any{"Env": []string{"QS_AI_ENVIRONMENT=production", "QS_AI_RELEASE_SHA=" + source, "QS_AI_DATABASE_URL=mysql+asyncmy://synthetic"}}, "HostConfig": map[string]any{"RestartPolicy": map[string]any{"Name": "unless-stopped", "MaximumRetryCount": 0}}, "State": map[string]any{"Running": true, "Status": "running", "StartedAt": started, "Pid": 123}, "NetworkSettings": map[string]any{"Networks": map[string]any{"infra-network": map[string]any{"NetworkID": network}}}}
+		fixture := map[string]string{"container": quote(metadata), "inspect": projection, "image": quote(image) + "|" + quote(source)}
+		p := aiStoppedNetworkFixtureProtocol(t, fixture)
+		p.input = AIExternalExecutionInput{ContainerID: cid, ImageID: image, RuntimeSourceSHA: source}
+		snapshot, err := p.snapshot(context.Background(), cid)
+		if err != nil || snapshot.NetworkID != network {
+			t.Fatalf("original network ID rejected or rewritten: %v", err)
+		}
+		changed := snapshot
+		changed.NetworkID = strings.Repeat("e", 64)
+		if snapshot.immutableSame(changed) {
+			t.Fatal("changed original network ID remained equal")
+		}
+		metadata["NetworkSettings"].(map[string]any)["Networks"].(map[string]any)["other"] = map[string]any{"NetworkID": strings.Repeat("f", 64)}
+		fixture["container"] = quote(metadata)
+		p = aiStoppedNetworkFixtureProtocol(t, fixture)
+		p.input = AIExternalExecutionInput{ContainerID: cid, ImageID: image, RuntimeSourceSHA: source}
+		if _, err := p.snapshot(context.Background(), cid); err == nil {
+			t.Fatal("multiple original networks admitted")
+		}
+	}
+}
 
 // Private fake protocols prove ordering and fail-closed behavior only. They do
 // not create native Window/Docker evidence, production approval or a full fence.

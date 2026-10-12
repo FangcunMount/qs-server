@@ -22,6 +22,14 @@ import (
 
 var ErrAIStoppedRuntime SourceError = "ai_original_stopped_runtime_or_carrier_unproven"
 
+// This temporary batch observed this exact attachable infrastructure network.
+// Keep its original Engine ID; it is neither a digest nor a caller-selected name.
+const aiStoppedInfraNetworkID = "m3tfd5h9sp5d1xmzht0ey0oql"
+
+func aiStoppedNetworkIDValid(id string) bool {
+	return evidenceHash(id) || id == aiStoppedInfraNetworkID
+}
+
 // Independently approved constraints on actual reads, never imported stop proof.
 // NetworkID is the original Engine network ID; no caller chooses a network name,
 // database URL, settings, executable, Docker arguments or completion assertion.
@@ -31,7 +39,7 @@ type AIStoppedRuntimeConstraints struct {
 }
 
 func (v AIStoppedRuntimeConstraints) Valid() bool {
-	return evidenceHash(v.SettingsSHA256) && evidenceHash(v.NetworkID)
+	return evidenceHash(v.SettingsSHA256) && aiStoppedNetworkIDValid(v.NetworkID)
 }
 
 type aiStoppedSnapshot struct {
@@ -914,19 +922,29 @@ func (p *aiStoppedDocker) snapshot(ctx context.Context, cid string) (aiStoppedSn
 	for _, n := range v.NetworkSettings.Networks {
 		out.NetworkID = n.NetworkID
 	}
-	if !evidenceHash(out.NetworkID) {
+	if !aiStoppedNetworkIDValid(out.NetworkID) {
 		return out, ErrAIStoppedRuntime
 	}
 	out.ExitCode, out.PID, out.OOM, out.Dead, out.Paused, out.Restarting, out.ExecIDs = v.State.ExitCode, v.State.Pid, v.State.OOMKilled, v.State.Dead, v.State.Paused, v.State.Restarting, v.ExecIDs
 	return out, nil
 }
 func (p *aiStoppedDocker) network(ctx context.Context, id string) error {
+	if !aiStoppedNetworkIDValid(id) {
+		return ErrAIStoppedRuntime
+	}
 	raw, e := p.wire.ordinary(ctx, http.MethodGet, "/v"+aiExecAPIVersion+"/networks/"+id, nil, http.StatusOK)
 	var v struct {
 		ID            string `json:"Id"`
 		Driver, Scope string
+		Attachable    *bool
+		Internal      *bool
 	}
-	if e != nil || strictJSON(raw) != nil || json.Unmarshal(raw, &v) != nil || v.ID != id || v.Driver != "bridge" || v.Scope != "local" {
+	if e != nil || strictJSON(raw) != nil || json.Unmarshal(raw, &v) != nil || v.ID != id {
+		return ErrAIStoppedRuntime
+	}
+	bridge := evidenceHash(id) && v.Driver == "bridge" && v.Scope == "local"
+	infra := id == aiStoppedInfraNetworkID && v.Driver == "overlay" && v.Scope == "swarm" && v.Attachable != nil && *v.Attachable && v.Internal != nil && !*v.Internal
+	if !bridge && !infra {
 		return ErrAIStoppedRuntime
 	}
 	return nil

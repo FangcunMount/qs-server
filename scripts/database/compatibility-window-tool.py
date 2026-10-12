@@ -31,6 +31,7 @@ import zlib
 
 SHA = re.compile(r"[0-9a-f]{40}")
 HASH = re.compile(r"[0-9a-f]{64}")
+AI_STOPPED_INFRA_NETWORK_ID = "m3tfd5h9sp5d1xmzht0ey0oql"
 RUN = re.compile(r"[1-9][0-9]{0,19}-[1-9][0-9]{0,3}")
 TARGET = "4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8"
 STAGES = {"prepare", "apply", "verify", "recover", "purge"}
@@ -146,6 +147,12 @@ def exact(value, required, optional=()):
 def token(value, pattern):
     if type(value) is not str or pattern.fullmatch(value) is None:
         reject()
+
+
+def validate_ai_stopped_network_id(value):
+    if type(value) is str and value == AI_STOPPED_INFRA_NETWORK_ID:
+        return
+    token(value, HASH)
 
 
 def decode(raw):
@@ -344,7 +351,7 @@ def validate_final_history(value, operation):
         constraints=value["stop_constraints"]
         exact(constraints,("settings_sha256","network_id"))
         token(constraints["settings_sha256"],HASH)
-        token(constraints["network_id"],HASH)
+        validate_ai_stopped_network_id(constraints["network_id"])
     if not isinstance(value["image_id"], str) or not value["image_id"].startswith("sha256:"):
         reject("window_tool_final_history_rejected")
     token(value["image_id"][7:], HASH)

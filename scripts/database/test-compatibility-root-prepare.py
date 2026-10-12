@@ -243,6 +243,29 @@ class PrepareFactsBoundaries(unittest.TestCase):
         self.assertEqual(decoded['observed_ai_runtime']['image_id_sha256'],'3'*64)
         self.assertEqual(decoded['observed_ai_runtime']['stop_constraints']['network_id'],'7'*64)
         self.assertFalse(decoded['complete']);self.assertFalse(decoded['execution_allowed']);self.assertFalse(decoded['drop_ready'])
+    def test_actual_swarm_network_facts_armored_roundtrip_and_other_ids_reject(self):
+        args,_=self.args();request=tool.prepare_facts_request(args)
+        for network in ('m3tfd5h9sp5d1xmzht0ey0oql','7'*64):
+            native=self.receipt(args,request,'7'*64)
+            native['observed_ai_runtime']['stop_constraints']['network_id']=network
+            result=tool.validate_prepare_facts_result(native,args,request,'7'*64,0)
+            output=io.StringIO()
+            argv=['--operation','prepare','--operation-id',args.operation_id,'--approved-source-sha',args.actual_source_sha,
+                '--actual-source-sha',args.actual_source_sha,'--run-id',args.run_id,'--prepare-mode','prepare-facts']
+            with mock.patch.object(tool,'execute',return_value=result),mock.patch.dict(os.environ,{},clear=True),contextlib.redirect_stdout(output):
+                self.assertEqual(tool.main(argv),0)
+            decoded=json.loads(tool.transport().decode_armored_receipt(output.getvalue().strip()))
+            self.assertEqual(decoded['observed_ai_runtime']['stop_constraints']['network_id'],network)
+            self.assertFalse(decoded['complete']);self.assertFalse(decoded['execution_allowed']);self.assertFalse(decoded['drop_ready'])
+            main_node=next(node for node in ast.parse(Path(tool.__file__).read_bytes()).body if isinstance(node,ast.FunctionDef) and node.name=='main')
+            schema_node=next(node for node in main_node.body if isinstance(node,ast.Assign) and any(isinstance(target,ast.Name) and target.id=='schema' for target in node.targets))
+            schema=eval(compile(ast.Expression(schema_node.value),'<original-receipt-schema>','eval'),dict(tool.__dict__,receipt=result))
+            self.assertEqual(json.loads(tool.transport().decode_armored_receipt(tool.transport().encode_armored_receipt(result,schema=schema))),decoded)
+        for network in ('infra-network','n3tfd5h9sp5d1xmzht0ey0oql','',None,'m3tfd5h9sp5d1xmzht0ey0oql\n'):
+            native=self.receipt(args,request,'7'*64)
+            native['observed_ai_runtime']['stop_constraints']['network_id']=network
+            with self.subTest(network=network),self.assertRaises(tool.Blocked):
+                tool.validate_prepare_facts_result(native,args,request,'7'*64,0)
     def test_actual_action_ten_input_validator_accepts_only_observation_descriptor(self):
         node=shutil.which('node')
         if node is None:self.skipTest('node required for actual Action validator')
