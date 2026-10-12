@@ -22,7 +22,7 @@ import (
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 )
 
-const aiExternalHostSHA = "2c83079dc8466b8ccd61a832bc957cd52c538cc2ddda5ded6dcaad1ed1795bb3"
+const aiExternalHostSHA = "288e41f5d4e08645c16204f258ad12f5136e19a02264642bba44c78394e3bbfc"
 const aiExternalResultLimit = 32 << 20
 const aiExternalInputLimit = 16 << 20
 
@@ -487,7 +487,7 @@ func aiExternalAssets(directory string) (aiExternalAssetSet, error) {
 	if !filepath.IsAbs(directory) || filepath.Clean(directory) != directory {
 		return out, ErrAIExternalInput
 	}
-	files := map[string]string{"qs-ai-retirement-readonly-host.py": aiExternalHostSHA, "qs-ai-retirement-readonly-verifier.py": "6a7e746e313a1028bd54edc878947c74c262d0e47af6de32b6c032fea035cee9", "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a", "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f"}
+	files := map[string]string{"qs-ai-retirement-readonly-host.py": aiExternalHostSHA, "qs-ai-retirement-readonly-verifier.py": "04bcf8091efcc30916be9a92e0d277bc15ed1ee724a1cf478e144aa63f250910", "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a", "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f"}
 	for name, want := range files {
 		path := filepath.Join(directory, name)
 		fd, e := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)

@@ -363,6 +363,9 @@ def _private_json(value):
                       if isinstance(v, bytes) else fail("unsupported_private_value")).encode()
 
 
+_AI_TRANSACTION_OBSERVER = object()
+
+
 def _scanner(side, head):
     path = Path(__file__).with_name("qs-ai-retirement-readonly-observer.py")
     if sha(path.read_bytes()) != _OBSERVER_SHA:
@@ -388,6 +391,11 @@ def _scanner(side, head):
     module._binding = lambda reader, identity, source: _binding(reader, identity, source, side, head, module)
     original_reader = module._Borrowed
     class BoundedReader(original_reader):
+        def __init__(self, session, *, head=None):
+            super().__init__(session, head=head)
+            self._observer_required = _AI_TRANSACTION_OBSERVER in session.info
+            self._transaction_observer = session.info.get(_AI_TRANSACTION_OBSERVER)
+
         async def query(self, sql, params=None):
             rows = await super().query(sql, params)
             if " AS _source_row_bytes " in sql and sum(r[-1] for r in rows) > MAX_PAGE_BYTES:
@@ -395,6 +403,64 @@ def _scanner(side, head):
             return rows
     module._Borrowed = BoundedReader
     return module
+
+
+class _AITransactionObserver:
+    """Private same-server metadata reader; never an AI data reader or receipt."""
+    def __init__(self, ai, peer, bindings):
+        self.ai, self.peer, self.bindings = ai, peer, bindings
+
+    def __repr__(self):
+        return "<private AI transaction observer>"
+
+    async def validate(self, reader):
+        if reader.session is not self.ai.session or reader.tx is not self.ai.tx:
+            fail("transaction_observer_binding_changed")
+        try:
+            for view, binding in zip((self.ai, self.peer), self.bindings):
+                if await view.query("SELECT CAST(@@server_uuid AS BINARY),CONNECTION_ID()") != [binding]:
+                    fail("transaction_observer_binding_changed")
+            reader.validate()
+            self.peer.validate()
+        except Exception:
+            fail("transaction_observer_binding_changed")
+
+    async def current(self, reader):
+        await self.validate(reader)
+        connection_id = self.bindings[0][1]
+        try:
+            rows = await self.peer.query("SELECT p.PROCESSLIST_ID,t.ACCESS_MODE,t.ISOLATION_LEVEL,t.STATE FROM performance_schema.events_transactions_current t JOIN performance_schema.threads p ON p.THREAD_ID=t.THREAD_ID WHERE p.PROCESSLIST_ID=:ai_conn", {"ai_conn": connection_id})
+        except Exception:
+            fail("actual_readonly_snapshot_not_observed")
+        await self.validate(reader)
+        if rows != [(connection_id, "READ ONLY", "REPEATABLE READ", "ACTIVE")]:
+            fail("actual_readonly_snapshot_not_observed")
+        return [rows[0][1:]]
+
+
+async def _bind_ai_transaction_observer(ai_session, peer_session):
+    # The owned host calls this for every new epoch. None means required but
+    # not bound, so a failed/missing observer cannot fall back to the AI account.
+    ai_session.info[_AI_TRANSACTION_OBSERVER] = None
+    if ai_session is peer_session:
+        fail("transaction_observer_binding_changed")
+    ai = _scanner("ai", AI_HEAD)._Borrowed(ai_session)
+    peer = _scanner("peer", "1")._Borrowed(peer_session)
+    bindings = []
+    try:
+        for reader in (ai, peer):
+            rows = await reader.query("SELECT CAST(@@server_uuid AS BINARY),CONNECTION_ID()")
+            if (len(rows) != 1 or len(rows[0]) != 2 or not isinstance(rows[0][0], bytes)
+                    or not rows[0][0] or type(rows[0][1]) is not int or not 0 < rows[0][1] < 2**64):
+                fail("transaction_observer_binding_changed")
+            bindings.append(rows[0])
+    except Exception:
+        fail("transaction_observer_binding_changed")
+    if bindings[0][0] != bindings[1][0] or bindings[0][1] == bindings[1][1]:
+        fail("transaction_observer_binding_changed")
+    observer = _AITransactionObserver(ai, peer, tuple(bindings))
+    await observer.validate(ai)
+    ai_session.info[_AI_TRANSACTION_OBSERVER] = observer
 
 
 async def _binding(reader, identity, source, side, head, module):
@@ -406,7 +472,13 @@ async def _binding(reader, identity, source, side, head, module):
     if side == "ai" and head == "0040_module_table_names" and source != module._layout().SOURCE_SHA:
         fail("fixed_0040_source_revision_required")
     # Check the actual running server transaction, not only the session default.
-    current = await reader.query("SELECT t.ACCESS_MODE,t.ISOLATION_LEVEL,t.STATE FROM performance_schema.events_transactions_current t JOIN performance_schema.threads p ON p.THREAD_ID=t.THREAD_ID WHERE p.PROCESSLIST_ID=CONNECTION_ID()")
+    if side == "ai" and reader._observer_required:
+        observer = reader._transaction_observer
+        if not isinstance(observer, _AITransactionObserver):
+            fail("private_transaction_observer_required")
+        current = await observer.current(reader)
+    else:
+        current = await reader.query("SELECT t.ACCESS_MODE,t.ISOLATION_LEVEL,t.STATE FROM performance_schema.events_transactions_current t JOIN performance_schema.threads p ON p.THREAD_ID=t.THREAD_ID WHERE p.PROCESSLIST_ID=CONNECTION_ID()")
     if current != [("READ ONLY", "REPEATABLE READ", "ACTIVE")]:
         fail("actual_readonly_snapshot_not_observed")
     state = await reader.query("SELECT version_num FROM alembic_version ORDER BY version_num") if side == "ai" else await reader.query("SELECT version,dirty FROM schema_migrations")
