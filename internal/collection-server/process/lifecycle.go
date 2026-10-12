@@ -17,11 +17,7 @@ type lifecycleDeps struct {
 
 func (s *server) registerShutdownCallback(deps lifecycleDeps) {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-		if s.runtimeFacts != nil {
-			if err := s.runtimeFacts.Close(); err != nil {
-				log.Warn("private runtime facts cleanup incomplete")
-			}
-		}
+
 		runCollectionLifecycle(deps)
 		log.Info("🏗️  Collection Server shutdown complete")
 		return nil
@@ -67,13 +63,7 @@ func runCollectionLifecycle(deps lifecycleDeps) {
 }
 
 func (s preparedServer) Run() error {
-	if s.runtimeFacts != nil {
-		defer func() {
-			if err := s.runtimeFacts.Close(); err != nil {
-				log.Warn("private runtime facts cleanup incomplete")
-			}
-		}()
-	}
+
 	if s.startCache != nil {
 		if err := s.startCache(context.Background()); err != nil {
 			return err
@@ -85,11 +75,7 @@ func (s preparedServer) Run() error {
 		}
 	}
 	log.Info("🚦 Shutdown manager started, servers coming online")
-	if s.runtimeFacts != nil {
-		if err := s.runtimeFacts.Start(); err != nil {
-			log.Warn("private runtime facts unavailable")
-		}
-	}
+
 	log.Info("🚀 Starting Collection Server HTTP REST API server...")
 	return processruntime.RunGroup{
 		Services: []processruntime.ServiceRunner{
