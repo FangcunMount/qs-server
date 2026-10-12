@@ -1,17 +1,13 @@
 package aibridge
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 func TestRetirementEvidenceRejectsUnknownPermissionAndMixedDigestKinds(t *testing.T) {
@@ -69,59 +65,5 @@ func TestRetirementEvidenceRejectsUnknownPermissionAndMixedDigestKinds(t *testin
 	gap.Reason = "history_terminal_evidence_gap"
 	if err := gap.validate(false); err != nil {
 		t.Fatal("closed historical evidence gap incorrectly rejected", err)
-	}
-}
-
-// A custom wrapper may expose Commit/Rollback while its writes are unrelated to
-// the borrowed SQL transaction. Only the SDK's supported original pools qualify.
-type unrecognizedRetirementPool struct{ gorm.ConnPool }
-
-func (*unrecognizedRetirementPool) Commit() error   { return nil }
-func (*unrecognizedRetirementPool) Rollback() error { return nil }
-
-func TestRetirementPoolUsesOriginalSDKTransactionGate(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-	mock.ExpectBegin()
-	tx, err := db.BeginTx(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var nilSQL *sql.Tx
-	var nilPrepared *gorm.PreparedStmtTX
-	for _, scenario := range []struct {
-		name  string
-		pool  gorm.ConnPool
-		valid bool
-	}{
-		{"original_sql", tx, true},
-		{"original_prepared_sql", &gorm.PreparedStmtTX{Tx: tx}, true},
-		{"ordinary_pool", db, false},
-		{"unrecognized_wrapper", &unrecognizedRetirementPool{ConnPool: tx}, false},
-		{"typed_nil_sql", nilSQL, false},
-		{"typed_nil_prepared", nilPrepared, false},
-		{"prepared_typed_nil_sql", &gorm.PreparedStmtTX{Tx: nilSQL}, false},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			g := &gorm.DB{Statement: &gorm.Statement{ConnPool: scenario.pool}}
-			pool, err := retirementPool(g)
-			if scenario.valid {
-				if err != nil || pool != scenario.pool {
-					t.Fatal("original transaction was not retained", err)
-				}
-			} else if !errors.Is(err, app.ErrConflict) || pool != nil {
-				t.Fatal("unsupported transaction shape was accepted", err)
-			}
-		})
-	}
-	mock.ExpectRollback()
-	if err := tx.Rollback(); err != nil {
-		t.Fatal(err)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatal(err)
 	}
 }

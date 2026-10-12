@@ -17,6 +17,7 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 )
 
 // The normal host pool negotiates utf8mb3. Native fixtures using the driver's
@@ -68,39 +69,23 @@ func TestMQOriginalUTF8BytesSurviveNormalHostCharset(t *testing.T) {
 	mustMQ(t, f.tx(func(tx *sql.Tx) error { return f.receive(tx, message, nil) }))
 	answer := "回答🙂𐐷"
 	change := app.Change{CommandID: uuid.NewString(), SessionID: f.session, Actor: f.request.Actor, Action: "answer", ExpectedVersion: 1, QuestionID: event.QuestionID, Answer: &answer}
-	// Seed a historical source row explicitly; no runtime legacy writer remains.
-	mustMQ(t, seedLegacyChangeFixture(context.Background(), f.request.RequestID, change, original))
-	var payload []byte
-	mustMQ(t, db.QueryRow("SELECT CAST(payload AS BINARY) FROM ai_bridge_commands WHERE command_id=?", change.CommandID).Scan(&payload))
-	var roundtrip app.Change
-	mustMQ(t, json.Unmarshal(payload, &roundtrip))
-	if roundtrip.Answer == nil || *roundtrip.Answer != answer {
-		t.Fatal("retained original answer changed")
+	changeSeals := 0
+	commands.Seal = func(k pb.MessagingKind, id, agg, org, at string, b *pb.MessagingBody) (*app.PreparedMessaging, error) {
+		changeSeals++
+		return app.ProtectMessaging(k, id, agg, "", org, at, b, f.qsSign, f.aiCrypt.Public())
 	}
-	// A reviewed historical transfer must decode the same first Unicode source,
-	// retain its original hash and reuse its wire on repeated apply.
-	handoffSeals := 0
-	handoff := handoffFixture(f, &handoffSeals)
-	for i := 0; i < 2; i++ {
-		mustMQ(t, f.tx(func(tx *sql.Tx) error {
-			moved, err := handoff.StageSingle(context.Background(), tx, change.CommandID)
-			if err == nil && moved != (i == 0) {
-				return errors.New("historical Unicode transfer did not preserve first ownership")
-			}
-			return err
-		}))
+	mustMQ(t, commands.StageChange(context.Background(), f.request.RequestID, change))
+	mustMQ(t, commands.StageChange(context.Background(), f.request.RequestID, change))
+	if changeSeals != 1 {
+		t.Fatal("duplicate current command resealed", changeSeals)
 	}
-	if handoffSeals != 1 {
-		t.Fatal("historical duplicate resealed", handoffSeals)
-	}
-	_, changeHash, err := encode(change)
-	mustMQ(t, err)
-	var source []byte
-	mustMQ(t, db.QueryRow("SELECT source_payload,source_payload_hash FROM ai_messaging_legacy_commands WHERE command_id=?", change.CommandID).Scan(&source, &storedHash))
-	var transferred app.Change
-	mustMQ(t, json.Unmarshal(source, &transferred))
-	if transferred.Answer == nil || *transferred.Answer != answer || storedHash != changeHash {
-		t.Fatal("historical first source changed")
+	var retained []byte
+	var retainedHash string
+	mustMQ(t, db.QueryRow("SELECT body,body_sha256 FROM ai_messaging_outbox WHERE message_id=?", change.CommandID).Scan(&retained, &retainedHash))
+	var retainedBody pb.MessagingBody
+	mustMQ(t, proto.Unmarshal(retained, &retainedBody))
+	if retainedBody.GetChange().GetAnswer() != answer || messagingHash(retained) != retainedHash {
+		t.Fatal("current first command lost Unicode answer or original digest")
 	}
 
 	content, _ := json.Marshal(map[string]string{"schema_version": "ai-explanation-output/v1", "text": strings.Repeat("边界🙂", 11000)})
