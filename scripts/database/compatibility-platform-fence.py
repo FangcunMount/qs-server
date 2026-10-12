@@ -241,6 +241,16 @@ def _listed(api, suffix, key, maximum=1000):
     fail("platform_fence_coverage_rejected")
 
 
+def _managed_analysis_workflow(row):
+    # Match the native observer's exact repository-managed catalog identities.
+    # Only their active catalog state is exempt; nonterminal runs still block.
+    return (row.get("path"), row.get("name")) == {
+        214640618: ("dynamic/dependabot/update-graph", "Dependency Graph"),
+        264440496: ("dynamic/github-code-scanning/codeql", "CodeQL"),
+        343442498: ("dynamic/github-code-quality/codeql", "CodeQL - Code Quality"),
+    }.get(row.get("id"))
+
+
 def _snapshot(api, scope, run, quarantined):
     base = "/repos/" + REPO
     repository = api.call("GET", base)
@@ -267,7 +277,7 @@ def _snapshot(api, scope, run, quarantined):
         if wid == scope["workflow_id"]:
             if workflow["path"] != WORKFLOW or workflow["state"] != "active":
                 fail("platform_fence_identity_rejected")
-        elif quarantined and workflow["state"] == "active":
+        elif quarantined and workflow["state"] == "active" and not _managed_analysis_workflow(workflow):
             fail("platform_fence_entrypoint_open")
     queue = []
     for status in ("queued", "in_progress", "waiting", "pending", "requested"):
@@ -292,7 +302,7 @@ def _snapshot(api, scope, run, quarantined):
             fail("platform_fence_other_active_job")
     if len(matched) != 1:
         fail("platform_fence_coverage_rejected")
-    return {"workflows": {str(wid): {k: w[k] for k in ("id", "path", "state")} for wid, w in sorted(workflows.items())}, "job_id": matched[0], "actual_run_id": run}
+    return {"workflows": {str(wid): {**{k: w[k] for k in ("id", "path", "state")}, "name": w.get("name", "")} for wid, w in sorted(workflows.items())}, "job_id": matched[0], "actual_run_id": run}
 
 
 class WorkflowQuarantine:
@@ -314,7 +324,7 @@ class WorkflowQuarantine:
     def _expected_installed(self):
         expected = copy.deepcopy(self._original)
         for wid, row in expected["workflows"].items():
-            if int(wid) != self._scope["workflow_id"] and row["state"] == "active":
+            if int(wid) != self._scope["workflow_id"] and row["state"] == "active" and not _managed_analysis_workflow(row):
                 row["state"] = "disabled_manually"
         return expected
 
@@ -330,12 +340,12 @@ class WorkflowQuarantine:
             self._store.save("platform-install.intent.json", {"scope": self._scope, "actual_run_id": self._run, "original": original})
             self._original = original
             for wid, row in original["workflows"].items():
-                if int(wid) == self._scope["workflow_id"] or row["state"] != "active":
+                if int(wid) == self._scope["workflow_id"] or row["state"] != "active" or _managed_analysis_workflow(row):
                     continue
                 self._store.save("workflow-" + wid + ".disable.intent.json", row)
                 self._api.call("PUT", "/repos/" + REPO + "/actions/workflows/" + wid + "/disable", 204)
                 current = self._api.call("GET", "/repos/" + REPO + "/actions/workflows/" + wid)
-                if {k: current.get(k) for k in ("id", "path", "state")} != {**row, "state": "disabled_manually"}:
+                if {**{k: current.get(k) for k in ("id", "path", "state")}, "name": current.get("name", "")} != {**row, "state": "disabled_manually"}:
                     fail("platform_fence_mutation_unknown")
                 self._store.save("workflow-" + wid + ".disable.result.json", {"id": row["id"], "path": row["path"], "state": "disabled_manually"})
             observed = _snapshot(self._api, self._scope, self._run, True)
@@ -367,12 +377,12 @@ class WorkflowQuarantine:
         try:
             self._store.save("platform-restore.intent.json", {"actual_run_id": self._run, "original_sha256": digest(canonical(self._original))})
             for wid, row in self._original["workflows"].items():
-                if int(wid) == self._scope["workflow_id"] or row["state"] != "active":
+                if int(wid) == self._scope["workflow_id"] or row["state"] != "active" or _managed_analysis_workflow(row):
                     continue
                 self._store.save("workflow-" + wid + ".enable.intent.json", row)
                 self._api.call("PUT", "/repos/" + REPO + "/actions/workflows/" + wid + "/enable", 204)
                 current = self._api.call("GET", "/repos/" + REPO + "/actions/workflows/" + wid)
-                if {k: current.get(k) for k in ("id", "path", "state")} != row:
+                if {**{k: current.get(k) for k in ("id", "path", "state")}, "name": current.get("name", "")} != row:
                     fail("platform_fence_mutation_unknown")
                 self._store.save("workflow-" + wid + ".enable.result.json", row)
             observed = _snapshot(self._api, self._scope, self._run, False)

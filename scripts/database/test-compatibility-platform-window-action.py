@@ -231,6 +231,43 @@ class RunnerWindowTests(unittest.TestCase):
             # Each load owns its class; use the locally loaded transport below.
             T.encode_armored_receipt(dict(receipt, credentials={}), schema={"protocol":frozenset({"runner_platform_window_owner_v1"}),"error_category":frozenset({"platform_window_native_unknown"}),"whole_writer_fence_proven":"bool","drop_ready":"bool"})
 
+    def test_platform_refusal_preserves_only_fixed_categories_in_original_four_fields(self):
+        # The existing observer evaluates only emit's two literal assignments.
+        emit = next(n for n in ast.parse(Path(A.__file__).read_text()).body if isinstance(n, ast.FunctionDef) and n.name == "emit")
+        assignments = {n.targets[0].id: n.value for n in emit.body if isinstance(n, ast.Assign)}
+        env = {"frozenset": frozenset}
+        env["errors"] = eval(compile(ast.Expression(assignments["errors"]), "<public-errors>", "eval"), env)
+        schema = eval(compile(ast.Expression(assignments["schema"]), "<public-schema>", "eval"), env)
+        for category in A.PLATFORM_ERRORS:
+            with self.subTest(category=category), self.assertRaises(A.Rejected) as caught:
+                A.platform_refusal(P.Refused(category), P)
+            receipt = dict(protocol="runner_platform_window_owner_v1", error_category=str(caught.exception), whole_writer_fence_proven=False, drop_ready=False)
+            self.assertEqual(receipt["error_category"], category)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output): A.emit(receipt, ("private-fixture-body",))
+            decoded = json.loads(T.decode_armored_receipt(output.getvalue()))
+            T._validate(decoded, schema)
+            self.assertEqual(decoded, receipt)
+        for error in (P.Refused("private-fixture-body"), ValueError("platform_fence_remote_unknown")):
+            with self.subTest(kind=type(error).__name__), self.assertRaises(A.Rejected) as caught:
+                A.platform_refusal(error, P)
+            self.assertEqual(str(caught.exception), "platform_window_operation_unknown")
+
+    def test_original_scope_boundary_maps_platform_refused_before_creating_assets(self):
+        fixture = F.WindowToolMetadata()
+        approval = fixture.approval(fixture.request(), "apply")
+        approval["workflow_scope"]["job_name"] = A.JOB_NAME
+        modules = {"owned_platform": P, "owned_pin": object(), "owned_transport": T, "owned_window": W}
+        for category, expected in (("platform_fence_scope_rejected", "platform_fence_scope_rejected"), ("private-fixture-body", "platform_window_operation_unknown")):
+            with self.subTest(category=category), patch.dict(os.environ, {"RETIREMENT_TOOL_SOURCE_SHA": approval["tool_source_sha"]}, clear=True), \
+                 patch.object(A, "source_bytes", return_value=b"fixture"), \
+                 patch.object(A, "load", side_effect=lambda path, name: modules[name]), \
+                 patch.object(W, "approve", return_value=approval), \
+                 patch.object(P, "validate_scope", side_effect=P.Refused(category)), \
+                 self.assertRaises(A.Rejected) as caught:
+                A.run(ROOT, ROOT, ROOT)
+            self.assertEqual(str(caught.exception), expected)
+
 
 
 class RootPasswordClosedTransport(unittest.TestCase):

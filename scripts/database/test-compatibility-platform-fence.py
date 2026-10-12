@@ -29,6 +29,8 @@ class API:
         self.calls = []
         self.closed = False
         self.mutation = None
+        self.other_runs = []
+        self.workflow_reads = 0
         self.workflows = {10: {"id": 10, "path": M.WORKFLOW, "state": "active"},
             20: {"id": 20, "path": ".github/workflows/cd.yml", "state": "active"},
             30: {"id": 30, "path": ".github/workflows/historical.yml", "state": "disabled_inactivity"}}
@@ -54,11 +56,16 @@ class API:
                 "status": "in_progress", "path": M.WORKFLOW, "actor": {"id": 202}, "triggering_actor": {"id": 202},
                 "repository": repo, "head_repository": repo}
         if p.path == base + "/actions/workflows":
-            rows = list(self.workflows.values())
+            self.workflow_reads += 1
+            rows = copy.deepcopy(list(self.workflows.values()))
             if self.mutation == "extra_workflow":
                 rows.append({"id": 40, "path": "other", "state": "active"})
             if self.mutation == "unknown_state":
                 rows = copy.deepcopy(rows); rows[2]["state"] = "new_unknown_state"
+            if self.mutation == "managed_name_change" and self.workflow_reads > 1:
+                next(row for row in rows if row["id"] == 214640618)["name"] += " changed"
+            if self.mutation == "duplicate_managed":
+                rows.append(copy.deepcopy(self.workflows[214640618]))
             return {"total_count": len(rows), "workflows": copy.deepcopy(rows)}
         if p.path.startswith(base + "/actions/workflows/"):
             return copy.deepcopy(self.workflows[int(p.path.rsplit("/", 1)[1])])
@@ -69,6 +76,7 @@ class API:
             if self.mutation == status:
                 rows.append({"id": 901, "run_attempt": 1, "workflow_id": 20, "status": status, "head_sha": "c" * 40,
                     "repository": {"id": 200, "full_name": M.REPO}})
+            rows.extend(copy.deepcopy(row) for row in self.other_runs if row["status"] == status)
             return {"total_count": len(rows), "workflow_runs": rows}
         if p.path == base + "/actions/runs/900/attempts/1/jobs":
             rows = [{"id": 910, "run_id": 900, "name": self.s["job_name"], "head_sha": self.s["dispatcher_source_sha"],
@@ -115,6 +123,74 @@ class WorkflowQuarantineTests(unittest.TestCase):
         self.assertEqual([c for c in api.calls if c[0] == "PUT"], puts)
         self.assertTrue((path / "platform-install.intent.json").exists())
         self.assertTrue(api.closed)
+
+    def managed_fixture(self):
+        lease, api, path = self.fixture()
+        # Independently specify the same three actual identities as the native tests.
+        rows = [
+            {"id": 214640618, "path": "dynamic/dependabot/update-graph", "name": "Dependency Graph", "state": "active"},
+            {"id": 264440496, "path": "dynamic/github-code-scanning/codeql", "name": "CodeQL", "state": "active"},
+            {"id": 343442498, "path": "dynamic/github-code-quality/codeql", "name": "CodeQL - Code Quality", "state": "active"},
+        ]
+        api.workflows.update({row["id"]: row for row in rows})
+        lease._scope["workflow_ids"] = sorted(api.workflows)
+        return lease, api, path, rows
+
+    def test_managed_catalog_active_is_preserved_without_any_managed_put(self):
+        lease, api, _, rows = self.managed_fixture()
+        lease.install()
+        self.assertEqual(lease.check()["workflow_count"], len(lease._scope["workflow_ids"]))
+        lease.restore()
+        self.assertEqual([c[1] for c in api.calls if c[0] == "PUT"], [
+            "/repos/" + M.REPO + "/actions/workflows/20/disable",
+            "/repos/" + M.REPO + "/actions/workflows/20/enable",
+        ])
+        for row in rows:
+            self.assertEqual(api.workflows[row["id"]], row)
+
+    def test_managed_active_exception_requires_exact_id_path_and_name(self):
+        for index in range(3):
+            for field in ("id", "path", "path_prefix", "name"):
+                with self.subTest(index=index, field=field):
+                    lease, api, _, rows = self.managed_fixture()
+                    api.workflows[20]["state"] = "disabled_manually"
+                    row = rows[index]
+                    if field == "id":
+                        del api.workflows[row["id"]]
+                        row["id"] += 1
+                        api.workflows[row["id"]] = row
+                        lease._scope["workflow_ids"] = sorted(api.workflows)
+                    elif field == "path": row["path"] = ".github/workflows/codeql.yml"
+                    elif field == "path_prefix": row["path"] += "/other"
+                    else: row["name"] += " "
+                    with self.assertRaises(M.Refused): M._snapshot(api, lease._scope, "900-1", True)
+                    self.assertFalse(any(c[0] == "PUT" for c in api.calls))
+                    lease.close()
+
+    def test_managed_nonterminal_runs_are_never_exempt(self):
+        for wid in (214640618, 264440496, 343442498):
+            for status in ("queued", "waiting", "pending", "requested", "in_progress"):
+                for origin in ("current", "old_ref", "rerun"):
+                    with self.subTest(wid=wid, status=status, origin=origin):
+                        lease, api, _, _ = self.managed_fixture()
+                        api.other_runs = [{"id": 901, "run_attempt": 2 if origin == "rerun" else 1,
+                            "workflow_id": wid, "status": status,
+                            "head_sha": "c" * 40 if origin == "old_ref" else lease._scope["dispatcher_source_sha"],
+                            "repository": {"id": 200, "full_name": M.REPO}}]
+                        with self.assertRaises(M.Refused): lease.install()
+                        self.assertFalse(any(c[0] == "PUT" for c in api.calls))
+                        lease.close()
+
+    def test_managed_exception_preserves_catalog_and_two_snapshot_closure(self):
+        for mutation in ("missing_row", "missing_approved_id", "duplicate_managed", "managed_name_change"):
+            with self.subTest(mutation=mutation):
+                lease, api, _, _ = self.managed_fixture()
+                if mutation == "missing_row": del api.workflows[214640618]
+                elif mutation == "missing_approved_id": lease._scope["workflow_ids"].remove(214640618)
+                else: api.mutation = mutation
+                with self.assertRaises(M.Refused): lease.install()
+                self.assertFalse(any(c[0] == "PUT" for c in api.calls))
+                lease.close()
 
     def test_unknown_put_is_not_retried_or_restored(self):
         lease, api, path = self.fixture(); api.mutation = "lost_put_result"

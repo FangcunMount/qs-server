@@ -28,6 +28,20 @@ ASSETS = ("compatibility-window-tool.py", "receipt-transport.py", "inventory-lin
 LIMIT = 128 << 20
 OUTPUT_LIMIT = 256 << 10
 TIMEOUT = 114 * 60
+PLATFORM_ERRORS = frozenset({
+    "platform_fence_coverage_rejected", "platform_fence_credential_rejected",
+    "platform_fence_deadline_exceeded", "platform_fence_descriptor_budget_unproven",
+    "platform_fence_endpoint_rejected", "platform_fence_entrypoint_open",
+    "platform_fence_existing_or_unknown", "platform_fence_identity_rejected",
+    "platform_fence_live_lease_rejected", "platform_fence_mutation_unknown",
+    "platform_fence_old_ref_rejected", "platform_fence_operation_unknown",
+    "platform_fence_other_active_job", "platform_fence_other_active_run",
+    "platform_fence_redirect_rejected", "platform_fence_remote_unknown",
+    "platform_fence_runner_binding_rejected", "platform_fence_schema_rejected",
+    "platform_fence_scope_rejected", "platform_fence_snapshot_changed",
+    "platform_fence_store_busy", "platform_fence_store_changed",
+    "platform_fence_store_rejected", "platform_fence_store_unknown",
+})
 
 
 class Rejected(Exception):
@@ -36,6 +50,11 @@ class Rejected(Exception):
 
 def fail(category):
     raise Rejected(category)
+
+
+def platform_refusal(error, platform):
+    category = str(error)
+    fail(category if isinstance(error, platform.Refused) and category in PLATFORM_ERRORS else "platform_window_operation_unknown")
 
 
 def sha(raw):
@@ -387,7 +406,9 @@ def run(dispatcher_repo, tool_repo, binary_directory):
     approval = window.approve(approval_raw, approval_sha, dispatcher, env.get("RETIREMENT_OPERATION", ""), env.get("RETIREMENT_OPERATION_ID", ""), env.get("RETIREMENT_MANIFEST_SHA256", ""), env.get("RETIREMENT_TEMPLATE_SHA256", ""))
     if approval["stage"] == "prepare" or approval["tool_source_sha"] != tool_sha or approval["workflow_scope"]["job_name"] != JOB_NAME:
         fail("platform_window_scope_rejected")
-    scope = approval["workflow_scope"]; platform.validate_scope(scope)
+    scope = approval["workflow_scope"]
+    try: platform.validate_scope(scope)
+    except platform.Refused as error: platform_refusal(error, platform)
     fixed_entry = env.get("RETIREMENT_FIXED_WINDOW_ENTRY_SHA256", "")
     if type(fixed_entry) is not str or fixed_entry and re.fullmatch(r"[0-9a-f]{64}", fixed_entry) is None:
         fail("platform_window_packet_rejected")
@@ -468,6 +489,8 @@ def run(dispatcher_repo, tool_repo, binary_directory):
         else:
             fail("platform_window_native_unknown")
         return {"protocol": "runner_platform_window_owner_v1", "dispatcher_source_sha": dispatcher, "tool_source_sha": tool_sha, "operation_id": approval["operation_id"], "actual_run_id": run_id, "workflow_scope_sha256": platform.digest(platform.canonical(scope)), "platform_installed": installed, "platform_restored": restored, "native_channel_terminal": native_terminal, "native_disposition": reason, "native_stdout_sha256": sha(output), "whole_writer_fence_proven": False, "drop_ready": False}, code
+    except platform.Refused as error:
+        platform_refusal(error, platform)
     finally:
         # Unknown native/PUT/cleanup retains all registered assets and original
         # states. No generic finally enables workflows or adopts an old owner.
@@ -480,7 +503,20 @@ def run(dispatcher_repo, tool_repo, binary_directory):
 
 def emit(result, secrets):
     transport = load(Path(__file__).resolve().parents[1] / "dbops/receipt-transport.py", "runner_receipt")
-    errors = frozenset({"platform_window_source_rejected", "platform_window_package_rejected", "platform_window_native_unknown", "platform_window_scope_rejected", "platform_window_route_rejected", "platform_window_transfer_unknown", "platform_window_packet_rejected", "platform_window_identity_cleanup_unknown", "platform_window_operation_unknown"})
+    # Keep this literal independently extractable by the existing public reader.
+    errors = frozenset({"platform_window_source_rejected", "platform_window_package_rejected", "platform_window_native_unknown", "platform_window_scope_rejected", "platform_window_route_rejected", "platform_window_transfer_unknown", "platform_window_packet_rejected", "platform_window_identity_cleanup_unknown", "platform_window_operation_unknown",
+        "platform_fence_coverage_rejected", "platform_fence_credential_rejected",
+        "platform_fence_deadline_exceeded", "platform_fence_descriptor_budget_unproven",
+        "platform_fence_endpoint_rejected", "platform_fence_entrypoint_open",
+        "platform_fence_existing_or_unknown", "platform_fence_identity_rejected",
+        "platform_fence_live_lease_rejected", "platform_fence_mutation_unknown",
+        "platform_fence_old_ref_rejected", "platform_fence_operation_unknown",
+        "platform_fence_other_active_job", "platform_fence_other_active_run",
+        "platform_fence_redirect_rejected", "platform_fence_remote_unknown",
+        "platform_fence_runner_binding_rejected", "platform_fence_schema_rejected",
+        "platform_fence_scope_rejected", "platform_fence_snapshot_changed",
+        "platform_fence_store_busy", "platform_fence_store_changed",
+        "platform_fence_store_rejected", "platform_fence_store_unknown"})
     schema = {"protocol": frozenset({"runner_platform_window_owner_v1"}), "dispatcher_source_sha": "sha40", "tool_source_sha": "sha40", "operation_id": "run_id", "actual_run_id": "run_id", "workflow_scope_sha256": "hash64", "platform_installed": "bool", "platform_restored": "bool", "native_channel_terminal": "bool", "native_disposition": frozenset({"native_preflight_refused", "native_completed", "native_recovered"}), "native_stdout_sha256": "hash64", "whole_writer_fence_proven": "bool", "drop_ready": "bool", "error_category": errors}
     print(transport.encode_armored_receipt(result, schema=schema, secrets=secrets))
 
