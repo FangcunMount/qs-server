@@ -3,7 +3,7 @@
   "checkout_ref": "git:HEAD",
   "source_baseline": {
     "sha": "ea61f987c424e10dcce02dc55cf5b0786efe3fe8",
-    "verified_on": "2026-10-11"
+    "verified_on": "2026-10-13"
   },
   "status_policy": {
     "doc_status": [
@@ -7122,6 +7122,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/migrations/**/*"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/bootstrap/database.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
         }
       ],
       "verification": [
@@ -7139,7 +7147,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "R4 is prepared locally against source 23905ecfebcb0db26e07d71c0d76eddd6873b595. Actual four-target absence, B deployment and acceptance, exact temporary-material purge and restored settings remain independently required before publishing this source exit. Cancelled historical migration and backfill are not prerequisites."
+          "The owner authorized direct root deletion of the four legacy objects followed by the final R4 ordinary three-service release and paired migration to MySQL100/MongoDB39. Existing precise backups are retained; historical migration, full restore rehearsal and the old native-window acceptance are not prerequisites. Direct deletion, final R4 deployment/runtime acceptance, exact temporary-material exit and original settings restoration remain pending; the failed old run38316933488-1 proves none of those outcomes."
         ]
       },
       "gaps": [
@@ -8359,6 +8367,14 @@
         {
           "kind": "source",
           "path": "docs/infrastructure-production-evidence.json"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/bootstrap/database.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
         }
       ],
       "verification": [],
@@ -8370,7 +8386,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance."
+          "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance.",
+          "The owner authorized direct root deletion of the four legacy objects followed by the final R4 ordinary three-service release and paired migration to MySQL100/MongoDB39. Existing precise backups are retained; historical migration, full restore rehearsal and the old native-window acceptance are not prerequisites. Direct deletion, final R4 deployment/runtime acceptance, exact temporary-material exit and original settings restoration remain pending; the failed old run38316933488-1 proves none of those outcomes."
         ]
       },
       "gaps": [
@@ -11283,6 +11300,14 @@
         {
           "kind": "source",
           "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/bootstrap/database.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
         }
       ],
       "verification": [],
@@ -11292,7 +11317,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "R4 is prepared locally against source 23905ecfebcb0db26e07d71c0d76eddd6873b595. Actual four-target absence, B deployment and acceptance, exact temporary-material purge and restored settings remain independently required before publishing this source exit. Cancelled historical migration and backfill are not prerequisites."
+          "The owner authorized direct root deletion of the four legacy objects followed by the final R4 ordinary three-service release and paired migration to MySQL100/MongoDB39. Existing precise backups are retained; historical migration, full restore rehearsal and the old native-window acceptance are not prerequisites. Direct deletion, final R4 deployment/runtime acceptance, exact temporary-material exit and original settings restoration remain pending; the failed old run38316933488-1 proves none of those outcomes."
         ]
       },
       "gaps": [
@@ -11300,36 +11325,36 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "R4 candidate removes the registered one-time tools and their exclusive tests. Current EventEvidence, standard Outbox, current MQ retirement protection and historical migrations remain. This candidate is rebound to actual main 23905ecfebcb0db26e07d71c0d76eddd6873b595; no production acceptance or material-zero result is claimed. Original implementation and proof identities remain in the fixed B Git snapshot. Final source CI and actual production receipts remain pending.",
-          "exit_criteria": "Review the final source exit, run its required checks, and separately bind actual four-target absence, non-target baseline, B deployment and runtime acceptance, batch-only material zero and restored settings before publishing."
+          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
+          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
         },
         {
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "R4 candidate removes the registered one-time tools and their exclusive tests. Current EventEvidence, standard Outbox, current MQ retirement protection and historical migrations remain. This candidate is rebound to actual main 23905ecfebcb0db26e07d71c0d76eddd6873b595; no production acceptance or material-zero result is claimed. Original implementation and proof identities remain in the fixed B Git snapshot. Final source CI and actual production receipts remain pending.",
-          "exit_criteria": "Review the final source exit, run its required checks, and separately bind actual four-target absence, non-target baseline, B deployment and runtime acceptance, batch-only material zero and restored settings before publishing."
+          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
+          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
         },
         {
           "id": "b_combined_snapshot_and_native_fence_pending",
           "kind": "source-lag",
           "severity": "medium",
-          "summary": "R4 candidate removes the registered one-time tools and their exclusive tests. Current EventEvidence, standard Outbox, current MQ retirement protection and historical migrations remain. This candidate is rebound to actual main 23905ecfebcb0db26e07d71c0d76eddd6873b595; no production acceptance or material-zero result is claimed. Original implementation and proof identities remain in the fixed B Git snapshot. Final source CI and actual production receipts remain pending.",
-          "exit_criteria": "Review the final source exit, run its required checks, and separately bind actual four-target absence, non-target baseline, B deployment and runtime acceptance, batch-only material zero and restored settings before publishing."
+          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
+          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
         },
         {
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "R4 candidate removes the registered one-time tools and their exclusive tests. Current EventEvidence, standard Outbox, current MQ retirement protection and historical migrations remain. This candidate is rebound to actual main 23905ecfebcb0db26e07d71c0d76eddd6873b595; no production acceptance or material-zero result is claimed. Original implementation and proof identities remain in the fixed B Git snapshot. Final source CI and actual production receipts remain pending.",
-          "exit_criteria": "Review the final source exit, run its required checks, and separately bind actual four-target absence, non-target baseline, B deployment and runtime acceptance, batch-only material zero and restored settings before publishing."
+          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
+          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
         },
         {
           "id": "DOC-RETIREMENT-MERGE-SELECTOR-20261010",
           "kind": "verification",
           "severity": "medium",
-          "summary": "R4 candidate removes the registered one-time tools and their exclusive tests. Current EventEvidence, standard Outbox, current MQ retirement protection and historical migrations remain. This candidate is rebound to actual main 23905ecfebcb0db26e07d71c0d76eddd6873b595; no production acceptance or material-zero result is claimed. Original implementation and proof identities remain in the fixed B Git snapshot. Final source CI and actual production receipts remain pending.",
-          "exit_criteria": "Review the final source exit, run its required checks, and separately bind actual four-target absence, non-target baseline, B deployment and runtime acceptance, batch-only material zero and restored settings before publishing.",
+          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
+          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt.",
           "historical_evidence": [
             {
               "kind": "source_selector",
@@ -11353,8 +11378,8 @@
           "id": "r4-source-exit-document-update",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "R4 candidate removes the registered one-time tools and their exclusive tests. Current EventEvidence, standard Outbox, current MQ retirement protection and historical migrations remain. This candidate is rebound to actual main 23905ecfebcb0db26e07d71c0d76eddd6873b595; no production acceptance or material-zero result is claimed. Original implementation and proof identities remain in the fixed B Git snapshot. Final source CI and actual production receipts remain pending.",
-          "exit_criteria": "Review the final source exit, run its required checks, and separately bind actual four-target absence, non-target baseline, B deployment and runtime acceptance, batch-only material zero and restored settings before publishing."
+          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
+          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
         }
       ]
     },
