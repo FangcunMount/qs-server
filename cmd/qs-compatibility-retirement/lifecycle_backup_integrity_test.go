@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,8 +116,11 @@ func TestBackupIntegrityStagingKeepsSourceBindingsWithoutRestoreClaims(t *testin
 			if err != nil || d == nil || peer == nil {
 				t.Fatalf("explicit backup-only source handoff rejected: %v", err)
 			}
-			defer d.close()
-			defer peer.close()
+			t.Cleanup(func() {
+				if err := errors.Join(d.close(), peer.close()); err != nil {
+					t.Error(err)
+				}
+			})
 			if err := d.checkComplete(false); err != nil {
 				t.Fatal(err)
 			}
