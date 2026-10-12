@@ -42,6 +42,11 @@ def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def ssh_identity_bytes(key):
+    raw = key.replace("\r\n", "\n").encode("ascii")
+    return raw if raw.endswith(b"\n") else raw + b"\n"
+
+
 def load(path, name):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -413,7 +418,7 @@ def run(dispatcher_repo, tool_repo, binary_directory):
         fd = os.open(archive, os.O_RDONLY | os.O_NOFOLLOW); os.fsync(fd); os.close(fd)
         private_route = {k: v for k, v in route.items() if k != "key"}
         identity_assets.append(IdentityAsset(assets / "route.json", platform.canonical(private_route)))
-        identity_assets.append(IdentityAsset(assets / "ssh.key", route["key"].encode("ascii")))
+        identity_assets.append(IdentityAsset(assets / "ssh.key", ssh_identity_bytes(route["key"])))
         # Existing pin helper, copied from the actual dispatcher Git object.
         identity_assets.append(IdentityAsset(assets / "pin.py", source_bytes(dispatcher_repo, dispatcher, "scripts/database/compatibility-host-inventory-action.py")))
         if any(c.isspace() or c in "\"'`$\\" for c in str(assets)): fail("platform_window_route_rejected")

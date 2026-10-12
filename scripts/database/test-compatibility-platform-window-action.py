@@ -144,6 +144,33 @@ class RunnerWindowTests(unittest.TestCase):
         with self.assertRaises(A.Rejected):
             A.collect_owned([sys.executable, "-I", "-c", "import time; time.sleep(.2)"], packet=b"x" * (1 << 20), timeout=.05)
 
+    def test_actual_openssh_key_format_missing_lf_and_crlf_preserve_public_key(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve(); directory.chmod(0o700)
+            original = directory / "original.key"
+            generated = subprocess.run(["/usr/bin/ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "qs-retirement-format-test", "-f", str(original)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+            self.assertEqual(generated.returncode, 0)
+            raw = original.read_bytes()
+            self.assertTrue(raw.endswith(b"\n") and not raw.endswith(b"\n\n"))
+            public = subprocess.run(["/usr/bin/ssh-keygen", "-y", "-f", str(original)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+            self.assertEqual(public.returncode, 0)
+            missing = directory / "missing-lf.key"; missing.write_bytes(raw[:-1]); missing.chmod(0o600)
+            rejected = subprocess.run(["/usr/bin/ssh-keygen", "-y", "-f", str(missing)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+            self.assertNotEqual(rejected.returncode, 0)
+            for case, value in (("missing-lf", raw[:-1]), ("complete-lf", raw), ("crlf", raw.replace(b"\n", b"\r\n"))):
+                with self.subTest(case=case):
+                    normalized = A.ssh_identity_bytes(value.decode("ascii"))
+                    self.assertTrue(normalized == raw, "normalized key changed beyond line endings")
+                    asset = A.IdentityAsset(directory / (case + ".normalized.key"), normalized)
+                    try:
+                        parsed = subprocess.run(["/usr/bin/ssh-keygen", "-y", "-f", str(asset.path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+                        self.assertEqual(parsed.returncode, 0)
+                        self.assertEqual(parsed.stdout, public.stdout)
+                        asset.remove()
+                    finally:
+                        asset.close()
+
     def test_exact_owned_ephemeral_identity_inode_cleanup_and_unknown_retention(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary).resolve(); directory.chmod(0o700)
