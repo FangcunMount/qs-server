@@ -18,10 +18,326 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"text/template"
 	"time"
 )
+
+type prepareFactsDirectoryOwnerInfo struct {
+	os.FileInfo
+	uid, gid uint32
+}
+
+func (i prepareFactsDirectoryOwnerInfo) Sys() any {
+	st := *i.FileInfo.Sys().(*syscall.Stat_t)
+	st.Uid, st.Gid = i.uid, i.gid
+	return &st
+}
+
+func TestPrepareFactsSharedKeyAncestorOwnershipIsExact(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Lstat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign := prepareFactsDirectoryOwnerInfo{FileInfo: st, uid: 12345, gid: 12346}
+	key := "/data/infra/qs-server-messaging/versions/mq-v1/qs.encrypt.v1.json"
+	for _, test := range []struct {
+		name, path, directory string
+		allowed               bool
+	}{
+		{"shared_data", key, "/data", true},
+		{"shared_infra", key, "/data/infra", true},
+		{"messaging_root", key, "/data/infra/qs-server-messaging", false},
+		{"versions", key, "/data/infra/qs-server-messaging/versions", false},
+		{"version", key, "/data/infra/qs-server-messaging/versions/mq-v1", false},
+		{"other_shared_parent", key, "/opt", false},
+		{"other_key_tree", "/data/infra/other/versions/mq-v1/qs.encrypt.v1.json", "/data", false},
+		{"other_role", "/data/infra/qs-server-messaging/versions/mq-v1/unrelated.json", "/data", false},
+		{"bad_revision", "/data/infra/qs-server-messaging/versions/MQ-V1/qs.encrypt.v1.json", "/data", false},
+		{"nested_leaf", "/data/infra/qs-server-messaging/versions/mq-v1/nested/qs.encrypt.v1.json", "/data", false},
+		{"release_asset", "/opt/qs-server/qs-apiserver/ai-mq-releases/source/binding.json", "/data", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := prepareFactsKeyDirectoryAllowed(test.path, test.directory, 2000, foreign); got != test.allowed {
+				t.Fatalf("directory owner decision=%v, want %v", got, test.allowed)
+			}
+		})
+	}
+	for _, mode := range []os.FileMode{0775, 0757, 0777 | os.ModeSticky} {
+		if err := os.Chmod(dir, mode); err != nil {
+			t.Fatal(err)
+		}
+		writable, err := os.Lstat(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if prepareFactsKeyDirectoryAllowed(key, "/data", 2000, prepareFactsDirectoryOwnerInfo{FileInfo: writable, uid: 12345, gid: 12346}) {
+			t.Fatal("writable shared ancestor accepted")
+		}
+	}
+	link := filepath.Join(t.TempDir(), "ancestor")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	symlink, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepareFactsKeyDirectoryAllowed(key, "/data", 2000, symlink) || prepareFactsKeyDirectoryAllowed(key, "/data", 2000, nil) {
+		t.Fatal("missing or symlink ancestor accepted")
+	}
+}
+
+func TestPrepareFactsMQInspectIgnoresOnlyMountOrder(t *testing.T) {
+	mount := func(source, destination string) map[string]any {
+		return map[string]any{"Type": "bind", "Source": source, "Destination": destination, "RW": false, "Mode": "ro", "Propagation": "rprivate", "unknown": map[string]any{"retained": true}}
+	}
+	value := map[string]any{"id": strings.Repeat("1", 64), "image": "sha256:" + strings.Repeat("2", 64), "pid": 123, "user": "www", "running": true, "name": "/qs-apiserver", "service": "qs-apiserver", "entrypoint": []string{"/app/qs-apiserver"}, "command": []string{"--config=/app/configs/apiserver.prod.yaml"}, "source_sha": strings.Repeat("3", 40), "mounts": []any{mount("/original/config", "/app/configs/apiserver.prod.yaml"), mount("/original/key", "/run/qs-server-jose/qs.sign.v1.json")}}
+	before, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mutation := range []string{"mount_order", "source", "type", "rw", "propagation", "extra_mount_field", "destination", "duplicate_destination", "uid", "pid", "source_sha", "image", "running", "id", "command", "unknown_top_field", "missing_mounts", "null_mounts"} {
+		t.Run(mutation, func(t *testing.T) {
+			var after map[string]any
+			if err := json.Unmarshal(before, &after); err != nil {
+				t.Fatal(err)
+			}
+			mounts := after["mounts"].([]any)
+			first := mounts[0].(map[string]any)
+			switch mutation {
+			case "mount_order":
+				mounts[0], mounts[1] = mounts[1], mounts[0]
+			case "source":
+				first["Source"] = "/changed/key"
+			case "type":
+				first["Type"] = "volume"
+			case "rw":
+				first["RW"] = true
+			case "propagation":
+				first["Propagation"] = "rshared"
+			case "extra_mount_field":
+				first["unknown"].(map[string]any)["retained"] = false
+			case "destination":
+				first["Destination"] = "/changed/destination"
+			case "duplicate_destination":
+				first["Destination"] = mounts[1].(map[string]any)["Destination"]
+			case "uid":
+				after["user"] = "1002"
+			case "pid":
+				after["pid"] = 456
+			case "source_sha":
+				after["source_sha"] = strings.Repeat("4", 40)
+			case "image":
+				after["image"] = "sha256:" + strings.Repeat("5", 64)
+			case "running":
+				after["running"] = false
+			case "id":
+				after["id"] = strings.Repeat("6", 64)
+			case "command":
+				after["command"] = []string{"--different"}
+			case "unknown_top_field":
+				after["new_field"] = true
+			case "missing_mounts":
+				delete(after, "mounts")
+			case "null_mounts":
+				after["mounts"] = nil
+			}
+			raw, err := json.Marshal(after)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := prepareFactsSameMQInspect(before, raw); got != (mutation == "mount_order") {
+				t.Fatalf("inspect equality=%v", got)
+			}
+		})
+	}
+	for _, malformed := range [][]byte{[]byte(`{"mounts":[],"mounts":[]}`), []byte(`{"mounts":[{"Destination":"/a","Destination":"/b"}]}`), []byte(`{"mounts":[{}]}`), []byte(`{"mounts":null}`), []byte(`{"mounts":[]}{}`)} {
+		if prepareFactsSameMQInspect(malformed, malformed) {
+			t.Fatal("ambiguous inspect accepted")
+		}
+	}
+}
+
+func TestPrepareFactsKeyDirectoryIdentityRecheck(t *testing.T) {
+	for _, mutation := range []string{"unchanged", "mode", "replaced", "symlink"} {
+		t.Run(mutation, func(t *testing.T) {
+			parent := t.TempDir()
+			path := filepath.Join(parent, "ancestor")
+			if err := os.Mkdir(path, 0755); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.Lstat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch mutation {
+			case "mode":
+				if err := os.Chmod(path, 0750); err != nil {
+					t.Fatal(err)
+				}
+			case "replaced", "symlink":
+				retained := filepath.Join(parent, "retained")
+				if err := os.Rename(path, retained); err != nil {
+					t.Fatal(err)
+				}
+				if mutation == "replaced" {
+					if err := os.Mkdir(path, 0755); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := os.Symlink(retained, path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := prepareFactsKeyDirectoriesUnchanged(map[string]os.FileInfo{path: before}); got != (mutation == "unchanged") {
+				t.Fatalf("ancestor identity equal=%v", got)
+			}
+		})
+	}
+}
+
+func TestPrepareFactsSharedKeyAncestorsLinuxRootFixture(t *testing.T) {
+	const enabled = "QS_RETIREMENT_TEST_SHARED_KEY_ANCESTORS"
+	if os.Getenv(enabled) == "" {
+		t.Skip("explicit isolated Linux root fixture required")
+	}
+	if os.Getenv(enabled) != "1" || runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 {
+		t.Fatal("fixture requires explicit switch and Linux root")
+	}
+	mountInfo, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	isolated := map[string]bool{}
+	for _, line := range strings.Split(string(mountInfo), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 10 {
+			continue
+		}
+		separator := -1
+		for i, field := range fields {
+			if field == "-" {
+				separator = i
+				break
+			}
+		}
+		if separator < 6 || separator+1 >= len(fields) {
+			continue
+		}
+		if fields[4] == "/" {
+			isolated["root_readonly"] = strings.Contains(","+fields[5]+",", ",ro,")
+		}
+		if fields[4] == "/data" || fields[4] == "/tmp" {
+			isolated[fields[4]] = fields[3] == "/" && fields[separator+1] == "tmpfs"
+		}
+	}
+	status, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(status), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "CapEff:" {
+			isolated["only_chown"] = fields[1] == "0000000000000001"
+		}
+	}
+	contents, err := os.ReadDir("/data")
+	if err != nil || len(contents) != 0 || !isolated["root_readonly"] || !isolated["/data"] || !isolated["/tmp"] || !isolated["only_chown"] {
+		t.Fatal("fixture requires empty independent /data tmpfs, /tmp tmpfs, readonly rootfs and only CAP_CHOWN")
+	}
+	const readerUID = uint32(2000)
+	const foreignUID, foreignGID = 12345, 12346
+	version := "/data/infra/qs-server-messaging/versions/mq-v1"
+	key := version + "/qs.encrypt.v1.json"
+	if err := os.MkdirAll(version, 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chown("/data", 0, 0); err != nil {
+			t.Error(err)
+		}
+		for _, path := range []string{"/data/infra", "/data/retained-infra"} {
+			if err := os.Chown(path, 0, 0); err != nil && !errors.Is(err, os.ErrNotExist) {
+				t.Error(err)
+			}
+			if err := os.RemoveAll(path); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	if err := os.WriteFile(key, []byte(`{"fixture":"synthetic-only"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/data", "/data/infra"} {
+		if err := os.Chmod(path, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chown(path, foreignUID, foreignGID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, raw, err := prepareFactsKeyFile(key, readerUID, true, 16384)
+	if err != nil || f == nil || string(raw) != `{"fixture":"synthetic-only"}` {
+		t.Fatal("real cross-UID shared ancestors rejected", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	rejected := func() {
+		t.Helper()
+		f, raw, err := prepareFactsKeyFile(key, readerUID, true, 16384)
+		if err == nil || f != nil || raw != nil {
+			t.Fatal("unsafe real key ancestry accepted")
+		}
+	}
+	if err := os.Chown(version, foreignUID, foreignGID); err != nil {
+		t.Fatal(err)
+	}
+	rejected()
+	if err := os.Chown(version, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	// Regain ownership only within this isolated test tmpfs to alter the fixture.
+	if err := os.Chown("/data", 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod("/data", 0757); err != nil {
+		t.Fatal(err)
+	}
+	rejected()
+	if err := os.Chmod("/data", 0755); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Lstat("/data/infra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename("/data/infra", "/data/retained-infra"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/data/retained-infra", "/data/infra"); err != nil {
+		t.Fatal(err)
+	}
+	rejected()
+	if prepareFactsKeyDirectoriesUnchanged(map[string]os.FileInfo{"/data/infra": before}) {
+		t.Fatal("real symlink ancestor replacement accepted")
+	}
+	if err := os.Remove("/data/infra"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir("/data/infra", 0755); err != nil {
+		t.Fatal(err)
+	}
+	if prepareFactsKeyDirectoriesUnchanged(map[string]os.FileInfo{"/data/infra": before}) {
+		t.Fatal("real directory inode replacement accepted")
+	}
+	rejected()
+}
 
 func prepareFactsRequestFixture(t *testing.T) prepareFactsRequest {
 	t.Helper()
