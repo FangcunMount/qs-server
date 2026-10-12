@@ -2262,6 +2262,12 @@ def root_once_lifecycle_prepare(args):
     return result.returncode,result.stdout
 
 
+def lifecycle_preparation_policy(value):
+    if type(value) is not str or value not in ("", "tested_restore_v1", "backup_integrity_only_v1"):
+        fail("lifecycle_preparation_policy_rejected")
+    return value or "tested_restore_v1"
+
+
 def live_lifecycle(args, directory):
     """Invoke the fixed native caller; a DTO never supplies its host adapters."""
     if args.operation != "prepare":
@@ -2272,7 +2278,8 @@ def live_lifecycle(args, directory):
     fields(request, ("format_version", "kind", "history_policy", "tool_source_sha", "original_source_sha",
         "operation_id", "actual_run_id", "manifest_sha256", "archive_directory",
         "window_directory", "journal_directory", "archive_approval", "recovery"),
-        ("source_directory", "restore_engines", "source_file_sha256", "storage_backup"))
+        ("source_directory", "restore_engines", "source_file_sha256", "storage_backup", "preparation_policy"))
+    policy = lifecycle_preparation_policy(request.get("preparation_policy", ""))
     token(request["original_source_sha"], SHA)
     if (request["format_version"] != 1 or request["kind"] != "compatibility_retirement_lifecycle_request" or
         request["history_policy"] != "discard_legacy_history_keep_current_responsibility_v1" or request["tool_source_sha"] != args.actual_source_sha or request["operation_id"] != args.operation_id or
@@ -2306,7 +2313,11 @@ def live_lifecycle(args, directory):
         "target_hash", "target_count", "complete", "execution_allowed", "drop_ready",
         "archive_binding_complete", "recovery_attempted", "recovery_complete", "acceptance_complete",
         "purge_complete", "error_category", "required_adapters", "isolated_content_restore_complete", "restore_elapsed_millis")
-    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256"))
+    fields(result, required, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256", "preparation_policy", "backup_integrity_complete"))
+    if lifecycle_preparation_policy(result.get("preparation_policy", "")) != policy or "backup_integrity_complete" in result and type(result["backup_integrity_complete"]) is not bool:
+        fail("lifecycle_native_receipt_binding_rejected")
+    if policy == "tested_restore_v1" and result.get("backup_integrity_complete", False):
+        fail("lifecycle_native_receipt_rejected")
     if (result["format_version"] != 1 or result["kind"] != "compatibility_retirement_lifecycle_result" or
         result["operation"] != args.operation or result["source_sha"] != args.actual_source_sha or
         result["original_source_sha"] != request["original_source_sha"] or result["operation_id"] != args.operation_id or
@@ -2333,7 +2344,10 @@ def live_lifecycle(args, directory):
             fail("lifecycle_native_receipt_binding_rejected")
     if type(result["restore_elapsed_millis"]) is not int or not 0 <= result["restore_elapsed_millis"] <= 600000:
         fail("lifecycle_native_restore_budget_rejected")
-    if args.operation == "prepare" and result["complete"] and not result["isolated_content_restore_complete"]:
+    if policy == "backup_integrity_only_v1":
+        if result["isolated_content_restore_complete"] or result["restore_elapsed_millis"] != 0 or "preparation_restore_zero_sha256" in result or result["complete"] and (not result["archive_binding_complete"] or not result.get("backup_integrity_complete", False) or "source_copy_intent_sha256" not in result):
+            fail("lifecycle_native_backup_integrity_missing")
+    elif args.operation == "prepare" and result["complete"] and not result["isolated_content_restore_complete"]:
         fail("lifecycle_native_restore_missing")
     if (result["execution_allowed"] is not False or result["drop_ready"] is not False or
         (result["complete"] is True) != (code == 0 and result["error_category"] == "none") or
@@ -2901,6 +2915,7 @@ def main(argv=None):
               "kind": frozenset({"compatibility_retirement_lifecycle_result", "readonly_prepare_facts_observation", "readonly_host_writer_scope_observation", "readonly_db_writer_census_observation", "readonly_storage_backup_result"}),
               "original_source_sha": "sha40", "manifest_sha256": "hash64", "request_sha256": "hash64", "archive_sha256": "hash64_or_empty",
               "isolated_content_restore_complete": "bool", "restore_elapsed_millis": "uint", "mysql_recovery_non_target_sha256": "hash64", "source_copy_intent_sha256": "hash64", "preparation_restore_zero_sha256": "hash64",
+              "preparation_policy": frozenset({"", "tested_restore_v1", "backup_integrity_only_v1"}), "backup_integrity_complete": "bool",
               "storage_backup_complete": "bool", "storage_archive_sha256": "hash64",
               "archive_approval": {**{key: "hash64" for key in ("inventory_sha256", "sql_metadata_sha256", "mongo_metadata_sha256", "ordered_mongo_schema_sha256", "request_hash")}, "source_sha": "sha40", "operation_id": "run_id", "run_id": "run_id"},
               "storage_backup": {"kind": frozenset({"storage_backup_v1"}), "tool_source_sha": "sha40", "run_id": "run_id", "archive_sha256": "hash64", "request_sha256": "hash64"},
@@ -3042,7 +3057,9 @@ def main(argv=None):
         all(value is False for value in receipt.get("capabilities", {}).values()))
     lifecycle_complete = (receipt.get("kind") == "compatibility_retirement_lifecycle_result" and
         receipt.get("operation") == "prepare" and receipt.get("complete") is True and
-        receipt.get("error_category") == "none" and receipt.get("isolated_content_restore_complete") is True and
+        receipt.get("error_category") == "none" and
+        (((receipt.get("preparation_policy") or "tested_restore_v1") == "tested_restore_v1" and receipt.get("isolated_content_restore_complete") is True) or
+         (receipt.get("preparation_policy") == "backup_integrity_only_v1" and receipt.get("archive_binding_complete") is True and receipt.get("backup_integrity_complete") is True and receipt.get("isolated_content_restore_complete") is False and receipt.get("restore_elapsed_millis") == 0 and "source_copy_intent_sha256" in receipt and "preparation_restore_zero_sha256" not in receipt)) and
         receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False and
         all(value is False for value in receipt.get("capabilities", {}).values()))
     return 0 if emitted and (lifecycle_complete or ((diagnostic_complete or evidence_finished) and receipt.get("complete") is False and receipt.get("execution_allowed") is False and receipt.get("drop_ready") is False)) else 42

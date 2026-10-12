@@ -16,6 +16,10 @@ one-off 不是“运行一次的普通脚本”，而是独立变更程序。每
 | destructive | 删除/覆盖不可轻易恢复的数据 | 独立审批、目标清单、业务/合规影响、可验证恢复、双人复核 |
 | blocked | 当前语义无法证明安全 | 禁止 apply；只能补分析、测试和保护条件 |
 
+本次兼容链退役经负责人于 2026-10-13 明确批准取消完整恢复演练。例外仅限 MySQL 的 `domain_event_outbox`、`ai_bridge_commands`、`ai_messaging_legacy_commands` 和 MongoDB 的 `domain_event_outbox`。退役请求及审批须同时明确选择 `preparation_policy=backup_integrity_only_v1`；未声明时仍使用原演练路径。
+
+该模式仍核对备份字节、原库身份与目标内容，保留写入隔离、四对象精确删除、非目标数据及上线验收约束；不创建隔离恢复实例，不签发恢复成功或恢复资源清零证明。生产证据必须记录完整恢复未验证，不能承诺在预留的十分钟内完成恢复。此前失败演练的资源须在最终验收后独立核对并退出，不得计作本次无恢复资源分支的清零结果。
+
 `cleanup_orphaned_assessment_documents` 当前必须是 blocked：AnswerSheet 与 `answersheet.submitted` Outbox 在同一 Mongo 事务持久化，Assessment 由 worker 异步确保；
 “暂时没有 MySQL Assessment”不能证明 AnswerSheet 是孤儿。该工具还未把 durable Outbox 纳入候选保护/备份，apply 会制造新的反向不一致。
 

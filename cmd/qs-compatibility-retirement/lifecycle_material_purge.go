@@ -88,6 +88,7 @@ type lifecycleBatchMaterials struct {
 	archive                          *lifecycleMaterialDirectory
 	census                           *lifecycleMaterialDirectory
 	engines                          []*lifecycleEnginePurge
+	backupIntegrityOnly              bool
 	journal                          *lifecycleMaterialDirectory
 	started, purged, closed, unknown bool
 	zeroVerified                     bool
@@ -188,8 +189,63 @@ func openLifecycleOriginalArchiveMaterials(ctx context.Context, r lifecycleReque
 	return d, nil
 }
 
+func lifecycleRestoreOwnerMatchesPolicy(r lifecycleRequest, owner *lifecyclePreparationOwner) bool {
+	if owner == nil {
+		return false
+	}
+	switch r.PreparationPolicy {
+	case lifecycleBackupIntegrityPolicy:
+		return len(owner.engines) == 0 && len(owner.materialRecords) == 0
+	case "", "tested_restore_v1":
+		return len(owner.engines) == 2
+	default:
+		return false
+	}
+}
+
+func checkLifecycleBackupIntegrityRestoreSet(ctx context.Context, binding lifecycleMaterialBinding, docker string, read func(context.Context, string, ...string) ([]byte, error)) error {
+	if ctx == nil || ctx.Err() != nil || !binding.valid() || docker == "" || read == nil {
+		return lifecycleError("lifecycle_restore_material_scope_unknown")
+	}
+	for _, kind := range []string{"container", "volume"} {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		args, format := []string{"ps", "--all", "--no-trunc"}, "{{.ID}}"
+		if kind == "volume" {
+			args, format = []string{"volume", "ls"}, "{{.Name}}"
+		}
+		args = append(args, "--filter", "label=qs.retirement.operation="+binding.operation, "--filter", "label=qs.retirement.run="+binding.actualRun, "--format", format)
+		raw, err := read(ctx, docker, args...)
+		if err != nil || !lifecycleMaterialNativeSet(raw, nil) {
+			return lifecycleError("lifecycle_restore_material_remaining_or_foreign")
+		}
+	}
+	return nil
+}
+
+func (c *lifecycleBatchMaterials) checkRestoreMaterials(ctx context.Context, zero bool) error {
+	if c.backupIntegrityOnly {
+		if len(c.engines) != 0 {
+			return lifecycleError("lifecycle_restore_material_scope_unknown")
+		}
+		docker, err := lifecycleDockerExecutable()
+		if err != nil {
+			return err
+		}
+		return checkLifecycleBackupIntegrityRestoreSet(ctx, c.binding, docker, lifecycleDocker)
+	}
+	return checkLifecycleRestoreMaterialSet(ctx, c.engines, zero)
+}
+
 func registerLifecycleCurrentRestoreMetadata(ctx context.Context, d *lifecycleMaterialDirectory, owner *lifecyclePreparationOwner, r lifecycleRequest) error {
-	if ctx == nil || ctx.Err() != nil || d == nil || d.path != r.prepareRoot || owner == nil || len(owner.engines) != 2 || len(owner.materialRecords) != 5 {
+	if ctx == nil || ctx.Err() != nil || d == nil || d.path != r.prepareRoot || !lifecycleRestoreOwnerMatchesPolicy(r, owner) {
+		return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
+	}
+	if r.PreparationPolicy == lifecycleBackupIntegrityPolicy {
+		return nil
+	}
+	if len(owner.materialRecords) != 5 {
 		return lifecycleError("lifecycle_restore_owned_material_binding_rejected")
 	}
 	expected := map[string]string{"lifecycle-restore-" + r.ActualRunID + ".registration.private.json": owner.materialRecords["lifecycle-restore-"+r.ActualRunID+".registration.private.json"]}
@@ -230,10 +286,10 @@ func registerLifecycleCurrentRestoreMetadata(ctx context.Context, d *lifecycleMa
 // no complete batch is inferred from A's actual owner or these resource leaves.
 func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r lifecycleRequest) (result error) {
 	b := lifecycleMaterialsBinding(r)
-	if h == nil || ctx == nil || ctx.Err() != nil || runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || version.GitCommit != sourceSHA || !b.valid() || b.tool != sourceSHA || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || h.materials != nil || h.acceptedMaterials != nil || h.currentMQ == nil || h.api == nil || h.api.self != h.api || h.api.unknown || h.api.materials == nil || h.api.acceptance == nil || h.api.acceptance.self != h.api.acceptance || h.api.acceptance.owner != h.api || lifecycleMaterialsBinding(h.api.request) != b || h.api.dir != filepath.Join(r.prepareRoot, "api-transition") || h.api.materials.path != h.api.dir || !h.api.bProgramVerified || !h.api.rollbackProgramVerified || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 {
+	if h == nil || ctx == nil || ctx.Err() != nil || runtime.GOOS != "linux" || os.Getuid() != 0 || os.Geteuid() != 0 || version.GitCommit != sourceSHA || !b.valid() || b.tool != sourceSHA || r.prepareRoot != lifecycleInvocationBatch(r.OperationID, r.ActualRunID) || h.materials != nil || h.acceptedMaterials != nil || h.currentMQ == nil || h.api == nil || h.api.self != h.api || h.api.unknown || h.api.materials == nil || h.api.acceptance == nil || h.api.acceptance.self != h.api.acceptance || h.api.acceptance.owner != h.api || lifecycleMaterialsBinding(h.api.request) != b || h.api.dir != filepath.Join(r.prepareRoot, "api-transition") || h.api.materials.path != h.api.dir || !h.api.bProgramVerified || !h.api.rollbackProgramVerified || !lifecycleRestoreOwnerMatchesPolicy(r, h.restoreOwner) {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
-	c := &lifecycleBatchMaterials{binding: b, scopes: map[lifecycleMaterialScope]struct{}{}}
+	c := &lifecycleBatchMaterials{binding: b, scopes: map[lifecycleMaterialScope]struct{}{}, backupIntegrityOnly: r.PreparationPolicy == lifecycleBackupIntegrityPolicy}
 	c.self = c
 	h.materials = c
 	defer func() {
@@ -335,7 +391,7 @@ func (h *lifecycleFixedHost) composeNativeMaterialOwners(ctx context.Context, r 
 		}
 		c.engines = append(c.engines, registered)
 	}
-	if e = checkLifecycleRestoreMaterialSet(ctx, c.engines, false); e != nil {
+	if e = c.checkRestoreMaterials(ctx, false); e != nil {
 		return e
 	}
 	c.scopes[lifecycleRestoreMaterials] = struct{}{}
@@ -383,7 +439,7 @@ func (h *lifecycleFixedHost) acceptedBatchMaterials(ctx context.Context, r lifec
 		return nil, lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	c := a.catalog
-	if c.closed || c.unknown || c.archive == nil || c.journal == nil || len(c.engines) != 2 || h.restoreOwner == nil || len(h.restoreOwner.engines) != 2 || h.services == nil || c.local == nil || c.local != h.services.materials || c.remote == nil || c.remote.self != c.remote || c.remote.binding != c.binding || c.remote.native == nil || c.remote.services != h.services || len(c.scopes) != int(lifecycleMaterialScopeCount) || !lifecycleMaterialPathsMatch(c, r) {
+	if c.closed || c.unknown || c.archive == nil || c.journal == nil || !lifecycleRestoreOwnerMatchesPolicy(r, h.restoreOwner) || len(c.engines) != len(h.restoreOwner.engines) || c.backupIntegrityOnly != (r.PreparationPolicy == lifecycleBackupIntegrityPolicy) || h.services == nil || c.local == nil || c.local != h.services.materials || c.remote == nil || c.remote.self != c.remote || c.remote.binding != c.binding || c.remote.native == nil || c.remote.services != h.services || len(c.scopes) != int(lifecycleMaterialScopeCount) || !lifecycleMaterialPathsMatch(c, r) {
 		return nil, lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
 	if z, e := c.remote.native.Snapshot(); e != nil || z.RemainingTemporaryFiles != 0 {
@@ -847,7 +903,7 @@ func (c *lifecycleBatchMaterials) preflight(ctx context.Context) error {
 			return err
 		}
 	}
-	return checkLifecycleRestoreMaterialSet(ctx, c.engines, false)
+	return c.checkRestoreMaterials(ctx, false)
 }
 func (c *lifecycleBatchMaterials) purge(ctx context.Context) error {
 	if e := c.preflight(ctx); e != nil {
@@ -942,7 +998,7 @@ func (c *lifecycleBatchMaterials) verifyZero(ctx context.Context) error {
 			return err
 		}
 	}
-	if e := checkLifecycleRestoreMaterialSet(ctx, c.engines, true); e != nil {
+	if e := c.checkRestoreMaterials(ctx, true); e != nil {
 		c.unknown = true
 		return e
 	}

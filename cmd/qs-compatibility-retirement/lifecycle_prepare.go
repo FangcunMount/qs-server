@@ -393,6 +393,9 @@ func prepareLifecycleNative(ctx context.Context, r lifecycleRequest, archive *ba
 	if archive == nil {
 		return nil, nil, lifecycleError("lifecycle_archive_missing")
 	}
+	if !lifecyclePreparationPolicyValid(r.PreparationPolicy) {
+		return nil, nil, lifecycleError("lifecycle_preparation_policy_rejected")
+	}
 	if !r.RestoreEngines.valid() {
 		return nil, nil, lifecycleError("lifecycle_restore_engine_approval_missing")
 	}
@@ -431,6 +434,15 @@ func prepareLifecycleNative(ctx context.Context, r lifecycleRequest, archive *ba
 	owner.originalConn, err = owner.originalSQL.Conn(ctx)
 	if err != nil {
 		return nil, owner, lifecycleError("lifecycle_original_dedicated_connection_failed")
+	}
+	if r.PreparationPolicy == lifecycleBackupIntegrityPolicy {
+		// VerifyHostOriginalSources above authenticates the retained archive and
+		// actual original identity/schema/content. No isolated instance is created
+		// and no restore proof, restore timer or restore-zero record is issued.
+		return &lifecyclePreparation{
+			Borrowed:                     backup.TargetRecoveryBorrowed{SQL: owner.originalConn, Mongo: owner.originalDB},
+			backupIntegrityArchiveSHA256: archive.Summary().ArchiveSHA256,
+		}, owner, nil
 	}
 	combinedStarted := time.Now()
 	restoreCtx, cancel := context.WithTimeout(ctx, backup.MaxRestoreSeconds*time.Second)
