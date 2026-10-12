@@ -142,7 +142,7 @@ func (h *lifecycleFixedHost) issueNativeAcceptedMaterials(ctx context.Context, r
 		return lifecycleError("lifecycle_actual_batch_acceptance_missing")
 	}
 	c := h.materials
-	if c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || !c.binding.valid() || c.binding.tool != sourceSHA || c.closed || c.unknown || c.started || c.remote != nil || c.localSealed || c.local == nil || h.services == nil || c.local != h.services.materials || c.archive == nil || c.journal == nil || len(c.engines) != 2 || !lifecycleMaterialPathsMatch(c, r) || len(c.scopes) != int(lifecycleMaterialScopeCount)-1 {
+	if c == nil || c.self != c || c.binding != lifecycleMaterialsBinding(r) || !c.binding.valid() || c.binding.tool != sourceSHA || c.closed || c.unknown || c.started || c.remote != nil || c.localSealed || c.local == nil || h.services == nil || c.local != h.services.materials || c.archive == nil || c.journal == nil || !lifecycleRestoreOwnerMatchesPolicy(r, h.restoreOwner) || len(c.engines) != len(h.restoreOwner.engines) || c.backupIntegrityOnly != (r.PreparationPolicy == lifecycleBackupIntegrityPolicy) || !lifecycleMaterialPathsMatch(c, r) || len(c.scopes) != int(lifecycleMaterialScopeCount)-1 {
 		return lifecycleError("lifecycle_actual_complete_material_scope_missing")
 	}
 	for scope := lifecycleMaterialScope(0); scope < lifecycleMaterialScopeCount; scope++ {

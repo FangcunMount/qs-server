@@ -136,7 +136,10 @@ func decodeLifecycleStagingRequest(raw []byte) (lifecycleRequest, error) {
 	}
 	d := json.NewDecoder(strings.NewReader(string(raw)))
 	d.DisallowUnknownFields()
-	if d.Decode(&r) != nil || d.Decode(new(any)) != io.EOF || r.HistoryPolicy != lifecycleDiscardHistoryPolicy {
+	if d.Decode(&r) != nil || d.Decode(new(any)) != io.EOF || r.HistoryPolicy != lifecycleDiscardHistoryPolicy || !lifecyclePreparationPolicyValid(r.PreparationPolicy) {
+		return r, lifecycleError("lifecycle_staging_request_rejected")
+	}
+	if rawPolicy, exists := fields["preparation_policy"]; exists && string(bytes.TrimSpace(rawPolicy)) == "null" {
 		return r, lifecycleError("lifecycle_staging_request_rejected")
 	}
 	return r, nil
@@ -266,13 +269,18 @@ func stageLifecycleRootInputs(ctx context.Context, path, expected, operation, ac
 	}
 	// Actual pinned local image facts are observed before any source-body copy
 	// or original DB connection. Starting the engines reobserves them again.
-	if e = verifyLifecycleRestoreImages(ctx, r.RestoreEngines); e != nil {
-		return "", e
+	if r.PreparationPolicy != lifecycleBackupIntegrityPolicy {
+		if e = verifyLifecycleRestoreImages(ctx, r.RestoreEngines); e != nil {
+			return "", e
+		}
 	}
 	// Root bootstrap has already installed only the approved binary here. No
 	// original owner/path is modified. The exact per-run source-copy intent is
 	// durable before even the first copied body, including partial failures.
 	intent := map[string]any{"format_version": 1, "kind": "root_once_exact_source_copy_intent", "original_source_sha": r.OriginalSourceSHA, "tool_source_sha": r.ToolSourceSHA, "operation_id": operation, "actual_run_id": actualRun, "original_run_id": r.Approval.RunID, "request_sha256": expected, "manifest_sha256": r.ManifestSHA256, "source_file_sha256": r.SourceFileSHA256, "targets": targets, "source_uid": uid64, "archive_directory": r.ArchiveDirectory, "source_staging_directory": lifecycleStagingSourcePath(root, r), "drop_authority": false, "purge_after_acceptance_required": true}
+	if r.PreparationPolicy != "" {
+		intent["preparation_policy"] = r.PreparationPolicy
+	}
 	// The original approved root caller passes only its actual write-time hashes.
 	// These transient inputs bind files; they never import a native capability.
 	basisHash, resultHash := os.Getenv("QS_LIFECYCLE_BUDGET_KEY_DESCRIPTOR_SHA256"), os.Getenv("QS_LIFECYCLE_BUDGET_KEY_RESULT_SHA256")
@@ -582,6 +590,7 @@ type lifecycleSourceCopyIntent struct {
 	PurgeRequired          bool              `json:"purge_after_acceptance_required"`
 	BudgetDescriptorSHA256 string            `json:"budget_key_descriptor_sha256,omitempty"`
 	BudgetResultSHA256     string            `json:"budget_key_result_sha256,omitempty"`
+	PreparationPolicy      string            `json:"preparation_policy,omitempty"`
 }
 
 func decodeLifecycleSourceCopyIntent(raw []byte, i *lifecycleSourceCopyIntent) error {
@@ -597,8 +606,13 @@ func decodeLifecycleSourceCopyIntent(raw []byte, i *lifecycleSourceCopyIntent) e
 	if !basis {
 		fields["budget_key_descriptor_sha256"], fields["budget_key_result_sha256"] = json.RawMessage(`""`), json.RawMessage(`""`)
 	}
+	if _, exists := fields["preparation_policy"]; !exists {
+		fields["preparation_policy"] = json.RawMessage(`""`)
+	} else if string(bytes.TrimSpace(fields["preparation_policy"])) == "null" {
+		return lifecycleError("lifecycle_staging_original_intent_rejected")
+	}
 	normalized, e := json.Marshal(fields)
-	if e != nil || decodeLifecycleClosedProducer(normalized, i) != nil || (i.BudgetDescriptorSHA256 == "") != (i.BudgetResultSHA256 == "") || basis && (!hashRE.MatchString(i.BudgetDescriptorSHA256) || !hashRE.MatchString(i.BudgetResultSHA256)) {
+	if e != nil || decodeLifecycleClosedProducer(normalized, i) != nil || !lifecyclePreparationPolicyValid(i.PreparationPolicy) || (i.BudgetDescriptorSHA256 == "") != (i.BudgetResultSHA256 == "") || basis && (!hashRE.MatchString(i.BudgetDescriptorSHA256) || !hashRE.MatchString(i.BudgetResultSHA256)) {
 		return lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	return nil
@@ -936,7 +950,7 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 	if err != nil {
 		return nil, nil, err
 	}
-	if decodeLifecycleSourceCopyIntent(raw, &i) != nil || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != lifecycleStagingSourcePath(root, r) || i.DropAuthority || !i.PurgeRequired {
+	if decodeLifecycleSourceCopyIntent(raw, &i) != nil || i.PreparationPolicy != r.PreparationPolicy || i.FormatVersion != 1 || i.Kind != "root_once_exact_source_copy_intent" || i.OriginalSourceSHA != r.OriginalSourceSHA || !shaRE.MatchString(i.ToolSourceSHA) || i.OperationID != r.OperationID || !runRE.MatchString(i.ActualRunID) || i.ActualRunID == r.ActualRunID || filepath.Base(root) != i.OperationID+"-"+i.ActualRunID || i.OriginalRunID != r.Approval.RunID || i.SourceUID != sourceUID || i.ManifestSHA256 != r.ManifestSHA256 || !hashRE.MatchString(i.RequestSHA256) || !reflect.DeepEqual(i.SourceFileSHA256, hashes) || !reflect.DeepEqual(i.Targets, targets) || i.ArchiveDirectory != r.ArchiveDirectory || i.SourceStagingDirectory != lifecycleStagingSourcePath(root, r) || i.DropAuthority || !i.PurgeRequired {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
 	if err = registerLifecyclePreparationBudgetMaterials(ctx, d, i, rootUID); err != nil {
@@ -987,38 +1001,47 @@ func openLifecycleRootStagingMaterialFiles(ctx context.Context, root, invocation
 		return nil, nil, err
 	}
 	original, err = decodeLifecycleStagingRequest(requestBytes)
-	if err != nil || original.FormatVersion != 1 || original.Kind != "compatibility_retirement_lifecycle_request" || original.HistoryPolicy != r.HistoryPolicy || original.HistoryPolicy != lifecycleDiscardHistoryPolicy || original.OperationID != i.OperationID || original.ActualRunID != i.ActualRunID || original.OriginalSourceSHA != i.OriginalSourceSHA || original.ToolSourceSHA != i.ToolSourceSHA || original.ManifestSHA256 != i.ManifestSHA256 || original.Approval != r.Approval || ((r.StorageBackup == nil && original.Recovery.ArchiveSHA256 != "") || (r.StorageBackup != nil && (!original.StorageBackup.valid(original) || !reflect.DeepEqual(original.StorageBackup, r.StorageBackup)))) || original.Recovery.SourceSHA != i.OriginalSourceSHA || original.Recovery.OperationID != i.OperationID || original.Recovery.OriginalRunID != i.OriginalRunID || original.Recovery.ActualRunID != i.ActualRunID || original.ArchiveDirectory != i.ArchiveDirectory || original.SourceDirectory != lifecycleOriginalSourcePath(r) || !reflect.DeepEqual(original.SourceFileSHA256, hashes) {
+	if err != nil || original.PreparationPolicy != r.PreparationPolicy || original.FormatVersion != 1 || original.Kind != "compatibility_retirement_lifecycle_request" || original.HistoryPolicy != r.HistoryPolicy || original.HistoryPolicy != lifecycleDiscardHistoryPolicy || original.OperationID != i.OperationID || original.ActualRunID != i.ActualRunID || original.OriginalSourceSHA != i.OriginalSourceSHA || original.ToolSourceSHA != i.ToolSourceSHA || original.ManifestSHA256 != i.ManifestSHA256 || original.Approval != r.Approval || ((r.StorageBackup == nil && original.Recovery.ArchiveSHA256 != "") || (r.StorageBackup != nil && (!original.StorageBackup.valid(original) || !reflect.DeepEqual(original.StorageBackup, r.StorageBackup)))) || original.Recovery.SourceSHA != i.OriginalSourceSHA || original.Recovery.OperationID != i.OperationID || original.Recovery.OriginalRunID != i.OriginalRunID || original.Recovery.ActualRunID != i.ActualRunID || original.ArchiveDirectory != i.ArchiveDirectory || original.SourceDirectory != lifecycleOriginalSourcePath(r) || !reflect.DeepEqual(original.SourceFileSHA256, hashes) {
 		return nil, nil, lifecycleError("lifecycle_staging_original_intent_rejected")
 	}
-	// The standalone producer's native engines are already removed. Its receipt
-	// grants only reopening the six exact metadata files, never engine adoption.
-	if r.PreparationRestoreZero == nil || r.PreparationRestoreZero.Path != filepath.Join(root, "lifecycle-restore-"+i.ActualRunID+".zero.private.json") || !hashRE.MatchString(r.PreparationRestoreZero.SHA256) || original.RestoreEngines == nil {
-		return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
-	}
-	var zero lifecyclePreparationRestoreZero
-	zeroRaw, err := readLifecycleProducerJSON(d, filepath.Base(r.PreparationRestoreZero.Path), r.PreparationRestoreZero.SHA256, rootUID, 256<<10, &zero)
-	if err != nil || decodeLifecycleClosedProducer(zeroRaw, &zero) != nil || zero.FormatVersion != 1 || zero.Kind != "original_preparation_isolated_restore_zero" || zero.OriginalSourceSHA != i.OriginalSourceSHA || zero.ToolSourceSHA != i.ToolSourceSHA || zero.OperationID != i.OperationID || zero.OriginalRunID != i.OriginalRunID || zero.ActualRunID != i.ActualRunID || zero.ManifestSHA256 != i.ManifestSHA256 || zero.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || zero.RequestSHA256 != i.RequestSHA256 || zero.ElapsedMillis < 0 || zero.ElapsedMillis > 600000 || len(zero.Files) != 5 || len(zero.Engines) != 2 {
-		return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
-	}
-	var originalMembers struct {
-		Files   []json.RawMessage `json:"files"`
-		Engines []json.RawMessage `json:"engines"`
-	}
-	if json.Unmarshal(zeroRaw, &originalMembers) != nil || len(originalMembers.Files) != 5 || len(originalMembers.Engines) != 2 {
-		return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
-	}
-	for n := range zero.Files {
-		if decodeLifecycleClosedProducer(originalMembers.Files[n], &zero.Files[n]) != nil {
+	if r.PreparationPolicy == lifecycleBackupIntegrityPolicy {
+		// The explicitly approved backup-only producer never created engines.
+		// Reject a supplied restore claim; the remaining closed file-tree checks
+		// still reject unregistered resources instead of manufacturing a zero.
+		if r.PreparationRestoreZero != nil {
+			return nil, nil, lifecycleError("lifecycle_preparation_policy_rejected")
+		}
+	} else {
+		// The standalone producer's native engines are already removed. Its receipt
+		// grants only reopening the six exact metadata files, never engine adoption.
+		if r.PreparationRestoreZero == nil || r.PreparationRestoreZero.Path != filepath.Join(root, "lifecycle-restore-"+i.ActualRunID+".zero.private.json") || !hashRE.MatchString(r.PreparationRestoreZero.SHA256) || original.RestoreEngines == nil {
 			return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
 		}
-	}
-	for n := range zero.Engines {
-		if decodeLifecycleClosedProducer(originalMembers.Engines[n], &zero.Engines[n]) != nil || zero.Engines[n].ImageID != []string{original.RestoreEngines.MySQLImageID, original.RestoreEngines.MongoImageID}[n] {
+		var zero lifecyclePreparationRestoreZero
+		zeroRaw, err := readLifecycleProducerJSON(d, filepath.Base(r.PreparationRestoreZero.Path), r.PreparationRestoreZero.SHA256, rootUID, 256<<10, &zero)
+		if err != nil || decodeLifecycleClosedProducer(zeroRaw, &zero) != nil || zero.FormatVersion != 1 || zero.Kind != "original_preparation_isolated_restore_zero" || zero.OriginalSourceSHA != i.OriginalSourceSHA || zero.ToolSourceSHA != i.ToolSourceSHA || zero.OperationID != i.OperationID || zero.OriginalRunID != i.OriginalRunID || zero.ActualRunID != i.ActualRunID || zero.ManifestSHA256 != i.ManifestSHA256 || zero.ArchiveSHA256 != r.Recovery.ArchiveSHA256 || zero.RequestSHA256 != i.RequestSHA256 || zero.ElapsedMillis < 0 || zero.ElapsedMillis > 600000 || len(zero.Files) != 5 || len(zero.Engines) != 2 {
 			return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
 		}
-	}
-	if _, err = registerLifecyclePreparationRestoreMetadata(ctx, d, &zero, nativeHash, original.RestoreEngines.Architecture, rootUID, nil); err != nil {
-		return nil, nil, err
+		var originalMembers struct {
+			Files   []json.RawMessage `json:"files"`
+			Engines []json.RawMessage `json:"engines"`
+		}
+		if json.Unmarshal(zeroRaw, &originalMembers) != nil || len(originalMembers.Files) != 5 || len(originalMembers.Engines) != 2 {
+			return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+		}
+		for n := range zero.Files {
+			if decodeLifecycleClosedProducer(originalMembers.Files[n], &zero.Files[n]) != nil {
+				return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+		}
+		for n := range zero.Engines {
+			if decodeLifecycleClosedProducer(originalMembers.Engines[n], &zero.Engines[n]) != nil || zero.Engines[n].ImageID != []string{original.RestoreEngines.MySQLImageID, original.RestoreEngines.MongoImageID}[n] {
+				return nil, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+			}
+		}
+		if _, err = registerLifecyclePreparationRestoreMetadata(ctx, d, &zero, nativeHash, original.RestoreEngines.Architecture, rootUID, nil); err != nil {
+			return nil, nil, err
+		}
 	}
 	if r.StorageBackup == nil {
 		child, err := openLifecycleMaterialDirectory(i.SourceStagingDirectory, rootUID)

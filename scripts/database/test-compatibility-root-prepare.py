@@ -93,6 +93,37 @@ class RootPrepareOnceTransport(unittest.TestCase):
                 tool.live_lifecycle(args,Path('/approved-operation'))
             once.assert_called_once_with(args)
             capture.assert_called_once_with(['/tool/private-native','--source-sha'],timeout=5,maximum=128)
+    def integrity_native(self):
+        args=self.args()
+        return dict(format_version=1,kind='compatibility_retirement_lifecycle_result',operation='prepare',source_sha=args.actual_source_sha,original_source_sha='e'*40,operation_id=args.operation_id,run_id=args.run_id,manifest_sha256=args.manifest_hash,request_sha256=args.lifecycle_request_hash,archive_sha256='f'*64,target_hash=tool.TARGET_HASH,target_count=4,complete=True,execution_allowed=False,drop_ready=False,archive_binding_complete=True,recovery_attempted=False,recovery_complete=False,acceptance_complete=False,purge_complete=False,error_category='none',required_adapters=[],isolated_content_restore_complete=False,restore_elapsed_millis=0,preparation_policy='backup_integrity_only_v1',backup_integrity_complete=True,source_copy_intent_sha256='7'*64)
+    def lifecycle_with_receipt(self,policy,native):
+        args=self.args();args.inventory_binary='/tool/private-native'
+        request=dict(format_version=1,kind='compatibility_retirement_lifecycle_request',history_policy='discard_legacy_history_keep_current_responsibility_v1',tool_source_sha=args.actual_source_sha,original_source_sha='e'*40,operation_id=args.operation_id,actual_run_id=args.run_id,manifest_sha256=args.manifest_hash,archive_directory='/archive',window_directory='/window',journal_directory='/journal',archive_approval={},recovery={})
+        if policy is not None:request['preparation_policy']=policy
+        metadata=SimpleNamespace(st_mode=stat.S_IFREG|0o700,st_nlink=1,st_uid=501)
+        with mock.patch.object(tool.os,'getuid',return_value=501),mock.patch.object(tool,'read_private',side_effect=[(request,'b'*64),({},'c'*64)]),mock.patch.object(tool,'validate_manifest'),mock.patch.object(Path,'lstat',return_value=metadata),mock.patch.object(tool,'capture_fixed',return_value=(0,b'a'*40+b'\n')),mock.patch.object(tool,'locked_operation',return_value=contextlib.nullcontext()),mock.patch.object(tool,'root_once_lifecycle_prepare',return_value=(0,tool.canonical_bytes(native))):
+            return tool.live_lifecycle(args,Path('/approved-operation'))
+    def test_explicit_integrity_receipt_is_complete_without_restore_claim_or_capability(self):
+        n=self.integrity_native();receipt=self.lifecycle_with_receipt('backup_integrity_only_v1',n)
+        self.assertEqual({k:receipt[k] for k in n},n);self.assertTrue(all(value is False for value in receipt['capabilities'].values()))
+        output=io.StringIO()
+        argv=['--operation','prepare','--operation-id','123-1','--approved-source-sha','a'*40,'--actual-source-sha','a'*40,'--run-id','456-1']
+        with mock.patch.object(tool,'execute',return_value=receipt),contextlib.redirect_stdout(output):code=tool.main(argv)
+        self.assertEqual(code,0)
+        public=json.loads(tool.transport().decode_armored_receipt(output.getvalue()))
+        self.assertEqual(public['preparation_policy'],'backup_integrity_only_v1');self.assertTrue(public['backup_integrity_complete']);self.assertFalse(public['isolated_content_restore_complete']);self.assertNotIn('preparation_restore_zero_sha256',public)
+    def test_integrity_receipt_cannot_downgrade_default_or_claim_restore(self):
+        for policy in (None,'','tested_restore_v1'):
+            with self.subTest(policy=policy),self.assertRaises(tool.Blocked):self.lifecycle_with_receipt(policy,self.integrity_native())
+        for change in ({'backup_integrity_complete':False},{'backup_integrity_complete':1},{'archive_binding_complete':False},{'isolated_content_restore_complete':True},{'restore_elapsed_millis':1},{'preparation_restore_zero_sha256':'8'*64}):
+            with self.subTest(change=change),self.assertRaises(tool.Blocked):self.lifecycle_with_receipt('backup_integrity_only_v1',dict(self.integrity_native(),**change))
+        for missing in ('preparation_policy','backup_integrity_complete','source_copy_intent_sha256'):
+            n=self.integrity_native();del n[missing]
+            with self.subTest(missing=missing),self.assertRaises(tool.Blocked):self.lifecycle_with_receipt('backup_integrity_only_v1',n)
+        n=self.integrity_native()
+        for name in ('preparation_policy','backup_integrity_complete'):del n[name]
+        n.update(isolated_content_restore_complete=True,restore_elapsed_millis=600000)
+        for policy in (None,'','tested_restore_v1'):self.assertTrue(self.lifecycle_with_receipt(policy,n)['complete'])
     def test_apply_cannot_borrow_pre_window_once_authority(self):
         args=self.args();args.operation='apply'
         with mock.patch.object(tool.subprocess,'run') as run,self.assertRaises(tool.Blocked):tool.root_once_lifecycle_prepare(args)

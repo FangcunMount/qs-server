@@ -40,6 +40,28 @@ class WindowToolMetadata(unittest.TestCase):
         self.assertEqual(self.approve(a),a)
         a['b_image_id']='';a['b_program_sha256']=''
         with self.assertRaises(tool.Refused):self.approve(a)
+    def test_integrity_policy_requires_matching_explicit_template_and_approval(self):
+        for value in ('', 'tested_restore_v1', 'backup_integrity_only_v1'):
+            r=self.request();r['preparation_policy']=value;a=self.approval(r);a['preparation_policy']=value
+            self.assertEqual(self.approve(a),a)
+            self.assertEqual(tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))['preparation_policy'],value)
+        for request_policy,approval_policy in (('backup_integrity_only_v1',None),(None,'backup_integrity_only_v1'),('','backup_integrity_only_v1'),('backup_integrity_only_v1','tested_restore_v1')):
+            r=self.request()
+            if request_policy is not None:r['preparation_policy']=request_policy
+            a=self.approval(r)
+            if approval_policy is not None:a['preparation_policy']=approval_policy
+            with self.subTest(request_policy=request_policy,approval_policy=approval_policy),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(r),a,'22-3')
+        for value in (None,True,'skip_restore','backup_integrity_only_v1\n'):
+            r=self.request();a=self.approval(r);a['preparation_policy']=value
+            with self.subTest(value=value),self.assertRaises(tool.Refused):self.approve(a)
+    def test_integrity_apply_never_accepts_a_restore_zero_even_when_null(self):
+        r=self.request();r['preparation_policy']='backup_integrity_only_v1'
+        r['source_copy_intent']=dict(path='/opt/backups/qs-server/compatibility-retirement-root-prepare/12-1-20-1/source-copy.intent.private.json',sha256='7'*64)
+        a=self.approval(r,'apply');a['preparation_policy']=r['preparation_policy']
+        self.assertEqual(tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))['source_copy_intent'],r['source_copy_intent'])
+        for value in (None,dict(path=str(Path(r['source_copy_intent']['path']).parent/'lifecycle-restore-20-1.zero.private.json'),sha256='8'*64)):
+            bad=copy.deepcopy(r);bad['preparation_restore_zero']=value;a=self.approval(bad,'apply');a['preparation_policy']=r['preparation_policy']
+            with self.subTest(value=value),self.assertRaises(tool.Refused):tool.derive_request(tool.canonical(bad),a,'22-3')
     def test_unknown_run_derives_only_two_new_current_fields_and_keeps_original(self):
         r=self.request();raw=tool.canonical(r);a=self.approval(r)
         derived=tool.derive_request(raw,a,'22-3');value=tool.decode(derived)
@@ -315,10 +337,52 @@ class WindowToolMetadata(unittest.TestCase):
         clean=tool.validate_native(tool.canonical(n),1,a,'22-3','e'*64)
         self.assertEqual(clean['error_category'],'lifecycle_native_operation_failed')
         self.assertNotIn('unrecognized_native_detail',tool.canonical(clean).decode())
+    def test_prepare_restore_fixed_errors_survive_validation_and_armored_transport(self):
+        import contextlib,io,shutil,tempfile
+        errors=('backup_approval_binding_rejected','backup_structure_incomplete_or_changed','backup_database_identity_or_head_changed',
+                'backup_source_copy_incomplete_or_changed','backup_private_asset_rejected','backup_borrowed_read_failed',
+                'backup_restore_unknown_or_failed','backup_restored_content_not_equal','backup_restore_isolation_unproven','backup_restore_budget_exceeded',
+                'lifecycle_original_read_epoch_failed','lifecycle_original_epoch_close_failed','lifecycle_original_dedicated_connection_failed',
+                'lifecycle_combined_restore_budget_exceeded','lifecycle_actual_restore_proof_missing_or_budget_rejected',
+                'lifecycle_owned_handle_close_failed','lifecycle_restore_wire_reap_failed','lifecycle_preparation_release_binding_rejected',
+                'lifecycle_preparation_release_receipt_rejected','lifecycle_preparation_release_receipt_unknown')
+        with tempfile.TemporaryDirectory() as name:
+            directory=Path(name).resolve();script=Path(__file__).with_name('compatibility-window-tool.py')
+            shutil.copyfile(script,directory/script.name)
+            shutil.copyfile(Path(__file__).resolve().parents[1]/'dbops/receipt-transport.py',directory/'receipt-transport.py')
+            spec=importlib.util.spec_from_file_location('packaged_restore_error_tool',directory/script.name);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            spec=importlib.util.spec_from_file_location('packaged_restore_error_transport',directory/'receipt-transport.py');transport=importlib.util.module_from_spec(spec);spec.loader.exec_module(transport)
+            for error in errors:
+                with self.subTest(error=error):
+                    a,n=self.native();n.update(complete=False,isolated_content_restore_complete=False,restore_elapsed_millis=0,error_category=error)
+                    native=module.validate_native(module.canonical(n),1,a,'22-3','e'*64)
+                    self.assertEqual(native,n)
+                    result=dict(format_version=1,kind='independent_window_tool_call_result',dispatcher_source_sha='d'*40,tool_source_sha='a'*40,approved_template_sha256='c'*64,derived_request_sha256='e'*64,native_result=native)
+                    output=io.StringIO()
+                    with contextlib.redirect_stdout(output):module.emit(result,('private-credential-value',))
+                    self.assertEqual(json.loads(transport.decode_armored_receipt(output.getvalue())),result)
+                    self.assertNotIn('private-credential-value',output.getvalue())
+                    with self.assertRaises(module.Refused):module.validate_native(module.canonical(dict(n,complete=True)),1,a,'22-3','e'*64)
     def test_receipt_preserves_actual_budget_and_requires_native_prepare_restore(self):
         a,n=self.native();self.assertEqual(tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64),n)
         for change in ({'isolated_content_restore_complete':False},{'error_category':'other_error'}, {'restore_elapsed_millis':True}):
             with self.subTest(change=change),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(dict(n,**change)),0,a,'22-3','e'*64)
+    def test_integrity_native_success_never_claims_a_restore_or_infers_approval(self):
+        a,n=self.native();a['preparation_policy']='backup_integrity_only_v1'
+        n.update(preparation_policy='backup_integrity_only_v1',backup_integrity_complete=True,isolated_content_restore_complete=False,restore_elapsed_millis=0,source_copy_intent_sha256='7'*64)
+        self.assertEqual(tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64),n)
+        for change in ({'backup_integrity_complete':False},{'backup_integrity_complete':1},{'isolated_content_restore_complete':True},{'restore_elapsed_millis':1},{'preparation_restore_zero_sha256':'8'*64},{'archive_binding_complete':False},{'preparation_policy':''},{'preparation_policy':None}):
+            with self.subTest(change=change),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(dict(n,**change)),0,a,'22-3','e'*64)
+        for name in ('preparation_policy','backup_integrity_complete','source_copy_intent_sha256'):
+            bad=copy.deepcopy(n);del bad[name]
+            with self.subTest(missing=name),self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(bad),0,a,'22-3','e'*64)
+        a,n_default=self.native()
+        with self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(n),0,a,'22-3','e'*64)
+        n_default['backup_integrity_complete']=True
+        with self.assertRaises(tool.Refused):tool.validate_native(tool.canonical(n_default),0,a,'22-3','e'*64)
+        a,n=self.native();a['preparation_policy']='backup_integrity_only_v1'
+        n.update(preparation_policy='backup_integrity_only_v1',complete=False,isolated_content_restore_complete=False,restore_elapsed_millis=0,error_category='backup_restore_unknown_or_failed')
+        self.assertEqual(tool.validate_native(tool.canonical(n),1,a,'22-3','e'*64),n)
     def test_nonfinite_json_never_enters_a_template(self):
         with self.assertRaises(tool.Refused):tool.decode('{"test":NaN}')
     def test_owned_file_bounded_exact_mode_and_name_guard(self):
@@ -349,6 +413,11 @@ class WindowToolMetadata(unittest.TestCase):
             self.assertEqual(json.loads(transport.decode_armored_receipt(output.getvalue())),result)
             self.assertNotIn('private-credential-value',output.getvalue())
             self.assertNotIn('source_sha',output.getvalue())
+            a['preparation_policy']='backup_integrity_only_v1'
+            n.update(preparation_policy='backup_integrity_only_v1',backup_integrity_complete=True,isolated_content_restore_complete=False,restore_elapsed_millis=0,source_copy_intent_sha256='7'*64)
+            result['native_result']=module.validate_native(module.canonical(n),0,a,'22-3','e'*64);output=io.StringIO()
+            with contextlib.redirect_stdout(output):module.emit(result,('private-credential-value',))
+            self.assertEqual(json.loads(transport.decode_armored_receipt(output.getvalue())),result)
 
 class WorkflowWindowTool(unittest.TestCase):
     request=WindowToolMetadata.request

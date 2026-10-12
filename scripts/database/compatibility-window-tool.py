@@ -35,6 +35,7 @@ AI_STOPPED_INFRA_NETWORK_ID = "m3tfd5h9sp5d1xmzht0ey0oql"
 RUN = re.compile(r"[1-9][0-9]{0,19}-[1-9][0-9]{0,3}")
 TARGET = "4e09444409d1cfab3c9df383ed80a0999419fcbbd2f4e80d2e5dac1cf7dfcfb8"
 STAGES = {"prepare", "apply", "verify", "recover", "purge"}
+PREPARATION_POLICIES = frozenset({"tested_restore_v1", "backup_integrity_only_v1"})
 CREDENTIALS = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MONGODB_HOST", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME", "MONGODB_METADATA_ADMIN_USERNAME", "MONGODB_METADATA_ADMIN_PASSWORD")
 
 READ_TOKEN = "GITHUB_READ_TOKEN"
@@ -179,6 +180,12 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def preparation_policy(value):
+    if type(value) is not str or value not in PREPARATION_POLICIES | {""}:
+        reject("window_tool_preparation_policy_rejected")
+    return value or "tested_restore_v1"
+
+
 def approve(raw, expected, dispatcher, stage, operation, manifest, template):
     token(expected, HASH)
     token(dispatcher, SHA)
@@ -193,7 +200,7 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
         reject()
     a = decode(supplied)
     fields = ("format_version", "kind", "dispatcher_source_sha", "tool_source_sha", "original_source_sha", "operation_id", "original_run_id", "stage", "target_hash", "manifest_sha256", "request_template_sha256", "tool_binary_sha256", "b_image_id", "b_program_sha256")
-    exact(a, fields if stage == "prepare" else fields + ("workflow_scope",), ("local_descriptor_sha256",) if stage == "prepare" else ())
+    exact(a, fields if stage == "prepare" else fields + ("workflow_scope",), ("preparation_policy", "local_descriptor_sha256") if stage == "prepare" else ("preparation_policy",))
     if canonical(a) != supplied or digest(supplied) != expected or type(a["format_version"]) is not int or a["format_version"] != 1 or a["kind"] != "independent_compatibility_window_tool_approval" or a["dispatcher_source_sha"] != dispatcher or a["stage"] != stage or a["operation_id"] != operation or a["manifest_sha256"] != manifest or a["request_template_sha256"] != template or a["target_hash"] != TARGET:
         reject()
     for key in ("tool_source_sha", "original_source_sha"):
@@ -204,6 +211,7 @@ def approve(raw, expected, dispatcher, stage, operation, manifest, template):
         token(value, HASH)
     if "local_descriptor_sha256" in a:
         token(a["local_descriptor_sha256"], HASH)
+    preparation_policy(a.get("preparation_policy", ""))
     # Earlier prepare-facts supplies actual cached B image/program identity.
     # Preparation and effectful stages both require that immutable pair.
     token(a["b_image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
@@ -241,10 +249,13 @@ def derive_request(raw, approval, current_run):
         reject("window_tool_template_hash_rejected")
     r = decode(raw)
     required = ("format_version", "kind", "history_policy", "tool_source_sha", "original_source_sha", "operation_id", "actual_run_id", "manifest_sha256", "archive_directory", "window_directory", "journal_directory", "archive_approval", "recovery")
-    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero", "storage_backup")
+    optional = ("source_directory", "restore_engines", "source_file_sha256", "service_control", "resume", "resume_kind", "deployment_control", "final_history", "writer_control", "source_copy_intent", "historical_write_report", "preparation_restore_zero", "storage_backup", "preparation_policy")
     exact(r, required, optional)
     if type(r["format_version"]) is not int or r["format_version"] != 1 or r["kind"] != "compatibility_retirement_lifecycle_request" or r["history_policy"] != "discard_legacy_history_keep_current_responsibility_v1" or r["tool_source_sha"] != approval["tool_source_sha"] or r["original_source_sha"] != approval["original_source_sha"] or r["operation_id"] != approval["operation_id"] or r["actual_run_id"] != "" or r["manifest_sha256"] != approval["manifest_sha256"]:
         reject("window_tool_template_binding_rejected")
+    policy = preparation_policy(r.get("preparation_policy", ""))
+    if policy != preparation_policy(approval.get("preparation_policy", "")) or policy == "backup_integrity_only_v1" and "preparation_restore_zero" in r:
+        reject("window_tool_preparation_policy_rejected")
     a = r["archive_approval"]
     exact(a, ("InventorySHA256", "SQLMetadataSHA256", "MongoMetadataSHA256", "OrderedMongoSchemaSHA256", "SourceSHA", "OperationID", "RunID", "RequestHash"))
     if a["SourceSHA"] != approval["original_source_sha"] or a["OperationID"] != approval["operation_id"] or a["RunID"] != approval["original_run_id"]:
@@ -1193,6 +1204,15 @@ ADAPTERS = frozenset({"actual_four_source_historical_persistence_and_readback", 
     "actual_runtime_acceptance_and_private_purge"})
 PUBLIC_ERRORS = frozenset({"none", "lifecycle_actual_host_adapters_missing", "lifecycle_whole_writer_and_old_ref_fence_missing",
     "lifecycle_parent_window_budget_rejected",
+    # Fixed, body-free codes from backup/contract.go and lifecycle prepare producers.
+    # Preserve isolated restore and final readback failures without driver text.
+    "backup_approval_binding_rejected", "backup_structure_incomplete_or_changed", "backup_database_identity_or_head_changed",
+    "backup_source_copy_incomplete_or_changed", "backup_private_asset_rejected", "backup_borrowed_read_failed",
+    "backup_restore_unknown_or_failed", "backup_restored_content_not_equal", "backup_restore_isolation_unproven", "backup_restore_budget_exceeded",
+    "lifecycle_original_read_epoch_failed", "lifecycle_original_epoch_close_failed", "lifecycle_original_dedicated_connection_failed",
+    "lifecycle_combined_restore_budget_exceeded", "lifecycle_actual_restore_proof_missing_or_budget_rejected",
+    "lifecycle_owned_handle_close_failed", "lifecycle_restore_wire_reap_failed", "lifecycle_preparation_release_binding_rejected",
+    "lifecycle_preparation_release_receipt_rejected", "lifecycle_preparation_release_receipt_unknown",
     "lifecycle_runtime_ledger_scan_rejected", "lifecycle_standard_audit_findings_present",
     "lifecycle_controlled_internal_resume_broker_and_complete_material_producers_missing",
     "lifecycle_final_historical_input_rejected", "lifecycle_final_historical_scope_rejected", "lifecycle_final_historical_scope_cleanup_failed",
@@ -1219,10 +1239,15 @@ def validate_native(raw, exit_code, approval, current_run, derived_hash):
         if n != {"format_version":1,"complete":False,"execution_allowed":False,"drop_ready":False,"error_category":"window_tool_root_native_call_rejected"} or exit_code == 0:
             reject("window_tool_native_output_rejected")
         return n
-    exact(n, NATIVE_REQUIRED, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256"))
+    exact(n, NATIVE_REQUIRED, ("recovery_error_category", "mysql_recovery_non_target_sha256", "source_copy_intent_sha256", "preparation_restore_zero_sha256", "preparation_policy", "backup_integrity_complete"))
     if type(n["format_version"]) is not int or n["format_version"] != 1 or n["source_sha"] != approval["tool_source_sha"] or n["operation_id"] != approval["operation_id"] or n["run_id"] != current_run or n["operation"] != approval["stage"] or n["request_sha256"] != derived_hash or n["target_hash"] != TARGET or type(n["target_count"]) is not int or n["target_count"] != 4:
         reject("window_tool_native_binding_rejected")
     if any(type(n[k]) is not bool for k in BOOLS) or n["execution_allowed"] is not False or n["drop_ready"] is not False or type(n["required_adapters"]) is not list or len(n["required_adapters"]) > len(ADAPTERS) or set(n["required_adapters"]) - ADAPTERS:
+        reject("window_tool_native_output_rejected")
+    policy = preparation_policy(n.get("preparation_policy", ""))
+    if policy != preparation_policy(approval.get("preparation_policy", "")) or "backup_integrity_complete" in n and type(n["backup_integrity_complete"]) is not bool:
+        reject("window_tool_native_binding_rejected")
+    if policy == "tested_restore_v1" and n.get("backup_integrity_complete", False):
         reject("window_tool_native_output_rejected")
     # The compile-time missing-adapter gate is intentionally before input/DB.
     # It can therefore have no original archive fields. It never completes.
@@ -1243,8 +1268,14 @@ def validate_native(raw, exit_code, approval, current_run, derived_hash):
         token(n["preparation_restore_zero_sha256"], HASH)
         if approval["stage"] != "prepare":
             reject("window_tool_native_binding_rejected")
-    if type(n["restore_elapsed_millis"]) is not int or not 0 <= n["restore_elapsed_millis"] <= 600000 or n["complete"] != (exit_code == 0 and n["error_category"] == "none") or approval["stage"] == "prepare" and n["complete"] and not n["isolated_content_restore_complete"]:
+    if type(n["restore_elapsed_millis"]) is not int or not 0 <= n["restore_elapsed_millis"] <= 600000 or n["complete"] != (exit_code == 0 and n["error_category"] == "none"):
         reject("window_tool_native_output_rejected")
+    if approval["stage"] == "prepare":
+        if policy == "backup_integrity_only_v1":
+            if n["isolated_content_restore_complete"] or n["restore_elapsed_millis"] != 0 or "preparation_restore_zero_sha256" in n or n["complete"] and (not n["archive_binding_complete"] or not n.get("backup_integrity_complete", False) or "source_copy_intent_sha256" not in n):
+                reject("window_tool_native_output_rejected")
+        elif n["complete"] and not n["isolated_content_restore_complete"]:
+            reject("window_tool_native_output_rejected")
     for key in ("error_category", "recovery_error_category"):
         if key in n:
             if type(n[key]) is not str or re.fullmatch(r"[a-z_]{1,128}", n[key]) is None:
@@ -1263,6 +1294,7 @@ def emit(result, secrets):
         "source_sha":"sha40", "original_source_sha":"hash64_or_empty", "operation_id":"run_id", "run_id":"run_id", "manifest_sha256":"hash64_or_empty",
         "request_sha256":"hash64", "archive_sha256":"hash64_or_empty", "target_hash":"hash64", "target_count":"uint",
         **{k:"bool" for k in BOOLS}, "restore_elapsed_millis":"uint", "mysql_recovery_non_target_sha256":"hash64", "source_copy_intent_sha256":"hash64", "preparation_restore_zero_sha256":"hash64",
+        "preparation_policy":PREPARATION_POLICIES | {""}, "backup_integrity_complete":"bool",
         "required_adapters":[ADAPTERS], "error_category":PUBLIC_ERRORS, "recovery_error_category":PUBLIC_ERRORS}
     # Preserve the existing transport: original source uses a 40-character SHA,
     # with empty permitted only for the actual compile-time preflight rejection.

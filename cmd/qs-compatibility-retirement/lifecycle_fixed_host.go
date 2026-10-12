@@ -159,18 +159,24 @@ func (h *lifecycleFixedHost) Prepare(ctx context.Context, r lifecycleRequest, a 
 	if err != nil {
 		return nil, err
 	}
-	if !lifecyclePreparationMatches(a, p) {
+	if !lifecyclePreparationApproved(r, a, p) {
 		_ = owner.Close()
 		return nil, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
 	}
 	// Complete the actual restore, close/join/reap and final inspection under
 	// the original600 budget before obtaining new autocommit DDL handles. A
 	// restored wire connection never survives into the maintenance window.
-	elapsed, err := owner.finishPreparation()
-	if err != nil {
-		return nil, err
+	if r.PreparationPolicy == lifecycleBackupIntegrityPolicy {
+		if err := owner.Close(); err != nil {
+			return nil, err
+		}
+	} else {
+		elapsed, err := owner.finishPreparation()
+		if err != nil {
+			return nil, err
+		}
+		p.combinedElapsedMillis = elapsed
 	}
-	p.combinedElapsedMillis = elapsed
 	p.Borrowed, err = h.OpenRecoveryHandles(ctx, r, a)
 	if err != nil {
 		return p, err

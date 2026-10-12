@@ -497,7 +497,7 @@ func originalRootStagingMaterialFixture(t *testing.T, windowTool bool) (string, 
 			t.Fatal("copy")
 		}
 	}
-	i := lifecycleSourceCopyIntent{1, "root_once_exact_source_copy_intent", r.OriginalSourceSHA, r.ToolSourceSHA, r.OperationID, r.ActualRunID, approval.RunID, digestRaw(request), r.ManifestSHA256, hashes, targets, uint32(os.Getuid()), r.ArchiveDirectory, child, false, true, "", ""}
+	i := lifecycleSourceCopyIntent{1, "root_once_exact_source_copy_intent", r.OriginalSourceSHA, r.ToolSourceSHA, r.OperationID, r.ActualRunID, approval.RunID, digestRaw(request), r.ManifestSHA256, hashes, targets, uint32(os.Getuid()), r.ArchiveDirectory, child, false, true, "", "", ""}
 	if writeJSON(filepath.Join(root, "source-copy.intent.private.json"), i) != nil {
 		t.Fatal("intent")
 	}

@@ -21,10 +21,17 @@ import (
 // Window, actual isolated restore, writer lease and original native journal
 // are produced or inspected separately; no imported completion flag is used.
 const lifecycleDiscardHistoryPolicy = "discard_legacy_history_keep_current_responsibility_v1"
+const lifecycleTestedRestorePolicy = "tested_restore_v1"
+const lifecycleBackupIntegrityPolicy = "backup_integrity_only_v1"
+
+func lifecyclePreparationPolicyValid(policy string) bool {
+	return policy == "" || policy == lifecycleTestedRestorePolicy || policy == lifecycleBackupIntegrityPolicy
+}
 
 type lifecycleRequest struct {
 	StorageBackup          *lifecycleStorageBackup              `json:"storage_backup,omitempty"`
 	HistoryPolicy          string                               `json:"history_policy"`
+	PreparationPolicy      string                               `json:"preparation_policy,omitempty"`
 	FormatVersion          int                                  `json:"format_version"`
 	Kind                   string                               `json:"kind"`
 	ToolSourceSHA          string                               `json:"tool_source_sha"`
@@ -120,6 +127,8 @@ type lifecycleReceipt struct {
 	ExecutionAllowed               bool     `json:"execution_allowed"`
 	DropReady                      bool     `json:"drop_ready"`
 	ArchiveBindingComplete         bool     `json:"archive_binding_complete"`
+	PreparationPolicy              string   `json:"preparation_policy,omitempty"`
+	BackupIntegrityComplete        bool     `json:"backup_integrity_complete,omitempty"`
 	IsolatedContentRestoreComplete bool     `json:"isolated_content_restore_complete"`
 	RestoreElapsedMillis           int64    `json:"restore_elapsed_millis"`
 	SQLRecoveryBaselineSHA256      string   `json:"mysql_recovery_non_target_sha256,omitempty"`
@@ -144,6 +153,9 @@ type lifecyclePreparation struct {
 	SQLRestore            *backup.RestoreVerification
 	MongoRestore          *backup.RestoreVerification
 	combinedElapsedMillis int64
+	// Set only by the native archive/source verification path. This never
+	// supplies a RestoreVerification or promises a measured recovery budget.
+	backupIntegrityArchiveSHA256 string
 }
 
 type lifecycleHost interface {
@@ -331,7 +343,7 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	staged := root == stagedRoot && stage == "prepare" && (r.Recovery.ArchiveSHA256 == "" || r.StorageBackup.valid(r)) && r.RestoreEngines.valid()
 	invocationRoot := lifecycleInvocationBatch(operation, actualRun)
 	if (stage == "prepare" && !staged || stage != "prepare" && root != wantRoot && root != invocationRoot) || r.FormatVersion != 1 || r.Kind != "compatibility_retirement_lifecycle_request" ||
-		r.HistoryPolicy != lifecycleDiscardHistoryPolicy || r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
+		r.HistoryPolicy != lifecycleDiscardHistoryPolicy || !lifecyclePreparationPolicyValid(r.PreparationPolicy) || r.ToolSourceSHA != sourceSHA || !shaRE.MatchString(r.OriginalSourceSHA) || r.OperationID != operation || r.ActualRunID != actualRun ||
 		!hashRE.MatchString(r.ManifestSHA256) || r.Approval.SourceSHA != r.OriginalSourceSHA || r.Approval.OperationID != operation ||
 		recovery.SourceSHA != r.OriginalSourceSHA || recovery.OperationID != operation || recovery.OriginalRunID != r.Approval.RunID ||
 		actualRun == r.Approval.RunID || actualRun == recovery.OriginalRunID ||
@@ -354,6 +366,9 @@ func loadLifecycleRequest(ctx context.Context, path, expected, operation, actual
 	}
 	if r.PreparationRestoreZero != nil && (stage == "prepare" || !lifecyclePreparationRestoreReferenceValid(r)) {
 		return r, nil, lifecycleError("lifecycle_preparation_release_receipt_rejected")
+	}
+	if r.PreparationPolicy == lifecycleBackupIntegrityPolicy && r.PreparationRestoreZero != nil {
+		return r, nil, lifecycleError("lifecycle_preparation_policy_rejected")
 	}
 	if r.HistoricalWriteReport != nil {
 		return r, nil, lifecycleError("lifecycle_history_original_material_rejected")
@@ -493,6 +508,18 @@ func lifecyclePreparationMatches(a *backup.Archive, p *lifecyclePreparation) boo
 		sqlProof.ElapsedMillis >= 0 && mongoProof.ElapsedMillis >= 0 && sqlProof.ElapsedMillis <= backup.MaxRestoreSeconds*1000 && mongoProof.ElapsedMillis <= backup.MaxRestoreSeconds*1000
 }
 
+func lifecyclePreparationApproved(r lifecycleRequest, a *backup.Archive, p *lifecyclePreparation) bool {
+	if !lifecyclePreparationPolicyValid(r.PreparationPolicy) {
+		return false
+	}
+	if r.PreparationPolicy != lifecycleBackupIntegrityPolicy {
+		return lifecyclePreparationMatches(a, p)
+	}
+	return a != nil && p != nil && p.Borrowed.SQL != nil && p.Borrowed.Mongo != nil &&
+		p.SQLRestore == nil && p.MongoRestore == nil && p.combinedElapsedMillis == 0 &&
+		hashRE.MatchString(p.backupIntegrityArchiveSHA256) && p.backupIntegrityArchiveSHA256 == a.Summary().ArchiveSHA256
+}
+
 func lifecycleWindowBinding(r lifecycleRequest) fence.WindowBinding {
 	return fence.WindowBinding{TargetSHA256: fence.MaintenanceWindowTargetSHA256(), SourceSHA: r.OriginalSourceSHA,
 		OperationID: r.OperationID, ManifestSHA256: r.ManifestSHA256, OriginalRunID: r.Recovery.OriginalRunID}
@@ -559,6 +586,7 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 	}
 	r, archive, err := loadLifecycleRequest(ctx, requestPath, requestHash, operation, actualRun, stage)
 	receipt.OriginalSourceSHA, receipt.ManifestSHA256, receipt.ArchiveSHA256 = r.OriginalSourceSHA, r.ManifestSHA256, r.Recovery.ArchiveSHA256
+	receipt.PreparationPolicy = r.PreparationPolicy
 	if err != nil {
 		return receipt, err
 	}
@@ -569,7 +597,7 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 		if err != nil {
 			return receipt, err
 		}
-		if !lifecyclePreparationMatches(archive, prepared) {
+		if !lifecyclePreparationApproved(r, archive, prepared) {
 			_ = owner.Close()
 			return receipt, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
 		}
@@ -578,6 +606,14 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 		if err != nil {
 			_ = owner.Close()
 			return receipt, err
+		}
+		if r.PreparationPolicy == lifecycleBackupIntegrityPolicy {
+			if err := owner.Close(); err != nil {
+				return receipt, err
+			}
+			receipt.SourceCopyIntentSHA256 = digestRaw(intentRaw)
+			receipt.BackupIntegrityComplete, receipt.Complete = true, true
+			return receipt, nil
 		}
 		// No success receipt until every actual handle, wire exec and final runtime
 		// inspection finishes under the unchanged original600-second deadline.
@@ -611,7 +647,7 @@ func runLifecycleCLI(ctx context.Context, mode, requestPath, requestHash, operat
 		if err != nil {
 			return receipt, err
 		}
-		if !lifecyclePreparationMatches(archive, prepared) {
+		if !lifecyclePreparationApproved(r, archive, prepared) {
 			return receipt, lifecycleError("lifecycle_actual_restore_proof_missing_or_budget_rejected")
 		}
 	} else {
