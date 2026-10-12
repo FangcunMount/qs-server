@@ -102,6 +102,16 @@ class WindowToolMetadata(unittest.TestCase):
         for mutate in (lambda v:v.update(stop_constraints=None),lambda v:v['stop_constraints'].update(network_id='infra-network'),lambda v:v['stop_constraints'].update(settings_sha256=''),lambda v:v['stop_constraints'].update(drop_ready=True),lambda v:v.update(image_id='qs-ai:latest'),lambda v:v['ai_bounds'].update(path='/tmp/ai.json'),lambda v:v['ai_bounds'].update(path='/opt/backups/qs-server/compatibility-retirement/13-1/ai.json'),lambda v:v.update(protection=v['ai_bounds']),lambda v:v.update(runtime_source_sha='main')):
             v=self.final_history();mutate(v)
             with self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
+    def test_final_history_preserves_only_actual_swarm_or_original_bridge_network(self):
+        for network in ('m3tfd5h9sp5d1xmzht0ey0oql','5'*64):
+            r=self.request();r['final_history']=self.final_history()
+            r['final_history']['stop_constraints']['network_id']=network
+            a=self.approval(r,'apply')
+            out=tool.decode(tool.derive_request(tool.canonical(r),a,'22-3'))
+            self.assertEqual(out['final_history']['stop_constraints']['network_id'],network)
+        for network in ('infra-network','n3tfd5h9sp5d1xmzht0ey0oql','',None,'m3tfd5h9sp5d1xmzht0ey0oql\n'):
+            v=self.final_history();v['stop_constraints']['network_id']=network
+            with self.subTest(network=network),self.assertRaises(tool.Refused):tool.validate_final_history(v,'12-1')
     def test_writer_control_preserves_expected_hash_only_and_rejects_prepare_even_null(self):
         for value in (None,dict(workflow_scope_sha256='a'*64)):
             r=self.request();r['writer_control']=value;a=self.approval(r)

@@ -40,6 +40,7 @@ ASSET_FILENAMES = frozenset(filename + ".asset.json" for filename in SOURCE_FILE
 ROOT_SUFFIX = ("backups", "qs-server", "compatibility-retirement")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
+AI_STOPPED_INFRA_NETWORK_ID = "m3tfd5h9sp5d1xmzht0ey0oql"
 RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
 NAME = re.compile(r"^[a-z][a-z0-9_-]{0,80}\.json$")
 MAX_JSON = 256 * 1024
@@ -175,6 +176,12 @@ def uint(value):
 def token(value, pattern):
     if type(value) is not str or not pattern.fullmatch(value):
         fail("evidence_type_invalid")
+
+
+def validate_ai_stopped_network_id(value):
+    if type(value) is str and value == AI_STOPPED_INFRA_NETWORK_ID:
+        return
+    token(value, HASH)
 
 
 def utc(value):
@@ -2420,7 +2427,8 @@ def validate_prepare_facts_result(result, args, request, request_hash, code):
         token(ai_runtime["image_id"], re.compile(r"sha256:[0-9a-f]{64}"))
         for key in ("container_id", "binding_sha256"): token(ai_runtime[key], HASH)
         fields(ai_runtime["stop_constraints"], ("settings_sha256", "network_id"))
-        for value in ai_runtime["stop_constraints"].values(): token(value, HASH)
+        token(ai_runtime["stop_constraints"]["settings_sha256"], HASH)
+        validate_ai_stopped_network_id(ai_runtime["stop_constraints"]["network_id"])
     storage = request.get("storage_backup")
     if result.get("storage_backup") != storage or ("storage_backup" in result) != (storage is not None): fail("prepare_facts_storage_binding_rejected")
     names = STORAGE_BACKUP_FILES if storage is not None else PREPARE_SOURCE_NAMES
@@ -2908,7 +2916,10 @@ def main(argv=None):
               "observed_restore_engines": {"mysql_image_id_sha256": "hash64", "mongodb_image_id_sha256": "hash64", "architecture": frozenset({"amd64", "arm64"})},
               "observed_cached_api_image": {"image_id_sha256":"hash64","program_sha256":"hash64","source_sha":"sha40","original_source_sha":"sha40","operation_id":"run_id","run_id":"run_id","image_archive_sha256":"hash64","probe_id":"hash64","probe_absent":"bool","temporary_files_zero":"bool","os":frozenset({"linux"}),"architecture":frozenset({"amd64"})},
               "observed_ai_bounds_sha256":"hash64", "observed_peer_bounds_sha256":"hash64",
-              "observed_ai_runtime": {"source_sha": "sha40", "image_id_sha256": "hash64", "container_id": "hash64", "binding_sha256": "hash64", "stop_constraints": {"settings_sha256": "hash64", "network_id": "hash64"}},
+              "observed_ai_runtime": {"source_sha": "sha40", "image_id_sha256": "hash64", "container_id": "hash64", "binding_sha256": "hash64", "stop_constraints": {"settings_sha256": "hash64", "network_id": (
+                  frozenset({AI_STOPPED_INFRA_NETWORK_ID}) if type(receipt.get("observed_ai_runtime")) is dict
+                  and type(receipt["observed_ai_runtime"].get("stop_constraints")) is dict
+                  and receipt["observed_ai_runtime"]["stop_constraints"].get("network_id") == AI_STOPPED_INFRA_NETWORK_ID else "hash64")}},
               "observed_filesystems": [{"scope": frozenset({"source", "staging", "archive", "docker"}), "path_sha256": "hash64", "total_bytes": "uint", "available_bytes": "uint", "free_bytes": "uint"}],
               "db_census_observation_complete":"bool", "mysql_all_connections_permission_proven":"bool", "mongodb_local_all_sessions_permission_proven":"bool", "all_nodes_sessions_coverage_complete":"bool", "external_writer_coverage_complete":"bool", "db_census_private_catalog_sha256":"hash64_or_empty", "db_census_catalog_sha256":"hash64_or_empty",
               "observed_identity_producer":({key:frozenset({""}) for key in ("operation_id","run_id","source_sha","sha256","request_sha256")} if not any(receipt.get("observed_identity_producer",{}).values()) else {"operation_id":"run_id", "run_id":"run_id", "source_sha":"sha40", "sha256":"hash64", "request_sha256":"hash64"}),
