@@ -795,6 +795,155 @@ class SignedMQ(unittest.TestCase):
             m._mq(ai, peer, originals(scan, approved), keys)
 
 
+class TransactionObserver(unittest.IsolatedAsyncioTestCase):
+    def sessions(self):
+        from sqlalchemy.ext.asyncio import AsyncSession
+        class Session(AsyncSession):
+            def __init__(self, connection, database, observer=False):
+                super().__init__()
+                self.root = SimpleNamespace(is_active=True)
+                self.server, self.connection_id = b"same-server", connection
+                self.database, self.observer = database, observer
+                self.calls, self.transaction_rows, self.after_query = [], None, None
+
+            def get_transaction(self):
+                return self.root
+
+            def get_nested_transaction(self):
+                return None
+
+            def get_bind(self):
+                return SimpleNamespace(dialect=SimpleNamespace(name="mysql"))
+
+            async def execute(self, statement, params):
+                sql = str(statement)
+                self.calls.append((sql, params))
+                if sql == "SELECT CAST(@@server_uuid AS BINARY),CONNECTION_ID()":
+                    rows = [(self.server, self.connection_id)]
+                elif sql == "SELECT CAST(@@server_uuid AS BINARY),CAST(DATABASE() AS BINARY),VERSION(),@@transaction_isolation":
+                    rows = [(self.server, self.database, "8.0.36", "REPEATABLE-READ")]
+                elif "performance_schema.events_transactions_current" in sql:
+                    if not self.observer:
+                        raise PermissionError("synthetic business SELECT 1142")
+                    rows = self.transaction_rows if self.transaction_rows is not None else ([(params["ai_conn"], "READ ONLY", "REPEATABLE READ", "ACTIVE")] if "ai_conn" in params else [("READ ONLY", "REPEATABLE READ", "ACTIVE")])
+                    if self.after_query is not None:
+                        self.after_query()
+                elif sql == "SELECT version_num FROM alembic_version ORDER BY version_num":
+                    rows = [(m.AI_HEAD,)]
+                elif sql == "SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema=DATABASE() AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME":
+                    rows = [(name,) for name in sorted(set(m.AI_SPECS) | {"alembic_version"})]
+                elif sql.startswith("SELECT CAST(`") and " ORDER BY " in sql and sql.endswith(" LIMIT 1"):
+                    rows = []
+                else:
+                    raise AssertionError("unexpected metadata query")
+                return SimpleNamespace(fetchall=lambda: rows, close=lambda: None)
+        return Session(101, b"ai"), Session(202, b"peer", True)
+
+    async def binding(self, ai):
+        scanner = m._scanner("ai", m.AI_HEAD)
+        reader = scanner._Borrowed(ai)
+        await scanner._binding(reader, scanner._identity(ai.server, ai.database), "a" * 40)
+        return reader
+
+    async def test_admin_observes_exact_ai_connection_without_changing_data_reader(self):
+        ai, peer = self.sessions()
+        await m._bind_ai_transaction_observer(ai, peer)
+        reader = await self.binding(ai)
+        self.assertIs(reader.session, ai)
+        self.assertIs(reader.tx, ai.root)
+        actual = [(sql, params) for sql, params in peer.calls if "performance_schema" in sql]
+        self.assertEqual(len(actual), 1)
+        self.assertIn("p.PROCESSLIST_ID=:ai_conn", actual[0][0])
+        self.assertEqual(actual[0][1], {"ai_conn": 101})
+        self.assertFalse(any("performance_schema" in sql for sql, _ in ai.calls))
+        with self.assertRaises(m.Rejected):
+            m._private_json(ai.info[m._AI_TRANSACTION_OBSERVER])
+
+    async def test_full_bounds_entry_preserves_head_keyword_and_private_data_reader(self):
+        ai, peer = self.sessions()
+        await m._bind_ai_transaction_observer(ai, peer)
+        async def schema(module, reader, table):
+            self.assertIs(reader.session, ai)
+            self.assertEqual(reader.head, m.AI_HEAD)
+            return {"columns": [(name,) for name in m.AI_SPECS[table][0].split()], "kinds": {},
+                    "ddl_sha256": "b" * 64, "columns_sha256": "c" * 64}
+        scanner = m._scanner("ai", m.AI_HEAD)
+        with patch.object(m, "_schema", schema):
+            bounds = await m.discover_full_bounds(ai, side="ai", source_sha="a" * 40,
+                identity_hash=scanner._identity(ai.server, ai.database), head=m.AI_HEAD)
+        self.assertEqual(set(bounds.tables), set(m.AI_SPECS))
+        self.assertEqual(bounds.head, m.AI_HEAD)
+        self.assertNotIn(b"observer", bounds.private_bytes())
+        self.assertFalse(any("performance_schema" in sql for sql, _ in ai.calls))
+
+    async def test_standalone_borrowed_binding_keeps_original_own_transaction_check(self):
+        ai, _ = self.sessions()
+        ai.observer = True
+        await self.binding(ai)
+        calls = [(sql, params) for sql, params in ai.calls if "performance_schema" in sql]
+        self.assertEqual(len(calls), 1)
+        self.assertIn("p.PROCESSLIST_ID=CONNECTION_ID()", calls[0][0])
+        self.assertEqual(calls[0][1], {})
+
+    async def test_cross_server_or_missing_private_observer_never_falls_back(self):
+        ai, peer = self.sessions()
+        peer.server = b"other-server"
+        with self.assertRaises(m.Rejected):
+            await m._bind_ai_transaction_observer(ai, peer)
+        for observer in (None, {}, True):
+            ai.info[m._AI_TRANSACTION_OBSERVER] = observer
+            with self.subTest(observer=type(observer).__name__), self.assertRaises(m.Rejected):
+                await self.binding(ai)
+        self.assertFalse(any("performance_schema" in sql for sql, _ in ai.calls))
+
+    async def test_actual_ai_state_not_admin_default_and_exact_unique_row_required(self):
+        for rows in ([], [(102, "READ ONLY", "REPEATABLE READ", "ACTIVE")],
+                     [(101, "READ WRITE", "REPEATABLE READ", "ACTIVE")],
+                     [(101, "READ ONLY", "READ COMMITTED", "ACTIVE")],
+                     [(101, "READ ONLY", "REPEATABLE READ", "COMMITTED")],
+                     [(101, "READ ONLY", "REPEATABLE READ", None)],
+                     [(101, "READ ONLY", "REPEATABLE READ", "ACTIVE")] * 2):
+            ai, peer = self.sessions()
+            await m._bind_ai_transaction_observer(ai, peer)
+            peer.transaction_rows = rows
+            with self.subTest(rows=rows), self.assertRaises(m.Rejected):
+                await self.binding(ai)
+            self.assertFalse(any("performance_schema" in sql for sql, _ in ai.calls))
+        ai, peer = self.sessions()
+        await m._bind_ai_transaction_observer(ai, peer)
+        peer.observer = False
+        with self.assertRaises(m.Rejected):
+            await self.binding(ai)
+
+    async def test_transaction_uuid_and_connection_stay_bound_before_and_after_query(self):
+        for side, attr, value in (("ai", "connection_id", 303), ("peer", "connection_id", 404),
+                                 ("ai", "server", b"changed"), ("peer", "server", b"changed"),
+                                 ("ai", "root", SimpleNamespace(is_active=True)),
+                                 ("peer", "root", SimpleNamespace(is_active=True))):
+            ai, peer = self.sessions()
+            await m._bind_ai_transaction_observer(ai, peer)
+            target = ai if side == "ai" else peer
+            peer.after_query = lambda: setattr(target, attr, value)
+            with self.subTest(side=side, attr=attr), self.assertRaises(m.Rejected):
+                await self.binding(ai)
+
+    async def test_fresh_epoch_rebinds_new_ai_connection_and_rejects_old_observer(self):
+        ai, peer = self.sessions()
+        await m._bind_ai_transaction_observer(ai, peer)
+        await self.binding(ai)
+        old = ai.info[m._AI_TRANSACTION_OBSERVER]
+        ai.root.is_active = peer.root.is_active = False
+        fresh_ai, fresh_peer = self.sessions()
+        fresh_ai.connection_id, fresh_peer.connection_id = 303, 404
+        fresh_ai.info[m._AI_TRANSACTION_OBSERVER] = old
+        with self.assertRaises(m.Rejected):
+            await self.binding(fresh_ai)
+        await m._bind_ai_transaction_observer(fresh_ai, fresh_peer)
+        await self.binding(fresh_ai)
+        calls = [(sql, params) for sql, params in fresh_peer.calls if "performance_schema" in sql]
+        self.assertEqual(calls[0][1], {"ai_conn": 303})
+
+
 @unittest.skipUnless(os.environ.get("QS_AI_RETIREMENT_VERIFIER_NATIVE") == "1", "owned native opt-in")
 class Native(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

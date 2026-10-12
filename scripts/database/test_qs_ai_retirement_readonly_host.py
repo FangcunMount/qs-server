@@ -1,4 +1,5 @@
 """Offline host grammar/privacy/framing tests; never database qualification."""
+import ast
 import base64
 import hashlib
 import importlib.util
@@ -166,6 +167,19 @@ class ActualHostContract(unittest.TestCase):
 
 
 class DiscoveryHostContract(unittest.TestCase):
+    def test_each_owned_epoch_binds_private_transaction_observer(self):
+        tree = ast.parse(PATH.read_text())
+        snapshots = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "open_snapshots")
+        calls = [n for n in ast.walk(snapshots) if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Attribute) and n.func.attr == "_bind_ai_transaction_observer"]
+        self.assertEqual(len(calls), 1)
+        for name in ("execute", "execute_discovery"):
+            owned = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == name)
+            epochs = [n for n in ast.walk(owned) if isinstance(n, ast.Call)
+                      and isinstance(n.func, ast.Name) and n.func.id == "open_snapshots"]
+            self.assertEqual(len(epochs), 2)
+            self.assertTrue(all([ast.unparse(arg) for arg in n.args] == ["engines", "module"] for n in epochs))
+
     def packet(self):
         original = ActualHostContract().packet()
         keep = m.DISCOVERY_FIELDS - {"expected_ai", "expected_peer"}

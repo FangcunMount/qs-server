@@ -25,7 +25,7 @@ OUTPUT_LIMIT = 32 << 20
 ORIGINAL_LIMIT = 10000
 TOTAL_SECONDS = 1500
 MODULES = {
-    "qs-ai-retirement-readonly-verifier.py": "6a7e746e313a1028bd54edc878947c74c262d0e47af6de32b6c032fea035cee9",
+    "qs-ai-retirement-readonly-verifier.py": "04bcf8091efcc30916be9a92e0d277bc15ed1ee724a1cf478e144aa63f250910",
     "qs-ai-retirement-readonly-observer.py": "20c501d0930a21c1e8be12416156d5635430cf6171e01d28a6db789e83f06d5a",
     "qs-ai-retirement-0040-layout.py": "690d68be91713641ad6ce13ad9ad126828c64fe780bda05522bd68697ead577f",
 }
@@ -348,7 +348,7 @@ async def close_sessions(sessions):
         reject()
 
 
-async def open_snapshots(engines):
+async def open_snapshots(engines, module):
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import AsyncSession
     sessions = []
@@ -358,6 +358,7 @@ async def open_snapshots(engines):
             sessions.append(session)
             await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
             await session.execute(text("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY"))
+        await module._bind_ai_transaction_observer(*sessions)
         return sessions
     except Exception:
         await close_sessions(sessions)
@@ -389,7 +390,7 @@ async def execute(packet, module):
         for url in (ai_url, peer_url):
             engines.append(create_async_engine(url, hide_parameters=True, echo=False,
                             isolation_level="REPEATABLE READ", pool_size=1, max_overflow=0))
-        sessions = await open_snapshots(engines)
+        sessions = await open_snapshots(engines, module)
         qualification = await module.verify(*sessions, ai_bounds=ai_bound, peer_bounds=peer_bound,
             approved_ai_bounds_sha256=packet["ai_bounds_sha256"],
             approved_peer_bounds_sha256=packet["peer_bounds_sha256"],
@@ -423,7 +424,7 @@ async def execute(packet, module):
         await close_sessions(sessions)
         sessions = []
         # Old transactions truly ended before either new transaction begins.
-        sessions = await open_snapshots(engines)
+        sessions = await open_snapshots(engines, module)
         await module.recheck(*sessions, qualification, protection_keys=keys)
         _, fresh_key_baseline = protection(module, packet, settings)
         if fresh_key_baseline != key_baseline:
@@ -610,7 +611,7 @@ async def execute_discovery(packet, module):
     try:
         for url in urls:
             engines.append(create_async_engine(url, hide_parameters=True, echo=False, isolation_level="REPEATABLE READ", pool_size=1, max_overflow=0))
-        sessions = await open_snapshots(engines)
+        sessions = await open_snapshots(engines, module)
         observed = [await discovery_binding(session, module, side, packet) for session, side in zip(sessions, ("ai", "peer"))]
         bounds_set = [value[0] for value in observed]
         if bounds_set[0].identity_hash == bounds_set[1].identity_hash:
@@ -636,7 +637,7 @@ async def execute_discovery(packet, module):
         sessions = []
         if any(tx is None or tx.is_active for tx in original_txs):
             reject()
-        sessions = await open_snapshots(engines)
+        sessions = await open_snapshots(engines, module)
         fresh = [await discovery_fresh_checks(session, module, bound, tx, sections) for session, bound, tx in zip(sessions, bounds_set, original_txs)]
         packets = {bound.side: {"bytes": base64.b64encode(bound.private_bytes()).decode(), "sha256": bound.digest(), "objects": len(bound.tables), "prior_binding_matched": observed[i][1], "after_upper": fresh[i][0]} for i, bound in enumerate(bounds_set)}
         if fresh[1][1] != sections or len(bounds_set[1].tables) != 14:
