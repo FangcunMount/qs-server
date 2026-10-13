@@ -3,8 +3,6 @@ package migration
 import (
 	"fmt"
 	"io/fs"
-	"strconv"
-	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -35,37 +33,6 @@ func embeddedMigrationSource(t *testing.T) fstest.MapFS {
 		t.Fatal(err)
 	}
 	return source
-}
-
-// Build a historical release by running its actual unchanged inventory, even
-// after a later release adds resources to this binary.
-func migrationResourcesThrough(t *testing.T, sqlHead, mongoHead uint) *migrationResources {
-	t.Helper()
-	source := embeddedMigrationSource(t)
-	for path := range source {
-		parts := strings.Split(path, "/")
-		if len(parts) != 3 || (!strings.Contains(parts[2], ".up.") && !strings.Contains(parts[2], ".down.")) {
-			continue
-		}
-		version, err := strconv.ParseUint(parts[2][:6], 10, 32)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if (parts[1] == "mysql" && uint(version) > sqlHead) || (parts[1] == "mongodb" && uint(version) > mongoHead) {
-			delete(source, path)
-		}
-	}
-	var pairs []schemaVersionPair
-	for _, pair := range declaredSchemaPairs {
-		if pair.SQL <= sqlHead && pair.Mongo <= mongoHead {
-			pairs = append(pairs, pair)
-		}
-	}
-	r, err := readMigrationResources(source, pairs)
-	if err != nil || r.sql.head != sqlHead || r.mongo.head != mongoHead {
-		t.Fatal("historical release inventory unavailable", err)
-	}
-	return r
 }
 
 func futureMigrationPaths(t *testing.T) (string, string) {
