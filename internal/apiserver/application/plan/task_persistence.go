@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -15,18 +14,21 @@ import (
 // taskPersistence keeps a task terminal transition and its Enrollment close check
 // inside one MySQL transaction. All task services require both dependencies.
 type taskPersistence struct {
-	tasks        domainplan.AssessmentTaskRepository
-	enrollments  domainplan.EnrollmentRepository
-	tx           apptransaction.Runner
-	openedOutbox appEventing.ProfileBinding
+	tasks          domainplan.AssessmentTaskRepository
+	enrollments    domainplan.EnrollmentRepository
+	tx             apptransaction.Runner
+	openingOptions TaskOpeningOptions
 }
 
 // saveOpened persists the winning pending->opened transition and its reminder
 // intent in the same MySQL transaction. An outer caller-owned transaction keeps
 // both writes together; its normal Relay scan recovers if no wake is registered.
 func (p taskPersistence) saveOpened(ctx context.Context, task *domainplan.AssessmentTask) (bool, error) {
-	if p.openedOutbox.Stager == nil {
+	if !p.openingOptions.ReminderEnabled {
 		return false, p.save(ctx, task, false)
+	}
+	if err := p.openingOptions.validate(); err != nil {
+		return false, err
 	}
 	if _, active := mysql.TxFromContext(ctx); !active && p.tx == nil {
 		return false, fmt.Errorf("task opened outbox requires a MySQL transaction runner")
@@ -44,13 +46,13 @@ func (p taskPersistence) saveOpened(ctx context.Context, task *domainplan.Assess
 		if err := p.tasks.Save(txCtx, task); err != nil {
 			return err
 		}
-		return p.openedOutbox.Stager.Stage(txCtx, staged...)
+		return p.openingOptions.ReminderOutbox.Stager.Stage(txCtx, staged...)
 	}); err != nil {
 		return false, err
 	}
 	task.ClearEvents()
-	if _, active := mysql.TxFromContext(ctx); !active && p.openedOutbox.PostCommit != nil {
-		p.openedOutbox.PostCommit.AfterCommit(ctx, staged, time.Now())
+	if _, active := mysql.TxFromContext(ctx); !active && p.openingOptions.ReminderOutbox.PostCommit != nil {
+		p.openingOptions.ReminderOutbox.PostCommit.AfterCommit(ctx, staged, time.Now())
 	}
 	return true, nil
 }

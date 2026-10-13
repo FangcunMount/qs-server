@@ -6,7 +6,6 @@ import (
 	"time"
 
 	componenterrors "github.com/FangcunMount/component-base/pkg/errors"
-	appeventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planentry "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
@@ -48,7 +47,7 @@ func newTestTaskSchedulerService(t *testing.T, tasks *schedulerTaskRepoStub, pla
 		task.AssignEnrollment(enrollment.ID())
 		enrollments.items[enrollment.ID()] = enrollment
 	}
-	service, err := NewTaskSchedulerService(tasks, plans, enrollments, directPlanTxRunner{}, entry, publisher, appeventing.ProfileBinding{})
+	service, err := NewTaskSchedulerService(tasks, plans, enrollments, directPlanTxRunner{}, entry, publisher, TaskOpeningOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,31 +94,31 @@ func TestTaskConstructorsRejectMissingRequiredDependencies(t *testing.T) {
 	entry := &entryGeneratorStub{}
 	for name, create := range map[string]func() error{
 		"scheduler task": func() error {
-			_, e := NewTaskSchedulerService(nil, plans, enrollments, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskSchedulerService(nil, plans, enrollments, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"scheduler plan": func() error {
-			_, e := NewTaskSchedulerService(tasks, nil, enrollments, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskSchedulerService(tasks, nil, enrollments, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"scheduler enrollment": func() error {
-			_, e := NewTaskSchedulerService(tasks, plans, nil, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskSchedulerService(tasks, plans, nil, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"scheduler transaction": func() error {
-			_, e := NewTaskSchedulerService(tasks, plans, enrollments, nil, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskSchedulerService(tasks, plans, enrollments, nil, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"management plan": func() error {
-			_, e := NewTaskManagementService(tasks, nil, enrollments, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskManagementService(tasks, nil, enrollments, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"management enrollment": func() error {
-			_, e := NewTaskManagementService(tasks, plans, nil, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskManagementService(tasks, plans, nil, directPlanTxRunner{}, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"management transaction": func() error {
-			_, e := NewTaskManagementService(tasks, plans, enrollments, nil, entry, event.NewNopEventPublisher(), appeventing.ProfileBinding{})
+			_, e := NewTaskManagementService(tasks, plans, enrollments, nil, entry, event.NewNopEventPublisher(), TaskOpeningOptions{})
 			return e
 		},
 		"entry enrollment": func() error { _, e := NewTaskEntryResolver(tasks, enrollmentScaleCatalogStub{}, nil); return e },

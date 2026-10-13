@@ -11,7 +11,6 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -107,7 +106,7 @@ func TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL(t *testing.T) {
 	}
 	recorder := &openEventRecorder{}
 	uow := mysqlbase.NewUnitOfWork(db)
-	service, err := appplan.NewTaskManagementService(barrier, mysqlplan.NewPlanRepository(db), mysqlplan.NewEnrollmentRepository(db), apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error { return uow.WithinTransaction(ctx, fn) }), &uniqueOpenEntryGenerator{}, recorder, appEventing.ProfileBinding{})
+	service, err := appplan.NewTaskManagementService(barrier, mysqlplan.NewPlanRepository(db), mysqlplan.NewEnrollmentRepository(db), apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error { return uow.WithinTransaction(ctx, fn) }), &uniqueOpenEntryGenerator{}, recorder, appplan.TaskOpeningOptions{})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()

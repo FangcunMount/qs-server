@@ -38,15 +38,18 @@ func NewTaskSchedulerService(
 	txRunner apptransaction.Runner,
 	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
-	openedOutbox eventing.ProfileBinding,
+	openingOptions TaskOpeningOptions,
 ) (TaskSchedulerService, error) {
 	if taskRepo == nil || planRepo == nil || enrollmentRepo == nil || txRunner == nil || entryGenerator == nil || eventPublisher == nil {
 		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "plan task service requires task, plan, enrollment, transaction, entry and event dependencies")
 	}
+	if err := openingOptions.validate(); err != nil {
+		return nil, err
+	}
 	return &taskSchedulerService{
 		taskRepo: taskRepo, planRepo: planRepo, enrollmentRepo: enrollmentRepo,
 		taskLifecycle: plan.NewTaskLifecycle(), entryGenerator: entryGenerator, eventPublisher: eventPublisher,
-		persistence: taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner, openedOutbox: openedOutbox},
+		persistence: taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner, openingOptions: openingOptions},
 	}, nil
 }
 

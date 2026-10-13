@@ -46,17 +46,18 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the plan module.
 type Deps struct {
-	MySQLDB         *gorm.DB
-	EventPublisher  event.EventPublisher
-	PublishedModels modelcatalogport.PublishedModelLister
-	RedisClient     redis.UniversalClient
-	CacheBuilder    *keyspace.Builder
-	CachePolicies   sharedcache.PolicyProvider
-	EntryBaseURL    string
-	Observer        *observability.ComponentObserver
-	MySQLLimiter    backpressure.Acquirer
-	TesteeAccess    actorAccessApp.TesteeAccessService
-	OpenedOutbox    appEventing.ProfileBinding
+	MySQLDB                   *gorm.DB
+	EventPublisher            event.EventPublisher
+	PublishedModels           modelcatalogport.PublishedModelLister
+	RedisClient               redis.UniversalClient
+	CacheBuilder              *keyspace.Builder
+	CachePolicies             sharedcache.PolicyProvider
+	EntryBaseURL              string
+	Observer                  *observability.ComponentObserver
+	MySQLLimiter              backpressure.Acquirer
+	TesteeAccess              actorAccessApp.TesteeAccessService
+	OpenedOutbox              appEventing.ProfileBinding
+	TaskOpenedReminderEnabled bool
 }
 
 // New assembles the plan module.
@@ -94,11 +95,11 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
-	taskSchedulerService, err := planApp.NewTaskSchedulerService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	taskSchedulerService, err := planApp.NewTaskSchedulerService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox})
 	if err != nil {
 		return nil, err
 	}
-	taskManagementService, err := planApp.NewTaskManagementService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	taskManagementService, err := planApp.NewTaskManagementService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox})
 	if err != nil {
 		return nil, err
 	}

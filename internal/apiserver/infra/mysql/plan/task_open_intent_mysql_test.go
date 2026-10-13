@@ -108,7 +108,7 @@ events:
 	legacyPublisher := &openEventRecorder{}
 	service, err := appplan.NewTaskManagementService(
 		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
-		appEventing.ProfileBinding{Stager: stager},
+		appplan.TaskOpeningOptions{ReminderEnabled: true, ReminderOutbox: appEventing.ProfileBinding{Stager: stager}},
 	)
 	require.NoError(t, err)
 	newTask := func(sequence int) *domainplan.AssessmentTask {
@@ -135,7 +135,7 @@ events:
 	// Stage failure after the real MySQL task update must roll that update back.
 	failedService, err := appplan.NewTaskManagementService(
 		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
-		appEventing.ProfileBinding{Stager: rejectOpenedIntentStager{}},
+		appplan.TaskOpeningOptions{ReminderEnabled: true, ReminderOutbox: appEventing.ProfileBinding{Stager: rejectOpenedIntentStager{}}},
 	)
 	require.NoError(t, err)
 	_, err = failedService.OpenTask(t.Context(), 501, task.GetID().String())
@@ -196,7 +196,7 @@ events:
 	scheduled := newTask(3)
 	scheduler, err := appplan.NewTaskSchedulerService(
 		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
-		appEventing.ProfileBinding{Stager: stager},
+		appplan.TaskOpeningOptions{ReminderEnabled: true, ReminderOutbox: appEventing.ProfileBinding{Stager: stager}},
 	)
 	require.NoError(t, err)
 	shanghai, err := time.LoadLocation("Asia/Shanghai")
@@ -219,7 +219,7 @@ events:
 	}
 	concurrent, err := appplan.NewTaskManagementService(
 		barrier, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
-		appEventing.ProfileBinding{Stager: stager},
+		appplan.TaskOpeningOptions{ReminderEnabled: true, ReminderOutbox: appEventing.ProfileBinding{Stager: stager}},
 	)
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -274,7 +274,7 @@ events:
 	})
 	unknownService, err := appplan.NewTaskManagementService(
 		repository, planRepository, enrollmentRepository, unknownRunner, &uniqueOpenEntryGenerator{}, legacyPublisher,
-		appEventing.ProfileBinding{Stager: stager},
+		appplan.TaskOpeningOptions{ReminderEnabled: true, ReminderOutbox: appEventing.ProfileBinding{Stager: stager}},
 	)
 	require.NoError(t, err)
 	_, err = unknownService.OpenTask(t.Context(), 501, unknownTask.GetID().String())
