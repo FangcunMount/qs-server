@@ -360,9 +360,26 @@ jobs:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m3_test
         run: |
+          set -euo pipefail
           go test -race -tags=integration -count=1 -timeout=8m \
-            -run '^(TestSchemaPairNative|TestDisabledDDLNative)' \
-            ./internal/pkg/migration ./internal/apiserver/bootstrap
+            -run '^(TestHistoricalEvidenceNative|TestSchemaPairNative|TestDisabledDDLNative)' -v \
+            ./internal/pkg/migration ./internal/apiserver/bootstrap \
+            | tee "${RUNNER_TEMP}/schema-pair.log"
+          for test_name in \
+            TestHistoricalEvidenceNativeSQLOnlyUpgradeAndRestart \
+            TestHistoricalEvidenceNativePartialDDLRemainsDirtyAndRefusesDown \
+            TestHistoricalEvidenceNativeSchemaObjectRestoreWithSyntheticNonNull \
+            TestSchemaPairNativeColdBootstrapAndRestart \
+            TestDisabledDDLNativeValidatesCurrentHeadsAndNeverCreatesMetadata; do
+            if ! grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/schema-pair.log"; then
+              echo "Required schema pair test did not pass: ${test_name}" >&2
+              exit 1
+            fi
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/schema-pair.log"; then
+            echo 'Schema pair verification must not skip' >&2
+            exit 1
+          fi
 
       - name: Verify compatibility retirement A evidence contracts on real databases
         env:
