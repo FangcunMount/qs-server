@@ -2559,6 +2559,204 @@
         "The UID1001 attempt emitted no decoder facts. Its diagnostics were suppressed; the record preserves the identity difference without claiming a proven raw error cause.",
         "The ordinary service run callback and database/queue/notification clients were excluded; physical MQ settlement and IAM/WeChat real acceptance remain unexecuted."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m5-legacy-assets-v1-shadow",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T17:11:23.262939+00:00",
+      "environment": "production/serverA qs Mongo rs0, complete read-only snapshot legacy-v1 asset shadow",
+      "deployed_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+      "source_baseline_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Exact running API identity and current input files bound the read-only client, not a full six-instance effective configuration hash. No version assignment, runtime-read switch or business acceptance occurred."
+      },
+      "command": "Authorized root SSH: exact API ead version/Id/StartedAt binding; bounded Mongo snapshot CountDocuments/Find/getMore sorted by _id, cap1000/batch25, original raw fingerprint. Canonical Definition directly enters immutable complete legacy-v1 DTO pure projection, then all actual stored Assets fields are compared. No stored-first getter or raw-data write. Original canonical-v2/Source gates are retained separately. Cached client container read-only, cap-drop/no-new-privileges/log-driver none; private connection, no body/URI/driver-error output.",
+      "result": {
+        "status": "findings",
+        "summary": "All105 original object identities/revisions/raw fingerprints remain unchanged. Complete legacy-v1 Assets and Decision for all80 structurally valid records match storage, including all4 MBTI snapshots. Original canonical-v2 differences4, invalid heads25 and invalid Source metadata15 remain independent; overall zero_mismatch=false/exit2. This proves v1 stored-asset equivalence only, not final retirement or business correctness.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "shadow_source_sha": "630721751212aa1805b20cf9e89bda33727d587d",
+          "source_heads": {
+            "auditor": "d530b312194999af30973b4e155d4ab5b6715ed5",
+            "legacy_projection": "d9b4987c5b67fc92b19000acc050af4d2d4c1ffd",
+            "frozen_hash": "e36ae7d2ff926bd24b4a52d8836d12216baefb11"
+          },
+          "binary_sha256": "sha256:cc27a71ec7550642132a269b8209686cf8d5f51afbd58bce893ca84b7608dc1c",
+          "runner_sha256": "sha256:22f6474ec44f8c659fecd8027ec535e3bb4a4bd7987ef7f797251d34be99ba00",
+          "raw_audit_sha256": "sha256:62d0d60492b68275bcd9fc2b3464d8ea5a9997bd4ded74d14c4e8b9d1b625189",
+          "raw_binding_sha256": "sha256:9836984effff6177629ad8c2870dbadc18b2822500d1ae70e4fdded08eff14fe",
+          "raw_artifact_retention": "Task private qs-server-cleanup-m5-definition-legacy-v1-shadow-audit.json and -binding.json; prior hash/reason/classification artifacts remain intact. No model/report copy.",
+          "source_file_sha256": {
+            "internal/apiserver/domain/modelcatalog/definition/report_assets_projection.go": "5562617b21b7118641c2badd48c1352f0caf36fc6b9d2a52c8afe67a5afcf44d",
+            "internal/apiserver/domain/modelcatalog/definition/content_hash_v1.go": "d2f488a326413cf0c295e2a9ccb7ae751c43c31a2f424967f364cca78be4d3a7",
+            "internal/apiserver/infra/mongo/modelcatalog/definition_projection_audit.go": "cdbb6869820846d3e8907dc7f94ba5787fbeb40879dc514b23c24811b67e961c",
+            "internal/apiserver/infra/mongo/modelcatalog/legacy_assets_shadow_audit.go": "b6eef75302821b0399e71d41ecb51b8c284210e25f4060695e2257954a98a492",
+            "scripts/oneoff/audit_norm_usage/definition_projections.go": "d01ac0f592fd135c37089a45878724170ed57667aa2da829f075749fed6a68e4",
+            "scripts/oneoff/audit_norm_usage/main.go": "41671bf439e1ab6885dc437a08eda5c8ff6cb655709e9781c63dc500bdcf28d8"
+          },
+          "identity_before": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_after": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_unchanged": true,
+          "api_runtime_unchanged": true,
+          "audit_exit_code": 2,
+          "summary": {
+            "complete": true,
+            "zero_mismatch": false,
+            "expected": 105,
+            "scanned": 105,
+            "compared": 80,
+            "matched": 76,
+            "mismatched": 4,
+            "missing_definition": 0,
+            "unknown_schema": 0,
+            "invalid": 25,
+            "record_errors": 0,
+            "scan_errors": 0,
+            "heads": 26,
+            "snapshots": 79,
+            "historical": 54,
+            "stored_decision_fields": 81,
+            "stored_asset_fields": 81,
+            "hash_metadata_matched": 64,
+            "hash_metadata_invalid": 15,
+            "hash_metadata_unverifiable": 0,
+            "truncated": false,
+            "legacy_assets_shadow_version": 1,
+            "legacy_assets_compared": 80,
+            "legacy_assets_matched": 80,
+            "legacy_assets_invalid": 25,
+            "shadow_compiled_source_sha": "630721751212aa1805b20cf9e89bda33727d587d"
+          },
+          "all_105_bound": true,
+          "raw_fingerprint_matches": 105,
+          "raw_fingerprint_changes": 0,
+          "original_classification_changes": 0,
+          "four_mbti_scope": [
+            {
+              "model_id": "6a59ea01d583d69046bdf1f5",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64",
+              "historical": true,
+              "fingerprint": "3f8172c543382905096bad574fa7796e1793742f29b28e5cbd9a1093c85f7933",
+              "original_status": "mismatched",
+              "original_difference_count": 32,
+              "hash_metadata_status": "matched",
+              "legacy_v1_shadow": {
+                "status": "matched",
+                "difference_count": 0,
+                "decision_status": "matched",
+                "decision_difference_count": 0,
+                "invalid_count": 0
+              }
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f6",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55",
+              "historical": true,
+              "fingerprint": "80c7b58ff1d814238dfebd8ecc29fc07eac641ad3e5fa23cb111ec66f7d17787",
+              "original_status": "mismatched",
+              "original_difference_count": 32,
+              "hash_metadata_status": "matched",
+              "legacy_v1_shadow": {
+                "status": "matched",
+                "difference_count": 0,
+                "decision_status": "matched",
+                "decision_difference_count": 0,
+                "invalid_count": 0
+              }
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af17",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64-report-202608-v1",
+              "historical": false,
+              "fingerprint": "90cd3d7bc250c63ed294dc4aeb5e87a6307da3bbe657e56a223d457b10317575",
+              "original_status": "mismatched",
+              "original_difference_count": 32,
+              "hash_metadata_status": "matched",
+              "legacy_v1_shadow": {
+                "status": "matched",
+                "difference_count": 0,
+                "decision_status": "matched",
+                "decision_difference_count": 0,
+                "invalid_count": 0
+              }
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af18",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55-report-202608-v1",
+              "historical": false,
+              "fingerprint": "f647412921f486af0418df9bc170dda617b6d9ec0b55ef84bae1d70a7c24d05d",
+              "original_status": "mismatched",
+              "original_difference_count": 32,
+              "hash_metadata_status": "matched",
+              "legacy_v1_shadow": {
+                "status": "matched",
+                "difference_count": 0,
+                "decision_status": "matched",
+                "decision_difference_count": 0,
+                "invalid_count": 0
+              }
+            }
+          ],
+          "projection_marker_assigned": false,
+          "cas_rehash_rematerialize_performed": false
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#67-m5-06-生产-definition-只读投影核查"
+        }
+      ],
+      "limitations": [
+        "Legacy-v1 intentionally preserves the entire old Rarity loss; using canonical-v2 on the same historical version would change assets. No source record, frozen ReportInput or actual report was rewritten.",
+        "All25 invalid heads and15 missing Source hash snapshots remain blocked. Matching80 assets is not permission to assign all105 record markers or remove derived storage fields.",
+        "Temporary integration source/CLI is isolated and reviewed, not pushed into the three formal M5 PRs or main and not a deployable integration candidate. All formal client release, observation, backup/restore and business gates remain separate."
+      ]
     }
   ]
 }
