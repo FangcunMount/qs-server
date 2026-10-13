@@ -300,8 +300,9 @@ jobs:
             docker logs "$mongo_cid" || true
           }
           trap 'mongo_exit=$?; if [ "$mongo_exit" -ne 0 ]; then mongo_startup_diagnostics; fi' EXIT
+          # Keep mongosh state outside the entrypoint's /data/db initialization.
           for attempt in $(seq 1 30); do
-            if docker exec "$mongo_cid" mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
+            if docker exec --env HOME=/tmp/qs-runtime-closure-mongosh --env XDG_CONFIG_HOME=/tmp/qs-runtime-closure-mongosh/config "$mongo_cid" mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
             fi
             if [ "$attempt" -eq 30 ]; then
@@ -309,10 +310,10 @@ jobs:
             fi
             sleep 2
           done
-          docker exec "$mongo_cid" mongosh --quiet --eval \
+          docker exec --env HOME=/tmp/qs-runtime-closure-mongosh --env XDG_CONFIG_HOME=/tmp/qs-runtime-closure-mongosh/config "$mongo_cid" mongosh --quiet --eval \
             'rs.initiate({_id: "rs0", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
           for attempt in $(seq 1 30); do
-            if docker exec "$mongo_cid" mongosh --quiet --eval \
+            if docker exec --env HOME=/tmp/qs-runtime-closure-mongosh --env XDG_CONFIG_HOME=/tmp/qs-runtime-closure-mongosh/config "$mongo_cid" mongosh --quiet --eval \
               'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
               exit 0
             fi
@@ -380,6 +381,33 @@ jobs:
             ./internal/apiserver/infra/mongo/questionnaire \
             ./internal/apiserver/infra/mongo/modelcatalog \
             ./internal/apiserver/container/modules/modelcatalog
+
+      - name: Require read-only Definition projection audit against real Mongo
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_definition_projection_ci_test
+        run: |
+          set -euo pipefail
+          test -n "$QS_SERVER_TEST_MONGO_URI"
+          tests=(
+            TestProjectionAuditRealMongoPaginationAllRolesAndNonzeroFindings
+            TestProjectionAuditRealMongoSnapshotBindsConcurrentChanges
+            TestProjectionAuditRealMongoEmptyAndCLIReadOnlyResult
+          )
+          selector="^($(IFS='|'; echo "${tests[*]}"))$"
+          selected="$RUNNER_TEMP/definition-projection-selected.txt"
+          result="$RUNNER_TEMP/definition-projection-result.txt"
+          go test -tags=integration -list "$selector" ./scripts/oneoff/audit_norm_usage > "$selected"
+          test "$(awk '/^TestProjectionAuditRealMongo/ {n++} END {print n+0}' "$selected")" -eq 3
+          for name in "${tests[@]}"; do
+            awk -v name="$name" '$0 == name {found=1} END {exit !found}' "$selected"
+          done
+          go test -race -tags=integration -count=1 -timeout=2m -v -run "$selector" \
+            ./scripts/oneoff/audit_norm_usage | tee "$result"
+          awk '/--- SKIP:/ {skipped=1} END {exit skipped}' "$result"
+          for name in "${tests[@]}"; do
+            awk -v name="$name" '$1 == "---" && $2 == "PASS:" && $3 == name {passed=1} END {exit !passed}' "$result"
+          done
 
       - name: Run Mongo runtime-ledger retirement guards
         env:
