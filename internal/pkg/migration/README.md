@@ -37,6 +37,8 @@ MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来�
 
 当前批准格式为 `format_version: 2`、`kind: qs_schema_pair_pristine_bootstrap`。它绑定实际编译 SHA、选定 MySQL 库与 Mongo 集群身份、该二进制的两个目标 head、完整嵌入迁移资源摘要和有效期。资源摘要是按 MySQL、MongoDB 目录及文件名顺序，将全部 up/down 文件记录为 `[backend, path, sha256]` 的 JSON 数组后再计算 SHA256。原 v1 仅绑定退役末尾资源，不能授权当前格式。
 
+批准文件的生成方可通过只读的 `EmbeddedMigrationResources()` 读取实际编译目标 head 与完整资源摘要，避免复制摘要算法或固定目标版本。运行闭环集成测试使用这个接口生成 v2 夹具；该只读接口不创建批准文件，也不绕过真实库身份和空库预检。
+
 批准在 SQL 开始前复核并一次消费；失败或部分冷启动不重新使用该文件。只有批准的新空库才允许完整历史升级后删除新生成的空旧对象。正常恢复不能使用冷启动批准，不能借关闭 DDL、down、force 或直接清除 dirty 绕过保护。
 
 本批真实数据库测试覆盖当前 `100/39`、仅在测试 FS 中的未来 `101/40`、独立阶段重启和部分 DDL 失败。源码和测试不是生产发布证明；本重构的实际发布及后续数据退出须独立验收，四对象此前的执行事实仍见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
