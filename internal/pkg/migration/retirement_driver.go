@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"embed"
 	"io"
+	"io/fs"
 	"reflect"
 	"strings"
 	"time"
@@ -33,14 +33,14 @@ type retirementDatabaseDriver struct {
 	tailSucceeded bool
 }
 
-func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *Config, conn *sql.Conn, client *mongo.Client, fs embed.FS) *retirementDatabaseDriver {
+func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *Config, conn *sql.Conn, client *mongo.Client, source fs.FS) *retirementDatabaseDriver {
 	directory, base := "mysql", "000100_retire_compatibility_message_storage"
 	extension := "sql"
 	if backend == BackendMongo {
 		directory, base, extension = "mongodb", "000039_retire_compatibility_message_storage", "json"
 	}
-	up, _ := fs.ReadFile("migrations/" + directory + "/" + base + ".up." + extension)
-	down, _ := fs.ReadFile("migrations/" + directory + "/" + base + ".down." + extension)
+	up, _ := fs.ReadFile(source, "migrations/"+directory+"/"+base+".up."+extension)
+	down, _ := fs.ReadFile(source, "migrations/"+directory+"/"+base+".down."+extension)
 	canonical, err := migrations.ReadFile("migrations/" + directory + "/" + base + ".up." + extension)
 	exact := err == nil && bytes.Equal(up, canonical)
 	if backend == BackendMySQL {

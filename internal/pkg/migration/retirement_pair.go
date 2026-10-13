@@ -42,6 +42,7 @@ type PairConfig struct {
 }
 type PairPreflight struct {
 	mu                  sync.Mutex
+	resources           *migrationResources
 	sqlDB               *sql.DB
 	migrationFailed     bool
 	initialSQLVersion   uint
@@ -388,6 +389,10 @@ func observeMongoPair(ctx context.Context, client *mongo.Client, name string) (p
 	return s, nil
 }
 func PreflightCompatibilityPair(ctx context.Context, db *sql.DB, client *mongo.Client, cfg PairConfig) (*PairPreflight, error) {
+	resources, e := compiledMigrationResources()
+	if e != nil {
+		return nil, e
+	}
 	sqlHash, mongoHash, e := pairIdentity(ctx, db, client, cfg.MySQLDatabase, cfg.MongoDatabase)
 	if e != nil {
 		return nil, e
@@ -406,7 +411,7 @@ func PreflightCompatibilityPair(ctx context.Context, db *sql.DB, client *mongo.C
 	if !sqlState.pristine && !installedPairComplete(sqlState.version, mongoState.version) {
 		return nil, retirementError("partial installed pair conflict")
 	}
-	p := &PairPreflight{sqlDB: db, mongo: client, config: cfg, pristine: sqlState.pristine, sqlHash: sqlHash, mongoHash: mongoHash, initialSQLVersion: sqlState.version, initialMongoVersion: mongoState.version}
+	p := &PairPreflight{resources: resources, sqlDB: db, mongo: client, config: cfg, pristine: sqlState.pristine, sqlHash: sqlHash, mongoHash: mongoHash, initialSQLVersion: sqlState.version, initialMongoVersion: mongoState.version}
 	if p.pristine {
 		a, e := readBootstrapAuthorization(cfg)
 		if e != nil {
