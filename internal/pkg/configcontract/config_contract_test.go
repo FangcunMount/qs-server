@@ -802,11 +802,6 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 		"Compatibility Metrics",
 		"scripts/cd/audit-compatibility-observation.sh",
 		"http://prometheus:9090",
-		"qs_actor_deprecated_practitioner_route_total",
-		"qs_statistics_deprecated_validate_only_total",
-		"qs_interpretation_deprecated_generate_report_from_assessment_total",
-		"qs_answersheet_legacy_idempotency_fallback_lookup_total",
-		"qs_answersheet_legacy_idempotency_fallback_hit_total",
 		"qs_evaluation_assessment_intake_legacy_binding_total",
 		"observation_window_incomplete",
 		"zero_window_candidate",
@@ -817,6 +812,11 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
+		"qs_actor_deprecated_practitioner_route_total",
+		"qs_statistics_deprecated_validate_only_total",
+		"qs_interpretation_deprecated_generate_report_from_assessment_total",
+		"qs_answersheet_legacy_idempotency_fallback_lookup_total",
+		"qs_answersheet_legacy_idempotency_fallback_hit_total",
 		"docker restart",
 		"docker rm",
 		"DELETE FROM",

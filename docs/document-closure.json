@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
+    "sha": "dd8e50273e60951cb9fcf937697a4099030ae090",
     "verified_on": "2026-10-13"
   },
   "status_policy": {
@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
-        "verified_on": "2026-10-10"
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -5547,8 +5547,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -5565,7 +5565,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/cache/query/versioned.go"
+          "path": "internal/pkg/cache/query/version_token.go"
         },
         {
           "kind": "source",
@@ -9781,8 +9781,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -9900,7 +9900,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
