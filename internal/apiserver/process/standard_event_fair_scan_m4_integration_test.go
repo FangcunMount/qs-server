@@ -11,6 +11,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	mysqlEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	qsmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -80,10 +81,8 @@ func proveM4RelayHotFairness(t *testing.T, parent context.Context, gormDB *gorm.
 	}
 	mysqlIDs := []string{"m4-fair-mysql-retry", "m4-fair-mysql-lease", "m4-fair-mysql-late-retry"}
 	mongoIDs := []string{"m4-fair-mongo-retry", "m4-fair-mongo-lease", "m4-fair-mongo-late-lease"}
-	mysqlEvents := []event.DomainEvent{
-		makeEvent(mysqlIDs[0], "evaluation.requested", "Assessment", 501),
-		makeEvent(mysqlIDs[1], "evaluation.requested", "Assessment", 502),
-	}
+	assessmentRepository := mysqlEvaluation.NewAssessmentRepository(gormDB)
+	mysqlEvents := make([]event.DomainEvent, 0, initialHotPerStore+2)
 	mongoEvents := []event.DomainEvent{
 		makeEvent(mongoIDs[0], "answersheet.submitted", "AnswerSheet", 501),
 		makeEvent(mongoIDs[1], "answersheet.submitted", "AnswerSheet", 502),
@@ -94,11 +93,22 @@ func proveM4RelayHotFairness(t *testing.T, parent context.Context, gormDB *gorm.
 		mysqlIDs = append(mysqlIDs, mysqlID)
 		mongoIDs = append(mongoIDs, mongoID)
 		if i < initialHotPerStore {
-			mysqlEvents = append(mysqlEvents, makeEvent(mysqlID, "evaluation.requested", "Assessment", 502))
 			mongoEvents = append(mongoEvents, makeEvent(mongoID, "answersheet.submitted", "AnswerSheet", 502))
 		}
 	}
 	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		initialIDs := append([]string{mysqlIDs[0], mysqlIDs[1]}, mysqlIDs[3:3+initialHotPerStore]...)
+		for i, id := range initialIDs {
+			orgID := int64(502)
+			if i == 0 {
+				orgID = 501
+			}
+			requested, err := newM4EvaluationRequest(txCtx, assessmentRepository, id, orgID)
+			if err != nil {
+				return err
+			}
+			mysqlEvents = append(mysqlEvents, requested)
+		}
 		return mysqlBinding.Stager.Stage(txCtx, mysqlEvents...)
 	}); err != nil {
 		t.Fatal(err)
@@ -172,8 +182,11 @@ func proveM4RelayHotFairness(t *testing.T, parent context.Context, gormDB *gorm.
 	producerResult := make(chan error, 1)
 	go func() {
 		for i := initialHotPerStore; i < initialHotPerStore+liveHotPerStore; i++ {
-			mysqlEvent := makeEvent(mysqlIDs[3+i], "evaluation.requested", "Assessment", 502)
 			if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+				mysqlEvent, err := newM4EvaluationRequest(txCtx, assessmentRepository, mysqlIDs[3+i], 502)
+				if err != nil {
+					return err
+				}
 				return mysqlBinding.Stager.Stage(txCtx, mysqlEvent)
 			}); err != nil {
 				producerResult <- err
@@ -187,8 +200,11 @@ func proveM4RelayHotFairness(t *testing.T, parent context.Context, gormDB *gorm.
 				return
 			}
 			if i == initialHotPerStore+8 {
-				mysqlLate := makeEvent(mysqlIDs[2], "evaluation.requested", "Assessment", 501)
 				if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+					mysqlLate, err := newM4EvaluationRequest(txCtx, assessmentRepository, mysqlIDs[2], 501)
+					if err != nil {
+						return err
+					}
 					return mysqlBinding.Stager.Stage(txCtx, mysqlLate)
 				}); err != nil {
 					producerResult <- err

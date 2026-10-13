@@ -18,17 +18,15 @@ import (
 type Command struct{ AssessmentID uint64 }
 
 type Outcome struct {
-	ID              string
-	ModelKind       string
-	SubKind         string
-	Algorithm       string
-	AlgorithmFamily string
-	DecisionKind    string
-	ModelCode       string
-	Version         string
-	Title           string
-	TotalScore      *float64
-	RiskLevel       string
+	ID           string
+	ModelKind    string
+	Algorithm    string
+	DecisionKind string
+	ModelCode    string
+	Version      string
+	Title        string
+	TotalScore   *float64
+	RiskLevel    string
 }
 
 type Result struct {
