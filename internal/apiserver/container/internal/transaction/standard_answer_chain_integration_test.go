@@ -135,7 +135,7 @@ events:
   evaluation.requested:
     topic: evaluation
     delivery: durable_outbox
-    aggregate: Assessment
+    aggregate: Evaluation
     domain: evaluation
     handler: evaluation_requested_handler
 `))

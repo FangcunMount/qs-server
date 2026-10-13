@@ -69,6 +69,14 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000084_standard_reliable_outbox.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000084_standard_reliable_outbox.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000048_add_system_governance_action_runs.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000048_add_system_governance_action_runs.up.sql
 "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/000085_system_governance_pending_replay_index.up.sql" mysql:/tmp/m4-qs-bootstrap/mysql/000085_system_governance_pending_replay_index.up.sql
+for migration in \
+  000001_init_actor_schema.up.sql 000002_remove_questionnaire_id.up.sql \
+  000014_optimize_core_query_indexes.up.sql 000030_add_evaluation_model_ref_to_assessment.up.sql \
+  000036_add_assessment_outcome_v2_fields.up.sql 000041_retire_medical_scale_assessment_fields.up.sql \
+  000044_retire_assessment_interpreted_and_score_copy_fields.up.sql 000081_assessment_conducting_context.up.sql \
+  000089_qs_evaluation_request_ref.up.sql; do
+  "${compose[@]}" cp "$repo/internal/pkg/migration/migrations/mysql/$migration" "mysql:/tmp/m4-qs-bootstrap/mysql/$migration"
+done
 
 # The business-chain test subscribes to the production-shaped topic. Run it
 # before the sender-only fault proof, whose topic would otherwise hold messages
@@ -81,6 +89,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/$project-build.XXXXXX")
   -e RM_QS_MONGO_URI='mongodb://mongo:27017/?replicaSet=rm-test' \
   -e RM_QS_GRPC_ACL_CONFIG='/tmp/m4-qs-bootstrap/configs/grpc-acl.prod.yaml' \
   -e RM_QS_ASSESSMENT_DSN='root@tcp(mysql:3306)/m4_qs_chain?parseTime=true&loc=UTC' \
+  -e RM_QS_EVALUATION_REQUEST_REF_MIGRATION='/tmp/m4-qs-bootstrap/mysql/000089_qs_evaluation_request_ref.up.sql' \
   -e RM_QS_NSQ_TCP='nsqd:4150' \
   mysql /tmp/m4-qs-bootstrap/m4-answer-chain.test \
     -test.run '^(TestStandardAnswerSheetToAssessmentAcrossNSQ|TestM5CollectionAdmissionReceiptFollowsStandardMongoCommit)$' -test.count=1 -test.timeout=2m -test.v
