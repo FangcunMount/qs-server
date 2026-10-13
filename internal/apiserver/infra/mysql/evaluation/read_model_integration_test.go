@@ -169,7 +169,7 @@ func TestAssessmentReadModelListAssessmentsFiltersAgainstDatabase(t *testing.T) 
 	}
 }
 
-func TestScoreReadModelFiltersAndOrdersAgainstDatabase(t *testing.T) {
+func TestScoreProjectionFactorTrendFiltersAndOrdersAgainstDatabase(t *testing.T) {
 	db := openEvaluationMySQLContractDB(t)
 	ctx := context.Background()
 
@@ -225,20 +225,6 @@ func TestScoreReadModelFiltersAndOrdersAgainstDatabase(t *testing.T) {
 	})
 
 	reader := NewScoreProjectionReadModel(db)
-	score, err := reader.GetScoreByAssessmentID(ctx, assessmentID)
-	if err != nil {
-		t.Fatalf("get score: %v", err)
-	}
-	if score.TotalScore != 88 || score.RiskLevel != "high" {
-		t.Fatalf("unexpected score summary: %#v", score)
-	}
-	if len(score.FactorScores) != 3 {
-		t.Fatalf("factor count = %d, want 3: %#v", len(score.FactorScores), score.FactorScores)
-	}
-	if score.FactorScores[0].FactorCode != "total" || score.FactorScores[1].FactorCode != "anxiety" || score.FactorScores[2].FactorCode != "sleep" {
-		t.Fatalf("factor order = %#v, want total then factor_code asc", score.FactorScores)
-	}
-
 	trend, err := reader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
 		TesteeID:   testeeID,
 		FactorCode: "sleep",
@@ -247,7 +233,7 @@ func TestScoreReadModelFiltersAndOrdersAgainstDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list factor trend: %v", err)
 	}
-	if len(trend) != 1 || trend[0].AssessmentID != assessmentID+1 || trend[0].TotalScore != 16 {
+	if len(trend) != 1 || trend[0].AssessmentID != assessmentID+1 || trend[0].TotalScore != 16 || len(trend[0].FactorScores) != 1 || trend[0].FactorScores[0].FactorCode != "sleep" {
 		t.Fatalf("trend = %#v, want latest sleep score only", trend)
 	}
 }

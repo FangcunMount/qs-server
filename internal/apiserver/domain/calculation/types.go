@@ -42,24 +42,17 @@ func (f FormulaType) String() string {
 // CalculationRule 计算规则值对象
 // 用于配置问题/因子的计分方式
 type CalculationRule struct {
-	formula     FormulaType
-	sourceCodes []string
+	formula FormulaType
 }
 
 // NewCalculationRule 创建计算规则
-func NewCalculationRule(formula FormulaType, sourceCodes []string) *CalculationRule {
+func NewCalculationRule(formula FormulaType) *CalculationRule {
 	return &CalculationRule{
-		formula:     formula,
-		sourceCodes: sourceCodes,
+		formula: formula,
 	}
 }
 
 // GetFormula 获取公式类型
 func (c *CalculationRule) GetFormula() FormulaType {
 	return c.formula
-}
-
-// GetSourceCodes 获取源码列表
-func (c *CalculationRule) GetSourceCodes() []string {
-	return c.sourceCodes
 }

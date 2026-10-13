@@ -816,6 +816,11 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
+		"qs_actor_deprecated_practitioner_route_total",
+		"qs_statistics_deprecated_validate_only_total",
+		"qs_interpretation_deprecated_generate_report_from_assessment_total",
+		"qs_answersheet_legacy_idempotency_fallback_lookup_total",
+		"qs_answersheet_legacy_idempotency_fallback_hit_total",
 		"docker restart",
 		"docker rm",
 		"DELETE FROM",

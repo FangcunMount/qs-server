@@ -102,11 +102,6 @@ func (r Registry) Resolve(identity domain.Identity) (Handler, bool) {
 	return r.ResolveBinding(AlgorithmBindingFromIdentity(identity))
 }
 
-// MustResolve must resolve by Identity fields (delegates to MustResolveBinding).
-func (r Registry) MustResolve(identity domain.Identity) (Handler, error) {
-	return r.MustResolveBinding(AlgorithmBindingFromIdentity(identity))
-}
-
 // PreviewReport 预览报告
 func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentModel, input json.RawMessage) (*PreviewResult, error) {
 	if model == nil {
