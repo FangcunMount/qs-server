@@ -89,10 +89,19 @@ func New(deps Deps) (*Module, error) {
 	if !ok {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "enrollment repository lacks lifecycle transitions")
 	}
-	lifecycleService := planApp.NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
+	lifecycleService, err := planApp.NewLifecycleService(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
+	if err != nil {
+		return nil, err
+	}
 	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
-	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
-	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	taskSchedulerService, err := planApp.NewTaskSchedulerService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	if err != nil {
+		return nil, err
+	}
+	taskManagementService, err := planApp.NewTaskManagementService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	if err != nil {
+		return nil, err
+	}
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,
@@ -107,7 +116,10 @@ func New(deps Deps) (*Module, error) {
 	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog, enrollmentAccess)
 	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog, enrollmentAccess)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
-	module.TaskEntryResolver = planApp.NewTaskEntryResolver(taskRepo, scaleCatalog, enrollmentRepo)
+	module.TaskEntryResolver, err = planApp.NewTaskEntryResolver(taskRepo, scaleCatalog, enrollmentRepo)
+	if err != nil {
+		return nil, err
+	}
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 	module.TaskReminderStateReader = planApp.NewTaskReminderStateReader(taskRepo)
 
@@ -117,6 +129,9 @@ func New(deps Deps) (*Module, error) {
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+	if deps.PublishedModels == nil {
+		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "published model catalog is required")
 	}
 
 	if deps.EventPublisher == nil {

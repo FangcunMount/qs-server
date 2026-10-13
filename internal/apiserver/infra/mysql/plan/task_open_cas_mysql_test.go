@@ -11,11 +11,14 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	mysqlplan "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	mysqlbase "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
@@ -90,11 +93,12 @@ func TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL(t *testing.T) {
 	var database string
 	require.NoError(t, db.Raw("SELECT DATABASE()").Scan(&database).Error)
 	require.True(t, strings.HasPrefix(database, "qs_m5_task_open_test_"), "disposable database required")
-	require.NoError(t, db.AutoMigrate(&mysqlplan.AssessmentTaskPO{}))
+	require.NoError(t, db.AutoMigrate(&mysqlplan.AssessmentTaskPO{}, &mysqlplan.AssessmentPlanPO{}, &mysqlplan.PlanEnrollmentPO{}))
 
 	repository := mysqlplan.NewTaskRepository(db)
 	plannedAt := time.Now().Add(-time.Minute).UTC()
 	task := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 1, 7, testee.NewID(99), "scale", plannedAt, plannedAt)
+	persistOpeningScope(t, db, task)
 	require.NoError(t, repository.Save(t.Context(), task))
 	barrier := &concurrentOpenRepository{
 		AssessmentTaskRepository: repository,
@@ -102,7 +106,9 @@ func TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL(t *testing.T) {
 		release:                  make(chan struct{}),
 	}
 	recorder := &openEventRecorder{}
-	service := appplan.NewTaskManagementService(barrier, &uniqueOpenEntryGenerator{}, recorder)
+	uow := mysqlbase.NewUnitOfWork(db)
+	service, err := appplan.NewTaskManagementService(barrier, mysqlplan.NewPlanRepository(db), mysqlplan.NewEnrollmentRepository(db), apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error { return uow.WithinTransaction(ctx, fn) }), &uniqueOpenEntryGenerator{}, recorder, appEventing.ProfileBinding{})
+	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	results := make(chan error, 2)

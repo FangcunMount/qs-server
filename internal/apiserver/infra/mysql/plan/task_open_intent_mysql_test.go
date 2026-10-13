@@ -55,7 +55,7 @@ func TestTaskOpeningAndReminderIntentCommitTogetherMySQL(t *testing.T) {
 	var database string
 	require.NoError(t, db.Raw("SELECT DATABASE()").Scan(&database).Error)
 	require.True(t, strings.HasPrefix(database, "qs_m5_task_open_test_"), "disposable database required")
-	require.NoError(t, db.AutoMigrate(&mysqlplan.AssessmentTaskPO{}))
+	require.NoError(t, db.AutoMigrate(&mysqlplan.AssessmentTaskPO{}, &mysqlplan.AssessmentPlanPO{}, &mysqlplan.PlanEnrollmentPO{}))
 	// Match the production migration's DATETIME(3), regardless of GORM's
 	// default precision in this disposable schema.
 	require.NoError(t, db.Exec("ALTER TABLE assessment_task MODIFY open_at DATETIME(3) NULL").Error)
@@ -78,13 +78,16 @@ events:
 	stager, err := mysqlstandard.NewStager(eventcatalog.NewCatalog(config), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	repository := mysqlplan.NewTaskRepository(db)
+	planRepository := mysqlplan.NewPlanRepository(db)
+	enrollmentRepository := mysqlplan.NewEnrollmentRepository(db)
 	precisionLocation, err := time.LoadLocation("Asia/Shanghai")
 	require.NoError(t, err)
-	preciseOpenAt := time.Date(2026, 10, 1, 9, 46, 31, 236779138, precisionLocation)
+	preciseOpenAt := time.Now().In(precisionLocation).Add(-time.Minute).Truncate(time.Second).Add(236779138 * time.Nanosecond)
 	precisionTask := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 99, 501,
 		testee.NewID(21), "scale", preciseOpenAt.Add(-time.Minute), preciseOpenAt.Add(-time.Minute))
 	require.NoError(t, domainplan.NewTaskLifecycle().OpenAt(t.Context(), precisionTask,
 		"test-entry", "https://example.invalid/entry", preciseOpenAt))
+	persistOpeningScope(t, db, precisionTask)
 	require.NoError(t, repository.Save(t.Context(), precisionTask))
 	precisionState, err := appplan.NewTaskReminderStateReader(repository).GetTaskReminderState(
 		t.Context(), 501, precisionTask.GetID().String())
@@ -103,13 +106,15 @@ events:
 		return uow.WithinTransaction(ctx, fn)
 	})
 	legacyPublisher := &openEventRecorder{}
-	service := appplan.NewTaskManagementServiceWithEnrollment(
-		repository, nil, nil, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+	service, err := appplan.NewTaskManagementService(
+		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
 		appEventing.ProfileBinding{Stager: stager},
 	)
+	require.NoError(t, err)
 	newTask := func(sequence int) *domainplan.AssessmentTask {
 		plannedAt := time.Now().Add(-time.Minute).UTC()
 		task := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), sequence, 501, testee.NewID(21), "scale", plannedAt, plannedAt)
+		persistOpeningScope(t, db, task)
 		require.NoError(t, repository.Save(t.Context(), task))
 		return task
 	}
@@ -128,10 +133,11 @@ events:
 	}
 
 	// Stage failure after the real MySQL task update must roll that update back.
-	failedService := appplan.NewTaskManagementServiceWithEnrollment(
-		repository, nil, nil, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+	failedService, err := appplan.NewTaskManagementService(
+		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
 		appEventing.ProfileBinding{Stager: rejectOpenedIntentStager{}},
 	)
+	require.NoError(t, err)
 	_, err = failedService.OpenTask(t.Context(), 501, task.GetID().String())
 	require.Error(t, err)
 	assertPendingWithoutIntent()
@@ -188,10 +194,11 @@ events:
 	// The timer path shares the same persistence boundary and cannot bypass
 	// staging by calling the legacy publisher after saving its task.
 	scheduled := newTask(3)
-	scheduler := appplan.NewTaskSchedulerServiceWithEnrollment(
-		repository, nil, nil, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+	scheduler, err := appplan.NewTaskSchedulerService(
+		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
 		appEventing.ProfileBinding{Stager: stager},
 	)
+	require.NoError(t, err)
 	shanghai, err := time.LoadLocation("Asia/Shanghai")
 	require.NoError(t, err)
 	openedTasks, err := scheduler.SchedulePendingTasks(t.Context(), 501, time.Now().Add(time.Second).In(shanghai).Format("2006-01-02 15:04:05"))
@@ -210,10 +217,11 @@ events:
 		ready:                    make(chan struct{}, 2),
 		release:                  make(chan struct{}),
 	}
-	concurrent := appplan.NewTaskManagementServiceWithEnrollment(
-		barrier, nil, nil, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+	concurrent, err := appplan.NewTaskManagementService(
+		barrier, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
 		appEventing.ProfileBinding{Stager: stager},
 	)
+	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	results := make(chan error, 2)
@@ -264,10 +272,11 @@ events:
 		}
 		return lostCommitResponse
 	})
-	unknownService := appplan.NewTaskManagementServiceWithEnrollment(
-		repository, nil, nil, unknownRunner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+	unknownService, err := appplan.NewTaskManagementService(
+		repository, planRepository, enrollmentRepository, unknownRunner, &uniqueOpenEntryGenerator{}, legacyPublisher,
 		appEventing.ProfileBinding{Stager: stager},
 	)
+	require.NoError(t, err)
 	_, err = unknownService.OpenTask(t.Context(), 501, unknownTask.GetID().String())
 	require.ErrorIs(t, err, lostCommitResponse)
 	committedTask, err := repository.FindByID(t.Context(), unknownTask.GetID())

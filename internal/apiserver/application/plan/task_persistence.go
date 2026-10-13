@@ -13,8 +13,7 @@ import (
 )
 
 // taskPersistence keeps a task terminal transition and its Enrollment close check
-// inside one MySQL transaction. Tests and legacy assembly may omit the optional
-// dependencies; production V2 assembly always supplies both.
+// inside one MySQL transaction. All task services require both dependencies.
 type taskPersistence struct {
 	tasks        domainplan.AssessmentTaskRepository
 	enrollments  domainplan.EnrollmentRepository
@@ -61,7 +60,7 @@ func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTa
 		if err := p.tasks.Save(txCtx, task); err != nil {
 			return err
 		}
-		if !checkEnrollment || p.enrollments == nil || task.GetEnrollmentID().IsZero() {
+		if !checkEnrollment || task.GetEnrollmentID().IsZero() {
 			return nil
 		}
 		closedAt := time.Now()
@@ -81,7 +80,7 @@ func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTa
 }
 
 func (p taskPersistence) withinTransaction(ctx context.Context, write func(context.Context) error) error {
-	if _, active := mysql.TxFromContext(ctx); active || p.tx == nil {
+	if _, active := mysql.TxFromContext(ctx); active {
 		return write(ctx)
 	}
 	return p.tx.WithinTransaction(ctx, write)
