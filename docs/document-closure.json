@@ -5565,7 +5565,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/cache/query/versioned.go"
+          "path": "internal/pkg/cache/query/version_token.go"
         },
         {
           "kind": "source",
