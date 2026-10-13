@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ea61f987c424e10dcce02dc55cf5b0786efe3fe8",
+    "sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
     "verified_on": "2026-10-13"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 46,
+      "expected_count": 44,
       "budgeted": false
     }
   },
@@ -7083,7 +7083,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "source_sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -8976,7 +8976,7 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "source_sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -8986,7 +8986,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging.go"
         },
         {
           "kind": "source",
@@ -9900,8 +9900,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
-        "verified_on": "2026-10-09"
+        "source_sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -11294,7 +11294,7 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "source_sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -11308,11 +11308,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/migration/retirement_transition.go"
+          "path": "internal/pkg/migration/retirement_pair.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging.go"
         },
         {
           "kind": "source",
@@ -11393,130 +11393,6 @@
           "severity": "medium",
           "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
           "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
-        }
-      ]
-    },
-    {
-      "path": "scripts/database/compatibility-retirement-fence-analysis.md",
-      "class": "sidecar",
-      "owner": "tooling",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": "12311e2a8c4d1a9bfcd318f0d3a1572f85a873eb",
-        "verified_on": "2026-10-10"
-      },
-      "fact_sources": [
-        {
-          "kind": "source",
-          "path": ".github/workflows/cd.yml"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/db-ops.yml"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/migration/retirement_transition.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "Local source and native regression evidence does not prove production retirement, fencing or deletion."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "RETIREMENT-FENCE-PRODUCTION",
-          "kind": "verification",
-          "severity": "high",
-          "summary": "The cryptographic SSH probe and protected challenge persistence are implemented and locally tested. Pre-fix combined concurrency and actual Linux public-root-anchor failures are retained; amended local regressions and a source-equivalent synthetic-API Linux public-root test pass. Live GitHub origin, production root installation, executor integration and all production writer paths remain unproven. The committed maintenance-window v2 budget component and one source-equivalent actual Linux root public-entry test pass. That case checks the returned cancel function, not native parent-context cancellation; BudgetOnly does not prove a full 600-second restoration or production/executor/writer/CAS/DROP authority.",
-          "exit_criteria": "Bind the actual root management connection and every writer/authentication path; prove exact restoration, single-use execution and complete historical-run exclusion before production mutation."
-        },
-        {
-          "id": "private_b_a_source_combination_pending_review",
-          "kind": "source-lag",
-          "severity": "medium",
-          "summary": "当前私有 A/B 源码合并改变该文档的来源范围，旧核验记录仅保留为历史；snapshot26未被本次重新批准，运行/生产能力不因合并升格。",
-          "exit_criteria": "完成本组合相应源码与文档独立复核，并以真实新检查补齐源码证据，生产运行证据保持独立。"
-        },
-        {
-          "id": "DOC-RETIREMENT-MERGE-SELECTOR-20261010",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Existing selector evidence is preserved as historical evidence because main updated the native fixture and workflow, or B changed the entrypoint responsibility text. It is not current-source proof.",
-          "exit_criteria": "Review the integrated selectors on the frozen B source before declaring the retirement docs aligned.",
-          "historical_evidence": [
-            {
-              "kind": "source_selector",
-              "path": "scripts/database/compatibility-retirement-entrypoints.json",
-              "selector": "window-tool prepare uses the approved current-main CLI",
-              "result": "matched",
-              "source_sha": "8e311d7b1e2aea206eb29c066b0da2f9baddc1b0",
-              "verified_on": "2026-10-10"
-            }
-          ]
-        },
-        {
-          "id": "r4-source-exit-document-update",
-          "kind": "retired_source_contract",
-          "severity": "medium",
-          "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
-          "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
-        }
-      ]
-    },
-    {
-      "path": "scripts/database/qs-ai-retirement-readonly-plan.md",
-      "class": "sidecar",
-      "owner": "tooling",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": "4dfdfd519e7a7e040e3bfd32759ff904df329f73",
-        "verified_on": "2026-10-09"
-      },
-      "fact_sources": [
-        {
-          "kind": "source",
-          "path": "cmd/qs-ai-messaging-audit/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/eventing/evidence/evidence.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "Local source and native regression evidence does not prove production retirement, fencing or deletion."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "RETIREMENT-AI-PRODUCTION",
-          "kind": "verification",
-          "severity": "high",
-          "summary": "Full original execution and MQ ledger verification is implemented and locally tested; current source derives target scope from both independently approved full-EOF legacy AI sources, validates the actual request/session/org/run graph, and reports unrelated unknown provider work only after complete owner/typed evaluation integrity checks. Target unknown/held/pending responsibility, orphan/cross-owner/duplicate/hash conflicts remain blockers. This source calibration is not new production verification; production identity, runtime source, historical trusted keys, broker and writer-fence bindings remain unproven. Current mixed history writer source 4dfdfd519e7a7e040e3bfd32759ff904df329f73 passed 914 ordinary race test actions, 74 configured Python ordinary tests (18 native cases skipped), integration-tag compile and both scoped lint modes. Native storage and full external-qualified production write remain unverified; public production mutation modes are still disabled.",
-          "exit_criteria": "Bind actual qs-ai and qs-server databases/runtime sources, original message keys, frozen broker responsibility and writer fencing; verify all original command IDs and persist minimal retirement records before DROP."
-        },
-        {
-          "id": "r4-source-exit-document-update",
-          "kind": "retired_source_contract",
-          "severity": "medium",
-          "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
-          "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
         }
       ]
     }
