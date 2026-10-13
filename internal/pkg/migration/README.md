@@ -4,7 +4,7 @@
 >
 > 适用范围：`internal/pkg/migration` 的 MySQL 与 MongoDB schema migration
 >
-> 事实来源：`migrate.go`、`driver.go`、`internal/apiserver/bootstrap/database.go` 与嵌入式迁移文件
+> 事实来源：`migrate.go`、`resources.go`、`retirement_pair.go`、`retirement_driver.go`、`internal/apiserver/bootstrap/database.go` 与嵌入式迁移文件
 
 ## 结论
 
@@ -19,19 +19,29 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - dirty 状态会阻断继续迁移；
 - 当前目录末端版本为 MySQL `100`、MongoDB `39`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
 
-MySQL `99`、MongoDB `38` 增加既有业务记录的有界历史证据槽与相关索引，保留原始事件身份、摘要和核验结论，不保存旧消息正文，也不删除本轮四个旧存储对象。历史回填与删除仍须通过独立的全量核验、生产隔离和恢复门禁；目录升级成功不能代替这些结论。
+MySQL `99`、MongoDB `38` 的历史证据槽和索引仍在已发布的 schema 中。历史回填已取消，额外历史证据读取已退出；本批迁移保护重构不删除这些字段、索引或其他业务结构。后续退出须另行盘点数据、演练、授权和发布。
 
-## 兼容链退役末尾版本
+## 固定退役边界与后续版本
 
-MySQL `100` 与 MongoDB `39` 是发布 B 的退役收尾。对已安装库，迁移前必须证明 MySQL `domain_event_outbox`、`ai_bridge_commands`、`ai_messaging_legacy_commands` 和 MongoDB `domain_event_outbox` 均已缺失；正常启动不会代替受控流程删除现存旧对象。部分 DROP、身份错误、dirty、权限或网络错误、旧对象重新出现均阻断。既有 MySQL `99` 与 MongoDB `38` 以及更早迁移不改写。
+MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来迁移的版本上限。对已安装库，启动必须证明 MySQL `domain_event_outbox`、`ai_bridge_commands`、`ai_messaging_legacy_commands` 和 MongoDB `domain_event_outbox` 均已缺失。身份、可见性、权限、网络或 dirty 结果未知均阻断；正常启动不代替受控流程删除现存旧对象。历史迁移字节及退役正文绑定保留。
 
-末尾 driver 只识别精确嵌入的 MySQL `100`／MongoDB `39` 正文及受支持的双库版本顺序。MongoDB 仅在已绑定末尾删除命令且目标确实缺失时正常完成；权限、网络和其他错误继续失败，不把错误当作不存在。只有经外部确认的新空双库才能在历史完整升级后删除新生成的空旧集合。
+`resources.go` 从嵌入文件形成实际版本清单和目标 head，并通过 `declaredSchemaPairs` 明确声明可运行的 clean 版本对。当前仍是 `99/38` 的历史升级入口和 `100/39` 的最终状态。新增迁移必须同时声明已审核的完整版本对；不存在于资源清单的版本、未来版本和任意组合不能靠数值大于退役边界获得通过。
 
-新空库另需 `migration.retirement-bootstrap-authorization-file` 与 `migration.retirement-bootstrap-authorization-sha256` 成对配置：文件为私有绝对路径，摘要为已批准原始字节 SHA256，批准绑定实际编译 SHA、双库身份、末尾资源与有效期。目录为空不构成批准。正常恢复不使用该冷启动批准，也不能靠关闭迁移、down、force 或清除 dirty 绕过配对检查。
+同一次启动先证明初始版本对，再执行 SQL 到该 release 的目标。只有迁移、cleanup、连接释放和最终 clean 回读成功，才允许 Mongo 从未变化的初始版本继续到自身目标。两个 backend 最终达到目标、身份不变且旧对象缺失后才能完成启动。同一 live pair 任一步失败或响应未知即失效。`100/38` 仅允许在同次已证明 SQL 成功的阶段存在，新进程不接管该部分状态。
 
-四目标备份恢复保留新增业务证据、退休 command ID 与当前 MQ 事实。备份 `Capture` 从已核验的实际 SQL 元数据和 `DATABASE()` 生成并封存 `sql_recovery_non_target_schema_hash`，恢复与该同口径摘要及当前 catalog 比较；库存目录的 `NonTargetHash` 仍保留自身含义，不能替代恢复摘要。旧档案缺少该字段、字段被篡改或 caller 自填摘要，均不能进行 B 恢复；须在删除前重新生成并实际恢复核验本批备份。
+后续互相独立的 DDL 可以分别发布，例如明确声明 `101/39`，再发布 `101/40`。该示例没有对应的新业务迁移文件，也不授权数据库动作。只有被源码声明并实际回读为 clean 的完整状态可以重启；dirty、未声明中间状态和未知 DDL 结果必须保留现场，依据该版本独立演练的方案前向修复。
 
-本节是源码契约。生产四对象删除、B 部署及恢复预算仍须独立证明，参见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
+## 新空库的批准
+
+新空双库继续使用 `migration.retirement-bootstrap-authorization-file` 和 `migration.retirement-bootstrap-authorization-sha256`，不新增 CLI。文件须为真实私有绝对路径、`0600` 单链接文件，摘要绑定已批准的原始字节；目录为空不构成批准。
+
+当前批准格式为 `format_version: 2`、`kind: qs_schema_pair_pristine_bootstrap`。它绑定实际编译 SHA、选定 MySQL 库与 Mongo 集群身份、该二进制的两个目标 head、完整嵌入迁移资源摘要和有效期。资源摘要是按 MySQL、MongoDB 目录及文件名顺序，将全部 up/down 文件记录为 `[backend, path, sha256]` 的 JSON 数组后再计算 SHA256。原 v1 仅绑定退役末尾资源，不能授权当前格式。
+
+批准文件的生成方可通过只读的 `EmbeddedMigrationResources()` 读取实际编译目标 head 与完整资源摘要，避免复制摘要算法或固定目标版本。运行闭环集成测试使用这个接口生成 v2 夹具；该只读接口不创建批准文件，也不绕过真实库身份和空库预检。
+
+批准在 SQL 开始前复核并一次消费；失败或部分冷启动不重新使用该文件。只有批准的新空库才允许完整历史升级后删除新生成的空旧对象。正常恢复不能使用冷启动批准，不能借关闭 DDL、down、force 或直接清除 dirty 绕过保护。
+
+本批真实数据库测试覆盖当前 `100/39`、仅在测试 FS 中的未来 `101/40`、独立阶段重启和部分 DDL 失败。源码和测试不是生产发布证明；本重构的实际发布及后续数据退出须独立验收，四对象此前的执行事实仍见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
 
 ## 目录与职责
 
@@ -39,8 +49,11 @@ MySQL `100` 与 MongoDB `39` 是发布 B 的退役收尾。对已安装库，迁
 internal/pkg/migration/
 ├── migrate.go
 ├── driver.go
-├── mysql_driver.go
-├── mongodb_driver.go
+├── driver_mysql.go
+├── driver_mongo.go
+├── resources.go
+├── retirement_pair.go
+├── retirement_driver.go
 └── migrations/
     ├── mysql/
     │   ├── 000001_*.up.sql
@@ -52,7 +65,7 @@ internal/pkg/migration/
 
 MySQL 和 MongoDB 各自维护独立的 `schema_migrations` 状态，版本号只在同一种后端内连续，不要求两个后端同步。
 
-M4 候选迁移 MySQL `84` 新建宿主 `rm_outbox`、`qs_rm_replay_requests`、`qs_rm_replay_items`；MongoDB `36` 为新 `rm_outbox` 和请求流水集合建索引。它们不迁移或删除旧 mock Outbox。MySQL down 只在三张新表都为空时删除结构；一旦写入新消息或授权证据，应用回退须保留兼容结构。Mongo down 保留集合、文档和索引，重新 up 可重复应用。正常 apiserver 启动只执行 up；这些 down 规则不构成生产回滚许可。
+标准 Outbox 迁移 MySQL `84` 新建宿主 `rm_outbox`、`qs_rm_replay_requests`、`qs_rm_replay_items`；MongoDB `36` 为新 `rm_outbox` 和请求流水集合建索引。它们不迁移或删除当时的旧 Outbox；旧对象已由之后的独立退役流程退出。MySQL down 只在三张新表都为空时删除结构；一旦写入新消息或授权证据，应用回退须保留兼容结构。Mongo down 保留集合、文档和索引，重新 up 可重复应用。正常 apiserver 启动只执行 up；这些 down 规则不构成生产回滚许可。
 
 MySQL `85` 只为现有 `system_governance_action_runs` 增加按组织、动作、状态与 ID 查询待核对记录的索引；down 只移除该索引，不删除审计数据。
 
@@ -61,10 +74,11 @@ MySQL `85` 只为现有 `system_governance_action_runs` 增加按组织、动作
 apiserver 的数据库 bootstrap 执行顺序为：
 
 1. 建立数据库连接；
-2. `migration.enabled=true` 时，先联合核对配置选定的 MySQL 与 MongoDB 身份、clean head、可见性和四个退役对象的实际状态；两个连接和选定库都必须存在，覆盖库名须与两个业务库一致；
-3. 联合检查成功后先执行 MySQL migration，再执行 MongoDB migration；
-4. MongoDB migration 完成后协调并验证 ModelCatalog 与报告目录索引；
-5. 任一步失败都会中止启动，不应带着部分完成状态继续提供服务。
+2. 无论 DDL 是否启用，都联合核对配置选定的 MySQL 与 MongoDB 身份、clean head、可见性和四个退役对象的状态；两个连接和选定库都必须存在，覆盖库名须与两个业务库一致；
+3. `migration.enabled=false` 只跳过 DDL，仍要求两个库已达到本 release 的目标 pair；pristine 或待升级状态拒绝，不消费冷启动批准；
+4. DDL 启用时先执行 MySQL，再在已证明的 SQL 成功阶段执行 MongoDB；
+5. MongoDB migration 完成后协调并验证 ModelCatalog 与报告目录索引，最后只读复验完整目标 pair；
+6. 任一步失败都会中止启动，不带着部分完成状态提供服务。
 
 正常开发启动：
 
@@ -172,7 +186,7 @@ QS_APISERVER_MIGRATION_ENABLED=false make run-apiserver
 2. 检查目标 schema 与数据处于“未执行、部分执行、已执行但未结算”的哪一种状态；
 3. 根据该版本的 `up/down` 和备份制定恢复或补偿方案；
 4. 在测试环境复现并验证方案；
-5. 经明确审批后，才可以修正版本状态或使用外部 migration 工具的 force 能力；
+5. 经明确审批完成该版本的前向修复或备份恢复，另行核对实际结构与版本元数据一致；不得靠 force 或清除 dirty 跳过未知结果；
 6. 重新启动并完成 schema、数据和业务验收。
 
 不要把直接修改 `schema_migrations.dirty` 作为首选操作。仅清除 dirty 标记可能导致版本记录与真实 schema 永久分叉。
@@ -188,7 +202,7 @@ QS_APISERVER_MIGRATION_ENABLED=false make run-apiserver
 3. 根据迁移性质选择前向修复、受控 down 或备份恢复；
 4. 重新验证版本状态和业务数据。
 
-对于已经删除的数据，应用回退和 down migration 都不能替代备份恢复。
+对于已经删除的数据，应用回退和 down migration 都不能替代备份恢复。MySQL `100`／MongoDB `39` 及之后的应用内迁移只允许前进，不跨越或降低已安装的退役边界。
 
 ## 验证
 
@@ -200,7 +214,16 @@ git diff --check
 make docs-hygiene
 ```
 
-涉及真实 MySQL/MongoDB 的集成测试需要明确授权的测试实例。测试跳过、空库通过或本地编译成功，都不能单独证明生产迁移成功。
+先配置专用测试 `QS_M3_TEST_MYSQL_DSN` 和 `QS_SERVER_TEST_MONGO_URI`（Mongo replica-set），再运行与 CI 相同的迁移保护检查：
+
+```bash
+QS_M3_REQUIRE_DATABASE=1 QS_SERVER_TEST_MONGO_DB_PREFIX=qs_m3_test \
+  go test -race -tags=integration -count=1 -timeout=8m \
+  -run '^(TestSchemaPairNative|TestDisabledDDLNative)' \
+  ./internal/pkg/migration ./internal/apiserver/bootstrap
+```
+
+该组测试只使用显式测试端点及独立随机 schema，缺少要求的数据库即失败；验证 cold bootstrap 一次消费、完整资源绑定、未来版本阶段、dirty/旧对象复现、禁用 DDL 与借用资源生命周期。真实数据库、升级、异常中断测试通过仍不能代替生产 schema 和业务验收。
 
 生产验收应记录：
 

@@ -42,6 +42,7 @@ type PairConfig struct {
 }
 type PairPreflight struct {
 	mu                  sync.Mutex
+	resources           *migrationResources
 	sqlDB               *sql.DB
 	migrationFailed     bool
 	initialSQLVersion   uint
@@ -92,12 +93,6 @@ func retirementError(s string) error   { return fmt.Errorf("compatibility retire
 func retirementHash(raw []byte) string { h := sha256.Sum256(raw); return hex.EncodeToString(h[:]) }
 func marshalSQLIdentity(uuid, name string) ([]byte, error) {
 	return json.Marshal([]any{"mysql_server_selected_v1", uuid, name})
-}
-func CompatibilityMigrationResourcesSHA256() string {
-	a, _ := migrations.ReadFile("migrations/mysql/000100_retire_compatibility_message_storage.up.sql")
-	b, _ := migrations.ReadFile("migrations/mongodb/000039_retire_compatibility_message_storage.up.json")
-	raw, _ := json.Marshal([]string{retirementHash(a), retirementHash(b)})
-	return retirementHash(raw)
 }
 func retirementContext(parent context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(parent, 15*time.Second)
@@ -206,7 +201,7 @@ func schemaVisible(ctx context.Context, db retirementSQLReader, name string, pri
 	}
 	return nil
 }
-func observeSQLPair(ctx context.Context, db retirementSQLReader, name string) (pairStoreState, error) {
+func observeSQLPair(ctx context.Context, db retirementSQLReader, name string, resources *migrationResources) (pairStoreState, error) {
 	var s pairStoreState
 	if e := schemaVisible(ctx, db, name, false); e != nil {
 		return s, e
@@ -294,7 +289,7 @@ func observeSQLPair(ctx context.Context, db retirementSQLReader, name string) (p
 	}
 	e = rows.Err()
 	closeErr = rows.Close()
-	if e != nil || closeErr != nil || count != 1 || s.dirty || (s.version != compatibilitySQLVersion-1 && s.version != compatibilitySQLVersion) {
+	if e != nil || closeErr != nil || count != 1 || s.dirty || (!resources.sql.contains(s.version) || s.version < compatibilitySQLVersion-1) {
 		return s, retirementError("mysql head rejected")
 	}
 	for _, n := range retirementSQLNames {
@@ -304,7 +299,7 @@ func observeSQLPair(ctx context.Context, db retirementSQLReader, name string) (p
 	}
 	return s, nil
 }
-func observeMongoPair(ctx context.Context, client *mongo.Client, name string) (pairStoreState, error) {
+func observeMongoPair(ctx context.Context, client *mongo.Client, name string, resources *migrationResources) (pairStoreState, error) {
 	var s pairStoreState
 	q, cancel := retirementContext(ctx)
 	defer cancel()
@@ -382,33 +377,41 @@ func observeMongoPair(ctx context.Context, client *mongo.Client, name string) (p
 	}
 	dirty, ok := heads[0]["dirty"].(bool)
 	s.dirty = dirty
-	if !ok || dirty || (s.version != compatibilityMongoVersion-1 && s.version != compatibilityMongoVersion) {
+	if !ok || dirty || (!resources.mongo.contains(s.version) || s.version < compatibilityMongoVersion-1) {
 		return s, retirementError("mongo head rejected")
 	}
 	return s, nil
 }
 func PreflightCompatibilityPair(ctx context.Context, db *sql.DB, client *mongo.Client, cfg PairConfig) (*PairPreflight, error) {
+	resources, e := compiledMigrationResources()
+	if e != nil {
+		return nil, e
+	}
+	return preflightCompatibilityPair(ctx, db, client, cfg, resources)
+}
+
+func preflightCompatibilityPair(ctx context.Context, db *sql.DB, client *mongo.Client, cfg PairConfig, resources *migrationResources) (*PairPreflight, error) {
 	sqlHash, mongoHash, e := pairIdentity(ctx, db, client, cfg.MySQLDatabase, cfg.MongoDatabase)
 	if e != nil {
 		return nil, e
 	}
-	sqlState, e := observeSQLPair(ctx, db, cfg.MySQLDatabase)
+	sqlState, e := observeSQLPair(ctx, db, cfg.MySQLDatabase, resources)
 	if e != nil {
 		return nil, e
 	}
-	mongoState, e := observeMongoPair(ctx, client, cfg.MongoDatabase)
+	mongoState, e := observeMongoPair(ctx, client, cfg.MongoDatabase, resources)
 	if e != nil {
 		return nil, e
 	}
 	if sqlState.pristine != mongoState.pristine {
 		return nil, retirementError("mixed pristine pair rejected")
 	}
-	if !sqlState.pristine && !installedPairComplete(sqlState.version, mongoState.version) {
+	if !sqlState.pristine && !resources.accepts(sqlState.version, mongoState.version) {
 		return nil, retirementError("partial installed pair conflict")
 	}
-	p := &PairPreflight{sqlDB: db, mongo: client, config: cfg, pristine: sqlState.pristine, sqlHash: sqlHash, mongoHash: mongoHash, initialSQLVersion: sqlState.version, initialMongoVersion: mongoState.version}
+	p := &PairPreflight{resources: resources, sqlDB: db, mongo: client, config: cfg, pristine: sqlState.pristine, sqlHash: sqlHash, mongoHash: mongoHash, initialSQLVersion: sqlState.version, initialMongoVersion: mongoState.version}
 	if p.pristine {
-		a, e := readBootstrapAuthorization(cfg)
+		a, e := readBootstrapAuthorization(cfg, resources)
 		if e != nil {
 			return nil, e
 		}
@@ -444,11 +447,11 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 	if e != nil || a != p.sqlHash || b != p.mongoHash {
 		return retirementError("pair identity changed")
 	}
-	sqlState, e := observeSQLPair(ctx, p.sqlDB, p.config.MySQLDatabase)
+	sqlState, e := observeSQLPair(ctx, p.sqlDB, p.config.MySQLDatabase, p.resources)
 	if e != nil {
 		return e
 	}
-	mongoState, e := observeMongoPair(ctx, p.mongo, p.config.MongoDatabase)
+	mongoState, e := observeMongoPair(ctx, p.mongo, p.config.MongoDatabase, p.resources)
 	if e != nil {
 		return e
 	}
@@ -456,7 +459,7 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 		if sqlState.pristine || mongoState.pristine {
 			return retirementError("installed pair state changed")
 		}
-		if !installedPairStepAllowed(p.initialSQLVersion, p.initialMongoVersion, sqlState.version, mongoState.version, backend, p.sqlDone) {
+		if !installedPairStepAllowed(p.initialSQLVersion, p.initialMongoVersion, sqlState.version, mongoState.version, backend, p.sqlDone, p.resources) {
 			return retirementError("installed pair phase changed or partial result unbound")
 		}
 		return nil
@@ -465,15 +468,66 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 		if !sqlState.pristine || !mongoState.pristine {
 			return retirementError("pristine pair changed")
 		}
-		return consumeBootstrapAuthorization(p.config, p.authorization)
+		return consumeBootstrapAuthorization(p.config, p.authorization, p.resources)
 	}
-	if !p.sqlDone || sqlState.pristine || sqlState.version != 100 || !mongoState.pristine {
+	if !p.sqlDone || sqlState.pristine || sqlState.version != p.resources.sql.head || !mongoState.pristine {
 		return retirementError("pristine complete sql up unproven")
 	}
 	return nil
 }
-func (p *PairPreflight) sqlFinished() { p.mu.Lock(); p.sqlDone = true; p.mu.Unlock() }
-func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error) {
+func (p *PairPreflight) backendFinished(ctx context.Context, backend Backend, version uint) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.migrationFailed || version != p.resources.backend(backend).head {
+		return retirementError("paired migration did not finish at embedded target")
+	}
+	sqlState, mongoState, err := p.observeBoundPair(ctx)
+	if err != nil {
+		return err
+	}
+	if backend == BackendMySQL {
+		if sqlState.pristine || sqlState.version != p.resources.sql.head || (p.pristine && !mongoState.pristine) || (!p.pristine && (mongoState.pristine || mongoState.version != p.initialMongoVersion)) {
+			return retirementError("mysql final clean phase unproven")
+		}
+		p.sqlDone = true
+		return nil
+	}
+	if !p.sqlDone || sqlState.pristine || mongoState.pristine || sqlState.version != p.resources.sql.head || mongoState.version != p.resources.mongo.head {
+		return retirementError("mongo final clean pair unproven")
+	}
+	return nil
+}
+
+func (p *PairPreflight) observeBoundPair(ctx context.Context) (pairStoreState, pairStoreState, error) {
+	a, b, err := pairIdentity(ctx, p.sqlDB, p.mongo, p.config.MySQLDatabase, p.config.MongoDatabase)
+	if err != nil || a != p.sqlHash || b != p.mongoHash {
+		return pairStoreState{}, pairStoreState{}, retirementError("pair identity changed or unknown")
+	}
+	sqlState, err := observeSQLPair(ctx, p.sqlDB, p.config.MySQLDatabase, p.resources)
+	if err != nil {
+		return sqlState, pairStoreState{}, err
+	}
+	mongoState, err := observeMongoPair(ctx, p.mongo, p.config.MongoDatabase, p.resources)
+	return sqlState, mongoState, err
+}
+
+// VerifyComplete is read-only and also applies when automatic DDL is disabled.
+func (p *PairPreflight) VerifyComplete(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.migrationFailed {
+		return retirementError("prior paired result failed or unknown")
+	}
+	sqlState, mongoState, err := p.observeBoundPair(ctx)
+	if err != nil {
+		return err
+	}
+	if sqlState.pristine || mongoState.pristine || sqlState.version != p.resources.sql.head || mongoState.version != p.resources.mongo.head {
+		return retirementError("current embedded schema pair required")
+	}
+	return nil
+}
+func readBootstrapAuthorization(cfg PairConfig, resources *migrationResources) (*bootstrapAuthorization, error) {
 	if !retirementHashRE.MatchString(cfg.BootstrapAuthorizationSHA256) || !filepath.IsAbs(cfg.BootstrapAuthorizationFile) || filepath.Clean(cfg.BootstrapAuthorizationFile) != cfg.BootstrapAuthorizationFile {
 		return nil, retirementError("pristine bootstrap explicit authorization required")
 	}
@@ -523,7 +577,7 @@ func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error)
 		return nil, retirementError("bootstrap authorization schema rejected")
 	}
 	expires, e := time.Parse(time.RFC3339, a.ExpiresAt)
-	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 1 || a.Kind != "qs_compatibility_retirement_b_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != 100 || a.MongoVersion != 39 || a.MigrationResourcesSHA256 != CompatibilityMigrationResourcesSHA256() || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
+	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 2 || a.Kind != "qs_schema_pair_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != resources.sql.head || a.MongoVersion != resources.mongo.head || a.MigrationResourcesSHA256 != resources.sha256 || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
 		return nil, retirementError("bootstrap authorization binding rejected")
 	}
 	if _, e = os.Lstat(path + ".consumed"); !errors.Is(e, os.ErrNotExist) {
@@ -531,11 +585,11 @@ func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error)
 	}
 	return &a, nil
 }
-func consumeBootstrapAuthorization(cfg PairConfig, a *bootstrapAuthorization) error {
+func consumeBootstrapAuthorization(cfg PairConfig, a *bootstrapAuthorization, resources *migrationResources) error {
 	if a == nil {
 		return retirementError("bootstrap authorization missing")
 	}
-	observed, e := readBootstrapAuthorization(cfg)
+	observed, e := readBootstrapAuthorization(cfg, resources)
 	if e != nil {
 		return e
 	}
@@ -615,21 +669,18 @@ func rejectRetirementDuplicateJSON(raw []byte) error {
 }
 
 func installedPairComplete(sqlVersion, mongoVersion uint) bool {
-	return (sqlVersion == 99 && mongoVersion == 38) || (sqlVersion == 100 && mongoVersion == 39)
+	resources, err := compiledMigrationResources()
+	return err == nil && resources.accepts(sqlVersion, mongoVersion)
 }
 
-// A 100/38 phase exists only within this one live pair after its own actual
-// SQL success. A new ordinary preflight never adopts either partial pair.
-func installedPairStepAllowed(initialSQL, initialMongo, actualSQL, actualMongo uint, backend Backend, sqlDone bool) bool {
-	if initialSQL == 100 && initialMongo == 39 {
-		return actualSQL == 100 && actualMongo == 39
-	}
-	if initialSQL != 99 || initialMongo != 38 {
+// An undeclared intermediate pair exists only in this live, successful SQL phase.
+func installedPairStepAllowed(initialSQL, initialMongo, actualSQL, actualMongo uint, backend Backend, sqlDone bool, resources *migrationResources) bool {
+	if !resources.accepts(initialSQL, initialMongo) {
 		return false
 	}
 	if backend == BackendMySQL {
-		return !sqlDone && actualSQL == 99 && actualMongo == 38
+		return !sqlDone && actualSQL == initialSQL && actualMongo == initialMongo
 	}
-	return backend == BackendMongo && sqlDone && actualSQL == 100 && actualMongo == 38
+	return backend == BackendMongo && sqlDone && actualSQL == resources.sql.head && actualMongo == initialMongo
 }
 func (p *PairPreflight) migrationResultFailed() { p.mu.Lock(); p.migrationFailed = true; p.mu.Unlock() }
