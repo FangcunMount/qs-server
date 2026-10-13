@@ -13,6 +13,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -102,7 +103,13 @@ func TestPublisherPublishAttachesDefinitionHash(t *testing.T) {
 		t.Fatalf("Publish: %v", err)
 	}
 	snapshot := repo.snapshots[model.Code]
-	if snapshot == nil || snapshot.Source[port.SourceDefinitionContentHash] == "" || snapshot.Source[port.SourceDefinitionHashSchema] == "" {
+	if snapshot == nil {
+		t.Fatal("published snapshot missing")
+	}
+	if snapshot.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 || model.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
+		t.Fatal("publish did not assign legacy assets encoding version")
+	}
+	if snapshot.Source[port.SourceDefinitionContentHash] == "" || snapshot.Source[port.SourceDefinitionHashSchema] == "" {
 		t.Fatalf("definition hash = %#v", snapshot.Source)
 	}
 }

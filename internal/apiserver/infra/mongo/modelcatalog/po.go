@@ -3,6 +3,8 @@ package modelcatalog
 import (
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,29 +25,30 @@ const (
 type PublishedAssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
-	SchemaVersion           string        `bson:"schema_version,omitempty"`
-	RecordRole              string        `bson:"record_role"`
-	ReleaseStatus           string        `bson:"release_status,omitempty"`
-	Kind                    string        `bson:"kind"`
-	Algorithm               string        `bson:"algorithm,omitempty"`
-	Code                    string        `bson:"code"`
-	ReleaseVersion          string        `bson:"release_version"`
-	Title                   string        `bson:"title"`
-	Description             string        `bson:"description,omitempty"`
-	Category                string        `bson:"category,omitempty"`
-	Stages                  []string      `bson:"stages,omitempty"`
-	ApplicableAges          []string      `bson:"applicable_ages,omitempty"`
-	Reporters               []string      `bson:"reporters,omitempty"`
-	Tags                    []string      `bson:"tags,omitempty"`
-	Status                  string        `bson:"status"`
-	DecisionKind            string        `bson:"decision_kind"`
-	QuestionnaireCode       string        `bson:"questionnaire_code"`
-	QuestionnaireVersion    string        `bson:"questionnaire_version"`
-	Source                  bson.M        `bson:"source,omitempty"`
-	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
-	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
-	PublishedAt             *time.Time    `bson:"published_at,omitempty"`
-	ReleaseArchivedAt       *time.Time    `bson:"release_archived_at,omitempty"`
+	SchemaVersion                 string                                 `bson:"schema_version,omitempty"`
+	RecordRole                    string                                 `bson:"record_role"`
+	ReleaseStatus                 string                                 `bson:"release_status,omitempty"`
+	Kind                          string                                 `bson:"kind"`
+	Algorithm                     string                                 `bson:"algorithm,omitempty"`
+	Code                          string                                 `bson:"code"`
+	ReleaseVersion                string                                 `bson:"release_version"`
+	Title                         string                                 `bson:"title"`
+	Description                   string                                 `bson:"description,omitempty"`
+	Category                      string                                 `bson:"category,omitempty"`
+	Stages                        []string                               `bson:"stages,omitempty"`
+	ApplicableAges                []string                               `bson:"applicable_ages,omitempty"`
+	Reporters                     []string                               `bson:"reporters,omitempty"`
+	Tags                          []string                               `bson:"tags,omitempty"`
+	Status                        string                                 `bson:"status"`
+	DecisionKind                  string                                 `bson:"decision_kind"`
+	QuestionnaireCode             string                                 `bson:"questionnaire_code"`
+	QuestionnaireVersion          string                                 `bson:"questionnaire_version"`
+	Source                        bson.M                                 `bson:"source,omitempty"`
+	DefinitionSchemaVersion       string                                 `bson:"definition_schema_version,omitempty"`
+	DefinitionV2                  *DefinitionPO                          `bson:"definition_v2,omitempty"`
+	ReportAssetsProjectionVersion interpretationassets.ProjectionVersion `bson:"report_assets_projection_version,omitempty"`
+	PublishedAt                   *time.Time                             `bson:"published_at,omitempty"`
+	ReleaseArchivedAt             *time.Time                             `bson:"release_archived_at,omitempty"`
 }
 
 func (PublishedAssessmentModelPO) CollectionName() string {

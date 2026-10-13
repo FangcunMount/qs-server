@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -65,6 +67,7 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	}
 	if model.DefinitionV2 != nil {
 		modeldefinition.MaterializeLayers(model.DefinitionV2)
+		model.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
 	}
 	now := p.now()
 	if model.IsPublished() {
@@ -110,25 +113,26 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Material
 		version = result.Version
 	}
 	snapshot := &port.AssessmentSnapshot{
-		SchemaVersion:        domain.SchemaVersionV2,
-		Kind:                 result.Kind,
-		Algorithm:            result.Algorithm,
-		AlgorithmFamily:      result.AlgorithmFamily,
-		Code:                 model.Code,
-		Version:              version,
-		Title:                model.Title,
-		Description:          model.Description,
-		Category:             model.Category,
-		Stages:               append([]string(nil), model.Stages...),
-		ApplicableAges:       append([]string(nil), model.ApplicableAges...),
-		Reporters:            append([]string(nil), model.Reporters...),
-		Tags:                 append([]string(nil), model.Tags...),
-		Status:               string(domain.ModelStatusPublished),
-		DecisionKind:         result.DecisionKind,
-		QuestionnaireCode:    model.Binding.QuestionnaireCode,
-		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
-		Source:               map[string]any{},
-		DefinitionV2:         model.DefinitionV2,
+		SchemaVersion:                 domain.SchemaVersionV2,
+		Kind:                          result.Kind,
+		Algorithm:                     result.Algorithm,
+		AlgorithmFamily:               result.AlgorithmFamily,
+		Code:                          model.Code,
+		Version:                       version,
+		Title:                         model.Title,
+		Description:                   model.Description,
+		Category:                      model.Category,
+		Stages:                        append([]string(nil), model.Stages...),
+		ApplicableAges:                append([]string(nil), model.ApplicableAges...),
+		Reporters:                     append([]string(nil), model.Reporters...),
+		Tags:                          append([]string(nil), model.Tags...),
+		Status:                        string(domain.ModelStatusPublished),
+		DecisionKind:                  result.DecisionKind,
+		QuestionnaireCode:             model.Binding.QuestionnaireCode,
+		QuestionnaireVersion:          model.Binding.QuestionnaireVersion,
+		Source:                        map[string]any{},
+		DefinitionV2:                  model.DefinitionV2,
+		ReportAssetsProjectionVersion: interpretationassets.ProjectionLegacyV1,
 	}
 	return snapshot
 }

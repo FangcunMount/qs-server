@@ -391,6 +391,22 @@ jobs:
             ./internal/apiserver/infra/mongo/modelcatalog \
             ./internal/apiserver/container/modules/modelcatalog
 
+      - name: Run report-assets projection preparation Mongo contracts
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_report_assets_projection_test
+        run: |
+          set -euo pipefail
+          test -n "${QS_SERVER_TEST_MONGO_URI:-}"
+          selector='^TestReportAssetsVersionRealMongo'
+          package='./internal/apiserver/infra/mongo/modelcatalog'
+          go test -tags=integration "$package" -list "$selector" > /tmp/report-assets-projection-selected.txt
+          test "$(grep -c '^TestReportAssetsVersionRealMongo' /tmp/report-assets-projection-selected.txt)" -eq 2
+          go test -race -tags=integration -count=1 -timeout=5m -v "$package" -run "$selector" | tee /tmp/report-assets-projection-tests.log
+          ! grep -q -- '--- SKIP:' /tmp/report-assets-projection-tests.log
+          grep -q -- '--- PASS: TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites ' /tmp/report-assets-projection-tests.log
+          grep -q -- '--- PASS: TestReportAssetsVersionRealMongoHeadEditDoesNotBackfillLegacyReads ' /tmp/report-assets-projection-tests.log
+
       - name: Run Mongo runtime-ledger retirement guards
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0

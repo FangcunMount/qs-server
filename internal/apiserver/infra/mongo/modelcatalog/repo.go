@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -86,6 +88,12 @@ func (r *Repository) DeletePublished(ctx context.Context, kind domain.Kind, code
 
 func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
 	po := r.mapper.ToPO(model)
+	// V2 writes remain closed during preparation. An absent marker on a new
+	// internal seed uses today's legacy encoder; reads never assign it.
+	if po.ReportAssetsProjectionVersion != interpretationassets.ProjectionUnassigned && po.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
+		return fmt.Errorf("%w: report assets projection write version is not enabled", domain.ErrInvalidArgument)
+	}
+	po.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
 	now := time.Now()
 	po.Status = statusPublished
 	po.ReleaseStatus = string(domain.ReleaseStatusActive)
@@ -138,6 +146,14 @@ func sameImmutablePublishedContent(a, b *port.PublishedModel) bool {
 		return a == b
 	}
 	aCopy, bCopy := *a, *b
+	// Legacy rows have no marker. Treat 0 and 1 as the same immutable old
+	// encoding only for idempotence; the existing BSON is not rewritten.
+	if aCopy.ReportAssetsProjectionVersion == interpretationassets.ProjectionUnassigned {
+		aCopy.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+	}
+	if bCopy.ReportAssetsProjectionVersion == interpretationassets.ProjectionUnassigned {
+		bCopy.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+	}
 	aCopy.ReleaseStatus, bCopy.ReleaseStatus = "", ""
 	aCopy.PublishedAt, bCopy.PublishedAt = nil, nil
 	aCopy.ReleaseArchivedAt, bCopy.ReleaseArchivedAt = nil, nil

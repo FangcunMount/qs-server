@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -66,6 +68,8 @@ type AssessmentSnapshot struct {
 	QuestionnaireVersion string
 	Source               map[string]any
 	DefinitionV2         *domain.Definition
+	// Internal storage/cache metadata, not exposed by public DTOs.
+	ReportAssetsProjectionVersion interpretationassets.ProjectionVersion
 }
 
 // PublishedModel 是 AssessmentSnapshot 的兼容名称，与 REST/gRPC、Mongo 字段及仓储接口术语一致。

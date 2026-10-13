@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 )
@@ -35,6 +37,8 @@ type AssessmentModel struct {
 	Binding binding.QuestionnaireBinding
 	// DefinitionV2 is the only persisted authoring definition.
 	DefinitionV2 *definition.Definition
+	// Internal record metadata; never part of the public Definition or its hash.
+	ReportAssetsProjectionVersion interpretationassets.ProjectionVersion `json:"-"`
 	// 版本
 	// Version is the persisted draft configuration revision.
 	// Business versioning is anchored by QuestionnaireBinding.Version.
@@ -84,20 +88,21 @@ func New(input NewInput) (*AssessmentModel, error) {
 		now = time.Now().UTC()
 	}
 	return &AssessmentModel{
-		Code:           input.Code,
-		Kind:           input.Kind,
-		Algorithm:      input.Algorithm,
-		Title:          input.Title,
-		Description:    input.Description,
-		Category:       input.Category,
-		Stages:         append([]string(nil), input.Stages...),
-		ApplicableAges: append([]string(nil), input.ApplicableAges...),
-		Reporters:      append([]string(nil), input.Reporters...),
-		Tags:           append([]string(nil), input.Tags...),
-		Status:         StatusDraft,
-		Version:        1,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		Code:                          input.Code,
+		Kind:                          input.Kind,
+		Algorithm:                     input.Algorithm,
+		Title:                         input.Title,
+		Description:                   input.Description,
+		Category:                      input.Category,
+		Stages:                        append([]string(nil), input.Stages...),
+		ApplicableAges:                append([]string(nil), input.ApplicableAges...),
+		Reporters:                     append([]string(nil), input.Reporters...),
+		Tags:                          append([]string(nil), input.Tags...),
+		Status:                        StatusDraft,
+		ReportAssetsProjectionVersion: interpretationassets.ProjectionLegacyV1,
+		Version:                       1,
+		CreatedAt:                     now,
+		UpdatedAt:                     now,
 	}, nil
 }
 
@@ -231,6 +236,7 @@ func (m *AssessmentModel) UpdateDefinition(value *definition.Definition, now tim
 		return fmt.Errorf("%w: definition_v2 is required", ErrInvalidArgument)
 	}
 	m.DefinitionV2 = value
+	m.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
 	m.touch(now)
 	return nil
 }

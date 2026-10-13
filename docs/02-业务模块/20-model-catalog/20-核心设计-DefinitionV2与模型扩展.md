@@ -143,6 +143,10 @@ type Definition struct {
 
 ### 4.2 当前字段与目标概念的映射
 
+资产投影的兼容准备在 `assessment_models` 的 head/snapshot 顶层增加内部 `report_assets_projection_version`：1 表示旧 Mongo 资产编码语义，2 表示完整 canonical 资产。该 metadata 不进入 Definition、公开 REST/protobuf、canonical hash、ModelDigest/CompositeDigest 或历史 ReportInput。
+
+当前阶段仍使用已有 derived 写入与 stored-assets 优先读取。新建记录、新 Definition 修订和发布使用版本1；历史记录缺 marker 或未知值时保留原读行为，metadata 编辑不会推断或补写资产版本。纯投影通过独立的冻结 v1 编码 DTO 复现旧编码的全部资产字段与 Rarity 缺失语义，版本2仅提供纯投影能力，尚未开放新写入或切换运行读取。整份资产影子比较只允许 nil/empty 集合等价，保持顺序、重复 code、报告路由和内容精确；mismatch 只记录模型身份与有界状态，不改结果。严格读取切换和 derived 字段删除仍需全部 retained/head/snapshot 的逐条版本分配与等价证据，现有无效定义、资产及 Source hash finding 不能自动修复。
+
 | 当前物理字段 | 目标领域角色 | 当前主要消费者 | 需要说明的边界 |
 | --- | --- | --- | --- |
 | `Measure` | CoreModel.Measure | Evaluation 输入适配 / Calculation | 描述测量节点和计分来源，不实现算法 |
