@@ -3273,6 +3273,10 @@
             {
               "name": "qs-server-cleanup-m1-readonly-readback-cleanup.json",
               "sha256": "04502a24d3d6c34d398f350d6e4fdac1ef1ea91bbc30ccd38d482d899d23c1c2"
+            },
+            {
+              "name": "m1-startup-config-scoped-readonly.json",
+              "sha256": "f9b73206d05d93da6d269114a805d451613784c960eccae1c9d1867adc7a3486"
             }
           ],
           "raw_artifact_retention": "/Users/yangshujie/.codex/visualizations/2026/10/13/01a133d4-6959-7860-b118-19132012d813",
@@ -3322,6 +3326,29 @@
             "manual_root_image_delete_performed": false,
             "deploy_account_permission_bypass_performed": false,
             "requires_named_infra_maintenance_followup": true
+          },
+          "startup_configuration_scoped": {
+            "source_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "read_only": true,
+            "raw_options_persisted_or_emitted": false,
+            "artifact_name": "m1-startup-config-scoped-readonly.json",
+            "artifact_sha256": "f9b73206d05d93da6d269114a805d451613784c960eccae1c9d1867adc7a3486",
+            "helper_sha256": "1dd415b06f0bc80b8a475aa35598f5f20cd9e180fd999c187d8050c2f9b98827",
+            "api_container_id": "11fb6047351d78681fa243d537ca236d81b6c1f1dea276e85db47ad84b0cf760",
+            "api_started_at": "2026-10-13T21:36:38.362290662Z",
+            "api_metadata_stable": true,
+            "api_runtime_binary_bound": true,
+            "api_post_unmarshal_task_opened_reminder": false,
+            "api_post_complete_validate_task_opened_reminder": false,
+            "api_post_complete_validate_timestamp": "2026-10-13T21:36:40.353595886Z",
+            "api_masked_public_options_hash": "848519f8a5bf6a4c39499bdd33b95d5174f4ec46daf5598f12d063e4f053b5e0",
+            "collection_post_complete_validate_parsed": 2,
+            "collection_masked_public_options_hash": "828978713cc0b35a8f8f0c9b8d789ed3c797e504061b7b5ecd1fb3c28233f62e",
+            "worker_unverified_count": 3,
+            "worker_error_category": "readonly_parse_or_transport_failed",
+            "hash_scope": "canonical JSON of already masked exported Options startup log; not plaintext, unexported state, resolved resource config or process memory",
+            "full_effective_configuration_verified": false,
+            "business_acceptance_verified": false
           }
         }
       },
@@ -3351,7 +3378,8 @@
         "Real answersheet-to-Outcome-to-Report business acceptance, formal consumer releases/device acceptance, 14-day observation and independent backup/restore gates remain unexecuted or incomplete. This deployment does not start the compatibility observation window.",
         "Original local guard status-reader CalledProcessError and its in-progress workflow snapshot remain preserved. The terminal workflow success was independently checked; no duplicate dispatch or additional pause disable occurred. Repository PRODUCTION_DEPLOY_PAUSED was read back true.",
         "Owned read-only audit container names and temporary directories are empty in the retained cleanup artifact. This is scoped cleanup, not permission to remove other runtime or production resources.",
-        "ServerA API job115552463176 and Collection job115552959159 succeeded but both recorded the fixed image-retention maintenance warning after the deploy account sudo request for image-retention.py was denied. Worker job115552958187 had no such warning. Production image-retention cleanup is not passed; no manual root image deletion or deploy-permission bypass was performed. This requires a separate named infrastructure maintenance task and does not change the CD/runtime passed result."
+        "ServerA API job115552463176 and Collection job115552959159 succeeded but both recorded the fixed image-retention maintenance warning after the deploy account sudo request for image-retention.py was denied. Worker job115552958187 had no such warning. Production image-retention cleanup is not passed; no manual root image deletion or deploy-permission bypass was performed. This requires a separate named infrastructure maintenance task and does not change the CD/runtime passed result.",
+        "New M1 API startup Options and post-Complete/Validate printable Config each parsed exactly once with task_opened_reminder=false and stable container/binary binding. These are hashes of already masked exported JSON Options, excluding real credential values, unexported context and later resolved runtime resources. Both Collection logs parsed; all three Worker scoped log reads failed with fixed readonly_parse_or_transport_failed, so their configuration stage is unverified. Full effective_config_hash remains null; this does not replace M2 post-release config and reminder delivery acceptance."
       ]
     }
   ]
