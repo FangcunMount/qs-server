@@ -50,9 +50,9 @@ func (r *concurrentOpenRepository) FindByID(ctx context.Context, id domainplan.A
 
 type uniqueOpenEntryGenerator struct{ next atomic.Uint64 }
 
-func (g *uniqueOpenEntryGenerator) GenerateEntry(context.Context, *domainplan.AssessmentTask) (string, string, error) {
+func (g *uniqueOpenEntryGenerator) GenerateEntry(_ context.Context, task *domainplan.AssessmentTask) (string, string, error) {
 	n := g.next.Add(1)
-	return fmt.Sprintf("token-%d", n), fmt.Sprintf("https://example.test/entry/%d", n), nil
+	return fmt.Sprintf("token-%d", n), fmt.Sprintf("https://example.test/entry/%d?task_id=%s", n, task.GetID().String()), nil
 }
 
 type openEventRecorder struct {

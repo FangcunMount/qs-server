@@ -316,4 +316,5 @@ events:
 	var preservedPayload []byte
 	require.NoError(t, db.Raw("SELECT payload FROM rm_outbox WHERE message_id = ?", string(rawID)).Row().Scan(&preservedPayload))
 	require.Equal(t, rawPayload, preservedPayload, "existing reminder responsibility remains immutable")
+	assertDisabledProducerBacklogSettlesReminder(t, db, repository, rawPayload)
 }
