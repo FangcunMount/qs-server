@@ -1,15 +1,12 @@
 package handler
 
 import (
-	"errors"
 	"strconv"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type AIWorkflowCatalogHandler struct {
@@ -29,18 +26,18 @@ func (h *AIWorkflowCatalogHandler) scope(c *gin.Context) (app.DraftScope, bool) 
 	return app.DraftScope{OrganizationID: org, OperatorUserID: user}, true
 }
 func (h *AIWorkflowCatalogHandler) failure(c *gin.Context, err error) {
-	errorCode, message := code.ErrUnknown, "AI asset catalog unavailable"
-	switch {
-	case errors.Is(err, app.ErrInvalid), status.Code(err) == codes.InvalidArgument:
-		errorCode, message = code.ErrInvalidArgument, "Invalid AI asset query"
-	case errors.Is(err, app.ErrGovernanceDenied), status.Code(err) == codes.PermissionDenied:
-		errorCode, message = code.ErrPermissionDenied, "AI asset audit permission required"
-	case errors.Is(err, app.ErrNotFound), status.Code(err) == codes.NotFound:
-		errorCode, message = code.ErrPageNotFound, "AI asset unavailable"
-	case errors.Is(err, app.ErrConflict), status.Code(err) == codes.Aborted:
-		errorCode, message = code.ErrConflict, "AI asset response differs from confirmed query"
-	case errors.Is(err, app.ErrManagementUnavailable):
-		errorCode, message = code.ErrUnsupportedOperation, "AI asset catalog disabled"
+	errorCode, message := aiWorkflowFailureCode(err), "AI asset catalog unavailable"
+	switch errorCode {
+	case code.ErrInvalidArgument:
+		message = "Invalid AI asset query"
+	case code.ErrPermissionDenied:
+		message = "AI asset audit permission required"
+	case code.ErrPageNotFound:
+		message = "AI asset unavailable"
+	case code.ErrConflict:
+		message = "AI asset response differs from confirmed query"
+	case code.ErrUnsupportedOperation:
+		message = "AI asset catalog disabled"
 	}
 	h.Error(c, cberrors.WithCode(errorCode, "%s", message))
 }
