@@ -25,39 +25,12 @@ type RunEvidence struct {
 }
 
 type AssessmentEvidence struct {
-	AssessmentID         uint64
-	Status               string
-	Outcome              *OutcomeEvidence
-	Run                  *RunEvidence
-	Projection           *ProjectionEvidence
-	Outbox               *CommittedOutboxEvidence
-	HistoricalReferences []HistoricalReferenceEvidence
-	CommittedHistory     *CommittedHistoricalEvidence
-}
-
-// CommittedHistoricalEvidence covers only a physically empty canonical pair.
-// It records retained history, with no SDK fingerprint or message row claim.
-type CommittedHistoricalEvidence struct {
-	Class     eventevidence.Class
-	OutcomeID string
-	RunID     string
-	Reasons   []string
-}
-
-// HistoricalReferenceEvidence is a retained source conclusion, separately
-// inspected within this business batch. It never means a standard message was
-// resolved or that all six retired legacy event types have been covered.
-type HistoricalReferenceEvidence struct {
-	Owner                 string
-	OwnerID               string
-	EventID               string
-	EventType             string
-	Class                 eventevidence.Class
-	InvalidReason         string
-	RunID                 string
-	Attempt               uint
-	HistoricalReason      string
-	LegacyCanonicalAbsent bool
+	AssessmentID uint64
+	Status       string
+	Outcome      *OutcomeEvidence
+	Run          *RunEvidence
+	Projection   *ProjectionEvidence
+	Outbox       *CommittedOutboxEvidence
 }
 
 type Batch struct {

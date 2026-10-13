@@ -14,7 +14,6 @@ import (
 type AssessmentPO struct {
 	ConductingContext *string `gorm:"column:conducting_context;type:json;->;<-:create"`
 	// Maintenance evidence is read-only for ordinary aggregate writers.
-	HistoricalLifecycleEvidence *string `gorm:"column:historical_lifecycle_evidence;type:json;->"`
 	mysql.AuditFields
 
 	// 组织信息

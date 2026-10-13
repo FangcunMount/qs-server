@@ -12,9 +12,8 @@ import (
 // MySQLDriver implements the Driver interface for MySQL databases.
 type MySQLDriver struct {
 	embeddedMigrationDriver
-	db           *sql.DB
-	runConn      *sql.Conn
-	borrowedConn *sql.Conn
+	db      *sql.DB
+	runConn *sql.Conn
 }
 
 // NewMySQLDriver creates a new MySQL migration driver.
@@ -27,7 +26,7 @@ func NewMySQLDriver(db *sql.DB) *MySQLDriver {
 
 // CreateInstance creates a migrate.Migrate instance for MySQL.
 func (d *MySQLDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error) {
-	if d.db == nil && d.borrowedConn == nil {
+	if d.db == nil {
 		return nil, fmt.Errorf("mysql: database connection is nil")
 	}
 	if d.runConn != nil {
@@ -36,11 +35,7 @@ func (d *MySQLDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migr
 
 	ctx, cancel := retirementContext(migrationRunContext(config))
 	defer cancel()
-	conn := d.borrowedConn
-	var err error
-	if conn == nil {
-		conn, err = d.db.Conn(ctx)
-	}
+	conn, err := d.db.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mysql: acquire run-owned connection: %w", err)
 	}
@@ -73,8 +68,5 @@ func (d *MySQLDriver) finishRun() error {
 	}
 	c := d.runConn
 	d.runConn = nil
-	if c == d.borrowedConn {
-		return nil
-	}
 	return c.Close()
 }

@@ -16,6 +16,48 @@ import (
 	"github.com/google/uuid"
 )
 
+// CommandRetirementSource keeps a physical source-bytes digest separate from the
+// historical business JSON hash. MySQL JSON CAST bytes are not the original JSON
+// encoding, and neither digest is a standard MQ body_sha256.
+type CommandRetirementSource struct {
+	Table               string `json:"table"`
+	CommandID           string `json:"command_id"`
+	BytesKind           string `json:"bytes_kind"`
+	BytesSHA256         string `json:"bytes_sha256"`
+	BusinessPayloadHash string `json:"business_payload_hash"`
+}
+
+type CommandRetirementReference struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// CommandRetirementEvidence is a minimal historical conclusion, never an MQ
+// receipt or permission to execute. It preserves source identity and the independently verified historical
+// ownership/responsibility conclusion for current readers and retired-ID guards.
+type CommandRetirementEvidence struct {
+	Version              int                          `json:"version"`
+	OperationID          string                       `json:"operation_id"`
+	VerifierVersion      string                       `json:"verifier_version"`
+	VerificationMethod   string                       `json:"verification_method"`
+	VerifiedAt           time.Time                    `json:"verified_at"`
+	AdmissionRevision    uint64                       `json:"admission_revision"`
+	CommandID            string                       `json:"command_id"`
+	RequestID            string                       `json:"request_id"`
+	SourceKind           string                       `json:"source_kind"`
+	OrganizationID       string                       `json:"organization_id"`
+	SubjectID            string                       `json:"subject_id"`
+	ResourceID           string                       `json:"resource_id"`
+	LiveBodySHA256       string                       `json:"live_body_sha256,omitempty"`
+	Sources              []CommandRetirementSource    `json:"sources"`
+	References           []CommandRetirementReference `json:"references"`
+	Conclusion           string                       `json:"conclusion"`
+	Reason               string                       `json:"reason"`
+	OwnershipVerified    bool                         `json:"ownership_verified"`
+	ResponsibilityClosed bool                         `json:"responsibility_closed"`
+	BusinessTerminal     bool                         `json:"business_terminal"`
+}
+
 func retirementEvidence(t *testing.T, f *mqFixture) CommandRetirementEvidence {
 	t.Helper()
 	var raw []byte

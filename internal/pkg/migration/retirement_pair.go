@@ -43,8 +43,6 @@ type PairConfig struct {
 type PairPreflight struct {
 	mu                  sync.Mutex
 	sqlDB               *sql.DB
-	sqlConn             *sql.Conn
-	controlledRun       bool
 	migrationFailed     bool
 	initialSQLVersion   uint
 	initialMongoVersion uint
@@ -57,8 +55,7 @@ type PairPreflight struct {
 	authorization       *bootstrapAuthorization
 }
 
-// Both the normal pool and the dedicated host connection expose reads. The
-// controlled host path never acquires another pool connection or closes this one.
+// Migration checks accept pool reads and the current run-owned connection.
 type retirementSQLReader interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
@@ -73,12 +70,6 @@ func retirementSQLMissing(reader retirementSQLReader) bool {
 	default:
 		return true
 	}
-}
-func (p *PairPreflight) sqlReader() retirementSQLReader {
-	if p.sqlConn != nil {
-		return p.sqlConn
-	}
-	return p.sqlDB
 }
 
 type bootstrapAuthorization struct {
@@ -449,11 +440,11 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 	if p.migrationFailed {
 		return retirementError("prior paired migration result failed or unknown")
 	}
-	a, b, e := pairIdentity(ctx, p.sqlReader(), p.mongo, p.config.MySQLDatabase, p.config.MongoDatabase)
+	a, b, e := pairIdentity(ctx, p.sqlDB, p.mongo, p.config.MySQLDatabase, p.config.MongoDatabase)
 	if e != nil || a != p.sqlHash || b != p.mongoHash {
 		return retirementError("pair identity changed")
 	}
-	sqlState, e := observeSQLPair(ctx, p.sqlReader(), p.config.MySQLDatabase)
+	sqlState, e := observeSQLPair(ctx, p.sqlDB, p.config.MySQLDatabase)
 	if e != nil {
 		return e
 	}
