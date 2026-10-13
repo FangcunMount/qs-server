@@ -214,11 +214,69 @@ type consistencyEvidence struct {
 func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 	items := make([]*mismatch, 0, 4)
 	add := func(kind mismatchKind, severity mismatchSeverity, action string) {
-		items = append(items, &mismatch{
-			Kind: kind, Severity: severity, RecommendedAction: action, DetectedAt: now,
-		})
+		items = append(items, &mismatch{Kind: kind, Severity: severity, RecommendedAction: action, DetectedAt: now})
 	}
+	classifyProjectionDrifts(evidence, add)
+	classifyCommittedEventDrifts(evidence, add)
+	if evidence.outcome != nil && (evidence.run == nil || evidence.run.ID != evidence.outcome.RunID) {
+		add(mismatchRunOutcomeReferenceMismatch, severityHigh, "locate the exact run referenced by the canonical outcome")
+	}
+	classifyAssessmentStatusDrifts(evidence, now, add)
+	return items
+}
 
+func classifyProjectionDrifts(evidence consistencyEvidence, add func(mismatchKind, mismatchSeverity, string)) {
+	if evidence.outcome == nil {
+		if evidence.projection != nil && evidence.projection.RowCount > 0 {
+			add(mismatchProjectionWithoutOutcome, severityHigh, "remove or rebuild projection only after locating the canonical outcome")
+		}
+		return
+	}
+	outcomeID := evidence.outcome.ID
+	if evidence.outcome.ModelKind == string(modelcatalog.KindScale) {
+		switch {
+		case evidence.projection == nil || evidence.projection.RowCount == 0:
+			add(mismatchProjectionMissing, severityMedium, "rebuild scale projection from the canonical outcome in an audited maintenance window")
+		case evidence.projection.UnlinkedRowCount > 0 ||
+			evidence.projection.DistinctOutcomeCount != 1 ||
+			evidence.projection.OutcomeID != outcomeID:
+			add(mismatchProjectionOutcomeMismatch, severityHigh, "replace projection from the canonical outcome after operator confirmation")
+		}
+	} else if evidence.projection != nil && evidence.projection.RowCount > 0 {
+		add(mismatchUnexpectedProjection, severityMedium, "inspect legacy scale projection attached to a non-scale outcome")
+	}
+}
+
+func classifyCommittedEventDrifts(evidence consistencyEvidence, add func(mismatchKind, mismatchSeverity, string)) {
+	if evidence.outcome == nil {
+		if evidence.outbox != nil && evidence.outbox.RowCount > 0 {
+			add(mismatchCommittedOutboxWithoutOutcome, severityHigh, "quarantine committed event and investigate missing canonical outcome")
+		}
+		return
+	}
+	outcomeID := evidence.outcome.ID
+	switch {
+	case evidence.outbox != nil && evidence.outbox.LegacyCanonicalAbsent && evidence.outbox.Class == "" && evidence.outbox.RowCount == 0 && evidence.outbox.OutcomeID == outcomeID && evidence.outbox.RunID == evidence.outcome.RunID && evidence.outbox.InvalidReason == "canonical outcome lacks classified committed event evidence":
+		// Physical pair absence proves neither historical age nor absence of
+		// current standard messages. Their complete reverse audit still rejects
+		// any real message without canonical standard provenance.
+		add(mismatchCommittedEventUnsupported, severityLow, "retain the business record without claiming original message verification; continue the full standard outbox reverse audit")
+	case evidence.outbox != nil && evidence.outbox.InvalidReason != "":
+		add(mismatchCommittedOutboxMismatch, severityHigh, "investigate classified evidence conflict; never synthesize or resend an event to erase uncertainty")
+	case evidence.outbox != nil && evidence.outbox.Class == eventevidence.Unverifiable:
+		add(mismatchHistoricalEventGap, severityLow, "retain the terminal historical gap; original message verification is unavailable")
+	case evidence.outbox != nil && evidence.outbox.Class == eventevidence.RetiredVerified:
+		// Verified retirement is recorded as historical provenance, not a live message match.
+	case evidence.outbox == nil || evidence.outbox.RowCount == 0:
+		add(mismatchCommittedOutboxMissing, severityHigh, "investigate missing canonical event evidence; preserve unknown execution state")
+	case evidence.outbox.RowCount != 1 ||
+		evidence.outbox.OutcomeID != outcomeID ||
+		evidence.outbox.RunID != evidence.outcome.RunID:
+		add(mismatchCommittedOutboxMismatch, severityHigh, "quarantine conflicting outbox evidence and require operator decision")
+	}
+}
+
+func classifyAssessmentStatusDrifts(evidence consistencyEvidence, now time.Time, add func(mismatchKind, mismatchSeverity, string)) {
 	runStatus := evalrun.Status("")
 	leaseExpired := false
 	if evidence.run != nil {
@@ -227,53 +285,6 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 			if lease := evidence.run.LeaseExpiresAt; lease != nil && !lease.After(now) {
 				leaseExpired = true
 			}
-		}
-	}
-
-	if evidence.outcome == nil {
-		if evidence.projection != nil && evidence.projection.RowCount > 0 {
-			add(mismatchProjectionWithoutOutcome, severityHigh, "remove or rebuild projection only after locating the canonical outcome")
-		}
-		if evidence.outbox != nil && evidence.outbox.RowCount > 0 {
-			add(mismatchCommittedOutboxWithoutOutcome, severityHigh, "quarantine committed event and investigate missing canonical outcome")
-		}
-	} else {
-		outcomeID := evidence.outcome.ID
-		if evidence.outcome.ModelKind == string(modelcatalog.KindScale) {
-			switch {
-			case evidence.projection == nil || evidence.projection.RowCount == 0:
-				add(mismatchProjectionMissing, severityMedium, "rebuild scale projection from the canonical outcome in an audited maintenance window")
-			case evidence.projection.UnlinkedRowCount > 0 ||
-				evidence.projection.DistinctOutcomeCount != 1 ||
-				evidence.projection.OutcomeID != outcomeID:
-				add(mismatchProjectionOutcomeMismatch, severityHigh, "replace projection from the canonical outcome after operator confirmation")
-			}
-		} else if evidence.projection != nil && evidence.projection.RowCount > 0 {
-			add(mismatchUnexpectedProjection, severityMedium, "inspect legacy scale projection attached to a non-scale outcome")
-		}
-
-		switch {
-		case evidence.outbox != nil && evidence.outbox.LegacyCanonicalAbsent && evidence.outbox.Class == "" && evidence.outbox.RowCount == 0 && evidence.outbox.OutcomeID == outcomeID && evidence.outbox.RunID == evidence.outcome.RunID && evidence.outbox.InvalidReason == "canonical outcome lacks classified committed event evidence":
-			// Physical pair absence proves neither historical age nor absence of
-			// current standard messages. Their complete reverse audit still rejects
-			// any real message without canonical standard provenance.
-			add(mismatchCommittedEventUnsupported, severityLow, "retain the business record without claiming original message verification; continue the full standard outbox reverse audit")
-		case evidence.outbox != nil && evidence.outbox.InvalidReason != "":
-			add(mismatchCommittedOutboxMismatch, severityHigh, "investigate classified evidence conflict; never synthesize or resend an event to erase uncertainty")
-		case evidence.outbox != nil && evidence.outbox.Class == eventevidence.Unverifiable:
-			add(mismatchHistoricalEventGap, severityLow, "retain the terminal historical gap; original message verification is unavailable")
-		case evidence.outbox != nil && evidence.outbox.Class == eventevidence.RetiredVerified:
-			// Verified retirement is recorded as historical provenance, not a live message match.
-		case evidence.outbox == nil || evidence.outbox.RowCount == 0:
-			add(mismatchCommittedOutboxMissing, severityHigh, "investigate missing canonical event evidence; preserve unknown execution state")
-		case evidence.outbox.RowCount != 1 ||
-			evidence.outbox.OutcomeID != outcomeID ||
-			evidence.outbox.RunID != evidence.outcome.RunID:
-			add(mismatchCommittedOutboxMismatch, severityHigh, "quarantine conflicting outbox evidence and require operator decision")
-		}
-
-		if evidence.run == nil || evidence.run.ID != evidence.outcome.RunID {
-			add(mismatchRunOutcomeReferenceMismatch, severityHigh, "locate the exact run referenced by the canonical outcome")
 		}
 	}
 
@@ -291,7 +302,6 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 	case evidence.status.IsFailed() && evidence.outcome != nil && runStatus == evalrun.StatusSucceeded:
 		add(mismatchTerminalConflict, severityHigh, "terminal conflict; require operator decision")
 	}
-	return items
 }
 
 var (

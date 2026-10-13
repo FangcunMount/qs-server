@@ -1,13 +1,10 @@
 package handler
 
 import (
-	"errors"
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type AIWorkflowPublicationHandler struct {
@@ -27,18 +24,18 @@ func (h *AIWorkflowPublicationHandler) scope(c *gin.Context) (app.PublicationSco
 	return app.PublicationScope{OrganizationID: org, OperatorUserID: user}, true
 }
 func (h *AIWorkflowPublicationHandler) failure(c *gin.Context, err error) {
-	errorCode, message := code.ErrUnknown, "AI publication outcome unknown; query the original command ID before deciding again"
-	switch {
-	case errors.Is(err, app.ErrInvalid), status.Code(err) == codes.InvalidArgument:
-		errorCode, message = code.ErrInvalidArgument, "Invalid AI publication operation"
-	case errors.Is(err, app.ErrGovernanceDenied), status.Code(err) == codes.PermissionDenied:
-		errorCode, message = code.ErrPermissionDenied, "AI publication governance permission required"
-	case errors.Is(err, app.ErrNotFound), status.Code(err) == codes.NotFound:
-		errorCode, message = code.ErrPageNotFound, "AI publication or command receipt unavailable"
-	case errors.Is(err, app.ErrConflict), status.Code(err) == codes.Aborted:
-		errorCode, message = code.ErrConflict, "AI publication version or confirmed state changed"
-	case errors.Is(err, app.ErrManagementUnavailable):
-		errorCode, message = code.ErrUnsupportedOperation, "AI publication management disabled"
+	errorCode, message := aiWorkflowFailureCode(err), "AI publication outcome unknown; query the original command ID before deciding again"
+	switch errorCode {
+	case code.ErrInvalidArgument:
+		message = "Invalid AI publication operation"
+	case code.ErrPermissionDenied:
+		message = "AI publication governance permission required"
+	case code.ErrPageNotFound:
+		message = "AI publication or command receipt unavailable"
+	case code.ErrConflict:
+		message = "AI publication version or confirmed state changed"
+	case code.ErrUnsupportedOperation:
+		message = "AI publication management disabled"
 	}
 	h.Error(c, cberrors.WithCode(errorCode, "%s", message))
 }

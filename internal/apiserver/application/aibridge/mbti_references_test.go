@@ -122,3 +122,49 @@ func TestReferenceIntegrityFailuresEvenWithUpdatedDigest(t *testing.T) {
 		})
 	}
 }
+
+func TestReferenceLinksCoverAllOutputGroups(t *testing.T) {
+	for _, group := range []string{"insights", "reflection_questions", "actions"} {
+		for _, test := range []struct {
+			name, ref, evidence string
+			want                error
+		}{
+			{"unresolved", "reference:missing", "", ErrInvalid},
+			{"different_topic", "reference:career.ei.i", "", ErrInvalid},
+			{"unprefixed", "personality.ei.i", "", ErrInvalid},
+			{"wrong_evidence_axis", "reference:personality.ei.i", "dimension:JP", ErrInvalid},
+			{"supported_axis", "reference:personality.ei.i", "dimension:EI", nil},
+			{"supported_model_result", "reference:personality.ei.i", "model_result", nil},
+		} {
+			t.Run(group+"/"+test.name, func(t *testing.T) {
+				event := referenceArtifactEvent(t)
+				var artifact Artifact
+				if err := json.Unmarshal([]byte(event.ArtifactJSON), &artifact); err != nil {
+					t.Fatal(err)
+				}
+				var content map[string]any
+				if err := json.Unmarshal([]byte(artifact.ContentJSON), &content); err != nil {
+					t.Fatal(err)
+				}
+				section := content["sections"].([]any)[0].(map[string]any)
+				items := section[group].([]any)
+				if len(items) == 0 {
+					t.Fatal("fixture does not cover output group", group)
+				}
+				item := items[len(items)-1].(map[string]any)
+				item["reference_refs"] = []string{test.ref}
+				if test.evidence != "" {
+					item["evidence_refs"] = []map[string]string{{"ref": test.evidence}}
+				}
+				raw, err := json.Marshal(content)
+				if err != nil {
+					t.Fatal(err)
+				}
+				artifact.ContentJSON = string(raw)
+				if err := validateMBTIReferences(artifact); err != test.want {
+					t.Fatalf("error=%v want=%v", err, test.want)
+				}
+			})
+		}
+	}
+}
