@@ -3607,6 +3607,123 @@
         "M1 release and earlier ServerA provisional metadata remain unchanged. Historical pending-role text reflects its recorded time and is resolved only by this dated user confirmation; no prior raw evidence is rewritten.",
         "Maintenance budget, stopped writers/background TTL scope, full backup pair, restored schemas/counts/summaries/indexes/references, old image compatibility, target migration/services and real business acceptance remain incomplete."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-private-destination-created",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T23:18:11.821884+00:00",
+      "environment": "Mac mini approved private M4 backup destination preparation; prior M1 source binding retained as context only",
+      "deployed_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+      "source_baseline_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Only approved directory preparation and closed filesystem metadata were observed. Prior M1 source binding is dated context; no new full runtime configuration or backup credential was read."
+      },
+      "command": "Explicit user adoption of the private Mac mini path; trusted SSH verifies Darwin/host/UID, traverses ancestors with directory FDs and no-follow, creates only the approved 0700 leaf and reads metadata. No existing files are modified.",
+      "result": {
+        "status": "findings",
+        "summary": "The approved private destination exists with mode0700, no symlink ancestors and zero entries. This removes the destination approval/path gap, but does not prove backup size, retention, same-freeze full backup pair, recovery or production maintenance readiness.",
+        "measurements": {
+          "directory_metadata": {
+            "observed_at": "2026-10-13T23:18:11.821884+00:00",
+            "hostname": "yangshujiedeMac-mini.local",
+            "platform": "Darwin",
+            "approved_backup_path": "/Users/yangshujie/backups/qs-server/cleanup-m4/",
+            "directory_created": true,
+            "final_directory_mode": "0o700",
+            "final_directory_owner_uid": 501,
+            "final_directory_owner_gid": 20,
+            "verified_ancestors": [
+              {
+                "path": "/Users",
+                "owner_uid": 0,
+                "mode": "0o755",
+                "symlink": false
+              },
+              {
+                "path": "/Users/yangshujie",
+                "owner_uid": 501,
+                "mode": "0o750",
+                "symlink": false
+              },
+              {
+                "path": "/Users/yangshujie/backups",
+                "owner_uid": 501,
+                "mode": "0o755",
+                "symlink": false
+              },
+              {
+                "path": "/Users/yangshujie/backups/qs-server",
+                "owner_uid": 501,
+                "mode": "0o755",
+                "symlink": false
+              },
+              {
+                "path": "/Users/yangshujie/backups/qs-server/cleanup-m4",
+                "owner_uid": 501,
+                "mode": "0o700",
+                "symlink": false
+              }
+            ],
+            "all_ancestors_no_symlink": true,
+            "available_bytes": 72625152000,
+            "filesystem_read_only": false,
+            "final_entries_count": 0,
+            "existing_files_modified": false,
+            "backup_pair_captured": false,
+            "restore_rehearsal_verified": false,
+            "production_services_stopped": false,
+            "database_writes_applied": 0,
+            "data_responsibility_owner": "system (10001)",
+            "recovery_responsibility_owner": "system (10001)",
+            "logical_owner_is_not_unix_uid": true,
+            "approval_source": "Explicit user reply adopting suggested Mac mini cleanup-m4 path",
+            "operation_scope": "Create or set permissions of this exact approved private leaf directory only; read existing ancestor metadata. No backup, data deletion, service control, install or runtime configuration.",
+            "remote_script_sha256": "51ff582719ffcdbc760531739f45f1fc58e05dd14fc7584abdd4b402b1bb21c7"
+          },
+          "alternative_path_approved": true,
+          "data_responsibility_owner": "system (10001)",
+          "recovery_responsibility_owner": "system (10001)",
+          "same_freeze_full_backup_pair_captured": false,
+          "actual_restore_rehearsal_verified": false,
+          "retention_30_days_verified": false,
+          "maintenance_30min_restore_60min_rpo0_verified": false,
+          "production_database_writes_applied": 0,
+          "production_services_changed": false,
+          "maintenance_window_approved": false,
+          "prior_m1_source_binding_record": "infra-2026-10-14-qs-cleanup-m4-backup-destination-readonly",
+          "prior_m1_source_binding_observed_at": "2026-10-13T22:06:03.163440+00:00",
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m4-private-backup-directory-created.json",
+              "sha256": "0a40f6f2de622f5e95cf75f412466ce604b0906096a083f7584f13eabb420b21"
+            }
+          ]
+        }
+      },
+      "owner": "Codex",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605"
+        }
+      ],
+      "limitations": [
+        "The linked CD proves the earlier M1 release only. This record does not refresh its six-instance configuration or business acceptance.",
+        "Unix ownership501 is separate from logical data/recovery responsibility system (10001). The dedicated directory is separate from the daily Mongo path with a three-archive retention policy.",
+        "Free space is an instantaneous shared-volume reading, not full backup/restore capacity or retention proof. No database backup has been captured.",
+        "Per-object consumer/deferred/recovery responsibilities, complete freeze backup pair, restore/old-image/target-service evidence, autonomous writer scope and measured maintenance/recovery budgets remain open. Production maintenance, DDL and M2/M4 release require their separate reviewable batch approval."
+      ]
     }
   ]
 }
