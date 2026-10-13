@@ -1,9 +1,9 @@
 package migration
 
 import (
-	"embed"
 	"errors"
 	"io"
+	"io/fs"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -75,11 +75,11 @@ type retirementFailureDriver struct {
 	releases                     int
 }
 
-func (d *retirementFailureDriver) CreateInstance(fs embed.FS, _ *Config) (*migrate.Migrate, error) {
+func (d *retirementFailureDriver) CreateInstance(source fs.FS, _ *Config) (*migrate.Migrate, error) {
 	if d.constructError != nil {
 		return nil, d.constructError
 	}
-	return d.createInstance(fs, d.provider)
+	return d.createInstance(source, d.provider)
 }
 func (d *retirementFailureDriver) finishRun() error { d.releases++; return d.releaseError }
 

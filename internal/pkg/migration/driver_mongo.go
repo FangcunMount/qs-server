@@ -2,9 +2,9 @@ package migration
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -52,7 +52,7 @@ func NewMongoDriver(client *mongo.Client) *MongoDriver {
 }
 
 // CreateInstance creates a migrate.Migrate instance for MongoDB.
-func (d *MongoDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error) {
+func (d *MongoDriver) CreateInstance(source fs.FS, config *Config) (*migrate.Migrate, error) {
 	if d.client == nil {
 		return nil, fmt.Errorf("mongodb: client is nil")
 	}
@@ -66,7 +66,7 @@ func (d *MongoDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migr
 		return nil, fmt.Errorf("mongodb: failed to create database driver: %w", err)
 	}
 
-	return d.createInstance(fs, newRetirementDatabaseDriver(databaseDriver, BackendMongo, config, nil, d.client, fs))
+	return d.createInstance(source, newRetirementDatabaseDriver(databaseDriver, BackendMongo, config, nil, d.client, source))
 }
 
 // PrepareRun enforces data-dependent migration preconditions and installs the
