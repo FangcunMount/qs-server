@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
+    "sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
     "verified_on": "2026-10-13"
   },
   "status_policy": {
@@ -9898,36 +9898,72 @@
       "path": "internal/pkg/migration/README.md",
       "class": "sidecar",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": "822db8d6a8e4144417f8c6d508f84c8447138c1a",
+        "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
           "kind": "source",
+          "path": "internal/pkg/migration/**/*.go"
+        },
+        {
+          "kind": "source",
           "path": "internal/pkg/migration/migrations/**/*"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/bootstrap/database.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/options/migration_options.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
+          "result": "passed",
+          "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
+          "result": "matched",
+          "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/retirement_driver.go",
+          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
+          "result": "matched",
+          "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+          "verified_on": "2026-10-13"
+        }
+      ],
       "production_evidence": {
         "level": "not_applicable",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "This governance or migration inventory document does not itself claim production acceptance."
+          "Source and isolated database verification describe the migration guard only. This M3 change has no production deployment or business acceptance proof."
         ]
       },
-      "gaps": [
-        {
-          "id": "DOC-INTERNAL-PKG-MIGRATION-README-MD-FRESHNESS",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Declared fact sources changed in the current worktree after the last committed source baseline.",
-          "exit_criteria": "Commit or otherwise freeze the source changes, repeat semantic review, attach strict verification evidence and update the verified baseline."
-        }
-      ]
+      "gaps": []
     },
     {
       "path": "internal/pkg/migration/migrations/mongodb/README.md",

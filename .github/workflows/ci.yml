@@ -353,6 +353,17 @@ jobs:
             -run '^(TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback|TestStatisticsAuditMigrationReplaysAfterInitialSchema|TestStatisticsMongoCollectorIndexesUpDown|TestStatisticsColdStartPublishIdempotencyAndRedisFailure)$' \
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
+      - name: Verify schema pair forward migration and disabled DDL guards
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m3_test
+        run: |
+          go test -race -tags=integration -count=1 -timeout=8m \
+            -run '^(TestSchemaPairNative|TestDisabledDDLNative)' \
+            ./internal/pkg/migration ./internal/apiserver/bootstrap
+
       - name: Verify compatibility retirement A evidence contracts on real databases
         env:
           QS_COMPAT_OUTCOME_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
