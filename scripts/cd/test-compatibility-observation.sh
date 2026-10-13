@@ -65,7 +65,10 @@ elif arguments[0] == "exec":
         for index, (job, instance) in enumerate(instances):
             if scenario == "missing_target" and index == 2:
                 continue
-            last = now - (121 if scenario == "stale_scrape" else 1)
+            # The audit pins its snapshot before this later fake API call.
+            # A one-second margin races runner scheduling; use a clearly stale
+            # sample while leaving the production two-interval gate unchanged.
+            last = now - (3600 if scenario == "stale_scrape" else 1)
             targets.append({"labels": {"job": job, "instance": instance}, "health": "down" if scenario == "down" and index == 2 else "up",
                             "scrapeUrl": "http://" + instance + "/metrics", "scrapeInterval": "60s", "lastScrape": datetime.datetime.fromtimestamp(last, datetime.timezone.utc).isoformat()})
         emit({"activeTargets": targets})
