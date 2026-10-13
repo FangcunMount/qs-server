@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -24,8 +23,6 @@ type BootstrapInput struct {
 	MySQLDB                    *gorm.DB
 	MongoDB                    *mongo.Database
 	InputResolver              evaluationinput.Resolver
-	ScaleCatalog               evaluationinput.ScaleCatalog
-	EventPublisher             event.EventPublisher
 	RedisClient                redis.UniversalClient
 	CacheBuilder               *keyspace.Builder
 	CachePolicies              sharedcache.PolicyProvider

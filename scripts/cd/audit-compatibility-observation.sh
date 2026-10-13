@@ -91,11 +91,6 @@ if [ "$(run_privileged "$DOCKER_BIN" inspect "$APISERVER_CONTAINER" --format '{{
 fi
 
 metrics=(
-  "actor_practitioners|qs_actor_deprecated_practitioner_route_total"
-  "statistics_validate_only|qs_statistics_deprecated_validate_only_total"
-  "interpretation_generate_from_assessment|qs_interpretation_deprecated_generate_report_from_assessment_total"
-  "survey_legacy_idempotency_lookup|qs_answersheet_legacy_idempotency_fallback_lookup_total"
-  "survey_legacy_idempotency_hit|qs_answersheet_legacy_idempotency_fallback_hit_total"
   "evaluation_legacy_binding|qs_evaluation_assessment_intake_legacy_binding_total"
 )
 

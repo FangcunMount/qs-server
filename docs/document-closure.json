@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d60a9c2b18146af0057402e71caa4b3bcaf0b7df",
+    "sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
     "verified_on": "2026-10-13"
   },
   "status_policy": {
@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
-        "verified_on": "2026-10-10"
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -5547,8 +5547,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -5565,7 +5565,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/cache/query/versioned.go"
+          "path": "internal/pkg/cache/query/version_token.go"
         },
         {
           "kind": "source",
@@ -9781,8 +9781,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -9900,7 +9900,11 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
+<<<<<<< HEAD
         "source_sha": "d60a9c2b18146af0057402e71caa4b3bcaf0b7df",
+=======
+        "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+>>>>>>> origin/main
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -9934,7 +9938,7 @@
           "kind": "command",
           "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
           "result": "passed",
-          "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
           "verified_on": "2026-10-13"
         },
         {
@@ -9942,7 +9946,7 @@
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
           "result": "matched",
-          "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
           "verified_on": "2026-10-13"
         },
         {
@@ -9950,7 +9954,7 @@
           "path": "internal/pkg/migration/retirement_driver.go",
           "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
           "result": "matched",
-          "source_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
           "verified_on": "2026-10-13"
         }
       ],
