@@ -67,7 +67,7 @@ func TestBootstrapV2RejectsStaleOrUnknownBinding(t *testing.T) {
 		{"old_kind", func(a *bootstrapAuthorization) { a.Kind = "qs_compatibility_retirement_b_pristine_bootstrap" }},
 		{"wrong_source", func(a *bootstrapAuthorization) { a.ApprovedSourceSHA = strings.Repeat("e", 40) }},
 		{"wrong_head", func(a *bootstrapAuthorization) { a.MySQLVersion++ }},
-		{"wrong_resources", func(a *bootstrapAuthorization) { a.MigrationResourcesSHA256 = CompatibilityMigrationResourcesSHA256() }},
+		{"wrong_resources", func(a *bootstrapAuthorization) { a.MigrationResourcesSHA256 = legacyBootstrapResourcesSHA256(t) }},
 		{"expired", func(a *bootstrapAuthorization) { a.ExpiresAt = time.Now().UTC().Add(-time.Minute).Format(time.RFC3339) }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -82,4 +82,21 @@ func TestBootstrapV2RejectsStaleOrUnknownBinding(t *testing.T) {
 			}
 		})
 	}
+}
+
+func legacyBootstrapResourcesSHA256(t *testing.T) string {
+	t.Helper()
+	a, err := migrations.ReadFile("migrations/mysql/000100_retire_compatibility_message_storage.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := migrations.ReadFile("migrations/mongodb/000039_retire_compatibility_message_storage.up.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal([]string{retirementHash(a), retirementHash(b)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return retirementHash(raw)
 }

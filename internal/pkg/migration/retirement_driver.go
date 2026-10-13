@@ -67,7 +67,7 @@ func (d *retirementDatabaseDriver) tailVersion() int {
 	return 100
 }
 func (d *retirementDatabaseDriver) SetVersion(version int, dirty bool) error {
-	current, currentDirty, err := d.Driver.Version()
+	current, currentDirty, err := d.Version()
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 	if d.version < d.tailVersion() {
 		return d.Driver.Run(bytes.NewReader(raw))
 	}
-	current, dirty, err := d.Driver.Version()
+	current, dirty, err := d.Version()
 	if err != nil || current != d.version || !dirty {
 		return retirementError("pending migration metadata changed or unknown")
 	}

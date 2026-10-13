@@ -94,12 +94,6 @@ func retirementHash(raw []byte) string { h := sha256.Sum256(raw); return hex.Enc
 func marshalSQLIdentity(uuid, name string) ([]byte, error) {
 	return json.Marshal([]any{"mysql_server_selected_v1", uuid, name})
 }
-func CompatibilityMigrationResourcesSHA256() string {
-	a, _ := migrations.ReadFile("migrations/mysql/000100_retire_compatibility_message_storage.up.sql")
-	b, _ := migrations.ReadFile("migrations/mongodb/000039_retire_compatibility_message_storage.up.json")
-	raw, _ := json.Marshal([]string{retirementHash(a), retirementHash(b)})
-	return retirementHash(raw)
-}
 func retirementContext(parent context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(parent, 15*time.Second)
 }

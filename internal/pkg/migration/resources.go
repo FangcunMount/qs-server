@@ -119,6 +119,16 @@ func compiledMigrationResources() (*migrationResources, error) {
 	return readMigrationResources(migrations, declaredSchemaPairs)
 }
 
+// EmbeddedMigrationResources returns the actual compiled target heads and the
+// complete up/down resource digest used to bind a pristine bootstrap approval.
+func EmbeddedMigrationResources() (mysqlVersion, mongoVersion uint, sha256 string, err error) {
+	resources, err := compiledMigrationResources()
+	if err != nil {
+		return 0, 0, "", err
+	}
+	return resources.sql.head, resources.mongo.head, resources.sha256, nil
+}
+
 func migrationSource(config *Config) fs.FS {
 	if config.retirementPair != nil {
 		return config.retirementPair.resources.source
