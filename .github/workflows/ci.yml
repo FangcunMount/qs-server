@@ -627,6 +627,9 @@ jobs:
       - name: Validate deployment package contract
         run: bash scripts/cd/test-prepare-package.sh
 
+      - name: Validate direct registry deployment contract
+        run: python3 scripts/cd/test-direct-registry-deploy.py
+
       - name: Validate deployment image export contract
         run: bash scripts/cd/test-export-image.sh
 

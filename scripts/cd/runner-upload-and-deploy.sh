@@ -28,7 +28,14 @@ IMAGE_FILE="${DEPLOY_IMAGE_PACKAGE:-deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
 REMOTE_PACKAGE="/tmp/deploy-package-${PACKAGE_SUFFIX}.tar.gz"
 REMOTE_IMAGE="/tmp/deploy-image-${PACKAGE_SUFFIX}.tar.gz"
 
-for f in "$PACKAGE_FILE" "$IMAGE_FILE"; do
+DEPLOY_IMAGE_SOURCE="${DEPLOY_IMAGE_SOURCE:-tarball}"
+case "$DEPLOY_IMAGE_SOURCE" in
+  registry|tarball) ;;
+  *) echo "DEPLOY_IMAGE_SOURCE must be registry or tarball" >&2; exit 1 ;;
+esac
+required_files=("$PACKAGE_FILE")
+if [ "$DEPLOY_IMAGE_SOURCE" = tarball ]; then required_files+=("$IMAGE_FILE"); fi
+for f in "${required_files[@]}"; do
   if [ ! -f "$f" ]; then
     echo "Missing file: $f" >&2
     exit 1
@@ -82,6 +89,10 @@ emit_export CD_SOURCE_SHA       "$CD_SOURCE_SHA"
 emit_export CD_RUN_ID           "$CD_RUN_ID"
 emit_export CD_RUN_ATTEMPT      "$CD_RUN_ATTEMPT"
 emit_export DEPLOY_IMAGE_SOURCE "${DEPLOY_IMAGE_SOURCE:-tarball}"
+emit_export DEPLOY_PULL_REGISTRY "${DEPLOY_PULL_REGISTRY:-acr}"
+for name in ALIYUN_ACR_REGISTRY ALIYUN_ACR_NAMESPACE ALIYUN_ACR_USERNAME ALIYUN_ACR_PASSWORD; do
+  emit_export "$name" "${!name:-}"
+done
 emit_export IMAGE_TARBALL       "$REMOTE_IMAGE"
 emit_export DOCKER_REGISTRY     "$DOCKER_REGISTRY"
 emit_export DOCKER_REPOSITORY   "$DOCKER_REPOSITORY"
@@ -119,7 +130,7 @@ chmod 600 "$LOCAL_BOOT"
 if is_local_deploy_target "$DEPLOY_HOST"; then
   echo "Deploy target is local (${DEPLOY_HOST}); skipping SSH/SCP and running bootstrap on this host."
   cp -f "$PACKAGE_FILE" "$REMOTE_PACKAGE"
-  cp -f "$IMAGE_FILE" "$REMOTE_IMAGE"
+  if [ "$DEPLOY_IMAGE_SOURCE" = tarball ]; then cp -f "$IMAGE_FILE" "$REMOTE_IMAGE"; fi
   echo "Running remote-deploy.sh locally..."
   if ! bash "$LOCAL_BOOT"; then
     echo "remote-deploy.sh failed on local host" >&2
@@ -146,8 +157,8 @@ upload_and_verify() {
   return 1
 }
 
-echo "Uploading ${PACKAGE_FILE} and ${IMAGE_FILE} to ${RUNNER_SSH_ALIAS}..."
-upload_and_verify "$IMAGE_FILE" "$REMOTE_IMAGE"
+echo "Uploading deployment materials to ${RUNNER_SSH_ALIAS} (image source: ${DEPLOY_IMAGE_SOURCE})..."
+if [ "$DEPLOY_IMAGE_SOURCE" = tarball ]; then upload_and_verify "$IMAGE_FILE" "$REMOTE_IMAGE"; fi
 upload_and_verify "$PACKAGE_FILE" "$REMOTE_PACKAGE"
 
 REMOTE_BOOT="/tmp/qs-cd-bootstrap-${SERVICE}-$$.sh"

@@ -15,6 +15,9 @@ get_var() {
     || true
 }
 
+image_source="$(get_var QS_DEPLOY_IMAGE_SOURCE)"
+image_source="${image_source:-registry}"
+case "$image_source" in registry|tarball) ;; *) echo "Invalid QS_DEPLOY_IMAGE_SOURCE" >&2; exit 1 ;; esac
 export_registry="$(get_var QS_DEPLOY_EXPORT_REGISTRY)"
 http_proxy="$(get_var QS_DEPLOY_HTTP_PROXY)"
 https_proxy="$(get_var QS_DEPLOY_HTTPS_PROXY)"
@@ -22,6 +25,7 @@ all_proxy="$(get_var QS_DEPLOY_ALL_PROXY)"
 no_proxy="$(get_var QS_DEPLOY_NO_PROXY)"
 
 {
+  echo "deploy_image_source=${image_source}"
   echo "deploy_export_registry=${export_registry:-acr}"
   echo "self_hosted_http_proxy=${http_proxy:-http://127.0.0.1:7890}"
   if [ -n "${https_proxy}" ]; then
