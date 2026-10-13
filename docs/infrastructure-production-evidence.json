@@ -3381,6 +3381,232 @@
         "ServerA API job115552463176 and Collection job115552959159 succeeded but both recorded the fixed image-retention maintenance warning after the deploy account sudo request for image-retention.py was denied. Worker job115552958187 had no such warning. Production image-retention cleanup is not passed; no manual root image deletion or deploy-permission bypass was performed. This requires a separate named infrastructure maintenance task and does not change the CD/runtime passed result.",
         "New M1 API startup Options and post-Complete/Validate printable Config each parsed exactly once with task_opened_reminder=false and stable container/binary binding. These are hashes of already masked exported JSON Options, excluding real credential values, unexported context and later resolved runtime resources. Both Collection logs parsed; all three Worker scoped log reads failed with fixed readonly_parse_or_transport_failed, so their configuration stage is unverified. Full effective_config_hash remains null; this does not replace M2 post-release config and reminder delivery acceptance."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-backup-destination-readonly",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T22:04:12.552398+00:00",
+      "environment": "Mac mini production backup destination metadata only; separate current M1 running-program identity binding on serverA",
+      "deployed_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+      "source_baseline_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Only closed directory/filesystem/tool metadata and unchanged previously verified M1 running-program identity were read. No backup credential, complete effective configuration, database snapshot or restored runtime was observed."
+      },
+      "command": "User-confirmed owner/host registration plus trusted existing SSH to Mac mini; statvfs/df, finite path metadata and explicit Homebrew PATH tool --version only. Existing root SSH on serverA read fixed API container metadata and /proc/1/exe/file SHA256, matched the prior exact249 M1 runtime evidence. No directory creation, install, backup, service stop, DDL or restore.",
+      "result": {
+        "status": "findings",
+        "summary": "Data and recovery Owner system (10001) and Mac mini destination are explicitly confirmed. Requested /data/bak is absent with a read-only system root; alternative writable cleanup-m4 path remains unapproved. Mongo tools are present, native MySQL tools are missing. This is preparation metadata, not backup/restore readiness or per-object retirement approval.",
+        "measurements": {
+          "read_only": true,
+          "data_responsibility_owner": "system (10001)",
+          "recovery_responsibility_owner": "system (10001)",
+          "responsibility_confirmation_source": "Explicit user reply in current conversation",
+          "backup_host": "yangshujiedeMac-mini.local",
+          "requested_path": "/data/bak/",
+          "directory_metadata": {
+            "observed_at": "2026-10-13T22:04:12.552398+00:00",
+            "read_only": true,
+            "hostname": "yangshujiedeMac-mini.local",
+            "platform": "Darwin",
+            "effective_uid": 501,
+            "requested_backup_path": "/data/bak/",
+            "requested_path_exists": false,
+            "requested_path_is_symlink": false,
+            "missing_paths": [
+              "/data/bak",
+              "/data"
+            ],
+            "nearest_existing_parent": "/",
+            "parent_filesystem_read_only": true,
+            "parent_write_access": false,
+            "available_bytes": 71680233472,
+            "homebrew_path_explicit": true,
+            "commands": {
+              "python3": "/usr/bin/python3",
+              "docker": "/usr/local/bin/docker",
+              "mysql": null,
+              "mysqldump": null,
+              "mongodump": "/opt/homebrew/bin/mongodump",
+              "mongorestore": "/opt/homebrew/bin/mongorestore",
+              "ssh": "/usr/bin/ssh",
+              "gzip": "/usr/bin/gzip",
+              "shasum": "/usr/bin/shasum"
+            },
+            "candidate_paths": [
+              {
+                "path": "/Users/yangshujie/backups",
+                "exists": true,
+                "is_symlink": false,
+                "nearest_existing_parent": "/Users/yangshujie/backups",
+                "parent_write_access": true,
+                "mode": "0o755",
+                "owner_uid": 501,
+                "is_directory": true,
+                "resolved_path": "/Users/yangshujie/backups"
+              },
+              {
+                "path": "/Users/yangshujie/backups/qs-server",
+                "exists": true,
+                "is_symlink": false,
+                "nearest_existing_parent": "/Users/yangshujie/backups/qs-server",
+                "parent_write_access": true,
+                "mode": "0o755",
+                "owner_uid": 501,
+                "is_directory": true,
+                "resolved_path": "/Users/yangshujie/backups/qs-server"
+              },
+              {
+                "path": "/Users/yangshujie/backups/qs-server/mongodb",
+                "exists": true,
+                "is_symlink": false,
+                "nearest_existing_parent": "/Users/yangshujie/backups/qs-server/mongodb",
+                "parent_write_access": true,
+                "mode": "0o750",
+                "owner_uid": 501,
+                "is_directory": true,
+                "resolved_path": "/Users/yangshujie/backups/qs-server/mongodb"
+              },
+              {
+                "path": "/Users/yangshujie/backups/qs-server/cleanup-m4",
+                "exists": false,
+                "is_symlink": false,
+                "nearest_existing_parent": "/Users/yangshujie/backups/qs-server",
+                "parent_write_access": true
+              }
+            ],
+            "tools": [
+              {
+                "name": "mongodump",
+                "available": true,
+                "exit_code": 0,
+                "version_lines": [
+                  "mongodump version: 100.16.1",
+                  "git version: bbe4099afe325211b5fa0aeaade0e1a1d2bea064",
+                  "Go version: go1.25.9"
+                ]
+              },
+              {
+                "name": "mongorestore",
+                "available": true,
+                "exit_code": 0,
+                "version_lines": [
+                  "mongorestore version: 100.16.1",
+                  "git version: bbe4099afe325211b5fa0aeaade0e1a1d2bea064",
+                  "Go version: go1.25.9"
+                ]
+              },
+              {
+                "name": "mysqldump",
+                "available": false
+              },
+              {
+                "name": "mysql",
+                "available": false
+              },
+              {
+                "name": "docker",
+                "available": true,
+                "exit_code": 0,
+                "version_lines": [
+                  "Docker version 29.7.2, build a7dcaa6"
+                ]
+              }
+            ],
+            "system_root": {
+              "exit_code": 0,
+              "rows": [
+                "Filesystem     1024-blocks      Used Available Capacity iused     ifree %iused  Mounted on",
+                "/dev/disk3s1s1   239362496  12341272  70000228    15%  458732 700002280    0%   /"
+              ]
+            },
+            "data_volume": {
+              "exit_code": 0,
+              "rows": [
+                "Filesystem   1024-blocks      Used Available Capacity iused     ifree %iused  Mounted on",
+                "/dev/disk3s5   239362496 143703152  70000228    68% 1686301 700002280    0%   /System/Volumes/Data"
+              ]
+            },
+            "data_responsibility_owner": "system (10001)",
+            "recovery_responsibility_owner": "system (10001)",
+            "owner_and_host_source": "User explicitly confirmed roles and Mac mini destination in the current conversation.",
+            "ssh_route": "Existing trusted-host SSH endpoint; no StrictHostKeyChecking override or known_hosts modification.",
+            "earlier_dns_attempt": "Hostname route refused due to missing trusted host key; no authentication or remote operation occurred. Existing trusted IP route succeeded and exact Mac mini identity was checked.",
+            "runner_shares_host": true,
+            "backup_pair_captured": false,
+            "restore_rehearsal_verified": false,
+            "directory_created": false,
+            "requested_path_usable": false,
+            "alternative_path_approved": false,
+            "script_sha256": "8203a72e0c310dafbb180752e4b7778a0f598e4ed070da8111533cd1d22e0176"
+          },
+          "current_m1_source_binding": {
+            "observed_at": "2026-10-13T22:06:03.163440+00:00",
+            "read_only": true,
+            "metadata": {
+              "container_id": "11fb6047351d78681fa243d537ca236d81b6c1f1dea276e85db47ad84b0cf760",
+              "image_id": "sha256:f95d238c11aded1018c7ec0fabd1702ff2ff57acd57760db313ecdc8b87dfbd4",
+              "started_at": "2026-10-13T21:36:38.362290662Z",
+              "running": true
+            },
+            "running_program_sha256": "871766e1abbf969d5167c83ded241b09c027977d2d0cef9856017b62cdc98780",
+            "file_program_sha256": "871766e1abbf969d5167c83ded241b09c027977d2d0cef9856017b62cdc98780",
+            "metadata_stable": true,
+            "compiled_sha_from_same_verified_running_program": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "prior_exact_release_record": "infra-2026-10-14-qs-cleanup-m1-release-249788c6",
+            "prior_raw_artifact_sha256": "87ecf50fa7477d89beb1db8b706ae67591c455550caaa0cead391ee71b2bca64"
+          },
+          "per_object_responsibilities_closed": false,
+          "real_business_participant_account_bound": false,
+          "real_business_device_recipient_bound": false,
+          "proposed_path": "/Users/yangshujie/backups/qs-server/cleanup-m4/",
+          "proposed_path_approved": false,
+          "same_freeze_full_backup_pair_captured": false,
+          "actual_restore_rehearsal_verified": false,
+          "retention_30_days_verified": false,
+          "maintenance_30min_restore_60min_rpo0_verified": false,
+          "production_mutations_applied": 0,
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m4-backup-directory-mac-mini-readonly.json",
+              "sha256": "9abb3bd2241a08be45e4a45247ce495488b584b6d636a9f1890c3d29768bb661"
+            },
+            {
+              "name": "qs-server-cleanup-m4-preparation-source-binding-readonly.json",
+              "sha256": "2bb84fe9f03f9ce0efd843fbcc6136956ae2c058fd2dd02d7f7520e371a4e21f"
+            }
+          ],
+          "per_object_data_and_recovery_owner_assigned": true,
+          "owner_assignment_scope": "Existing approved M4-A through M4-F cleanup candidates only; exit conditions and outstanding responsibilities remain open."
+        }
+      },
+      "owner": "Codex",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md"
+        }
+      ],
+      "limitations": [
+        "General Owner and destination-host acknowledgement do not settle consumers, deferred manifests or each object responsibility, and do not authorize a production maintenance window or DDL. system (10001) is a data/recovery responsibility label, not a participant account, SQL user, SSH identity or credential.",
+        "Free bytes are an instantaneous shared-volume reading, not a guarantee for simultaneous complete backup pair, restore working space, CI occupancy or 30-day retention. No database backup size was measured.",
+        "Requested /data/bak is unusable on the current read-only macOS root. The alternative existing writable parent was inspected, but no new directory was created and no alternate destination approval is inferred.",
+        "Homebrew PATH reveals installed Mongo tools and Docker CLI. Version output does not prove daemon connectivity or an authenticated backup/recovery route. Native MySQL tools are absent; no software was installed.",
+        "The existing daily Mongo script enforces three retained archives and a different suffix path; its dryRun validation and same-source --drop restore do not satisfy full isolated M4 recovery or 30-day backup retention. It was not dispatched.",
+        "The exact M1 source is bound by unchanged CID/image/start time and /proc/file program hashes matching independently verified prior compiled249 evidence. This snapshot does not repeat all six-instance configuration or business acceptance. The linked CD proves M1 release, not this destination metadata probe or M4 backup success.",
+        "M1 release and earlier ServerA provisional metadata remain unchanged. Historical pending-role text reflects its recorded time and is resolved only by this dated user confirmation; no prior raw evidence is rewritten.",
+        "Maintenance budget, stopped writers/background TTL scope, full backup pair, restored schemas/counts/summaries/indexes/references, old image compatibility, target migration/services and real business acceptance remain incomplete."
+      ]
     }
   ]
 }
