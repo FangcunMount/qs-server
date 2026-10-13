@@ -399,7 +399,7 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
         "collection_l1_cache": ("internal/collection-server/application/modelcatalog/readthrough.go",),
         "published_model_l1": ("internal/apiserver/cache/modelcatalog/published_model_l1.go",),
         "cache_metric_reader": ("internal/apiserver/application/systemgovernance/metric_evidence_reader.go",),
-        "cache_core": ("internal/pkg/cache/query/versioned.go",),
+        "cache_core": ("internal/pkg/cache/query/version_token.go",),
         "signal_contract": ("internal/pkg/signalcatalog/types.go",),
         "redis_runtime": ("internal/pkg/redisruntime/runtime.go",),
         "config_contract": ("internal/pkg/configcontract/config_contract_test.go",),

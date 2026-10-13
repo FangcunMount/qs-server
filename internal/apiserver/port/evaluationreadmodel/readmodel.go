@@ -110,6 +110,5 @@ type FactorTrendFilter struct {
 // It is suitable for analytical views such as trends, never as the canonical
 // source for one Evaluation outcome.
 type ScoreProjectionReader interface {
-	GetScoreByAssessmentID(ctx context.Context, assessmentID uint64) (*ScoreRow, error)
 	ListFactorTrend(ctx context.Context, filter FactorTrendFilter) ([]ScoreRow, error)
 }

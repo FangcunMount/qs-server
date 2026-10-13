@@ -10,34 +10,36 @@ import (
 	report "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 )
 
-func TestModuleDescriptorsExposeCanonicalNames(t *testing.T) {
+func TestBusinessModuleInfoUsesCanonicalRegistrationNames(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name string
-		got  modules.PackageName
-		want modules.PackageName
+		name   string
+		module modules.Module
+		want   modules.PackageName
 	}{
-		{"survey", survey.Describe().Name, modules.PackageSurvey},
-		{"modelcatalog", modelcatalog.Describe().Name, modules.PackageModelCatalog},
-		{"evaluation", evaluation.Describe().Name, modules.PackageEvaluation},
-		{"interpretation", report.Describe().Name, modules.PackageInterpretation},
-		{"actor", actor.Describe().Name, modules.PackageActor},
-		{"plan", plan.Describe().Name, modules.PackagePlan},
-		{"statistics", statistics.Describe().Name, modules.PackageStatistics},
-		{"platform", platform.Describe().Name, modules.PackagePlatform},
+		{"survey", &survey.Module{}, modules.PackageSurvey},
+		{"modelcatalog", &modelcatalog.Module{}, modules.PackageModelCatalog},
+		{"evaluation", &evaluation.Module{}, modules.PackageEvaluation},
+		{"interpretation", &report.Module{}, modules.PackageInterpretation},
+		{"actor", &actor.Module{}, modules.PackageActor},
+		{"plan", &plan.Module{}, modules.PackagePlan},
+		{"statistics", &statistics.Module{}, modules.PackageStatistics},
 	}
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if tc.got != tc.want {
-				t.Fatalf("name = %q, want %q", tc.got, tc.want)
+			info := tc.module.ModuleInfo()
+			if info.Name != string(tc.want) {
+				t.Fatalf("module registration name = %q, want %q", info.Name, tc.want)
+			}
+			if info.Version == "" || info.Description == "" {
+				t.Fatalf("module lifecycle metadata is incomplete: %#v", info)
 			}
 		})
 	}
