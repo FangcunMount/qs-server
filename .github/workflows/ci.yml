@@ -391,6 +391,33 @@ jobs:
             ./internal/apiserver/infra/mongo/modelcatalog \
             ./internal/apiserver/container/modules/modelcatalog
 
+      - name: Require read-only Definition projection audit against real Mongo
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_definition_projection_ci_test
+        run: |
+          set -euo pipefail
+          test -n "$QS_SERVER_TEST_MONGO_URI"
+          tests=(
+            TestProjectionAuditRealMongoPaginationAllRolesAndNonzeroFindings
+            TestProjectionAuditRealMongoSnapshotBindsConcurrentChanges
+            TestProjectionAuditRealMongoEmptyAndCLIReadOnlyResult
+          )
+          selector="^($(IFS='|'; echo "${tests[*]}"))$"
+          selected="$RUNNER_TEMP/definition-projection-selected.txt"
+          result="$RUNNER_TEMP/definition-projection-result.txt"
+          go test -tags=integration -list "$selector" ./scripts/oneoff/audit_norm_usage > "$selected"
+          test "$(awk '/^TestProjectionAuditRealMongo/ {n++} END {print n+0}' "$selected")" -eq 3
+          for name in "${tests[@]}"; do
+            awk -v name="$name" '$0 == name {found=1} END {exit !found}' "$selected"
+          done
+          go test -race -tags=integration -count=1 -timeout=2m -v -run "$selector" \
+            ./scripts/oneoff/audit_norm_usage | tee "$result"
+          awk '/--- SKIP:/ {skipped=1} END {exit skipped}' "$result"
+          for name in "${tests[@]}"; do
+            awk -v name="$name" '$1 == "---" && $2 == "PASS:" && $3 == name {passed=1} END {exit !passed}' "$result"
+          done
+
       - name: Run Mongo runtime-ledger retirement guards
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
