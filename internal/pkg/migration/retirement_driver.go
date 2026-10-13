@@ -164,7 +164,7 @@ func (d *retirementDatabaseDriver) runMongoTail(raw []byte) error {
 	ctx, cancel := context.WithTimeout(d.ctx, 15*time.Second)
 	defer cancel()
 	db := d.client.Database(d.database)
-	a, b, e := pairIdentity(ctx, d.pair.sqlReader(), d.client, d.pair.config.MySQLDatabase, d.database)
+	a, b, e := pairIdentity(ctx, d.pair.sqlDB, d.client, d.pair.config.MySQLDatabase, d.database)
 	if e != nil || a != d.pair.sqlHash || b != d.pair.mongoHash {
 		return retirementError("mongo tail pair identity changed")
 	}

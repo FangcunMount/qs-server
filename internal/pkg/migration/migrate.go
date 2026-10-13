@@ -107,7 +107,7 @@ func (m *Migrator) run(target ...uint) (version uint, changed bool, resultErr er
 		}
 		if backend == BackendMySQL {
 			d, ok := m.driver.(*MySQLDriver)
-			if !ok || (p.sqlConn == nil && d.db != p.sqlDB) || (p.sqlConn != nil && d.borrowedConn != p.sqlConn) || m.config.Database != p.config.MySQLDatabase {
+			if !ok || d.db != p.sqlDB || m.config.Database != p.config.MySQLDatabase {
 				return 0, false, retirementError("paired mysql connection mismatch")
 			}
 		} else {
