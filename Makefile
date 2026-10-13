@@ -102,7 +102,6 @@ COLOR_RED := \033[31m
 .PHONY: check-infra check-mysql check-redis check-mongodb check-nsq
 .PHONY: dev dev-apiserver dev-collection dev-worker dev-stop dev-status dev-logs
 .PHONY: test test-unit test-coverage test-race test-bench test-all
-.PHONY: test-submit test-message-queue
 .PHONY: lint lint-boundaries fmt fmt-check maintainability-lint maintainability-lint-ci tier1-test-policy ensure-golangci-lint
 .PHONY: verify vuln
 .PHONY: security security-govulncheck security-govulncheck-ci security-gosec security-gosec-ci
@@ -751,22 +750,6 @@ test-bench: ## 运行基准测试
 	@$(GO_TEST) -v -bench=. -benchmem ./...
 
 test-all: test test-race ## 运行所有测试
-
-test-message-queue: ## 测试消息队列系统
-	@echo "📨 测试消息队列系统..."
-	@if [ ! -x "./test-message-queue.sh" ]; then \
-		echo "❌ 测试脚本不存在或不可执行"; \
-		exit 1; \
-	fi
-	@./test-message-queue.sh
-
-test-submit: ## 测试答卷提交
-	@echo "📝 测试答卷提交..."
-	@if [ ! -x "./test-answersheet-submit.sh" ]; then \
-		echo "❌ 测试脚本不存在或不可执行"; \
-		exit 1; \
-	fi
-	@./test-answersheet-submit.sh
 
 # ============================================================================
 # 代码质量

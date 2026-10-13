@@ -49,18 +49,3 @@ func (f *FillerRef) UserID() int64 {
 func (f *FillerRef) FillerType() FillerType {
 	return f.fillerType
 }
-
-// IsSelf 是否本人填写
-func (f *FillerRef) IsSelf() bool {
-	return f.fillerType == FillerTypeSelf
-}
-
-// IsGuardian 是否监护人代填
-func (f *FillerRef) IsGuardian() bool {
-	return f.fillerType == FillerTypeGuardian
-}
-
-// IsOperator 是否操作者代填
-func (f *FillerRef) IsOperator() bool {
-	return f.fillerType == FillerTypeOperator
-}
