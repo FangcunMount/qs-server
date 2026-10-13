@@ -782,8 +782,8 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
-        "verified_on": "2026-10-09"
+        "source_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -801,6 +801,26 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/migrations/**/*"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/contract/**/*.go"
         }
       ],
       "verification": [
