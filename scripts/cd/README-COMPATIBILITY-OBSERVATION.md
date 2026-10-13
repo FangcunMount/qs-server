@@ -6,7 +6,7 @@
 
 | 契约 | 指标 | 计数位置与语义 |
 | --- | --- | --- |
-| 已验签 Claims.Extra 身份别名 | `qs_auth_claim_source_total{field,source}` | REST 验证成功后，只计 UserID、AccountID、OrgID 真正选中的来源；未选中的 Extra 不算依赖。AccountID 继续优先 Extra，UserID／OrgID 继续优先 canonical。 |
+| 已验签 Claims.Extra 身份别名 | `qs_auth_claim_source_total{field,source}` | REST 验证成功后，只计 UserID、AccountID、OrgID 真正选中的来源；未选中的 Extra 不算依赖。AccountID 继续优先 Extra，UserID／OrgID 继续优先 canonical；OrgID 合法可选，已验签且未选出 Org 的原分支计为 missing。 |
 | Authorization 裸 token | `qs_auth_token_source_total{source,result}` | 区分 bearer、bare、query、cookie、missing、unavailable，accepted 仅表示认证验证成功，rejected 不计已选身份声明；下游授权结果另计。query／cookie 保留原语义。 |
 | Collection 旧 Task token 路由 | `qs_plan_entry_route_total{route,result}` | 在原 IAM 链之前观察已匹配的两个固定 GET 模板，包含认证拒绝。canonical／legacy_token 均继续执行原鉴权，2xx 为 accepted，其余为 rejected。 |
 | Definition 写入的衍生字段 | `qs_model_definition_write_total{input,result}`、`qs_model_definition_input_field_total{field,presence,result}` | 仅 REST UpdateDefinition 读取原 binder 消费的字节；两个固定字段 DecisionSpec／InterpretationAssets 的 presence 包括 null、空对象和 binder 接受的大小写形式。嵌套同名键不计；canonical 表示两个字段均未提供。MaterializeLayers、共享 domain JSON 解码和 Mongo 读取不产生计数。 |
@@ -27,15 +27,17 @@
 
 - 当前部署清单和全部 source SHA 相符；实例未在窗口内部署或重启。
 - 每个实际 scrape interval 的查询点均覆盖全部实例、source 能力与固定 series；样本 age 小于两个 interval。支持 15–60 秒 interval；缺点、down、陈旧样本、来源切换、部分部署或 counter reset 均失败，不能视作零。
-- 每个实例都有实际 accepted canonical 流量：bearer、三个身份字段的 canonical 来源，以及各自服务的 TaskID 路由／无衍生字段 Definition 写入。零流量不是兼容退出证据。
+- 每个实例都有实际 accepted bearer、UserID 与 AccountID 的 canonical 来源流量，以及各自服务的 TaskID 路由／无衍生字段 Definition 写入。OrgID 合法可选：只允许已经验签并由原选择逻辑计数的 canonical 或 missing 来源之和为正；两个来源都零仍失败。用户或登录身份缺失不能满足 canonical 门槛，零流量不是兼容退出证据。
 - Extra 真实选中、bare 请求（含拒绝）、旧 Task 路由（含拒绝）、带衍生字段写入（含拒绝）任一出现，保留 `active_compatibility`。四项全零也只得到候选，仍需客户端、数据负责人和业务退出确认。
+
+IAM 当前新会话使用空 BusinessContext，OrgID 为零时 JWT 的 `org_id,omitempty` 不输出组织声明。因此正常 fresh 身份流量可以全部记为 Org missing，无需为观察门禁新增组织 claim。Org missing 只证明已验签后的来源选择被观察到，不证明业务组织授权、权限范围或实际业务流程验收；旧 `Extra.org_id`／`Extra.organization_id` 真实选中仍属于 `active_compatibility`，不计入上述合法 Org 正流量，也不能成为零调用候选。
 
 工作流沿用现有固定SSH初始化、ServerA身份核对和非交互sudo；密钥与sudo密码不输出。人工调用明确提供mode/source/W/T0。每天北京02:00的调用使用production环境中已批准的 `QS_COMPAT_OBSERVATION_MODE`、`QS_COMPAT_SOURCE_SHA`、`QS_COMPAT_WINDOW_DAYS`、`QS_COMPAT_STARTED_AT`、`QS_COMPAT_APISERVER_CONTAINERS`、`QS_COMPAT_COLLECTION_CONTAINERS`；实例清单也由人工调用沿用这两个配置，缺失时失败。不从观测到的SHA自动批准自身，不更改上述环境变量或保留配置。未批准T0时只允许默认预检查，不能启动观察计时。
 
 ## 验证入口
 
 - `go test -race ./internal/pkg/authobservability ./internal/pkg/middleware ./internal/collection-server/transport/rest ./internal/apiserver/transport/rest/handler`：真实签名／SDK 验证、实际选中来源、载体优先级、认证拒绝、旧路由顺序、输入 presence 与原 body／错误行为。
-- `bash scripts/cd/test-compatibility-observation.sh`：完整窗口、真实命中及实例遗漏、版本不符、重启、reset、断档、无 canonical 流量等失败关闭矩阵。合成矩阵不证明生产已有历史样本。
-- `M6_QUERY_ARTIFACT=/tmp/qs-compat-queries.jsonl bash scripts/cd/test-compatibility-observation.sh` 后运行 `python3 scripts/cd/test-compatibility-prometheus.py /tmp/qs-compat-queries.jsonl`：隔离原生Prometheus实际解析／执行vector与range表达式，核对固定series和真实counter increase；不冒充14天生产历史。
+- `bash scripts/cd/test-compatibility-observation.sh`：完整窗口、真实命中及实例遗漏、版本不符、重启、reset、断档、无 canonical 流量、用户／登录身份缺失、Org 未观察到等失败关闭矩阵；另验证只有合法 missing Org 增长且其他 canonical 正流量时可得候选，旧 Extra Org 仍 active。合成矩阵不证明生产已有历史样本。
+- `M6_QUERY_ARTIFACT=/tmp/qs-compat-queries.jsonl bash scripts/cd/test-compatibility-observation.sh` 后运行 `python3 scripts/cd/test-compatibility-prometheus.py /tmp/qs-compat-queries.jsonl`：隔离原生Prometheus实际解析／执行vector与range表达式，核对固定series、真实counter increase、用户／登录身份 canonical 正流量与只有 missing Org 的正流量（Org canonical 为零）；不冒充14天生产历史。
 
 PromQL 的矩阵与 timestamp／counter 函数语义依据 [Prometheus HTTP API](https://prometheus.io/docs/prometheus/latest/querying/api/) 和 [查询函数](https://prometheus.io/docs/prometheus/latest/querying/functions/)；原生parser/API验证与生产采样覆盖是不同证据。

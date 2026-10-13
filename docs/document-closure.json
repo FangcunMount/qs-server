@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "67e99e7fb3b0e8ad0be7b75bbed0e4d89bd2c9ac",
-    "verified_on": "2026-10-13"
+    "sha": "b8ebb46e9d5dbb10c01bdf4bfa33b703670f7d9e",
+    "verified_on": "2026-10-14"
   },
   "status_policy": {
     "doc_status": [
@@ -11452,8 +11452,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "67e99e7fb3b0e8ad0be7b75bbed0e4d89bd2c9ac",
-        "verified_on": "2026-10-13"
+        "source_sha": "b8ebb46e9d5dbb10c01bdf4bfa33b703670f7d9e",
+        "verified_on": "2026-10-14"
       },
       "fact_sources": [
         {
@@ -11486,8 +11486,8 @@
           "kind": "command",
           "command": "bash scripts/cd/test-compatibility-observation.sh",
           "result": "passed",
-          "source_sha": "67e99e7fb3b0e8ad0be7b75bbed0e4d89bd2c9ac",
-          "verified_on": "2026-10-13"
+          "source_sha": "b8ebb46e9d5dbb10c01bdf4bfa33b703670f7d9e",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -11496,7 +11496,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Source, synthetic fail-closed matrix and native Prometheus parser/API checks do not attest production sampling, client release or an approved T0."
+          "Source, synthetic fail-closed matrix and native Prometheus parser/API checks distinguish optional verified Org missing from required canonical user/login identity; they do not attest production sampling, business organization authorization, client release or an approved T0."
         ]
       },
       "gaps": []
