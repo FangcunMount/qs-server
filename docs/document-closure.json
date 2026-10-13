@@ -7083,8 +7083,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
-        "verified_on": "2026-10-09"
+        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -7147,7 +7147,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "The owner authorized direct root deletion of the four legacy objects followed by the final R4 ordinary three-service release and paired migration to MySQL100/MongoDB39. Existing precise backups are retained; historical migration, full restore rehearsal and the old native-window acceptance are not prerequisites. Direct deletion, final R4 deployment/runtime acceptance, exact temporary-material exit and original settings restoration remain pending; the failed old run38316933488-1 proves none of those outcomes."
+          "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored."
         ]
       },
       "gaps": [
@@ -8348,8 +8348,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -8387,7 +8387,7 @@
         "observed_at": null,
         "limitations": [
           "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance.",
-          "The owner authorized direct root deletion of the four legacy objects followed by the final R4 ordinary three-service release and paired migration to MySQL100/MongoDB39. Existing precise backups are retained; historical migration, full restore rehearsal and the old native-window acceptance are not prerequisites. Direct deletion, final R4 deployment/runtime acceptance, exact temporary-material exit and original settings restoration remain pending; the failed old run38316933488-1 proves none of those outcomes."
+          "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored."
         ]
       },
       "gaps": [
@@ -8976,10 +8976,23 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "verified_on": "2026-10-13"
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging_retirement.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -8987,7 +9000,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored."
         ]
       },
       "gaps": [
@@ -11281,8 +11294,8 @@
       "owner": "tooling",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "2be3fe69c1ad9a1c9e89442ae25aa434ff020616",
-        "verified_on": "2026-10-10"
+        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -11317,7 +11330,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "The owner authorized direct root deletion of the four legacy objects followed by the final R4 ordinary three-service release and paired migration to MySQL100/MongoDB39. Existing precise backups are retained; historical migration, full restore rehearsal and the old native-window acceptance are not prerequisites. Direct deletion, final R4 deployment/runtime acceptance, exact temporary-material exit and original settings restoration remain pending; the failed old run38316933488-1 proves none of those outcomes."
+          "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored."
         ]
       },
       "gaps": [
@@ -11325,36 +11338,36 @@
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
-          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
+          "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
         },
         {
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
-          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
+          "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
         },
         {
           "id": "b_combined_snapshot_and_native_fence_pending",
           "kind": "source-lag",
           "severity": "medium",
-          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
-          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
+          "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
         },
         {
           "id": "COMPAT-RETIREMENT-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
-          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
+          "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
         },
         {
           "id": "DOC-RETIREMENT-MERGE-SELECTOR-20261010",
           "kind": "verification",
           "severity": "medium",
-          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
-          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt.",
+          "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal.",
           "historical_evidence": [
             {
               "kind": "source_selector",
@@ -11378,8 +11391,8 @@
           "id": "r4-source-exit-document-update",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "The final R4 candidate removes the registered one-time tools and exclusive tests while preserving current EventEvidence, standard Outbox, current MQ protection and historical migrations. The source baseline is ea61f987c424e10dcce02dc55cf5b0786efe3fe8. The owner selected direct root DROP followed by this final ordinary release; no old native-window success, recovery proof or material-zero result is claimed. Actual deletion, final source CI/release, runtime acceptance and temporary exit remain pending.",
-          "exit_criteria": "Run the final source checks, record actual direct four-target deletion, deploy final R4 through ordinary CD, verify paired100/39clean and actual business/runtime behavior, then record batch-only material exit and original settings restoration. Do not require or manufacture an old native accepted/purge receipt."
+          "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
         }
       ]
     },
