@@ -91,7 +91,7 @@ func TestProjectionRecordBindsIdentityRevisionFingerprintAndBlocksMetadata(t *te
 	}
 	duplicate = append(duplicate, bson.E{Key: "revision", Value: int64(10)})
 	raw, _ = bson.Marshal(duplicate)
-	if record := auditProjectionRecord(raw); record.Status != "invalid" {
+	if record := auditProjectionRecord(raw); record.Status != "invalid" || record.InvalidReasonCounts["raw.duplicate_key"] != 1 {
 		t.Fatal("ambiguous metadata was classified as matching")
 	}
 	for _, tc := range []struct {
@@ -114,6 +114,22 @@ func TestProjectionRecordBindsIdentityRevisionFingerprintAndBlocksMetadata(t *te
 		if strings.Contains(string(encoded), "NEVER_PRINT_REPORT_TEXT") || strings.Contains(string(encoded), "private invalid body") {
 			t.Fatal("report text disclosed")
 		}
+	}
+}
+
+func TestProjectionRecordReportsBoundedReasonsWithSameIdentityAndInvalidStatus(t *testing.T) {
+	doc := projectionTestDoc(t, "scale")
+	doc["decision_kind"] = "NEVER_PRINT_PRIVATE_DECISION_KIND"
+	record := recordFromDoc(t, doc)
+	if record.Status != "invalid" || record.InvalidCount != 1 || record.InvalidReasonCounts["metadata.decision_kind_invalid"] != 1 || record.CanonicalHash == "" || record.Revision != "v1" || len(record.Fingerprint) != 64 {
+		t.Fatalf("metadata diagnostic changed result or identity: %+v", record)
+	}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "NEVER_PRINT") {
+		t.Fatal("metadata value disclosed through reason")
 	}
 }
 

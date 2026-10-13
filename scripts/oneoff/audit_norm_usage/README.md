@@ -79,6 +79,8 @@ go run ./scripts/oneoff/audit_norm_usage/ \
 | 2 | 完整扫描有差异、缺失、未知 schema、invalid/error，或集合为空 |
 | 3 | 达到总量上限导致扫描不完整 |
 
+每条 invalid 记录另有 `invalid_reason_counts`：原始 BSON 的 `raw.unknown_field` / `raw.duplicate_key` 与当前 `validation.*` 枚举分别计数。原因计数覆盖全部校验问题，路径最多显示 32 条；原因 label 使用固定有界枚举，未知 validation Code 归为 `validation.unrecognized`，不输出 Message、值或正文。增加诊断不改变 invalid、差异比较或 zero 判定；复查须按原 ID/revision/fingerprint 绑定，fingerprint 变化应单独注明。
+
 已知 mapper 中 canonical typology profile 可包含 Rarity，而 derived `TypeProfilePO` 未保存该字段。审计保留纯投影的 Rarity，并报告这类存储损失，不通过二次 PO 编码隐藏差异。任何非 zero 结果都需要逐项核查；此工具不会覆盖现有 derived fields、公开契约、冻结报告或历史数据。
 
 ## 非目标

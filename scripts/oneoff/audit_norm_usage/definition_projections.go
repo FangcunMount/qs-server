@@ -256,7 +256,7 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 		DefinitionSchema string             `bson:"definition_schema_version"`
 	}
 	if err := bson.Unmarshal(raw, &metadata); err != nil {
-		record.InvalidCount, record.InvalidPaths = 1, []string{"metadata"}
+		record.invalid("metadata", "metadata.decode_error")
 		return record
 	}
 	if !metadata.ID.IsZero() {
@@ -272,13 +272,13 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 	// cannot make an ambiguous identity/revision safe to classify as matching.
 	elements, err := raw.Elements()
 	if err != nil {
-		record.InvalidCount, record.InvalidPaths = 1, []string{"metadata"}
+		record.invalid("metadata", "raw.invalid_bson")
 		return record
 	}
 	seen := map[string]bool{}
 	for _, element := range elements {
 		if seen[element.Key()] {
-			record.InvalidCount, record.InvalidPaths = 1, []string{"metadata.duplicate_field"}
+			record.invalid("metadata.duplicate_field", "raw.duplicate_key")
 			return record
 		}
 		seen[element.Key()] = true
@@ -293,7 +293,7 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 		record.Historical = true
 	}
 	if metadata.ID.IsZero() || metadata.Code == "" || strings.TrimSpace(metadata.Code) != metadata.Code || record.Revision == "" || (record.Role == "head" && metadata.Revision <= 0) {
-		record.InvalidCount, record.InvalidPaths = 1, []string{"metadata.identity_revision"}
+		record.invalid("metadata.identity_revision", "metadata.identity_revision_invalid")
 		return record
 	}
 	definition := raw.Lookup("definition_v2")
@@ -303,26 +303,26 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 	}
 	if metadata.DefinitionSchema != domain.SchemaVersionV2 || (metadata.Schema != "" && metadata.Schema != domain.SchemaVersionV2) || (record.Role == "published_snapshot" && metadata.Schema != domain.SchemaVersionV2) || (record.Role != "head" && record.Role != "published_snapshot") {
 		record.Status = "unknown_schema"
-		record.InvalidCount, record.InvalidPaths = 1, []string{"metadata.schema_role"}
+		record.invalid("metadata.schema_role", "metadata.schema_role_unsupported")
 		return record
 	}
 	switch metadata.Kind {
 	case "scale", "typology", "behavioral_rating", "cognitive":
 	default:
 		record.Status = "unknown_schema"
-		record.InvalidCount, record.InvalidPaths = 1, []string{"metadata.kind"}
+		record.invalid("metadata.kind", "metadata.kind_unsupported")
 		return record
 	}
 	def, ok := definition.DocumentOK()
 	if !ok {
-		record.InvalidCount, record.InvalidPaths = 1, []string{"definition_v2"}
+		record.invalid("definition_v2", "raw.type_mismatch")
 		return record
 	}
 	record.DefinitionProjectionAudit = mongomodelcatalog.AuditDefinitionProjections(def)
 	if record.InvalidCount == 0 && !record.HashError {
 		var po mongomodelcatalog.DefinitionPO
 		if err := bson.Unmarshal(def, &po); err != nil {
-			record.InvalidCount, record.InvalidPaths = 1, []string{"definition_v2"}
+			record.invalid("definition_v2", "raw.decode_error")
 		} else {
 			// This mapper only decodes the canonical Definition; routing is derived
 			// by the existing pure domain rule, independently of stored layers.
@@ -330,13 +330,11 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 			model := &domain.AssessmentModel{Kind: domain.Kind(metadata.Kind), DefinitionV2: mapped.DefinitionV2}
 			decision, err := model.DecisionKindForDefinition()
 			if err != nil || (record.Role == "published_snapshot" && metadata.DecisionKind != string(decision)) {
-				record.InvalidCount++
-				record.InvalidPaths = append(record.InvalidPaths, "metadata.decision_kind")
+				record.invalid("metadata.decision_kind", "metadata.decision_kind_invalid")
 			}
 			policy := domain.ClassifyAlgorithmWritePolicy(domain.Kind(metadata.Kind), domain.Algorithm(metadata.Algorithm))
 			if policy == domain.AlgorithmWriteUnknown || (record.Role == "published_snapshot" && !domain.IsCanonicalPublishAlgorithm(domain.Kind(metadata.Kind), domain.Algorithm(metadata.Algorithm))) {
-				record.InvalidCount++
-				record.InvalidPaths = append(record.InvalidPaths, "metadata.algorithm")
+				record.invalid("metadata.algorithm", "metadata.algorithm_invalid")
 			}
 		}
 	}
@@ -351,4 +349,14 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 		record.Status = "matched"
 	}
 	return record
+}
+
+// All callers provide fixed diagnostic enums; no metadata value becomes a label.
+func (r *projectionRecord) invalid(path, reason string) {
+	r.InvalidCount++
+	r.InvalidPaths = append(r.InvalidPaths, path)
+	if r.InvalidReasonCounts == nil {
+		r.InvalidReasonCounts = make(map[string]int)
+	}
+	r.InvalidReasonCounts[reason]++
 }

@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -140,5 +141,62 @@ func TestProjectionAuditKeepsOrderAndRejectsDuplicatesUnknownAndInvalid(t *testi
 	}
 	if result := AuditDefinitionProjections(bson.Raw{1, 2}); result.InvalidCount == 0 {
 		t.Fatal("malformed BSON accepted")
+	}
+}
+
+func TestProjectionAuditReasonsDistinguishRawShapeAndKeepFullCounts(t *testing.T) {
+	var stored bson.D
+	if err := bson.Unmarshal(projectionRaw(t, projectionDefinition("scale")), &stored); err != nil {
+		t.Fatal(err)
+	}
+	// Each invalid element still counts once, including an unknown duplicate.
+	for i := range 40 {
+		stored = append(stored, bson.E{Key: fmt.Sprintf("retired_%d", i), Value: "NEVER_PRINT_RAW_VALUE"})
+	}
+	stored = append(stored, bson.E{Key: "retired_0", Value: "NEVER_PRINT_DUPLICATE_VALUE"})
+	raw, err := bson.Marshal(stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := AuditDefinitionProjections(raw)
+	if result.InvalidCount != 41 || len(result.InvalidPaths) != projectionAuditPathLimit || result.InvalidReasonCounts["raw.unknown_field"] != 40 || result.InvalidReasonCounts["raw.duplicate_key"] != 1 || result.CanonicalHash != "" || result.DifferenceCount != 0 {
+		t.Fatalf("reason counts lost or changed invalid behavior: %+v", result)
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "NEVER_PRINT") {
+		t.Fatal("raw value became a diagnostic label")
+	}
+}
+
+func TestProjectionAuditReasonsResolveSharedRuleAndTemplatePathsWithoutCopy(t *testing.T) {
+	def := projectionDefinition("scale")
+	def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{FactorCode: "total", Rules: []conclusion.ScoreRangeOutcome{
+		{MinScore: 0, MaxScore: 4},
+		{MinScore: 6, MaxScore: 10, OutcomeCode: "low"},
+	}}}
+	result := AuditDefinitionProjections(projectionRaw(t, def))
+	for _, code := range []string{"validation.conclusion.outcome_code.required", "validation.conclusion.range.endpoint.required", "validation.conclusion.range.gap"} {
+		if result.InvalidReasonCounts[code] != 1 {
+			t.Fatalf("shared rule path reason %s missing: %+v", code, result)
+		}
+	}
+	if result.InvalidCount != 3 || result.CanonicalHash != "" || result.DifferenceCount != 0 {
+		t.Fatalf("diagnostics changed invalid behavior: %+v", result)
+	}
+	def = projectionDefinition("typology")
+	def.ReportMap.Sections[1].TemplateID = "NEVER_PRINT_PRIVATE_TEMPLATE"
+	result = AuditDefinitionProjections(projectionRaw(t, def))
+	if result.InvalidReasonCounts["validation.report_section.template_id.unknown"] != 1 {
+		t.Fatalf("template reason=%+v", result)
+	}
+	encoded, _ := json.Marshal(result)
+	if strings.Contains(string(encoded), "NEVER_PRINT") || strings.Contains(string(encoded), "private report copy") {
+		t.Fatal("validation message or content was disclosed")
+	}
+	if got := projectionValidationReason("NEVER_PRINT_UNBOUNDED_CODE"); got != "validation.unrecognized" {
+		t.Fatalf("unexpected validation code became a label: %s", got)
 	}
 }
