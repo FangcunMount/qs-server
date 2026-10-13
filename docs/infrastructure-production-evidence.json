@@ -1844,6 +1844,307 @@
         "No full backup pair restoration, external consumer release/traffic or business acceptance was performed.",
         "Current authoring/publish validation is stronger than historic read semantics. Findings do not prove historic computation errors or authorize mechanical endpoint/outcome repair."
       ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m3-release-ead5622e",
+      "status": "historical",
+      "observed_at": "2026-10-13T12:48:43.556306+00:00",
+      "environment": "production/serverA-serverD",
+      "deployed_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+      "source_baseline_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Only selected runtime/config fields and migration flags were read back; complete post-Viper YAML, environment and secret effective configuration was not hashed."
+      },
+      "command": "GitHub Actions Production Deploy 38398364774, workflow_dispatch service=all collection_replicas=2 worker_replicas=3; exact-container /version and /readyz, collection /serve-readyz; read-only migration preflight helper built at ead5622e using the running apiserver configuration; repository PRODUCTION_DEPLOY_PAUSED read-back.",
+      "result": {
+        "status": "passed",
+        "summary": "M3 alone was merged and deployed at exact ead5622e. All six instances passed compiled-SHA, image-digest and readiness checks; actual-application MySQL100/Mongo39 remained clean with unchanged identities and resource digest. The deployment pause was restored to true. Business acceptance and the full M0–M8 cleanup remain incomplete.",
+        "measurements": {
+          "ci_runs": {
+            "ci": 38396280884,
+            "ai_bridge_mysql": 38396280855,
+            "codeql": 38396280612,
+            "sonarqube": 38396280972
+          },
+          "ci_exact_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+          "ci_all_success": true,
+          "deploy_run": 38398364774,
+          "deploy_event": "workflow_dispatch",
+          "deploy_inputs": {
+            "service": "all",
+            "collection_replicas": "2",
+            "worker_replicas": "3"
+          },
+          "deploy_conclusion": "success",
+          "build_jobs_success": 3,
+          "deploy_jobs_success": 3,
+          "worker_governance_k6_observability": "success",
+          "automatic_full_deploy_marker": "skipped_by_manual_dispatch_design",
+          "instances": [
+            {
+              "host": "ServerA",
+              "name": "qs-apiserver",
+              "observed_at": "2026-10-13T12:45:46.901027+00:00",
+              "compiled_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+              "image_digest": "sha256:a9e911bec957f60304384f8e9a5663da2b774029876db0670a5de78e3b4c8c71",
+              "running": true,
+              "container_health": "healthy",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            },
+            {
+              "host": "ServerA",
+              "name": "qs-collection-server-1",
+              "observed_at": "2026-10-13T12:45:46.901027+00:00",
+              "compiled_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+              "image_digest": "sha256:e6e99a76d231486ff6597622ef73027a8aeeb04b2f2b07bdcfd7b5179d426a03",
+              "running": true,
+              "container_health": "healthy",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                },
+                {
+                  "path": "/serve-readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0,
+              "collection_serve_ready": true,
+              "collection_dependency_ready": true,
+              "collection_control_synchronized": true
+            },
+            {
+              "host": "ServerA",
+              "name": "qs-collection-server-2",
+              "observed_at": "2026-10-13T12:45:46.901027+00:00",
+              "compiled_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+              "image_digest": "sha256:e6e99a76d231486ff6597622ef73027a8aeeb04b2f2b07bdcfd7b5179d426a03",
+              "running": true,
+              "container_health": "healthy",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                },
+                {
+                  "path": "/serve-readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0,
+              "collection_serve_ready": true,
+              "collection_dependency_ready": true,
+              "collection_control_synchronized": true
+            },
+            {
+              "host": "ServerD",
+              "name": "qs-worker-runtime-1",
+              "observed_at": "2026-10-13T12:45:44.533346+00:00",
+              "compiled_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+              "image_digest": "sha256:28216e739565c910838f3ab6a8fda5dd04580d10f3ded162cf37a2da4e8f89a4",
+              "running": true,
+              "container_health": "not_configured",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            },
+            {
+              "host": "ServerD",
+              "name": "qs-worker-runtime-2",
+              "observed_at": "2026-10-13T12:45:44.533346+00:00",
+              "compiled_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+              "image_digest": "sha256:28216e739565c910838f3ab6a8fda5dd04580d10f3ded162cf37a2da4e8f89a4",
+              "running": true,
+              "container_health": "not_configured",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            },
+            {
+              "host": "ServerD",
+              "name": "qs-worker-runtime-3",
+              "observed_at": "2026-10-13T12:45:44.533346+00:00",
+              "compiled_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+              "image_digest": "sha256:28216e739565c910838f3ab6a8fda5dd04580d10f3ded162cf37a2da4e8f89a4",
+              "running": true,
+              "container_health": "not_configured",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            }
+          ],
+          "apiserver_replicas_verified": 1,
+          "collection_replicas_verified": 2,
+          "worker_replicas_verified": 3,
+          "all_instances_restart_count": 0,
+          "whitelisted_config_diff_count": 0,
+          "database_readback": {
+            "observed_at": "2026-10-13T12:44:14.543610+00:00",
+            "read_only": true,
+            "actual_running_config_bound": true,
+            "database_cli_override": false,
+            "accepted": true,
+            "exit_code": 0,
+            "binary_sha256": "78bf97a5e498753733b9d6f5dcc275172755668dcec5c3ab0496f2687e32d35e",
+            "runtime_sha_before": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+            "runtime_sha_after": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+            "before": {
+              "mysql": {
+                "selected_database": "qs",
+                "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+                "version": 100,
+                "dirty": false,
+                "retired_present": []
+              },
+              "mongodb": {
+                "database": "qs",
+                "replica_set": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "version": 39,
+                "dirty": false,
+                "retired_present": []
+              }
+            },
+            "after": {
+              "mysql": {
+                "selected_database": "qs",
+                "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+                "version": 100,
+                "dirty": false,
+                "retired_present": []
+              },
+              "mongodb": {
+                "database": "qs",
+                "replica_set": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "version": 39,
+                "dirty": false,
+                "retired_present": []
+              }
+            },
+            "identity_and_metadata_unchanged": true,
+            "identity_matches_pre_release": true,
+            "migration_resource_sha256": "1af415423e4382d35108a400d1c93913bb17abb277b860560661710447b8a95b",
+            "resource_digest_matches_pre_release": true,
+            "connections_released": true
+          },
+          "deployment_pause": {
+            "original_value": "true",
+            "temporary_value": "false",
+            "restored_value": "true",
+            "temporary_value_verified_at": "2026-10-13T12:35:01.545362+00:00",
+            "restored_value_verified_at": "2026-10-13T12:48:43.556306+00:00"
+          },
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m3-production-release.json",
+              "sha256": "62c954f8f431d17c32a94e9ab7d9bb4ce601a9f77844acd61d494f927d9feee9"
+            },
+            {
+              "name": "qs-server-cleanup-m3-release-readback.json",
+              "sha256": "8b75ecd0bdf1cc4c42fa3b61fa0541bf657a71b336c89a7f096ffb1587ee86cf"
+            },
+            {
+              "name": "m3-runtime-postdeploy-serverA.json",
+              "sha256": "feab604d282bee2c3259d526f810b06d70c5e1f6eaf8edd1ba596f4ccc09527c"
+            },
+            {
+              "name": "m3-runtime-postdeploy-serverD.json",
+              "sha256": "f5950059326bad3831b970b23466cd1872f3ed475a3df9cf1ba9882958de4dc5"
+            },
+            {
+              "name": "m3-runtime-postdeploy-validation.json",
+              "sha256": "9551dbac17251322736872fa3fb8658927c861b70476c2aacfb606a2e41922ed"
+            }
+          ],
+          "business_acceptance": "not_executed",
+          "full_m0_m8_acceptance": "incomplete",
+          "compatibility_observation_window": "not_started",
+          "rollback": "not_executed"
+        }
+      },
+      "owner": "infra",
+      "topics": [
+        "deployment_cd_network",
+        "data_migration_transaction"
+      ],
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38398364774"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38396280884"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38396280855"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38396280612"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38396280972"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#65-源码批次与后续验收"
+        }
+      ],
+      "limitations": [
+        "This is dated M3 release and structural runtime evidence, classified historical/passed. It does not cover a later documentation checkout or constitute infrastructure production ready or accountable semantic signoff.",
+        "Only whitelisted configuration and migration settings were compared. The complete post-Viper YAML, environment and secret effective configuration hash is unknown; zero whitelist differences cannot substitute for that attestation.",
+        "Six exact compiled SHAs, image digests, readiness200 and zero restarts attest startup/readiness at the recorded time. Worker Docker HEALTHCHECK is not configured; readiness was checked through the application endpoint.",
+        "The actual-application read-only database preflight attests clean100/39, unchanged database identities and four retired objects absent. It does not prove whole-database historical consistency, data responsibility closure or business behavior.",
+        "No real answersheet→Outcome→Report business acceptance was executed. The full M0–M8 cleanup, consumer releases, 14-day compatibility observation and independent 30-day backup retention remain incomplete; this rollout does not start the observation window.",
+        "Production pristine v2 bootstrap authorization was not exercised on this already-installed100/39 environment. Isolated real-database matrix tests remain distinct evidence.",
+        "The retained 2f8 source/image is only a recovery boundary at the same clean100/39 identities and configuration without application-data or migration DDL. Rollback/restore was not exercised, and the boundary does not extend to future101/40.",
+        "gh run watch encountered an API EOF. The final workflow result and each build/deploy/governance job were independently confirmed successful; the manual-dispatch automatic deployment marker was skipped by design."
+      ]
     }
   ]
 }

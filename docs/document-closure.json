@@ -782,7 +782,7 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+        "source_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -832,7 +832,7 @@
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
-          "source_sha": "cd885a256083442eaaa891df2505e40def1d8484",
+          "source_sha": "463eb57584b2a049781ff936308632430ca03787",
           "verified_on": "2026-10-13"
         }
       ],
@@ -841,10 +841,11 @@
         "refs": [
           "docs/infrastructure-production-evidence.json"
         ],
-        "deployed_sha": null,
-        "observed_at": null,
+        "deployed_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+        "observed_at": "2026-10-13T12:48:43.556306+00:00",
         "limitations": [
-          "Dated M0 inventory binds the starting deployment only. It does not prove this cleanup checkout, complete effective configuration, worker instances, consumer cutover or business acceptance."
+          "Dated M3 evidence binds exact ead5622e across six instances, clean100/39 read-only database checks and the restored deployment pause. It does not attest the later documentation checkout or the full M0–M8 cleanup.",
+          "Only whitelisted configuration was compared; the complete effective-config hash is unknown. Real business acceptance, rollback/restore and the 14-day consumer compatibility observation were not executed."
         ]
       },
       "gaps": [
@@ -852,8 +853,8 @@
           "id": "VERSION-LEDGER-CURRENT-EVIDENCE",
           "kind": "production",
           "severity": "high",
-          "summary": "M0 starting deployment and partial read-only DB facts are bound; cleanup release, complete data responsibility, restoration, consumer observation and real business acceptance remain unbound.",
-          "exit_criteria": "Close the source blocker, pass required CI, deploy the exact version and retain dated runtime and business evidence."
+          "summary": "M3 source, exact CI, six-instance production readiness and actual-application clean100/39 read-back are bound. Complete effective configuration, data responsibility, restoration, consumer observation, real business acceptance and the remaining M0–M8 tasks remain incomplete.",
+          "exit_criteria": "Complete each remaining task and its source/CI/release gates, then retain complete effective-config, data responsibility, restoration, consumer observation and real business evidence at the exact deployed version."
         }
       ]
     },
@@ -863,7 +864,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+        "source_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -877,7 +878,7 @@
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
-          "source_sha": "cd885a256083442eaaa891df2505e40def1d8484",
+          "source_sha": "463eb57584b2a049781ff936308632430ca03787",
           "verified_on": "2026-10-13"
         }
       ],
@@ -886,10 +887,11 @@
         "refs": [
           "docs/infrastructure-production-evidence.json"
         ],
-        "deployed_sha": null,
-        "observed_at": null,
+        "deployed_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+        "observed_at": "2026-10-13T12:48:43.556306+00:00",
         "limitations": [
-          "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance."
+          "Dated M3 evidence binds exact ead5622e across six instances, clean100/39 read-only database checks and the restored deployment pause. It does not attest the later documentation checkout or the full M0–M8 cleanup.",
+          "Only whitelisted configuration was compared; the complete effective-config hash is unknown. Real business acceptance, rollback/restore and the 14-day consumer compatibility observation were not executed."
         ]
       },
       "gaps": [
@@ -14593,28 +14595,29 @@
         ],
         "production_evidence": [
           "infra-2026-08-16-production-deploy-8f663383",
-          "infra-2026-08-18-production-probe"
+          "infra-2026-08-18-production-probe",
+          "infra-2026-10-13-qs-cleanup-m3-release-ead5622e"
         ],
         "gaps": [
           {
             "id": "INFRA-DEPLOYMENT_CD_NETWORK-ENV",
             "kind": "environment",
             "severity": "high",
-            "summary": "No target-environment verification is retained for deployment, CD and network topology.",
+            "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
             "exit_criteria": "Deploy an exact SHA through the target topology, attest image, config and network digests, run probes, then execute and record rollback."
           },
           {
             "id": "INFRA-DEPLOYMENT_CD_NETWORK-CRITICAL",
             "kind": "semantic",
             "severity": "high",
-            "summary": "Historical deploy and probe runs do not attest the current image, effective configuration, listener exposure, rollback path or network policy.",
+            "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
             "exit_criteria": "Complete an exact-SHA deploy and rollback rehearsal with image, config, port, certificate and network-policy evidence."
           },
           {
             "id": "INFRA-DEPLOYMENT_CD_NETWORK-CURRENT-PRODUCTION",
             "kind": "production",
             "severity": "high",
-            "summary": "Only historical production records are linked for deployment, CD and network topology; none covers the current source baseline and effective configuration.",
+            "summary": "M3 dated structural runtime evidence is linked, but no eligible current-checkout evidence with a complete effective-config hash and accountable production signoff is retained.",
             "exit_criteria": "Run an exact-SHA deployment and current, unexpired production verification with effective-config evidence and accountable signoff."
           }
         ],
@@ -14637,7 +14640,7 @@
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for deployment, CD and network topology.",
+                "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
                 "exit_criteria": "Deploy an exact SHA through the target topology, attest image, config and network digests, run probes, then execute and record rollback."
               }
             ],
@@ -14666,7 +14669,7 @@
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Historical deploy and probe runs do not attest the current image, effective configuration, listener exposure, rollback path or network policy.",
+                "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
                 "exit_criteria": "Complete an exact-SHA deploy and rollback rehearsal with image, config, port, certificate and network-policy evidence."
               }
             ],
@@ -14695,7 +14698,7 @@
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for deployment, CD and network topology.",
+                "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
                 "exit_criteria": "Deploy an exact SHA through the target topology, attest image, config and network digests, run probes, then execute and record rollback."
               }
             ],
@@ -14724,7 +14727,7 @@
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for deployment, CD and network topology.",
+                "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
                 "exit_criteria": "Deploy an exact SHA through the target topology, attest image, config and network digests, run probes, then execute and record rollback."
               }
             ],
@@ -14794,7 +14797,7 @@
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for deployment, CD and network topology.",
+                "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
                 "exit_criteria": "Deploy an exact SHA through the target topology, attest image, config and network digests, run probes, then execute and record rollback."
               }
             ],
@@ -14807,7 +14810,7 @@
           },
           "operations": {
             "review_state": "conditional",
-            "rationale": "Repository operations paths for deployment, CD and network topology are source-traceable, but no target-environment operation was run and retained.",
+            "rationale": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -14823,7 +14826,7 @@
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for deployment, CD and network topology.",
+                "summary": "M3 exact-SHA image, readiness and pause-restoration evidence is retained; full effective configuration, listener/certificate/network-policy attestation and rollback rehearsal remain incomplete.",
                 "exit_criteria": "Deploy an exact SHA through the target topology, attest image, config and network digests, run probes, then execute and record rollback."
               }
             ],
@@ -14836,14 +14839,14 @@
           },
           "production": {
             "review_state": "blocked",
-            "rationale": "The linked ledger entries explicitly include this topic, but remain historical, expired for current-state eligibility and without a current effective-config attestation.",
+            "rationale": "Dated M3 exact-SHA deployment, six-instance readiness and actual-application clean100/39 read-back are retained. The entry remains historical/passed: complete effective configuration, the current documentation checkout and accountable business/production acceptance are not attested.",
             "evidence": [],
             "gaps": [
               {
                 "id": "INFRA-DEPLOYMENT_CD_NETWORK-CURRENT-PRODUCTION",
                 "kind": "production",
                 "severity": "high",
-                "summary": "Only historical production records are linked for deployment, CD and network topology; none covers the current source baseline and effective configuration.",
+                "summary": "M3 dated structural runtime evidence is linked, but no eligible current-checkout evidence with a complete effective-config hash and accountable production signoff is retained.",
                 "exit_criteria": "Run an exact-SHA deployment and current, unexpired production verification with effective-config evidence and accountable signoff."
               }
             ],
@@ -14917,14 +14920,15 @@
         ],
         "production_evidence": [
           "infra-2026-08-15-interpretation-ledger-migration",
-          "infra-2026-08-16-mongo-consistency-oneoff"
+          "infra-2026-08-16-mongo-consistency-oneoff",
+          "infra-2026-10-13-qs-cleanup-m3-release-ead5622e"
         ],
         "gaps": [
           {
             "id": "INFRA-DATA_MIGRATION_TRANSACTION-ENV",
             "kind": "environment",
             "severity": "high",
-            "summary": "No target-environment verification is retained for data ownership, migration and transaction boundaries.",
+            "summary": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
             "exit_criteria": "Run authorized MySQL and Mongo migration dry-runs, transaction failure injection and post-run consistency checks against disposable data."
           },
           {
@@ -14938,7 +14942,7 @@
             "id": "INFRA-DATA_MIGRATION_TRANSACTION-CURRENT-PRODUCTION",
             "kind": "production",
             "severity": "high",
-            "summary": "Only historical production records are linked for data ownership, migration and transaction boundaries; none covers the current source baseline and effective configuration.",
+            "summary": "M3 dated structural runtime evidence is linked, but no eligible current-checkout evidence with a complete effective-config hash and accountable production signoff is retained.",
             "exit_criteria": "Run an exact-SHA deployment and current, unexpired production verification with effective-config evidence and accountable signoff."
           }
         ],
@@ -14961,7 +14965,7 @@
                 "id": "INFRA-DATA_MIGRATION_TRANSACTION-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for data ownership, migration and transaction boundaries.",
+                "summary": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
                 "exit_criteria": "Run authorized MySQL and Mongo migration dry-runs, transaction failure injection and post-run consistency checks against disposable data."
               }
             ],
@@ -15019,7 +15023,7 @@
                 "id": "INFRA-DATA_MIGRATION_TRANSACTION-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for data ownership, migration and transaction boundaries.",
+                "summary": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
                 "exit_criteria": "Run authorized MySQL and Mongo migration dry-runs, transaction failure injection and post-run consistency checks against disposable data."
               }
             ],
@@ -15048,7 +15052,7 @@
                 "id": "INFRA-DATA_MIGRATION_TRANSACTION-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for data ownership, migration and transaction boundaries.",
+                "summary": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
                 "exit_criteria": "Run authorized MySQL and Mongo migration dry-runs, transaction failure injection and post-run consistency checks against disposable data."
               }
             ],
@@ -15076,7 +15080,7 @@
                 "id": "INFRA-DATA_MIGRATION_TRANSACTION-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for data ownership, migration and transaction boundaries.",
+                "summary": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
                 "exit_criteria": "Run authorized MySQL and Mongo migration dry-runs, transaction failure injection and post-run consistency checks against disposable data."
               }
             ],
@@ -15089,7 +15093,7 @@
           },
           "operations": {
             "review_state": "conditional",
-            "rationale": "Repository operations paths for data ownership, migration and transaction boundaries are source-traceable, but no target-environment operation was run and retained.",
+            "rationale": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -15105,7 +15109,7 @@
                 "id": "INFRA-DATA_MIGRATION_TRANSACTION-ENV",
                 "kind": "environment",
                 "severity": "high",
-                "summary": "No target-environment verification is retained for data ownership, migration and transaction boundaries.",
+                "summary": "M3 read-only actual-application clean100/39 and unchanged-identity evidence is retained; full historical consistency, data responsibility, restoration and production transaction/failure behavior remain incomplete.",
                 "exit_criteria": "Run authorized MySQL and Mongo migration dry-runs, transaction failure injection and post-run consistency checks against disposable data."
               }
             ],
@@ -15118,14 +15122,14 @@
           },
           "production": {
             "review_state": "blocked",
-            "rationale": "The linked ledger entries explicitly include this topic, but remain historical, expired for current-state eligibility and without a current effective-config attestation.",
+            "rationale": "Dated M3 exact-SHA deployment, six-instance readiness and actual-application clean100/39 read-back are retained. The entry remains historical/passed: complete effective configuration, the current documentation checkout and accountable business/production acceptance are not attested.",
             "evidence": [],
             "gaps": [
               {
                 "id": "INFRA-DATA_MIGRATION_TRANSACTION-CURRENT-PRODUCTION",
                 "kind": "production",
                 "severity": "high",
-                "summary": "Only historical production records are linked for data ownership, migration and transaction boundaries; none covers the current source baseline and effective configuration.",
+                "summary": "M3 dated structural runtime evidence is linked, but no eligible current-checkout evidence with a complete effective-config hash and accountable production signoff is retained.",
                 "exit_criteria": "Run an exact-SHA deployment and current, unexpired production verification with effective-config evidence and accountable signoff."
               }
             ],
