@@ -240,6 +240,1610 @@
         "This is a dated host and shallow service-probe result, not current production evidence for the checkout or source baseline.",
         "The probe did not independently re-attest the running container SHA, full business path, data consistency, failure recovery, or capacity thresholds."
       ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m0-inventory",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T09:18:36.769840+00:00",
+      "environment": "production/serverA runtime-config-bound MySQL qs and MongoDB qs",
+      "deployed_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "source_baseline_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Exact mounted qs-apiserver configuration and runtime env supplied the DB binding; full post-Viper effective configuration was not hashed. This dated inventory cannot sign infrastructure production readiness."
+      },
+      "command": "Authorized root SSH read-only inventory: MySQL host mysql client with private defaults-file, 5s statement limit and READ ONLY transactions; Mongo cached mongo:7.0 client on infra-network as uid 1001 with private env-file, maxTimeMS 5s. No business documents, credentials or raw driver errors emitted.",
+      "result": {
+        "status": "findings",
+        "summary": "Clean MySQL100/Mongo39; 62 application tables and 17 Mongo namespaces. Business namespace metadata and candidate counts retained. Mongo system.profile metadata unauthorized. Outcome JSON initial full scan failed; a later bounded PK scan reached its initial high-water boundary, read247462 rows and found zero non-null history values. No schema or business writes applied.",
+        "measurements": {
+          "mysql_observed_at": "2026-10-13T09:04:07.198952+00:00",
+          "mongodb_observed_at": "2026-10-13T09:18:36.769840+00:00",
+          "read_only": true,
+          "mysql": {
+            "database": "qs",
+            "server_version": "8.0.36",
+            "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+            "configured_host": "rm-2zet3fx250176qq8j.mysql.rds.aliyuncs.com",
+            "configured_port": 3306,
+            "migration_state": [
+              {
+                "version": 100,
+                "dirty": false
+              }
+            ],
+            "candidate_counts": {
+              "assessment_history": [
+                247462,
+                0
+              ],
+              "testee_tags": [
+                83798,
+                83798,
+                0
+              ],
+              "operator_roles": [
+                136,
+                0
+              ],
+              "task_tokens": [
+                372358,
+                252158
+              ],
+              "ai_runtime_backfill": [
+                30,
+                0
+              ],
+              "testee_store_migration_manifests": [
+                1,
+                0
+              ],
+              "testee_store_migration_items": [
+                83797,
+                0
+              ],
+              "testee_store_migration_reversions": [
+                0
+              ],
+              "operator_retirement_manifests": [
+                1
+              ],
+              "clinician_operator_binding_archive": [
+                119
+              ]
+            },
+            "candidate_count_errors": {
+              "outcome_history": "client_execution_failed"
+            },
+            "base_table_count": 63,
+            "application_table_count": 62,
+            "column_count": 876,
+            "index_part_count": 732,
+            "table_names": [
+              "actor_stores",
+              "ai_bridge_events",
+              "ai_bridge_request_assessments",
+              "ai_bridge_requests",
+              "ai_messaging_admission",
+              "ai_messaging_aggregates",
+              "ai_messaging_evaluation_states",
+              "ai_messaging_failures",
+              "ai_messaging_inbox",
+              "ai_messaging_observations",
+              "ai_messaging_operations",
+              "ai_messaging_outbox",
+              "ai_messaging_quarantine",
+              "answering_start",
+              "assessment",
+              "assessment_entry",
+              "assessment_entry_intake_log",
+              "assessment_entry_resolve_log",
+              "assessment_plan",
+              "assessment_score",
+              "assessment_task",
+              "clinician",
+              "clinician_operator_binding_archive",
+              "clinician_relation",
+              "clinician_store_history",
+              "evaluation_outcome",
+              "event_delivery_dead_letter",
+              "interpretation_admission_failure",
+              "interpretation_attention_projection",
+              "interpretation_catalog_audit_checkpoint",
+              "mongo_consistency_audit_checkpoint",
+              "operator_recovery_archives",
+              "operator_retirement_manifests",
+              "operator_retirement_tasks",
+              "operators",
+              "plan_enrollment",
+              "qs_rm_evaluation_request_ref",
+              "qs_rm_gap_recovery_request",
+              "qs_rm_replay_items",
+              "qs_rm_replay_requests",
+              "retry_event_hold",
+              "rm_outbox",
+              "runtime_checkpoint",
+              "schema_migrations",
+              "statistics_access_daily",
+              "statistics_access_fact",
+              "statistics_assessment_daily",
+              "statistics_assessment_fact",
+              "statistics_org_snapshot",
+              "statistics_plan_activity_daily",
+              "statistics_plan_fact",
+              "statistics_plan_fulfillment_daily",
+              "statistics_store_activity_daily",
+              "statistics_store_activity_fact",
+              "statistics_sync_run",
+              "system_governance_action_runs",
+              "task_opened_reminder_batch",
+              "task_opened_reminder_delivery",
+              "testee",
+              "testee_store_history",
+              "testee_store_migration_items",
+              "testee_store_migration_manifests",
+              "testee_store_migration_reversions"
+            ],
+            "candidate_columns": [
+              {
+                "table": "assessment",
+                "position": 37,
+                "name": "historical_lifecycle_evidence",
+                "data_type": "json",
+                "nullable": true,
+                "character_maximum_length": null,
+                "numeric_precision": null
+              },
+              {
+                "table": "assessment_task",
+                "position": 21,
+                "name": "entry_token",
+                "data_type": "varchar",
+                "nullable": true,
+                "character_maximum_length": 255,
+                "numeric_precision": null
+              },
+              {
+                "table": "evaluation_outcome",
+                "position": 21,
+                "name": "historical_committed_evidence",
+                "data_type": "json",
+                "nullable": true,
+                "character_maximum_length": null,
+                "numeric_precision": null
+              },
+              {
+                "table": "operators",
+                "position": 5,
+                "name": "effective_roles",
+                "data_type": "json",
+                "nullable": false,
+                "character_maximum_length": null,
+                "numeric_precision": null
+              },
+              {
+                "table": "testee",
+                "position": 7,
+                "name": "tags",
+                "data_type": "json",
+                "nullable": true,
+                "character_maximum_length": null,
+                "numeric_precision": null
+              }
+            ]
+          },
+          "mongodb": {
+            "database": "qs",
+            "configured_host": "mongo",
+            "configured_port": 27017,
+            "migration_state": [
+              {
+                "version": 39,
+                "dirty": false
+              }
+            ],
+            "metadata_complete": false,
+            "cleanup_evidence": {
+              "identity": {
+                "set_name": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "server_version": "7.0.31"
+              },
+              "counts": {
+                "models_total": "105",
+                "models_head": "26",
+                "models_snapshot": "79",
+                "models_decision_spec_present": "81",
+                "models_interpretation_assets_present": "81",
+                "answersheets_total": "250107",
+                "answersheets_admission_absent": "0",
+                "durable_answersheets_admission_absent": "0",
+                "answersheets_legacy_evidence_present": "0",
+                "generation_historical_evidence_present": "0",
+                "evaluation_claims": "1",
+                "interpretation_claims": "1",
+                "qrcode_claims": "2"
+              },
+              "errors": {}
+            },
+            "namespaces": [
+              {
+                "name": "answersheets",
+                "type": "collection",
+                "index_count": 11,
+                "metadata_error": []
+              },
+              {
+                "name": "assessment_models",
+                "type": "collection",
+                "index_count": 8,
+                "metadata_error": []
+              },
+              {
+                "name": "assessment_norms",
+                "type": "collection",
+                "index_count": 2,
+                "metadata_error": []
+              },
+              {
+                "name": "evaluation_acceptance_failure_claims",
+                "type": "collection",
+                "index_count": 1,
+                "metadata_error": []
+              },
+              {
+                "name": "interpret_report_artifacts",
+                "type": "collection",
+                "index_count": 8,
+                "metadata_error": []
+              },
+              {
+                "name": "interpretation_acceptance_failure_claims",
+                "type": "collection",
+                "index_count": 1,
+                "metadata_error": []
+              },
+              {
+                "name": "interpretation_catalog_repair_plans",
+                "type": "collection",
+                "index_count": 3,
+                "metadata_error": []
+              },
+              {
+                "name": "interpretation_report_templates",
+                "type": "collection",
+                "index_count": 4,
+                "metadata_error": []
+              },
+              {
+                "name": "interpretation_runs",
+                "type": "collection",
+                "index_count": 9,
+                "metadata_error": []
+              },
+              {
+                "name": "qrcode_acceptance_failure_claims",
+                "type": "collection",
+                "index_count": 1,
+                "metadata_error": []
+              },
+              {
+                "name": "qs_rm_replay_requests",
+                "type": "collection",
+                "index_count": 2,
+                "metadata_error": []
+              },
+              {
+                "name": "questionnaires",
+                "type": "collection",
+                "index_count": 9,
+                "metadata_error": []
+              },
+              {
+                "name": "report_generations",
+                "type": "collection",
+                "index_count": 8,
+                "metadata_error": []
+              },
+              {
+                "name": "report_query_catalog",
+                "type": "collection",
+                "index_count": 8,
+                "metadata_error": []
+              },
+              {
+                "name": "rm_outbox",
+                "type": "collection",
+                "index_count": 6,
+                "metadata_error": []
+              },
+              {
+                "name": "schema_migrations",
+                "type": "collection",
+                "index_count": 1,
+                "metadata_error": []
+              },
+              {
+                "name": "system.profile",
+                "type": "collection",
+                "index_count": null,
+                "metadata_error": [
+                  "collStats_unauthorized_code_13",
+                  "listIndexes_unauthorized_code_13"
+                ]
+              }
+            ],
+            "historical_indexes": [
+              {
+                "collection": "answersheets",
+                "name": "uk_answersheet_legacy_submission_event_id",
+                "keys": {
+                  "legacy_submission_evidence.entries.event_id": 1
+                },
+                "unique": true,
+                "sparse": false,
+                "hidden": false,
+                "partial": true,
+                "expire_after_seconds": null
+              },
+              {
+                "collection": "answersheets",
+                "name": "idx_answersheet_legacy_submission_audit",
+                "keys": {
+                  "legacy_submission_evidence.version": 1,
+                  "deleted_at": 1,
+                  "domain_id": 1
+                },
+                "unique": false,
+                "sparse": false,
+                "hidden": false,
+                "partial": false,
+                "expire_after_seconds": null
+              },
+              {
+                "collection": "report_generations",
+                "name": "uk_generation_historical_generated_event_id",
+                "keys": {
+                  "historical_generated_evidence.entries.event_id": 1
+                },
+                "unique": true,
+                "sparse": false,
+                "hidden": false,
+                "partial": true,
+                "expire_after_seconds": null
+              },
+              {
+                "collection": "report_generations",
+                "name": "idx_generation_historical_generated_audit",
+                "keys": {
+                  "historical_generated_evidence.version": 1,
+                  "deleted_at": 1,
+                  "status": 1,
+                  "domain_id": 1
+                },
+                "unique": false,
+                "sparse": false,
+                "hidden": false,
+                "partial": false,
+                "expire_after_seconds": null
+              }
+            ]
+          },
+          "inventory_action_run": 38360563524,
+          "inventory_action_result": "failure: system.profile optional detail unauthorized",
+          "mutations_applied": 0,
+          "raw_inventory_sha256": "sha256:b09bacaad3a03e43e5efc1bedadbec33f75686457183f49264dd979f310e7263",
+          "raw_inventory_retention": "Task audit artifact qs-server-cleanup-m0-inventory.json; complete technical metadata, no credentials/business bodies. This ledger keeps scoped measurements and inventory names rather than copying every current schema definition.",
+          "consumer_observations": {
+            "observed_on": "2026-10-13",
+            "qs_server_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+            "apiserver": {
+              "instances": [
+                "qs-apiserver"
+              ],
+              "compiled_sha_verified": true,
+              "image_digest": "sha256:db786fe6a67a2733b82149b3f1c238379bc97121198e8c8285f85e2b3d1cd4d8"
+            },
+            "collection": {
+              "instances": [
+                "qs-collection-server-1",
+                "qs-collection-server-2"
+              ],
+              "compiled_sha_verified": true,
+              "image_digest": "sha256:6fdf2d758fa5ad72fd37e67f571e4e68d6d4ca4a79921e3b127343fbb5b48fcf"
+            },
+            "worker": {
+              "instances": [
+                "qs-worker-runtime-1",
+                "qs-worker-runtime-2",
+                "qs-worker-runtime-3"
+              ],
+              "compiled_sha_verified": true,
+              "image_digest": "sha256:e7c5b3a90c6125eaac5a8b849811cfd0e82a8ecc3250ae44201f59a15cfa3d81",
+              "readyz_passed_instances": 3
+            },
+            "iam": {
+              "compiled_sha": "c8fc1fe61a32056368148e232e96d32763c15ba5",
+              "image_digest": "sha256:592a4051a8ba2982df55d47c9b82c759f2d85f728ce4a3825fd5b083338e1945"
+            },
+            "qs_ai": {
+              "oci_revision": "7c71d1e95500aa20c3d82f57a7304578c8a794dd",
+              "release_env_matches": true,
+              "image_digest": "sha256:e511347af54ea85d6b360f8b6cc89f02eb81f474977871739129a7cf702c2fa8"
+            },
+            "web": {
+              "oci_revision": "1c413e53eb02da25608d92b2d193404fd18eed12",
+              "image_digest": "sha256:0f56b750f350e6d3598aa3c36560889f54cd72b07d986f8424718db51a0e3d7e"
+            },
+            "mini_program": {
+              "release_commit": "ebefc00b07c19a90cdadf14f7fae19c7616e7bb1",
+              "evidence": "explicit user release confirmation; source checked, actual device behavior not attested"
+            },
+            "limitation": "These are version/health observations of the starting deployment, not successful business effects, compatibility-flow coverage or cleanup release acceptance."
+          },
+          "paged_followup": {
+            "read_only": true,
+            "database": "qs",
+            "observed_at": "2026-10-13T09:39:50.900242+00:00",
+            "counts": {
+              "outcome_history": {
+                "rows_scanned": 247462,
+                "non_null": 0,
+                "pages": 248,
+                "bounded_by_initial_max_primary_key": true,
+                "reached_initial_max": true,
+                "scan_semantics": "ordered PK pages under per-query READ ONLY transactions; not one global snapshot; source has no current history-field writer",
+                "duration_seconds": 13.491
+              },
+              "task_token_responsibility": [
+                372358,
+                0,
+                0
+              ],
+              "store_manifest_states": [
+                1,
+                0,
+                0
+              ],
+              "retirement_manifest_stages": [
+                1,
+                0,
+                0,
+                0
+              ]
+            },
+            "errors": {}
+          },
+          "historical_responsibility_followup": {
+            "read_only": true,
+            "observed_at": "2026-10-13T11:06:24.014649+00:00",
+            "source_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+            "counts": {
+              "store_manifest_states": [
+                1,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "store_item_dispositions": [
+                83797,
+                55577,
+                28220,
+                0,
+                0
+              ],
+              "operator_manifest_stages": [
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "operator_manifest_boundaries": [
+                0,
+                0
+              ]
+            },
+            "errors": {},
+            "mutations_applied": 0,
+            "database": "qs",
+            "before": {
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "version": "8.0.36",
+              "migration_version": 100,
+              "dirty": false
+            },
+            "after": {
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "version": "8.0.36",
+              "migration_version": 100,
+              "dirty": false
+            },
+            "identity_unchanged": true,
+            "raw_artifact_sha256": "sha256:f336e96095bec24b16eadd23ce49e311102ff7fca09077f984eec21d1f164555",
+            "semantics": {
+              "store_manifest_states": "total/applied/rolled_back/other/incomplete_timestamp/incomplete_hash_lengths",
+              "store_item_dispositions": "total/candidate/deferred/already_assigned/other",
+              "operator_manifest_stages": "total/applied_unchanged/executing/pending/other/payload_sha_mismatch/invalid_json",
+              "operator_manifest_boundaries": "payload_state_mismatch/missing_after_hash"
+            },
+            "limitation": "Deferred items and current business hashes/rollback obligations are not certified closed by stage/metadata counts."
+          },
+          "compatibility_observation_targets": {
+            "read_only": true,
+            "observed_at": "2026-10-13T11:11:24.497716+00:00",
+            "containers": [
+              {
+                "name": "qs-apiserver",
+                "running": true,
+                "labels": {
+                  "prometheus.component": "qs-apiserver",
+                  "prometheus.job": "qs-apiserver",
+                  "prometheus.metrics_path": "/metrics",
+                  "prometheus.metrics_port": "8080",
+                  "prometheus.scrape": "true"
+                },
+                "networks": {
+                  "infra-network": "172.20.0.16",
+                  "qs-network": "172.21.0.2"
+                },
+                "compiled_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+                "grpc_jwt_config_enabled": false,
+                "grpc_jwt_env_override": null
+              },
+              {
+                "name": "qs-collection-server-1",
+                "running": true,
+                "labels": {
+                  "prometheus.component": "qs-collection-server",
+                  "prometheus.job": "qs-collection-server",
+                  "prometheus.metrics_path": "/metrics",
+                  "prometheus.metrics_port": "8080",
+                  "prometheus.scrape": "true"
+                },
+                "networks": {
+                  "infra-network": "172.20.0.25",
+                  "qs-network": "172.21.0.3"
+                },
+                "compiled_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+              },
+              {
+                "name": "qs-collection-server-2",
+                "running": true,
+                "labels": {
+                  "prometheus.component": "qs-collection-server",
+                  "prometheus.job": "qs-collection-server",
+                  "prometheus.metrics_path": "/metrics",
+                  "prometheus.metrics_port": "8080",
+                  "prometheus.scrape": "true"
+                },
+                "networks": {
+                  "infra-network": "172.20.0.26",
+                  "qs-network": "172.21.0.4"
+                },
+                "compiled_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+              }
+            ],
+            "targets": [
+              {
+                "labels": {
+                  "instance": "qs-apiserver:8080",
+                  "job": "qs-apiserver"
+                },
+                "discovered_labels": {
+                  "__address__": "qs-apiserver:8080"
+                },
+                "health": "up",
+                "last_scrape": "2026-10-13T19:11:17.126689339+08:00",
+                "scrape_interval": "15s",
+                "scrape_timeout": "10s",
+                "has_last_error": false
+              },
+              {
+                "labels": {
+                  "instance": "172.20.0.25:8080",
+                  "job": "qs-collection-server"
+                },
+                "discovered_labels": {
+                  "__address__": "172.20.0.25:8080"
+                },
+                "health": "up",
+                "last_scrape": "2026-10-13T19:11:13.897763379+08:00",
+                "scrape_interval": "15s",
+                "scrape_timeout": "10s",
+                "has_last_error": false
+              },
+              {
+                "labels": {
+                  "instance": "172.20.0.26:8080",
+                  "job": "qs-collection-server"
+                },
+                "discovered_labels": {
+                  "__address__": "172.20.0.26:8080"
+                },
+                "health": "up",
+                "last_scrape": "2026-10-13T19:11:21.57354576+08:00",
+                "scrape_interval": "15s",
+                "scrape_timeout": "10s",
+                "has_last_error": false
+              }
+            ],
+            "errors": [],
+            "raw_artifact_sha256": "sha256:cab9c877b965cb3240d6b2456490443e0fe2c3a56b92cb9cd8fd70c9941c4845",
+            "limitation": "Only current scrape topology and initial build identities are observed; new dedicated compatibility metrics are not deployed and14d window has not begun."
+          }
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38360563524"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#6-m0m8-清理任务与验收"
+        }
+      ],
+      "limitations": [
+        "Snapshot counts are dated and do not authorize deletion. Metadata row estimates cannot prove emptiness.",
+        "Source audit candidates still require external consumer proof, scoped backup and isolated restoration, unresolved responsibility inventory and a reviewed release batch.",
+        "No system.profile administrator permission was acquired. The initial bounded full outcome JSON count failed; the later read-only PK-paged followup recovered the count under its stated high-water and per-page snapshot limits.",
+        "At this original inventory time pure projection equality was not audited; the later independent M5 projection findings entry now binds its result. All AnswerSheets having admission does not establish no pending, held, dead-letter or replayable legacy input.",
+        "This observes the starting deployed version, not cleanup artifacts. All six QS service binaries/images are bound separately; full effective configuration, consumer traffic and business effects are not bound."
+      ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m5-projection-audit",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T10:42:00.896147+00:00",
+      "environment": "production/serverA qs MongoDB rs0, read-only snapshot audit",
+      "deployed_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "source_baseline_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Audit selected the exact running API config/env and verified its compiled SHA; complete post-Viper config was not hashed. This is dated findings evidence, not production ready signoff."
+      },
+      "command": "Authorized root SSH: bounded static read-only projection audit in cached client container on infra-network; private 0600 connection file, snapshot session, CountDocuments/Find/getMore only, batch25/max1000/timeout2m; no URI/driver error/model body output.",
+      "result": {
+        "status": "findings",
+        "summary": "All105 retained records scanned;76matched,4MBTI snapshot projection mismatches,25head structural/validation findings. Audit exit2 blocks derived-field retirement. No writes/CAS/rematerialization/cache purge.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "audit_source_sha": "e68bf786def7782f2e6c74ba9ab51358711e9c9e",
+          "binary_sha256": "sha256:a401d25ab2dc967e0b9d4e91ecaba626b674fd023af4c328751de0ee1512e466",
+          "raw_audit_sha256": "sha256:bcc573b1d46ca2b81e8daf86cb1f905cccdb2b8224b492d61587fcd006670100",
+          "raw_audit_retention": "Task private artifact qs-server-cleanup-m5-definition-projection-audit-initial.json contains full ID/revision/fingerprint scope and paths, no content.",
+          "identity_before": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_after": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_unchanged": true,
+          "audit_exit_code": 2,
+          "summary": {
+            "complete": true,
+            "zero_mismatch": false,
+            "expected": 105,
+            "scanned": 105,
+            "compared": 80,
+            "matched": 76,
+            "mismatched": 4,
+            "missing_definition": 0,
+            "unknown_schema": 0,
+            "invalid": 25,
+            "record_errors": 0,
+            "scan_errors": 0,
+            "heads": 26,
+            "snapshots": 79,
+            "historical": 54,
+            "stored_decision_fields": 81,
+            "stored_asset_fields": 81,
+            "truncated": false
+          },
+          "finding_scope": [
+            {
+              "model_id": "6a435a990f9028c6eeb8cf5f",
+              "code": "MBTI_OEJTS",
+              "role": "head",
+              "revision": "64",
+              "fingerprint": "5390b11a700587daebaabee9d585d219dbcdbc789d2ed20b252d780d5947f184",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf61",
+              "code": "MBTI_FC_93",
+              "role": "head",
+              "revision": "55",
+              "fingerprint": "ab191c165834a351e85bf330a9a1db3f404b53fa7723a7a05a8b8d7db0c473ba",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf63",
+              "code": "SBTI_FUN",
+              "role": "head",
+              "revision": "48",
+              "fingerprint": "4e44c5946f443225186a95ab551f0898d9ebb6311924296cd00d7cc9c63976bd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 15,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf65",
+              "code": "BIG5_IPIP_50",
+              "role": "head",
+              "revision": "34",
+              "fingerprint": "9f8674a1973fd14951d003e9a2a2baf80b1af4f0782322a08c5fce7aa005a4b9",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a9a0f9028c6eeb8cf67",
+              "code": "ENNEAGRAM_45",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "9afe676d720583f56ae58ba28bf99c257b44da452b497ef416c60a6900997e19",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 10,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff7",
+              "code": "3adyDE",
+              "role": "head",
+              "revision": "138",
+              "fingerprint": "227c827729b3db1ccd9dd844e6fb0fdb433772de146eb1be882c8c9f897a5be7",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff8",
+              "code": "zOO4eG",
+              "role": "head",
+              "revision": "14",
+              "fingerprint": "7a4f4764d0f20832eb27d0854f5129973f2b2c696c8bfb029c919912fe842b9d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 11,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffb",
+              "code": "mbdoeV",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "031a66daf593ac5d292c17ea37de7d98f09673bb2d495c55effd754d9b5e8b78",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffc",
+              "code": "D6ZvjC",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "8f8a819384be9e1f533543d4d09325e19f0abed1be4a5d8650beab16f34cf42d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffd",
+              "code": "fthN56",
+              "role": "head",
+              "revision": "10",
+              "fingerprint": "acf6a3134abb27b72c500a74670a6469a4af9f8b55605a35d55168aa4e456cfd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 54,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffe",
+              "code": "tuixuu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "a02e9195fe52d69d78fc1ad6c0f8f0af69e4ba953715451225e2e51e0ef1c136",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdfff",
+              "code": "sJFa2R",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d2ac2661f2bba396acf41f410415d7d2ccf28662caca9f46bdc22aa5e188e363",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 42,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce000",
+              "code": "TMiNB8",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d6f6913a9918b8a0d449f2a8ff3df198d565393ae7cafd0907a321f3cf6febfb",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce001",
+              "code": "oAWamd",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "1ac5d6f92f227203ec2c595981a26ea5a959725ff1166a5ebc24ae2429e34072",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 38,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce002",
+              "code": "eLl0sv",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "3c37ddf4d166c22e429543da67294324f69e57148181df1eb0f88e3c9c0054cd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 16,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce003",
+              "code": "AMwIzu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "f2d7bdc181f8f9a2736d23d819d4f166d7e5d433320479b1b00229fe1be43553",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce004",
+              "code": "kTC43z",
+              "role": "head",
+              "revision": "37",
+              "fingerprint": "c4eb115c745c97d64e0f20e0ee24bb72759f45d54312300b73424b4b9402e0a8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 7,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce005",
+              "code": "WFIRSP",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "814658e13bc8a0562ae4cf7dddcd8d4c8e3bfae3dbfaaa6687ddb63207196865",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 89,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce006",
+              "code": "yGtSs1",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "b59889d094f7bc3dae0190f91481b2427ed0d8c61f6b0c9ada0101a7067a880a",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 33,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce007",
+              "code": "tssl35",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "05123ecde1133da36b0bc88d8ab18ad8fa36da2b83468d156f96a6afcbd30f73",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 30,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce008",
+              "code": "ISI7",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "186da8a6b5c30d3b0abdd378e87ce9062c1434d12691786a3cbdc0412309fed0",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce009",
+              "code": "PROMIS_SD8A",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "c8a9f22142a998bf6e3ae488c19be900a586005419e0522109a5ff2195cd8ca8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce00d",
+              "code": "NEO_FFI3_60_CN",
+              "role": "head",
+              "revision": "3",
+              "fingerprint": "ad8ef343c02147f526fe40be79e892963a80e11373fee3b3632e8246f3c5d6af",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 20,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f64705f7258ba3cf0d45",
+              "code": "gXkk9W",
+              "role": "head",
+              "revision": "22",
+              "fingerprint": "c4b7834d6ca23515728a23c2546ed700d42c0062d2972919d8a99dce88742c86",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 113,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f699cd18e798ee513121",
+              "code": "bJFKi3",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "02a29956d3d90fcdbf407444e4a28ceb10ad87d82a6b64f69f34e0f88ceacac3",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 56,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f5",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64",
+              "fingerprint": "3f8172c543382905096bad574fa7796e1793742f29b28e5cbd9a1093c85f7933",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "2b4a6006e21922ddb49acfddfa62120ac9c20d5b62aeefe0d09391c33190e15d",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f6",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55",
+              "fingerprint": "80c7b58ff1d814238dfebd8ecc29fc07eac641ad3e5fa23cb111ec66f7d17787",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "6a87cf00e37b90874057ee983bb9dc213e2376f234da6c096eeedb2d987180b2",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af17",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64-report-202608-v1",
+              "fingerprint": "90cd3d7bc250c63ed294dc4aeb5e87a6307da3bbe657e56a223d457b10317575",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "d5196ff5208a281c1eafc6c9cac0649925d31c9d89481398bfe04c90b76c3dbe",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af18",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55-report-202608-v1",
+              "fingerprint": "f647412921f486af0418df9bc170dda617b6d9ec0b55ef84bae1d70a7c24d05d",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "76add43050805ace00b41ab33d7d3123c682ecaac5cc532915a8684a6a170571",
+              "invalid_count": 0,
+              "difference_count": 32
+            }
+          ]
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#67-m5-06-生产-definition-只读投影核查"
+        }
+      ],
+      "limitations": [
+        "Mismatches and invalid heads require per-object conclusions. Do not rewrite historical ReportInput or rematerialize over differences.",
+        "No full backup pair restoration, external consumer release/traffic or business acceptance was performed.",
+        "Initial client binding guard rejected the host:port shape before any audit; normalized host/port was then used for the complete run. No database mutation occurred in either attempt."
+      ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m5-projection-reasons",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T10:59:48.941181+00:00",
+      "environment": "production/serverA qs MongoDB rs0, read-only snapshot audit",
+      "deployed_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "source_baseline_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Audit selected the exact running API config/env and verified its compiled SHA; complete post-Viper config was not hashed. This is dated findings evidence, not production ready signoff."
+      },
+      "command": "Authorized root SSH: bounded static read-only projection audit in cached client container on infra-network; private 0600 connection file, snapshot session, CountDocuments/Find/getMore only, batch25/max1000/timeout2m; no URI/driver error/model body output. Second complete snapshot adds bounded reason codes; equality/zero gate unchanged.",
+      "result": {
+        "status": "findings",
+        "summary": "All105 retained records scanned;76matched,4MBTI snapshot projection mismatches,25head structural/validation findings. Audit exit2 blocks derived-field retirement. No writes/CAS/rematerialization/cache purge.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "audit_source_sha": "ddcd00480dd5083b2584a178df1c46ae4a27d21e",
+          "binary_sha256": "sha256:931a59018762b6687ce0ff10435948aebf386784adf5295da6f40fba397960b4",
+          "raw_audit_sha256": "sha256:90d4e9fc8dcff8f58df828f39170cc43247cbbe1e6bffbe38d01a607792a0469",
+          "raw_audit_retention": "Task private artifact qs-server-cleanup-m5-definition-projection-audit.json; prior exact bytes retained separately as audit-initial.json.",
+          "identity_before": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_after": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_unchanged": true,
+          "audit_exit_code": 2,
+          "summary": {
+            "complete": true,
+            "zero_mismatch": false,
+            "expected": 105,
+            "scanned": 105,
+            "compared": 80,
+            "matched": 76,
+            "mismatched": 4,
+            "missing_definition": 0,
+            "unknown_schema": 0,
+            "invalid": 25,
+            "record_errors": 0,
+            "scan_errors": 0,
+            "heads": 26,
+            "snapshots": 79,
+            "historical": 54,
+            "stored_decision_fields": 81,
+            "stored_asset_fields": 81,
+            "truncated": false
+          },
+          "finding_scope": [
+            {
+              "model_id": "6a435a990f9028c6eeb8cf5f",
+              "code": "MBTI_OEJTS",
+              "role": "head",
+              "revision": "64",
+              "fingerprint": "5390b11a700587daebaabee9d585d219dbcdbc789d2ed20b252d780d5947f184",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf61",
+              "code": "MBTI_FC_93",
+              "role": "head",
+              "revision": "55",
+              "fingerprint": "ab191c165834a351e85bf330a9a1db3f404b53fa7723a7a05a8b8d7db0c473ba",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf63",
+              "code": "SBTI_FUN",
+              "role": "head",
+              "revision": "48",
+              "fingerprint": "4e44c5946f443225186a95ab551f0898d9ebb6311924296cd00d7cc9c63976bd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 15,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 15
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf65",
+              "code": "BIG5_IPIP_50",
+              "role": "head",
+              "revision": "34",
+              "fingerprint": "9f8674a1973fd14951d003e9a2a2baf80b1af4f0782322a08c5fce7aa005a4b9",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a9a0f9028c6eeb8cf67",
+              "code": "ENNEAGRAM_45",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "9afe676d720583f56ae58ba28bf99c257b44da452b497ef416c60a6900997e19",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 10,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 9,
+                "validation.report_section.template_id.adapter_mismatch": 1
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff7",
+              "code": "3adyDE",
+              "role": "head",
+              "revision": "138",
+              "fingerprint": "227c827729b3db1ccd9dd844e6fb0fdb433772de146eb1be882c8c9f897a5be7",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "invalid_reason_counts": {
+                "validation.conclusion.range.endpoint.required": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff8",
+              "code": "zOO4eG",
+              "role": "head",
+              "revision": "14",
+              "fingerprint": "7a4f4764d0f20832eb27d0854f5129973f2b2c696c8bfb029c919912fe842b9d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 11,
+              "invalid_reason_counts": {
+                "validation.conclusion.range.endpoint.required": 7,
+                "validation.conclusion.range.gap": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffb",
+              "code": "mbdoeV",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "031a66daf593ac5d292c17ea37de7d98f09673bb2d495c55effd754d9b5e8b78",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffc",
+              "code": "D6ZvjC",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "8f8a819384be9e1f533543d4d09325e19f0abed1be4a5d8650beab16f34cf42d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffd",
+              "code": "fthN56",
+              "role": "head",
+              "revision": "10",
+              "fingerprint": "acf6a3134abb27b72c500a74670a6469a4af9f8b55605a35d55168aa4e456cfd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 54,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 45,
+                "validation.conclusion.range.endpoint.required": 9
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffe",
+              "code": "tuixuu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "a02e9195fe52d69d78fc1ad6c0f8f0af69e4ba953715451225e2e51e0ef1c136",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 20,
+                "validation.conclusion.range.endpoint.required": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdfff",
+              "code": "sJFa2R",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d2ac2661f2bba396acf41f410415d7d2ccf28662caca9f46bdc22aa5e188e363",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 42,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 35,
+                "validation.conclusion.range.endpoint.required": 7
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce000",
+              "code": "TMiNB8",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d6f6913a9918b8a0d449f2a8ff3df198d565393ae7cafd0907a321f3cf6febfb",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 20,
+                "validation.conclusion.range.endpoint.required": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce001",
+              "code": "oAWamd",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "1ac5d6f92f227203ec2c595981a26ea5a959725ff1166a5ebc24ae2429e34072",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 38,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 31,
+                "validation.conclusion.range.endpoint.required": 7
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce002",
+              "code": "eLl0sv",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "3c37ddf4d166c22e429543da67294324f69e57148181df1eb0f88e3c9c0054cd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 16,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 12,
+                "validation.conclusion.range.endpoint.required": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce003",
+              "code": "AMwIzu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "f2d7bdc181f8f9a2736d23d819d4f166d7e5d433320479b1b00229fe1be43553",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce004",
+              "code": "kTC43z",
+              "role": "head",
+              "revision": "37",
+              "fingerprint": "c4eb115c745c97d64e0f20e0ee24bb72759f45d54312300b73424b4b9402e0a8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 7,
+              "invalid_reason_counts": {
+                "validation.conclusion.range.endpoint.required": 7
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce005",
+              "code": "WFIRSP",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "814658e13bc8a0562ae4cf7dddcd8d4c8e3bfae3dbfaaa6687ddb63207196865",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 89,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 74,
+                "validation.conclusion.range.endpoint.required": 15
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce006",
+              "code": "yGtSs1",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "b59889d094f7bc3dae0190f91481b2427ed0d8c61f6b0c9ada0101a7067a880a",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 33,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 25,
+                "validation.conclusion.range.endpoint.required": 5,
+                "validation.conclusion.range.gap": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce007",
+              "code": "tssl35",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "05123ecde1133da36b0bc88d8ab18ad8fa36da2b83468d156f96a6afcbd30f73",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 30,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 25,
+                "validation.conclusion.range.endpoint.required": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce008",
+              "code": "ISI7",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "186da8a6b5c30d3b0abdd378e87ce9062c1434d12691786a3cbdc0412309fed0",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 5,
+                "validation.conclusion.range.endpoint.required": 1
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce009",
+              "code": "PROMIS_SD8A",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "c8a9f22142a998bf6e3ae488c19be900a586005419e0522109a5ff2195cd8ca8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 5,
+                "validation.conclusion.range.endpoint.required": 1
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce00d",
+              "code": "NEO_FFI3_60_CN",
+              "role": "head",
+              "revision": "3",
+              "fingerprint": "ad8ef343c02147f526fe40be79e892963a80e11373fee3b3632e8246f3c5d6af",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 20,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f64705f7258ba3cf0d45",
+              "code": "gXkk9W",
+              "role": "head",
+              "revision": "22",
+              "fingerprint": "c4b7834d6ca23515728a23c2546ed700d42c0062d2972919d8a99dce88742c86",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 113,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 9,
+                "validation.conclusion.outcome_code.required": 52,
+                "validation.conclusion.range.endpoint.required": 13,
+                "validation.conclusion.range.gap": 39
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f699cd18e798ee513121",
+              "code": "bJFKi3",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "02a29956d3d90fcdbf407444e4a28ceb10ad87d82a6b64f69f34e0f88ceacac3",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 56,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 8,
+                "validation.conclusion.outcome_code.required": 24,
+                "validation.conclusion.range.endpoint.required": 8,
+                "validation.conclusion.range.gap": 16
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f5",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64",
+              "fingerprint": "3f8172c543382905096bad574fa7796e1793742f29b28e5cbd9a1093c85f7933",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "2b4a6006e21922ddb49acfddfa62120ac9c20d5b62aeefe0d09391c33190e15d",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f6",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55",
+              "fingerprint": "80c7b58ff1d814238dfebd8ecc29fc07eac641ad3e5fa23cb111ec66f7d17787",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "6a87cf00e37b90874057ee983bb9dc213e2376f234da6c096eeedb2d987180b2",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af17",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64-report-202608-v1",
+              "fingerprint": "90cd3d7bc250c63ed294dc4aeb5e87a6307da3bbe657e56a223d457b10317575",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "d5196ff5208a281c1eafc6c9cac0649925d31c9d89481398bfe04c90b76c3dbe",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af18",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55-report-202608-v1",
+              "fingerprint": "f647412921f486af0418df9bc170dda617b6d9ec0b55ef84bae1d70a7c24d05d",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "76add43050805ace00b41ab33d7d3123c682ecaac5cc532915a8684a6a170571",
+              "invalid_count": 0,
+              "difference_count": 32
+            }
+          ],
+          "scope_identity_fingerprint_changes_from_initial": 0,
+          "scope_additions_removals_from_initial": 0
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#67-m5-06-生产-definition-只读投影核查"
+        }
+      ],
+      "limitations": [
+        "Mismatches and invalid heads require per-object conclusions. Do not rewrite historical ReportInput or rematerialize over differences.",
+        "No full backup pair restoration, external consumer release/traffic or business acceptance was performed.",
+        "Current authoring/publish validation is stronger than historic read semantics. Findings do not prove historic computation errors or authorize mechanical endpoint/outcome repair."
+      ]
     }
   ]
 }
