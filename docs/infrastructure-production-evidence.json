@@ -720,6 +720,168 @@
               ]
             },
             "errors": {}
+          },
+          "historical_responsibility_followup": {
+            "read_only": true,
+            "observed_at": "2026-10-13T11:06:24.014649+00:00",
+            "source_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+            "counts": {
+              "store_manifest_states": [
+                1,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "store_item_dispositions": [
+                83797,
+                55577,
+                28220,
+                0,
+                0
+              ],
+              "operator_manifest_stages": [
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "operator_manifest_boundaries": [
+                0,
+                0
+              ]
+            },
+            "errors": {},
+            "mutations_applied": 0,
+            "database": "qs",
+            "before": {
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "version": "8.0.36",
+              "migration_version": 100,
+              "dirty": false
+            },
+            "after": {
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "version": "8.0.36",
+              "migration_version": 100,
+              "dirty": false
+            },
+            "identity_unchanged": true,
+            "raw_artifact_sha256": "sha256:f336e96095bec24b16eadd23ce49e311102ff7fca09077f984eec21d1f164555",
+            "semantics": {
+              "store_manifest_states": "total/applied/rolled_back/other/incomplete_timestamp/incomplete_hash_lengths",
+              "store_item_dispositions": "total/candidate/deferred/already_assigned/other",
+              "operator_manifest_stages": "total/applied_unchanged/executing/pending/other/payload_sha_mismatch/invalid_json",
+              "operator_manifest_boundaries": "payload_state_mismatch/missing_after_hash"
+            },
+            "limitation": "Deferred items and current business hashes/rollback obligations are not certified closed by stage/metadata counts."
+          },
+          "compatibility_observation_targets": {
+            "read_only": true,
+            "observed_at": "2026-10-13T11:11:24.497716+00:00",
+            "containers": [
+              {
+                "name": "qs-apiserver",
+                "running": true,
+                "labels": {
+                  "prometheus.component": "qs-apiserver",
+                  "prometheus.job": "qs-apiserver",
+                  "prometheus.metrics_path": "/metrics",
+                  "prometheus.metrics_port": "8080",
+                  "prometheus.scrape": "true"
+                },
+                "networks": {
+                  "infra-network": "172.20.0.16",
+                  "qs-network": "172.21.0.2"
+                },
+                "compiled_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+                "grpc_jwt_config_enabled": false,
+                "grpc_jwt_env_override": null
+              },
+              {
+                "name": "qs-collection-server-1",
+                "running": true,
+                "labels": {
+                  "prometheus.component": "qs-collection-server",
+                  "prometheus.job": "qs-collection-server",
+                  "prometheus.metrics_path": "/metrics",
+                  "prometheus.metrics_port": "8080",
+                  "prometheus.scrape": "true"
+                },
+                "networks": {
+                  "infra-network": "172.20.0.25",
+                  "qs-network": "172.21.0.3"
+                },
+                "compiled_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+              },
+              {
+                "name": "qs-collection-server-2",
+                "running": true,
+                "labels": {
+                  "prometheus.component": "qs-collection-server",
+                  "prometheus.job": "qs-collection-server",
+                  "prometheus.metrics_path": "/metrics",
+                  "prometheus.metrics_port": "8080",
+                  "prometheus.scrape": "true"
+                },
+                "networks": {
+                  "infra-network": "172.20.0.26",
+                  "qs-network": "172.21.0.4"
+                },
+                "compiled_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+              }
+            ],
+            "targets": [
+              {
+                "labels": {
+                  "instance": "qs-apiserver:8080",
+                  "job": "qs-apiserver"
+                },
+                "discovered_labels": {
+                  "__address__": "qs-apiserver:8080"
+                },
+                "health": "up",
+                "last_scrape": "2026-10-13T19:11:17.126689339+08:00",
+                "scrape_interval": "15s",
+                "scrape_timeout": "10s",
+                "has_last_error": false
+              },
+              {
+                "labels": {
+                  "instance": "172.20.0.25:8080",
+                  "job": "qs-collection-server"
+                },
+                "discovered_labels": {
+                  "__address__": "172.20.0.25:8080"
+                },
+                "health": "up",
+                "last_scrape": "2026-10-13T19:11:13.897763379+08:00",
+                "scrape_interval": "15s",
+                "scrape_timeout": "10s",
+                "has_last_error": false
+              },
+              {
+                "labels": {
+                  "instance": "172.20.0.26:8080",
+                  "job": "qs-collection-server"
+                },
+                "discovered_labels": {
+                  "__address__": "172.20.0.26:8080"
+                },
+                "health": "up",
+                "last_scrape": "2026-10-13T19:11:21.57354576+08:00",
+                "scrape_interval": "15s",
+                "scrape_timeout": "10s",
+                "has_last_error": false
+              }
+            ],
+            "errors": [],
+            "raw_artifact_sha256": "sha256:cab9c877b965cb3240d6b2456490443e0fe2c3a56b92cb9cd8fd70c9941c4845",
+            "limitation": "Only current scrape topology and initial build identities are observed; new dedicated compatibility metrics are not deployed and14d window has not begun."
           }
         }
       },
@@ -740,8 +902,947 @@
         "Snapshot counts are dated and do not authorize deletion. Metadata row estimates cannot prove emptiness.",
         "Source audit candidates still require external consumer proof, scoped backup and isolated restoration, unresolved responsibility inventory and a reviewed release batch.",
         "No system.profile administrator permission was acquired. The initial bounded full outcome JSON count failed; the later read-only PK-paged followup recovered the count under its stated high-water and per-page snapshot limits.",
-        "Stored Definition fields are present in 81 records; pure projection equality has not been audited. All AnswerSheets having admission does not establish no pending, held, dead-letter or replayable legacy input.",
+        "At this original inventory time pure projection equality was not audited; the later independent M5 projection findings entry now binds its result. All AnswerSheets having admission does not establish no pending, held, dead-letter or replayable legacy input.",
         "This observes the starting deployed version, not cleanup artifacts. All six QS service binaries/images are bound separately; full effective configuration, consumer traffic and business effects are not bound."
+      ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m5-projection-audit",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T10:42:00.896147+00:00",
+      "environment": "production/serverA qs MongoDB rs0, read-only snapshot audit",
+      "deployed_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "source_baseline_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Audit selected the exact running API config/env and verified its compiled SHA; complete post-Viper config was not hashed. This is dated findings evidence, not production ready signoff."
+      },
+      "command": "Authorized root SSH: bounded static read-only projection audit in cached client container on infra-network; private 0600 connection file, snapshot session, CountDocuments/Find/getMore only, batch25/max1000/timeout2m; no URI/driver error/model body output.",
+      "result": {
+        "status": "findings",
+        "summary": "All105 retained records scanned;76matched,4MBTI snapshot projection mismatches,25head structural/validation findings. Audit exit2 blocks derived-field retirement. No writes/CAS/rematerialization/cache purge.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "audit_source_sha": "e68bf786def7782f2e6c74ba9ab51358711e9c9e",
+          "binary_sha256": "sha256:a401d25ab2dc967e0b9d4e91ecaba626b674fd023af4c328751de0ee1512e466",
+          "raw_audit_sha256": "sha256:bcc573b1d46ca2b81e8daf86cb1f905cccdb2b8224b492d61587fcd006670100",
+          "raw_audit_retention": "Task private artifact qs-server-cleanup-m5-definition-projection-audit-initial.json contains full ID/revision/fingerprint scope and paths, no content.",
+          "identity_before": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_after": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_unchanged": true,
+          "audit_exit_code": 2,
+          "summary": {
+            "complete": true,
+            "zero_mismatch": false,
+            "expected": 105,
+            "scanned": 105,
+            "compared": 80,
+            "matched": 76,
+            "mismatched": 4,
+            "missing_definition": 0,
+            "unknown_schema": 0,
+            "invalid": 25,
+            "record_errors": 0,
+            "scan_errors": 0,
+            "heads": 26,
+            "snapshots": 79,
+            "historical": 54,
+            "stored_decision_fields": 81,
+            "stored_asset_fields": 81,
+            "truncated": false
+          },
+          "finding_scope": [
+            {
+              "model_id": "6a435a990f9028c6eeb8cf5f",
+              "code": "MBTI_OEJTS",
+              "role": "head",
+              "revision": "64",
+              "fingerprint": "5390b11a700587daebaabee9d585d219dbcdbc789d2ed20b252d780d5947f184",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf61",
+              "code": "MBTI_FC_93",
+              "role": "head",
+              "revision": "55",
+              "fingerprint": "ab191c165834a351e85bf330a9a1db3f404b53fa7723a7a05a8b8d7db0c473ba",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf63",
+              "code": "SBTI_FUN",
+              "role": "head",
+              "revision": "48",
+              "fingerprint": "4e44c5946f443225186a95ab551f0898d9ebb6311924296cd00d7cc9c63976bd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 15,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf65",
+              "code": "BIG5_IPIP_50",
+              "role": "head",
+              "revision": "34",
+              "fingerprint": "9f8674a1973fd14951d003e9a2a2baf80b1af4f0782322a08c5fce7aa005a4b9",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a9a0f9028c6eeb8cf67",
+              "code": "ENNEAGRAM_45",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "9afe676d720583f56ae58ba28bf99c257b44da452b497ef416c60a6900997e19",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 10,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff7",
+              "code": "3adyDE",
+              "role": "head",
+              "revision": "138",
+              "fingerprint": "227c827729b3db1ccd9dd844e6fb0fdb433772de146eb1be882c8c9f897a5be7",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff8",
+              "code": "zOO4eG",
+              "role": "head",
+              "revision": "14",
+              "fingerprint": "7a4f4764d0f20832eb27d0854f5129973f2b2c696c8bfb029c919912fe842b9d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 11,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffb",
+              "code": "mbdoeV",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "031a66daf593ac5d292c17ea37de7d98f09673bb2d495c55effd754d9b5e8b78",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffc",
+              "code": "D6ZvjC",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "8f8a819384be9e1f533543d4d09325e19f0abed1be4a5d8650beab16f34cf42d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffd",
+              "code": "fthN56",
+              "role": "head",
+              "revision": "10",
+              "fingerprint": "acf6a3134abb27b72c500a74670a6469a4af9f8b55605a35d55168aa4e456cfd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 54,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffe",
+              "code": "tuixuu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "a02e9195fe52d69d78fc1ad6c0f8f0af69e4ba953715451225e2e51e0ef1c136",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdfff",
+              "code": "sJFa2R",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d2ac2661f2bba396acf41f410415d7d2ccf28662caca9f46bdc22aa5e188e363",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 42,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce000",
+              "code": "TMiNB8",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d6f6913a9918b8a0d449f2a8ff3df198d565393ae7cafd0907a321f3cf6febfb",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce001",
+              "code": "oAWamd",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "1ac5d6f92f227203ec2c595981a26ea5a959725ff1166a5ebc24ae2429e34072",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 38,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce002",
+              "code": "eLl0sv",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "3c37ddf4d166c22e429543da67294324f69e57148181df1eb0f88e3c9c0054cd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 16,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce003",
+              "code": "AMwIzu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "f2d7bdc181f8f9a2736d23d819d4f166d7e5d433320479b1b00229fe1be43553",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce004",
+              "code": "kTC43z",
+              "role": "head",
+              "revision": "37",
+              "fingerprint": "c4eb115c745c97d64e0f20e0ee24bb72759f45d54312300b73424b4b9402e0a8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 7,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce005",
+              "code": "WFIRSP",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "814658e13bc8a0562ae4cf7dddcd8d4c8e3bfae3dbfaaa6687ddb63207196865",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 89,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce006",
+              "code": "yGtSs1",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "b59889d094f7bc3dae0190f91481b2427ed0d8c61f6b0c9ada0101a7067a880a",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 33,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce007",
+              "code": "tssl35",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "05123ecde1133da36b0bc88d8ab18ad8fa36da2b83468d156f96a6afcbd30f73",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 30,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce008",
+              "code": "ISI7",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "186da8a6b5c30d3b0abdd378e87ce9062c1434d12691786a3cbdc0412309fed0",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce009",
+              "code": "PROMIS_SD8A",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "c8a9f22142a998bf6e3ae488c19be900a586005419e0522109a5ff2195cd8ca8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce00d",
+              "code": "NEO_FFI3_60_CN",
+              "role": "head",
+              "revision": "3",
+              "fingerprint": "ad8ef343c02147f526fe40be79e892963a80e11373fee3b3632e8246f3c5d6af",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 20,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f64705f7258ba3cf0d45",
+              "code": "gXkk9W",
+              "role": "head",
+              "revision": "22",
+              "fingerprint": "c4b7834d6ca23515728a23c2546ed700d42c0062d2972919d8a99dce88742c86",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 113,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f699cd18e798ee513121",
+              "code": "bJFKi3",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "02a29956d3d90fcdbf407444e4a28ceb10ad87d82a6b64f69f34e0f88ceacac3",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 56,
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f5",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64",
+              "fingerprint": "3f8172c543382905096bad574fa7796e1793742f29b28e5cbd9a1093c85f7933",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "2b4a6006e21922ddb49acfddfa62120ac9c20d5b62aeefe0d09391c33190e15d",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f6",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55",
+              "fingerprint": "80c7b58ff1d814238dfebd8ecc29fc07eac641ad3e5fa23cb111ec66f7d17787",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "6a87cf00e37b90874057ee983bb9dc213e2376f234da6c096eeedb2d987180b2",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af17",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64-report-202608-v1",
+              "fingerprint": "90cd3d7bc250c63ed294dc4aeb5e87a6307da3bbe657e56a223d457b10317575",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "d5196ff5208a281c1eafc6c9cac0649925d31c9d89481398bfe04c90b76c3dbe",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af18",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55-report-202608-v1",
+              "fingerprint": "f647412921f486af0418df9bc170dda617b6d9ec0b55ef84bae1d70a7c24d05d",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "76add43050805ace00b41ab33d7d3123c682ecaac5cc532915a8684a6a170571",
+              "invalid_count": 0,
+              "difference_count": 32
+            }
+          ]
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#67-m5-06-生产-definition-只读投影核查"
+        }
+      ],
+      "limitations": [
+        "Mismatches and invalid heads require per-object conclusions. Do not rewrite historical ReportInput or rematerialize over differences.",
+        "No full backup pair restoration, external consumer release/traffic or business acceptance was performed.",
+        "Initial client binding guard rejected the host:port shape before any audit; normalized host/port was then used for the complete run. No database mutation occurred in either attempt."
+      ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m5-projection-reasons",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T10:59:48.941181+00:00",
+      "environment": "production/serverA qs MongoDB rs0, read-only snapshot audit",
+      "deployed_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "source_baseline_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Audit selected the exact running API config/env and verified its compiled SHA; complete post-Viper config was not hashed. This is dated findings evidence, not production ready signoff."
+      },
+      "command": "Authorized root SSH: bounded static read-only projection audit in cached client container on infra-network; private 0600 connection file, snapshot session, CountDocuments/Find/getMore only, batch25/max1000/timeout2m; no URI/driver error/model body output. Second complete snapshot adds bounded reason codes; equality/zero gate unchanged.",
+      "result": {
+        "status": "findings",
+        "summary": "All105 retained records scanned;76matched,4MBTI snapshot projection mismatches,25head structural/validation findings. Audit exit2 blocks derived-field retirement. No writes/CAS/rematerialization/cache purge.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "audit_source_sha": "ddcd00480dd5083b2584a178df1c46ae4a27d21e",
+          "binary_sha256": "sha256:931a59018762b6687ce0ff10435948aebf386784adf5295da6f40fba397960b4",
+          "raw_audit_sha256": "sha256:90d4e9fc8dcff8f58df828f39170cc43247cbbe1e6bffbe38d01a607792a0469",
+          "raw_audit_retention": "Task private artifact qs-server-cleanup-m5-definition-projection-audit.json; prior exact bytes retained separately as audit-initial.json.",
+          "identity_before": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_after": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_unchanged": true,
+          "audit_exit_code": 2,
+          "summary": {
+            "complete": true,
+            "zero_mismatch": false,
+            "expected": 105,
+            "scanned": 105,
+            "compared": 80,
+            "matched": 76,
+            "mismatched": 4,
+            "missing_definition": 0,
+            "unknown_schema": 0,
+            "invalid": 25,
+            "record_errors": 0,
+            "scan_errors": 0,
+            "heads": 26,
+            "snapshots": 79,
+            "historical": 54,
+            "stored_decision_fields": 81,
+            "stored_asset_fields": 81,
+            "truncated": false
+          },
+          "finding_scope": [
+            {
+              "model_id": "6a435a990f9028c6eeb8cf5f",
+              "code": "MBTI_OEJTS",
+              "role": "head",
+              "revision": "64",
+              "fingerprint": "5390b11a700587daebaabee9d585d219dbcdbc789d2ed20b252d780d5947f184",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf61",
+              "code": "MBTI_FC_93",
+              "role": "head",
+              "revision": "55",
+              "fingerprint": "ab191c165834a351e85bf330a9a1db3f404b53fa7723a7a05a8b8d7db0c473ba",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 4,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf63",
+              "code": "SBTI_FUN",
+              "role": "head",
+              "revision": "48",
+              "fingerprint": "4e44c5946f443225186a95ab551f0898d9ebb6311924296cd00d7cc9c63976bd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 15,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 15
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a990f9028c6eeb8cf65",
+              "code": "BIG5_IPIP_50",
+              "role": "head",
+              "revision": "34",
+              "fingerprint": "9f8674a1973fd14951d003e9a2a2baf80b1af4f0782322a08c5fce7aa005a4b9",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a435a9a0f9028c6eeb8cf67",
+              "code": "ENNEAGRAM_45",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "9afe676d720583f56ae58ba28bf99c257b44da452b497ef416c60a6900997e19",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 10,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 9,
+                "validation.report_section.template_id.adapter_mismatch": 1
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff7",
+              "code": "3adyDE",
+              "role": "head",
+              "revision": "138",
+              "fingerprint": "227c827729b3db1ccd9dd844e6fb0fdb433772de146eb1be882c8c9f897a5be7",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 5,
+              "invalid_reason_counts": {
+                "validation.conclusion.range.endpoint.required": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdff8",
+              "code": "zOO4eG",
+              "role": "head",
+              "revision": "14",
+              "fingerprint": "7a4f4764d0f20832eb27d0854f5129973f2b2c696c8bfb029c919912fe842b9d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 11,
+              "invalid_reason_counts": {
+                "validation.conclusion.range.endpoint.required": 7,
+                "validation.conclusion.range.gap": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffb",
+              "code": "mbdoeV",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "031a66daf593ac5d292c17ea37de7d98f09673bb2d495c55effd754d9b5e8b78",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffc",
+              "code": "D6ZvjC",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "8f8a819384be9e1f533543d4d09325e19f0abed1be4a5d8650beab16f34cf42d",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffd",
+              "code": "fthN56",
+              "role": "head",
+              "revision": "10",
+              "fingerprint": "acf6a3134abb27b72c500a74670a6469a4af9f8b55605a35d55168aa4e456cfd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 54,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 45,
+                "validation.conclusion.range.endpoint.required": 9
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdffe",
+              "code": "tuixuu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "a02e9195fe52d69d78fc1ad6c0f8f0af69e4ba953715451225e2e51e0ef1c136",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 20,
+                "validation.conclusion.range.endpoint.required": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8ccdfff",
+              "code": "sJFa2R",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d2ac2661f2bba396acf41f410415d7d2ccf28662caca9f46bdc22aa5e188e363",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 42,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 35,
+                "validation.conclusion.range.endpoint.required": 7
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce000",
+              "code": "TMiNB8",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "d6f6913a9918b8a0d449f2a8ff3df198d565393ae7cafd0907a321f3cf6febfb",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 24,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 20,
+                "validation.conclusion.range.endpoint.required": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce001",
+              "code": "oAWamd",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "1ac5d6f92f227203ec2c595981a26ea5a959725ff1166a5ebc24ae2429e34072",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 38,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 31,
+                "validation.conclusion.range.endpoint.required": 7
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce002",
+              "code": "eLl0sv",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "3c37ddf4d166c22e429543da67294324f69e57148181df1eb0f88e3c9c0054cd",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 16,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 12,
+                "validation.conclusion.range.endpoint.required": 4
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce003",
+              "code": "AMwIzu",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "f2d7bdc181f8f9a2736d23d819d4f166d7e5d433320479b1b00229fe1be43553",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 18,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce004",
+              "code": "kTC43z",
+              "role": "head",
+              "revision": "37",
+              "fingerprint": "c4eb115c745c97d64e0f20e0ee24bb72759f45d54312300b73424b4b9402e0a8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 7,
+              "invalid_reason_counts": {
+                "validation.conclusion.range.endpoint.required": 7
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce005",
+              "code": "WFIRSP",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "814658e13bc8a0562ae4cf7dddcd8d4c8e3bfae3dbfaaa6687ddb63207196865",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 89,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 74,
+                "validation.conclusion.range.endpoint.required": 15
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce006",
+              "code": "yGtSs1",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "b59889d094f7bc3dae0190f91481b2427ed0d8c61f6b0c9ada0101a7067a880a",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 33,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 25,
+                "validation.conclusion.range.endpoint.required": 5,
+                "validation.conclusion.range.gap": 3
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce007",
+              "code": "tssl35",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "05123ecde1133da36b0bc88d8ab18ad8fa36da2b83468d156f96a6afcbd30f73",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 30,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 25,
+                "validation.conclusion.range.endpoint.required": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce008",
+              "code": "ISI7",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "186da8a6b5c30d3b0abdd378e87ce9062c1434d12691786a3cbdc0412309fed0",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 5,
+                "validation.conclusion.range.endpoint.required": 1
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce009",
+              "code": "PROMIS_SD8A",
+              "role": "head",
+              "revision": "4",
+              "fingerprint": "c8a9f22142a998bf6e3ae488c19be900a586005419e0522109a5ff2195cd8ca8",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 6,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 5,
+                "validation.conclusion.range.endpoint.required": 1
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a4f7eea58815f95a8cce00d",
+              "code": "NEO_FFI3_60_CN",
+              "role": "head",
+              "revision": "3",
+              "fingerprint": "ad8ef343c02147f526fe40be79e892963a80e11373fee3b3632e8246f3c5d6af",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 20,
+              "invalid_reason_counts": {
+                "validation.conclusion.outcome.not_found": 15,
+                "validation.conclusion.range.endpoint.required": 5
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f64705f7258ba3cf0d45",
+              "code": "gXkk9W",
+              "role": "head",
+              "revision": "22",
+              "fingerprint": "c4b7834d6ca23515728a23c2546ed700d42c0062d2972919d8a99dce88742c86",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 113,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 9,
+                "validation.conclusion.outcome_code.required": 52,
+                "validation.conclusion.range.endpoint.required": 13,
+                "validation.conclusion.range.gap": 39
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a55f699cd18e798ee513121",
+              "code": "bJFKi3",
+              "role": "head",
+              "revision": "16",
+              "fingerprint": "02a29956d3d90fcdbf407444e4a28ceb10ad87d82a6b64f69f34e0f88ceacac3",
+              "status": "invalid",
+              "historical": false,
+              "invalid_count": 56,
+              "invalid_reason_counts": {
+                "raw.unknown_field": 8,
+                "validation.conclusion.outcome_code.required": 24,
+                "validation.conclusion.range.endpoint.required": 8,
+                "validation.conclusion.range.gap": 16
+              },
+              "difference_count": 0
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f5",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64",
+              "fingerprint": "3f8172c543382905096bad574fa7796e1793742f29b28e5cbd9a1093c85f7933",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "2b4a6006e21922ddb49acfddfa62120ac9c20d5b62aeefe0d09391c33190e15d",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a59ea01d583d69046bdf1f6",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55",
+              "fingerprint": "80c7b58ff1d814238dfebd8ecc29fc07eac641ad3e5fa23cb111ec66f7d17787",
+              "status": "mismatched",
+              "historical": true,
+              "canonical_hash": "6a87cf00e37b90874057ee983bb9dc213e2376f234da6c096eeedb2d987180b2",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af17",
+              "code": "MBTI_OEJTS",
+              "role": "published_snapshot",
+              "revision": "v64-report-202608-v1",
+              "fingerprint": "90cd3d7bc250c63ed294dc4aeb5e87a6307da3bbe657e56a223d457b10317575",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "d5196ff5208a281c1eafc6c9cac0649925d31c9d89481398bfe04c90b76c3dbe",
+              "invalid_count": 0,
+              "difference_count": 32
+            },
+            {
+              "model_id": "6a746dda27b7674b06f5af18",
+              "code": "MBTI_FC_93",
+              "role": "published_snapshot",
+              "revision": "v55-report-202608-v1",
+              "fingerprint": "f647412921f486af0418df9bc170dda617b6d9ec0b55ef84bae1d70a7c24d05d",
+              "status": "mismatched",
+              "historical": false,
+              "canonical_hash": "76add43050805ace00b41ab33d7d3123c682ecaac5cc532915a8684a6a170571",
+              "invalid_count": 0,
+              "difference_count": 32
+            }
+          ],
+          "scope_identity_fingerprint_changes_from_initial": 0,
+          "scope_additions_removals_from_initial": 0
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#67-m5-06-生产-definition-只读投影核查"
+        }
+      ],
+      "limitations": [
+        "Mismatches and invalid heads require per-object conclusions. Do not rewrite historical ReportInput or rematerialize over differences.",
+        "No full backup pair restoration, external consumer release/traffic or business acceptance was performed.",
+        "Current authoring/publish validation is stronger than historic read semantics. Findings do not prove historic computation errors or authorize mechanical endpoint/outcome repair."
       ]
     }
   ]
