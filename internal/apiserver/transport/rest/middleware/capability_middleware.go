@@ -48,26 +48,6 @@ func RequireCapabilityMiddleware(capability Capability) gin.HandlerFunc {
 	}
 }
 
-// RequireAnyCapabilityMiddleware 要求当前请求具备任一能力。
-func RequireAnyCapabilityMiddleware(capabilities ...Capability) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		snap := GetAuthzSnapshot(c)
-		if snap == nil {
-			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required"))
-			return
-		}
-		if decision := authzapp.DecideAnyCapability(snap, capabilities...); decision.Allowed {
-			c.Next()
-			return
-		}
-		abortPermissionDenied(c, errors.WithCode(
-			code.ErrPermissionDenied,
-			"capabilities %v denied by IAM authorization",
-			capabilities,
-		))
-	}
-}
-
 // RequirePermissionMiddleware requires one exact IAM resource/action grant.
 // It is the default route guard for concrete use cases; coarse capabilities
 // remain available only where the route itself represents a composite ability.

@@ -16,7 +16,6 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -29,7 +28,6 @@ import (
 type WireInput struct {
 	MySQLDB                   *gorm.DB
 	MongoDB                   *mongo.Database
-	EventPublisher            event.EventPublisher
 	RedisClient               redis.UniversalClient
 	CacheBuilder              *keyspace.Builder
 	CachePolicies             sharedcache.PolicyProvider
@@ -63,7 +61,6 @@ func Wire(in WireInput) (WireResult, error) {
 
 	catalog := in.PublishedModelCatalog
 	var inputResolver evaluationinput.Resolver
-	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra := in.SurveyRuntimeInfra; infra != nil {
 		resolver, err := evaluationinputInfra.NewRepositoryResolver(
 			infra.AnswerSheetRepo,
@@ -77,7 +74,6 @@ func Wire(in WireInput) (WireResult, error) {
 			return WireResult{}, fmt.Errorf("evaluation input resolver: %w", err)
 		}
 		inputResolver = resolver
-		scaleCatalog = resolver
 	}
 
 	var publishedModelReader rulesetport.PublishedModelReader
@@ -93,8 +89,6 @@ func Wire(in WireInput) (WireResult, error) {
 		MySQLDB:                    in.MySQLDB,
 		MongoDB:                    in.MongoDB,
 		InputResolver:              inputResolver,
-		ScaleCatalog:               scaleCatalog,
-		EventPublisher:             in.EventPublisher,
 		RedisClient:                in.RedisClient,
 		CacheBuilder:               in.CacheBuilder,
 		CachePolicies:              in.CachePolicies,

@@ -73,14 +73,6 @@ func (k CacheKeyspace) QueryVersion(kind, scope string) string {
 	return k.keyspace.Prefix("query:version:" + kind + ":" + scope)
 }
 
-func (k CacheKeyspace) VersionedQuery(kind, scope string, version uint64, hash string) string {
-	key := fmt.Sprintf("query:%s:%s:v%d", kind, scope, version)
-	if hash != "" {
-		key += ":" + hash
-	}
-	return k.keyspace.Prefix(key)
-}
-
 func (k CacheKeyspace) StatisticsGeneration(orgID int64) string {
 	return k.QueryVersion(statisticsCacheKind, "org:"+strconv.FormatInt(orgID, 10))
 }

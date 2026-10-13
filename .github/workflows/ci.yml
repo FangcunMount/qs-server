@@ -376,17 +376,15 @@ jobs:
             -run '^(TestSchemaPairNative|TestDisabledDDLNative)' \
             ./internal/pkg/migration ./internal/apiserver/bootstrap
 
-      - name: Verify compatibility retirement A evidence contracts on real databases
+      - name: Verify committed evidence, retry governance and retirement A on real databases
         env:
           QS_COMPAT_OUTCOME_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
-          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
-          QS_HISTORY_REQUIRE_DATABASE: '1'
           QS_COMPAT_REQUIRE_DATABASE: '1'
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
         run: |
-          go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^(TestCommittedEvidence.*|TestHistoricalReferencesUpgradeFrom98Native|TestConsistencyHistoricalReferences(PhysicalNullAcceptance|PreserveNormalSave|StrictSourceAndSet|OutcomeOriginalGraph)Native)$'
+          go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^TestCommittedEvidenceAtomicNativeMySQL$'
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
           go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
 

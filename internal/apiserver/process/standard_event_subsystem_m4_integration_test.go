@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -24,8 +25,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
+	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
+	mysqlEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	governanceinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -36,6 +41,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	"github.com/gin-gonic/gin"
@@ -56,6 +62,8 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err != nil || parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m4_qs_bootstrap" {
 		t.Fatal("disposable m4_qs_bootstrap MySQL at mysql:3306 required")
 	}
+	parsed.MultiStatements = true
+	dsn = parsed.FormatDSN()
 	uri := os.Getenv("RM_QS_BOOTSTRAP_MONGO_URI")
 	if !strings.HasPrefix(uri, "mongodb://mongo:27017/") || !strings.Contains(uri, "replicaSet=rm-test") {
 		t.Fatal("disposable rm-test Mongo at mongo:27017 required")
@@ -89,7 +97,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err := db.PingContext(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []string{"qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox", "system_governance_action_runs"} {
+	for _, table := range []string{"qs_rm_evaluation_request_ref", "assessment_score", "assessment", "qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox", "system_governance_action_runs"} {
 		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table); err != nil {
 			t.Fatal(err)
 		}
@@ -121,8 +129,9 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if _, err := db.ExecContext(ctx, string(auditIndexDDL)); err != nil {
 		t.Fatal(err)
 	}
+	applyM4AssessmentSchema(t, ctx, db, filepath.Dir(migrationPath))
 	defer func() {
-		for _, table := range []string{"qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox", "system_governance_action_runs"} {
+		for _, table := range []string{"qs_rm_evaluation_request_ref", "assessment_score", "assessment", "qs_rm_replay_items", "qs_rm_replay_requests", "rm_outbox", "system_governance_action_runs"} {
 			_, _ = db.ExecContext(context.Background(), "DROP TABLE IF EXISTS "+table)
 		}
 	}()
@@ -222,18 +231,25 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if err := host.HealthCheck(ctx); err != nil {
 		t.Fatalf("initialized container health check: %v", err)
 	}
-	evt := event.Event[map[string]any]{
-		BaseEvent: event.BaseEvent{
-			ID: "m4-process-probe", EventTypeValue: "evaluation.requested", AggregateTypeValue: "Assessment",
-			AggregateIDValue: "101", OccurredAtValue: time.Now(),
-		},
-		Data: map[string]any{"org_id": 501},
-	}
+	assessmentRepository := mysqlEvaluation.NewAssessmentRepository(gormDB)
+	var evt event.DomainEvent
 	binding := subsystem.Profile(eventcatalog.OutboxProfileAssessmentMySQL)
 	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		evt, err = newM4EvaluationRequest(txCtx, assessmentRepository, "m4-process-probe", 501)
+		if err != nil {
+			return err
+		}
 		return binding.Stager.Stage(txCtx, evt)
 	}); err != nil {
 		t.Fatal(err)
+	}
+	var assessmentID string
+	if err := db.QueryRowContext(ctx, `SELECT CAST(a.id AS CHAR) FROM assessment a
+		JOIN qs_rm_evaluation_request_ref r ON r.assessment_id=a.id AND r.org_id=a.org_id
+		JOIN rm_outbox o ON o.message_id=r.event_id
+		WHERE r.event_id=? AND a.status='submitted' AND a.deleted_at IS NULL AND a.org_id=501`, evt.EventID()).Scan(&assessmentID); err != nil || assessmentID != evt.AggregateID() {
+		t.Fatalf("canonical assessment/request reference/outbox transaction: assessment=%s event=%s err=%v", assessmentID, evt.AggregateID(), err)
 	}
 	binding.PostCommit.AfterCommit(ctx, []event.DomainEvent{evt}, time.Now())
 	mongoEvent := event.Event[map[string]any]{
@@ -300,13 +316,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	// Let the previous events' wake signals drain before introducing the two
 	// scan-only intents. The configured poll interval is 200 milliseconds.
 	time.Sleep(600 * time.Millisecond)
-	missedWakeMySQL := event.Event[map[string]any]{
-		BaseEvent: event.BaseEvent{
-			ID: "m4-scan-mysql-no-wake", EventTypeValue: "evaluation.requested", AggregateTypeValue: "Assessment",
-			AggregateIDValue: "103", OccurredAtValue: time.Now(),
-		},
-		Data: map[string]any{"org_id": 501},
-	}
+	var missedWakeMySQL event.DomainEvent
 	missedWakeMongo := event.Event[map[string]any]{
 		BaseEvent: event.BaseEvent{
 			ID: "m4-scan-mongo-no-wake", EventTypeValue: "answersheet.submitted", AggregateTypeValue: "AnswerSheet",
@@ -315,6 +325,11 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		Data: map[string]any{"org_id": 502},
 	}
 	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		missedWakeMySQL, err = newM4EvaluationRequest(txCtx, assessmentRepository, "m4-scan-mysql-no-wake", 501)
+		if err != nil {
+			return err
+		}
 		return binding.Stager.Stage(txCtx, missedWakeMySQL)
 	}); err != nil {
 		t.Fatal(err)
@@ -327,7 +342,7 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	missedWakeStarted := time.Now()
 	for {
 		var mysqlState string
-		if err := db.QueryRowContext(ctx, "SELECT state FROM rm_outbox WHERE message_id=?", missedWakeMySQL.ID).
+		if err := db.QueryRowContext(ctx, "SELECT state FROM rm_outbox WHERE message_id=?", missedWakeMySQL.EventID()).
 			Scan(&mysqlState); err != nil {
 			t.Fatal(err)
 		}
@@ -354,15 +369,16 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	outageEvents := []struct {
 		id, eventType, aggregateType, aggregateID string
 	}{
-		{"m4-nsq-outage-mysql", "evaluation.requested", "Assessment", "102"},
+		{"m4-nsq-outage-mysql", "evaluation.requested", "Evaluation", "102"},
 		{"m4-nsq-outage-mongo", "answersheet.submitted", "AnswerSheet", "202"},
 	}
-	mysqlOutage := event.Event[map[string]any]{
-		BaseEvent: event.BaseEvent{ID: outageEvents[0].id, EventTypeValue: outageEvents[0].eventType,
-			AggregateTypeValue: outageEvents[0].aggregateType, AggregateIDValue: outageEvents[0].aggregateID, OccurredAtValue: time.Now()},
-		Data: map[string]any{"org_id": 501},
-	}
+	var mysqlOutage event.DomainEvent
 	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		mysqlOutage, err = newM4EvaluationRequest(txCtx, assessmentRepository, outageEvents[0].id, 501)
+		if err != nil {
+			return err
+		}
 		return binding.Stager.Stage(txCtx, mysqlOutage)
 	}); err != nil {
 		t.Fatal(err)
@@ -414,12 +430,6 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		if i%2 != 0 {
 			orgID = 502
 		}
-		mysqlBacklog = append(mysqlBacklog, event.Event[map[string]any]{
-			BaseEvent: event.BaseEvent{ID: fmt.Sprintf("m4-backlog-mysql-%03d", i),
-				EventTypeValue: "evaluation.requested", AggregateTypeValue: "Assessment",
-				AggregateIDValue: fmt.Sprintf("%d", 1000+i), OccurredAtValue: time.Now()},
-			Data: map[string]any{"org_id": orgID},
-		})
 		mongoBacklog = append(mongoBacklog, event.Event[map[string]any]{
 			BaseEvent: event.BaseEvent{ID: fmt.Sprintf("m4-backlog-mongo-%03d", i),
 				EventTypeValue: "answersheet.submitted", AggregateTypeValue: "AnswerSheet",
@@ -428,6 +438,17 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 		})
 	}
 	if err := qsmysql.NewUnitOfWork(gormDB).WithinTransaction(ctx, func(txCtx context.Context) error {
+		for i := 0; i < backlogPerStore; i++ {
+			orgID := int64(501)
+			if i%2 != 0 {
+				orgID = 502
+			}
+			requested, err := newM4EvaluationRequest(txCtx, assessmentRepository, fmt.Sprintf("m4-backlog-mysql-%03d", i), orgID)
+			if err != nil {
+				return err
+			}
+			mysqlBacklog = append(mysqlBacklog, requested)
+		}
 		return binding.Stager.Stage(txCtx, mysqlBacklog...)
 	}); err != nil {
 		t.Fatal(err)
@@ -1012,4 +1033,62 @@ func TestM4ProcessBootstrapRunsSelectedStandardProfiles(t *testing.T) {
 	if _, err := buildResourceEventSubsystem(gormDB, mongoDB, nil, catalog, eventruntime.PublishModeMQ, nil, deps); err == nil || !strings.Contains(err.Error(), "M4 MySQL standard schema is incomplete") {
 		t.Fatalf("missing standard table did not fail before candidate startup: %v", err)
 	}
+}
+
+func applyM4AssessmentSchema(t *testing.T, ctx context.Context, db *sql.DB, directory string) {
+	t.Helper()
+	for _, name := range []string{
+		"000001_init_actor_schema.up.sql", "000002_remove_questionnaire_id.up.sql",
+		"000014_optimize_core_query_indexes.up.sql", "000030_add_evaluation_model_ref_to_assessment.up.sql",
+		"000036_add_assessment_outcome_v2_fields.up.sql", "000041_retire_medical_scale_assessment_fields.up.sql",
+		"000044_retire_assessment_interpreted_and_score_copy_fields.up.sql", "000081_assessment_conducting_context.up.sql",
+		"000089_qs_evaluation_request_ref.up.sql",
+	} {
+		raw, err := os.ReadFile(filepath.Join(directory, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name == "000014_optimize_core_query_indexes.up.sql" {
+			// Only the two Assessment tables participate in this sender fixture.
+			// Execute their actual index statements before the later retirement DDL.
+			for _, statement := range strings.Split(string(raw), ";") {
+				if strings.Contains(statement, "ALTER TABLE `assessment`") || strings.Contains(statement, "ALTER TABLE `assessment_score`") {
+					if _, err := db.ExecContext(ctx, statement); err != nil {
+						t.Fatalf("apply %s: %v", name, err)
+					}
+				}
+			}
+			continue
+		}
+		if _, err := db.ExecContext(ctx, string(raw)); err != nil {
+			t.Fatalf("apply %s: %v", name, err)
+		}
+	}
+}
+
+func newM4EvaluationRequest(ctx context.Context, repository assessmentDomain.Repository, eventID string, orgID int64) (event.DomainEvent, error) {
+	submissionRepository, ok := repository.(assessmentDomain.PendingSubmissionRepository)
+	if !ok {
+		return nil, fmt.Errorf("canonical pending submission writer required")
+	}
+	model := assessmentDomain.NewEvaluationModelRefWithIdentity(assessmentDomain.EvaluationModelKindScale, modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmScaleDefault, 0, meta.NewCode("SCALE-M4"), "1.0.0", "M4 fixture")
+	a, err := assessmentDomain.NewAssessment(orgID, testeeDomain.NewID(41),
+		assessmentDomain.NewQuestionnaireRefByCode(meta.NewCode("QNR-M4"), "1.0.0"),
+		assessmentDomain.NewAnswerSheetRef(meta.New()), assessmentDomain.NewAdhocOrigin(), assessmentDomain.WithEvaluationModel(model))
+	if err != nil {
+		return nil, err
+	}
+	if err := repository.Save(ctx, a); err != nil {
+		return nil, err
+	}
+	if err := a.Submit(); err != nil {
+		return nil, err
+	}
+	if err := submissionRepository.SavePendingSubmission(ctx, a); err != nil {
+		return nil, err
+	}
+	requested := a.Events()[0].(assessmentDomain.EvaluationRequestedEvent)
+	requested.ID = eventID // Stable invocation correlation; the domain builds all binding facts.
+	return requested, nil
 }

@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "d5a4c9671813a2f05b375963cc6760fd6cc0e239",
-        "verified_on": "2026-10-10"
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -5547,8 +5547,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -5565,7 +5565,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/cache/query/versioned.go"
+          "path": "internal/pkg/cache/query/version_token.go"
         },
         {
           "kind": "source",
@@ -9781,8 +9781,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
