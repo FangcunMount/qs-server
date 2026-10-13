@@ -2,9 +2,7 @@ package qrcode
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
@@ -80,59 +78,5 @@ func TestProbeClaimsBeforeExternalCallAndDoesNotSwallowStoreFailure(t *testing.T
 	store.err = mongo.WriteException{WriteErrors: mongo.WriteErrors{{Code: 11000}}}
 	if _, err := p.GenerateQuestionnaireQRCode(ctx, "test-qr", "v1"); err != nil || qr.calls != 1 {
 		t.Fatal("existing durable claim must allow original service")
-	}
-}
-
-func TestProbeConfigurationIsExplicitAndStrict(t *testing.T) {
-	t.Setenv(AcceptanceFailureEnv, "")
-	if _, err := WrapAcceptanceFailureFromEnv(nil, nil); err == nil {
-		t.Fatal("empty explicit setting must fail")
-	}
-	now := time.Now()
-	scope := testScope(now)
-	raw, _ := json.Marshal(scope)
-	if _, err := parseFailureScope(string(raw), now); err != nil {
-		t.Fatal(err)
-	}
-	cases := []string{"", string(raw) + " {}", string(raw[:len(raw)-1]) + `,"unknown":true}`}
-	for _, r := range cases {
-		if _, err := parseFailureScope(r, now); err == nil {
-			t.Fatalf("accepted invalid config %q", r)
-		}
-	}
-	for _, mutate := range []func(*FailureScope){func(s *FailureScope) { s.Targets[0].Code = "*" }, func(s *FailureScope) { s.Targets[0].Version = "" }, func(s *FailureScope) { s.ExpiresAt = now.Add(11 * time.Minute) }, func(s *FailureScope) { s.Targets[1].Version = "v1" }} {
-		s := testScope(now)
-		mutate(&s)
-		raw, _ := json.Marshal(s)
-		if _, err := parseFailureScope(string(raw), now); err == nil {
-			t.Fatal("accepted unbounded or ambiguous scope")
-		}
-	}
-}
-
-func TestUnconfiguredProbePreservesOriginalService(t *testing.T) {
-	t.Setenv(AcceptanceFailureEnv, "")
-	if err := os.Unsetenv(AcceptanceFailureEnv); err != nil {
-		t.Fatal(err)
-	}
-	qr := &recordingQR{}
-	got, err := WrapAcceptanceFailureFromEnv(qr, nil)
-	if err != nil || got != qr {
-		t.Fatal("absent configuration must retain original service without database")
-	}
-}
-
-func TestExpiredValidConfigDoesNotPreventRestart(t *testing.T) {
-	t.Setenv(AcceptanceFailureEnv, "")
-	now := time.Now()
-	scope := testScope(now)
-	scope.StartsAt = now.Add(-2 * time.Minute)
-	scope.ExpiresAt = now.Add(-time.Minute)
-	raw, _ := json.Marshal(scope)
-	t.Setenv(AcceptanceFailureEnv, string(raw))
-	qr := &recordingQR{}
-	got, err := WrapAcceptanceFailureFromEnv(qr, nil)
-	if err != nil || got != qr {
-		t.Fatalf("expired valid config must disable itself without blocking service restart: %v", err)
 	}
 }

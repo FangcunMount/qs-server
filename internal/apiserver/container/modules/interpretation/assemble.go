@@ -209,16 +209,7 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}
-		failureGate, err := acceptanceFailureGateFromEnv(deps.MongoDB)
-		if err != nil {
-			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "invalid acceptance report failure gate: %v", err)
-		}
-		var executor interpretationexecution.Executor
-		if failureGate == nil {
-			executor, err = interpretationexecution.NewExecutor(starter, registry, committer)
-		} else {
-			executor, err = interpretationexecution.NewExecutorWithBuildFailureGate(starter, registry, committer, failureGate)
-		}
+		executor, err := interpretationexecution.NewExecutor(starter, registry, committer)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation execution: %v", err)
 		}

@@ -15,8 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// AcceptanceFailureScope limits the temporary pre-model fault to one dedicated
-// test identity and a short window. An absent configuration creates no gate.
+// AcceptanceFailureScope bounds the test-only durable fault fixture to one identity and a short window.
 type AcceptanceFailureScope struct {
 	Token     string    `json:"token"`
 	OrgID     int64     `json:"org_id"`

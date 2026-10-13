@@ -1,8 +1,6 @@
 package evaluation
 
 import (
-	"fmt"
-
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
@@ -161,10 +159,6 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 
 func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) error {
 	if normalized.InputResolver != nil {
-		failureGate, err := evaluationFailureGateFromEnv(normalized.MongoDB)
-		if err != nil {
-			return fmt.Errorf("evaluation acceptance failure gate: %w", err)
-		}
 		wiringDeps := WiringDeps{ScaleScorer: ruleengine.NewScaleFactorScorer()}
 		if normalized.RuntimeDescriptorRegistry != nil {
 			if err := evalruntime.AttachNativePipelines(normalized.RuntimeDescriptorRegistry, evalruntime.NativePipelineDeps{
@@ -192,9 +186,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithEvaluationCommitter(evaluationCommitter),
-		}
-		if failureGate != nil {
-			engineOptions = append(engineOptions, execute.WithPreExecutionFailureGate(failureGate))
 		}
 		engine := execute.NewEngine(
 			infra.assessmentRepo,
