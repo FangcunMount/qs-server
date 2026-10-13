@@ -33,7 +33,6 @@ func InstallFrom(host InstallHost) error {
 	result, err := Wire(WireInput{
 		MySQLDB:                   host.MySQLDB(),
 		MongoDB:                   host.MongoDB(),
-		EventPublisher:            host.EventPublisher(),
 		RedisClient:               objectRedis,
 		CacheBuilder:              host.CacheBuilder(redisruntime.FamilyObject),
 		CachePolicies:             provider,

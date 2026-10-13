@@ -32,7 +32,6 @@
 //   - factor/: Factor 和共享因子图元数据
 //   - norm/: Norm 和 NormRef
 //   - conclusion/: Risk/Type/Norm/Ability Conclusion
-//   - taskperformance/: cognitive 测量 metadata
 //
 // 深 import 目标领域子包用于机制专用逻辑；跨机制常用读路径类型经 export.go 薄 re-export。
 // 新增机制专用逻辑仍优先落在子包；仅将跨包高频叶子类型提升到根包别名。
@@ -48,5 +47,4 @@
 //   - factor/: 共享因子图元数据
 //   - norm/: 常模资料与引用
 //   - conclusion/: 解释与结果声明
-//   - taskperformance/: cognitive 测量 metadata
 package modelcatalog

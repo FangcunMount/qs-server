@@ -25,13 +25,17 @@ case "${1:-}" in
       echo "fake docker received no Prometheus query" >&2
       exit 2
     fi
+    if [[ "$query" != *qs_evaluation_assessment_intake_legacy_binding_total* ]]; then
+      echo "unexpected retired compatibility metric: $query" >&2
+      exit 2
+    fi
     value=1
     case "$query" in
       count*offset*) value="${FAKE_ANCHOR_SERIES:-1}" ;;
       count*) value="${FAKE_CURRENT_SERIES:-1}" ;;
       *increase*)
         value=0
-        if [ "${FAKE_ACTIVE:-0}" = 1 ] && [[ "$query" == *qs_actor_deprecated_practitioner_route_total* ]]; then
+        if [ "${FAKE_ACTIVE:-0}" = 1 ] && [[ "$query" == *qs_evaluation_assessment_intake_legacy_binding_total* ]]; then
           value=2
         fi
         ;;
@@ -57,19 +61,19 @@ COMMON_ENV=(
 )
 
 zero_output="$(env "${COMMON_ENV[@]}" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$zero_output" | awk -F '\t' '$6 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 6 ]; then
+if [ "$(printf '%s\n' "$zero_output" | awk -F '\t' '$6 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 1 ]; then
   echo "zero-window observation did not classify all compatibility metrics" >&2
   exit 1
 fi
 
 active_output="$(env "${COMMON_ENV[@]}" FAKE_ACTIVE=1 "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if ! printf '%s\n' "$active_output" | grep -Fq $'actor_practitioners\t1\t1\t2\tactive_compatibility'; then
+if ! printf '%s\n' "$active_output" | grep -Fq $'evaluation_legacy_binding\t1\t1\t2\tactive_compatibility'; then
   echo "active compatibility hit was not preserved" >&2
   exit 1
 fi
 
 incomplete_output="$(env "${COMMON_ENV[@]}" FAKE_ANCHOR_SERIES=0 "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$incomplete_output" | awk -F '\t' '$6 == "observation_window_incomplete" {count++} END {print count + 0}')" -ne 6 ]; then
+if [ "$(printf '%s\n' "$incomplete_output" | awk -F '\t' '$6 == "observation_window_incomplete" {count++} END {print count + 0}')" -ne 1 ]; then
   echo "incomplete history was not distinguished from a zero window" >&2
   exit 1
 fi
