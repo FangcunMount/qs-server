@@ -399,22 +399,6 @@ func NewScoreProjectionReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOption
 	}
 }
 
-func (r *scoreReadModel) GetScoreByAssessmentID(ctx context.Context, assessmentID uint64) (*evaluationreadmodel.ScoreRow, error) {
-	var pos []*AssessmentScorePO
-	err := r.WithContext(ctx).
-		Where("assessment_id = ? AND deleted_at IS NULL", assessmentID).
-		Order("is_total_score DESC, factor_code ASC").
-		Find(&pos).Error
-	if err != nil {
-		return nil, err
-	}
-	if len(pos) == 0 {
-		return nil, cberrors.WithCode(code.ErrAssessmentScoreNotFound, "score not found")
-	}
-	row := scorePOsToReadRow(pos)
-	return &row, nil
-}
-
 func (r *scoreReadModel) ListFactorTrend(ctx context.Context, filter evaluationreadmodel.FactorTrendFilter) ([]evaluationreadmodel.ScoreRow, error) {
 	query := buildFactorTrendQuery(r.WithContext(ctx), filter)
 

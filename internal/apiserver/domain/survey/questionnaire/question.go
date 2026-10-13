@@ -397,7 +397,7 @@ func WithValidationRule(ruleType validation.RuleType, targetValue string) Questi
 }
 func WithCalculationRule(formula calculation.FormulaType) QuestionParamsOption {
 	return func(b *QuestionParams) {
-		b.calculationRule = calculation.NewCalculationRule(formula, []string{})
+		b.calculationRule = calculation.NewCalculationRule(formula)
 	}
 }
 func WithShowController(showController *ShowController) QuestionParamsOption {

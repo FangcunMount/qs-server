@@ -12,7 +12,7 @@
 | `ping-runner.yml` | 周期/手动执行目标环境连通与服务探针 | 只证明该时点、该检查项；不证明业务全链和数据一致性 |
 | `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验；不输出凭据 |
 | `attention-reconcile-audit.yml` | 受控 Attention reconciliation 审计 | 不得把 dry-run 自动升级为 apply |
-| `compatibility-observation.yml` | 只读兼容流量/指标观察 | 无指标、零值、无命中和证据缺失必须区分 |
+| `compatibility-observation.yml` | 只读观察仍在用的 Evaluation legacy binding 指标 | 无指标、零值、无命中和证据缺失必须区分 |
 | `authz-production-matrix.yml` | 使用生产主体执行只读 IAM AuthZ v3 精确 12 项矩阵 | 覆盖角色与 origin、缺属性、错误属性类型及 force_retry；IAM 快照复核角色，不写角色或业务数据 |
 | `authz-production-matrix-provision.yml` | 显式创建隔离的 evaluator 与 plan manager 矩阵主体 | 仅手工触发并要求固定确认词；幂等创建无登录凭据/联系方式/外部身份的 IAM 用户及单一角色 assignment，不修改现有用户 |
 

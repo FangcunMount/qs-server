@@ -79,7 +79,7 @@ func toDomainCalculationRule(rule *CalculationRuleDTO) *calculation.CalculationR
 	if rule == nil || rule.FormulaType == "" {
 		return nil
 	}
-	return calculation.NewCalculationRule(calculation.FormulaType(rule.FormulaType), []string{})
+	return calculation.NewCalculationRule(calculation.FormulaType(rule.FormulaType))
 }
 
 func toDomainShowController(controller *ShowControllerDTO) *domainQuestionnaire.ShowController {

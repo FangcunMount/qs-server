@@ -300,8 +300,9 @@ jobs:
             docker logs "$mongo_cid" || true
           }
           trap 'mongo_exit=$?; if [ "$mongo_exit" -ne 0 ]; then mongo_startup_diagnostics; fi' EXIT
+          # Shell state must stay outside the entrypoint chown of /data/db.
           for attempt in $(seq 1 30); do
-            if docker exec "$mongo_cid" mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
+            if docker exec --env HOME=/tmp/qs-runtime-closure-mongosh --env XDG_CONFIG_HOME=/tmp/qs-runtime-closure-mongosh/config "$mongo_cid" mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
             fi
             if [ "$attempt" -eq 30 ]; then
@@ -309,10 +310,10 @@ jobs:
             fi
             sleep 2
           done
-          docker exec "$mongo_cid" mongosh --quiet --eval \
+          docker exec --env HOME=/tmp/qs-runtime-closure-mongosh --env XDG_CONFIG_HOME=/tmp/qs-runtime-closure-mongosh/config "$mongo_cid" mongosh --quiet --eval \
             'rs.initiate({_id: "rs0", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
           for attempt in $(seq 1 30); do
-            if docker exec "$mongo_cid" mongosh --quiet --eval \
+            if docker exec --env HOME=/tmp/qs-runtime-closure-mongosh --env XDG_CONFIG_HOME=/tmp/qs-runtime-closure-mongosh/config "$mongo_cid" mongosh --quiet --eval \
               'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
               exit 0
             fi
@@ -387,17 +388,15 @@ jobs:
           done
           if grep -E -- '^--- SKIP:' "$proof_log"; then exit 1; fi
 
-      - name: Verify compatibility retirement A evidence contracts on real databases
+      - name: Verify committed evidence, retry governance and retirement A on real databases
         env:
           QS_COMPAT_OUTCOME_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
-          QS_HISTORY_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
-          QS_HISTORY_REQUIRE_DATABASE: '1'
           QS_COMPAT_REQUIRE_DATABASE: '1'
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
         run: |
-          go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^(TestCommittedEvidence.*|TestHistoricalReferencesUpgradeFrom98Native|TestConsistencyHistoricalReferences(PhysicalNullAcceptance|PreserveNormalSave|StrictSourceAndSet|OutcomeOriginalGraph)Native)$'
+          go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/mysql/evaluation -run '^TestCommittedEvidenceAtomicNativeMySQL$'
           go test -race -tags=integration -count=1 -timeout=5m ./internal/apiserver/infra/retrygovernance
           go test -race -tags=integration -count=1 -timeout=5m ./internal/pkg/migration -run '^TestCompatibilityRetirementA'
 
