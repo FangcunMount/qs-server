@@ -2471,6 +2471,79 @@
         "Historical suffix/source-tool commits support investigation but cannot independently prove every retained record identity. Preserve legacy governance receipts; do not fill hashes, overwrite Source, re-sign history, rematerialize, or remove models to hide missing metadata.",
         "The original4 asset differences and25 structural-head findings remain separate obligations. Asset matching is not published-snapshot identity acceptance; heads are exempt from snapshot-only hash metadata requirements."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m2-reminder-input-decode",
+      "topics": [
+        "config_secrets"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T16:32:06.969380+00:00",
+      "environment": "production/serverA APIServer inputs; isolated no-network read-only decoder",
+      "deployed_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+      "source_baseline_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Only a fresh replay of current APIServer startup ENV/Cmd/files through the identical App/Options chain was hashed. This is not a running-process memory dump, a proof that files never changed since startup, a credential-file-content hash or a full six-instance effective configuration hash."
+      },
+      "command": "Authorized root SSH: capture PID1 startup ENV and original container Cmd privately, require captured ENV includes all original Config.Env; replay after Clearenv with actual nonroot UID/GID2000 in cached client --network none/--read-only/--cap-drop ALL/--log-driver none. Allow only configuration/TLS/JOSE read-only mounts; skip business logs and QRCode data. App RawSettingsValidate/BindPFlags/Unmarshal/RuntimeConfigContext/Complete/Validate then a hash-only callback; no Log.Init, database client, service assembly or business Run. Intermediate stdout/stderr neither retained nor emitted.",
+      "result": {
+        "status": "passed",
+        "summary": "The current APIServer startup inputs decode task_opened_reminder=false. Completed Options JSON hash captured; exact container identity/start time/compiled ead SHA unchanged. No business runtime or network started. This scoped decode result is not production M2 release or reminder business acceptance.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "decoder_library_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+          "helper_source_sha256": "sha256:a0ebb9fe9e129c22abfe422744ac6f94a7a8f4207100c136c8acb7e7fb9fff4c",
+          "binary_sha256": "sha256:df43a51126239b1febc7da616b30a38c4059b080b0bf6e7e187c83e6a3422c1d",
+          "runner_source_sha256": "sha256:e5fb4b000ea54d7474770939b5bd8b2d9e967963d0781e0a9ff45f09c9fe77ea",
+          "raw_artifact_sha256": "sha256:f8580cb50f4552c42690e35dcda2ff7c7538917b6e6b3329909909a3f2990ac2",
+          "raw_artifact_retention": "Task private artifact qs-server-cleanup-apiserver-current-input-decode.json; credentials/intermediate application logs are absent.",
+          "startup_input_sha256": "sha256:4dfe765b101028ced14b69be674832e6aae068bc055d9ea5549c76981c2cbe11",
+          "post_complete_options_sha256": "sha256:f9e539344181ffc3d95137e5e0b300ec4334a4adbf5963ca91525bc02bb08482",
+          "task_opened_reminder": false,
+          "runtime_user": {
+            "uid": 2000,
+            "gid": 2000,
+            "matched": true
+          },
+          "environment_replay": "exact captured PID1 startup ENV after Clearenv",
+          "decoder_exit_code": 0,
+          "business_runtime_started": false,
+          "network_disabled": true,
+          "runtime_unchanged": true,
+          "app_options_shared_option_bytes_unchanged_across_m3_m1_m2": true,
+          "previous_attempts": [
+            {
+              "status": "refused_before_decoder",
+              "reason": "mount_scope_requires_review",
+              "raw_artifact_sha256": "sha256:73e8556a52b7f874f332392ff4009ad961d345949a703c7a3da94f84214b2aa1"
+            },
+            {
+              "status": "decoder_failed",
+              "reason": "audit UID1001 differs from actual www UID2000; failure was not used as configuration evidence",
+              "raw_artifact_sha256": "sha256:bf2098a1996c65a71fdc85d40a583d99e613800a1a8f7285f00d445ffc82831e"
+            }
+          ]
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#68-后续实施顺序与已批准约束"
+        }
+      ],
+      "limitations": [
+        "This rereads current startup files and captured PID1 startup ENV/container Cmd, not an in-process dump of already-running options. It does not prove files are unchanged since process startup.",
+        "Hash covers JSON of completed APIServer Options; later ApplyTo transformations, referenced credential file contents and other five instances are outside this scope.",
+        "Library source matches M1; options/app/shared option paths are unchanged from M3 and M2. This is not production M2 deployment or reminder delivery acceptance.",
+        "The UID1001 attempt emitted no decoder facts. Its diagnostics were suppressed; the record preserves the identity difference without claiming a proven raw error cause.",
+        "The ordinary service run callback and database/queue/notification clients were excluded; physical MQ settlement and IAM/WeChat real acceptance remain unexecuted."
+      ]
     }
   ]
 }
