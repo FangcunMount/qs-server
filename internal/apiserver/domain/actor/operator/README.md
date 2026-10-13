@@ -4,7 +4,7 @@
 
 `Operator` 是 IAM User 在 QS 业务域中的员工投影，负责本地员工身份、机构归属、联系方式和激活状态。IAM 仍是角色分配与权限授权的唯一事实源。
 
-`staff.roles` 与 `staff.effective_roles` 均保存 IAM 直接角色投影（兼容字段；继承已退役）。两者只用于管理端展示、查询和审计，不参与请求授权判定。
+`operators.roles` 与 `operators.effective_roles` 均保存 IAM 直接角色投影（兼容字段；继承已退役）。两者只用于管理端展示、查询和审计，不参与请求授权判定。
 
 ## 授权边界
 
@@ -17,15 +17,15 @@
 ## 角色投影
 
 ```text
-IAM Assignment
-  -> GetAuthorizationSnapshot
+当前公司 Scoped Assignment
+  -> LoadOperatorRoleProjection
   -> DirectRoles (+ EffectiveRoles 同值) + PolicyVersion
-  -> staff 本地非权威投影
+  -> operators 本地非权威投影
 ```
 
 IAM 提交成功但快照尚未追上提交版本时，员工操作仍返回成功，并把 `authz_projection_pending` 标记为 `true`。投影通过以下路径收敛：
 
-- 当前请求加载到新 Snapshot 时顺带持久化；
+- 当前请求加载到新 Snapshot 时，以策略版本为提示重新读取当前公司的角色投影并持久化；
 - 管理操作提交后主动等待并刷新；
 - apiserver 每 10 分钟在分布式 lease 下扫描 pending 记录并重试。
 

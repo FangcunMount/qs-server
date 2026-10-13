@@ -19,7 +19,7 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - dirty 状态会阻断继续迁移；
 - 当前目录末端版本为 MySQL `100`、MongoDB `39`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
 
-MySQL `99`、MongoDB `38` 增加既有业务记录的有界历史证据槽与相关索引，保留原始事件身份、摘要和核验结论，不保存旧消息正文，也不删除本轮四个旧存储对象。历史回填与删除仍须通过独立的全量核验、生产隔离和恢复门禁；目录升级成功不能代替这些结论。
+MySQL `99`、MongoDB `38` 曾为既有业务记录增加有界历史证据槽与相关索引；历史回填已取消，对应额外证据的读取和核验器也已退出当前源码。历史迁移文件保持原字节，遗留 nullable 字段和索引的后续删除属于独立 schema 退休批次；目录升级成功不能代替生产数据盘点或业务验收。
 
 ## 兼容链退役末尾版本
 
@@ -29,7 +29,7 @@ MySQL `100` 与 MongoDB `39` 是发布 B 的退役收尾。对已安装库，迁
 
 新空库另需 `migration.retirement-bootstrap-authorization-file` 与 `migration.retirement-bootstrap-authorization-sha256` 成对配置：文件为私有绝对路径，摘要为已批准原始字节 SHA256，批准绑定实际编译 SHA、双库身份、末尾资源与有效期。目录为空不构成批准。正常恢复不使用该冷启动批准，也不能靠关闭迁移、down、force 或清除 dirty 绕过配对检查。
 
-四目标备份恢复保留新增业务证据、退休 command ID 与当前 MQ 事实。备份 `Capture` 从已核验的实际 SQL 元数据和 `DATABASE()` 生成并封存 `sql_recovery_non_target_schema_hash`，恢复与该同口径摘要及当前 catalog 比较；库存目录的 `NonTargetHash` 仍保留自身含义，不能替代恢复摘要。旧档案缺少该字段、字段被篡改或 caller 自填摘要，均不能进行 B 恢复；须在删除前重新生成并实际恢复核验本批备份。
+专用备份 `Capture`、恢复摘要生成及 B 恢复核验器已退出当前源码。已完成批次的备份、恢复预算和生产回执保留在独立归档，当前通用迁移器不提供该历史恢复工具接口。
 
 本节是源码契约。生产四对象删除、B 部署及恢复预算仍须独立证明，参见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
 
@@ -39,8 +39,10 @@ MySQL `100` 与 MongoDB `39` 是发布 B 的退役收尾。对已安装库，迁
 internal/pkg/migration/
 ├── migrate.go
 ├── driver.go
-├── mysql_driver.go
-├── mongodb_driver.go
+├── driver_mysql.go
+├── driver_mongo.go
+├── retirement_driver.go
+├── retirement_pair.go
 └── migrations/
     ├── mysql/
     │   ├── 000001_*.up.sql
@@ -143,7 +145,7 @@ QS_APISERVER_MIGRATION_ENABLED=false make run-apiserver
 ]
 ```
 
-支持的操作和约束以 `mongodb_driver.go` 及 [MongoDB migration 说明](migrations/mongodb/README.md)为准，不要凭借 Mongo Shell 语法推断 JSON driver 一定支持。
+支持的操作和约束以 `driver_mongo.go` 及 [MongoDB migration 说明](migrations/mongodb/README.md)为准，不要凭借 Mongo Shell 语法推断 JSON driver 一定支持。
 
 ## 风险分级
 
