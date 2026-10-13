@@ -640,7 +640,54 @@
           "inventory_action_result": "failure: system.profile optional detail unauthorized",
           "mutations_applied": 0,
           "raw_inventory_sha256": "sha256:b09bacaad3a03e43e5efc1bedadbec33f75686457183f49264dd979f310e7263",
-          "raw_inventory_retention": "Task audit artifact qs-server-cleanup-m0-inventory.json; complete technical metadata, no credentials/business bodies. This ledger keeps scoped measurements and inventory names rather than copying every current schema definition."
+          "raw_inventory_retention": "Task audit artifact qs-server-cleanup-m0-inventory.json; complete technical metadata, no credentials/business bodies. This ledger keeps scoped measurements and inventory names rather than copying every current schema definition.",
+          "consumer_observations": {
+            "observed_on": "2026-10-13",
+            "qs_server_sha": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d",
+            "apiserver": {
+              "instances": [
+                "qs-apiserver"
+              ],
+              "compiled_sha_verified": true,
+              "image_digest": "sha256:db786fe6a67a2733b82149b3f1c238379bc97121198e8c8285f85e2b3d1cd4d8"
+            },
+            "collection": {
+              "instances": [
+                "qs-collection-server-1",
+                "qs-collection-server-2"
+              ],
+              "compiled_sha_verified": true,
+              "image_digest": "sha256:6fdf2d758fa5ad72fd37e67f571e4e68d6d4ca4a79921e3b127343fbb5b48fcf"
+            },
+            "worker": {
+              "instances": [
+                "qs-worker-runtime-1",
+                "qs-worker-runtime-2",
+                "qs-worker-runtime-3"
+              ],
+              "compiled_sha_verified": true,
+              "image_digest": "sha256:e7c5b3a90c6125eaac5a8b849811cfd0e82a8ecc3250ae44201f59a15cfa3d81",
+              "readyz_passed_instances": 3
+            },
+            "iam": {
+              "compiled_sha": "c8fc1fe61a32056368148e232e96d32763c15ba5",
+              "image_digest": "sha256:592a4051a8ba2982df55d47c9b82c759f2d85f728ce4a3825fd5b083338e1945"
+            },
+            "qs_ai": {
+              "oci_revision": "7c71d1e95500aa20c3d82f57a7304578c8a794dd",
+              "release_env_matches": true,
+              "image_digest": "sha256:e511347af54ea85d6b360f8b6cc89f02eb81f474977871739129a7cf702c2fa8"
+            },
+            "web": {
+              "oci_revision": "1c413e53eb02da25608d92b2d193404fd18eed12",
+              "image_digest": "sha256:0f56b750f350e6d3598aa3c36560889f54cd72b07d986f8424718db51a0e3d7e"
+            },
+            "mini_program": {
+              "release_commit": "ebefc00b07c19a90cdadf14f7fae19c7616e7bb1",
+              "evidence": "explicit user release confirmation; source checked, actual device behavior not attested"
+            },
+            "limitation": "These are version/health observations of the starting deployment, not successful business effects, compatibility-flow coverage or cleanup release acceptance."
+          }
         }
       },
       "owner": "infra",
@@ -661,7 +708,7 @@
         "Source audit candidates still require external consumer proof, scoped backup and isolated restoration, unresolved responsibility inventory and a reviewed release batch.",
         "No system.profile administrator permission was acquired. The failed bounded outcome JSON count is unknown; it is not zero.",
         "Stored Definition fields are present in 81 records; pure projection equality has not been audited. All AnswerSheets having admission does not establish no pending, held, dead-letter or replayable legacy input.",
-        "This observes the starting deployed version, not M1/M2/M3/M5/M7 artifacts. Worker instances and complete effective configuration are not bound here."
+        "This observes the starting deployed version, not cleanup artifacts. All six QS service binaries/images are bound separately; full effective configuration, consumer traffic and business effects are not bound."
       ]
     }
   ]
