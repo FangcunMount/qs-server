@@ -32,8 +32,19 @@ func NewLifecycleService(
 	tx apptransaction.Runner,
 	eventPublisher event.EventPublisher,
 ) (PlanLifecycleService, error) {
-	if planRepo == nil || taskRepo == nil || scaleCatalog == nil || enrollments == nil || tx == nil || eventPublisher == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "plan lifecycle requires plan, task, scale, enrollment, transaction and event dependencies")
+	switch {
+	case planRepo == nil:
+		return nil, missingPlanDependency("plan lifecycle", "plan repository")
+	case taskRepo == nil:
+		return nil, missingPlanDependency("plan lifecycle", "task repository")
+	case scaleCatalog == nil:
+		return nil, missingPlanDependency("plan lifecycle", "scale catalog")
+	case enrollments == nil:
+		return nil, missingPlanDependency("plan lifecycle", "enrollment repository")
+	case tx == nil:
+		return nil, missingPlanDependency("plan lifecycle", "transaction runner")
+	case eventPublisher == nil:
+		return nil, missingPlanDependency("plan lifecycle", "event publisher")
 	}
 	taskGenerator := plan.NewTaskGenerator()
 	taskLifecycle := plan.NewTaskLifecycle()

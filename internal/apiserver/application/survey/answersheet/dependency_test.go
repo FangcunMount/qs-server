@@ -2,6 +2,8 @@ package answersheet
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,8 +73,18 @@ func TestSubmissionReadinessRequiresCompletePortsAfterComposition(t *testing.T) 
 		t.Run(name, func(t *testing.T) {
 			s := ready()
 			remove(s)
-			if err := s.ValidateReadiness(); !errors.IsCode(err, code.ErrModuleInitializationFailed) {
+			err := s.ValidateReadiness()
+			if !errors.IsCode(err, code.ErrModuleInitializationFailed) {
 				t.Fatalf("missing %s: %v", name, err)
+			}
+			dependency := map[string]string{
+				"repository": "answer sheet repository", "reader": "answer sheet reader",
+				"questionnaire": "questionnaire repository", "durable writer": "durable writer",
+				"binding": "assessment binding resolver", "attribution": "attribution resolver",
+				"answering start": "answering start resolver",
+			}[name]
+			if !strings.Contains(fmt.Sprintf("%-v", err), dependency+" is required") {
+				t.Fatalf("missing %s must be individually identified: %v", dependency, err)
 			}
 		})
 	}

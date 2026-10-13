@@ -2,6 +2,8 @@ package plan
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,8 +130,17 @@ func TestTaskConstructorsRejectMissingRequiredDependencies(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := create(); !componenterrors.IsCode(err, code.ErrModuleInitializationFailed) {
+			err := create()
+			if !componenterrors.IsCode(err, code.ErrModuleInitializationFailed) {
 				t.Fatalf("missing dependency: %v", err)
+			}
+			parts := strings.Fields(name)
+			dependency := map[string]string{
+				"task": "task repository", "plan": "plan repository",
+				"enrollment": "enrollment repository", "transaction": "transaction runner",
+			}[parts[len(parts)-1]]
+			if dependency == "" || !strings.Contains(fmt.Sprintf("%-v", err), dependency+" is required") {
+				t.Fatalf("missing %s must be individually identified: %v", dependency, err)
 			}
 		})
 	}

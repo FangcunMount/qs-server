@@ -2,6 +2,8 @@ package plan
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,7 +51,8 @@ func TestReminderProducerEnabledRequiresOutboxAtConstruction(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := create(); !componenterrors.IsCode(err, code.ErrModuleInitializationFailed) {
+			err := create()
+			if !componenterrors.IsCode(err, code.ErrModuleInitializationFailed) || !strings.Contains(fmt.Sprintf("%-v", err), "MySQL outbox stager is required") {
 				t.Fatalf("enabled reminder lacks outbox: %v", err)
 			}
 		})

@@ -45,8 +45,13 @@ type taskEntryResolver struct {
 }
 
 func NewTaskEntryResolver(tasks taskEntryFinder, scales ScaleCatalog, enrollments domainplan.EnrollmentRepository) (TaskEntryResolver, error) {
-	if tasks == nil || scales == nil || enrollments == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "task entry requires task, scale and enrollment dependencies")
+	switch {
+	case tasks == nil:
+		return nil, missingPlanDependency("task entry", "task repository")
+	case scales == nil:
+		return nil, missingPlanDependency("task entry", "scale catalog")
+	case enrollments == nil:
+		return nil, missingPlanDependency("task entry", "enrollment repository")
 	}
 	return &taskEntryResolver{tasks: tasks, scales: scales, now: time.Now, enrollments: enrollments}, nil
 }

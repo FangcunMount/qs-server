@@ -59,17 +59,17 @@ func (s *catalogBindingSyncer) IsQuestionnaireBound(ctx context.Context, questio
 
 func (s *catalogBindingSyncer) validateReadiness() error {
 	if s == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog management is not configured")
+		return missingApplicationService("questionnaire catalog management")
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.management == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog management is not configured")
+		return missingApplicationService("questionnaire catalog management")
 	}
 	if _, ok := s.management.(interface {
 		IsQuestionnaireBound(context.Context, string) (bool, error)
 	}); !ok {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog binding reader is not configured")
+		return missingApplicationService("questionnaire catalog binding reader")
 	}
 	return nil
 }

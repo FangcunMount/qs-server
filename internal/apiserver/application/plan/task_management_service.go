@@ -37,8 +37,8 @@ func NewTaskManagementService(
 	eventPublisher event.EventPublisher,
 	openingOptions TaskOpeningOptions,
 ) (TaskManagementService, error) {
-	if taskRepo == nil || planRepo == nil || enrollmentRepo == nil || txRunner == nil || entryGenerator == nil || eventPublisher == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "plan task service requires task, plan, enrollment, transaction, entry and event dependencies")
+	if err := validateTaskServiceDependencies("plan task management", taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, eventPublisher); err != nil {
+		return nil, err
 	}
 	if err := openingOptions.validate(); err != nil {
 		return nil, err

@@ -3,6 +3,8 @@ package survey
 import (
 	"context"
 	stderrors "errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -110,5 +112,41 @@ func TestSurveyReadinessRunsAfterLateBindingAndExcludesOptionalServices(t *testi
 	m.AnsweringStart = nil
 	if err := m.ValidateReadiness(); !errors.IsCode(err, code.ErrModuleInitializationFailed) {
 		t.Fatalf("missing answering start: %v", err)
+	}
+}
+
+func TestSurveyReadinessIdentifiesMissingApplicationService(t *testing.T) {
+	for name, remove := range map[string]func(*Module){
+		"questionnaire module":            func(m *Module) { m.Questionnaire = nil },
+		"answer sheet module":             func(m *Module) { m.AnswerSheet = nil },
+		"answering start service":         func(m *Module) { m.AnsweringStart = nil },
+		"questionnaire lifecycle service": func(m *Module) { m.Questionnaire.LifecycleService = nil },
+		"questionnaire content service":   func(m *Module) { m.Questionnaire.ContentService = nil },
+		"questionnaire query service":     func(m *Module) { m.Questionnaire.QueryService = nil },
+		"answer sheet submission service": func(m *Module) { m.AnswerSheet.SubmissionService = nil },
+		"answer sheet management service": func(m *Module) { m.AnswerSheet.ManagementService = nil },
+		"answer sheet scoring service":    func(m *Module) { m.AnswerSheet.ScoringService = nil },
+		"questionnaire catalog management": func(m *Module) {
+			m.bindingSyncer.SetCatalogManagementService(nil)
+		},
+		"questionnaire catalog binding reader": func(m *Module) {
+			m.bindingSyncer.SetCatalogManagementService(struct {
+				modelcatalog.CatalogManagementService
+			}{})
+		},
+		"submission readiness validator": func(m *Module) {
+			m.AnswerSheet.SubmissionService = struct {
+				asapp.AnswerSheetSubmissionService
+			}{}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := readySurveyFixture()
+			remove(m)
+			err := m.ValidateReadiness()
+			if !errors.IsCode(err, code.ErrModuleInitializationFailed) || !strings.Contains(fmt.Sprintf("%-v", err), name+" is not configured") {
+				t.Fatalf("missing service must be individually identified: %v", err)
+			}
+		})
 	}
 }

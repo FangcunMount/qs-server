@@ -40,8 +40,8 @@ func NewTaskSchedulerService(
 	eventPublisher event.EventPublisher,
 	openingOptions TaskOpeningOptions,
 ) (TaskSchedulerService, error) {
-	if taskRepo == nil || planRepo == nil || enrollmentRepo == nil || txRunner == nil || entryGenerator == nil || eventPublisher == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "plan task service requires task, plan, enrollment, transaction, entry and event dependencies")
+	if err := validateTaskServiceDependencies("plan task scheduler", taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, eventPublisher); err != nil {
+		return nil, err
 	}
 	if err := openingOptions.validate(); err != nil {
 		return nil, err

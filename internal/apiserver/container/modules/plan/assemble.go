@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"strings"
 
 	"gorm.io/gorm"
@@ -8,6 +9,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -88,7 +90,7 @@ func New(deps Deps) (*Module, error) {
 
 	lifecycleEnrollments, ok := enrollmentRepo.(planDomain.PlanEnrollmentLifecycleRepository)
 	if !ok {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "enrollment repository lacks lifecycle transitions")
+		return nil, missingModuleDependency("enrollment lifecycle transitions")
 	}
 	lifecycleService, err := planApp.NewLifecycleService(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
 	if err != nil {
@@ -129,10 +131,10 @@ func New(deps Deps) (*Module, error) {
 
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+		return Deps{}, missingModuleDependency("MySQL database")
 	}
 	if deps.PublishedModels == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "published model catalog is required")
+		return Deps{}, missingModuleDependency("published model catalog")
 	}
 
 	if deps.EventPublisher == nil {
@@ -144,6 +146,11 @@ func normalizeDeps(deps Deps) (Deps, error) {
 		deps.EntryBaseURL = strings.TrimSpace(deps.EntryBaseURL)
 	}
 	return deps, nil
+}
+
+func missingModuleDependency(dependency string) error {
+	logger.L(context.Background()).Errorw("required Plan module dependency is missing", "dependency", dependency)
+	return errors.WithCode(code.ErrModuleInitializationFailed, "plan module: %s is required", dependency)
 }
 
 // Cleanup releases module resources.
