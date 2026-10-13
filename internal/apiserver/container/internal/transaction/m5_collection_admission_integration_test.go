@@ -29,6 +29,7 @@ import (
 	collectionacl "github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	servergrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -94,6 +95,10 @@ func (m5ReceiptQuestionnaireReader) Get(context.Context, string, string) (*colle
 type m5ReceiptStager struct {
 	inner *mongostandard.Stager
 	fail  atomic.Bool
+}
+
+func (s *m5ReceiptStager) PrepareReference(evt event.DomainEvent) (evidence.StandardReference, error) {
+	return s.inner.PrepareReference(evt)
 }
 
 func (s *m5ReceiptStager) Stage(ctx context.Context, events ...event.DomainEvent) error {

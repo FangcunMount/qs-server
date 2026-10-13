@@ -41,7 +41,6 @@ import (
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -69,8 +68,6 @@ type Deps struct {
 	MySQLDB                    *gorm.DB
 	MongoDB                    *mongo.Database
 	InputResolver              evaluationinput.Resolver
-	ScaleCatalog               evaluationinput.ScaleCatalog
-	EventPublisher             event.EventPublisher
 	RedisClient                redis.UniversalClient
 	CacheBuilder               *keyspace.Builder
 	CachePolicies              sharedcache.PolicyProvider
@@ -251,9 +248,6 @@ func (m *Module) wireScheduler(infra *evaluationInfra) {
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
-	}
-	if deps.EventPublisher == nil {
-		deps.EventPublisher = event.NewNopEventPublisher()
 	}
 	if deps.InputResolver != nil {
 		if len(deps.ExecutionPaths) == 0 {
