@@ -1,10 +1,10 @@
 // audit_norm_usage is a read-only reverse-reference inventory for Norm assets
 // (MC-R020 slice A). Published AssessmentSnapshot NormRefs are the usage
 // source of truth; Norm aggregates are never mutated.
+// --definition-projections audits all retained Definition layers against their
+// pure canonical projections. Its bounds and exit codes are documented in README.
 //
-// Exit 0: scan OK and no dangling refs.
-// Exit 1: connect/scan failure.
-// Exit 2: scan OK but dangling NormRefs found.
+// Norm usage exit 0: no dangling refs; exit 1: scan failure; exit 2: dangling refs.
 package main
 
 import (
@@ -25,11 +25,16 @@ import (
 )
 
 type config struct {
-	mongoURI    string
-	mongoDB     string
-	normVersion string
-	jsonOut     bool
-	timeout     time.Duration
+	mongoURI              string
+	mongoDB               string
+	normVersion           string
+	jsonOut               bool
+	timeout               time.Duration
+	definitionProjections bool
+	privateConfig         string
+	batchSize             int
+	maxRecords            int64
+	uriFromFlag           bool
 }
 
 type snapshotRef struct {
@@ -131,6 +136,9 @@ type normDoc struct {
 
 func main() {
 	cfg := parseFlags()
+	if cfg.definitionProjections {
+		os.Exit(runDefinitionProjectionAudit(cfg, os.Stdout))
+	}
 	if cfg.mongoURI == "" {
 		fmt.Fprintln(os.Stderr, "audit norm usage failed: --mongo-uri is required (or set MONGO_URI)")
 		os.Exit(1)
@@ -165,12 +173,25 @@ func main() {
 
 func parseFlags() config {
 	var cfg config
-	flag.StringVar(&cfg.mongoURI, "mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI")
+	// Read the environment after parsing so --help never prints a secret URI.
+	flag.StringVar(&cfg.mongoURI, "mongo-uri", "", "MongoDB URI (credentials must use environment/private config for projection audit)")
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs_server"), "MongoDB database")
 	flag.StringVar(&cfg.normVersion, "norm-version", "", "only report usage for this NormTableVersion")
 	flag.BoolVar(&cfg.jsonOut, "json", false, "emit JSON report")
 	flag.DurationVar(&cfg.timeout, "timeout", 5*time.Minute, "operation timeout")
+	flag.BoolVar(&cfg.definitionProjections, "definition-projections", false, "read-only bounded audit of all stored Definition projections, including retained history")
+	flag.StringVar(&cfg.privateConfig, "private-config", "", "private JSON connection file; projection audit only")
+	flag.IntVar(&cfg.batchSize, "batch-size", 100, "projection audit cursor batch size (1-1000)")
+	flag.Int64Var(&cfg.maxRecords, "max-records", 10000, "projection audit maximum records (1-100000)")
 	flag.Parse()
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "mongo-uri" {
+			cfg.uriFromFlag = true
+		}
+	})
+	if !cfg.uriFromFlag {
+		cfg.mongoURI = os.Getenv("MONGO_URI")
+	}
 	return cfg
 }
 
