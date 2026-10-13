@@ -44,7 +44,7 @@ func TestProbeNeverTouchesDirectRecoveryOtherIdentityOrExpiredWindow(t *testing.
 	store := &failingClaimStore{}
 	p := &failureProbe{QRCodeService: qr, claims: store, scope: testScope(now), now: func() time.Time { return now }}
 	ctx := context.Background()
-	marked := app.WithPublishedPostAction(ctx)
+	marked := withPublishedPostAction(ctx)
 	for _, c := range []struct {
 		ctx           context.Context
 		code, version string
@@ -67,7 +67,7 @@ func TestProbeClaimsBeforeExternalCallAndDoesNotSwallowStoreFailure(t *testing.T
 	qr := &recordingQR{}
 	store := &failingClaimStore{}
 	p := &failureProbe{QRCodeService: qr, claims: store, scope: testScope(now), now: func() time.Time { return now }}
-	ctx := app.WithPublishedPostAction(context.Background())
+	ctx := withPublishedPostAction(context.Background())
 	if _, err := p.GenerateQuestionnaireQRCode(ctx, "test-qr", "v1"); err == nil || qr.calls != 0 {
 		t.Fatal("injected failure must occur before external call")
 	}

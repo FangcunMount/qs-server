@@ -62,7 +62,7 @@ func TestQRProbeRestartProcess(t *testing.T) {
 		claims := db.Collection("qrcode_acceptance_failure_claims")
 		now := time.Now()
 		qr := &concurrentQR{}
-		ctx := app.WithPublishedPostAction(t.Context())
+		ctx := withPublishedPostAction(t.Context())
 		const contenders = 32
 		for _, kind := range []string{"questionnaire", "scale"} {
 			var wg sync.WaitGroup
@@ -103,7 +103,7 @@ func TestQRProbeRestartProcess(t *testing.T) {
 	}
 	qr := &concurrentQR{}
 	probe := &failureProbe{QRCodeService: qr, claims: db.Collection("qrcode_acceptance_failure_claims"), scope: scope, now: time.Now}
-	ctx := app.WithPublishedPostAction(t.Context())
+	ctx := withPublishedPostAction(t.Context())
 	if _, err := probe.GenerateQuestionnaireQRCode(ctx, "test-qr", "v1"); err != nil {
 		t.Fatal(err)
 	}

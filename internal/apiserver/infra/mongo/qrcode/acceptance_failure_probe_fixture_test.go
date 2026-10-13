@@ -38,7 +38,7 @@ type failureProbe struct {
 // failureProbe is a test-only durable fault fixture. Production QR wiring uses the ordinary optional service.
 func (p *failureProbe) before(ctx context.Context, kind, code, version string) error {
 	now := p.now()
-	if !app.IsPublishedPostAction(ctx) || now.Before(p.scope.StartsAt) || !now.Before(p.scope.ExpiresAt) {
+	if !isPublishedPostAction(ctx) || now.Before(p.scope.StartsAt) || !now.Before(p.scope.ExpiresAt) {
 		return nil
 	}
 	for _, target := range p.scope.Targets {
@@ -68,4 +68,17 @@ func (p *failureProbe) GenerateScaleQRCode(ctx context.Context, code string) (st
 		return "", err
 	}
 	return p.QRCodeService.GenerateScaleQRCode(ctx, code)
+}
+
+// A test-only marker scopes the durable fault fixture; normal service callers
+// carry only their existing request context.
+type publishedPostActionKey struct{}
+
+func withPublishedPostAction(ctx context.Context) context.Context {
+	return context.WithValue(ctx, publishedPostActionKey{}, true)
+}
+
+func isPublishedPostAction(ctx context.Context) bool {
+	marked, _ := ctx.Value(publishedPostActionKey{}).(bool)
+	return marked
 }
