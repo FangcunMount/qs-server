@@ -390,7 +390,8 @@ jobs:
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m4_index_ci_test
         run: |
           set -euo pipefail
-          export QS_M4_AUTH_PASSWORD="$(openssl rand -hex 24)"
+          QS_M4_AUTH_PASSWORD="$(openssl rand -hex 24)"
+          export QS_M4_AUTH_PASSWORD
           echo "::add-mask::${QS_M4_AUTH_PASSWORD}"
           auth_cid="$(docker run --detach \
             --name qs-m4-index-auth --label qs.cleanup.owner=m4-index-ci \
@@ -418,7 +419,10 @@ jobs:
             fi
             sleep 1
           done
-          [ "$ready" = true ]
+          if [ "$ready" != true ]; then
+            echo "Owned auth fixture initialization failed after ${attempt} attempts" >&2
+            exit 1
+          fi
           ready=false
           for attempt in $(seq 1 60); do
             if auth_shell 'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
@@ -427,7 +431,10 @@ jobs:
             fi
             sleep 1
           done
-          [ "$ready" = true ]
+          if [ "$ready" != true ]; then
+            echo "Owned auth fixture primary unavailable after ${attempt} attempts" >&2
+            exit 1
+          fi
           auth_shell 'print(db.version())'
           export QS_M4_TEST_MONGO_AUTH_CONFIG="${RUNNER_TEMP}/qs-m4-auth-config.json"
           python3 - <<'PYCONFIG'
