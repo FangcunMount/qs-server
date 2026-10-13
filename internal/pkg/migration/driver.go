@@ -1,7 +1,7 @@
 package migration
 
 import (
-	"embed"
+	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
 )
@@ -21,5 +21,5 @@ type Driver interface {
 	SourcePath() string
 
 	// CreateInstance creates a migrate.Migrate instance for this driver.
-	CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error)
+	CreateInstance(source fs.FS, config *Config) (*migrate.Migrate, error)
 }

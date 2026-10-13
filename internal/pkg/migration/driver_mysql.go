@@ -2,8 +2,8 @@ package migration
 
 import (
 	"database/sql"
-	"embed"
 	"fmt"
+	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
@@ -25,7 +25,7 @@ func NewMySQLDriver(db *sql.DB) *MySQLDriver {
 }
 
 // CreateInstance creates a migrate.Migrate instance for MySQL.
-func (d *MySQLDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error) {
+func (d *MySQLDriver) CreateInstance(source fs.FS, config *Config) (*migrate.Migrate, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("mysql: database connection is nil")
 	}
@@ -54,7 +54,7 @@ func (d *MySQLDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migr
 		closeErr := d.finishRun()
 		return nil, fmt.Errorf("mysql: failed to create database driver: %w (close: %v)", err, closeErr)
 	}
-	instance, err := d.createInstance(fs, newRetirementDatabaseDriver(databaseDriver, BackendMySQL, config, conn, nil, fs))
+	instance, err := d.createInstance(source, newRetirementDatabaseDriver(databaseDriver, BackendMySQL, config, conn, nil, source))
 	if err != nil {
 		closeErr := d.finishRun()
 		return nil, fmt.Errorf("mysql: create migration instance: %w (close: %v)", err, closeErr)
