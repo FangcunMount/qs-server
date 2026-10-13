@@ -106,14 +106,12 @@ def api(endpoint, parameters=None):
     return payload["data"]
 
 
-def query(expression, start=None, end=None, step=None):
+def query(expression, end=None):
     parameters = {"query": expression}
-    endpoint = "query"
-    if start is not None:
-        endpoint = "query_range"
-        parameters.update(start=start, end=end, step=step)
-    data = api(endpoint, parameters)
-    if data.get("resultType") != ("matrix" if start is not None else "vector"):
+    if end is not None:
+        parameters["time"] = end
+    data = api("query", parameters)
+    if data.get("resultType") != "vector":
         fail("unexpected Prometheus result type")
     return data["result"]
 
@@ -147,29 +145,201 @@ def exact_values(values, expected_value, description):
         fail(description)
 
 
-def check_continuity(expression, expected, count, start, end, step):
-    # Prometheus limits query_range points per series. Six-hour chunks retain
-    # the actual scrape cadence and bound both request size and memory.
-    cursor = start
-    span = (21600 // step) * step
-    while cursor <= end:
-        chunk_end = min(cursor + span, end)
-        series = keyed(query(expression, cursor, chunk_end, step), expected)
-        size = (chunk_end - cursor) // step + 1
-        for item in series.values():
-            samples = item["values"]
-            if len(samples) != size:
-                fail("observation history incomplete or disappeared within the window")
-            for index, (timestamp, value) in enumerate(samples):
-                if abs(finite(timestamp) - (cursor + index * step)) > 0.01 or finite(value) != count:
-                    fail("scrape/source/series coverage gap within the observation window")
-        cursor += span + step
+# These fixed combinations mirror the existing bounded producer registration.
+def family_combinations(metric, source):
+    if metric.endswith("_compatibility_observation_info"):
+        return [{"source_sha": source, "capability": "1"}]
+    if metric == "qs_auth_token_source_total":
+        return [dict(source=s, result=r) for s in ("bearer", "bare", "query", "cookie", "missing", "unavailable") for r in ("accepted", "rejected")]
+    if metric == "qs_auth_claim_source_total":
+        return [dict(field=f, source=s) for f, sources in {
+            "user_id": ("canonical", "missing", "extra_user_id", "extra_uid", "extra_sub"),
+            "account_id": ("canonical", "missing", "extra_account_id", "extra_accountId", "extra_aid"),
+            "org_id": ("canonical", "missing", "extra_org_id", "extra_organization_id")}.items() for s in sources]
+    if metric == "qs_plan_entry_route_total":
+        return [dict(route=r, result=s) for r in ("canonical", "legacy_token") for s in ("accepted", "rejected")]
+    if metric == "qs_model_definition_write_total":
+        return [dict(input=i, result=r) for i in ("canonical", "derived", "unreadable") for r in ("accepted", "rejected")]
+    if metric == "qs_model_definition_input_field_total":
+        return [dict(field=f, presence=p, result=r) for f in ("DecisionSpec", "InterpretationAssets") for p in ("present", "absent", "unreadable") for r in ("accepted", "rejected")]
+    fail("unexpected raw metric family")
+
+
+def traffic_contract(metric, labels):
+    if metric == "qs_auth_token_source_total":
+        if labels["source"] == "bare": return "bare_authorization", True
+        if labels["source"] == "bearer" and labels["result"] == "accepted": return "bearer", False
+    if metric == "qs_auth_claim_source_total":
+        if labels["source"].startswith("extra_"): return "claims_extra", True
+        if labels["source"] == "canonical" and labels["field"] in ("user_id", "account_id"): return labels["field"], False
+        if labels["field"] == "org_id" and labels["source"] in ("canonical", "missing"): return "org_id", False
+    if metric == "qs_plan_entry_route_total":
+        if labels["route"] == "legacy_token": return "task_token_route", True
+        if labels["result"] == "accepted": return "task", False
+    if metric == "qs_model_definition_write_total":
+        if labels["input"] == "unreadable": return "definition_unreadable", True
+        if labels["input"] == "derived": return "definition_derived_input", True
+        if labels["input"] == "canonical" and labels["result"] == "accepted": return "definition", False
+    if metric == "qs_model_definition_input_field_total" and labels["presence"] == "unreadable":
+        return "definition_unreadable", True
+    return None, False
+
+
+def raw_points(item, begin, end):
+    result = []
+    previous = None
+    begin_stamp, end_stamp = round(begin * 1000), round(end * 1000)
+    for timestamp, value in item["values"]:
+        stamp = round(finite(timestamp) * 1000)
+        value = finite(value)
+        if previous is not None and stamp <= previous:
+            fail("duplicate or out-of-order raw scrape sample")
+        previous = stamp
+        if begin_stamp <= stamp <= end_stamp:
+            result.append((stamp, value))
+    if not result:
+        fail("raw scrape samples absent; absence is not zero")
+    return result
+
+
+def audit_raw_chunk(up_rows, family_rows, cadence, t0, end, source, state, close=False, window_end=None):
+    """Validate only actual retained samples; state keeps bounded seam evidence."""
+    timelines = state.setdefault("up", {})
+    last = state.setdefault("last", {})
+    recent = state.setdefault("recent", {})
+    traffic = state.setdefault("traffic", set())
+    boundary = state.setdefault("boundary", set())
+    fixed_labels = state.setdefault("labels", {})
+    begins = {key: t0 - 2 * interval - min(1.0, interval / 10) for key, interval in cadence.items()}
+    window_end = end if window_end is None else window_end
+    bounds = {}
+    up_samples = {}
+    for key, row in keyed(up_rows, set(cadence)).items():
+        interval = cadence[key]
+        jitter = min(1.0, interval / 10)
+        bound = end
+        if close:
+            closing = [finite(ts) for ts, _ in row["values"] if finite(ts) > window_end]
+            if not closing: fail("first post-end scrape closing bracket is missing")
+            bound = min(closing)
+        bounds[key] = bound
+        points = raw_points(row, begins[key], bound)
+        timeline = timelines.setdefault(key, {"last": None, "recent": {}, "baseline": set()})
+        all_labels = tuple(sorted(row["metric"].items()))
+        if timeline.setdefault("labels", all_labels) != all_labels:
+            fail("complete raw up label set changed across chunks")
+        for stamp, value in points:
+            if value != 1:
+                fail("an actual target scrape was not up")
+            if stamp / 1000 <= t0: timeline["baseline"].add(stamp)
+            if stamp in timeline["recent"]:
+                if timeline["recent"][stamp] != value: fail("overlap up sample changed")
+                continue
+            if timeline["last"] is None:
+                timeline.update(slot=0, low=stamp / 1000 - jitter, high=stamp / 1000 + jitter)
+            else:
+                if stamp <= timeline["last"]: fail("unverifiable overlap up sample")
+                phase = (timeline["low"] + timeline["high"]) / 2
+                slot = round((stamp / 1000 - phase) / interval)
+                if slot != timeline["slot"] + 1: fail("an actual scrape cadence slot is missing or duplicated")
+                timeline["low"] = max(timeline["low"], stamp / 1000 - slot * interval - jitter)
+                timeline["high"] = min(timeline["high"], stamp / 1000 - slot * interval + jitter)
+                if timeline["low"] > timeline["high"]: fail("actual scrape jitter exceeds the bounded phase contract")
+                timeline["slot"] = slot
+            timeline["last"] = stamp
+            timeline["recent"][stamp] = value
+        if len(timeline["baseline"]) < 2:
+            fail("two successful actual baseline scrapes before T0 are required")
+        if not close and timeline["high"] + (timeline["slot"] + 1) * interval < end - 0.001:
+            fail("the last expected scrape slot before the fixed end is missing")
+        up_samples[key] = points
+        timeline["recent"] = {ts: v for ts, v in timeline["recent"].items() if ts >= (end - 2 * max(cadence.values()) - 2) * 1000}
+    metrics = ("qs_auth_compatibility_observation_info", "qs_plan_entry_compatibility_observation_info", "qs_definition_compatibility_observation_info", "qs_auth_token_source_total", "qs_auth_claim_source_total", "qs_plan_entry_route_total", "qs_model_definition_write_total", "qs_model_definition_input_field_total")
+    if set(family_rows) != set(metrics): fail("fixed raw metric family inventory differs")
+    for metric in metrics:
+        expected = {key for key in cadence if ("plan_entry" not in metric or key[0] == "qs-collection-server") and ("definition" not in metric or key[0] == "qs-apiserver")}
+        combinations = [tuple(sorted(combo.items())) for combo in family_combinations(metric, source)]
+        dimensions = set(dict(combinations[0]))
+        rows = {}
+        for item in family_rows[metric]:
+            labels = item["metric"]
+            key = (labels.get("job"), labels.get("instance"))
+            combo = tuple(sorted((name, labels.get(name)) for name in dimensions))
+            identity = (key, combo)
+            if key not in expected or combo not in combinations or identity in rows:
+                fail("raw source or fixed label combination missing, duplicate or unexpected")
+            rows[identity] = item
+        required = {(key, combo) for key in expected for combo in combinations}
+        if set(rows) != required: fail("raw fixed label combination inventory incomplete")
+        info = metric.endswith("_compatibility_observation_info")
+        for (key, combo), item in rows.items():
+            points = raw_points(item, begins[key], bounds[key])
+            if [ts for ts, _ in points] != [ts for ts, _ in up_samples[key]]:
+                fail("a fixed source/counter sample is missing at an actual up scrape timestamp")
+            identity = (metric, key, combo)
+            all_labels = tuple(sorted(item["metric"].items()))
+            if fixed_labels.setdefault(identity, all_labels) != all_labels:
+                fail("complete raw series label set changed across chunks")
+            cache = recent.setdefault(identity, {})
+            for stamp, value in points:
+                if info and value != 1: fail("compiled source capability changed within the window")
+                if not info and not 0 <= value < 2 ** 53: fail("counter value cannot safely prove unit increments")
+                if stamp in cache:
+                    if cache[stamp] != value: fail("overlap counter sample changed")
+                    continue
+                previous = last.get(identity)
+                if previous is not None:
+                    if stamp <= previous[0]: fail("unverifiable overlap counter sample")
+                    if not info and value < previous[1]: fail("counter reset within baseline/window; cannot classify as zero")
+                    contract, legacy = traffic_contract(metric, dict(combo))
+                    if contract and value > previous[1] and (legacy or (previous[0] / 1000 >= t0 and stamp / 1000 <= window_end)):
+                        traffic.add((contract, key))
+                        if legacy and (previous[0] / 1000 < t0 or stamp / 1000 > window_end): boundary.add((contract, key))
+                last[identity] = (stamp, value)
+                cache[stamp] = value
+            recent[identity] = {ts: v for ts, v in cache.items() if ts >= (end - 2 * max(cadence.values()) - 2) * 1000}
+
+
+def raw_query(selector, begin, end):
+    # Instant range vectors return retained sample timestamps, not an evaluation
+    # grid filled by lookback. One extra second includes the left boundary.
+    duration = math.ceil(end - begin) + 1
+    data = api("query", {"query": selector + "[" + str(duration) + "s]", "time": end})
+    if data.get("resultType") != "matrix": fail("raw Prometheus matrix unavailable")
+    return data["result"]
+
+
+def check_raw_window(selectors, cadence, start, end, source):
+    state = {}
+    overlap = max(cadence.values())
+    cursor = start - 2 * overlap - 1
+    while cursor < end:
+        chunk_end = min(cursor + 21600, end)
+        begin = cursor - overlap
+        up = raw_query('up{job=~"qs-apiserver|qs-collection-server"}', begin, chunk_end)
+        families = {metric: raw_query(selector, begin, chunk_end) for metric, selector in selectors.items()}
+        audit_raw_chunk(up, families, cadence, start, chunk_end, source, state, window_end=end)
+        cursor = chunk_end
+    # Logical E never moves. After the historical scan, read a separate fixed
+    # closing snapshot and require the first real post-E sample for every child.
+    # Boundary legacy growth is conservatively active, never a zero candidate.
+    closing_end = time.time()
+    if closing_end <= end: fail("post-end closing snapshot unavailable")
+    if closing_end - end > 21600 - overlap:
+        fail("historical audit exceeded the bounded closing read; window remains incomplete")
+    begin = end - 2 * overlap
+    up = raw_query('up{job=~"qs-apiserver|qs-collection-server"}', begin, closing_end)
+    families = {metric: raw_query(selector, begin, closing_end) for metric, selector in selectors.items()}
+    audit_raw_chunk(up, families, cadence, start, end, source, state, close=True, window_end=end)
+    print("M6 evidence bounds: T0=" + str(start) + "; audited_end=" + str(end) + "; closing_snapshot=" + str(closing_end))
+    if state["boundary"]: print("M6 boundary_ambiguous: conservative_active=" + ",".join(sorted({name for name, _ in state["boundary"]})))
+    return state["traffic"]
 
 
 def retention_seconds(raw):
     units = {"y": 365 * 86400, "w": 7 * 86400, "d": 86400,
-             "h": 3600, "m": 60, "s": 1}
-    parts = re.findall(r"([0-9]+)([ywdhms])", raw)
+             "h": 3600, "m": 60, "s": 1, "ms": 0.001}
+    parts = re.findall(r"([0-9]+)(ms|[ywdhms])", raw)
     if not parts or "".join(number + unit for number, unit in parts) != raw:
         fail("Prometheus retention duration unavailable or unsupported")
     return sum(int(number) * units[unit] for number, unit in parts)
@@ -198,10 +368,10 @@ def main():
     retained = retention_seconds(api("status/flags").get("storage.tsdb.retention.time", ""))
     if retained < max(30, days + 7) * 86400:
         fail("Prometheus retention is shorter than max(30 days, approved period + 7 days)")
-    duration = str(max(1, end - start)) + "s"
     targets = api("targets")["activeTargets"]
+    targets_now = time.time()
     inventory = {}
-    intervals = []
+    intervals = {}
     for job, variable in [("qs-apiserver", "EXPECTED_APISERVER_CONTAINERS"),
                           ("qs-collection-server", "EXPECTED_COLLECTION_CONTAINERS")]:
         names = os.environ[variable].split(",")
@@ -237,15 +407,16 @@ def main():
             scrape_url = urllib.parse.urlparse(target.get("scrapeUrl", ""))
             if scrape_url.netloc not in candidates or scrape_url.path != "/metrics":
                 fail("scrape URL does not match deployed service endpoint")
-            interval = re.fullmatch(r"([0-9]+)s", target.get("scrapeInterval", ""))
-            if interval is None or not 15 <= int(interval[1]) <= 60:
-                fail("scrape interval must be explicitly bounded to 15-60 seconds")
-            intervals.append(int(interval[1]))
+            interval = retention_seconds(target.get("scrapeInterval", ""))
+            timeout = retention_seconds(target.get("scrapeTimeout", ""))
+            if not 15 <= interval <= 60 or not 0 < timeout < interval:
+                fail("scrape interval/timeout must be bounded to 15-60 seconds and timeout below interval")
+            intervals[key] = interval
             last = datetime.datetime.fromisoformat(target["lastScrape"].replace("Z", "+00:00")).timestamp()
-            if not 0 <= end - last <= 2 * int(interval[1]):
+            if not -0.001 <= targets_now - last <= 2 * interval:
                 fail("current scrape sample is stale")
             started = datetime.datetime.fromisoformat(metadata["started"].replace("Z", "+00:00")).timestamp()
-            if mode == "window" and started > start:
+            if mode == "window" and started > start - 2 * interval - min(1.0, interval / 10):
                 fail("service restarted or was deployed inside the requested window; window incomplete")
             inventory[key] = name
     api_instances = {key for key in inventory if key[0] == "qs-apiserver"}
@@ -261,22 +432,23 @@ def main():
         ("qs_model_definition_write_total", api_instances, 6, False),
         ("qs_model_definition_input_field_total", api_instances, 12, False),
     ]
-    step = min(intervals)
-    max_age = 2 * min(intervals)
+    selectors = {}
     for metric, expected, count, info in family_specs:
         jobs = "|".join(sorted({key[0] for key in expected}))
+        broad = metric + '{job=~"' + jobs + '"}'
+        selectors[metric] = broad
         selector = metric + '{job=~"' + jobs + '"' + (',source_sha="' + source + '",capability="1"' if info else '') + '}'
         if info:
             selector = "(" + selector + " == 1)"
         aggregate = "count by(job,instance)(" + selector + ")"
         exact_values(current_values(aggregate, expected), count, "required zero-valued source/series capability is absent or partial")
-        fresh = "(max by(job,instance)(time()-timestamp(" + selector + ")) < bool " + str(max_age) + ")"
-        exact_values(current_values("(" + aggregate + ") * on(job,instance) " + fresh, expected), count, "current capability or counter sample is stale")
-        if mode == "window":
-            check_continuity("(" + aggregate + ") * on(job,instance) " + fresh, expected, count, start, end, step)
-            if not info:
-                resets = "sum by(job,instance)(resets(" + selector + "[" + duration + "]))"
-                exact_values(current_values(resets, expected), 0, "counter reset within the observation window; cannot classify as zero")
+        for key in expected:
+            interval = intervals[key]
+            scoped = metric + '{job="' + key[0] + '",instance="' + key[1] + '"}'
+            fresh = "max(time()-timestamp(" + scoped + "))"
+            samples = query(fresh)
+            if len(samples) != 1 or not 0 <= finite(samples[0]["value"][1]) < 2 * interval:
+                fail("current capability or counter sample is stale")
     up = 'up{job=~"qs-apiserver|qs-collection-server"}'
     exact_values(current_values(up, all_instances), 1, "service scrape is not up")
     # The retained legacy admission counter is supplementary: it cannot settle
@@ -288,41 +460,25 @@ def main():
     if mode == "preflight":
         print("M6 preflight ready: current deployment/source/zero-series coverage verified; observation_window=not_started")
         return
-    admission_increase = query("sum(increase(" + admission + "[" + duration + "]))")
+    traffic = check_raw_window(selectors, intervals, start, end, source)
+    # Supplementary Worker intake is fixed to this same historical end. It does
+    # not have a reviewed Worker inventory and cannot sign off its zero usage.
+    admission_duration = str(math.ceil(end - start + 2 * max(intervals.values()))) + "s"
+    admission_increase = query("sum(increase(" + admission + "[" + admission_duration + "]))", end=end)
     if len(admission_increase) != 1:
         fail("legacy admission observation history is missing")
     admission_value = finite(admission_increase[0]["value"][1])
-    if admission_value < 0:
-        fail("negative legacy admission increase")
+    if admission_value < 0: fail("negative legacy admission increase")
     print("M6\tevaluation_legacy_binding\t" + ("active_compatibility" if admission_value > 0 else "supplementary_zero"))
-    up_fresh = "(" + up + " == 1) * on(job,instance) ((time()-timestamp(" + up + ")) < bool " + str(max_age) + ")"
-    check_continuity(up_fresh, all_instances, 1, start, end, step)
-    canonical = [
-        ('qs_auth_token_source_total{job=~"qs-apiserver|qs-collection-server",source="bearer",result="accepted"}', all_instances),
-        ('qs_plan_entry_route_total{job="qs-collection-server",route="canonical",result="accepted"}', collection_instances),
-        ('qs_model_definition_write_total{job="qs-apiserver",input="canonical",result="accepted"}', api_instances),
-    ]
-    for field in ("user_id", "account_id"):
-        canonical.append(('qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",field="' + field + '",source="canonical"}', all_instances))
-    # OrgID is optional in current IAM sessions. Only the already verified
-    # canonical or missing selection counts; Extra still belongs to legacy below.
-    canonical.append(('qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",field="org_id",source=~"canonical|missing"}', all_instances))
-    for selector, expected in canonical:
-        expression = "sum by(job,instance)(increase(" + selector + "[" + duration + "]))"
-        if any(value <= 0 for value in current_values(expression, expected).values()):
-            fail("required verified traffic does not cover every deployed instance and contract")
-    legacy = [
-        ('claims_extra', 'qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",source=~"extra_.*"}', all_instances),
-        ('bare_authorization', 'qs_auth_token_source_total{job=~"qs-apiserver|qs-collection-server",source="bare"}', all_instances),
-        ('task_token_route', 'qs_plan_entry_route_total{job="qs-collection-server",route="legacy_token"}', collection_instances),
-        ('definition_derived_input', 'qs_model_definition_write_total{job="qs-apiserver",input="derived"}', api_instances),
-    ]
-    for name, selector, expected in legacy:
-        expression = "sum by(job,instance)(increase(" + selector + "[" + duration + "]))"
-        values = current_values(expression, expected)
-        if any(value < 0 for value in values.values()):
-            fail("negative compatibility increase is invalid evidence")
-        classification = "active_compatibility" if any(value > 0 for value in values.values()) else "zero_window_candidate"
+    required = [("bearer", all_instances), ("user_id", all_instances), ("account_id", all_instances),
+                ("org_id", all_instances), ("task", collection_instances), ("definition", api_instances)]
+    for contract, expected in required:
+        if any((contract, key) not in traffic for key in expected):
+            fail("required verified post-T0 traffic is insufficient; baseline-only growth is not window coverage")
+    if any(("definition_unreadable", key) in traffic for key in api_instances):
+        fail("Definition unknown_input: unreadable request growth cannot prove absence of retired fields; no zero candidate")
+    for name in ("claims_extra", "bare_authorization", "task_token_route", "definition_derived_input"):
+        classification = "active_compatibility" if any((name, key) in traffic for key in all_instances) else "zero_window_candidate"
         print("M6\t" + name + "\t" + classification)
     print("M6 window evidence audited read-only; client/data-owner and business exit approval remain separate")
 

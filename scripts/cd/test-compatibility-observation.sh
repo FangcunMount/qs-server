@@ -10,11 +10,13 @@ cat >"$FAKE_DOCKER" <<'EOF'
 #!/usr/bin/env python3
 import datetime
 import json
+import math
 import os
 import re
 import sys
 import time
 import urllib.parse
+from pathlib import Path
 
 arguments = sys.argv[1:]
 scenario = os.environ.get("FAKE_M6_SCENARIO", "")
@@ -39,6 +41,25 @@ family = {
 def emit(data):
     print(json.dumps({"status": "success", "data": data}, separators=(",", ":")))
 
+
+def raw_matrix(metric, end, duration):
+    path = Path(os.environ["FAKE_AUDIT_PATH"])
+    embedded = path.read_text().split("<<'PY_M6_OBSERVATION'\n", 1)[1].rsplit("\nPY_M6_OBSERVATION", 1)[0]
+    namespace = {}
+    exec(compile(embedded.rsplit("\ntry:\n    main()", 1)[0], str(path), "exec"), namespace)
+    t0 = datetime.datetime.fromisoformat(os.environ["OBSERVATION_STARTED_AT"].replace("Z", "+00:00")).timestamp()
+    stamps = range(math.floor((end-duration)/60)*60+60, math.floor(end/60)*60+1, 60)
+    rows = []
+    for job, instance in family[metric][1]:
+        combos = [{}] if metric == "up" else namespace["family_combinations"](metric, source)
+        for combo in combos:
+            contract, legacy = namespace["traffic_contract"](metric, combo)
+            # Real verified missing Org grows; canonical Org stays zero.
+            if metric == "qs_auth_claim_source_total" and combo.get("field") == "org_id" and combo.get("source") == "canonical":
+                contract = None
+            values = [[stamp, "1" if metric == "up" or metric.endswith("_observation_info") else str(max(0, int((stamp-t0)//60)) if contract and not legacy else 0)] for stamp in stamps]
+            rows.append({"metric": {"job": job, "instance": instance, **combo}, "values": values})
+    return rows
 
 if arguments[0] == "ps":
     names = ["qs-apiserver"] if "label=prometheus.job=qs-apiserver" in arguments else ["qs-collection-server-1", "qs-collection-server-2"]
@@ -70,7 +91,7 @@ elif arguments[0] == "exec":
             # sample while leaving the production two-interval gate unchanged.
             last = now - (3600 if scenario == "stale_scrape" else 1)
             targets.append({"labels": {"job": job, "instance": instance}, "health": "down" if scenario == "down" and index == 2 else "up",
-                            "scrapeUrl": "http://" + instance + "/metrics", "scrapeInterval": "60s", "lastScrape": datetime.datetime.fromtimestamp(last, datetime.timezone.utc).isoformat()})
+                            "scrapeUrl": "http://" + instance + "/metrics", "scrapeInterval": "1m", "scrapeTimeout": "1s500ms", "lastScrape": datetime.datetime.fromtimestamp(last, datetime.timezone.utc).isoformat()})
         emit({"activeTargets": targets})
     else:
         raw = next((arg[len("--post-data="):] for arg in arguments if arg.startswith("--post-data=")), "")
@@ -81,15 +102,22 @@ elif arguments[0] == "exec":
                 stream.write(json.dumps({"endpoint": urllib.parse.urlparse(url).path, "parameters": parameters}) + "\n")
         metric_match = re.search(r"qs_[a-z_]+|up\{", query)
         metric = metric_match[0].rstrip("{") if metric_match else ""
-        if metric not in family:
+        if url.endswith("/query_range"):
+            raise SystemExit("raw evidence cannot use interpolated query_range")
+        raw_match = re.fullmatch(r"[a-z_]+\{[^}]*\}\[([0-9]+)s\]", query)
+        if raw_match:
+            if "time" not in parameters:
+                raise SystemExit("raw query lacks explicit historical end")
+            emit({"resultType": "matrix", "result": raw_matrix(metric, float(parameters["time"][0]), int(raw_match[1]))})
+        elif query.startswith("max(time()-timestamp("):
+            emit({"resultType": "vector", "result": [{"metric": {}, "value": [now, "3600" if scenario == "stale_scrape" else "1"]}]})
+        elif metric not in family:
             if metric != "qs_evaluation_assessment_intake_legacy_binding_total":
                 raise SystemExit("unexpected observation query: " + query)
             if scenario == "admission_absent":
                 emit({"resultType": "vector", "result": []})
-                sys.exit(0)
-            value = 4 if query.startswith("count(") else (2 if scenario == "admission_active" else 0)
-            emit({"resultType": "vector", "result": [{"metric": {}, "value": [now, str(value)]}]})
-
+            else:
+                emit({"resultType": "vector", "result": [{"metric": {}, "value": [now, "4" if query.startswith("count(") else "0"]}]})
         else:
             count, keys = family[metric]
             keys = list(keys)
@@ -100,51 +128,51 @@ elif arguments[0] == "exec":
             if "source_sha" in query and source not in query:
                 keys = []
             result = []
-            for index, (job, instance) in enumerate(keys):
-                value = count
-                if "resets(" in query:
-                    value = 1 if scenario == "counter_reset" and index == 0 else 0
-                elif "increase(" in query:
-                    legacy = any(part in query for part in ['source=~"extra_.*"', 'source="bare"', 'route="legacy_token"', 'input="derived"'])
-                    value = (2 if scenario == "active" else 0) if legacy else (0 if scenario == "canonical_empty" and index == 0 else 1)
-                    if metric == "qs_auth_claim_source_total":
-                        field_match = re.search(r'field="([a-z_]+)"', query)
-                        field = field_match[1] if field_match else ""
-                        if scenario in ("org_missing", "org_extra") and field == "org_id":
-                            # Only the real verified missing-Org branch increments;
-                            # requiring canonical Org must fail this fixture.
-                            value = 1 if 'source=~"canonical|missing"' in query else 0
-                        if scenario == "org_extra" and legacy:
-                            value = 2
-                        if scenario == "org_empty" and field == "org_id" and index == 1:
-                            value = 0
-                        if ((scenario == "user_missing" and field == "user_id") or
-                                (scenario == "account_missing" and field == "account_id")):
-                            value = 0 if 'source="canonical"' in query else 1
-                elif scenario == "missing_zero_series" and metric == "qs_auth_claim_source_total":
+            for job, instance in keys:
+                value = 1 if metric == "up" else count
+                if scenario == "missing_zero_series" and metric == "qs_auth_claim_source_total":
                     value -= 1
-                labels = {"job": job, "instance": instance}
-                if url.endswith("/query_range"):
-                    start, end, step = (int(parameters[key][0]) for key in ("start", "end", "step"))
-                    samples = [[point, str(value)] for point in range(start, end + 1, step)]
-                    if metric == "qs_auth_compatibility_observation_info" and index == 0:
-                        if scenario == "history_gap": samples.pop(10)
-                        if scenario == "stale_history": samples[10][1] = "0"
-                    result.append({"metric": labels, "values": samples})
-                else:
-                    result.append({"metric": labels, "value": [now, "NaN" if scenario == "nan" else str(value)]})
-            emit({"resultType": "matrix" if url.endswith("/query_range") else "vector", "result": result})
+                result.append({"metric": {"job": job, "instance": instance}, "value": [now, "NaN" if scenario == "nan" else str(value)]})
+            emit({"resultType": "vector", "result": result})
 else:
     raise SystemExit("unexpected fake docker command")
 EOF
 chmod +x "$FAKE_DOCKER"
 
+# Only the first logical time is pinned in this test interpreter. Later target,
+# current and closing reads use real time, reproducing an audit delayed past E.
+FAKE_PYTHON="$TEST_ROOT/python"
+cat >"$FAKE_PYTHON" <<'EOF'
+#!/usr/bin/env python3
+import os
+import sys
+import time
+original = time.time
+first = True
+
+
+def clock():
+    global first
+    if first:
+        first = False
+        return float(os.environ["FAKE_LOGICAL_END"])
+    return original()
+
+
+time.time = clock
+exec(compile(sys.stdin.read(), "synthetic_m6_cli", "exec"), {"__name__": "__main__"})
+EOF
+chmod +x "$FAKE_PYTHON"
+logical_end=$(python3 -c 'import time; print(int(time.time())-120)')
 COMMON_ENV=(
   WINDOW_DAYS=14
   PRIVILEGE_RUNNER=
   DOCKER_BIN="$FAKE_DOCKER"
+  PYTHON_BIN="$FAKE_PYTHON"
+  "FAKE_LOGICAL_END=$logical_end"
+  "FAKE_AUDIT_PATH=$SCRIPT_DIR/audit-compatibility-observation.sh"
   EXPECTED_SOURCE_SHA=0123456789abcdef0123456789abcdef01234567
-  "OBSERVATION_STARTED_AT=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=14,seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"
+  "OBSERVATION_STARTED_AT=$(python3 -c 'import datetime,sys; print(datetime.datetime.fromtimestamp(int(sys.argv[1])-14*86400-2,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))' "$logical_end")"
 )
 
 query_log="$TEST_ROOT/queries.jsonl"
@@ -174,22 +202,12 @@ if [ "$(printf '%s\n' "$window_output" | awk -F '\t' '$1 == "M6" && $3 == "zero_
   echo "complete window did not classify all four M6 contracts" >&2
   exit 1
 fi
-missing_org_output="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window FAKE_M6_SCENARIO=org_missing FAKE_QUERY_LOG="$query_log" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$missing_org_output" | awk -F '\t' '$1 == "M6" && $3 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 4 ]; then
-  echo "verified missing optional Org claim did not allow the otherwise canonical window" >&2
-  exit 1
-fi
-extra_org_output="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window FAKE_M6_SCENARIO=org_extra "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if ! printf '%s\n' "$extra_org_output" | grep -Fq $'M6\tclaims_extra\tactive_compatibility'; then
-  echo "legacy Extra Org traffic was falsely classified as an exit candidate" >&2
-  exit 1
-fi
-active_m6="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 FAKE_M6_SCENARIO=active "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$active_m6" | awk -F '\t' '$1 == "M6" && $3 == "active_compatibility" {count++} END {print count + 0}')" -ne 4 ]; then
-  echo "actual legacy traffic was lost" >&2
-  exit 1
-fi
-for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance history_gap stale_history counter_reset canonical_empty user_missing account_missing org_empty nan retention_short admission_absent; do
+printf '%s\n' "$zero_output" "$window_output"
+
+# Short raw-sample matrices cover the counterexamples without replaying an
+# invented 14-day history for every malformed point or label.
+python3 "$SCRIPT_DIR/test-compatibility-raw-window.py"
+for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance nan retention_short admission_absent; do
   if env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 FAKE_M6_SCENARIO="$scenario" \
     "$SCRIPT_DIR/audit-compatibility-observation.sh" >"$TEST_ROOT/$scenario.log" 2>&1; then
     echo "M6 observation accepted incomplete evidence: $scenario" >&2
@@ -215,24 +233,28 @@ for start in '' 'invalid' '2099-01-01T00:00:00Z'; do
   fi
 done
 
-python3 - "$query_log" <<'PY'
+python3 - "$query_log" "$logical_end" <<'PY'
 import json
+import re
 import sys
 ranges = []
+logical_end = int(sys.argv[2])
 for line in open(sys.argv[1]):
     query = json.loads(line)
+    params = query['parameters']
+    expression = params.get('query', [''])[0]
     if query['endpoint'].endswith('query_range'):
-        params = query['parameters']
-        start, end, step = (int(params[key][0]) for key in ('start', 'end', 'step'))
-        if end-start > 21600 or (end-start)//step+1 > 11000:
-            raise SystemExit('Prometheus range query exceeded the bounded chunk')
-        ranges.append(query)
-if len(ranges) < 10:
-    raise SystemExit('window continuity did not inspect multiple bounded chunks')
+        raise SystemExit('window continuity used interpolated evaluation samples')
+    match = re.fullmatch(r'[a-z_]+\{[^}]*\}\[([0-9]+)s\]', expression)
+    if match:
+        if 'time' not in params or int(match[1]) > 21600+61:
+            raise SystemExit('raw matrix lacks explicit end or exceeds bounded six-hour overlap')
+        ranges.append(float(params['time'][0]))
+    if 'increase(' in expression and float(params.get('time', ['0'])[0]) != logical_end:
+        raise SystemExit('historical instant increase moved beyond its fixed logical end')
+if len(ranges) < 10 or max(ranges) <= logical_end or logical_end not in ranges:
+    raise SystemExit('raw audit did not inspect bounded chunks and a separate closing snapshot')
 PY
-# A longer approved period is supported without truncating it to 30 days.
-long_start=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=31,seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"))')
-env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=31 "OBSERVATION_STARTED_AT=$long_start" "$SCRIPT_DIR/audit-compatibility-observation.sh" > "$TEST_ROOT/long-window.log"
 
 if [ -n "${M6_QUERY_ARTIFACT:-}" ]; then
   cp "$query_log" "$M6_QUERY_ARTIFACT"
