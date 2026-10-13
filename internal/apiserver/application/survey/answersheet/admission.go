@@ -10,11 +10,11 @@ import (
 )
 
 // resolveAdmission freezes evaluation intent at accept time (EV-R001).
-// When the binding resolver is not wired yet, returns zero admission so Journey
-// can fall back to legacy live binding for that rare window.
+// The catalog must be wired before accepting a new submission. An unbound
+// questionnaire is an explicit independent admission, not a missing dependency.
 func (s *submissionService) resolveAdmission(ctx context.Context, questionnaireCode, questionnaireVersion string) (domainanswersheet.Admission, error) {
-	if s.binding == nil {
-		return domainanswersheet.Admission{}, nil
+	if s == nil || s.binding == nil {
+		return domainanswersheet.Admission{}, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment admission binding resolver is not configured")
 	}
 	binding, ok, err := s.binding.ResolveAssessmentBinding(ctx, questionnaireCode, questionnaireVersion)
 	if err != nil {
