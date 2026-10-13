@@ -1,6 +1,6 @@
 # 兼容契约退役观测
 
-本工具只读检查调用和采样证据，不删除契约或数据。四项新计量已准备源码；生产部署、连续观察与客户端／数据负责人退出确认仍需分别完成，14 天窗口尚未开始。旧指标清单继续由原退役批次管理，指标缺失仍会阻止整个检查。
+本工具只读检查调用和采样证据，不删除契约或数据。四项新计量已准备源码；生产部署、连续观察与客户端／数据负责人退出确认仍需分别完成，14 天窗口尚未开始。五个已退役指标退出清单，现用 legacy admission 指标保留为补充证据；该汇总不证明各Worker源码或结清待处理／人工可重放责任。
 
 ## 四项计量
 
@@ -21,18 +21,21 @@
 
 预检查将运行容器的 scrape labels、网络 IP／端口与 Prometheus targets 唯一匹配，要求全部实例 up、样本新鲜、编译 source 能力和所有固定零值组合齐全。成功也只输出 `observation_window=not_started`，不启动计时，不为四项新契约输出零调用候选。
 
-授权部署和完整采样后，可显式调用 `OBSERVATION_MODE=window WINDOW_DAYS=14`，审核已经存在的 14–30 天证据。检查要求：
+授权部署、正式客户端和完整采样后，登记批准的UTC `OBSERVATION_STARTED_AT`（例如 `2026-11-01T00:00:00Z`，示例不是实际T0）。`WINDOW_DAYS`绑定W=max(14天、相关最长有效token周期、受支持消息重投周期)。`OBSERVATION_MODE=window`要求T0后已完整经过W日；审核从T0到当前的全部采样，不截成最近14或30天。人工可重放责任单独结清。
+
+预检查也要求Prometheus实际保留时间至少max(30天、W+7天)，但不读取历史range/increase、不启动窗口。每个range请求最多六小时，保留15–60秒scrape步长，避免Prometheus单series查询点上限。检查要求：
 
 - 当前部署清单和全部 source SHA 相符；实例未在窗口内部署或重启。
 - 每个实际 scrape interval 的查询点均覆盖全部实例、source 能力与固定 series；样本 age 小于两个 interval。支持 15–60 秒 interval；缺点、down、陈旧样本、来源切换、部分部署或 counter reset 均失败，不能视作零。
 - 每个实例都有实际 accepted canonical 流量：bearer、三个身份字段的 canonical 来源，以及各自服务的 TaskID 路由／无衍生字段 Definition 写入。零流量不是兼容退出证据。
 - Extra 真实选中、bare 请求（含拒绝）、旧 Task 路由（含拒绝）、带衍生字段写入（含拒绝）任一出现，保留 `active_compatibility`。四项全零也只得到候选，仍需客户端、数据负责人和业务退出确认。
 
-源码没有启动生产自动化或观察计时，也没有改变既有工作流状态。现有定时调用仍是默认预检查；未绑定 source、旧清单指标已缺失或新能力尚未部署时返回失败。源码检查、CI、生产部署、运行观察和最终业务验收分别记录。
+工作流沿用现有固定SSH初始化、ServerA身份核对和非交互sudo；密钥与sudo密码不输出。人工调用明确提供mode/source/W/T0。每天北京02:00的调用使用production环境中已批准的 `QS_COMPAT_OBSERVATION_MODE`、`QS_COMPAT_SOURCE_SHA`、`QS_COMPAT_WINDOW_DAYS`、`QS_COMPAT_STARTED_AT`、`QS_COMPAT_APISERVER_CONTAINERS`、`QS_COMPAT_COLLECTION_CONTAINERS`；实例清单也由人工调用沿用这两个配置，缺失时失败。不从观测到的SHA自动批准自身，不更改上述环境变量或保留配置。未批准T0时只允许默认预检查，不能启动观察计时。
 
 ## 验证入口
 
 - `go test -race ./internal/pkg/authobservability ./internal/pkg/middleware ./internal/collection-server/transport/rest ./internal/apiserver/transport/rest/handler`：真实签名／SDK 验证、实际选中来源、载体优先级、认证拒绝、旧路由顺序、输入 presence 与原 body／错误行为。
 - `bash scripts/cd/test-compatibility-observation.sh`：完整窗口、真实命中及实例遗漏、版本不符、重启、reset、断档、无 canonical 流量等失败关闭矩阵。合成矩阵不证明生产已有历史样本。
+- `M6_QUERY_ARTIFACT=/tmp/qs-compat-queries.jsonl bash scripts/cd/test-compatibility-observation.sh` 后运行 `python3 scripts/cd/test-compatibility-prometheus.py /tmp/qs-compat-queries.jsonl`：隔离原生Prometheus实际解析／执行vector与range表达式，核对固定series和真实counter increase；不冒充14天生产历史。
 
-PromQL 的矩阵与 timestamp／counter 函数语义依据 [Prometheus HTTP API](https://prometheus.io/docs/prometheus/latest/querying/api/) 和 [查询函数](https://prometheus.io/docs/prometheus/latest/querying/functions/)；真实 parser 验证与生产采样覆盖是不同证据。
+PromQL 的矩阵与 timestamp／counter 函数语义依据 [Prometheus HTTP API](https://prometheus.io/docs/prometheus/latest/querying/api/) 和 [查询函数](https://prometheus.io/docs/prometheus/latest/querying/functions/)；原生parser/API验证与生产采样覆盖是不同证据。

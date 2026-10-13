@@ -666,7 +666,12 @@ jobs:
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 
       - name: Validate compatibility observation contract
+        env:
+          M6_QUERY_ARTIFACT: ${{ runner.temp }}/qs-compat-queries.jsonl
         run: bash scripts/cd/test-compatibility-observation.sh
+
+      - name: Verify observation expressions with native Prometheus
+        run: python3 scripts/cd/test-compatibility-prometheus.py "${RUNNER_TEMP}/qs-compat-queries.jsonl"
 
       - name: Validate production AuthZ matrix contract
         run: bash scripts/cd/test-verify-authz-production-matrix.sh

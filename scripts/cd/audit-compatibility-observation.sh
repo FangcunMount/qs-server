@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-WINDOW_DAYS="${WINDOW_DAYS:-30}"
+WINDOW_DAYS="${WINDOW_DAYS:-14}"
 APISERVER_CONTAINER="${APISERVER_CONTAINER:-qs-apiserver}"
 PROMETHEUS_BASE_URL="${PROMETHEUS_BASE_URL:-http://prometheus:9090}"
 QUERY_TIMEOUT_SECONDS="${QUERY_TIMEOUT_SECONDS:-10}"
@@ -12,6 +12,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 # the reviewed deployment inventory and compiled source; it never starts a timer.
 OBSERVATION_MODE="${OBSERVATION_MODE:-preflight}"
 EXPECTED_SOURCE_SHA="${EXPECTED_SOURCE_SHA:-}"
+OBSERVATION_STARTED_AT="${OBSERVATION_STARTED_AT:-}"
 EXPECTED_APISERVER_CONTAINERS="${EXPECTED_APISERVER_CONTAINERS:-qs-apiserver}"
 EXPECTED_COLLECTION_CONTAINERS="${EXPECTED_COLLECTION_CONTAINERS:-qs-collection-server-1,qs-collection-server-2}"
 
@@ -25,60 +26,21 @@ require_positive_integer() {
 }
 
 run_privileged() {
-  if [ -n "$PRIVILEGE_RUNNER" ]; then
+  if [ "$PRIVILEGE_RUNNER" = sudo ]; then
+    if [ -n "${SUDO_PASSWORD:-}" ]; then
+      printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -- "$@"
+    else
+      sudo -n -- "$@"
+    fi
+  elif [ -n "$PRIVILEGE_RUNNER" ]; then
     "$PRIVILEGE_RUNNER" "$@"
   else
     "$@"
   fi
 }
 
-parse_single_vector_value() {
-  "$PYTHON_BIN" -c '
-import json
-import sys
-from decimal import Decimal, InvalidOperation
-
-payload = json.load(sys.stdin)
-if payload.get("status") != "success":
-    raise SystemExit("Prometheus query did not succeed")
-result = payload.get("data", {}).get("result", [])
-if not result:
-    print("absent")
-    raise SystemExit(0)
-if len(result) != 1:
-    raise SystemExit(f"Prometheus query returned {len(result)} series, want exactly one")
-try:
-    value = Decimal(result[0]["value"][1])
-except (InvalidOperation, KeyError, IndexError, TypeError) as exc:
-    raise SystemExit(f"Prometheus query returned an invalid value: {exc}")
-print(format(value, "f"))
-'
-}
-
-prometheus_query() {
-  local query="$1"
-  local response
-  response="$(run_privileged "$DOCKER_BIN" exec "$APISERVER_CONTAINER" \
-    wget -qO- -T "$QUERY_TIMEOUT_SECONDS" \
-    --post-data="query=$query" \
-    "${PROMETHEUS_BASE_URL%/}/api/v1/query")"
-  printf '%s' "$response" | parse_single_vector_value
-}
-
-is_zero() {
-  "$PYTHON_BIN" -c '
-import sys
-from decimal import Decimal
-raise SystemExit(0 if Decimal(sys.argv[1]) == 0 else 1)
-' "$1"
-}
-
 require_positive_integer WINDOW_DAYS "$WINDOW_DAYS"
 require_positive_integer QUERY_TIMEOUT_SECONDS "$QUERY_TIMEOUT_SECONDS"
-if [ "$WINDOW_DAYS" -gt 90 ]; then
-  echo "WINDOW_DAYS must not exceed 90, got: $WINDOW_DAYS" >&2
-  exit 1
-fi
 if [ -n "$PRIVILEGE_RUNNER" ] && ! command -v "$PRIVILEGE_RUNNER" >/dev/null 2>&1; then
   echo "Privilege runner is unavailable: $PRIVILEGE_RUNNER" >&2
   exit 1
@@ -96,46 +58,9 @@ if [ "$(run_privileged "$DOCKER_BIN" inspect "$APISERVER_CONTAINER" --format '{{
   exit 1
 fi
 
-metrics=(
-  "actor_practitioners|qs_actor_deprecated_practitioner_route_total"
-  "statistics_validate_only|qs_statistics_deprecated_validate_only_total"
-  "interpretation_generate_from_assessment|qs_interpretation_deprecated_generate_report_from_assessment_total"
-  "survey_legacy_idempotency_lookup|qs_answersheet_legacy_idempotency_fallback_lookup_total"
-  "survey_legacy_idempotency_hit|qs_answersheet_legacy_idempotency_fallback_hit_total"
-  "evaluation_legacy_binding|qs_evaluation_assessment_intake_legacy_binding_total"
-)
-
-echo "Compatibility observation (Prometheus read-only):"
-printf 'window_days\tmetric\tcurrent_series\tanchor_series\twindow_increase\tclassification\n'
-for item in "${metrics[@]}"; do
-  IFS='|' read -r name metric <<<"$item"
-  current_series="$(prometheus_query "count(${metric})")"
-  if [ "$current_series" = "absent" ] || is_zero "$current_series"; then
-    echo "Compatibility metric is absent from the current Prometheus snapshot: $metric" >&2
-    exit 1
-  fi
-
-  anchor_series="$(prometheus_query "count(${metric} offset ${WINDOW_DAYS}d)")"
-  increase="$(prometheus_query "sum(increase(${metric}[${WINDOW_DAYS}d]))")"
-  if [ "$increase" = "absent" ]; then
-    echo "Compatibility metric has no samples in the requested window: $metric" >&2
-    exit 1
-  fi
-
-  classification="active_compatibility"
-  if [ "$anchor_series" = "absent" ] || is_zero "$anchor_series"; then
-    classification="observation_window_incomplete"
-  elif is_zero "$increase"; then
-    classification="zero_window_candidate"
-  fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$WINDOW_DAYS" "$name" "$current_series" "$anchor_series" "$increase" "$classification"
-done
-
-echo "Compatibility observation completed; counter semantics and caller/data-owner confirmation are still required before removal."
-
-export WINDOW_DAYS OBSERVATION_MODE EXPECTED_SOURCE_SHA EXPECTED_APISERVER_CONTAINERS EXPECTED_COLLECTION_CONTAINERS
+export WINDOW_DAYS OBSERVATION_MODE EXPECTED_SOURCE_SHA OBSERVATION_STARTED_AT EXPECTED_APISERVER_CONTAINERS EXPECTED_COLLECTION_CONTAINERS
 export DOCKER_BIN PRIVILEGE_RUNNER APISERVER_CONTAINER PROMETHEUS_BASE_URL QUERY_TIMEOUT_SECONDS
+export SUDO_PASSWORD="${SUDO_PASSWORD:-}"
 "$PYTHON_BIN" - <<'PY_M6_OBSERVATION'
 import datetime
 import json
@@ -154,9 +79,17 @@ def fail(message):
 
 def docker(*arguments):
     command = [os.environ["DOCKER_BIN"], *arguments]
-    if os.environ["PRIVILEGE_RUNNER"]:
-        command.insert(0, os.environ["PRIVILEGE_RUNNER"])
-    result = subprocess.run(command, check=True, capture_output=True, text=True,
+    password = None
+    runner = os.environ["PRIVILEGE_RUNNER"]
+    if runner == "sudo":
+        if os.environ["SUDO_PASSWORD"]:
+            command = [runner, "-S", "-p", "", "--", *command]
+            password = os.environ["SUDO_PASSWORD"] + "\n"
+        else:
+            command = [runner, "-n", "--", *command]
+    elif runner:
+        command.insert(0, runner)
+    result = subprocess.run(command, input=password, check=True, capture_output=True, text=True,
                             timeout=int(os.environ["QUERY_TIMEOUT_SECONDS"]) + 5)
     return result.stdout
 
@@ -215,15 +148,31 @@ def exact_values(values, expected_value, description):
 
 
 def check_continuity(expression, expected, count, start, end, step):
-    series = keyed(query(expression, start, end, step), expected)
-    size = (end - start) // step + 1
-    for item in series.values():
-        samples = item["values"]
-        if len(samples) != size:
-            fail("observation history incomplete or disappeared within the window")
-        for index, (timestamp, value) in enumerate(samples):
-            if abs(finite(timestamp) - (start + index * step)) > 0.01 or finite(value) != count:
-                fail("scrape/source/series coverage gap within the observation window")
+    # Prometheus limits query_range points per series. Six-hour chunks retain
+    # the actual scrape cadence and bound both request size and memory.
+    cursor = start
+    span = (21600 // step) * step
+    while cursor <= end:
+        chunk_end = min(cursor + span, end)
+        series = keyed(query(expression, cursor, chunk_end, step), expected)
+        size = (chunk_end - cursor) // step + 1
+        for item in series.values():
+            samples = item["values"]
+            if len(samples) != size:
+                fail("observation history incomplete or disappeared within the window")
+            for index, (timestamp, value) in enumerate(samples):
+                if abs(finite(timestamp) - (cursor + index * step)) > 0.01 or finite(value) != count:
+                    fail("scrape/source/series coverage gap within the observation window")
+        cursor += span + step
+
+
+def retention_seconds(raw):
+    units = {"y": 365 * 86400, "w": 7 * 86400, "d": 86400,
+             "h": 3600, "m": 60, "s": 1}
+    parts = re.findall(r"([0-9]+)([ywdhms])", raw)
+    if not parts or "".join(number + unit for number, unit in parts) != raw:
+        fail("Prometheus retention duration unavailable or unsupported")
+    return sum(int(number) * units[unit] for number, unit in parts)
 
 
 def main():
@@ -234,10 +183,22 @@ def main():
     if re.fullmatch(r"[0-9a-f]{40}", source) is None:
         fail("compiled source approval missing: EXPECTED_SOURCE_SHA must be the reviewed full SHA; window not started")
     days = int(os.environ["WINDOW_DAYS"])
-    if mode == "window" and not 14 <= days <= 30:
-        fail("retirement observation requires 14-30 complete days")
+    if mode == "window" and days < 14:
+        fail("retirement observation requires at least 14 complete days")
     end = int(time.time())
-    start = end - days * 86400
+    start = end
+    if mode == "window":
+        approved_start = os.environ["OBSERVATION_STARTED_AT"]
+        if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", approved_start) is None:
+            fail("approved observation T0 is missing or is not a UTC timestamp")
+        start = int(datetime.datetime.fromisoformat(approved_start.replace("Z", "+00:00")).timestamp())
+        if end - start < days * 86400:
+            fail("approved observation period has not elapsed since T0")
+    # Retention is a prerequisite, not evidence that samples actually exist.
+    retained = retention_seconds(api("status/flags").get("storage.tsdb.retention.time", ""))
+    if retained < max(30, days + 7) * 86400:
+        fail("Prometheus retention is shorter than max(30 days, approved period + 7 days)")
+    duration = str(max(1, end - start)) + "s"
     targets = api("targets")["activeTargets"]
     inventory = {}
     intervals = []
@@ -309,17 +270,31 @@ def main():
             selector = "(" + selector + " == 1)"
         aggregate = "count by(job,instance)(" + selector + ")"
         exact_values(current_values(aggregate, expected), count, "required zero-valued source/series capability is absent or partial")
+        fresh = "(max by(job,instance)(time()-timestamp(" + selector + ")) < bool " + str(max_age) + ")"
+        exact_values(current_values("(" + aggregate + ") * on(job,instance) " + fresh, expected), count, "current capability or counter sample is stale")
         if mode == "window":
-            fresh = "(max by(job,instance)(time()-timestamp(" + selector + ")) < bool " + str(max_age) + ")"
             check_continuity("(" + aggregate + ") * on(job,instance) " + fresh, expected, count, start, end, step)
             if not info:
-                resets = "sum by(job,instance)(resets(" + selector + "[" + str(days) + "d]))"
+                resets = "sum by(job,instance)(resets(" + selector + "[" + duration + "]))"
                 exact_values(current_values(resets, expected), 0, "counter reset within the observation window; cannot classify as zero")
     up = 'up{job=~"qs-apiserver|qs-collection-server"}'
     exact_values(current_values(up, all_instances), 1, "service scrape is not up")
+    # The retained legacy admission counter is supplementary: it cannot settle
+    # pending/hold/dead-letter/manual replay responsibility or attest Worker SHA.
+    admission = "qs_evaluation_assessment_intake_legacy_binding_total"
+    current_admission = query("count(" + admission + ")")
+    if len(current_admission) != 1 or finite(current_admission[0]["value"][1]) < 1:
+        fail("legacy admission metric is absent; absence is not zero")
     if mode == "preflight":
         print("M6 preflight ready: current deployment/source/zero-series coverage verified; observation_window=not_started")
         return
+    admission_increase = query("sum(increase(" + admission + "[" + duration + "]))")
+    if len(admission_increase) != 1:
+        fail("legacy admission observation history is missing")
+    admission_value = finite(admission_increase[0]["value"][1])
+    if admission_value < 0:
+        fail("negative legacy admission increase")
+    print("M6\tevaluation_legacy_binding\t" + ("active_compatibility" if admission_value > 0 else "supplementary_zero"))
     up_fresh = "(" + up + " == 1) * on(job,instance) ((time()-timestamp(" + up + ")) < bool " + str(max_age) + ")"
     check_continuity(up_fresh, all_instances, 1, start, end, step)
     canonical = [
@@ -330,7 +305,7 @@ def main():
     for field in ("user_id", "account_id", "org_id"):
         canonical.append(('qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",field="' + field + '",source="canonical"}', all_instances))
     for selector, expected in canonical:
-        expression = "sum by(job,instance)(increase(" + selector + "[" + str(days) + "d]))"
+        expression = "sum by(job,instance)(increase(" + selector + "[" + duration + "]))"
         if any(value <= 0 for value in current_values(expression, expected).values()):
             fail("canonical traffic does not cover every deployed instance and contract")
     legacy = [
@@ -340,7 +315,7 @@ def main():
         ('definition_derived_input', 'qs_model_definition_write_total{job="qs-apiserver",input="derived"}', api_instances),
     ]
     for name, selector, expected in legacy:
-        expression = "sum by(job,instance)(increase(" + selector + "[" + str(days) + "d]))"
+        expression = "sum by(job,instance)(increase(" + selector + "[" + duration + "]))"
         values = current_values(expression, expected)
         if any(value < 0 for value in values.values()):
             fail("negative compatibility increase is invalid evidence")

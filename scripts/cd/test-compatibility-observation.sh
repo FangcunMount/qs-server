@@ -58,7 +58,9 @@ elif arguments[0] == "inspect":
                           "networks": {"infra-network": {"IPAddress": ip}}}))
 elif arguments[0] == "exec":
     url = arguments[-1]
-    if url.endswith("/targets"):
+    if url.endswith("/status/flags"):
+        emit({"storage.tsdb.retention.time": "15d" if scenario == "retention_short" else "400d"})
+    elif url.endswith("/targets"):
         targets = []
         for index, (job, instance) in enumerate(instances):
             if scenario == "missing_target" and index == 2:
@@ -77,16 +79,14 @@ elif arguments[0] == "exec":
         metric_match = re.search(r"qs_[a-z_]+|up\{", query)
         metric = metric_match[0].rstrip("{") if metric_match else ""
         if metric not in family:
-            value = 1
-            if query.startswith("count") and "offset" in query:
-                value = int(os.environ.get("FAKE_ANCHOR_SERIES", "1"))
-            elif query.startswith("count"):
-                value = int(os.environ.get("FAKE_CURRENT_SERIES", "1"))
-            elif "increase" in query:
-                value = 2 if os.environ.get("FAKE_ACTIVE") == "1" and "qs_actor_deprecated_practitioner_route_total" in query else 0
-            else:
-                raise SystemExit("unexpected legacy query: " + query)
+            if metric != "qs_evaluation_assessment_intake_legacy_binding_total":
+                raise SystemExit("unexpected observation query: " + query)
+            if scenario == "admission_absent":
+                emit({"resultType": "vector", "result": []})
+                sys.exit(0)
+            value = 4 if query.startswith("count(") else (2 if scenario == "admission_active" else 0)
             emit({"resultType": "vector", "result": [{"metric": {}, "value": [now, str(value)]}]})
+
         else:
             count, keys = family[metric]
             keys = list(keys)
@@ -123,35 +123,23 @@ EOF
 chmod +x "$FAKE_DOCKER"
 
 COMMON_ENV=(
-  WINDOW_DAYS=30
+  WINDOW_DAYS=14
   PRIVILEGE_RUNNER=
   DOCKER_BIN="$FAKE_DOCKER"
   EXPECTED_SOURCE_SHA=0123456789abcdef0123456789abcdef01234567
+  "OBSERVATION_STARTED_AT=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=14,seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"
 )
 
-zero_output="$(env "${COMMON_ENV[@]}" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$zero_output" | awk -F '\t' '$6 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 6 ]; then
-  echo "zero-window observation did not classify all compatibility metrics" >&2
-  exit 1
-fi
-
-active_output="$(env "${COMMON_ENV[@]}" FAKE_ACTIVE=1 "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if ! printf '%s\n' "$active_output" | grep -Fq $'actor_practitioners\t1\t1\t2\tactive_compatibility'; then
-  echo "active compatibility hit was not preserved" >&2
-  exit 1
-fi
-
-incomplete_output="$(env "${COMMON_ENV[@]}" FAKE_ANCHOR_SERIES=0 "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$incomplete_output" | awk -F '\t' '$6 == "observation_window_incomplete" {count++} END {print count + 0}')" -ne 6 ]; then
-  echo "incomplete history was not distinguished from a zero window" >&2
-  exit 1
-fi
-
-if env "${COMMON_ENV[@]}" FAKE_CURRENT_SERIES=0 \
-  "$SCRIPT_DIR/audit-compatibility-observation.sh" >/dev/null 2>&1; then
-  echo "observation accepted a missing current metric" >&2
-  exit 1
-fi
+query_log="$TEST_ROOT/queries.jsonl"
+zero_output="$(env "${COMMON_ENV[@]}" FAKE_QUERY_LOG="$query_log" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
+python3 - "$query_log" <<'PY'
+import json
+import sys
+for line in open(sys.argv[1]):
+    query = json.loads(line)
+    if query['endpoint'].endswith('query_range') or any('increase(' in value or 'resets(' in value for value in query['parameters'].get('query', [])):
+        raise SystemExit('preflight inspected historical samples or claimed an observation window')
+PY
 
 if env "${COMMON_ENV[@]}" WINDOW_DAYS=0 \
   "$SCRIPT_DIR/audit-compatibility-observation.sh" >/dev/null 2>&1; then
@@ -164,7 +152,7 @@ if ! printf '%s\n' "$zero_output" | grep -Fq 'observation_window=not_started'; t
   exit 1
 fi
 
-window_output="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 "$SCRIPT_DIR/audit-compatibility-observation.sh")"
+window_output="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window FAKE_QUERY_LOG="$query_log" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
 if [ "$(printf '%s\n' "$window_output" | awk -F '\t' '$1 == "M6" && $3 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 4 ]; then
   echo "complete window did not classify all four M6 contracts" >&2
   exit 1
@@ -174,7 +162,7 @@ if [ "$(printf '%s\n' "$active_m6" | awk -F '\t' '$1 == "M6" && $3 == "active_co
   echo "actual legacy traffic was lost" >&2
   exit 1
 fi
-for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance history_gap stale_history counter_reset canonical_empty nan; do
+for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance history_gap stale_history counter_reset canonical_empty nan retention_short admission_absent; do
   if env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 FAKE_M6_SCENARIO="$scenario" \
     "$SCRIPT_DIR/audit-compatibility-observation.sh" >"$TEST_ROOT/$scenario.log" 2>&1; then
     echo "M6 observation accepted incomplete evidence: $scenario" >&2
@@ -190,6 +178,37 @@ done
 if env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=13 "$SCRIPT_DIR/audit-compatibility-observation.sh" >/dev/null 2>&1; then
   echo "M6 accepted a shorter retirement observation window" >&2
   exit 1
+fi
+
+
+for start in '' 'invalid' '2099-01-01T00:00:00Z'; do
+  if env "${COMMON_ENV[@]}" OBSERVATION_MODE=window "OBSERVATION_STARTED_AT=$start" "$SCRIPT_DIR/audit-compatibility-observation.sh" >/dev/null 2>&1; then
+    echo "M6 accepted missing, invalid or unelapsed approved T0" >&2
+    exit 1
+  fi
+done
+
+python3 - "$query_log" <<'PY'
+import json
+import sys
+ranges = []
+for line in open(sys.argv[1]):
+    query = json.loads(line)
+    if query['endpoint'].endswith('query_range'):
+        params = query['parameters']
+        start, end, step = (int(params[key][0]) for key in ('start', 'end', 'step'))
+        if end-start > 21600 or (end-start)//step+1 > 11000:
+            raise SystemExit('Prometheus range query exceeded the bounded chunk')
+        ranges.append(query)
+if len(ranges) < 10:
+    raise SystemExit('window continuity did not inspect multiple bounded chunks')
+PY
+# A longer approved period is supported without truncating it to 30 days.
+long_start=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=31,seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ"))')
+env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=31 "OBSERVATION_STARTED_AT=$long_start" "$SCRIPT_DIR/audit-compatibility-observation.sh" > "$TEST_ROOT/long-window.log"
+
+if [ -n "${M6_QUERY_ARTIFACT:-}" ]; then
+  cp "$query_log" "$M6_QUERY_ARTIFACT"
 fi
 
 echo "compatibility observation contract passed"
