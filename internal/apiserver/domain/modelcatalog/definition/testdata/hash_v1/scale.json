@@ -1,0 +1,402 @@
+{
+  "answersheet": {
+    "ID": 7001,
+    "QuestionnaireCode": "M5_scale_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireTitle": "",
+    "Answers": [
+      {
+        "QuestionCode": "q1",
+        "Score": 2,
+        "Value": "b"
+      }
+    ]
+  },
+  "canonical_bytes": "{\"Measure\":{\"Factors\":[{\"Code\":\"total\",\"Title\":\"总分\\u003c旧\\u0026v1\\u003e\",\"Role\":\"total\"},{\"Code\":\"mood\",\"Title\":\"情绪\",\"Role\":\"dimension\"}],\"FactorGraph\":{\"Roots\":[\"total\"],\"Edges\":[{\"ParentCode\":\"total\",\"ChildCode\":\"mood\"}],\"SortOrders\":{\"mood\":2,\"total\":1}},\"Scoring\":[{\"FactorCode\":\"total\",\"Sources\":[{\"Kind\":\"question\",\"Code\":\"q1\",\"ScoringMode\":\"option_override\",\"Sign\":1,\"Weight\":0.5,\"OptionScores\":{\"a\":0,\"b\":2}}],\"Strategy\":\"weighted_sum\",\"Params\":null,\"MaxScore\":10,\"Weights\":{\"q1\":0.5},\"Constant\":1},{\"FactorCode\":\"mood\",\"Sources\":[{\"Kind\":\"question\",\"Code\":\"q1\"}],\"Strategy\":\"cnt\",\"Params\":{\"CntOptionContents\":[\"b\"]},\"MaxScore\":1,\"Weights\":null,\"Constant\":0}]},\"Calibration\":{\"NormRefs\":null},\"Execution\":{\"Brief2\":null,\"SPM\":null},\"Conclusions\":[{\"Kind\":\"risk\",\"FactorCode\":\"total\",\"FactorCodes\":null,\"ScoreBasis\":\"\",\"Primary\":false,\"Rules\":[{\"MinScore\":0,\"MaxScore\":10,\"MaxInclusive\":true,\"UnboundedMax\":false,\"Level\":\"low\",\"OutcomeCode\":\"low\",\"Title\":\"被顶层文案覆盖\",\"Summary\":\"内联摘要\",\"Description\":\"内联建议\"}],\"Outcomes\":[],\"Decision\":{\"Kind\":\"\",\"FallbackSimilarityThreshold\":0,\"FallbackCode\":\"\",\"LevelRule\":null,\"Poles\":null,\"TopK\":0},\"SpecialRules\":null,\"OutcomeMapping\":{\"DetailKind\":\"\",\"DetailAdapterKey\":\"\",\"Algorithm\":\"\"},\"Profiles\":null}],\"Outcomes\":[{\"Code\":\"low\",\"Title\":\"冻结低\",\"Summary\":\"冻结摘要\\u003c旧\\u0026v1\\u003e\",\"Description\":\"冻结建议\"}],\"ReportMap\":{\"Sections\":[{\"Code\":\"scores\",\"Title\":\"因子分\",\"SourceRefs\":[\"total\"],\"Kind\":\"factor_scores\",\"AdapterKey\":\"scale\",\"TemplateID\":\"medical_scale\",\"TemplateVersion\":\"v1\",\"CategoryLabel\":\"历史分类\"}]},\"DecisionSpec\":{\"ScoreRanges\":null,\"TypeDecision\":null,\"OutcomeRefs\":null,\"SpecialOutcomes\":null},\"InterpretationAssets\":{\"Outcomes\":null,\"Profiles\":null,\"ReportSpec\":{\"Sections\":null}}}",
+  "canonical_hash": "77caf3d647ab0a174b96be9d53704fe9b182bff99f3a6cfcc25b4a13872af80a",
+  "definition": {
+    "Measure": {
+      "Factors": [
+        {
+          "Code": "total",
+          "Title": "总分\u003c旧\u0026v1\u003e",
+          "Role": "total"
+        },
+        {
+          "Code": "mood",
+          "Title": "情绪",
+          "Role": "dimension"
+        }
+      ],
+      "FactorGraph": {
+        "Roots": [
+          "total"
+        ],
+        "Edges": [
+          {
+            "ParentCode": "total",
+            "ChildCode": "mood"
+          }
+        ],
+        "SortOrders": {
+          "mood": 2,
+          "total": 1
+        }
+      },
+      "Scoring": [
+        {
+          "FactorCode": "total",
+          "Sources": [
+            {
+              "Kind": "question",
+              "Code": "q1",
+              "ScoringMode": "option_override",
+              "Sign": 1,
+              "Weight": 0.5,
+              "OptionScores": {
+                "a": 0,
+                "b": 2
+              }
+            }
+          ],
+          "Strategy": "weighted_sum",
+          "Params": null,
+          "MaxScore": 10,
+          "Weights": {
+            "q1": 0.5
+          },
+          "Constant": 1
+        },
+        {
+          "FactorCode": "mood",
+          "Sources": [
+            {
+              "Kind": "question",
+              "Code": "q1"
+            }
+          ],
+          "Strategy": "cnt",
+          "Params": {
+            "CntOptionContents": [
+              "b"
+            ]
+          },
+          "MaxScore": 1,
+          "Weights": null,
+          "Constant": 0
+        }
+      ]
+    },
+    "Calibration": {
+      "NormRefs": null
+    },
+    "Execution": {
+      "Brief2": null,
+      "SPM": null
+    },
+    "Conclusions": [
+      {
+        "Kind": "risk",
+        "FactorCode": "total",
+        "FactorCodes": null,
+        "ScoreBasis": "",
+        "Primary": false,
+        "Rules": [
+          {
+            "MinScore": 0,
+            "MaxScore": 10,
+            "MaxInclusive": true,
+            "UnboundedMax": false,
+            "Level": "low",
+            "OutcomeCode": "low",
+            "Title": "被顶层文案覆盖",
+            "Summary": "内联摘要",
+            "Description": "内联建议"
+          }
+        ],
+        "Outcomes": [],
+        "Decision": {
+          "Kind": "",
+          "FallbackSimilarityThreshold": 0,
+          "FallbackCode": "",
+          "LevelRule": null,
+          "Poles": null,
+          "TopK": 0
+        },
+        "SpecialRules": null,
+        "OutcomeMapping": {
+          "DetailKind": "",
+          "DetailAdapterKey": "",
+          "Algorithm": ""
+        },
+        "Profiles": null
+      }
+    ],
+    "Outcomes": [
+      {
+        "Code": "low",
+        "Title": "冻结低",
+        "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+        "Description": "冻结建议"
+      }
+    ],
+    "ReportMap": {
+      "Sections": [
+        {
+          "Code": "scores",
+          "Title": "因子分",
+          "SourceRefs": [
+            "total"
+          ],
+          "Kind": "factor_scores",
+          "AdapterKey": "scale",
+          "TemplateID": "medical_scale",
+          "TemplateVersion": "v1",
+          "CategoryLabel": "历史分类"
+        }
+      ]
+    },
+    "DecisionSpec": {
+      "ScoreRanges": [
+        {
+          "FactorCode": "total",
+          "Kind": "risk",
+          "Primary": false,
+          "Rules": [
+            {
+              "MinScore": 0,
+              "MaxScore": 10,
+              "MaxInclusive": true,
+              "UnboundedMax": false,
+              "Level": "low",
+              "OutcomeCode": "low"
+            }
+          ]
+        }
+      ],
+      "TypeDecision": null,
+      "OutcomeRefs": [
+        {
+          "Code": "low"
+        }
+      ],
+      "SpecialOutcomes": null
+    },
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "冻结低",
+          "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+          "Description": "冻结建议"
+        }
+      ],
+      "Profiles": null,
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "scores",
+            "Title": "因子分",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "factor_scores",
+            "AdapterKey": "scale",
+            "TemplateID": "medical_scale",
+            "TemplateVersion": "v1",
+            "CategoryLabel": "历史分类"
+          }
+        ]
+      }
+    }
+  },
+  "frozen_assets": {
+    "Outcomes": [
+      {
+        "OutcomeCode": "low",
+        "Title": "冻结低",
+        "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+        "Description": "冻结建议"
+      }
+    ],
+    "Profiles": null,
+    "ReportSpec": {
+      "Sections": [
+        {
+          "Code": "scores",
+          "Title": "因子分",
+          "SourceRefs": [
+            "total"
+          ],
+          "Kind": "factor_scores",
+          "AdapterKey": "scale",
+          "TemplateID": "medical_scale",
+          "TemplateVersion": "v1",
+          "CategoryLabel": "历史分类"
+        }
+      ]
+    }
+  },
+  "frozen_payload": {
+    "Scale": {
+      "ID": 0,
+      "Code": "M5_scale",
+      "ScaleVersion": "v1",
+      "Title": "历史冻结模型",
+      "QuestionnaireCode": "",
+      "QuestionnaireVersion": "",
+      "Status": "",
+      "Factors": [
+        {
+          "Code": "total",
+          "Title": "总分\u003c旧\u0026v1\u003e",
+          "IsTotalScore": true,
+          "QuestionCodes": null,
+          "ScoringStrategy": "",
+          "ScoringParams": {
+            "CntOptionContents": null
+          },
+          "MaxScore": 10,
+          "InterpretRules": null
+        },
+        {
+          "Code": "mood",
+          "Title": "情绪",
+          "IsTotalScore": false,
+          "QuestionCodes": null,
+          "ScoringStrategy": "",
+          "ScoringParams": {
+            "CntOptionContents": null
+          },
+          "MaxScore": 1,
+          "InterpretRules": null
+        }
+      ],
+      "InterpretationAssets": {
+        "Outcomes": [
+          {
+            "OutcomeCode": "low",
+            "Title": "冻结低",
+            "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+            "Description": "冻结建议"
+          }
+        ],
+        "Profiles": null,
+        "ReportSpec": {
+          "Sections": [
+            {
+              "Code": "scores",
+              "Title": "因子分",
+              "SourceRefs": [
+                "total"
+              ],
+              "Kind": "factor_scores",
+              "AdapterKey": "scale",
+              "TemplateID": "medical_scale",
+              "TemplateVersion": "v1",
+              "CategoryLabel": "历史分类"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "input_identity": {
+    "ModelCode": "M5_scale",
+    "ModelVersion": "v1",
+    "ModelDigest": "8844838d95c755391bb11e289df3088a072785d9c17f21c6e7ef254b29da93be",
+    "QuestionnaireCode": "M5_scale_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireDigest": "d98a7a36b7393d2c55745d7e1a98256f139fe2c225bf30a008dee007078d419c",
+    "AnswerSheetID": 7001,
+    "AnswerSheetDigest": "a1eae14201ff6be00f15bccfe83ebca18fada757093befa4a1100a544546412f",
+    "SubjectDigest": "",
+    "CompositeDigest": "161fb2ab1a62685a0589b567a2471368eaae440d1d11a6de09077e52755fec75"
+  },
+  "model": {
+    "Kind": "scale",
+    "Algorithm": "scale_default",
+    "DecisionKind": "score_range",
+    "Code": "M5_scale",
+    "Version": "v1",
+    "Title": "历史冻结模型",
+    "Payload": null
+  },
+  "name": "scale",
+  "norm_subject": null,
+  "questionnaire": {
+    "Code": "M5_scale_Q",
+    "Version": "1.0.0",
+    "Title": "",
+    "Questions": [
+      {
+        "Code": "q1",
+        "Type": "radio",
+        "Options": [
+          {
+            "Code": "a",
+            "Content": "",
+            "Score": 0
+          },
+          {
+            "Code": "b",
+            "Content": "",
+            "Score": 2
+          }
+        ]
+      }
+    ]
+  },
+  "report_input": {
+    "schema_version": 3,
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "冻结低",
+          "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+          "Description": "冻结建议"
+        }
+      ],
+      "Profiles": null,
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "scores",
+            "Title": "因子分",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "factor_scores",
+            "AdapterKey": "scale",
+            "TemplateID": "medical_scale",
+            "TemplateVersion": "v1",
+            "CategoryLabel": "历史分类"
+          }
+        ]
+      }
+    },
+    "model_ref": {
+      "Kind": "scale",
+      "Algorithm": "scale_default",
+      "Code": "M5_scale",
+      "Version": "v1",
+      "Title": "历史冻结模型"
+    },
+    "factor_catalog": [
+      {
+        "code": "total",
+        "title": "总分\u003c旧\u0026v1\u003e",
+        "max_score": 10,
+        "is_total_score": true
+      },
+      {
+        "code": "mood",
+        "title": "情绪",
+        "max_score": 1
+      }
+    ]
+  },
+  "scope": "synthetic source characterization; no production data",
+  "source_baseline": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+}

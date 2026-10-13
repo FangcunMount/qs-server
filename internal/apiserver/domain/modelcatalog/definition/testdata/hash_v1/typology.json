@@ -1,0 +1,493 @@
+{
+  "answersheet": {
+    "ID": 7002,
+    "QuestionnaireCode": "M5_typology_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireTitle": "",
+    "Answers": [
+      {
+        "QuestionCode": "q1",
+        "Score": 2,
+        "Value": "b"
+      }
+    ]
+  },
+  "canonical_bytes": "{\"Measure\":{\"Factors\":[{\"Code\":\"total\",\"Title\":\"总分\\u003c旧\\u0026v1\\u003e\",\"Role\":\"total\"}],\"FactorGraph\":{\"Roots\":[\"total\"],\"Edges\":null,\"SortOrders\":{\"total\":1}},\"Scoring\":[{\"FactorCode\":\"total\",\"Sources\":[{\"Kind\":\"question\",\"Code\":\"q1\",\"ScoringMode\":\"option_override\",\"Sign\":1,\"Weight\":0.5,\"OptionScores\":{\"a\":0,\"b\":2}}],\"Strategy\":\"weighted_sum\",\"Params\":null,\"MaxScore\":10,\"Weights\":{\"q1\":0.5},\"Constant\":1}]},\"Calibration\":{\"NormRefs\":null},\"Execution\":{\"Brief2\":null,\"SPM\":null},\"Conclusions\":[{\"Kind\":\"type\",\"FactorCode\":\"\",\"FactorCodes\":[\"total\"],\"ScoreBasis\":\"\",\"Primary\":false,\"Rules\":null,\"Outcomes\":[{\"Code\":\"fallback\",\"Title\":\"补充\",\"Summary\":\"补充摘要\",\"Description\":\"\"}],\"Decision\":{\"Kind\":\"pole_composition\",\"FallbackSimilarityThreshold\":0.7,\"FallbackCode\":\"low\",\"LevelRule\":{\"LowMax\":0.25,\"HighMin\":0.75},\"Poles\":[{\"FactorCode\":\"total\",\"LeftPole\":\"I\",\"RightPole\":\"E\",\"Threshold\":5,\"Model\":\"axis-v1\"}],\"TopK\":2},\"SpecialRules\":[{\"Code\":\"special\",\"Kind\":\"answer_match\",\"Phase\":\"before_decision\",\"Trigger\":\"all\",\"OutcomeCode\":\"low\",\"QuestionCodes\":[\"q1\"],\"OptionValues\":[\"b\"]}],\"OutcomeMapping\":{\"DetailKind\":\"mbti\",\"DetailAdapterKey\":\"mbti\",\"Algorithm\":\"personality_typology\"},\"Profiles\":[{\"OutcomeCode\":\"low\",\"Pattern\":\"I\",\"Traits\":[\"谨慎\"],\"Strengths\":[\"观察\"],\"Weaknesses\":[],\"Suggestions\":[\"保持\"],\"ImageURL\":\"https://example.invalid/profile.png\",\"Image\":\"profile-v1\",\"Rarity\":{\"Percent\":10,\"Label\":\"少见\",\"OneInX\":10},\"IsSpecial\":true,\"Trigger\":\"historical\",\"Commentary\":\"冻结人格评语\"}]}],\"Outcomes\":[{\"Code\":\"low\",\"Title\":\"冻结低\",\"Summary\":\"冻结摘要\\u003c旧\\u0026v1\\u003e\",\"Description\":\"冻结建议\"}],\"ReportMap\":{\"Sections\":[{\"Code\":\"type\",\"Title\":\"类型\",\"SourceRefs\":[\"total\"],\"Kind\":\"personality_type\",\"AdapterKey\":\"mbti\",\"TemplateID\":\"personality.mbti\",\"TemplateVersion\":\"v1\",\"CategoryLabel\":\"\"}]},\"DecisionSpec\":{\"ScoreRanges\":null,\"TypeDecision\":null,\"OutcomeRefs\":null,\"SpecialOutcomes\":null},\"InterpretationAssets\":{\"Outcomes\":null,\"Profiles\":null,\"ReportSpec\":{\"Sections\":null}}}",
+  "canonical_hash": "416e3eb9e9ba7b35b41363072f70401fd1c09a3c033074abe1521cd34ada7e11",
+  "definition": {
+    "Measure": {
+      "Factors": [
+        {
+          "Code": "total",
+          "Title": "总分\u003c旧\u0026v1\u003e",
+          "Role": "total"
+        }
+      ],
+      "FactorGraph": {
+        "Roots": [
+          "total"
+        ],
+        "Edges": null,
+        "SortOrders": {
+          "total": 1
+        }
+      },
+      "Scoring": [
+        {
+          "FactorCode": "total",
+          "Sources": [
+            {
+              "Kind": "question",
+              "Code": "q1",
+              "ScoringMode": "option_override",
+              "Sign": 1,
+              "Weight": 0.5,
+              "OptionScores": {
+                "a": 0,
+                "b": 2
+              }
+            }
+          ],
+          "Strategy": "weighted_sum",
+          "Params": null,
+          "MaxScore": 10,
+          "Weights": {
+            "q1": 0.5
+          },
+          "Constant": 1
+        }
+      ]
+    },
+    "Calibration": {
+      "NormRefs": null
+    },
+    "Execution": {
+      "Brief2": null,
+      "SPM": null
+    },
+    "Conclusions": [
+      {
+        "Kind": "type",
+        "FactorCode": "",
+        "FactorCodes": [
+          "total"
+        ],
+        "ScoreBasis": "",
+        "Primary": false,
+        "Rules": null,
+        "Outcomes": [
+          {
+            "Code": "fallback",
+            "Title": "补充",
+            "Summary": "补充摘要",
+            "Description": ""
+          }
+        ],
+        "Decision": {
+          "Kind": "pole_composition",
+          "FallbackSimilarityThreshold": 0.7,
+          "FallbackCode": "low",
+          "LevelRule": {
+            "LowMax": 0.25,
+            "HighMin": 0.75
+          },
+          "Poles": [
+            {
+              "FactorCode": "total",
+              "LeftPole": "I",
+              "RightPole": "E",
+              "Threshold": 5,
+              "Model": "axis-v1"
+            }
+          ],
+          "TopK": 2
+        },
+        "SpecialRules": [
+          {
+            "Code": "special",
+            "Kind": "answer_match",
+            "Phase": "before_decision",
+            "Trigger": "all",
+            "OutcomeCode": "low",
+            "QuestionCodes": [
+              "q1"
+            ],
+            "OptionValues": [
+              "b"
+            ]
+          }
+        ],
+        "OutcomeMapping": {
+          "DetailKind": "mbti",
+          "DetailAdapterKey": "mbti",
+          "Algorithm": "personality_typology"
+        },
+        "Profiles": [
+          {
+            "OutcomeCode": "low",
+            "Pattern": "I",
+            "Traits": [
+              "谨慎"
+            ],
+            "Strengths": [
+              "观察"
+            ],
+            "Weaknesses": [],
+            "Suggestions": [
+              "保持"
+            ],
+            "ImageURL": "https://example.invalid/profile.png",
+            "Image": "profile-v1",
+            "Rarity": {
+              "Percent": 10,
+              "Label": "少见",
+              "OneInX": 10
+            },
+            "IsSpecial": true,
+            "Trigger": "historical",
+            "Commentary": "冻结人格评语"
+          }
+        ]
+      }
+    ],
+    "Outcomes": [
+      {
+        "Code": "low",
+        "Title": "冻结低",
+        "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+        "Description": "冻结建议"
+      }
+    ],
+    "ReportMap": {
+      "Sections": [
+        {
+          "Code": "type",
+          "Title": "类型",
+          "SourceRefs": [
+            "total"
+          ],
+          "Kind": "personality_type",
+          "AdapterKey": "mbti",
+          "TemplateID": "personality.mbti",
+          "TemplateVersion": "v1",
+          "CategoryLabel": ""
+        }
+      ]
+    },
+    "DecisionSpec": {
+      "ScoreRanges": null,
+      "TypeDecision": {
+        "Kind": "pole_composition",
+        "FallbackSimilarityThreshold": 0.7,
+        "FallbackCode": "low",
+        "TopK": 2
+      },
+      "OutcomeRefs": [
+        {
+          "Code": "low"
+        }
+      ],
+      "SpecialOutcomes": [
+        "low",
+        "low"
+      ]
+    },
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "冻结低",
+          "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+          "Description": "冻结建议"
+        },
+        {
+          "OutcomeCode": "fallback",
+          "Title": "补充",
+          "Summary": "补充摘要",
+          "Description": ""
+        }
+      ],
+      "Profiles": [
+        {
+          "OutcomeCode": "low",
+          "Pattern": "I",
+          "Traits": [
+            "谨慎"
+          ],
+          "Strengths": [
+            "观察"
+          ],
+          "Weaknesses": null,
+          "Suggestions": [
+            "保持"
+          ],
+          "ImageURL": "https://example.invalid/profile.png",
+          "Image": "profile-v1",
+          "Rarity": {
+            "Percent": 10,
+            "Label": "少见",
+            "OneInX": 10
+          },
+          "IsSpecial": true,
+          "Trigger": "historical",
+          "Commentary": "冻结人格评语"
+        }
+      ],
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "type",
+            "Title": "类型",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "personality_type",
+            "AdapterKey": "mbti",
+            "TemplateID": "personality.mbti",
+            "TemplateVersion": "v1",
+            "CategoryLabel": ""
+          }
+        ]
+      }
+    }
+  },
+  "frozen_assets": {
+    "Outcomes": [
+      {
+        "OutcomeCode": "low",
+        "Title": "冻结低",
+        "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+        "Description": "冻结建议"
+      },
+      {
+        "OutcomeCode": "fallback",
+        "Title": "补充",
+        "Summary": "补充摘要",
+        "Description": ""
+      }
+    ],
+    "Profiles": [
+      {
+        "OutcomeCode": "low",
+        "Pattern": "I",
+        "Traits": [
+          "谨慎"
+        ],
+        "Strengths": [
+          "观察"
+        ],
+        "Weaknesses": null,
+        "Suggestions": [
+          "保持"
+        ],
+        "ImageURL": "https://example.invalid/profile.png",
+        "Image": "profile-v1",
+        "Rarity": {
+          "Percent": 10,
+          "Label": "少见",
+          "OneInX": 10
+        },
+        "IsSpecial": true,
+        "Trigger": "historical",
+        "Commentary": "冻结人格评语"
+      }
+    ],
+    "ReportSpec": {
+      "Sections": [
+        {
+          "Code": "type",
+          "Title": "类型",
+          "SourceRefs": [
+            "total"
+          ],
+          "Kind": "personality_type",
+          "AdapterKey": "mbti",
+          "TemplateID": "personality.mbti",
+          "TemplateVersion": "v1",
+          "CategoryLabel": ""
+        }
+      ]
+    }
+  },
+  "frozen_payload": {
+    "Payload": {
+      "code": "M5_typology",
+      "version": "v1",
+      "title": "历史冻结模型",
+      "questionnaire_code": "",
+      "questionnaire_version": "",
+      "status": "",
+      "source": {},
+      "algorithm": "personality_typology",
+      "outcomes": [
+        {
+          "code": "low",
+          "name": "冻结低",
+          "one_liner": "冻结摘要\u003c旧\u0026v1\u003e",
+          "summary": "冻结人格评语",
+          "traits": [
+            "谨慎"
+          ],
+          "strengths": [
+            "观察"
+          ],
+          "suggestions": [
+            "保持"
+          ],
+          "image_url": "https://example.invalid/profile.png",
+          "pattern": "I",
+          "image": "profile-v1",
+          "rarity": {
+            "percent": 10,
+            "label": "少见",
+            "one_in_x": 10
+          },
+          "is_special": true,
+          "trigger": "historical",
+          "commentary": "冻结人格评语"
+        },
+        {
+          "code": "fallback",
+          "name": "补充",
+          "one_liner": "补充摘要",
+          "summary": "补充摘要",
+          "rarity": {}
+        }
+      ]
+    }
+  },
+  "input_identity": {
+    "ModelCode": "M5_typology",
+    "ModelVersion": "v1",
+    "ModelDigest": "09c33daaf7a225cc497a17c649aa28a52158ff620742ed556343910d3bd002e8",
+    "QuestionnaireCode": "M5_typology_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireDigest": "a3396f5224b55fd7304fb7e70e42beb8cd105b0e71786532dc63c230e4257d3e",
+    "AnswerSheetID": 7002,
+    "AnswerSheetDigest": "8c1933713c59ae06ada2d9b2c0389e86fe35a6fdbd06d0328ec20ab41f6b17c8",
+    "SubjectDigest": "29dc536656eb6c1b1a9927c5cb8262158ad4bc86dc7ed100050f943157e8e7ed",
+    "CompositeDigest": "8df04b7f5a316b3617e352a298d51e1024008173e8d4d79d90bd6c993b6a926c"
+  },
+  "model": {
+    "Kind": "typology",
+    "Algorithm": "personality_typology",
+    "DecisionKind": "pole_composition",
+    "Code": "M5_typology",
+    "Version": "v1",
+    "Title": "历史冻结模型",
+    "Payload": null
+  },
+  "name": "typology",
+  "norm_subject": {
+    "AgeMonths": 120,
+    "Gender": "female"
+  },
+  "questionnaire": {
+    "Code": "M5_typology_Q",
+    "Version": "1.0.0",
+    "Title": "",
+    "Questions": [
+      {
+        "Code": "q1",
+        "Type": "radio",
+        "Options": [
+          {
+            "Code": "a",
+            "Content": "",
+            "Score": 0
+          },
+          {
+            "Code": "b",
+            "Content": "",
+            "Score": 2
+          }
+        ]
+      }
+    ]
+  },
+  "report_input": {
+    "schema_version": 3,
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "冻结低",
+          "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+          "Description": "冻结建议"
+        },
+        {
+          "OutcomeCode": "fallback",
+          "Title": "补充",
+          "Summary": "补充摘要",
+          "Description": ""
+        }
+      ],
+      "Profiles": [
+        {
+          "OutcomeCode": "low",
+          "Pattern": "I",
+          "Traits": [
+            "谨慎"
+          ],
+          "Strengths": [
+            "观察"
+          ],
+          "Weaknesses": null,
+          "Suggestions": [
+            "保持"
+          ],
+          "ImageURL": "https://example.invalid/profile.png",
+          "Image": "profile-v1",
+          "Rarity": {
+            "Percent": 10,
+            "Label": "少见",
+            "OneInX": 10
+          },
+          "IsSpecial": true,
+          "Trigger": "historical",
+          "Commentary": "冻结人格评语"
+        }
+      ],
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "type",
+            "Title": "类型",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "personality_type",
+            "AdapterKey": "mbti",
+            "TemplateID": "personality.mbti",
+            "TemplateVersion": "v1",
+            "CategoryLabel": ""
+          }
+        ]
+      }
+    },
+    "model_ref": {
+      "Kind": "typology",
+      "Algorithm": "personality_typology",
+      "Code": "M5_typology",
+      "Version": "v1",
+      "Title": "历史冻结模型"
+    },
+    "factor_catalog": [
+      {
+        "code": "total",
+        "title": "总分\u003c旧\u0026v1\u003e",
+        "max_score": 10,
+        "is_total_score": true
+      }
+    ],
+    "typology_routing": {
+      "decision_kind": "pole_composition",
+      "report_kind": "personality_type",
+      "adapter_key": "mbti",
+      "template_id": "personality.mbti",
+      "template_version": "v1"
+    }
+  },
+  "scope": "synthetic source characterization; no production data",
+  "source_baseline": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+}

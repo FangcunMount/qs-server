@@ -1,0 +1,356 @@
+{
+  "answersheet": {
+    "ID": 7004,
+    "QuestionnaireCode": "M5_cognitive_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireTitle": "",
+    "Answers": [
+      {
+        "QuestionCode": "q1",
+        "Score": 2,
+        "Value": "b"
+      }
+    ]
+  },
+  "canonical_bytes": "{\"Measure\":{\"Factors\":[{\"Code\":\"total\",\"Title\":\"总分\\u003c旧\\u0026v1\\u003e\",\"Role\":\"total\"}],\"FactorGraph\":{\"Roots\":[\"total\"],\"Edges\":null,\"SortOrders\":{\"total\":1}},\"Scoring\":[{\"FactorCode\":\"total\",\"Sources\":[{\"Kind\":\"question\",\"Code\":\"q1\",\"ScoringMode\":\"option_override\",\"Sign\":1,\"Weight\":0.5,\"OptionScores\":{\"a\":0,\"b\":2}}],\"Strategy\":\"weighted_sum\",\"Params\":null,\"MaxScore\":10,\"Weights\":{\"q1\":0.5},\"Constant\":1}]},\"Calibration\":{\"NormRefs\":[{\"FactorCode\":\"total\",\"NormTableVersion\":\"spm-golden-v1\"}]},\"Execution\":{\"Brief2\":null,\"SPM\":{\"TimeLimitSeconds\":600,\"TotalFactorCode\":\"total\",\"ItemSets\":[{\"Code\":\"A\",\"Items\":[{\"QuestionCode\":\"q1\",\"CorrectOptionCode\":\"b\"}]}]}},\"Conclusions\":[{\"Kind\":\"ability\",\"FactorCode\":\"total\",\"FactorCodes\":null,\"ScoreBasis\":\"percentile\",\"Primary\":true,\"Rules\":[{\"MinScore\":0,\"MaxScore\":10,\"MaxInclusive\":true,\"UnboundedMax\":false,\"Level\":\"low\",\"OutcomeCode\":\"low\",\"Title\":\"被顶层文案覆盖\",\"Summary\":\"内联摘要\",\"Description\":\"内联建议\"}],\"Outcomes\":[],\"Decision\":{\"Kind\":\"\",\"FallbackSimilarityThreshold\":0,\"FallbackCode\":\"\",\"LevelRule\":null,\"Poles\":null,\"TopK\":0},\"SpecialRules\":null,\"OutcomeMapping\":{\"DetailKind\":\"\",\"DetailAdapterKey\":\"\",\"Algorithm\":\"\"},\"Profiles\":null}],\"Outcomes\":[{\"Code\":\"low\",\"Title\":\"冻结低\",\"Summary\":\"冻结摘要\\u003c旧\\u0026v1\\u003e\",\"Description\":\"冻结建议\"}],\"ReportMap\":{\"Sections\":[{\"Code\":\"scores\",\"Title\":\"因子分\",\"SourceRefs\":[\"total\"],\"Kind\":\"factor_scores\",\"AdapterKey\":\"scale\",\"TemplateID\":\"medical_scale\",\"TemplateVersion\":\"v1\",\"CategoryLabel\":\"历史分类\"}]},\"DecisionSpec\":{\"ScoreRanges\":null,\"TypeDecision\":null,\"OutcomeRefs\":null,\"SpecialOutcomes\":null},\"InterpretationAssets\":{\"Outcomes\":null,\"Profiles\":null,\"ReportSpec\":{\"Sections\":null}}}",
+  "canonical_hash": "6e39a4f720ca430c85774d069d4e478e95bd877f391549deb0fe719f174018eb",
+  "definition": {
+    "Measure": {
+      "Factors": [
+        {
+          "Code": "total",
+          "Title": "总分\u003c旧\u0026v1\u003e",
+          "Role": "total"
+        }
+      ],
+      "FactorGraph": {
+        "Roots": [
+          "total"
+        ],
+        "Edges": null,
+        "SortOrders": {
+          "total": 1
+        }
+      },
+      "Scoring": [
+        {
+          "FactorCode": "total",
+          "Sources": [
+            {
+              "Kind": "question",
+              "Code": "q1",
+              "ScoringMode": "option_override",
+              "Sign": 1,
+              "Weight": 0.5,
+              "OptionScores": {
+                "a": 0,
+                "b": 2
+              }
+            }
+          ],
+          "Strategy": "weighted_sum",
+          "Params": null,
+          "MaxScore": 10,
+          "Weights": {
+            "q1": 0.5
+          },
+          "Constant": 1
+        }
+      ]
+    },
+    "Calibration": {
+      "NormRefs": [
+        {
+          "FactorCode": "total",
+          "NormTableVersion": "spm-golden-v1"
+        }
+      ]
+    },
+    "Execution": {
+      "Brief2": null,
+      "SPM": {
+        "TimeLimitSeconds": 600,
+        "TotalFactorCode": "total",
+        "ItemSets": [
+          {
+            "Code": "A",
+            "Items": [
+              {
+                "QuestionCode": "q1",
+                "CorrectOptionCode": "b"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "Conclusions": [
+      {
+        "Kind": "ability",
+        "FactorCode": "total",
+        "FactorCodes": null,
+        "ScoreBasis": "percentile",
+        "Primary": true,
+        "Rules": [
+          {
+            "MinScore": 0,
+            "MaxScore": 10,
+            "MaxInclusive": true,
+            "UnboundedMax": false,
+            "Level": "low",
+            "OutcomeCode": "low",
+            "Title": "被顶层文案覆盖",
+            "Summary": "内联摘要",
+            "Description": "内联建议"
+          }
+        ],
+        "Outcomes": [],
+        "Decision": {
+          "Kind": "",
+          "FallbackSimilarityThreshold": 0,
+          "FallbackCode": "",
+          "LevelRule": null,
+          "Poles": null,
+          "TopK": 0
+        },
+        "SpecialRules": null,
+        "OutcomeMapping": {
+          "DetailKind": "",
+          "DetailAdapterKey": "",
+          "Algorithm": ""
+        },
+        "Profiles": null
+      }
+    ],
+    "Outcomes": [
+      {
+        "Code": "low",
+        "Title": "冻结低",
+        "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+        "Description": "冻结建议"
+      }
+    ],
+    "ReportMap": {
+      "Sections": [
+        {
+          "Code": "scores",
+          "Title": "因子分",
+          "SourceRefs": [
+            "total"
+          ],
+          "Kind": "factor_scores",
+          "AdapterKey": "scale",
+          "TemplateID": "medical_scale",
+          "TemplateVersion": "v1",
+          "CategoryLabel": "历史分类"
+        }
+      ]
+    },
+    "DecisionSpec": {
+      "ScoreRanges": [
+        {
+          "FactorCode": "total",
+          "Kind": "ability",
+          "Primary": true,
+          "Rules": [
+            {
+              "MinScore": 0,
+              "MaxScore": 10,
+              "MaxInclusive": true,
+              "UnboundedMax": false,
+              "Level": "low",
+              "OutcomeCode": "low"
+            }
+          ]
+        }
+      ],
+      "TypeDecision": null,
+      "OutcomeRefs": [
+        {
+          "Code": "low"
+        }
+      ],
+      "SpecialOutcomes": null
+    },
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "冻结低",
+          "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+          "Description": "冻结建议"
+        }
+      ],
+      "Profiles": null,
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "scores",
+            "Title": "因子分",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "factor_scores",
+            "AdapterKey": "scale",
+            "TemplateID": "medical_scale",
+            "TemplateVersion": "v1",
+            "CategoryLabel": "历史分类"
+          }
+        ]
+      }
+    }
+  },
+  "frozen_assets": {
+    "Outcomes": [
+      {
+        "OutcomeCode": "low",
+        "Title": "冻结低",
+        "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+        "Description": "冻结建议"
+      }
+    ],
+    "Profiles": null,
+    "ReportSpec": {
+      "Sections": [
+        {
+          "Code": "scores",
+          "Title": "因子分",
+          "SourceRefs": [
+            "total"
+          ],
+          "Kind": "factor_scores",
+          "AdapterKey": "scale",
+          "TemplateID": "medical_scale",
+          "TemplateVersion": "v1",
+          "CategoryLabel": "历史分类"
+        }
+      ]
+    }
+  },
+  "frozen_payload": {
+    "Snapshot": {
+      "Code": "M5_cognitive",
+      "Version": "v1",
+      "Title": "历史冻结模型",
+      "QuestionnaireCode": "",
+      "QuestionnaireVersion": "",
+      "Status": "",
+      "Factors": [
+        {
+          "Code": "total",
+          "Title": "总分\u003c旧\u0026v1\u003e",
+          "Role": "",
+          "ParentCode": "",
+          "SortOrder": 0,
+          "Level": 0,
+          "IsTotalScore": true,
+          "QuestionCodes": null,
+          "ScoringStrategy": "",
+          "ScoringParams": null,
+          "MaxScore": 10,
+          "Norm": null,
+          "ChildrenPolicy": null
+        }
+      ],
+      "AbilityConclusions": null,
+      "SPM": null,
+      "PublishedRuntime": null
+    }
+  },
+  "input_identity": {
+    "ModelCode": "M5_cognitive",
+    "ModelVersion": "v1",
+    "ModelDigest": "ea0e4de8627d7cc333ab47c1c40d1c6bfd1ce970cd13b0fe9c2468308972211b",
+    "QuestionnaireCode": "M5_cognitive_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireDigest": "89b8edd5cb802f0abc3217acd5b8aaaf98bcb4dda66fc75472defc856d1c6d7e",
+    "AnswerSheetID": 7004,
+    "AnswerSheetDigest": "32e47bf554eaa7e53e960aef2b2b7caba479ae750a43caed6eca5fab8f76b943",
+    "SubjectDigest": "1f20211aaa2a8a16671bea0dad1f0e19e90daffc83161711929b92cccbefdc09",
+    "CompositeDigest": "9068e9664ca37078af75b00c2cf487d08af72f0bea51b2e7d91029cf4ef23e5b"
+  },
+  "model": {
+    "Kind": "cognitive",
+    "Algorithm": "spm",
+    "DecisionKind": "ability_level",
+    "Code": "M5_cognitive",
+    "Version": "v1",
+    "Title": "历史冻结模型",
+    "Payload": null
+  },
+  "name": "cognitive",
+  "norm_subject": {
+    "AgeMonths": 0,
+    "Gender": "female"
+  },
+  "questionnaire": {
+    "Code": "M5_cognitive_Q",
+    "Version": "1.0.0",
+    "Title": "",
+    "Questions": [
+      {
+        "Code": "q1",
+        "Type": "radio",
+        "Options": [
+          {
+            "Code": "a",
+            "Content": "",
+            "Score": 0
+          },
+          {
+            "Code": "b",
+            "Content": "",
+            "Score": 2
+          }
+        ]
+      }
+    ]
+  },
+  "report_input": {
+    "schema_version": 3,
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "冻结低",
+          "Summary": "冻结摘要\u003c旧\u0026v1\u003e",
+          "Description": "冻结建议"
+        }
+      ],
+      "Profiles": null,
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "scores",
+            "Title": "因子分",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "factor_scores",
+            "AdapterKey": "scale",
+            "TemplateID": "medical_scale",
+            "TemplateVersion": "v1",
+            "CategoryLabel": "历史分类"
+          }
+        ]
+      }
+    },
+    "model_ref": {
+      "Kind": "cognitive",
+      "Algorithm": "spm",
+      "Code": "M5_cognitive",
+      "Version": "v1",
+      "Title": "历史冻结模型"
+    },
+    "factor_catalog": [
+      {
+        "code": "total",
+        "title": "总分\u003c旧\u0026v1\u003e",
+        "max_score": 10,
+        "is_total_score": true
+      }
+    ]
+  },
+  "scope": "synthetic source characterization; no production data",
+  "source_baseline": "2f8cccf527ac4123d5c2067fd01e4c228c09f50d"
+}
