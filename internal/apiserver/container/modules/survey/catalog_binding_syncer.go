@@ -4,7 +4,9 @@ import (
 	"context"
 	"sync"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
@@ -26,13 +28,13 @@ func (s *catalogBindingSyncer) SetCatalogManagementService(service modelcatalog.
 
 func (s *catalogBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
 	if s == nil {
-		return nil
+		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog management is not configured")
 	}
 	s.mu.RLock()
 	service := s.management
 	s.mu.RUnlock()
 	if service == nil {
-		return nil
+		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog management is not configured")
 	}
 	return service.SynchronizeQuestionnaireVersion(ctx, modelcatalog.ActorContext{
 		Principal: securityplane.Principal{Kind: securityplane.PrincipalKindService, Source: securityplane.PrincipalSourceInternal},
@@ -41,7 +43,7 @@ func (s *catalogBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, que
 
 func (s *catalogBindingSyncer) IsQuestionnaireBound(ctx context.Context, questionnaireCode string) (bool, error) {
 	if s == nil {
-		return false, nil
+		return false, errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog binding reader is not configured")
 	}
 	s.mu.RLock()
 	service := s.management
@@ -50,7 +52,24 @@ func (s *catalogBindingSyncer) IsQuestionnaireBound(ctx context.Context, questio
 		IsQuestionnaireBound(context.Context, string) (bool, error)
 	})
 	if !ok {
-		return false, nil
+		return false, errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog binding reader is not configured")
 	}
 	return reader.IsQuestionnaireBound(ctx, questionnaireCode)
+}
+
+func (s *catalogBindingSyncer) validateReadiness() error {
+	if s == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog management is not configured")
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.management == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog management is not configured")
+	}
+	if _, ok := s.management.(interface {
+		IsQuestionnaireBound(context.Context, string) (bool, error)
+	}); !ok {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "questionnaire catalog binding reader is not configured")
+	}
+	return nil
 }
