@@ -295,4 +295,25 @@ events:
 	require.NoError(t, db.Table("rm_outbox").Count(&rows).Error)
 	require.Equal(t, initialRows+4, rows)
 	require.Empty(t, legacyPublisher.events)
+
+	// Turning off the producer keeps normal task opening valid. It must not
+	// erase or change durable intents created while reminders were enabled.
+	disabledService, err := appplan.NewTaskManagementService(
+		repository, planRepository, enrollmentRepository, runner, &uniqueOpenEntryGenerator{}, legacyPublisher,
+		appplan.TaskOpeningOptions{ReminderEnabled: false, ReminderOutbox: appEventing.ProfileBinding{Stager: stager}},
+	)
+	require.NoError(t, err)
+	disabledTask := newTask(6)
+	_, err = disabledService.OpenTask(t.Context(), 501, disabledTask.GetID().String())
+	require.NoError(t, err)
+	disabledState, err := repository.FindByID(t.Context(), disabledTask.GetID())
+	require.NoError(t, err)
+	require.Equal(t, domainplan.TaskStatusOpened, disabledState.GetStatus())
+	require.NoError(t, db.Table("rm_outbox").Count(&rows).Error)
+	require.Equal(t, initialRows+4, rows, "disabled producer must not stage a new reminder")
+	require.Len(t, legacyPublisher.events, 1, "the existing task.opened path remains available")
+	require.Equal(t, domainplan.EventTypeTaskOpened, legacyPublisher.events[0].EventType())
+	var preservedPayload []byte
+	require.NoError(t, db.Raw("SELECT payload FROM rm_outbox WHERE message_id = ?", string(rawID)).Row().Scan(&preservedPayload))
+	require.Equal(t, rawPayload, preservedPayload, "existing reminder responsibility remains immutable")
 }
