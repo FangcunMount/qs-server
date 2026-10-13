@@ -129,19 +129,19 @@ func (m *Migrator) run(target ...uint) (version uint, changed bool, resultErr er
 			}
 		}()
 	}
-	if finalizer, ok := m.driver.(interface{ finishRun() error }); ok {
-		defer func() {
+	defer func() {
+		if finalizer, ok := m.driver.(interface{ finishRun() error }); ok {
 			if err := finalizer.finishRun(); err != nil {
 				resultErr = errors.Join(resultErr, fmt.Errorf("release run-owned migration connection: %w", err))
 			}
-			if resultErr == nil && backend == BackendMySQL && m.config.retirementPair != nil && version == compatibilitySQLVersion {
-				m.config.retirementPair.sqlFinished()
-			}
-		}()
-	}
+		}
+		if resultErr == nil && historicalTarget == 0 && m.config.retirementPair != nil {
+			resultErr = m.config.retirementPair.backendFinished(migrationRunContext(m.config), backend, version)
+		}
+	}()
 
 	// 创建 migrate 实例
-	instance, err := m.driver.CreateInstance(migrations, m.config)
+	instance, err := m.driver.CreateInstance(migrationSource(m.config), m.config)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to create migrate instance: %w", err)
 	}
@@ -202,11 +202,14 @@ func (m *Migrator) run(target ...uint) (version uint, changed bool, resultErr er
 	}
 
 	// 获取新版本
-	newVersion, _, verr := instance.Version()
+	newVersion, newDirty, verr := instance.Version()
 	if verr != nil {
 		return versionBefore, true, fmt.Errorf("failed to get new version: %w", verr)
 	}
 
+	if newDirty {
+		return versionBefore, true, retirementError("final migration head remains dirty")
+	}
 	return newVersion, true, nil
 }
 
