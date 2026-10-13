@@ -10699,8 +10699,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
-        "verified_on": "2026-10-08"
+        "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -10836,6 +10836,13 @@
           "result": "passed",
           "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
+          "verified_on": "2026-10-13"
         }
       ],
       "production_evidence": {
@@ -11075,8 +11082,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
-        "verified_on": "2026-10-08"
+        "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
+        "verified_on": "2026-10-13"
       },
       "fact_sources": [
         {
@@ -11123,6 +11130,13 @@
           "result": "passed",
           "source_sha": "ba564d3d3d80113c4a23d271b0f52e9fa30878f0",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
+          "verified_on": "2026-10-13"
         }
       ],
       "production_evidence": {
