@@ -2487,10 +2487,10 @@
         "code": "unknown_not_recorded",
         "detail": "Only a fresh replay of current APIServer startup ENV/Cmd/files through the identical App/Options chain was hashed. This is not a running-process memory dump, a proof that files never changed since startup, a credential-file-content hash or a full six-instance effective configuration hash."
       },
-      "command": "Authorized root SSH: capture PID1 startup ENV and original container Cmd privately, require captured ENV includes all original Config.Env; replay after Clearenv with actual nonroot UID/GID2000 in cached client --network none/--read-only/--cap-drop ALL/--log-driver none. Allow only configuration/TLS/JOSE read-only mounts; skip business logs and QRCode data. App RawSettingsValidate/BindPFlags/Unmarshal/RuntimeConfigContext/Complete/Validate then a hash-only callback; no Log.Init, database client, service assembly or business Run. Intermediate stdout/stderr neither retained nor emitted.",
+      "command": "Authorized root SSH: capture PID1 startup ENV and original container Cmd privately, require captured ENV includes all original Config.Env; replay after Clearenv with actual nonroot UID/GID2000 in cached client --network none/--read-only/--cap-drop ALL/--log-driver none. Allow only configuration/TLS/JOSE read-only mounts; skip business logs and QRCode data. App RawSettingsValidate/BindPFlags/Unmarshal/RuntimeConfigContext/Complete/Validate then a hash-only callback; no Log.Init, database client, service assembly or business Run. Intermediate stdout/stderr neither retained nor emitted. Follow-up: bounded docker logs for this exact container first120 startup seconds, max10000 lines/20MiB; retain only the single actual post-Unmarshal Options reminder boolean, never raw logs/config.",
       "result": {
         "status": "passed",
-        "summary": "The current APIServer startup inputs decode task_opened_reminder=false. Completed Options JSON hash captured; exact container identity/start time/compiled ead SHA unchanged. No business runtime or network started. This scoped decode result is not production M2 release or reminder business acceptance.",
+        "summary": "The current APIServer startup inputs decode task_opened_reminder=false. Completed Options JSON hash captured; exact container identity/start time/compiled ead SHA unchanged. No business runtime or network started. This scoped decode result is not production M2 release or reminder business acceptance. A separate read of the exact container original startup Options line confirms the running M3 process decoded reminder=false.",
         "measurements": {
           "read_only": true,
           "mutations_applied": 0,
@@ -2525,7 +2525,22 @@
               "reason": "audit UID1001 differs from actual www UID2000; failure was not used as configuration evidence",
               "raw_artifact_sha256": "sha256:bf2098a1996c65a71fdc85d40a583d99e613800a1a8f7285f00d445ffc82831e"
             }
-          ]
+          ],
+          "startup_log_follow_up": {
+            "observed_at": "2026-10-13T16:46:04.906415+00:00",
+            "container_started_at": "2026-10-13T12:41:03.410072812Z",
+            "log_read_exit_code": 0,
+            "matching_options_lines": 1,
+            "task_opened_reminder": false,
+            "runtime_unchanged": true,
+            "raw_artifact_sha256": "sha256:df7cd838f8153f4ce540ef5a083fd8083abcad6175385aa0e0e9631b87b5526c",
+            "reader_source_sha256": "sha256:00efef0e9c248527a8d7a7c486e23c622f67452980e09b6f37d5a33b27c12de6",
+            "raw_artifact_retention": "Task private artifact qs-server-cleanup-apiserver-reminder-startup-read.json; only safe boolean extraction, no original logs.",
+            "limits": [
+              "Only the actual decoded reminder boolean is retained; no raw log/config/claims or credential output.",
+              "App emits Options after Viper.Unmarshal and before Complete; source proves Complete/Validate do not modify Eventing. No complete effective configuration hash or physical reminder business acceptance is claimed."
+            ]
+          }
         }
       },
       "owner": "infra",
