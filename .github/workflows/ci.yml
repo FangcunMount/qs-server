@@ -403,7 +403,10 @@ jobs:
           go test -tags=integration "$package" -list "$selector" > /tmp/report-assets-projection-selected.txt
           test "$(grep -c '^TestReportAssetsVersionRealMongo' /tmp/report-assets-projection-selected.txt)" -eq 2
           go test -race -tags=integration -count=1 -timeout=5m -v "$package" -run "$selector" | tee /tmp/report-assets-projection-tests.log
-          ! grep -q -- '--- SKIP:' /tmp/report-assets-projection-tests.log
+          if grep -q -- '--- SKIP:' /tmp/report-assets-projection-tests.log; then
+            echo 'report-assets projection Mongo contracts must not skip' >&2
+            exit 1
+          fi
           grep -q -- '--- PASS: TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites ' /tmp/report-assets-projection-tests.log
           grep -q -- '--- PASS: TestReportAssetsVersionRealMongoHeadEditDoesNotBackfillLegacyReads ' /tmp/report-assets-projection-tests.log
 
