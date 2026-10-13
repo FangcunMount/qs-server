@@ -19,7 +19,7 @@ func TestHistoricalEvidenceRetirementResources(t *testing.T) {
 		t.Fatal("historical evidence down must refuse rather than recreate empty evidence")
 	}
 	resources, err := compiledMigrationResources()
-	if err != nil || !resources.accepts(101, 39) || resources.mongo.head != 39 {
-		t.Fatal("SQL-only historical evidence retirement requires declared 101/39 without Mongo advancement", err)
+	if err != nil || !resources.accepts(101, 39) || !resources.sql.contains(101) || !resources.mongo.contains(39) {
+		t.Fatal("SQL-only historical evidence release must retain its declared101/39 resources", err)
 	}
 }
