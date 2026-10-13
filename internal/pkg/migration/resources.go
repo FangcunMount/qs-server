@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 type schemaVersionPair struct{ SQL, Mongo uint }
@@ -39,10 +40,16 @@ func readMigrationResources(source fs.FS, pairs []schemaVersionPair) (*migration
 		if err != nil {
 			return nil, retirementError("embedded migration inventory unavailable")
 		}
-		pattern := regexp.MustCompile(`^([0-9]{6})_[a-z0-9_]+\.up\.` + item.extension + `$`)
+		pattern := regexp.MustCompile(`^([0-9]{6})_[a-z0-9_]+\.(up|down)\.` + item.extension + `$`)
 		for _, entry := range entries {
 			match := pattern.FindStringSubmatch(entry.Name())
-			if entry.IsDir() || match == nil {
+			if entry.IsDir() {
+				return nil, retirementError("unexpected embedded migration directory")
+			}
+			if match == nil {
+				if strings.Contains(entry.Name(), ".up.") || strings.Contains(entry.Name(), ".down.") {
+					return nil, retirementError("embedded migration filename malformed")
+				}
 				continue
 			}
 			v, err := strconv.ParseUint(match[1], 10, 32)
@@ -50,8 +57,10 @@ func readMigrationResources(source fs.FS, pairs []schemaVersionPair) (*migration
 				return nil, retirementError("embedded migration version malformed")
 			}
 			version := uint(v)
-			if _, exists := item.target.up[version]; exists {
-				return nil, retirementError("duplicate embedded migration version")
+			if match[2] == "up" {
+				if _, exists := item.target.up[version]; exists {
+					return nil, retirementError("duplicate embedded migration version")
+				}
 			}
 			path := "migrations/" + item.directory + "/" + entry.Name()
 			raw, err := fs.ReadFile(source, path)
@@ -59,9 +68,11 @@ func readMigrationResources(source fs.FS, pairs []schemaVersionPair) (*migration
 				return nil, retirementError("embedded migration body unavailable")
 			}
 			hash := retirementHash(raw)
-			item.target.up[version] = hash
+			if match[2] == "up" {
+				item.target.up[version] = hash
+			}
 			inventory = append(inventory, [3]string{item.directory, path, hash})
-			if version > item.target.head {
+			if match[2] == "up" && version > item.target.head {
 				item.target.head = version
 			}
 		}

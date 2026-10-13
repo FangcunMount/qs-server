@@ -102,6 +102,13 @@ func (m *Migrator) run(target ...uint) (version uint, changed bool, resultErr er
 		if p == nil {
 			return 0, false, retirementError("paired preflight required before latest migration")
 		}
+		// Poison before phase validation, and run this after connection finalization.
+		// Every failed or unknown attempt requires a new independently checked pair.
+		defer func() {
+			if resultErr != nil {
+				p.migrationResultFailed()
+			}
+		}()
 		if m.config.MigrationsTable != defaultTable || m.config.MigrationsCollection != defaultTable {
 			return 0, false, retirementError("paired migration namespace override rejected")
 		}
@@ -119,15 +126,6 @@ func (m *Migrator) run(target ...uint) (version uint, changed bool, resultErr er
 		if err := p.validateStart(migrationRunContext(m.config), backend); err != nil {
 			return 0, false, err
 		}
-	}
-	if historicalTarget == 0 {
-		// Registered before the owned-connection finalizer so release errors also
-		// invalidate this live pair. No retry can adopt a partial/unknown response.
-		defer func() {
-			if resultErr != nil {
-				m.config.retirementPair.migrationResultFailed()
-			}
-		}()
 	}
 	defer func() {
 		if finalizer, ok := m.driver.(interface{ finishRun() error }); ok {

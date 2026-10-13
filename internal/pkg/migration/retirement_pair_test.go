@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -100,5 +101,20 @@ func TestBoundaryAndFutureCleanWritesCannotForceSuccess(t *testing.T) {
 		if provider.version != 100 {
 			t.Fatal("rejected force changed schema metadata")
 		}
+	}
+}
+
+func TestFutureStepRejectsChangedDirtyMetadataBeforeRunAndClean(t *testing.T) {
+	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 40}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &retirementFailureProvider{version: 101, dirty: false}
+	driver := &retirementDatabaseDriver{Driver: provider, backend: BackendMySQL, resources: r, sourceValid: true, bodyValid: true, version: 101, dirty: true, stepSucceeded: true, pair: &PairPreflight{resources: r}}
+	if err := driver.Run(bytes.NewBufferString("CREATE TABLE migration_future_probe (id BIGINT PRIMARY KEY);\n")); err == nil {
+		t.Fatal("externally cleared pending metadata accepted")
+	}
+	if err := driver.SetVersion(101, false); err == nil {
+		t.Fatal("externally changed metadata re-certified clean")
 	}
 }

@@ -56,6 +56,13 @@ func TestMigrationResourcesRequireActualVersionsAndDeclaredPairs(t *testing.T) {
 			}
 		})
 	}
+	for _, name := range []string{"migrations/mysql/000102_wrong_extension.up.json", "migrations/mysql/102_malformed.up.sql"} {
+		malformed := futureMigrationSource(t)
+		malformed[name] = &fstest.MapFile{Data: []byte("SELECT 1;")}
+		if _, err := readMigrationResources(malformed, pairs); err == nil {
+			t.Fatal("malformed source filename accepted", name)
+		}
+	}
 	delete(source, "migrations/mysql/000101_future_test.up.sql")
 	source["migrations/mysql/000102_future_test.up.sql"] = &fstest.MapFile{Data: []byte("SELECT 1;")}
 	if _, err := readMigrationResources(source, pairs); err == nil {
@@ -63,7 +70,7 @@ func TestMigrationResourcesRequireActualVersionsAndDeclaredPairs(t *testing.T) {
 	}
 }
 
-func TestMigrationResourceHashBindsFullUpInventory(t *testing.T) {
+func TestMigrationResourceHashBindsFullInventory(t *testing.T) {
 	pairs := []schemaVersionPair{{100, 39}, {101, 40}}
 	source := futureMigrationSource(t)
 	first, err := readMigrationResources(source, pairs)
@@ -74,6 +81,11 @@ func TestMigrationResourceHashBindsFullUpInventory(t *testing.T) {
 	changed, err := readMigrationResources(source, pairs)
 	if err != nil || first.sha256 == changed.sha256 {
 		t.Fatal("historical body mutation not bound", err)
+	}
+	source["migrations/mysql/000100_retire_compatibility_message_storage.down.sql"].Data = []byte("SELECT 1;")
+	downChanged, err := readMigrationResources(source, pairs)
+	if err != nil || downChanged.sha256 == changed.sha256 {
+		t.Fatal("down resource mutation not bound", err)
 	}
 	source["migrations/mysql/000101_duplicate_test.up.sql"] = &fstest.MapFile{Data: []byte("SELECT 1;")}
 	if _, err := readMigrationResources(source, pairs); err == nil {

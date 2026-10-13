@@ -89,7 +89,7 @@ func (d *retirementDatabaseDriver) SetVersion(version int, dirty bool) error {
 				}
 			}
 		} else {
-			if !d.dirty || d.version != version || !d.stepSucceeded {
+			if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded {
 				return retirementError("clean version write without successful bound run refused")
 			}
 			if version > d.tailVersion() {
@@ -129,6 +129,10 @@ func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 	}
 	if d.version < d.tailVersion() {
 		return d.Driver.Run(bytes.NewReader(raw))
+	}
+	current, dirty, err := d.Driver.Version()
+	if err != nil || current != d.version || !dirty {
+		return retirementError("pending migration metadata changed or unknown")
 	}
 	if d.version > d.tailVersion() {
 		expected := ""
