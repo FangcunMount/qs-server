@@ -11,12 +11,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -528,44 +526,9 @@ func (p *PairPreflight) VerifyComplete(ctx context.Context) error {
 	return nil
 }
 func readBootstrapAuthorization(cfg PairConfig, resources *migrationResources) (*bootstrapAuthorization, error) {
-	if !retirementHashRE.MatchString(cfg.BootstrapAuthorizationSHA256) || !filepath.IsAbs(cfg.BootstrapAuthorizationFile) || filepath.Clean(cfg.BootstrapAuthorizationFile) != cfg.BootstrapAuthorizationFile {
-		return nil, retirementError("pristine bootstrap explicit authorization required")
-	}
-	path := cfg.BootstrapAuthorizationFile
-	for x := path; ; x = filepath.Dir(x) {
-		info, e := os.Lstat(x)
-		if e != nil || info.Mode()&os.ModeSymlink != 0 {
-			return nil, retirementError("bootstrap private path rejected")
-		}
-		if x != path && !info.IsDir() {
-			return nil, retirementError("bootstrap private path rejected")
-		}
-		if x != path && info.Mode().Perm()&022 != 0 && info.Mode()&os.ModeSticky == 0 {
-			return nil, retirementError("bootstrap ancestor writable")
-		}
-		if x == filepath.Dir(x) {
-			break
-		}
-	}
-	info, e := os.Lstat(path)
-	if e != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Sys().(*syscall.Stat_t).Nlink != 1 || (info.Sys().(*syscall.Stat_t).Uid != 0 && info.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid())) || info.Size() < 1 || info.Size() > 32768 {
-		return nil, retirementError("bootstrap private file rejected")
-	}
-	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	raw, e := readPrivateRetirementAuthorization(cfg.BootstrapAuthorizationFile, cfg.BootstrapAuthorizationSHA256)
 	if e != nil {
-		return nil, retirementError("bootstrap private file open rejected")
-	}
-	opened, e := f.Stat()
-	if e != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || opened.Mode().Perm() != 0600 || opened.Sys().(*syscall.Stat_t).Nlink != 1 {
-		_ = f.Close()
-		return nil, retirementError("bootstrap private file changed")
-	}
-	raw, e := io.ReadAll(io.LimitReader(f, 32769))
-	after, statErr := f.Stat()
-	closeErr := f.Close()
-	current, pathErr := os.Lstat(path)
-	if e != nil || statErr != nil || closeErr != nil || pathErr != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || len(raw) > 32768 || retirementHash(raw) != cfg.BootstrapAuthorizationSHA256 {
-		return nil, retirementError("bootstrap raw authorization hash mismatch")
+		return nil, e
 	}
 	if e = rejectRetirementDuplicateJSON(raw); e != nil {
 		return nil, e
@@ -580,7 +543,7 @@ func readBootstrapAuthorization(cfg PairConfig, resources *migrationResources) (
 	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 2 || a.Kind != "qs_schema_pair_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != resources.sql.head || a.MongoVersion != resources.mongo.head || a.MigrationResourcesSHA256 != resources.sha256 || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
 		return nil, retirementError("bootstrap authorization binding rejected")
 	}
-	if _, e = os.Lstat(path + ".consumed"); !errors.Is(e, os.ErrNotExist) {
+	if _, e = os.Lstat(cfg.BootstrapAuthorizationFile + ".consumed"); !errors.Is(e, os.ErrNotExist) {
 		return nil, retirementError("bootstrap authorization already consumed or unknown")
 	}
 	return &a, nil
@@ -596,30 +559,9 @@ func consumeBootstrapAuthorization(cfg PairConfig, a *bootstrapAuthorization, re
 	if *observed != *a {
 		return retirementError("bootstrap authorization changed")
 	}
-	f, e := os.OpenFile(cfg.BootstrapAuthorizationFile+".consumed", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if e != nil {
-		return retirementError("bootstrap authorization reuse rejected")
-	}
-	raw, _ := json.Marshal([]string{a.OperationID, cfg.BootstrapAuthorizationSHA256})
-	_, e = f.Write(raw)
-	if e == nil {
-		e = f.Sync()
-	}
-	closeErr := f.Close()
-	if e != nil || closeErr != nil {
-		return retirementError("bootstrap consumption receipt incomplete")
-	}
-	d, e := os.Open(filepath.Dir(cfg.BootstrapAuthorizationFile))
-	if e != nil {
-		return retirementError("bootstrap consumption receipt incomplete")
-	}
-	e = d.Sync()
-	closeErr = d.Close()
-	if e != nil || closeErr != nil {
-		return retirementError("bootstrap consumption receipt incomplete")
-	}
-	return nil
+	return claimPrivateRetirementAuthorization(cfg.BootstrapAuthorizationFile, a.OperationID, cfg.BootstrapAuthorizationSHA256)
 }
+
 func rejectRetirementDuplicateJSON(raw []byte) error {
 	d := json.NewDecoder(bytes.NewReader(raw))
 	var walk func() error
