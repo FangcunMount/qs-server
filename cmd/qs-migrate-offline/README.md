@@ -14,7 +14,7 @@ go build -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(
 sha256sum /private/task-owned/qs-migrate-offline
 ```
 
-凭据通过受限环境输入 `QS_OFFLINE_MYSQL_DSN`、`QS_OFFLINE_MONGO_URI`；不放进CLI、命令历史或文档。MySQL DSN必须选择显式指定的数据库；Mongo集群必须提供稳定replica-set身份。所有连接和查询仅属于这两库，不加载普通服务配置或业务资源。
+凭据通过受限环境输入 `QS_OFFLINE_MYSQL_DSN`、`QS_OFFLINE_MONGO_URI`；不放进CLI、命令历史或文档。MySQL DSN必须选择显式指定的数据库；Mongo集群必须提供稳定replica-set身份。仅创建所选MySQL pool和Mongo client，不加载普通服务配置或业务资源；information_schema与admin hello仅用于只读身份/迁移元数据验证。
 
 ```bash
 /private/task-owned/qs-migrate-offline --mysql-database=qs --mongo-database=qs

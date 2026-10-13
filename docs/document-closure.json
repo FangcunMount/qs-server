@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+    "sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
     "verified_on": "2026-10-13"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 45,
       "budgeted": false
     }
   },
@@ -8348,7 +8348,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -9900,7 +9900,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+        "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -9934,7 +9934,7 @@
           "kind": "command",
           "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
           "result": "passed",
-          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
           "verified_on": "2026-10-13"
         },
         {
@@ -9942,7 +9942,7 @@
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
           "result": "matched",
-          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
           "verified_on": "2026-10-13"
         },
         {
@@ -9950,7 +9950,7 @@
           "path": "internal/pkg/migration/retirement_driver.go",
           "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
           "result": "matched",
-          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
           "verified_on": "2026-10-13"
         }
       ],
@@ -11443,6 +11443,72 @@
           "severity": "medium",
           "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
           "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
+        }
+      ]
+    },
+    {
+      "path": "cmd/qs-migrate-offline/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+        "verified_on": "2026-10-13"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "cmd/qs-migrate-offline/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -tags=integration -count=1 -timeout=8m -run=^TestOfflineNative ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func RunOffline(",
+          "result": "matched",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Isolated migration tests and synthetic approval claims do not certify a production writer freeze, complete production backup-pair restore, startup time budget, destructive authorization, or runtime commit."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "OFFLINE-EXECUTION-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Production backup location, named responsibility, complete restore and startup/freeze receipts remain unbound.",
+          "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, per-object responsibility, complete backup-pair restoration within60min, runtime startup reserve and whole writer/TTL freeze before a separately authorized production apply."
         }
       ]
     }
