@@ -38,8 +38,7 @@ func TestCanonicalContentHashV1GoldenCorpus(t *testing.T) {
 			if hex.EncodeToString(sum[:]) != fixture.CanonicalHash {
 				t.Fatal("golden bytes do not match captured digest")
 			}
-			canonical := Definition{Measure: fixture.Definition.Measure, Calibration: fixture.Definition.Calibration, Execution: fixture.Definition.Execution, Conclusions: fixture.Definition.Conclusions, Outcomes: fixture.Definition.Outcomes, ReportMap: fixture.Definition.ReportMap}
-			encoded, err := json.Marshal(canonical)
+			encoded, err := canonicalContentBytesV1(fixture.Definition)
 			if err != nil {
 				t.Fatal(err)
 			}

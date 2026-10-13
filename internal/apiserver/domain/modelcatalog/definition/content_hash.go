@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"reflect"
 )
 
 // CanonicalContentHash fingerprints the canonical authoring layers frozen in a
@@ -12,17 +13,10 @@ func CanonicalContentHash(def *Definition) (string, error) {
 	if def == nil {
 		return "", nil
 	}
-	canonical := Definition{
-		Measure:     def.Measure,
-		Calibration: def.Calibration,
-		Execution:   def.Execution,
-		Conclusions: def.Conclusions,
-		Outcomes:    def.Outcomes,
-		ReportMap:   def.ReportMap,
-	}
-	data, err := json.Marshal(canonical)
+	data, err := canonicalContentBytesV1(def)
 	if err != nil {
-		return "", err
+		// Keep the prior JSON error type/message while encoding through the fixed v1 DTO.
+		return "", &json.MarshalerError{Type: reflect.TypeOf(Definition{}), Err: err}
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil
