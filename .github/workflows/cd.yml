@@ -38,6 +38,7 @@ name: Production Deploy
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
 #
 # 可选 Repository / Organization Variables（Mac mini self-hosted deploy）:
+#   QS_DEPLOY_IMAGE_SOURCE=registry   服务器直接拉取 ACR；tarball 恢复镜像包路径
 #   QS_DEPLOY_EXPORT_REGISTRY=acr      export 镜像源；留空默认 acr
 #   SVRA_PUBLIC_HOST / SVRD_PUBLIC_HOST  大文件上传优先公网（避免 Tailscale DERP）
 #   SVR_MINI_SSH_KEY（可选）Mac mini 部署优先 SSH 私钥
@@ -108,6 +109,7 @@ jobs:
       apiserver: ${{ steps.plan.outputs.apiserver }}
       collection: ${{ steps.plan.outputs.collection }}
       worker: ${{ steps.plan.outputs.worker }}
+      deploy_image_source: ${{ steps.deploy_config.outputs.deploy_image_source }}
       deploy_export_registry: ${{ steps.deploy_config.outputs.deploy_export_registry }}
       self_hosted_http_proxy: ${{ steps.deploy_config.outputs.self_hosted_http_proxy }}
       self_hosted_https_proxy: ${{ steps.deploy_config.outputs.self_hosted_https_proxy }}
@@ -249,7 +251,7 @@ jobs:
           fetch-depth: 1
 
       - name: Login ACR (isolated config, no keychain)
-        if: needs.plan.outputs.deploy_export_registry == 'acr'
+        if: needs.plan.outputs.deploy_image_source == 'tarball' && needs.plan.outputs.deploy_export_registry == 'acr'
         shell: bash
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
@@ -266,7 +268,7 @@ jobs:
           echo "DOCKER_CONFIG=${DOCKER_CONFIG_DIR}" >> "${GITHUB_ENV}"
 
       - name: Export deployment image tarball
-        if: needs.plan.outputs.deploy_export_registry == 'acr'
+        if: needs.plan.outputs.deploy_image_source == 'tarball' && needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           EXPORT_IMAGE_REGISTRY: acr
@@ -333,7 +335,12 @@ jobs:
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
-          DEPLOY_IMAGE_SOURCE: tarball
+          DEPLOY_IMAGE_SOURCE: ${{ needs.plan.outputs.deploy_image_source }}
+          DEPLOY_PULL_REGISTRY: acr
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
         run: bash scripts/cd/runner-upload-and-deploy.sh
 
       - name: Cleanup runner artifacts
@@ -376,7 +383,7 @@ jobs:
           fetch-depth: 1
 
       - name: Login ACR (isolated config, no keychain)
-        if: needs.plan.outputs.deploy_export_registry == 'acr'
+        if: needs.plan.outputs.deploy_image_source == 'tarball' && needs.plan.outputs.deploy_export_registry == 'acr'
         shell: bash
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
@@ -393,7 +400,7 @@ jobs:
           echo "DOCKER_CONFIG=${DOCKER_CONFIG_DIR}" >> "${GITHUB_ENV}"
 
       - name: Export deployment image tarball
-        if: needs.plan.outputs.deploy_export_registry == 'acr'
+        if: needs.plan.outputs.deploy_image_source == 'tarball' && needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           EXPORT_IMAGE_REGISTRY: acr
@@ -445,7 +452,12 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           COLLECTION_REPLICAS: ${{ env.COLLECTION_REPLICAS }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
-          DEPLOY_IMAGE_SOURCE: tarball
+          DEPLOY_IMAGE_SOURCE: ${{ needs.plan.outputs.deploy_image_source }}
+          DEPLOY_PULL_REGISTRY: acr
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
         run: bash scripts/cd/runner-upload-and-deploy.sh
 
       - name: Cleanup runner artifacts
@@ -487,7 +499,7 @@ jobs:
           fetch-depth: 1
 
       - name: Login ACR (isolated config, no keychain)
-        if: needs.plan.outputs.deploy_export_registry == 'acr'
+        if: needs.plan.outputs.deploy_image_source == 'tarball' && needs.plan.outputs.deploy_export_registry == 'acr'
         shell: bash
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
@@ -504,7 +516,7 @@ jobs:
           echo "DOCKER_CONFIG=${DOCKER_CONFIG_DIR}" >> "${GITHUB_ENV}"
 
       - name: Export deployment image tarball
-        if: needs.plan.outputs.deploy_export_registry == 'acr'
+        if: needs.plan.outputs.deploy_image_source == 'tarball' && needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           EXPORT_IMAGE_REGISTRY: acr
@@ -573,7 +585,12 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
-          DEPLOY_IMAGE_SOURCE: tarball
+          DEPLOY_IMAGE_SOURCE: ${{ needs.plan.outputs.deploy_image_source }}
+          DEPLOY_PULL_REGISTRY: acr
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
         run: bash scripts/cd/runner-upload-and-deploy.sh
 
       - name: Cleanup runner artifacts

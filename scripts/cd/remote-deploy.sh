@@ -55,6 +55,8 @@ docker_login_with_token() {
   local token="$2"
   local registry="${3:-}"
   local token_file rc
+  local -a config_args=()
+  if [ -n "${4:-}" ]; then config_args=(--config "$4"); fi
 
   token_file="$(mktemp)"
   chmod 600 "$token_file"
@@ -63,13 +65,13 @@ docker_login_with_token() {
 
   if [ "$SUDO" = "sudo_pw" ]; then
     if [ -n "$registry" ]; then
-      if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
+      if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker "${config_args[@]}" login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
         rc=0
       else
         rc=$?
       fi
     else
-      if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker login -u "$username" --password-stdin <"$token_file" >/dev/null; then
+      if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker "${config_args[@]}" login -u "$username" --password-stdin <"$token_file" >/dev/null; then
         rc=0
       else
         rc=$?
@@ -77,13 +79,13 @@ docker_login_with_token() {
     fi
   else
     if [ -n "$registry" ]; then
-      if $SUDO docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
+      if $SUDO docker "${config_args[@]}" login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
         rc=0
       else
         rc=$?
       fi
     else
-      if $SUDO docker login -u "$username" --password-stdin <"$token_file" >/dev/null; then
+      if $SUDO docker "${config_args[@]}" login -u "$username" --password-stdin <"$token_file" >/dev/null; then
         rc=0
       else
         rc=$?
@@ -290,12 +292,37 @@ select_image_from_registry() {
   local pull_registry="${DEPLOY_PULL_REGISTRY:-dockerhub}"
 
   case "$pull_registry" in
-    dockerhub|ghcr|auto) ;;
+    acr|dockerhub|ghcr|auto) ;;
     *)
-      echo "DEPLOY_PULL_REGISTRY must be dockerhub, ghcr, or auto; got: ${pull_registry}" >&2
+      echo "DEPLOY_PULL_REGISTRY must be acr, dockerhub, ghcr, or auto; got: ${pull_registry}" >&2
       exit 1
       ;;
   esac
+
+  if [ "$pull_registry" = acr ]; then
+    # Pull before replacing containers; never leave registry credentials on the host.
+    (
+      set -Eeuo pipefail
+      : "${ALIYUN_ACR_REGISTRY:?ACR registry is required}"
+      : "${ALIYUN_ACR_NAMESPACE:?ACR namespace is required}"
+      : "${ALIYUN_ACR_USERNAME:?ACR username is required}"
+      : "${ALIYUN_ACR_PASSWORD:?ACR password is required}"
+      local auth_dir source_image started
+      auth_dir="$(mktemp -d)"
+      chmod 700 "$auth_dir"
+      trap 'rm -rf "$auth_dir"' EXIT
+      source_image="${ALIYUN_ACR_REGISTRY}/${ALIYUN_ACR_NAMESPACE}/${IMAGE_NAME}:${IMAGE_TAG}"
+      docker_login_with_token "$ALIYUN_ACR_USERNAME" "$ALIYUN_ACR_PASSWORD" "$ALIYUN_ACR_REGISTRY" "$auth_dir" || exit $?
+      started=$(date +%s)
+      $SUDO docker --config "$auth_dir" pull --platform linux/amd64 "$source_image" || exit $?
+      $SUDO docker tag "$source_image" "$image" || exit $?
+      $SUDO docker image inspect "$image" >/dev/null || exit $?
+      echo "Pulled ACR deployment image in $(($(date +%s) - started))s"
+    ) || return $?
+    # Keep canonical image names for existing Compose, retention and evidence contracts.
+    write_compose_image_env "$image"
+    return 0
+  fi
 
   if [ "$pull_registry" = "dockerhub" ] || [ "$pull_registry" = "auto" ]; then
     if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
