@@ -3724,6 +3724,130 @@
         "Free space is an instantaneous shared-volume reading, not full backup/restore capacity or retention proof. No database backup has been captured.",
         "Per-object consumer/deferred/recovery responsibilities, complete freeze backup pair, restore/old-image/target-service evidence, autonomous writer scope and measured maintenance/recovery budgets remain open. Production maintenance, DDL and M2/M4 release require their separate reviewable batch approval."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-backup-client-version-preparation",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T23:51:52.494742+00:00",
+      "environment": "Mac mini local Docker Desktop backup-client cache/version preparation only; prior M1 source binding is historical context",
+      "deployed_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+      "source_baseline_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Only isolated backup-client image content and version were verified. Production runtime configuration, database credentials, connection/TLS/privileges, full backup and recovered services were not read or validated."
+      },
+      "command": "Official cached mysql8.0.36 linux/arm64 transferred using owned private temporary archives and a unique private cache tag after direct registry attempts failed; full original config bytes and all11 layers proved equal. Two version-only runs by verified target immutable OCI manifest ID, pull=never/network=none/read-only/cap-drop=ALL/no-new-privileges/log-driver=none/UID65534, no credentials, host mounts, Docker volumes or DB daemon. A readonly1MiB tmpfs covers the image-declared data volume; task-owned temporary archives and version containers are released.",
+      "result": {
+        "status": "passed",
+        "summary": "Only the MySQL backup-client version prerequisite passed: mysql and mysqldump each executed --version once and returned8.0.36/Linux aarch64. Earlier pull/import identity failures remain preserved. Full backup/restore and production maintenance readiness remain unverified.",
+        "measurements": {
+          "client_versions": [
+            {
+              "client": "mysql",
+              "version_output": "mysql  Ver 8.0.36 for Linux on aarch64 (MySQL Community Server - GPL)",
+              "run_count": 1,
+              "exit_code": 0,
+              "accepted": true
+            },
+            {
+              "client": "mysqldump",
+              "version_output": "mysqldump  Ver 8.0.36 for Linux on aarch64 (MySQL Community Server - GPL)",
+              "run_count": 1,
+              "exit_code": 0,
+              "accepted": true
+            }
+          ],
+          "accepted_runtime_image_id": "sha256:6de947e1ef168af0142707c6ec905ef524a6c4fc9575a9ec15cd7b34b458cf78",
+          "official_source_config_digest": "sha256:8aca36d040eba3cfafcd3b6cec800214e89f3789921bdcb3b967e8844145c27f",
+          "proved_oci_manifest_digest": "sha256:6de947e1ef168af0142707c6ec905ef524a6c4fc9575a9ec15cd7b34b458cf78",
+          "content_comparison": {
+            "config_original_byte_hash_equal": true,
+            "config_size_equal": true,
+            "rootfs_diff_ids_and_order_equal": true,
+            "layer_count_equal": true,
+            "all_raw_layer_payload_hashes_and_order_equal": true,
+            "all_raw_layer_payload_sizes_equal": true,
+            "all_uncompressed_layer_content_hashes_and_order_equal": true,
+            "source_layers_match_config_rootfs": true,
+            "target_layers_match_config_rootfs": true,
+            "target_rootfs_matches_inspected_image": true
+          },
+          "owned_version_containers_released": true,
+          "original_images_containers_volumes_and_named_tags_preserved": true,
+          "before_existing_image_ids": 37,
+          "before_existing_container_ids": 11,
+          "before_existing_volumes": 12,
+          "database_connections": 0,
+          "database_daemon_started": false,
+          "source_database_tls_privileges_verified": false,
+          "same_freeze_full_backup_pair_captured": false,
+          "actual_restore_rehearsal_verified": false,
+          "production_services_changed": false,
+          "maintenance_window_approved": false,
+          "earlier_receipts_preserved": true,
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-cache-transfer.json",
+              "sha256": "3450e3279dab5d73dab2dcd6cd10e501ba913cde552c08881b44741b64f850e2",
+              "status": "blocked"
+            },
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-cached-probe.json",
+              "sha256": "b179ca8083a33df59fed744cffa459b732437bbf2e43dc123ff011acdfd708b1",
+              "status": "blocked"
+            },
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-content-identity-oci.json",
+              "sha256": "d3518916ce0a2d35701c999e5c1c772c586acfbd8e8e9d2b7ec37425d9f2885d",
+              "status": "content_identity_proven_pending_root_decision"
+            },
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-content-identity.json",
+              "sha256": "e6c472916cfacffef43591d10b4d6b9420489e5d143532201ab7d306e32f949a",
+              "status": "unverified"
+            },
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-preparation.json",
+              "sha256": "a12459b0337b82f0d60020394a0183b1e2457f974c809d002dfcab5de25b3e17",
+              "status": "blocked"
+            },
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-tagged-cache-transfer.json",
+              "sha256": "ab5566f558d0cf2e6d52cca9f26068b60e9e92f4c4b60832df7c3927a0641592",
+              "status": "blocked"
+            },
+            {
+              "name": "qs-server-cleanup-m4-mysql-client-version-verification.json",
+              "sha256": "0da520fdb79101e6e4ad1a98508d53476d7f1a45fbb16d779f02433a02f5e949",
+              "status": "client_versions_verified"
+            }
+          ]
+        }
+      },
+      "owner": "Codex",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605"
+        }
+      ],
+      "limitations": [
+        "The CD reference is only prior M1 deployment context and proves neither these client operations nor M4 backup/restore. No production config readiness is signed.",
+        "The host-native MySQL tools remain absent. These are cached official container clients; version output proves no source connection, privileges, TLS, complete export or restore.",
+        "The source image config digest and target Docker .Id use different representations: complete raw config8aca and11 layers match; target.Id6de equals the verified original OCI manifest. No mutable tag was used for the version run. Earlier strict-ID rejections are retained instead of relabeled successful.",
+        "Only task-owned temporary archive directories and --rm version containers were removed; existing Docker objects and previous evidence were preserved. The unique client cache tag remains for controlled future preparation.",
+        "The private backup destination is approved, but no backup pair, isolation rehearsal, old-image compatibility, target service startup,30-day retention or measured30/60-minute RPO0 boundary is proven. Production freeze/DDL/release remains separately approved per batch."
+      ]
     }
   ]
 }
