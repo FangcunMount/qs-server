@@ -21,6 +21,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
+	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	collectionanswersheet "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
@@ -63,6 +64,15 @@ type m5ReceiptBinding struct {
 
 func (m5ReceiptBinding) ResolveAssessmentBinding(context.Context, string, string) (rulesetport.AssessmentBinding, bool, error) {
 	return rulesetport.AssessmentBinding{}, false, nil
+}
+
+type m5ReceiptAttribution struct{}
+
+func (m5ReceiptAttribution) Resolve(_ context.Context, request attributionport.ResolveRequest) (domainanswersheet.AttributionSnapshot, error) {
+	if request.OriginRef.Type != domainanswersheet.OriginTypeSelfService || request.OrgID != 501 || request.TesteeID == 0 {
+		return domainanswersheet.AttributionSnapshot{}, errors.New("receipt fixture requires its admitted self-service scope")
+	}
+	return domainanswersheet.NewAttributionSnapshot(request.OriginRef, "", "", "", "", "", request.CapturedAt)
 }
 
 type m5ReceiptActor struct{}
@@ -156,8 +166,9 @@ events:
 	)
 	require.NoError(t, err)
 	require.NoError(t, questionnaire.AddQuestion(question))
-	apiService := appanswersheet.NewSubmissionService(sheets, durable, m5ReceiptQuestionnaireRepo{value: questionnaire}, nil)
+	apiService := appanswersheet.NewSubmissionService(sheets, durable, m5ReceiptQuestionnaireRepo{value: questionnaire}, mongoanswersheet.NewAnswerSheetReadModel(sheets))
 	apiService.(appanswersheet.AssessmentBindingInjector).SetAssessmentBindingResolver(m5ReceiptBinding{})
+	apiService.(appanswersheet.AttributionResolverInjector).SetAttributionResolver(m5ReceiptAttribution{})
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
