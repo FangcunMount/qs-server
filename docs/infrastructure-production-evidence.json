@@ -260,7 +260,7 @@
       "command": "Authorized root SSH read-only inventory: MySQL host mysql client with private defaults-file, 5s statement limit and READ ONLY transactions; Mongo cached mongo:7.0 client on infra-network as uid 1001 with private env-file, maxTimeMS 5s. No business documents, credentials or raw driver errors emitted.",
       "result": {
         "status": "findings",
-        "summary": "Clean MySQL100/Mongo39; 62 application tables and 17 Mongo namespaces. Business namespace metadata and aggregate candidate counts retained. Mongo system.profile metadata unauthorized; evaluation_outcome historical JSON count timed out/failed, remains unknown. No schema or business writes applied.",
+        "summary": "Clean MySQL100/Mongo39; 62 application tables and 17 Mongo namespaces. Business namespace metadata and candidate counts retained. Mongo system.profile metadata unauthorized. Outcome JSON initial full scan failed; a later bounded PK scan reached its initial high-water boundary, read247462 rows and found zero non-null history values. No schema or business writes applied.",
         "measurements": {
           "mysql_observed_at": "2026-10-13T09:04:07.198952+00:00",
           "mongodb_observed_at": "2026-10-13T09:18:36.769840+00:00",
@@ -687,6 +687,39 @@
               "evidence": "explicit user release confirmation; source checked, actual device behavior not attested"
             },
             "limitation": "These are version/health observations of the starting deployment, not successful business effects, compatibility-flow coverage or cleanup release acceptance."
+          },
+          "paged_followup": {
+            "read_only": true,
+            "database": "qs",
+            "observed_at": "2026-10-13T09:39:50.900242+00:00",
+            "counts": {
+              "outcome_history": {
+                "rows_scanned": 247462,
+                "non_null": 0,
+                "pages": 248,
+                "bounded_by_initial_max_primary_key": true,
+                "reached_initial_max": true,
+                "scan_semantics": "ordered PK pages under per-query READ ONLY transactions; not one global snapshot; source has no current history-field writer",
+                "duration_seconds": 13.491
+              },
+              "task_token_responsibility": [
+                372358,
+                0,
+                0
+              ],
+              "store_manifest_states": [
+                1,
+                0,
+                0
+              ],
+              "retirement_manifest_stages": [
+                1,
+                0,
+                0,
+                0
+              ]
+            },
+            "errors": {}
           }
         }
       },
@@ -706,7 +739,7 @@
       "limitations": [
         "Snapshot counts are dated and do not authorize deletion. Metadata row estimates cannot prove emptiness.",
         "Source audit candidates still require external consumer proof, scoped backup and isolated restoration, unresolved responsibility inventory and a reviewed release batch.",
-        "No system.profile administrator permission was acquired. The failed bounded outcome JSON count is unknown; it is not zero.",
+        "No system.profile administrator permission was acquired. The initial bounded full outcome JSON count failed; the later read-only PK-paged followup recovered the count under its stated high-water and per-page snapshot limits.",
         "Stored Definition fields are present in 81 records; pure projection equality has not been audited. All AnswerSheets having admission does not establish no pending, held, dead-letter or replayable legacy input.",
         "This observes the starting deployed version, not cleanup artifacts. All six QS service binaries/images are bound separately; full effective configuration, consumer traffic and business effects are not bound."
       ]
