@@ -88,6 +88,7 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 // registerBusinessRoutes 注册业务路由
 func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	api := engine.Group("/api/v1")
+	api.Use(observePlanEntryRoutes())
 
 	// 应用 IAM JWT 认证中间件（如果启用，使用 SDK TokenVerifier 本地验签）
 	r.applyIAMAuth(api, isPublicCatalogReadOnly)

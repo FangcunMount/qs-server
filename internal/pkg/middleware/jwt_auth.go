@@ -11,6 +11,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	"github.com/FangcunMount/qs-server/internal/pkg/authobservability"
 	"github.com/gin-gonic/gin"
 
 	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
@@ -48,6 +49,8 @@ func normalizeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.VerifyOptions) gin.HandlerFunc {
 	verifyOpts := normalizeVerifyOptions(opts)
 	return func(c *gin.Context) {
+		source, outcome := "unavailable", "rejected"
+		defer func() { authobservability.RecordTokenVerification(source, outcome) }()
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
 		// 检查 verifier 是否可用
 		if verifier == nil {
@@ -61,7 +64,8 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 		}
 
 		// 提取 Token
-		token := extractToken(c)
+		token, tokenSource := extractToken(c)
+		source = tokenSource
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token extracted", "has_token", token != "", "token_length", len(token))
 		if token == "" {
 			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
@@ -104,7 +108,9 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 			return
 		}
 
-		claims := buildUserClaims(result)
+		claims, sources := buildUserClaims(result)
+		authobservability.RecordVerifiedClaimSources(sources)
+		outcome = "accepted"
 		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
@@ -121,29 +127,29 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 // 辅助函数
 
 // extractToken 从请求中提取 Token
-func extractToken(c *gin.Context) string {
+func extractToken(c *gin.Context) (string, string) {
 	// 1. Authorization Header
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
 		// Bearer token
 		if strings.HasPrefix(authHeader, "Bearer ") {
-			return strings.TrimPrefix(authHeader, "Bearer ")
+			return strings.TrimPrefix(authHeader, "Bearer "), "bearer"
 		}
 		// 直接是 token
-		return authHeader
+		return authHeader, "bare"
 	}
 
 	// 2. Query Parameter
 	if token := c.Query("access_token"); token != "" {
-		return token
+		return token, "query"
 	}
 
 	// 3. Cookie
 	if token, err := c.Cookie("access_token"); err == nil && token != "" {
-		return token
+		return token, "cookie"
 	}
 
-	return ""
+	return "", "missing"
 }
 
 // GetUserClaims 从上下文获取用户声明
@@ -182,24 +188,24 @@ func GetUserID(c *gin.Context) string {
 }
 
 // resolveOrgIDClaim 读取 JWT 中明确的业务组织声明。
-func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) string {
+func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) (string, string) {
 	if tokenClaims == nil {
-		return ""
+		return "", "missing"
 	}
 	if raw := strings.TrimSpace(tokenClaims.OrgID); raw != "" {
-		return raw
+		return raw, "canonical"
 	}
 	if len(tokenClaims.Extra) == 0 {
-		return ""
+		return "", "missing"
 	}
 	for _, key := range []string{"org_id", "organization_id"} {
 		if v, ok := tokenClaims.Extra[key]; ok {
 			if s := claimValueToString(v); s != "" {
-				return s
+				return s, "extra_" + key
 			}
 		}
 	}
-	return ""
+	return "", "missing"
 }
 
 // logJWTClaimMapping 在用户标识映射为空时记录调试信息，不记录声明值。
@@ -234,53 +240,60 @@ func sortedExtraKeys(raw *auth.TokenClaims) []string {
 	return keys
 }
 
-func buildUserClaims(result *auth.VerifyResult) *UserClaims {
+func buildUserClaims(result *auth.VerifyResult) (*UserClaims, [3]string) {
 	if result == nil || result.Claims == nil {
-		return nil
+		return nil, [3]string{}
 	}
 	tokenClaims := result.Claims
+	userID, userSource := resolveUserID(tokenClaims.UserID, tokenClaims.Extra)
+	accountID, accountSource := resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra)
+	orgID, orgSource := resolveOrgIDClaim(tokenClaims)
 	return &UserClaims{
-		UserID:    resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-		AccountID: resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra),
+		UserID:    userID,
+		AccountID: accountID,
 
-		OrgID:     resolveOrgIDClaim(tokenClaims),
+		OrgID:     orgID,
 		SessionID: tokenClaims.SessionID,
 		TokenID:   tokenClaims.TokenID,
 		AMR:       tokenClaims.AMR,
 		Metadata:  result.Metadata,
-	}
+	}, [3]string{userSource, accountSource, orgSource}
 }
 
 // resolveAccountID keeps qs-server's historical AccountID context key compatible with IAM v2 LoginIdentityID.
-func resolveAccountID(loginIdentityID string, extra map[string]interface{}) string {
+func resolveAccountID(loginIdentityID string, extra map[string]interface{}) (string, string) {
 	if len(extra) > 0 {
 		for _, key := range []string{"account_id", "accountId", "aid"} {
 			if v, ok := extra[key]; ok {
 				if s := claimValueToString(v); s != "" {
-					return s
+					return s, "extra_" + key
 				}
 			}
 		}
 	}
-	return strings.TrimSpace(loginIdentityID)
+	value := strings.TrimSpace(loginIdentityID)
+	if value == "" {
+		return "", "missing"
+	}
+	return value, "canonical"
 }
 
 // resolveUserID 优先使用标准 UserID 字段，缺失时从 Extra 兼容提取。
-func resolveUserID(userID string, extra map[string]interface{}) string {
+func resolveUserID(userID string, extra map[string]interface{}) (string, string) {
 	if userID != "" {
-		return userID
+		return userID, "canonical"
 	}
 	if len(extra) == 0 {
-		return ""
+		return "", "missing"
 	}
 	for _, key := range []string{"user_id", "uid", "sub"} {
 		if v, ok := extra[key]; ok {
 			if s := claimValueToString(v); s != "" {
-				return s
+				return s, "extra_" + key
 			}
 		}
 	}
-	return ""
+	return "", "missing"
 }
 
 func claimValueToString(v interface{}) string {

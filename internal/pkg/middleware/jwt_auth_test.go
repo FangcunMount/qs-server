@@ -31,7 +31,7 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 		},
 	}
 
-	claims := buildUserClaims(result)
+	claims, _ := buildUserClaims(result)
 	if claims == nil {
 		t.Fatal("expected claims")
 		return
@@ -76,7 +76,7 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 		},
 	}
 
-	claims := buildUserClaims(result)
+	claims, _ := buildUserClaims(result)
 	if claims == nil {
 		t.Fatal("expected claims")
 		return
@@ -106,7 +106,7 @@ func TestUserClaimsMapToSecurityPlaneOrgScope(t *testing.T) {
 		},
 	}
 
-	claims := buildUserClaims(result)
+	claims, _ := buildUserClaims(result)
 	scope := securityplane.NewOrgScope(3001, true)
 
 	if claims.UserID != "1001" || claims.AccountID != "2001" {
