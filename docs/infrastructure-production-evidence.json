@@ -2145,6 +2145,332 @@
         "The retained 2f8 source/image is only a recovery boundary at the same clean100/39 identities and configuration without application-data or migration DDL. Rollback/restore was not exercised, and the boundary does not extend to future101/40.",
         "gh run watch encountered an API EOF. The final workflow result and each build/deploy/governance job were independently confirmed successful; the manual-dispatch automatic deployment marker was skipped by design."
       ]
+    },
+    {
+      "id": "infra-2026-10-13-qs-cleanup-m5-hash-metadata",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-13T15:38:13.391482+00:00",
+      "environment": "production/serverA qs MongoDB rs0, read-only snapshot audit and bounded BSON-type follow-up",
+      "deployed_sha": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+      "source_baseline_sha": "0f399acbc950dc8a6508c7568ed4bc9858264954",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The exact running API config/env and compiled SHA selected the application Mongo identity. Complete post-Viper effective configuration was not hashed; this dated findings record does not sign production readiness."
+      },
+      "command": "Authorized root SSH: private0600 connection file, cached read-only client container, source81ba7f70 snapshot-session audit batch25/max1000/timeout2m; follow-up bounded aggregation only for the15 exact retained IDs reports BSON field types. No model bodies, credentials, writes, CAS, cache purge, or rematerialization. Follow-up did not execute the Go audit binary.",
+      "result": {
+        "status": "findings",
+        "summary": "Complete105 retained records:76asset-matched,4MBTI snapshot differences,25invalid heads. Published-snapshot hash metadata64matched/15invalid/0unverifiable. All15 invalid historical snapshots independently have both Source hash metadata fields missing; no calculated production hash mismatch was observed. These are additional identity obligations, not authority to re-sign or delete records.",
+        "measurements": {
+          "read_only": true,
+          "mutations_applied": 0,
+          "audit_source_sha": "81ba7f70284e0d7ec31732de4ef79bc5ae098c6b",
+          "binary_sha256": "sha256:7dfffd89c11462cb7613ac040df2e85930a7347be23856ce75098fa739dd3b04",
+          "raw_audit_sha256": "sha256:542b7ded81900dda8eb05110cede8aff989a276199d4afb88ecd9e6234b74607",
+          "raw_audit_retention": "Task private artifact qs-server-cleanup-m5-definition-hash-audit.json; earlier audit/reason artifacts remain preserved.",
+          "identity_before": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_after": {
+            "database": "qs",
+            "version": "7.0.31",
+            "set_name": "rs0",
+            "hosts": [
+              "mongo:27017"
+            ],
+            "migration": [
+              {
+                "version": "39",
+                "dirty": false
+              }
+            ]
+          },
+          "identity_unchanged": true,
+          "audit_exit_code": 2,
+          "summary": {
+            "complete": true,
+            "zero_mismatch": false,
+            "expected": 105,
+            "scanned": 105,
+            "compared": 80,
+            "matched": 76,
+            "mismatched": 4,
+            "missing_definition": 0,
+            "unknown_schema": 0,
+            "invalid": 25,
+            "record_errors": 0,
+            "scan_errors": 0,
+            "heads": 26,
+            "snapshots": 79,
+            "historical": 54,
+            "stored_decision_fields": 81,
+            "stored_asset_fields": 81,
+            "hash_metadata_matched": 64,
+            "hash_metadata_invalid": 15,
+            "hash_metadata_unverifiable": 0,
+            "truncated": false
+          },
+          "scope_additions_from_reason_audit": 0,
+          "scope_removals_from_reason_audit": 0,
+          "identity_revision_fingerprint_projection_changes_from_reason_audit": 0,
+          "finding_scope": [
+            {
+              "model_id": "6a757d9b2c07fb78a2286416",
+              "code": "AMwIzu",
+              "role": "published_snapshot",
+              "revision": "3.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "a2c87aedd48990d758c4a474659ef298ddd5d960fed47b358246b68f6b103028",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a2286417",
+              "code": "D6ZvjC",
+              "role": "published_snapshot",
+              "revision": "4.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "c806f9438bfa98970838dcf40f3657aec73ded75e777f8216a6b6d3b9efd19a4",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a2286418",
+              "code": "ISI7",
+              "role": "published_snapshot",
+              "revision": "1.0.0-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "b89c12270247e0844fd1bf6d14a4e0f6f0fbcebe6e3c5bc5102e72732381bcac",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a2286419",
+              "code": "PROMIS_SD8A",
+              "role": "published_snapshot",
+              "revision": "1.0.0-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "367fc9aa88a2d2f0a3768960f2e227838f7d7941b5e3e5e6cb271c7096cd5986",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a228641a",
+              "code": "TMiNB8",
+              "role": "published_snapshot",
+              "revision": "4.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "ced062e25ca4475181b3db6850985628297291bfe0fdf234aad81237a9d67038",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a228641b",
+              "code": "WFIRSP",
+              "role": "published_snapshot",
+              "revision": "1.0.0-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "eaef40b8a0fe268324fb6ebf592af6be9e4b323a78e902dc9d52e254d21e7445",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a228641c",
+              "code": "eLl0sv",
+              "role": "published_snapshot",
+              "revision": "3.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "1d38c730f09e572a9c1d594b393d3af4d53d036c8665d25d36bf93b65b56a1e0",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a228641d",
+              "code": "fthN56",
+              "role": "published_snapshot",
+              "revision": "4.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "1145c8c76c19da5e0111a3e918970f363b89dc4cfb028145377b9f54498200e1",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a228641e",
+              "code": "mbdoeV",
+              "role": "published_snapshot",
+              "revision": "4.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "9e6d2aef677f472b932b2937d405ea5d8681f240b9d2c6245c6c452e60b3bcce",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9b2c07fb78a228641f",
+              "code": "oAWamd",
+              "role": "published_snapshot",
+              "revision": "1.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "40f9745b7739ead4b118eaa0a7d9eb3e41f08abae09005d5565f2b749b80cdd4",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9c2c07fb78a2286420",
+              "code": "sJFa2R",
+              "role": "published_snapshot",
+              "revision": "4.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "36e3303f722026fe3cf3864af8df51585ee00fb755264e27fa9a59748f3b5fc2",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9c2c07fb78a2286421",
+              "code": "tssl35",
+              "role": "published_snapshot",
+              "revision": "1.0.0-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "3953ede868ecda48cf5a4f464912448cb09e45157715a26a85fbc1208fae730d",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9c2c07fb78a2286422",
+              "code": "tuixuu",
+              "role": "published_snapshot",
+              "revision": "4.0.1-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "7ab2d45f66cc393667b2b99f04fe3d43569d9e6130d77ca3adf32d09666887f0",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9c2c07fb78a2286423",
+              "code": "yGtSs1",
+              "role": "published_snapshot",
+              "revision": "1.0.0-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "1bac7676f712ecd04c525890fc66932de783779930c0f442e6499a56103885fd",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            },
+            {
+              "model_id": "6a757d9c2c07fb78a2286424",
+              "code": "zOO4eG",
+              "role": "published_snapshot",
+              "revision": "v9-report-202608-v1-catalog-202608-v1",
+              "fingerprint": "960ecd874bf6f5f1b7f92d43a569233924cc147577cad27e8dbaf762ae6c5b11",
+              "asset_status": "matched",
+              "hash_metadata_paths": [
+                "source.definition_hash_schema",
+                "source.definition_content_hash"
+              ],
+              "schema_type": "missing",
+              "hash_type": "missing"
+            }
+          ],
+          "bounded_metadata_query": {
+            "observed_at": "2026-10-13T15:51:47.507748+00:00",
+            "method": "bounded Mongo aggregation of BSON field types",
+            "script_sha256": "sha256:4dc8ad7c6308f805ef2f69d973520ad9eb82cb7dfdac8e4d802e55e3868acd50",
+            "raw_artifact_sha256": "sha256:e653486bf5dde80146d7d6d3f508ec27a8abb0301241e9c003402f9eef1307c5",
+            "raw_artifact_retention": "Task private artifact qs-server-cleanup-m5-definition-hash-types.json. Metadata aggregation, not Go binary execution.",
+            "expected": 15,
+            "scanned": 15,
+            "complete": true,
+            "schema_missing": 15,
+            "hash_missing": 15,
+            "identity_unchanged": true,
+            "exit_code": 0
+          }
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#67-m5-06-生产-definition-只读投影核查"
+        }
+      ],
+      "limitations": [
+        "Mongo only; no fresh MySQL read-back in these two operations. Effective configuration, backup-pair restoration, deployed preparation code and business acceptance remain unproven.",
+        "Historical suffix/source-tool commits support investigation but cannot independently prove every retained record identity. Preserve legacy governance receipts; do not fill hashes, overwrite Source, re-sign history, rematerialize, or remove models to hide missing metadata.",
+        "The original4 asset differences and25 structural-head findings remain separate obligations. Asset matching is not published-snapshot identity acceptance; heads are exempt from snapshot-only hash metadata requirements."
+      ]
     }
   ]
 }
