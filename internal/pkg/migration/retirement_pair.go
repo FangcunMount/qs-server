@@ -417,7 +417,7 @@ func preflightCompatibilityPair(ctx context.Context, db *sql.DB, client *mongo.C
 	}
 	p := &PairPreflight{resources: resources, sqlDB: db, mongo: client, config: cfg, pristine: sqlState.pristine, sqlHash: sqlHash, mongoHash: mongoHash, initialSQLVersion: sqlState.version, initialMongoVersion: mongoState.version}
 	if p.pristine {
-		a, e := readBootstrapAuthorization(cfg)
+		a, e := readBootstrapAuthorization(cfg, resources)
 		if e != nil {
 			return nil, e
 		}
@@ -474,7 +474,7 @@ func (p *PairPreflight) validateStart(ctx context.Context, backend Backend) erro
 		if !sqlState.pristine || !mongoState.pristine {
 			return retirementError("pristine pair changed")
 		}
-		return consumeBootstrapAuthorization(p.config, p.authorization)
+		return consumeBootstrapAuthorization(p.config, p.authorization, p.resources)
 	}
 	if !p.sqlDone || sqlState.pristine || sqlState.version != p.resources.sql.head || !mongoState.pristine {
 		return retirementError("pristine complete sql up unproven")
@@ -533,7 +533,7 @@ func (p *PairPreflight) VerifyComplete(ctx context.Context) error {
 	}
 	return nil
 }
-func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error) {
+func readBootstrapAuthorization(cfg PairConfig, resources *migrationResources) (*bootstrapAuthorization, error) {
 	if !retirementHashRE.MatchString(cfg.BootstrapAuthorizationSHA256) || !filepath.IsAbs(cfg.BootstrapAuthorizationFile) || filepath.Clean(cfg.BootstrapAuthorizationFile) != cfg.BootstrapAuthorizationFile {
 		return nil, retirementError("pristine bootstrap explicit authorization required")
 	}
@@ -583,7 +583,7 @@ func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error)
 		return nil, retirementError("bootstrap authorization schema rejected")
 	}
 	expires, e := time.Parse(time.RFC3339, a.ExpiresAt)
-	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 1 || a.Kind != "qs_compatibility_retirement_b_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != 100 || a.MongoVersion != 39 || a.MigrationResourcesSHA256 != CompatibilityMigrationResourcesSHA256() || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
+	if e != nil || !strings.HasSuffix(a.ExpiresAt, "Z") || !time.Now().Before(expires) || expires.After(time.Now().Add(24*time.Hour)) || a.FormatVersion != 2 || a.Kind != "qs_schema_pair_pristine_bootstrap" || !retirementOpRE.MatchString(a.OperationID) || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(a.ApprovedSourceSHA) || a.ApprovedSourceSHA != cfg.ExpectedSourceSHA || !retirementHashRE.MatchString(a.ApprovalSummarySHA256) || a.MySQLVersion != resources.sql.head || a.MongoVersion != resources.mongo.head || a.MigrationResourcesSHA256 != resources.sha256 || !retirementHashRE.MatchString(a.MySQLIdentitySHA256) || !retirementHashRE.MatchString(a.MongoClusterSHA256) {
 		return nil, retirementError("bootstrap authorization binding rejected")
 	}
 	if _, e = os.Lstat(path + ".consumed"); !errors.Is(e, os.ErrNotExist) {
@@ -591,11 +591,11 @@ func readBootstrapAuthorization(cfg PairConfig) (*bootstrapAuthorization, error)
 	}
 	return &a, nil
 }
-func consumeBootstrapAuthorization(cfg PairConfig, a *bootstrapAuthorization) error {
+func consumeBootstrapAuthorization(cfg PairConfig, a *bootstrapAuthorization, resources *migrationResources) error {
 	if a == nil {
 		return retirementError("bootstrap authorization missing")
 	}
-	observed, e := readBootstrapAuthorization(cfg)
+	observed, e := readBootstrapAuthorization(cfg, resources)
 	if e != nil {
 		return e
 	}
