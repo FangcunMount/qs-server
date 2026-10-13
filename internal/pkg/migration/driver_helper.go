@@ -1,8 +1,8 @@
 package migration
 
 import (
-	"embed"
 	"fmt"
+	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
 	migratedb "github.com/golang-migrate/migrate/v4/database"
@@ -27,18 +27,18 @@ func (d embeddedMigrationDriver) SourcePath() string {
 	return d.sourcePath
 }
 
-func (d embeddedMigrationDriver) createInstance(fs embed.FS, databaseDriver migratedb.Driver) (*migrate.Migrate, error) {
-	return createEmbeddedMigrationInstance(fs, d.sourcePath, d.backend, databaseDriver, d.prefix)
+func (d embeddedMigrationDriver) createInstance(source fs.FS, databaseDriver migratedb.Driver) (*migrate.Migrate, error) {
+	return createEmbeddedMigrationInstance(source, d.sourcePath, d.backend, databaseDriver, d.prefix)
 }
 
 func createEmbeddedMigrationInstance(
-	fs embed.FS,
+	source fs.FS,
 	sourcePath string,
 	backend Backend,
 	databaseDriver migratedb.Driver,
 	prefix string,
 ) (*migrate.Migrate, error) {
-	sourceDriver, err := iofs.New(fs, sourcePath)
+	sourceDriver, err := iofs.New(source, sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to create source driver: %w", prefix, err)
 	}

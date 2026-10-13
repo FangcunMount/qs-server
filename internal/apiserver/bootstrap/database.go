@@ -473,14 +473,6 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 	if dm.config.MigrationOptions == nil {
 		return fmt.Errorf("migration options are required")
 	}
-	// 检查是否启用迁移
-	if !dm.config.MigrationOptions.Enabled {
-		logger.L(ctx).Infow("Database migration is disabled, skipping...",
-			"component", "Migration",
-			"result", "skipped",
-		)
-		return nil
-	}
 	if errs := dm.config.MigrationOptions.Validate(); len(errs) != 0 {
 		return fmt.Errorf("migration options rejected: %v", errs)
 	}
@@ -518,6 +510,14 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 		return fmt.Errorf("paired migration preflight rejected: %w", err)
 	}
 
+	if !dm.config.MigrationOptions.Enabled {
+		if err := pair.VerifyComplete(ctx); err != nil {
+			return fmt.Errorf("disabled DDL schema verification rejected: %w", err)
+		}
+		logger.L(ctx).Infow("Database DDL is disabled; current schema pair verified", "component", "Migration", "result", "verified")
+		return nil
+	}
+
 	// MySQL 迁移
 	{
 		database := selectedSQL
@@ -551,7 +551,7 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 		}
 	}
 
-	// MongoDB follows the proved SQL100 head on the same borrowed client.
+	// MongoDB follows this release's proved SQL target on the same borrowed client.
 	{
 		mongoDatabase := selectedMongo
 		mongoClient := pairedMongo
@@ -597,6 +597,10 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 			"action", "verify_indexes",
 			"result", "success",
 		)
+	}
+
+	if err := pair.VerifyComplete(ctx); err != nil {
+		return fmt.Errorf("final schema pair verification rejected: %w", err)
 	}
 
 	return nil

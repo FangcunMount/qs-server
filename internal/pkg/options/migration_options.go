@@ -47,13 +47,13 @@ func (o *MigrationOptions) Validate() []error {
 // AddFlags adds flags related to database migration for a specific APIServer to the specified FlagSet.
 func (o *MigrationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "migration.enabled", o.Enabled, ""+
-		"Enable automatic database migration on startup.")
+		"Enable automatic database DDL on startup; schema identity and clean target verification remain mandatory.")
 
 	fs.BoolVar(&o.AutoSeed, "migration.autoseed", o.AutoSeed, ""+
 		"Enable automatic seed data loading on startup (requires migration.enabled).")
 
 	fs.StringVar(&o.Database, "migration.database", o.Database, ""+
 		"Database name for migration.")
-	fs.StringVar(&o.BootstrapAuthorizationFile, "migration.retirement-bootstrap-authorization-file", o.BootstrapAuthorizationFile, "Private externally approved pristine SQL100/Mongo39 bootstrap authorization file.")
+	fs.StringVar(&o.BootstrapAuthorizationFile, "migration.retirement-bootstrap-authorization-file", o.BootstrapAuthorizationFile, "Private externally approved v2 pristine schema-pair bootstrap authorization file bound to embedded heads and full up resources.")
 	fs.StringVar(&o.BootstrapAuthorizationSHA256, "migration.retirement-bootstrap-authorization-sha256", o.BootstrapAuthorizationSHA256, "Externally approved raw SHA256 of the pristine bootstrap authorization; empty rejects cold bootstrap.")
 }

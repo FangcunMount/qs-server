@@ -80,16 +80,20 @@ func runtimeClosurePristinePair(t *testing.T, sqlDB *sql.DB, sqlName string, cli
 	if err != nil {
 		t.Fatal(err)
 	}
+	mysqlVersion, mongoVersion, resourcesSHA256, err := migrationpkg.EmbeddedMigrationResources()
+	if err != nil {
+		t.Fatalf("read compiled bootstrap resource binding: %v", err)
+	}
 	approval := map[string]any{
-		"format_version": 1, "kind": "qs_compatibility_retirement_b_pristine_bootstrap",
+		"format_version": 2, "kind": "qs_schema_pair_pristine_bootstrap",
 		"operation_id":        fmt.Sprintf("%d-1", time.Now().UnixNano()),
 		"expires_at":          time.Now().UTC().Add(15 * time.Minute).Format(time.RFC3339),
 		"approved_source_sha": source, "mysql_database": sqlName, "mongo_database": mongoName,
 		"mysql_identity_sha256": hash(sqlIdentity), "mongo_cluster_sha256": hash(mongoIdentity),
-		"mysql_version": 100, "mongo_version": 39,
-		"migration_resources_sha256": migrationpkg.CompatibilityMigrationResourcesSHA256(),
+		"mysql_version": mysqlVersion, "mongo_version": mongoVersion,
+		"migration_resources_sha256": resourcesSHA256,
 	}
-	summary, err := json.Marshal([]any{"owned-pristine-runtime-test-approval-v1", t.Name(), approval})
+	summary, err := json.Marshal([]any{"owned-pristine-runtime-test-approval-v2", t.Name(), approval})
 	if err != nil {
 		t.Fatal(err)
 	}
