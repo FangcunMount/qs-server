@@ -50,8 +50,11 @@ def metrics(accepted):
                 "account_id": ("canonical", "missing", "extra_account_id", "extra_accountId", "extra_aid"),
                 "org_id": ("canonical", "missing", "extra_org_id", "extra_organization_id")}.items():
             for source in sources:
+                # Fresh IAM sessions omit optional OrgID. The verified selected
+                # branch is missing; user/login identity stay canonical.
+                selected = "missing" if field == "org_id" else "canonical"
                 sample("qs_auth_claim_source_total", job, instance,
-                       accepted if source == "canonical" else 0, field=field, source=source)
+                       accepted if source == selected else 0, field=field, source=source)
         if job == "qs-collection-server":
             sample("qs_plan_entry_compatibility_observation_info", job, instance, 1,
                    source_sha=SOURCE, capability="1")
@@ -123,6 +126,9 @@ def main():
                               "    static_configs:\n      - targets: ['host.docker.internal:"
                               + str(fixture.server_port) + "']\n")
             command = ["docker", "run", "--detach", "--name", container,
+                       "--label", "qs.cleanup.owner=compat-observation-native",
+                       "--cpus", "1", "--memory", "512m",
+                       "--tmpfs", "/prometheus:rw,nosuid,size=134217728,mode=1777",
                        "--publish", "127.0.0.1::9090", "--mount",
                        "type=bind,source=" + str(config) + ",target=/etc/prometheus/prometheus.yml,readonly"]
             if platform.system() != "Darwin":
@@ -143,6 +149,9 @@ def main():
                 if time.monotonic() > deadline:
                     raise RuntimeError("native Prometheus did not scrape the fixture")
                 time.sleep(0.2)
+            build_info = request(base, "status/buildinfo")
+            if build_info.get("version") != "3.5.0":
+                raise RuntimeError("unexpected isolated Prometheus version")
             time.sleep(2)
             state["accepted"] = 1
             time.sleep(2)
@@ -166,12 +175,30 @@ def main():
             result = request(base, "query", {"query": 'increase(qs_auth_token_source_total{source="bearer",result="accepted"}[10s])'})
             if len(result["result"]) != 3 or any(float(item["value"][1]) <= 0 for item in result["result"]):
                 raise RuntimeError("native increase failed to retain real canonical traffic")
-            print("native Prometheus: " + str(len(expressions)) + " expressions parsed and executed; fixed series and increase verified")
+            org_queries = {expression for expression in expressions
+                           if 'field="org_id",source=~"canonical|missing"' in expression
+                           and "increase(" in expression}
+            if not org_queries:
+                raise RuntimeError("artifact does not contain the optional verified Org source gate")
+            org_selector = 'qs_auth_claim_source_total{field="org_id",source="canonical"}'
+            result = request(base, "query", {"query": 'sum by(job,instance)(increase(' + org_selector + '[10s]))'})
+            if len(result["result"]) != 3 or any(float(item["value"][1]) != 0 for item in result["result"]):
+                raise RuntimeError("native fixture must contain no canonical Org traffic")
+            for expression in org_queries:
+                result = request(base, "query", {"query": expression})
+                if len(result["result"]) != 3 or any(float(item["value"][1]) <= 0 for item in result["result"]):
+                    raise RuntimeError("optional Org gate lost real verified missing-source traffic")
+            for field in ("user_id", "account_id"):
+                selector = 'qs_auth_claim_source_total{field="' + field + '",source="canonical"}'
+                result = request(base, "query", {"query": 'sum by(job,instance)(increase(' + selector + '[10s]))'})
+                if len(result["result"]) != 3 or any(float(item["value"][1]) <= 0 for item in result["result"]):
+                    raise RuntimeError("native canonical identity traffic is absent")
+            print("native Prometheus: " + str(len(expressions)) + " expressions parsed and executed; version=" + build_info["version"] + "; fixed series, canonical identity and optional missing Org increase verified")
     finally:
         fixture.shutdown()
         fixture.server_close()
         if created:
-            subprocess.run(["docker", "rm", "--force", container], check=True, capture_output=True)
+            subprocess.run(["docker", "rm", "--force", "--volumes", container], check=True, capture_output=True)
 
 
 if __name__ == "__main__":

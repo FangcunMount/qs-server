@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
@@ -104,6 +104,20 @@ elif arguments[0] == "exec":
                 elif "increase(" in query:
                     legacy = any(part in query for part in ['source=~"extra_.*"', 'source="bare"', 'route="legacy_token"', 'input="derived"'])
                     value = (2 if scenario == "active" else 0) if legacy else (0 if scenario == "canonical_empty" and index == 0 else 1)
+                    if metric == "qs_auth_claim_source_total":
+                        field_match = re.search(r'field="([a-z_]+)"', query)
+                        field = field_match[1] if field_match else ""
+                        if scenario in ("org_missing", "org_extra") and field == "org_id":
+                            # Only the real verified missing-Org branch increments;
+                            # requiring canonical Org must fail this fixture.
+                            value = 1 if 'source=~"canonical|missing"' in query else 0
+                        if scenario == "org_extra" and legacy:
+                            value = 2
+                        if scenario == "org_empty" and field == "org_id" and index == 1:
+                            value = 0
+                        if ((scenario == "user_missing" and field == "user_id") or
+                                (scenario == "account_missing" and field == "account_id")):
+                            value = 0 if 'source="canonical"' in query else 1
                 elif scenario == "missing_zero_series" and metric == "qs_auth_claim_source_total":
                     value -= 1
                 labels = {"job": job, "instance": instance}
@@ -157,12 +171,22 @@ if [ "$(printf '%s\n' "$window_output" | awk -F '\t' '$1 == "M6" && $3 == "zero_
   echo "complete window did not classify all four M6 contracts" >&2
   exit 1
 fi
+missing_org_output="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window FAKE_M6_SCENARIO=org_missing FAKE_QUERY_LOG="$query_log" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
+if [ "$(printf '%s\n' "$missing_org_output" | awk -F '\t' '$1 == "M6" && $3 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 4 ]; then
+  echo "verified missing optional Org claim did not allow the otherwise canonical window" >&2
+  exit 1
+fi
+extra_org_output="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window FAKE_M6_SCENARIO=org_extra "$SCRIPT_DIR/audit-compatibility-observation.sh")"
+if ! printf '%s\n' "$extra_org_output" | grep -Fq $'M6\tclaims_extra\tactive_compatibility'; then
+  echo "legacy Extra Org traffic was falsely classified as an exit candidate" >&2
+  exit 1
+fi
 active_m6="$(env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 FAKE_M6_SCENARIO=active "$SCRIPT_DIR/audit-compatibility-observation.sh")"
 if [ "$(printf '%s\n' "$active_m6" | awk -F '\t' '$1 == "M6" && $3 == "active_compatibility" {count++} END {print count + 0}')" -ne 4 ]; then
   echo "actual legacy traffic was lost" >&2
   exit 1
 fi
-for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance history_gap stale_history counter_reset canonical_empty nan retention_short admission_absent; do
+for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance history_gap stale_history counter_reset canonical_empty user_missing account_missing org_empty nan retention_short admission_absent; do
   if env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 FAKE_M6_SCENARIO="$scenario" \
     "$SCRIPT_DIR/audit-compatibility-observation.sh" >"$TEST_ROOT/$scenario.log" 2>&1; then
     echo "M6 observation accepted incomplete evidence: $scenario" >&2

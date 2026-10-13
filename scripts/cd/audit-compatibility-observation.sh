@@ -302,12 +302,15 @@ def main():
         ('qs_plan_entry_route_total{job="qs-collection-server",route="canonical",result="accepted"}', collection_instances),
         ('qs_model_definition_write_total{job="qs-apiserver",input="canonical",result="accepted"}', api_instances),
     ]
-    for field in ("user_id", "account_id", "org_id"):
+    for field in ("user_id", "account_id"):
         canonical.append(('qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",field="' + field + '",source="canonical"}', all_instances))
+    # OrgID is optional in current IAM sessions. Only the already verified
+    # canonical or missing selection counts; Extra still belongs to legacy below.
+    canonical.append(('qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",field="org_id",source=~"canonical|missing"}', all_instances))
     for selector, expected in canonical:
         expression = "sum by(job,instance)(increase(" + selector + "[" + duration + "]))"
         if any(value <= 0 for value in current_values(expression, expected).values()):
-            fail("canonical traffic does not cover every deployed instance and contract")
+            fail("required verified traffic does not cover every deployed instance and contract")
     legacy = [
         ('claims_extra', 'qs_auth_claim_source_total{job=~"qs-apiserver|qs-collection-server",source=~"extra_.*"}', all_instances),
         ('bare_authorization', 'qs_auth_token_source_total{job=~"qs-apiserver|qs-collection-server",source="bare"}', all_instances),
