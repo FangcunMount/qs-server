@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	modelport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/event"
@@ -97,6 +98,15 @@ func TestProjectionAuditRealMongoPaginationAllRolesAndNonzeroFindings(t *testing
 		if len(record.Fingerprint) != 64 || record.ModelID == "" || record.Revision == "" {
 			t.Fatal("record was not bound to identity and revision")
 		}
+	}
+	hashMismatch := projectionTestDoc(t, "scale")
+	hashMismatch["source"].(bson.M)[modelport.SourceDefinitionContentHash] = strings.Repeat("0", 64)
+	if _, err := collection.InsertOne(t.Context(), hashMismatch); err != nil {
+		t.Fatal(err)
+	}
+	withHashFinding := auditDefinitionProjectionCollection(t.Context(), reader, projectionTestConfig())
+	if !withHashFinding.Complete || withHashFinding.Scanned != 9 || withHashFinding.Matched != 5 || withHashFinding.Mismatched != 1 || withHashFinding.Invalid != 1 || withHashFinding.HashMetadataInvalid != 1 || withHashFinding.HashMetadataUnverifiable != 2 || withHashFinding.ZeroMismatch || withHashFinding.exitCode() != 2 {
+		t.Fatalf("hash finding was merged into or hidden by asset counts: %+v", withHashFinding)
 	}
 	bounded := projectionTestConfig()
 	bounded.maxRecords = 3

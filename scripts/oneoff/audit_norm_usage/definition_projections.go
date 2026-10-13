@@ -15,6 +15,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,37 +23,43 @@ import (
 )
 
 type projectionRecord struct {
-	ModelID     string `json:"model_id,omitempty"`
-	Code        string `json:"code,omitempty"`
-	Role        string `json:"role,omitempty"`
-	Revision    string `json:"revision,omitempty"`
-	Fingerprint string `json:"fingerprint"`
-	Status      string `json:"status"`
-	Historical  bool   `json:"historical"`
+	ModelID                  string         `json:"model_id,omitempty"`
+	Code                     string         `json:"code,omitempty"`
+	Role                     string         `json:"role,omitempty"`
+	Revision                 string         `json:"revision,omitempty"`
+	Fingerprint              string         `json:"fingerprint"`
+	Status                   string         `json:"status"`
+	Historical               bool           `json:"historical"`
+	HashMetadataStatus       string         `json:"hash_metadata_status"`
+	HashMetadataPaths        []string       `json:"hash_metadata_paths,omitempty"`
+	HashMetadataReasonCounts map[string]int `json:"hash_metadata_reason_counts,omitempty"`
 	mongomodelcatalog.DefinitionProjectionAudit
 }
 
 type projectionReport struct {
-	Complete             bool               `json:"complete"`
-	ZeroMismatch         bool               `json:"zero_mismatch"`
-	Expected             int64              `json:"expected"`
-	Scanned              int64              `json:"scanned"`
-	Compared             int64              `json:"compared"`
-	Matched              int64              `json:"matched"`
-	Mismatched           int64              `json:"mismatched"`
-	MissingDefinition    int64              `json:"missing_definition"`
-	UnknownSchema        int64              `json:"unknown_schema"`
-	Invalid              int64              `json:"invalid"`
-	RecordErrors         int64              `json:"record_errors"`
-	ScanErrors           int64              `json:"scan_errors"`
-	Heads                int64              `json:"heads"`
-	Snapshots            int64              `json:"snapshots"`
-	Historical           int64              `json:"historical"`
-	StoredDecisionFields int64              `json:"stored_decision_fields"`
-	StoredAssetFields    int64              `json:"stored_asset_fields"`
-	Truncated            bool               `json:"truncated"`
-	Reason               string             `json:"reason,omitempty"`
-	Records              []projectionRecord `json:"records"`
+	Complete                 bool               `json:"complete"`
+	ZeroMismatch             bool               `json:"zero_mismatch"`
+	Expected                 int64              `json:"expected"`
+	Scanned                  int64              `json:"scanned"`
+	Compared                 int64              `json:"compared"`
+	Matched                  int64              `json:"matched"`
+	Mismatched               int64              `json:"mismatched"`
+	MissingDefinition        int64              `json:"missing_definition"`
+	UnknownSchema            int64              `json:"unknown_schema"`
+	Invalid                  int64              `json:"invalid"`
+	RecordErrors             int64              `json:"record_errors"`
+	ScanErrors               int64              `json:"scan_errors"`
+	Heads                    int64              `json:"heads"`
+	Snapshots                int64              `json:"snapshots"`
+	Historical               int64              `json:"historical"`
+	StoredDecisionFields     int64              `json:"stored_decision_fields"`
+	StoredAssetFields        int64              `json:"stored_asset_fields"`
+	HashMetadataMatched      int64              `json:"hash_metadata_matched"`
+	HashMetadataInvalid      int64              `json:"hash_metadata_invalid"`
+	HashMetadataUnverifiable int64              `json:"hash_metadata_unverifiable"`
+	Truncated                bool               `json:"truncated"`
+	Reason                   string             `json:"reason,omitempty"`
+	Records                  []projectionRecord `json:"records"`
 }
 
 func projectionConfig(cfg config) (config, error) {
@@ -161,7 +168,7 @@ func auditDefinitionProjectionCollection(ctx context.Context, collection *mongo.
 	} else if result.Scanned == 0 {
 		result.Reason = "empty_collection"
 	}
-	result.ZeroMismatch = result.Complete && result.Scanned > 0 && result.Matched == result.Scanned
+	result.ZeroMismatch = result.Complete && result.Scanned > 0 && result.Matched == result.Scanned && result.HashMetadataMatched == result.Snapshots && result.HashMetadataInvalid == 0 && result.HashMetadataUnverifiable == 0
 	return result
 }
 
@@ -187,6 +194,14 @@ func scanProjectionRows(sc context.Context, collection projectionReadSource, cfg
 		record := auditProjectionRecord(raw)
 		result.Records = append(result.Records, record)
 		result.Scanned++
+		switch record.HashMetadataStatus {
+		case "matched":
+			result.HashMetadataMatched++
+		case "invalid":
+			result.HashMetadataInvalid++
+		case "unverifiable":
+			result.HashMetadataUnverifiable++
+		}
 		switch record.Role {
 		case "head":
 			result.Heads++
@@ -239,9 +254,9 @@ func (r projectionReport) exitCode() int {
 	return 0
 }
 
-func auditProjectionRecord(raw bson.Raw) projectionRecord {
+func auditProjectionRecord(raw bson.Raw) (record projectionRecord) {
 	fingerprint := sha256.Sum256(raw)
-	record := projectionRecord{Fingerprint: hex.EncodeToString(fingerprint[:]), Status: "invalid"}
+	record = projectionRecord{Fingerprint: hex.EncodeToString(fingerprint[:]), Status: "invalid", HashMetadataStatus: "not_applicable"}
 	var metadata struct {
 		ID               primitive.ObjectID `bson:"_id"`
 		Code             string             `bson:"code"`
@@ -263,6 +278,9 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 		record.ModelID = metadata.ID.Hex()
 	}
 	record.Code, record.Role = metadata.Code, metadata.Role
+	if record.Role == "published_snapshot" {
+		defer auditPublishedDefinitionHash(raw, &record)
+	}
 	if record.Role == "head" {
 		record.Revision = strconv.FormatInt(metadata.Revision, 10)
 	} else {
@@ -349,6 +367,57 @@ func auditProjectionRecord(raw bson.Raw) projectionRecord {
 		record.Status = "matched"
 	}
 	return record
+}
+
+// Published hashes are frozen metadata, not a request to repair or rehash a
+// record. Heads do not carry this snapshot-only Source contract.
+func auditPublishedDefinitionHash(raw bson.Raw, record *projectionRecord) {
+	record.HashMetadataStatus = "invalid"
+	source, ok := raw.Lookup("source").DocumentOK()
+	if !ok {
+		record.hashMetadataIssue("source", "metadata.definition_hash_source_invalid")
+		return
+	}
+	elements, err := source.Elements()
+	if err != nil {
+		record.hashMetadataIssue("source", "raw.invalid_bson")
+		return
+	}
+	seen := make(map[string]bool, len(elements))
+	for _, element := range elements {
+		if seen[element.Key()] {
+			record.hashMetadataIssue("source.duplicate_field", "raw.duplicate_key")
+			return
+		}
+		seen[element.Key()] = true
+	}
+	schema, schemaOK := source.Lookup(modelcatalogport.SourceDefinitionHashSchema).StringValueOK()
+	if !schemaOK || schema != "definition-v2/v1" {
+		record.hashMetadataIssue("source.definition_hash_schema", "metadata.definition_hash_schema_invalid")
+	}
+	hash, hashOK := source.Lookup(modelcatalogport.SourceDefinitionContentHash).StringValueOK()
+	decoded, decodeErr := hex.DecodeString(hash)
+	if !hashOK || decodeErr != nil || len(decoded) != sha256.Size || strings.ToLower(hash) != hash {
+		record.hashMetadataIssue("source.definition_content_hash", "metadata.definition_content_hash_invalid")
+	} else if record.CanonicalHash != "" && hash != record.CanonicalHash {
+		record.hashMetadataIssue("source.definition_content_hash", "metadata.definition_content_hash_mismatch")
+	}
+	if len(record.HashMetadataReasonCounts) == 0 {
+		if record.CanonicalHash == "" || record.HashError {
+			record.HashMetadataStatus = "unverifiable"
+			record.hashMetadataIssue("source.definition_content_hash", "metadata.definition_hash_canonical_unavailable")
+		} else {
+			record.HashMetadataStatus = "matched"
+		}
+	}
+}
+
+func (r *projectionRecord) hashMetadataIssue(path, reason string) {
+	if r.HashMetadataReasonCounts == nil {
+		r.HashMetadataReasonCounts = make(map[string]int)
+	}
+	r.HashMetadataReasonCounts[reason]++
+	r.HashMetadataPaths = append(r.HashMetadataPaths, path)
 }
 
 // All callers provide fixed diagnostic enums; no metadata value becomes a label.

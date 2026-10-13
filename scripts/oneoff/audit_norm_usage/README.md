@@ -65,11 +65,12 @@ go run ./scripts/oneoff/audit_norm_usage/ \
 | 输出 | 含义 |
 | --- | --- |
 | `complete` | cursor 正常结束，且实际扫描数与 snapshot count 相等，没有截断 |
-| `zero_mismatch` | 非空、完整扫描，全部记录均匹配，且无缺失、未知 schema、invalid 或 error |
+| `zero_mismatch` | 非空、完整扫描，全部资产/结构均匹配；全部 published snapshot 的 hash metadata 也匹配，且无缺失、未知 schema、invalid、unverifiable 或 error |
 | `compared` | 已完成纯投影比较的记录数；缺失或无法验证的记录不会混入匹配数 |
 | `mismatched` | 有实际派生字段差异的记录数；可同时具有 metadata invalid |
 | `missing_definition` / `unknown_schema` / `invalid` | 均阻断 zero，不会按不存在问题处理 |
 | `record_errors` / `scan_errors` | hash/扫描失败，均阻断 zero |
+| `hash_metadata_matched` / `hash_metadata_invalid` / `hash_metadata_unverifiable` | 独立统计 snapshot 的 Source hash 契约；不能把资产 `matched` 当作 hash metadata 已匹配 |
 | `fingerprint` | 整条读取 BSON 的 SHA-256，与 ID/revision 绑定；不是写入凭据 |
 
 | 模式 exit code | 含义 |
@@ -82,6 +83,10 @@ go run ./scripts/oneoff/audit_norm_usage/ \
 每条 invalid 记录另有 `invalid_reason_counts`：原始 BSON 的 `raw.unknown_field` / `raw.duplicate_key` 与当前 `validation.*` 枚举分别计数。原因计数覆盖全部校验问题，路径最多显示 32 条；原因 label 使用固定有界枚举，未知 validation Code 归为 `validation.unrecognized`，不输出 Message、值或正文。增加诊断不改变 invalid、差异比较或 zero 判定；复查须按原 ID/revision/fingerprint 绑定，fingerprint 变化应单独注明。
 
 已知 mapper 中 canonical typology profile 可包含 Rarity，而 derived `TypeProfilePO` 未保存该字段。审计保留纯投影的 Rarity，并报告这类存储损失，不通过二次 PO 编码隐藏差异。任何非 zero 结果都需要逐项核查；此工具不会覆盖现有 derived fields、公开契约、冻结报告或历史数据。
+
+Published snapshot 另核验 `Source.definition_hash_schema=definition-v2/v1` 及 `definition_content_hash` 与读取后 canonical v1 hash 的精确相等；head 不要求这两个 snapshot-only 字段。每条记录的 `hash_metadata_status` 为 `matched`、`invalid`、`unverifiable` 或 head 的 `not_applicable`，原因/路径单独输出，不泄露原 Source 值。缺字段、错误格式、未知 hash schema、重复 Source key 与 hash 不一致不能成为 zero；canonical 因结构问题无法计算时，不宣称 hash 匹配。
+
+现有 Mongo mapper 会把部分 canonical nil/空集合形态规范化。回归夹具证明保存前 hash 与读取后 hash 可以不同；审计保留该独立 finding，不改 PO、重新签 hash 或放宽字节比较。有效测试夹具明确绑定已存 canonical 形态。旧105条审计的76/4/25只证明当时的资产/结构分类，未证明新增 hash metadata gate；生产需要重新只读核验。
 
 ## 非目标
 

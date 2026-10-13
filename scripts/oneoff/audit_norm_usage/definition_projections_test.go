@@ -51,7 +51,20 @@ func projectionTestDoc(t *testing.T, family string) bson.M {
 	if err != nil {
 		t.Fatal(err)
 	}
-	po := mongomodelcatalog.NewMapper().ToPO(&modelport.PublishedModel{Code: "test-model", ReleaseStatus: domain.ReleaseStatusActive, Kind: domain.Kind(family), Algorithm: algorithm, DecisionKind: decision, Version: "v1", DefinitionV2: def})
+	model := &modelport.PublishedModel{Code: "test-model", ReleaseStatus: domain.ReleaseStatusActive, Kind: domain.Kind(family), Algorithm: algorithm, DecisionKind: decision, Version: "v1", DefinitionV2: def}
+	hash, err := modeldefinition.CanonicalContentHash(def)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modelport.AttachDefinitionHash(model, hash)
+	po := mongomodelcatalog.NewMapper().ToPO(model)
+	// Valid stored-metadata fixtures bind the exact decoded canonical shape.
+	// A separate test preserves the real pre-storage hash mismatch case.
+	storedHash, err := modeldefinition.CanonicalContentHash(mongomodelcatalog.NewMapper().ToPublished(po).DefinitionV2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	po.Source[modelport.SourceDefinitionContentHash] = storedHash
 	po.ID = primitive.NewObjectID()
 	raw, err := bson.Marshal(po)
 	if err != nil {
@@ -62,6 +75,85 @@ func projectionTestDoc(t *testing.T, family string) bson.M {
 		t.Fatal(err)
 	}
 	return doc
+}
+
+func TestProjectionRecordVerifiesPublishedHashMetadataWithoutDisclosure(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(bson.M)
+		reason string
+	}{
+		{"missing source", func(d bson.M) { delete(d, "source") }, "metadata.definition_hash_source_invalid"},
+		{"null source", func(d bson.M) { d["source"] = nil }, "metadata.definition_hash_source_invalid"},
+		{"non-document source", func(d bson.M) { d["source"] = "NEVER_PRINT_SOURCE" }, "metadata.definition_hash_source_invalid"},
+		{"missing schema", func(d bson.M) { delete(d["source"].(bson.M), modelport.SourceDefinitionHashSchema) }, "metadata.definition_hash_schema_invalid"},
+		{"unknown schema", func(d bson.M) { d["source"].(bson.M)[modelport.SourceDefinitionHashSchema] = "NEVER_PRINT_SCHEMA" }, "metadata.definition_hash_schema_invalid"},
+		{"typed schema", func(d bson.M) { d["source"].(bson.M)[modelport.SourceDefinitionHashSchema] = 1 }, "metadata.definition_hash_schema_invalid"},
+		{"missing hash", func(d bson.M) { delete(d["source"].(bson.M), modelport.SourceDefinitionContentHash) }, "metadata.definition_content_hash_invalid"},
+		{"malformed hash", func(d bson.M) { d["source"].(bson.M)[modelport.SourceDefinitionContentHash] = "NEVER_PRINT_HASH" }, "metadata.definition_content_hash_invalid"},
+		{"typed hash", func(d bson.M) { d["source"].(bson.M)[modelport.SourceDefinitionContentHash] = 1 }, "metadata.definition_content_hash_invalid"},
+		{"uppercase hash", func(d bson.M) {
+			s := d["source"].(bson.M)
+			s[modelport.SourceDefinitionContentHash] = strings.ToUpper(s[modelport.SourceDefinitionContentHash].(string))
+		}, "metadata.definition_content_hash_invalid"},
+		{"mismatched hash", func(d bson.M) { d["source"].(bson.M)[modelport.SourceDefinitionContentHash] = strings.Repeat("0", 64) }, "metadata.definition_content_hash_mismatch"},
+		{"duplicate source keys", func(d bson.M) {
+			d["source"] = bson.D{{Key: modelport.SourceDefinitionHashSchema, Value: "definition-v2/v1"}, {Key: modelport.SourceDefinitionHashSchema, Value: "NEVER_PRINT_DUPLICATE"}}
+		}, "raw.duplicate_key"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := projectionTestDoc(t, "scale")
+			tc.mutate(doc)
+			record := recordFromDoc(t, doc)
+			if record.Status != "matched" || record.HashMetadataStatus != "invalid" || record.HashMetadataReasonCounts[tc.reason] != 1 || record.CanonicalHash == "" || record.Revision != "v1" || len(record.Fingerprint) != 64 {
+				t.Fatalf("published hash metadata was not blocked: %+v", record)
+			}
+			encoded, err := json.Marshal(record)
+			if err != nil || strings.Contains(string(encoded), "NEVER_PRINT") {
+				t.Fatal("source value disclosed")
+			}
+		})
+	}
+	for _, family := range []string{"scale", "typology", "behavioral_rating", "cognitive"} {
+		doc := projectionTestDoc(t, family)
+		if got := recordFromDoc(t, doc); got.Status != "matched" || got.HashMetadataStatus != "matched" {
+			t.Fatalf("valid %s published hash rejected: %+v", family, got)
+		}
+		doc["record_role"], doc["revision"] = "head", int64(9)
+		delete(doc, "source")
+		if got := recordFromDoc(t, doc); got.Status != "matched" || got.HashMetadataStatus != "not_applicable" {
+			t.Fatalf("snapshot-only source required on %s head: %+v", family, got)
+		}
+	}
+}
+
+func TestProjectionRecordRetainsPreStorageHashMismatchAsIndependentFinding(t *testing.T) {
+	def := &modeldefinition.Definition{
+		Measure:     modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Role: factor.FactorRoleTotal}}},
+		Outcomes:    []conclusion.Outcome{{Code: "low"}},
+		Conclusions: []conclusion.Conclusion{conclusion.RiskConclusion{FactorCode: "total", Rules: []conclusion.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, MaxInclusive: true, OutcomeCode: "low"}}}},
+	}
+	modeldefinition.MaterializeLayers(def)
+	before, err := modeldefinition.CanonicalContentHash(def)
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &modelport.PublishedModel{Code: "roundtrip-model", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, DecisionKind: domain.DecisionKindScoreRange, Version: "v1", DefinitionV2: def}
+	modelport.AttachDefinitionHash(model, before)
+	po := mongomodelcatalog.NewMapper().ToPO(model)
+	po.ID = primitive.NewObjectID()
+	raw, err := bson.Marshal(po)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := auditProjectionRecord(raw)
+	if record.CanonicalHash == before || record.Status != "matched" || record.HashMetadataStatus != "invalid" || record.HashMetadataReasonCounts["metadata.definition_content_hash_mismatch"] != 1 {
+		t.Fatalf("pre-storage hash mismatch was hidden or relabeled as an asset mismatch: %+v", record)
+	}
+	// Existing storage normalization is observed, never repaired by this audit.
+	if def.Calibration.NormRefs != nil || model.Source[modelport.SourceDefinitionContentHash] != before {
+		t.Fatal("audit rehashed or changed its input")
+	}
 }
 
 func recordFromDoc(t *testing.T, doc bson.M) projectionRecord {
