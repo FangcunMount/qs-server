@@ -43,6 +43,15 @@ jobs:
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
+      - name: Verify four native model kernel golden cases
+        run: |
+          set -euo pipefail
+          m5_kernel_package=./internal/apiserver/application/evaluation/execute
+          m5_kernel_selector='^TestM5NativeKernelGolden'
+          go test -list "$m5_kernel_selector" "$m5_kernel_package" | python3 -c 'import sys; names=[line.strip() for line in sys.stdin if line.startswith("TestM5NativeKernelGolden")]; expected={"TestM5NativeKernelGoldenFactorScoring", "TestM5NativeKernelGoldenFactorNorm", "TestM5NativeKernelGoldenTaskPerformance", "TestM5NativeKernelGoldenFactorClassification"}; assert set(names)==expected and len(names)==4, names'
+          go test -race -count=1 -timeout=2m -v -run "$m5_kernel_selector" "$m5_kernel_package" | tee "$RUNNER_TEMP/m5-native-kernels.log"
+          python3 -c 'import pathlib,sys; log=pathlib.Path(sys.argv[1]).read_text(); names=["FactorScoring", "FactorNorm", "TaskPerformance", "FactorClassification"]; assert all("--- PASS: TestM5NativeKernelGolden"+name+" " in log for name in names); assert "--- SKIP:" not in log' "$RUNNER_TEMP/m5-native-kernels.log"
+
       - name: Compile all integration-tag contracts
         run: |
           go test -tags=integration -run '^$' ./...
