@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"embed"
 	"io"
+	"io/fs"
 	"reflect"
 	"strings"
 	"time"
@@ -30,17 +30,19 @@ type retirementDatabaseDriver struct {
 	upHash        string
 	downHash      string
 	bodyValid     bool
-	tailSucceeded bool
+	stepSucceeded bool
+	resources     *migrationResources
+	sourceValid   bool
 }
 
-func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *Config, conn *sql.Conn, client *mongo.Client, fs embed.FS) *retirementDatabaseDriver {
+func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *Config, conn *sql.Conn, client *mongo.Client, source fs.FS) *retirementDatabaseDriver {
 	directory, base := "mysql", "000100_retire_compatibility_message_storage"
 	extension := "sql"
 	if backend == BackendMongo {
 		directory, base, extension = "mongodb", "000039_retire_compatibility_message_storage", "json"
 	}
-	up, _ := fs.ReadFile("migrations/" + directory + "/" + base + ".up." + extension)
-	down, _ := fs.ReadFile("migrations/" + directory + "/" + base + ".down." + extension)
+	up, _ := fs.ReadFile(source, "migrations/"+directory+"/"+base+".up."+extension)
+	down, _ := fs.ReadFile(source, "migrations/"+directory+"/"+base+".down."+extension)
 	canonical, err := migrations.ReadFile("migrations/" + directory + "/" + base + ".up." + extension)
 	exact := err == nil && bytes.Equal(up, canonical)
 	if backend == BackendMySQL {
@@ -48,7 +50,15 @@ func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *
 	} else {
 		exact = exact && strings.TrimSpace(string(up)) == `[{"drop":"domain_event_outbox"}]`
 	}
-	return &retirementDatabaseDriver{Driver: driver, backend: backend, pair: cfg.retirementPair, ctx: migrationRunContext(cfg), sqlConn: conn, client: client, database: cfg.Database, upHash: retirementHash(canonical), downHash: retirementHash(down), bodyValid: exact}
+	resources, resourceErr := compiledMigrationResources()
+	if cfg.retirementPair != nil {
+		resources, resourceErr = readMigrationResources(source, cfg.retirementPair.resources.pairs)
+	}
+	sourceValid := resourceErr == nil
+	if cfg.retirementPair != nil {
+		sourceValid = sourceValid && resources.sha256 == cfg.retirementPair.resources.sha256
+	}
+	return &retirementDatabaseDriver{resources: resources, sourceValid: sourceValid, Driver: driver, backend: backend, pair: cfg.retirementPair, ctx: migrationRunContext(cfg), sqlConn: conn, client: client, database: cfg.Database, upHash: retirementHash(canonical), downHash: retirementHash(down), bodyValid: exact}
 }
 func (d *retirementDatabaseDriver) tailVersion() int {
 	if d.backend == BackendMongo {
@@ -57,32 +67,53 @@ func (d *retirementDatabaseDriver) tailVersion() int {
 	return 100
 }
 func (d *retirementDatabaseDriver) SetVersion(version int, dirty bool) error {
-	if version > d.tailVersion() {
-		return retirementError("unsupported post-retirement version write")
-	}
-	if version >= d.tailVersion() && (d.pair == nil || !d.bodyValid) {
-		return retirementError("paired preflight required before retirement version write")
+	current, currentDirty, err := d.Version()
+	if err != nil {
+		return err
 	}
 	if version < d.tailVersion() {
-		current, _, err := d.Version()
-		if err != nil {
-			return err
-		}
 		if current >= d.tailVersion() {
 			return retirementError("retirement head downgrade or force refused")
 		}
-	}
-	if version == d.tailVersion() {
-		if !dirty && !d.tailSucceeded {
-			return retirementError("retirement clean write without successful exact run refused")
+	} else {
+		if d.pair == nil || !d.bodyValid || !d.sourceValid || version < 0 || !d.resources.backend(d.backend).contains(uint(version)) {
+			return retirementError("paired embedded migration required before version write")
 		}
-		d.tailSucceeded = false
+		if dirty {
+			if currentDirty || version != d.nextVersion(current) {
+				return retirementError("non-forward or dirty migration version write refused")
+			}
+			if version > d.tailVersion() {
+				if err := d.verifyPostRetirementStep(); err != nil {
+					return err
+				}
+			}
+		} else {
+			if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded {
+				return retirementError("clean version write without successful bound run refused")
+			}
+			if version > d.tailVersion() {
+				if err := d.verifyPostRetirementStep(); err != nil {
+					return err
+				}
+			}
+		}
 	}
-	if e := d.Driver.SetVersion(version, dirty); e != nil {
-		return e
+	if err := d.Driver.SetVersion(version, dirty); err != nil {
+		return err
 	}
 	d.version, d.dirty = version, dirty
+	d.stepSucceeded = false
 	return nil
+}
+func (d *retirementDatabaseDriver) nextVersion(current int) int {
+	next := -1
+	for version := range d.resources.backend(d.backend).up {
+		if int(version) > current && (next == -1 || int(version) < next) {
+			next = int(version)
+		}
+	}
+	return next
 }
 func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 	raw, e := io.ReadAll(reader)
@@ -96,8 +127,29 @@ func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 	if hash == d.upHash && d.version != d.tailVersion() {
 		return retirementError("retirement exact body at wrong version rejected")
 	}
-	if d.version != d.tailVersion() {
+	if d.version < d.tailVersion() {
 		return d.Driver.Run(bytes.NewReader(raw))
+	}
+	current, dirty, err := d.Version()
+	if err != nil || current != d.version || !dirty {
+		return retirementError("pending migration metadata changed or unknown")
+	}
+	if d.version > d.tailVersion() {
+		expected := ""
+		if d.resources != nil {
+			expected = d.resources.backend(d.backend).up[uint(d.version)]
+		}
+		if d.pair == nil || !d.dirty || !d.sourceValid || expected == "" || hash != expected {
+			return retirementError("post-retirement migration body or phase rejected")
+		}
+		if err := d.verifyPostRetirementStep(); err != nil {
+			return err
+		}
+		if err := d.Driver.Run(bytes.NewReader(raw)); err != nil {
+			return err
+		}
+		d.stepSucceeded = true
+		return nil
 	}
 	if d.pair == nil || !d.dirty || hash != d.upHash || !d.bodyValid {
 		return retirementError("retirement version or exact body binding rejected")
@@ -108,7 +160,7 @@ func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 		e = d.runMongoTail(raw)
 	}
 	if e == nil {
-		d.tailSucceeded = true
+		d.stepSucceeded = true
 	}
 	return e
 }
@@ -200,6 +252,33 @@ func (d *retirementDatabaseDriver) runMongoTail(raw []byte) error {
 	collections, e = mongoRetirementNamespace(ctx, db)
 	if e != nil || len(collections) != 0 {
 		return retirementError("mongo tail absence unknown")
+	}
+	return nil
+}
+
+func (d *retirementDatabaseDriver) verifyPostRetirementStep() error {
+	ctx, cancel := retirementContext(d.ctx)
+	defer cancel()
+	var sqlReader retirementSQLReader = d.pair.sqlDB
+	if d.backend == BackendMySQL {
+		sqlReader = d.sqlConn
+	}
+	a, b, err := pairIdentity(ctx, sqlReader, d.pair.mongo, d.pair.config.MySQLDatabase, d.pair.config.MongoDatabase)
+	if err != nil || a != d.pair.sqlHash || b != d.pair.mongoHash {
+		return retirementError("post-retirement pair identity changed or unknown")
+	}
+	if d.backend == BackendMongo {
+		collections, err := mongoRetirementNamespace(ctx, d.client.Database(d.database))
+		if err != nil || len(collections) != 0 {
+			return retirementError("post-retirement mongo target reappeared or unknown")
+		}
+		return nil
+	}
+	for _, name := range retirementSQLNames {
+		var count int
+		if d.sqlConn.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?", name).Scan(&count) != nil || count != 0 {
+			return retirementError("post-retirement mysql target reappeared or unknown")
+		}
 	}
 	return nil
 }

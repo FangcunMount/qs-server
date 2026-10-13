@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -23,6 +24,10 @@ func TestFinalMigrationResourceBoundary(t *testing.T) {
 }
 
 func TestOrdinaryPairCannotAdoptPartialOrUnknownMigration(t *testing.T) {
+	resources, err := compiledMigrationResources()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, state := range []struct {
 		sql, mongo uint
 		want       bool
@@ -31,7 +36,7 @@ func TestOrdinaryPairCannotAdoptPartialOrUnknownMigration(t *testing.T) {
 			t.Fatal("ordinary initial pair conflict")
 		}
 	}
-	if !installedPairStepAllowed(99, 38, 99, 38, BackendMySQL, false) || !installedPairStepAllowed(99, 38, 100, 38, BackendMongo, true) || !installedPairStepAllowed(100, 39, 100, 39, BackendMySQL, false) || !installedPairStepAllowed(100, 39, 100, 39, BackendMongo, true) {
+	if !installedPairStepAllowed(99, 38, 99, 38, BackendMySQL, false, resources) || !installedPairStepAllowed(99, 38, 100, 38, BackendMongo, true, resources) || !installedPairStepAllowed(100, 39, 100, 39, BackendMySQL, false, resources) || !installedPairStepAllowed(100, 39, 100, 39, BackendMongo, true, resources) {
 		t.Fatal("true same-process migration phase rejected")
 	}
 	for _, state := range []struct {
@@ -46,8 +51,70 @@ func TestOrdinaryPairCannotAdoptPartialOrUnknownMigration(t *testing.T) {
 		{100, 39, 100, 38, BackendMongo, true},
 		{99, 38, 100, 39, BackendMongo, true},
 	} {
-		if installedPairStepAllowed(state.is, state.im, state.as, state.am, state.backend, state.done) {
+		if installedPairStepAllowed(state.is, state.im, state.as, state.am, state.backend, state.done, resources) {
 			t.Fatal("unbound partial or changed phase accepted")
 		}
+	}
+}
+
+func TestFuturePairStagesUseDeclaredStartAndActualTargets(t *testing.T) {
+	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{99, 38}, {100, 39}, {101, 39}, {101, 40}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name                                             string
+		initialSQL, initialMongo, actualSQL, actualMongo uint
+		backend                                          Backend
+		done, want                                       bool
+	}{
+		{"sql_start", 100, 39, 100, 39, BackendMySQL, false, true},
+		{"mongo_after_sql", 100, 39, 101, 39, BackendMongo, true, true},
+		{"declared_independent_restart", 101, 39, 101, 39, BackendMySQL, false, true},
+		{"mongo_no_change_start", 101, 40, 101, 40, BackendMongo, true, true},
+		{"old_boundary_live_phase", 99, 38, 101, 38, BackendMongo, true, true},
+		{"undeclared_start", 100, 40, 101, 40, BackendMongo, true, false},
+		{"sql_not_finished", 100, 39, 101, 39, BackendMongo, false, false},
+		{"mongo_changed_externally", 100, 39, 101, 40, BackendMongo, true, false},
+		{"sql_changed_externally", 100, 39, 101, 39, BackendMySQL, false, false},
+		{"old_partial_restart", 100, 38, 101, 38, BackendMongo, true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := installedPairStepAllowed(test.initialSQL, test.initialMongo, test.actualSQL, test.actualMongo, test.backend, test.done, r); got != test.want {
+				t.Fatalf("allowed=%v want=%v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestBoundaryAndFutureCleanWritesCannotForceSuccess(t *testing.T) {
+	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 40}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []int{99, 100, 101, 102} {
+		provider := &retirementFailureProvider{version: 100}
+		driver := &retirementDatabaseDriver{Driver: provider, backend: BackendMySQL, resources: r, sourceValid: true, bodyValid: true, pair: &PairPreflight{resources: r}}
+		if err := driver.SetVersion(version, false); err == nil {
+			t.Fatalf("force to %d accepted", version)
+		}
+		if provider.version != 100 {
+			t.Fatal("rejected force changed schema metadata")
+		}
+	}
+}
+
+func TestFutureStepRejectsChangedDirtyMetadataBeforeRunAndClean(t *testing.T) {
+	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 40}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &retirementFailureProvider{version: 101, dirty: false}
+	driver := &retirementDatabaseDriver{Driver: provider, backend: BackendMySQL, resources: r, sourceValid: true, bodyValid: true, version: 101, dirty: true, stepSucceeded: true, pair: &PairPreflight{resources: r}}
+	if err := driver.Run(bytes.NewBufferString("CREATE TABLE migration_future_probe (id BIGINT PRIMARY KEY);\n")); err == nil {
+		t.Fatal("externally cleared pending metadata accepted")
+	}
+	if err := driver.SetVersion(101, false); err == nil {
+		t.Fatal("externally changed metadata re-certified clean")
 	}
 }
