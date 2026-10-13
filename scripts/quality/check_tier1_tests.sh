@@ -8,7 +8,7 @@ package_list="${repo_root}/scripts/quality/tier1-packages.txt"
 base_ref=""
 if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
 	base_ref="origin/${GITHUB_BASE_REF}"
-	git -C "${repo_root}" fetch --no-tags --depth=1 origin "${GITHUB_BASE_REF}" >/dev/null 2>&1 || true
+	git -C "${repo_root}" fetch --no-tags origin "${GITHUB_BASE_REF}" >/dev/null 2>&1 || true
 elif git -C "${repo_root}" rev-parse --verify HEAD^ >/dev/null 2>&1; then
 	base_ref="HEAD^"
 else
