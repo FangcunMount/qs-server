@@ -2757,6 +2757,602 @@
         "All25 invalid heads and15 missing Source hash snapshots remain blocked. Matching80 assets is not permission to assign all105 record markers or remove derived storage fields.",
         "Temporary integration source/CLI is isolated and reviewed, not pushed into the three formal M5 PRs or main and not a deployable integration candidate. All formal client release, observation, backup/restore and business gates remain separate."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m1-release-249788c6",
+      "status": "historical",
+      "observed_at": "2026-10-13T21:41:08.349414+00:00",
+      "environment": "production/serverA-serverD",
+      "deployed_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+      "source_baseline_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Formal CD v2 receipts and independent after-probes bind exact source, images, running programs and six instances; only a finite safe input/config whitelist was compared. Complete post-Viper effective YAML, environment and secret configuration was not hashed."
+      },
+      "command": "User-authorized M1-only GitHub Actions Production Deploy 38471191605 workflow_dispatch service=all collection_replicas=2 worker_replicas=3 at exact249788c6; original local guard-reader failure retained without duplicate dispatch. Trusted formal CD v2 receipts independently matched post-release container IDs, image configs and running programs; /readyz and Collection /serve-readyz plus finite whitelist comparison. Actual running apiserver configuration selected bounded read-only MySQL/Mongo100/39 preflight/readback; repository pause read-back and cleanup of owned audit container/temp directories. No migration apply, DDL or business write.",
+      "result": {
+        "status": "passed",
+        "summary": "M1 source249788c6 was deployed by one approved manual all/1/2/3 CD run. Three formal role receipts cover six instances and match independent image/program/SHA observations and ready200/zero restarts; both Collection service/dependency/control checks passed, and the finite whitelist remained unchanged. Actual qs MySQL100/Mongo39 stayed clean with the M3 identities/resource digest and four retired objects absent. Pause=true and owned read-only audit facilities are cleared. This is dated release/structural evidence, not complete effective configuration or business acceptance.",
+        "measurements": {
+          "deploy_run": 38471191605,
+          "deploy_run_attempt": 1,
+          "deploy_event": "workflow_dispatch",
+          "deploy_inputs": {
+            "service": "all",
+            "apiserver_replicas": 1,
+            "collection_replicas": 2,
+            "worker_replicas": 3
+          },
+          "deploy_conclusion": "success",
+          "build_jobs_success": 3,
+          "deploy_jobs_success": 3,
+          "worker_governance_k6_observability": "success",
+          "automatic_full_deploy_marker": "skipped_by_manual_dispatch_design",
+          "jobs": [
+            {
+              "name": "Plan Deploy Services",
+              "job_id": 115550390442,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115550390442"
+            },
+            {
+              "name": "Build and Push Docker Images (collection)",
+              "job_id": 115550593964,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115550593964"
+            },
+            {
+              "name": "Build and Push Docker Images (apiserver)",
+              "job_id": 115550593993,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115550593993"
+            },
+            {
+              "name": "Build and Push Docker Images (worker)",
+              "job_id": 115550594027,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115550594027"
+            },
+            {
+              "name": "Deploy API Server",
+              "job_id": 115552463176,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552463176"
+            },
+            {
+              "name": "Deploy Worker",
+              "job_id": 115552958187,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552958187"
+            },
+            {
+              "name": "Deploy Collection Server",
+              "job_id": 115552959159,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552959159"
+            },
+            {
+              "name": "Verify Worker Governance and K6 Observability",
+              "job_id": 115553456505,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115553456505"
+            },
+            {
+              "name": "Send Notification",
+              "job_id": 115553664797,
+              "status": "completed",
+              "conclusion": "success",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115553664797"
+            },
+            {
+              "name": "Record Automatic Full Deployment",
+              "job_id": 115553666090,
+              "status": "completed",
+              "conclusion": "skipped",
+              "url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115553666090"
+            }
+          ],
+          "formal_cd_runtime_receipts_verified": true,
+          "formal_receipt_tool_sha256": "a16ee88d0013f3ded5aade3d915e2ffba4003b6ddf7ee9d48eaad7dfba2531a6",
+          "formal_receipts": [
+            {
+              "role": "apiserver",
+              "job_id": 115552463176,
+              "log_url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552463176",
+              "log_file_sha256": "ca10b71262c2607d1625db33c5c5f08f7a9ae0b61f52228f4d383a7892866ba6",
+              "receipt": "m1-cd-runtime-receipt-apiserver.json",
+              "receipt_file_sha256": "8212fae2335a826f8be1adf3359af26a6edbd8fc7b5123c4e1c326974c2a97ed",
+              "receipt_body_sha256": "8595736eac19e88bc44f2ba032cc5d4ea0db6aa2b0b38b1225049664aa3b3101",
+              "expected_instances": 1,
+              "source_run_tool_bound": true,
+              "independent_after_ids_program_images_match": true,
+              "tool_sha256": "a16ee88d0013f3ded5aade3d915e2ffba4003b6ddf7ee9d48eaad7dfba2531a6",
+              "image_binding_kind": "preflight_config_id",
+              "expected_image_config_sha256": "f95d238c11aded1018c7ec0fabd1702ff2ff57acd57760db313ecdc8b87dfbd4",
+              "instance_set_sha256": "7e3010a346541f3f05a277b258038a565924a544d3a4f1dd2ffae08dd23c9fe9",
+              "topology_sha256": "58c509cd8ffaaee2055f77ea48e9e067b168cc2160bc783599e899ff3983d324"
+            },
+            {
+              "role": "collection",
+              "job_id": 115552959159,
+              "log_url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552959159",
+              "log_file_sha256": "d8c0db22991e3c9357ba011628f0ad7107116f6c503bc6510779139e4efdba85",
+              "receipt": "m1-cd-runtime-receipt-collection.json",
+              "receipt_file_sha256": "f0a4273df286d7478e76a4e06d9bfabe4c7f3d7c4dd8e64fdf8f0f6d31ac2383",
+              "receipt_body_sha256": "64238b42b0d51acdb62ef71ed6b14098567e4f73295d8180bbdf1b14c4f3f626",
+              "expected_instances": 2,
+              "source_run_tool_bound": true,
+              "independent_after_ids_program_images_match": true,
+              "tool_sha256": "a16ee88d0013f3ded5aade3d915e2ffba4003b6ddf7ee9d48eaad7dfba2531a6",
+              "image_binding_kind": "source_tag",
+              "expected_image_config_sha256": null,
+              "instance_set_sha256": "f780036512ad2705835498a777d93dfda15ccd0be775c21154fde1d18310ca65",
+              "topology_sha256": "02cdf09c4204a285d0fec32bb2924902b7700f228ce34582106e88c7ce999cb8"
+            },
+            {
+              "role": "worker",
+              "job_id": 115552958187,
+              "log_url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552958187",
+              "log_file_sha256": "c988840906254e0e4e4c71b38fdf0dba769ac6a01a1ef0d2725757979651a46b",
+              "receipt": "m1-cd-runtime-receipt-worker.json",
+              "receipt_file_sha256": "7565647f94b61b3da17587e272f3696c24ed3d28e76eba71c4a58b05bd9ed21c",
+              "receipt_body_sha256": "c04bd88d717798703e136a442112457a06d443ed38dcb441ccdc71b150bc1889",
+              "expected_instances": 3,
+              "source_run_tool_bound": true,
+              "independent_after_ids_program_images_match": true,
+              "tool_sha256": "a16ee88d0013f3ded5aade3d915e2ffba4003b6ddf7ee9d48eaad7dfba2531a6",
+              "image_binding_kind": "source_tag",
+              "expected_image_config_sha256": null,
+              "instance_set_sha256": "02dde48abdcfe1f33861155ba11bbf4dce9bcf2b253a42886f3cfe3b31524d18",
+              "topology_sha256": "2460562f35bdb06f2101bea8cf2134adbeb0adc1c2d7f3e1ca4e2fc869a69fbe"
+            }
+          ],
+          "supplementary_runtime_verified": true,
+          "instances": [
+            {
+              "host": "serverA",
+              "name": "qs-apiserver",
+              "role": "apiserver",
+              "observed_at": "2026-10-13T21:39:35.674429+00:00",
+              "container_id": "11fb6047351d78681fa243d537ca236d81b6c1f1dea276e85db47ad84b0cf760",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "image_config_sha256": "sha256:f95d238c11aded1018c7ec0fabd1702ff2ff57acd57760db313ecdc8b87dfbd4",
+              "program_sha256": "sha256:871766e1abbf969d5167c83ded241b09c027977d2d0cef9856017b62cdc98780",
+              "running_executable_matches_binary": true,
+              "metadata_stable_during_probe": true,
+              "running": true,
+              "container_health": "healthy",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            },
+            {
+              "host": "serverA",
+              "name": "qs-collection-server-1",
+              "role": "collection",
+              "observed_at": "2026-10-13T21:39:35.674429+00:00",
+              "container_id": "1df682335775991de714359aebec3daf5e0382539cc661850c9cd09df359ef74",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "image_config_sha256": "sha256:35ea85f898dcee539fabe0e626dde795380414d2e5279a957ef44965ef3ed719",
+              "program_sha256": "sha256:4c6f486158e9dca3b93cd0d14bd8c890aeecb180d7bc434e52deb2d2b68daa88",
+              "running_executable_matches_binary": true,
+              "metadata_stable_during_probe": true,
+              "running": true,
+              "container_health": "healthy",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                },
+                {
+                  "path": "/serve-readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0,
+              "collection_serve_ready": true,
+              "collection_dependency_ready": true,
+              "collection_control_synchronized": true
+            },
+            {
+              "host": "serverA",
+              "name": "qs-collection-server-2",
+              "role": "collection",
+              "observed_at": "2026-10-13T21:39:35.674429+00:00",
+              "container_id": "8576ada9cb8a9441765fe9539b26a9c6d0beefac8af1403a04a3f4ceb266cbd5",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "image_config_sha256": "sha256:35ea85f898dcee539fabe0e626dde795380414d2e5279a957ef44965ef3ed719",
+              "program_sha256": "sha256:4c6f486158e9dca3b93cd0d14bd8c890aeecb180d7bc434e52deb2d2b68daa88",
+              "running_executable_matches_binary": true,
+              "metadata_stable_during_probe": true,
+              "running": true,
+              "container_health": "healthy",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                },
+                {
+                  "path": "/serve-readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0,
+              "collection_serve_ready": true,
+              "collection_dependency_ready": true,
+              "collection_control_synchronized": true
+            },
+            {
+              "host": "serverD",
+              "name": "qs-worker-runtime-1",
+              "role": "worker",
+              "observed_at": "2026-10-13T21:39:33.334718+00:00",
+              "container_id": "e2b2ef2fe2a983d0d25e2f3fe8c70a6f627b79ab453829ab2c8fe70a4f15b794",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "image_config_sha256": "sha256:37a35ba8aecb8b1d11c13293440d7fefc3f010ca951e51596900b4c78549047a",
+              "program_sha256": "sha256:4c805294bcc9b99e498619a40a8d87e6937f0152efb58f6db3a67e8f58605e2d",
+              "running_executable_matches_binary": true,
+              "metadata_stable_during_probe": true,
+              "running": true,
+              "container_health": "not_configured",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            },
+            {
+              "host": "serverD",
+              "name": "qs-worker-runtime-2",
+              "role": "worker",
+              "observed_at": "2026-10-13T21:39:33.334718+00:00",
+              "container_id": "e50ca29aeb655dd7227f3e0cca83129cb6b747c94ffbecdc2100d0f7f416af95",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "image_config_sha256": "sha256:37a35ba8aecb8b1d11c13293440d7fefc3f010ca951e51596900b4c78549047a",
+              "program_sha256": "sha256:4c805294bcc9b99e498619a40a8d87e6937f0152efb58f6db3a67e8f58605e2d",
+              "running_executable_matches_binary": true,
+              "metadata_stable_during_probe": true,
+              "running": true,
+              "container_health": "not_configured",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            },
+            {
+              "host": "serverD",
+              "name": "qs-worker-runtime-3",
+              "role": "worker",
+              "observed_at": "2026-10-13T21:39:33.334718+00:00",
+              "container_id": "6c5378c2064f42c62469c82a0eb245935ac75316137cf61d5a4c850eeab88171",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "image_config_sha256": "sha256:37a35ba8aecb8b1d11c13293440d7fefc3f010ca951e51596900b4c78549047a",
+              "program_sha256": "sha256:4c805294bcc9b99e498619a40a8d87e6937f0152efb58f6db3a67e8f58605e2d",
+              "running_executable_matches_binary": true,
+              "metadata_stable_during_probe": true,
+              "running": true,
+              "container_health": "not_configured",
+              "restart_count": 0,
+              "readiness": [
+                {
+                  "path": "/readyz",
+                  "http_status": 200,
+                  "status": "ready"
+                }
+              ],
+              "whitelisted_config_diff_count": 0
+            }
+          ],
+          "apiserver_replicas_verified": 1,
+          "collection_replicas_verified": 2,
+          "worker_replicas_verified": 3,
+          "all_instances_restart_count": 0,
+          "whitelisted_config_diff_count": 0,
+          "frozen_release_metadata": {
+            "observed_at": "2026-10-13T21:41:08.349414+00:00",
+            "source_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "image_config_sha256": "sha256:f95d238c11aded1018c7ec0fabd1702ff2ff57acd57760db313ecdc8b87dfbd4",
+            "offline": true,
+            "metadata_file_sha256": "1e6e4b3d5626e286a84722804ddb4b7fd85cc23ae01b9b75ad78b04e83de08f1",
+            "source_config_sha256": "3cc3763b8c71f2131b25438d56dd96c60af550e7dfe98377743a2b0ca4801611",
+            "rendered_config_sha256": "63530b49e931d5ce69395b7752cdf6abe3024d83d55883695eff062f476babc3",
+            "compose_sha256": "cc7e56f3d29299ab111af5d08800e439a54ee38e6a2e87c65ae4f4eeaa25c689"
+          },
+          "database_preflight": {
+            "observed_at": "2026-10-13T21:26:01.710755+00:00",
+            "read_only": true,
+            "accepted": true,
+            "exit_code": 0,
+            "binary_sha256": "81eb12c76ec385e6c5022d86314ad39968f65b7cda428d562139b7d307d96200",
+            "resource_source_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "runtime_sha_before": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+            "runtime_sha_after": "ead5622e67232672089ae75fe82d8a0914ae7d6c",
+            "before": {
+              "mysql": {
+                "selected_database": "qs",
+                "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+                "version": 100,
+                "dirty": false,
+                "retired_present": []
+              },
+              "mongodb": {
+                "database": "qs",
+                "replica_set": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "version": 39,
+                "dirty": false,
+                "retired_present": []
+              }
+            },
+            "after": {
+              "mysql": {
+                "selected_database": "qs",
+                "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+                "version": 100,
+                "dirty": false,
+                "retired_present": []
+              },
+              "mongodb": {
+                "database": "qs",
+                "replica_set": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "version": 39,
+                "dirty": false,
+                "retired_present": []
+              }
+            },
+            "identity_and_metadata_unchanged": true,
+            "identity_matches_pre_release": true,
+            "migration_resource_sha256": "1af415423e4382d35108a400d1c93913bb17abb277b860560661710447b8a95b",
+            "resource_digest_matches_pre_release": true,
+            "connections_released": true
+          },
+          "database_readback": {
+            "observed_at": "2026-10-13T21:40:23.726435+00:00",
+            "read_only": true,
+            "actual_running_config_bound": true,
+            "database_cli_override": false,
+            "accepted": true,
+            "exit_code": 0,
+            "binary_sha256": "81eb12c76ec385e6c5022d86314ad39968f65b7cda428d562139b7d307d96200",
+            "resource_source_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "runtime_sha_before": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "runtime_sha_after": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+            "before": {
+              "mysql": {
+                "selected_database": "qs",
+                "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+                "version": 100,
+                "dirty": false,
+                "retired_present": []
+              },
+              "mongodb": {
+                "database": "qs",
+                "replica_set": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "version": 39,
+                "dirty": false,
+                "retired_present": []
+              }
+            },
+            "after": {
+              "mysql": {
+                "selected_database": "qs",
+                "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+                "version": 100,
+                "dirty": false,
+                "retired_present": []
+              },
+              "mongodb": {
+                "database": "qs",
+                "replica_set": "rs0",
+                "hosts": [
+                  "mongo:27017"
+                ],
+                "version": 39,
+                "dirty": false,
+                "retired_present": []
+              }
+            },
+            "identity_and_metadata_unchanged": true,
+            "identity_matches_pre_release": true,
+            "identity_and_metadata_matches_m1_preflight": true,
+            "migration_resource_sha256": "1af415423e4382d35108a400d1c93913bb17abb277b860560661710447b8a95b",
+            "resource_digest_matches_pre_release": true,
+            "resource_source_and_digest_matches_m1_preflight": true,
+            "connections_released": true,
+            "ddl_performed": false
+          },
+          "deployment_pause": {
+            "original_value": "true",
+            "temporary_value": "false",
+            "restored_value": "true",
+            "restored_value_verified_at": "2026-10-13T21:39:43.710193+00:00"
+          },
+          "guard_reader_failure": {
+            "error": "CalledProcessError",
+            "original_artifact": "qs-server-cleanup-m1-production-release.json",
+            "original_artifact_sha256": "71a1d335b5d900b1569643cd2aadc9ae655d749eb5c46cccab24709199e68343",
+            "terminal_artifact": "qs-server-cleanup-m1-production-release-terminal.json",
+            "terminal_artifact_sha256": "1603ba3ac5025f62a2fb7de15c059fa542aa10678f72556536635c01aec8f7c3",
+            "original_workflow_observation": "in_progress",
+            "terminal_workflow_observation": "completed/success",
+            "redispatch_performed": false,
+            "additional_pause_disable_performed": false
+          },
+          "owned_readonly_audit_cleanup": {
+            "read_only": true,
+            "own_audit_container_names": [],
+            "own_audit_temp_directories": []
+          },
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m1-production-release.json",
+              "sha256": "71a1d335b5d900b1569643cd2aadc9ae655d749eb5c46cccab24709199e68343"
+            },
+            {
+              "name": "qs-server-cleanup-m1-production-release-terminal.json",
+              "sha256": "1603ba3ac5025f62a2fb7de15c059fa542aa10678f72556536635c01aec8f7c3"
+            },
+            {
+              "name": "m1-cd-runtime-receipts-validation.json",
+              "sha256": "189a36531716a5a73e8e6d09dc8f3dfcd7ca5a600d3f2f8271dd974b68d1f650"
+            },
+            {
+              "name": "m1-cd-runtime-receipt-apiserver.json",
+              "sha256": "8212fae2335a826f8be1adf3359af26a6edbd8fc7b5123c4e1c326974c2a97ed"
+            },
+            {
+              "name": "m1-cd-runtime-receipt-collection.json",
+              "sha256": "f0a4273df286d7478e76a4e06d9bfabe4c7f3d7c4dd8e64fdf8f0f6d31ac2383"
+            },
+            {
+              "name": "m1-cd-runtime-receipt-worker.json",
+              "sha256": "7565647f94b61b3da17587e272f3696c24ed3d28e76eba71c4a58b05bd9ed21c"
+            },
+            {
+              "name": "m1-mq-preflight-frozen-metadata-readonly.json",
+              "sha256": "ea420fdd4fde1f4f5ce8e35a35ae8fa6da2b50fdaa27bbb7765d099208f095bf"
+            },
+            {
+              "name": "m1-runtime-after-serverA.json",
+              "sha256": "87ecf50fa7477d89beb1db8b706ae67591c455550caaa0cead391ee71b2bca64"
+            },
+            {
+              "name": "m1-runtime-after-serverD.json",
+              "sha256": "be4f47d60185b39ed3e7206eb48ddb515b4baac7cdf0f17e6d0a923145aa2862"
+            },
+            {
+              "name": "m1-runtime-after-validation.json",
+              "sha256": "a423ddd31e495b12ccdb4082ca69880fd5860d74b9d1fb2d9846fdb131e1cfce"
+            },
+            {
+              "name": "qs-server-cleanup-m1-release-readonly-preflight.json",
+              "sha256": "c1346347df04bf6c7a25472f93cbec7c6a396ceddbf09e8c7d4e3792c7a58c26"
+            },
+            {
+              "name": "qs-server-cleanup-m1-release-readonly-readback.json",
+              "sha256": "1513a630764a33c11cdb5b70f6561b67a39492ac8337a9c302b3470811245432"
+            },
+            {
+              "name": "qs-server-cleanup-m1-readonly-readback-cleanup.json",
+              "sha256": "04502a24d3d6c34d398f350d6e4fdac1ef1ea91bbc30ccd38d482d899d23c1c2"
+            }
+          ],
+          "raw_artifact_retention": "/Users/yangshujie/.codex/visualizations/2026/10/13/01a133d4-6959-7860-b118-19132012d813",
+          "execution_owner": "Codex",
+          "data_owner": "unconfirmed",
+          "full_effective_configuration_verified": false,
+          "business_acceptance": "not_executed",
+          "full_m0_m8_acceptance": "incomplete",
+          "compatibility_observation_window": "not_started",
+          "rollback": "not_executed",
+          "image_retention_maintenance": {
+            "status": "maintenance_warning",
+            "warning": "Deployment succeeded, but image retention failed; inspect the server retention audit.",
+            "production_image_retention_cleanup_passed": false,
+            "roles": [
+              {
+                "role": "apiserver",
+                "host": "serverA",
+                "job_id": 115552463176,
+                "log_url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552463176",
+                "deployment_conclusion": "success",
+                "maintenance_warning_count": 1,
+                "retention_status": "not_passed_sudo_permission_denied",
+                "sudo_permission_denial_observed": true
+              },
+              {
+                "role": "collection",
+                "host": "serverA",
+                "job_id": 115552959159,
+                "log_url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552959159",
+                "deployment_conclusion": "success",
+                "maintenance_warning_count": 1,
+                "retention_status": "not_passed_sudo_permission_denied",
+                "sudo_permission_denial_observed": true
+              },
+              {
+                "role": "worker",
+                "host": "serverD",
+                "job_id": 115552958187,
+                "log_url": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605/job/115552958187",
+                "deployment_conclusion": "success",
+                "maintenance_warning_count": 0,
+                "retention_status": "no_warning_observed",
+                "sudo_permission_denial_observed": false
+              }
+            ],
+            "manual_root_image_delete_performed": false,
+            "deploy_account_permission_bypass_performed": false,
+            "requires_named_infra_maintenance_followup": true
+          }
+        }
+      },
+      "owner": "Codex",
+      "topics": [
+        "deployment_cd_network",
+        "data_migration_transaction"
+      ],
+      "expires_on": "2026-11-12",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38471191605"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md"
+        }
+      ],
+      "limitations": [
+        "Dated M1-only historical/passed release and structural runtime evidence; it does not sign infrastructure production readiness, semantic correctness or full M0-M8 cleanup acceptance. M2 and later prepared branches were not included in this release.",
+        "Finite safe whitelist equality and retained source/rendered/compose file hashes are not a complete effective configuration hash. Complete post-Viper YAML, environment and secret configuration remains unknown_not_recorded.",
+        "Formal CD v2 receipts bind source-tag image configurations and running programs to exact container IDs/roles/counts. Independent after-probes are dated separately; no continuous health or registry signature/manifest attestation is claimed. Worker Docker HEALTHCHECK is not configured; application /readyz was checked.",
+        "Actual-application read-only clean100/39, unchanged identities/resource digest and M3 retired objects absent do not prove historical data consistency, authoritative data ownership, restore rehearsal or business behavior. No DDL was performed.",
+        "Execution evidence Owner is Codex. The user-specified /data/bak/ path is acknowledged; its corresponding server, roles, device and recipient remain unresolved, and system(10001) is not a confirmed data Owner or accountable approval. No completed backup, restore authorization or data responsibility signature is inferred.",
+        "Real answersheet-to-Outcome-to-Report business acceptance, formal consumer releases/device acceptance, 14-day observation and independent backup/restore gates remain unexecuted or incomplete. This deployment does not start the compatibility observation window.",
+        "Original local guard status-reader CalledProcessError and its in-progress workflow snapshot remain preserved. The terminal workflow success was independently checked; no duplicate dispatch or additional pause disable occurred. Repository PRODUCTION_DEPLOY_PAUSED was read back true.",
+        "Owned read-only audit container names and temporary directories are empty in the retained cleanup artifact. This is scoped cleanup, not permission to remove other runtime or production resources.",
+        "ServerA API job115552463176 and Collection job115552959159 succeeded but both recorded the fixed image-retention maintenance warning after the deploy account sudo request for image-retention.py was denied. Worker job115552958187 had no such warning. Production image-retention cleanup is not passed; no manual root image deletion or deploy-permission bypass was performed. This requires a separate named infrastructure maintenance task and does not change the CD/runtime passed result."
+      ]
     }
   ]
 }
