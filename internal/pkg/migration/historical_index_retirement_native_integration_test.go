@@ -79,7 +79,7 @@ func mongoIndexInventory(t *testing.T, db *mongo.Database) map[string]bson.D {
 	return result
 }
 
-func mongoNamespaceInventory(t *testing.T, db *mongo.Database) map[string]bson.Raw {
+func mongoBusinessNamespaceInventory(t *testing.T, db *mongo.Database) map[string]bson.Raw {
 	t.Helper()
 	cursor, err := db.ListCollections(t.Context(), bson.D{})
 	if err != nil {
@@ -91,7 +91,13 @@ func mongoNamespaceInventory(t *testing.T, db *mongo.Database) map[string]bson.R
 	}
 	result := make(map[string]bson.Raw)
 	for _, row := range rows {
-		result[row.Lookup("name").StringValue()] = row
+		name := row.Lookup("name").StringValue()
+		// The migrate provider recreates only its schema_migrations collection
+		// when recording each dirty/clean version. Verify that metadata through
+		// heads/VerifyComplete, while every business namespace stays identical.
+		if name != "schema_migrations" {
+			result[name] = row
+		}
 	}
 	return result
 }
@@ -132,7 +138,7 @@ func runHistoricalIndexCommands(t *testing.T, db *mongo.Database, raw []byte) er
 func TestHistoricalIndexNativeMongoOnlyUpgradeAndRestart(t *testing.T) {
 	n := nativeHistoricalIndexPair(t)
 	sqlBefore := historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations")
-	before, namespaces, documents := mongoIndexInventory(t, n.mongoDB), mongoNamespaceInventory(t, n.mongoDB), mongoFrozenDocuments(t, n.mongoDB)
+	before, namespaces, documents := mongoIndexInventory(t, n.mongoDB), mongoBusinessNamespaceInventory(t, n.mongoDB), mongoFrozenDocuments(t, n.mongoDB)
 	for _, target := range historicalIndexTargets {
 		if before[target.collection+"/"+target.name] == nil {
 			t.Fatal("required historical index missing before upgrade", target.name)
@@ -147,8 +153,17 @@ func TestHistoricalIndexNativeMongoOnlyUpgradeAndRestart(t *testing.T) {
 	if version, changed, err := NewMongoMigrator(n.client, p.MongoConfig(false)).Run(); err != nil || !changed || version != 40 {
 		t.Fatal("Mongo40 upgrade failed", version, changed, err)
 	}
-	if !reflect.DeepEqual(before, mongoIndexInventory(t, n.mongoDB)) || !reflect.DeepEqual(namespaces, mongoNamespaceInventory(t, n.mongoDB)) || !reflect.DeepEqual(documents, mongoFrozenDocuments(t, n.mongoDB)) || !reflect.DeepEqual(sqlBefore, historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations")) {
-		t.Fatal("Mongo40 changed unrelated index specs, namespace UUIDs, frozen/current business documents or SQL metadata")
+	if after := mongoIndexInventory(t, n.mongoDB); !reflect.DeepEqual(before, after) {
+		t.Errorf("Mongo40 changed unrelated index specs: before=%v after=%v", before, after)
+	}
+	if after := mongoBusinessNamespaceInventory(t, n.mongoDB); !reflect.DeepEqual(namespaces, after) {
+		t.Error("Mongo40 changed business namespace UUIDs/options")
+	}
+	if after := mongoFrozenDocuments(t, n.mongoDB); !reflect.DeepEqual(documents, after) {
+		t.Error("Mongo40 changed frozen/current business documents")
+	}
+	if !reflect.DeepEqual(sqlBefore, historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations")) {
+		t.Error("Mongo-only release changed SQL metadata")
 	}
 	restart := n.preflight(t, r)
 	for _, migrator := range []*Migrator{NewMigrator(n.db, restart.MySQLConfig(false)), NewMongoMigrator(n.client, restart.MongoConfig(false))} {
@@ -285,7 +300,7 @@ func TestHistoricalIndexNativePermissionDeniedAfterMetadataWrite(t *testing.T) {
 	role, user := "m4_no_index_drop", "m4_scoped_migrator"
 	if err := n.mongoDB.RunCommand(t.Context(), bson.D{{Key: "createRole", Value: role}, {Key: "privileges", Value: bson.A{
 		bson.M{"resource": bson.M{"db": n.mongoDB.Name(), "collection": ""}, "actions": bson.A{"find", "listCollections", "listIndexes"}},
-		bson.M{"resource": bson.M{"db": n.mongoDB.Name(), "collection": "schema_migrations"}, "actions": bson.A{"find", "insert", "remove", "update"}},
+		bson.M{"resource": bson.M{"db": n.mongoDB.Name(), "collection": "schema_migrations"}, "actions": bson.A{"find", "insert", "remove", "update", "dropCollection"}},
 	}}, {Key: "roles", Value: bson.A{}}}).Err(); err != nil {
 		t.Fatal(err)
 	}
