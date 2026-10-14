@@ -11276,7 +11276,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+        "source_sha": "3ab1d90f9dd9f2af90764c375433c282b1ccc9bb",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11402,6 +11402,13 @@
           "selector": "func TestMetadataProfileNativeOwnedMySQL",
           "result": "matched",
           "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "3ab1d90f9dd9f2af90764c375433c282b1ccc9bb",
           "verified_on": "2026-10-14"
         }
       ],
