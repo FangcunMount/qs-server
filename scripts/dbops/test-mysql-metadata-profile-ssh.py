@@ -1,4 +1,5 @@
 import copy
+import contextlib
 import hashlib
 import importlib.util
 import io
@@ -246,6 +247,67 @@ class SSHProfileTests(unittest.TestCase):
                 return 0, json.dumps(receipt()).encode()
             with patch.object(profile, 'capture_private', side_effect=capture):
                 self.assertTrue(profile.execute_native(str(binary), env, profile.runtime_module())[1]['complete'])
+
+    def run_main(self, path, env):
+        output, errors = io.StringIO(), io.StringIO()
+        with patch.object(ssh, 'load_profile', return_value=profile), patch.object(sys, 'argv', ['mysql-metadata-profile-ssh.py', '--archive', str(path)]), patch.dict(os.environ, env, clear=True), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            code = ssh.main()
+        self.assertNotIn(SECRET, output.getvalue())
+        self.assertEqual(errors.getvalue(), '')
+        raw = armor.decode_armored_receipt(output.getvalue())
+        value = profile.safe_receipt(profile.runtime_module(), raw, code, SHA, RUN, HASH)
+        return code, value
+
+    def test_fixed_stage_failures_emit_no_secret_trace_or_positive_facts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'package.tar.gz'
+            path.write_bytes(package())
+            path.chmod(0o600)
+            env = environment()
+            env['PROFILE_PACKAGE_SHA256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+            cases = [
+                ('profile_input_preflight_failed', dict(env, MYSQL_PASSWORD=''), None),
+                ('profile_package_preflight_failed', dict(env, PROFILE_PACKAGE_SHA256='f' * 64), None),
+                ('profile_trusted_ssh_preflight_failed', env, OSError(SECRET)),
+                ('profile_remote_or_receipt_failed', env, None),
+            ]
+            for category, private, ssh_error in cases:
+                with self.subTest(category=category), patch.object(ssh, 'trusted_ssh', side_effect=ssh_error, return_value=(['ssh'], {})) as trusted, patch.object(profile, 'capture_private', return_value=(1, SECRET.encode())) as captured:
+                    code, value = self.run_main(path, private)
+                    self.assertEqual(code, 1)
+                    self.assertEqual(value['error_category'], category)
+                    self.assertFalse(value['complete'])
+                    self.assertFalse(value['current_unrestricted_metadata_grants'])
+                    for key in (*profile.FACT_KEYS, 'rds_role_grants_available', 'rds_role_unrestricted_metadata_grants', 'assigned_roles_present', 'mandatory_roles_present'):
+                        self.assertIsNone(value[key])
+                    if category in ('profile_input_preflight_failed', 'profile_package_preflight_failed'):
+                        trusted.assert_not_called()
+                    if category != 'profile_remote_or_receipt_failed':
+                        captured.assert_not_called()
+
+    def test_specific_sql_failure_survives_remote_transport_without_stage_rename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'package.tar.gz'
+            path.write_bytes(package())
+            path.chmod(0o600)
+            env = environment()
+            env['PROFILE_PACKAGE_SHA256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+            value = dict(receipt(), complete=False, error_category='current_grants_query_failed',
+                         rds_role_grants_available=None, assigned_roles_present=None, mandatory_roles_present=None)
+            value.update({key: None for key in profile.FACT_KEYS})
+            sealed = armor.encode_armored_receipt(value, schema=profile.RECEIPT_SCHEMA).encode()
+            with patch.object(ssh, 'trusted_ssh', return_value=(['ssh'], {})), patch.object(profile, 'capture_private', return_value=(1, sealed)):
+                code, actual = self.run_main(path, env)
+            self.assertEqual(code, 1)
+            self.assertEqual(actual, value)
+            self.assertEqual(actual['error_category'], 'current_grants_query_failed')
+
+    def test_unknown_stage_token_cannot_enter_sealed_receipt(self):
+        value = ssh.stage_receipt(profile, environment(), SECRET)
+        self.assertEqual(value['error_category'], 'profile_transport_or_receipt_failed')
+        self.assertNotIn(SECRET, json.dumps(value))
+        with self.assertRaises(Exception):
+            armor.encode_armored_receipt(dict(value, error_category=SECRET), schema=profile.RECEIPT_SCHEMA)
 
     def test_release_failure_categories_are_closed_and_remove_facts(self):
         for category in ('connection_release_failed', 'database_release_failed'):

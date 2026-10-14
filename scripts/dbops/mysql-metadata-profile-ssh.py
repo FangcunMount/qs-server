@@ -180,32 +180,69 @@ def trusted_ssh(profile, home):
     return ["/usr/bin/ssh", "-T", *options, "-l", "root", ALIAS], local
 
 
+TRANSPORT_ERRORS = frozenset(("profile_input_preflight_failed", "profile_package_preflight_failed",
+                              "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed"))
+
+
+class ProfileStageFailure(Exception):
+    """Carries a fixed stage token only; raw exceptions are never published."""
+
+
+def stage_receipt(profile, env, category):
+    value = dict(profile.FAILURE_RECEIPT)
+    value["error_category"] = category if category in TRANSPORT_ERRORS else "profile_transport_or_receipt_failed"
+    value["current_unrestricted_metadata_grants"] = False
+    for key in (*profile.FACT_KEYS, "rds_role_grants_available", "rds_role_unrestricted_metadata_grants",
+                "assigned_roles_present", "mandatory_roles_present"):
+        value[key] = None
+    for name, key, expression in (("source_sha", "PROFILE_SOURCE_SHA", profile.SHA),
+                                  ("run_id", "PROFILE_RUN_ID", profile.RUN),
+                                  ("expected_target_hash", "PROFILE_EXPECTED_TARGET_HASH", profile.HASH)):
+        if expression.fullmatch(env.get(key, "")):
+            value[name] = env[key]
+    return value
+
+
 def dispatch(archive, env, profile, home):
-    if env.get("PROFILE_OPERATION") not in ("metadata-visibility-profile", "metadata-visibility-admin-profile") or env.get("PROFILE_DATABASE") != "mysql" or env.get("PROFILE_ARCHIVE_INPUT", ""):
-        raise ValueError("operation_binding")
-    private = {key: env.get(key, "") for key in profile.PROFILE_KEYS}
-    private["MYSQL_PORT"] = private["MYSQL_PORT"] or "3306"
-    profile.runtime_module().validate_source(private)
-    path = Path(archive)
-    if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid() or stat.S_IMODE(path.stat().st_mode) != 0o600 or path.stat().st_size > ARCHIVE_LIMIT:
-        raise ValueError("local_package_private")
-    raw = path.read_bytes()
-    envelope = {"env": private, "package_sha256": env.get("PROFILE_PACKAGE_SHA256", ""), "package_size": len(raw)}
-    validate_envelope(envelope)
-    if hashlib.sha256(raw).hexdigest() != envelope["package_sha256"]:
-        raise ValueError("local_package_checksum")
-    # Public receiver code only enters argv; package and secrets travel solely over stdin.
-    receiver = base64.b64encode(Path(__file__).read_bytes()).decode("ascii")
-    command = "/usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + " --receive"
-    ssh, local = trusted_ssh(profile, home)
-    payload = json.dumps(envelope, separators=(",", ":"), ensure_ascii=True).encode() + b"\n" + raw
-    if len(payload) - len(raw) > HEADER_LIMIT:
-        raise ValueError("envelope_limit")
-    code, sealed = profile.capture_private([*ssh, command], env=local, payload=payload, timeout=90, limit=262144)
-    value = profile.safe_receipt(profile.runtime_module(), profile.receipt_transport_module().decode_armored_receipt(sealed.decode()),
-                                 code, private["PROFILE_SOURCE_SHA"], private["PROFILE_RUN_ID"], private["PROFILE_EXPECTED_TARGET_HASH"])
-    return code, profile.receipt_transport_module().encode_armored_receipt(value, schema=profile.RECEIPT_SCHEMA,
-                                                                        secrets=(private["MYSQL_USERNAME"], private["MYSQL_PASSWORD"]))
+    try:
+        if env.get("PROFILE_OPERATION") not in ("metadata-visibility-profile", "metadata-visibility-admin-profile") or env.get("PROFILE_DATABASE") != "mysql" or env.get("PROFILE_ARCHIVE_INPUT", ""):
+            raise ValueError("operation_binding")
+        private = {key: env.get(key, "") for key in profile.PROFILE_KEYS}
+        private["MYSQL_PORT"] = private["MYSQL_PORT"] or "3306"
+        profile.runtime_module().validate_source(private)
+        if not profile.SHA.fullmatch(private["PROFILE_SOURCE_SHA"]) or not profile.RUN.fullmatch(private["PROFILE_RUN_ID"]) or not profile.HASH.fullmatch(private["PROFILE_EXPECTED_TARGET_HASH"]):
+            raise ValueError("source_binding")
+    except Exception:
+        raise ProfileStageFailure("profile_input_preflight_failed") from None
+    try:
+        path = Path(archive)
+        if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid() or stat.S_IMODE(path.stat().st_mode) != 0o600 or path.stat().st_size > ARCHIVE_LIMIT:
+            raise ValueError("local_package_private")
+        raw = path.read_bytes()
+        envelope = {"env": private, "package_sha256": env.get("PROFILE_PACKAGE_SHA256", ""), "package_size": len(raw)}
+        validate_envelope(envelope)
+        if hashlib.sha256(raw).hexdigest() != envelope["package_sha256"]:
+            raise ValueError("local_package_checksum")
+        # Public receiver code only enters argv; package and secrets travel solely over stdin.
+        receiver = base64.b64encode(Path(__file__).read_bytes()).decode("ascii")
+        command = "/usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + " --receive"
+        payload = json.dumps(envelope, separators=(",", ":"), ensure_ascii=True).encode() + b"\n" + raw
+        if len(payload) - len(raw) > HEADER_LIMIT:
+            raise ValueError("envelope_limit")
+    except Exception:
+        raise ProfileStageFailure("profile_package_preflight_failed") from None
+    try:
+        ssh, local = trusted_ssh(profile, home)
+    except Exception:
+        raise ProfileStageFailure("profile_trusted_ssh_preflight_failed") from None
+    try:
+        code, sealed = profile.capture_private([*ssh, command], env=local, payload=payload, timeout=90, limit=262144)
+        value = profile.safe_receipt(profile.runtime_module(), profile.receipt_transport_module().decode_armored_receipt(sealed.decode()),
+                                     code, private["PROFILE_SOURCE_SHA"], private["PROFILE_RUN_ID"], private["PROFILE_EXPECTED_TARGET_HASH"])
+        return code, profile.receipt_transport_module().encode_armored_receipt(value, schema=profile.RECEIPT_SCHEMA,
+                                                                            secrets=(private["MYSQL_USERNAME"], private["MYSQL_PASSWORD"]))
+    except Exception:
+        raise ProfileStageFailure("profile_remote_or_receipt_failed") from None
 
 
 def main():
@@ -226,9 +263,10 @@ def main():
             return 1
         try:
             code, output = dispatch(args.archive, os.environ, profile, Path.home())
-        except Exception:
+        except Exception as failure:
             try:
-                output = profile.receipt_transport_module().encode_armored_receipt(dict(profile.FAILURE_RECEIPT),
+                category = failure.args[0] if isinstance(failure, ProfileStageFailure) and failure.args else "profile_transport_or_receipt_failed"
+                output = profile.receipt_transport_module().encode_armored_receipt(stage_receipt(profile, os.environ, category),
                     schema=profile.RECEIPT_SCHEMA, secrets=(os.environ.get("MYSQL_USERNAME", ""), os.environ.get("MYSQL_PASSWORD", "")))
             except Exception:
                 return 1

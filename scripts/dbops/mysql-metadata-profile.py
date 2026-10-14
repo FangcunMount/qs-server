@@ -20,7 +20,7 @@ KEYS = {"format_version", "source_sha", "run_id", "expected_target_hash", "sourc
 FACT_KEYS = {"current_global_select_grant", "current_global_show_view_grant", "current_global_trigger_grant", "current_global_event_grant", "current_partial_revocations_present"}
 ALLOWED_KEYS = KEYS | FACT_KEYS
 
-ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed", "connection_release_failed", "database_release_failed"}
+ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed", "connection_release_failed", "database_release_failed", "profile_input_preflight_failed", "profile_package_preflight_failed", "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed"}
 
 
 FAILURE_RECEIPT = {"format_version": 1, "diagnostic_only": True, "complete": False,
