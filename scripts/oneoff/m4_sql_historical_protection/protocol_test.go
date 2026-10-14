@@ -30,10 +30,40 @@ func testMaterial() material {
 	now := time.Now().UTC()
 	m := material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: testSource, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: now.Format(time.RFC3339Nano), SQLName: "qs_fixture", MongoName: "qs_fixture", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), MongoUUID: strings.Repeat("c", 64), MongoHead: []byte{1}, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE schema_migrations", Ledger: []ledgerRow{{100, false}}}
 	for i, o := range objects {
-		ddl := "CREATE TABLE `" + o.table + "` (\n  `id` bigint unsigned NOT NULL,\n  `" + o.column + "` json DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  CONSTRAINT `" + o.check + "` CHECK ((1))\n) ENGINE=InnoDB AUTO_INCREMENT=3"
+		check, e := originalCheckDefinition(i)
+		if e != nil {
+			panic(e)
+		}
+		ddl := "CREATE TABLE `" + o.table + "` (\n  `id` bigint unsigned NOT NULL,\n  `" + o.column + "` json DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  " + check + "\n) ENGINE=InnoDB AUTO_INCREMENT=3"
 		m.Tables[i] = tableProof{Table: o.table, OriginalDDL: ddl, RetainedDDL: normalizeDDL(ddl, i), Columns: []column{{"id", "bigint unsigned"}}, Rows: []rowProof{{0, strings.Repeat("d", 64)}, {^uint64(0), strings.Repeat("e", 64)}}, Pages: 2, EOF: true, SQLNullOnly: true}
 	}
 	return m
+}
+
+func TestOriginalDefinitionDriftRefusedBeforeRestoration(t *testing.T) {
+	for i := range objects {
+		original := testMaterial().Tables[i].OriginalDDL
+		if e := validateOriginalObjectDefinition(original, i); e != nil {
+			t.Fatal(e)
+		}
+		for _, changed := range []string{
+			strings.Replace(original, "<= 524288", "<= 524287", 1),
+			strings.Replace(original, "DEFAULT NULL", "INVISIBLE DEFAULT NULL", 1),
+			strings.Replace(original, "  PRIMARY KEY", "  `unexpected_after` int DEFAULT NULL,\n  PRIMARY KEY", 1),
+			strings.Replace(original, "is null", "is not null", 1),
+			strings.Replace(original, "\"maxItems\":128", "\"maxItems\":127", 1),
+		} {
+			if changed == original || validateOriginalObjectDefinition(changed, i) == nil {
+				t.Fatal("unrestorable definition accepted")
+			}
+			m := testMaterial()
+			m.Tables[i].OriginalDDL = changed
+			m.Tables[i].RetainedDDL = normalizeDDL(changed, i)
+			if validateMaterial(m, testSource, m.SQLName, m.MongoName) == nil {
+				t.Fatal("bound material may not authorize an unknown original definition")
+			}
+		}
+	}
 }
 func testApproval(t *testing.T, m material, hash string) approval {
 	t.Helper()

@@ -7,10 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -129,6 +131,9 @@ func validateMaterial(m material, tool, sqlName, mongoName string) error {
 		if t.Table != objects[i].table || !t.EOF || !t.SQLNullOnly || len(t.Rows) > maxRows || t.Pages < 1 || t.OriginalDDL == "" || t.RetainedDDL != normalizeDDL(t.OriginalDDL, i) || len(t.Columns) < 1 || len(t.Columns) > 128 {
 			return errors.New("material_table_rejected")
 		}
+		if validateOriginalObjectDefinition(t.OriginalDDL, i) != nil {
+			return errors.New("material_original_099_definition_rejected")
+		}
 		seen := map[string]bool{}
 		for _, c := range t.Columns {
 			if !nameRE.MatchString(c.Name) || c.Name == objects[i].column || c.Type == "" || len(c.Type) > 255 || seen[c.Name] {
@@ -144,6 +149,64 @@ func validateMaterial(m material, tool, sqlName, mongoName string) error {
 				return errors.New("material_rows_rejected")
 			}
 		}
+	}
+	return nil
+}
+
+// MySQL8.0.36 SHOW CREATE renders the original OCTET_LENGTH alias as length.
+// Accept only this fixed server encoding of the immutable 099 expression;
+// no generic SQL normalization or material-supplied DDL is executed.
+func originalCheckDefinition(i int) (string, error) {
+	if i < 0 || i >= len(objects) || fingerprint([]byte(originalDDL)) != originalDDLHash {
+		return "", errors.New("compiled_original_ddl_changed")
+	}
+	parts := strings.SplitN(originalDDL, "ALTER TABLE `"+objects[i].table+"`", 2)
+	if len(parts) != 2 {
+		return "", errors.New("original_check_resource_invalid")
+	}
+	parts = strings.SplitN(parts[1], "JSON_SCHEMA_VALID('", 2)
+	if len(parts) != 2 {
+		return "", errors.New("original_check_resource_invalid")
+	}
+	parts = strings.SplitN(parts[1], "', `"+objects[i].column+"`)", 2)
+	if len(parts) != 2 || !json.Valid([]byte(parts[0])) || strings.ContainsAny(parts[0], "'\\") {
+		return "", errors.New("original_check_resource_invalid")
+	}
+	c := objects[i].column
+	return fmt.Sprintf("CONSTRAINT `%s` CHECK (((`%s` is null) or (json_schema_valid(_utf8mb4'%s',`%s`) and (length(cast(`%s` as char charset utf8mb4)) <= 524288))))", objects[i].check, c, parts[0], c, c), nil
+}
+
+func validateOriginalObjectDefinition(text string, i int) error {
+	want, e := originalCheckDefinition(i)
+	if e != nil {
+		return e
+	}
+	columnCount, checkCount := 0, 0
+	lastColumn := ""
+	for _, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSuffix(strings.TrimSpace(raw), ",")
+		if strings.HasPrefix(line, "`") {
+			parts := strings.SplitN(line, "`", 3)
+			if len(parts) != 3 {
+				return errors.New("original_099_object_definition_rejected")
+			}
+			lastColumn = parts[1]
+			if lastColumn == objects[i].column {
+				columnCount++
+				if line != "`"+objects[i].column+"` json DEFAULT NULL" {
+					return errors.New("original_099_object_definition_rejected")
+				}
+			}
+		}
+		if strings.HasPrefix(line, "CONSTRAINT `"+objects[i].check+"`") {
+			checkCount++
+			if line != want {
+				return errors.New("original_099_object_definition_rejected")
+			}
+		}
+	}
+	if columnCount != 1 || checkCount != 1 || lastColumn != objects[i].column {
+		return errors.New("original_099_object_definition_rejected")
 	}
 	return nil
 }

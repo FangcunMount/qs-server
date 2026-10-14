@@ -482,6 +482,11 @@ func (d database) snapshot(ctx context.Context, tool string, original bool) (m m
 		if e != nil {
 			return m, before, e
 		}
+		if present {
+			if e = validateOriginalObjectDefinition(t.OriginalDDL, i); e != nil {
+				return m, before, e
+			}
+		}
 		t.RetainedDDL = normalizeDDL(t.OriginalDDL, i)
 		m.Tables[i] = t
 	}

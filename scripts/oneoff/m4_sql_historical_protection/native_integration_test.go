@@ -368,6 +368,51 @@ func TestM4SQLObjectNativeCaptureAndTargetVerification(t *testing.T) {
 		t.Fatal(r)
 	}
 }
+
+func TestM4SQLObjectNativeOriginalDefinitionDriftRefused(t *testing.T) {
+	for _, kind := range []string{"CheckChanged", "ColumnMoved"} {
+		t.Run(kind, func(t *testing.T) {
+			h := newNative(t)
+			h.capture()
+			statement := "ALTER TABLE assessment DROP CHECK chk_assessment_historical_lifecycle, ADD CONSTRAINT chk_assessment_historical_lifecycle CHECK (historical_lifecycle_evidence IS NULL)"
+			if kind == "ColumnMoved" {
+				statement = "ALTER TABLE assessment MODIFY COLUMN historical_lifecycle_evidence JSON NULL FIRST"
+			}
+			if _, e := h.db.Exec(statement); e != nil {
+				t.Fatal("owned schema drift fixture failed", e)
+			}
+			r := h.action("capture", "--capture-file="+filepath.Join(h.dir, "drift-rejected.json"))
+			if r.Complete || r.Error != "original_099_object_definition_rejected" || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed {
+				t.Fatal(r)
+			}
+			if _, e := os.Stat(filepath.Join(h.dir, "drift-rejected.json")); !os.IsNotExist(e) {
+				t.Fatal("drifted original capture material was created")
+			}
+			h.upgrade(0, false)
+			args, _ := h.restoreInput()
+			var before, after string
+			var table string
+			if e := h.db.QueryRow("SHOW CREATE TABLE assessment").Scan(&table, &before); e != nil {
+				t.Fatal(e)
+			}
+			r = h.action("restore", args...)
+			if r.Complete || r.Error != "original_099_object_definition_rejected" || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed {
+				t.Fatal(r)
+			}
+			if e := h.db.QueryRow("SHOW CREATE TABLE assessment").Scan(&table, &after); e != nil || after != before {
+				t.Fatal("early refusal changed the drifted original structure", e)
+			}
+			h.assertHead(101, true)
+			for _, arg := range args {
+				if strings.HasPrefix(arg, "--approval-file=") {
+					if _, e := os.Stat(strings.TrimPrefix(arg, "--approval-file=") + ".consumed"); !os.IsNotExist(e) {
+						t.Fatal("early definition refusal consumed authorization")
+					}
+				}
+			}
+		})
+	}
+}
 func TestM4SQLObjectNativeRecoveryMatrix(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

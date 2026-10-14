@@ -236,6 +236,7 @@ jobs:
           import json, sys
           expected = {
               'TestM4SQLObjectNativeCaptureAndTargetVerification',
+              'TestM4SQLObjectNativeOriginalDefinitionDriftRefused',
               'TestM4SQLObjectNativeRecoveryMatrix',
               'TestM4SQLObjectNativePermissionAndLedgerFailure',
               'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused',
@@ -249,7 +250,7 @@ jobs:
               actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
               if actual != expected:
                   raise SystemExit('A object native selectors did not all RUN/PASS')
-          print('A object native: six required top-level selectors RUN/PASS; zero SKIP')
+          print('A object native: seven required top-level selectors RUN/PASS; zero SKIP')
           PY_OBJECT_PROOF
 
   action-audit-mysql:
