@@ -17,7 +17,7 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前目录末端版本为 MySQL `101`、MongoDB `40`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
+- 当前目录末端版本为 MySQL `102`、MongoDB `40`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
 
 MySQL `99`、MongoDB `38` 的历史证据槽和索引仍在已发布的 schema 中。历史回填已取消，额外历史证据的读取和核验器已退出当前源码；历史迁移文件保持原字节，本批不删除这些字段、索引或其他业务结构。后续退出须另行盘点数据、演练、授权和发布；目录升级成功不能代替生产数据盘点或业务验收。
 
@@ -25,7 +25,7 @@ MySQL `99`、MongoDB `38` 的历史证据槽和索引仍在已发布的 schema �
 
 MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来迁移的版本上限。对已安装库，启动必须证明 MySQL `domain_event_outbox`、`ai_bridge_commands`、`ai_messaging_legacy_commands` 和 MongoDB `domain_event_outbox` 均已缺失。身份、可见性、权限、网络或 dirty 结果未知均阻断；正常启动不代替受控流程删除现存旧对象。历史迁移字节及退役正文绑定保留。
 
-`resources.go` 从嵌入文件形成实际版本清单和目标 head，并通过 `declaredSchemaPairs` 明确声明可运行的 clean 版本对。当前声明 `99/38`、`100/39` 的历史升级入口、独立 SQL 发布的 clean `101/39` 和本批完整目标 `101/40`。新增迁移必须同时声明已审核的完整版本对；不存在于资源清单的版本、未来版本和任意组合不能靠数值大于退役边界获得通过。
+`resources.go` 从嵌入文件形成实际版本清单和目标 head，并通过 `declaredSchemaPairs` 明确声明可运行的 clean 版本对。当前声明 `99/38`、`100/39` 的历史升级入口、独立 SQL 发布的 clean `101/39`、Mongo 发布的 clean `101/40` 和本批完整目标 `102/40`。新增迁移必须同时声明已审核的完整版本对；不存在于资源清单的版本、未来版本和任意组合不能靠数值大于退役边界获得通过。
 
 同一次启动先证明初始版本对，再执行 SQL 到该 release 的目标。只有迁移、cleanup、连接释放和最终 clean 回读成功，才允许 Mongo 从未变化的初始版本继续到自身目标。两个 backend 最终达到目标、身份不变且旧对象缺失后才能完成启动。同一 live pair 任一步失败或响应未知即失效。`100/38` 仅允许在同次已证明 SQL 成功的阶段存在，新进程不接管该部分状态。
 
@@ -33,9 +33,17 @@ MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来�
 
 后续互相独立的 DDL 分别准备：SQL101 声明 `101/39`，Mongo40 声明 `101/40`。发布顺序必须先验收 SQL-only `101/39`，再以该 clean pair 为初始批准执行 Mongo-only `101/40`；资源文件和版本声明不授权生产数据库动作。只有被源码声明并实际回读为 clean 的完整状态可以重启；dirty、未声明中间状态和未知 DDL 结果必须保留现场，依据该版本独立演练的方案前向修复。
 
+### M4-C：Actor 两列
+
+SQL102 仅删除 `testee.tags` 与 `operators.effective_roles`；历史迁移1..101及Mongo1..40保持原字节。使用 `m4_actor_columns` 只授权 `101/40 → 102/40`，不能借历史JSON或索引保护范围；`102/39` 不声明为可重启版本对。
+
+本候选必须先离线完成DDL，再启动新runtime；旧有效角色列无默认值，新PO省略它后不能在旧schema写入。现代prepare/exit/recover只能在cleanSQL102预检，旧未执行指纹重做。旧raw archive和checksum不重写；旧镜像对SQL102未来head会拒绝。SQL102down明确拒绝，不提供Force、SetVersion、手清dirty或空列重建替代真实数据恢复。
+
+Actor原生四主场景及两个范围拒绝子场景已在独占 MySQL8.0.36/MongoRS7.0.31 实际 RUN/PASS；现代工具及原历史隔离 SQL 九场景亦通过，均零 SKIP。schema/value恢复场景的版本表保持clean101/40，未证明从102dirty回放真实原ledger。生产值分布、定向备份、dirty失败对象和版本表恢复、原/新完整服务启动、完整冻结与30/60分钟/RPO0仍待具名证明。五张历史维护表不在SQL102范围。
+
 ## 新空库的批准
 
-现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4两列或M4四索引；两个对象scope分别只允许 `100/39 → 101/39` 和 `101/39 → 101/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
+现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4历史两列、M4四索引或Actor两列；三个对象scope分别只允许 `100/39 → 101/39`、`101/39 → 101/40` 和 `101/40 → 102/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
 
 新空双库继续使用 `migration.retirement-bootstrap-authorization-file` 和 `migration.retirement-bootstrap-authorization-sha256`，不新增 CLI。文件须为真实私有绝对路径、`0600` 单链接文件，摘要绑定已批准的原始字节；目录为空不构成批准。
 
