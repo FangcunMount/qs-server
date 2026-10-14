@@ -11276,7 +11276,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f22c3f26bc88c213ebab670313acc76819cb121d",
+        "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11430,6 +11430,27 @@
           "command": "python3 -B scripts/dbops/test-receipt-transport.py",
           "result": "passed",
           "source_sha": "f22c3f26bc88c213ebab670313acc76819cb121d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
           "verified_on": "2026-10-14"
         }
       ],
