@@ -44,6 +44,19 @@ CI for exact SHA
 - 自动部署必须校验目标 SHA 没有被更新提交取代；手动部署仍须记录调用者、输入、environment 和审批。
 - self-hosted runner 的网络、SSH、Docker 权限和工具版本属于环境前置条件，不能写死为当前事实。
 
+两个有界只读入口只接受手工派发，必须在 checkout 前提交 `governance_confirm=<完整 GitHub SHA>` 且 `backup_name` 为空；不匹配时不进入携带数据库 Secret 的读取步骤。它们使用 production Environment 和 Mac mini 自托管 runner，但 source SHA 只标识工具源码，不是生产应用部署身份。
+
+| operation / database | 只读入口及连接来源 | 证据边界 |
+| --- | --- | --- |
+| `metadata-readiness-admin` / `mysql` | 固定 `root@47.94.204.124:22` 接收器，现有 `MYSQL_METADATA_ADMIN_*`；六成员静态 Linux 包使用独立 `--metadata-readiness` 模式 | 绑定读取前后数据库身份、限定目录及 readiness 读取；原五成员权限 profile 保持独立 |
+| `metadata-visibility-admin-profile` / `mongodb` | 原 Mongo 日常备份的 `MONGO_BACKUP_*` / `MONGODB_*` 候选配置；Mac mini 原生 reader 使用独占 loopback SSH tunnel，认证库固定 `admin` | 仅观测固定 qs / rs0 / member / migration / UUID 目标的身份、FCV、TTL monitor 和认证元数据；不执行日常备份脚本，不回退其它连接 |
+
+`complete` 只证明本次已声明的有界读取和 owned 连接释放。metadata count、digest、权限及 FCV 不证明对象无业务责任、完整 namespace 导出、备份对可恢复或停写 RPO=0，也不授权停写、恢复、DDL 或删除。`system.profile` 的业务恢复排除范围另须保留定义、索引和计数回执，生产集合继续保留。两个 reader 均不初始化业务容器、迁移 runner、消息消费者或发送端点；现用 backup、validate、restore、status 和 scheduled job 使用各自原入口。
+
+Mongo 最多执行 10 个固定逻辑只读查询，异常时至多释放一个本 reader 拥有的 cursor；driver 握手不计为业务查询。`ttl_monitor.known=false` 表示未知，不能把零值 `enabled=false` 解释为已关闭。TTL 参数仅为本次观测，不扫描 TTL 业务数据、不读取 currentOp、不执行关闭动作，也不证明未来持续状态或维护冻结。
+
+CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 rs0。必须设置 required 标记，精确 selector 的 JSON 事件必须实际 RUN/PASS；任意 SKIP、缺失 selector 或依赖未就绪均失败。Mongo fixture 使用固定官方 digest、owned network/container label 和唯一 127.0.0.1 随机端口，不复用业务 runtime fixture。
+
 ## 4. 本地非缓存验证
 
 ```bash
@@ -52,6 +65,12 @@ go test -race -count=1 ./scripts/oneoff/mysql_metadata_profile
 python3 -B scripts/dbops/test-mysql-metadata-profile.py
 python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
 python3 -B scripts/dbops/test-receipt-transport.py
+python3 -B scripts/dbops/test-mysql-metadata-readiness.py
+python3 -B scripts/dbops/test-mongodb-metadata-profile.py
+python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
+# 仅在各自独占 fixture 和 required 身份变量已绑定后执行：
+make test-metadata-readiness-mysql-native
+make test-metadata-readiness-mongodb-native
 bash scripts/cd/test-github-action-runtimes.sh
 bash scripts/cd/test-plan-services.sh
 bash scripts/cd/test-prepare-package.sh
