@@ -1,10 +1,10 @@
 # MySQL 只读元数据诊断
 
-无 argv 的原权限模式只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合，不读取业务记录。独立 readiness 模式只读取明确限定的目录和分页标量分类。两个模式均不激活角色、不替代现有删除门禁，也不证明清理资格。
+无 argv 的原权限模式只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合，不读取业务记录。独立 readiness 模式只读取明确限定的目录和分页标量分类。新增 inventory 模式只返回固定退役对象的标量计数。三个模式均不激活角色、不替代现有删除门禁，也不证明清理资格。
 
 工作流提供两个独立的只读入口：`metadata-visibility-profile` 使用现有应用账号；`metadata-visibility-admin-profile` 使用 production 环境中的 `MYSQL_METADATA_ADMIN_USERNAME`、`MYSQL_METADATA_ADMIN_PASSWORD`，复用既有 host/port/database，并保持上述生产目标 hash 校验。管理员 Secret 缺失时停止，绝不回落到应用账号。CBPT 清理四个入口固定使用这组管理员身份，但原有全局元数据、依赖、锁、内容与恢复证明门禁不变。新工作流 source SHA 必须重新归档和隔离恢复，原归档及证明保留。 CBPT 手工入口必须提交 `governance_confirm`，在 checkout 和执行前核对实际 GitHub SHA，防止派发期间分支移动导致执行未审查版本。
 
-固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。无 argv 时执行本页原权限 profile；唯一另行声明的诊断 argv 为 `--metadata-readiness`。没有命令行业务参数；其它 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
+固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。无 argv 时执行本页原权限 profile；另行声明的两个固定诊断 argv 为 `--metadata-readiness`、`--retirement-inventory`，均只允许单独使用。没有命令行业务参数；其它 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
 
 `metadata-readiness-admin` / `database=mysql` 使用独立 `--metadata-readiness` 模式，只接受固定 `qs` 目标及 clean 100。派发必须在 checkout 前验证完整 `governance_confirm` 等于 GitHub SHA，且 `backup_name` 为空；只使用现有 metadata 管理员 Secret，缺失时停止。SSH 控制器使用显式 `--readiness` 与六成员包，原五成员权限 profile 的格式和行为保持独立。
 
@@ -35,7 +35,7 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、current 与固定角色 grant 输入互不混用（不证明真实 active role 权限展开）、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
 
-三个 MySQL metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。除所选入口外，其余 db-ops job 在这三组 MySQL metadata 输入下均不符合执行条件。
+四个 MySQL metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。除所选入口外，其余 db-ops job 在这四组 MySQL metadata 输入下均不符合执行条件。
 
 `mysql-metadata-profile-ssh.py` 将唯一固定文件集的 SHA-256 归档及凭据通过 SSH stdin 传入；密码不进入命令行、日志或 Git。远端只在任务拥有的 0700 临时目录解包，使用 Linux 静态 binary，不创建生产 Docker 容器、不拉取镜像。临时 JSON 环境文件为 0600，固定字段经过验证，不经 shell source/eval，并在建立数据库连接前删除该文件；binary 不继承无关凭据或 LD_* 环境。SSH 输出限 256 KiB/90 秒，binary 输出限 64 KiB/50 秒，stderr 只排空不保留，原始异常不输出。只有 task-owned 文件完整释放后才输出安全密封回执，传输、清理或回执错误均失败关闭。封装失败使用四个固定类别：`profile_input_preflight_failed`（操作、输入与绑定）、`profile_package_preflight_failed`（本地包、checksum 与 envelope）、`profile_trusted_ssh_preflight_failed`（本地可信 SSH 预检）、`profile_remote_or_receipt_failed`（实际 SSH、远端执行、回执与释放后输出）。这些类别只描述本次源码的边界，保留 complete=false、权限 false/nullable 字段，不含异常正文、trace、凭据或远端状态猜测；remote 类别不能单独证明是否连接数据库。原来的 `profile_transport_or_receipt_failed` 继续接受为未定位失败。已通过原验证器的具体 SQL 失败回执沿用原类别，不被封装阶段改名。
 
@@ -63,3 +63,16 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 源码 `4160cc63ac881d1addd3f066d6053301e8d5431e` 在自有 MySQL8.0.36 上实际执行 `bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql`：16项 RUN/PASS、0 SKIP/FAIL。包含同一 RR 快照内并发插入／更新／删除、跨页、主键0及uint64最大值、真实有符号主键拒绝，以及原五查询权限与真实错误／释放场景。字符串参数经 `CAST AS UNSIGNED` 的反例保留原失败回执；固定 `DECIMAL(20,0)` 比较后完整边界及 EOF 通过，5秒单条／45秒总预算不变。
 
 原 native JSONL SHA256 `31d513d2f61f1ccf50a9a0b2326d129c9cb3e5779a8bd8593ce3b0d3ef623265`，最终交付摘要 `678e948624238d08fe7384e287e539c956ac15609d92d0d485706c88c84b64a8`；自有容器、网络和连接文件均已释放，旧CID/image保持。既有本机nsqd运行元数据实际变化，未签整个环境稳定或作因果推断。这证明对应组件隔离读取与释放，不能证明当前生产全量空值、持续停写、对象恢复、三服务启动或30/60分钟预算。
+
+
+## 固定退役盘点
+
+`retirement-inventory-admin` / `database=mysql` 是独立 `--retirement-inventory` 入口。它沿同一已核目标 hash、管理员 Secret 和固定 SSH route；先验证 `governance_confirm` 等于实际 GitHub SHA、`backup_name` 为空，再 checkout、构建和读取 Secret。不试探其它账号，不回落应用身份，不接受任意 SQL、对象名或目标版本。SSH `--inventory` / `--receive-inventory` 的六成员包为原五成员加 `mysql-retirement-inventory.py`；原五查询 profile、readiness V2 和 inventory V1 的 flag、包及回执互不兼容，任何交叉模式或额外参数均拒绝。
+
+固定11条业务读取覆盖九张 InnoDB BASE TABLE：`testee`、`operators`、五张历史维护表，以及 `ai_bridge_requests`、`ai_bridge_request_assessments`。缺对象或非 InnoDB 不变成零值。tags 输出 SQL NULL／JSON null／空数组／非空数组／其它形状的守恒分区；roles 与 effective_roles 仅作 MySQL 规范 JSON 二进制空安全比较。历史状态按固定词汇分组，其它状态只计 `unknown`，不输出原值；保留五表总量和内部孤儿引用计数。AI 同时覆盖所有 payload 的期望 assessment 关系（保留重复条目）和实际关系，分别计非法期望 ID、缺关系、孤儿、零 ID及多余关系。三个 actor 字段要求 JSON STRING，org/testee 是正数且规范 uint64 十进制，subject 是非空、最多128字节且无 NUL 的 opaque 字符串；合法 payload 与已索引 identity 作逐字节比较，不把 subject 当数字。该盘点不验证 stored request_hash、所有运行环境或实际业务授权。
+
+单一 pinned Conn 先核身份和实际 clean100，再执行固定 RR／READ ONLY 事务并读取上述11条语句；首条业务一致读建立 InnoDB 视图，后续计数复用它。成功 rollback 后，在事务外实时重读 clean100 和完整 RAM 会话身份，避免旧快照掩盖迁移变化。成功回执精确 `query_count=15`、`control_statement_count=3`；每条5秒和总45秒共用截止，包含释放，不重试或续跑。每条结果最多1000行，1001为截断哨兵；固定字段、非负 uint64、完整标签集合、各分区及跨表守恒不符便丢弃全部 measurements。完成还要求事务、Conn、DB 与 pool 释放全部为 true。回执版本只允许新的 `format_version=1`；`retirement_inventory_only=true`、`freeze_verified=false` 固定不变，只输出三项受控 MySQL 版本数字、结构/快照布尔及封闭计数，不输出数据库身份、账号、SQL、ID或正文。
+
+非零差异、非法字段、孤儿关系及 `unknown` 状态仍是完整观测中的 finding，不自动得出 eligible 或删除许可。生产盘点须独立绑定 source/run/target 回执；本源码批次的隔离验收不包含生产连接或派发，实际生产观测由另行授权任务登记。盘点不证明持续停写、定向值备份、失败恢复、旧新服务启动或30/60分钟与RPO=0。这个一次性工具随 M7 退出，清理完成后不得扩成永久通用查询入口。
+
+源码 `80f422101ccfd83b4c4eb5bd165272145afe7afd` 在自有 MySQL8.0.36 上实际执行同一 required race proof：三个 top 及子场景共24项 RUN/PASS、0 FAIL/SKIP。新 inventory 的8项包括非零/unknown计数、重复期望关系、非法actor和字节差异、真实列权限1143、缺对象与非InnoDB、dirty/其它head、RR并发actor/AI变化及 rollback 后实时版本、全空对象；原 profile 和 readiness 回归保留。原 JSONL SHA256 `54a68e1c8a491e11d6f4ab7923c9eefa63e3971b2101cd28b9c710dc56b4fb6f`，回执 SHA256 `ff72274b13056b70066880e636fa825b0d504eb50b4a90db5b7e8d3481076f38`。自有容器/网络已释放，旧CID/images/volumes保持，所有组件源码前后相同；该 fixture 是限定 reader 结构/计量证明，不冒称生产迁移初始化或实际生产权限。

@@ -5,8 +5,8 @@ case "${1:-}" in
   mysql)
     [[ "${QS_METADATA_PROFILE_NATIVE_REQUIRED:-}" == 1 ]] || { echo 'MySQL native fixture is required' >&2; exit 1; }
     package=./scripts/oneoff/mysql_metadata_profile
-    selector='^(TestMetadataProfileNativeOwnedMySQL|TestMetadataReadinessNativeOwnedMySQL)$'
-    expected='["TestMetadataProfileNativeOwnedMySQL", "TestMetadataReadinessNativeOwnedMySQL"]'
+    selector='^(TestMetadataProfileNativeOwnedMySQL|TestMetadataReadinessNativeOwnedMySQL|TestRetirementInventoryNativeOwnedMySQL)$'
+    expected='["TestMetadataProfileNativeOwnedMySQL", "TestMetadataReadinessNativeOwnedMySQL", "TestRetirementInventoryNativeOwnedMySQL"]'
     ;;
   mongodb)
     [[ "${QS_MONGO_METADATA_NATIVE_REQUIRED:-}" == 1 ]] || { echo 'MongoDB native fixture is required' >&2; exit 1; }

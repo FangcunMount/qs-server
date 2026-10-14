@@ -466,5 +466,114 @@ class SSHReadinessTests(unittest.TestCase):
         self.assertNotIn(SECRET, json.dumps(result))
 
 
+
+class SSHInventoryTests(unittest.TestCase):
+    def support(self):
+        spec = importlib.util.spec_from_file_location('inventory_fixtures', DIRECTORY / 'test-mysql-retirement-inventory.py')
+        value = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(value)
+        return value
+
+    def inventory_package(self):
+        return package([(n, b'owned-fixture', tarfile.REGTYPE) for n in sorted(ssh.INVENTORY_MEMBERS)])
+
+    def test_three_fixed_modes_reject_cross_operations_modules_and_receipts(self):
+        inv, ready = ssh.load_inventory(DIRECTORY), ssh.load_readiness(DIRECTORY)
+        controllers = ((profile, 'metadata-visibility-admin-profile', {}), (ready, 'metadata-readiness-admin', {'readiness': True}),
+                       (inv, 'retirement-inventory-admin', {'inventory': True}))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'package.tar.gz'
+            raw = self.inventory_package()
+            path.write_bytes(raw)
+            path.chmod(0o600)
+            for controller, operation, kwargs in controllers:
+                env = dict(environment(), PROFILE_OPERATION=operation, MYSQL_DATABASE='qs', PROFILE_PACKAGE_SHA256=hashlib.sha256(raw).hexdigest())
+                for other, selected_operation, _ in controllers:
+                    if selected_operation == operation:
+                        continue
+                    with self.subTest(mode=operation, other=selected_operation), patch.object(ssh, 'trusted_ssh') as trusted, self.assertRaises(Exception):
+                        ssh.dispatch(path, dict(env, PROFILE_OPERATION=selected_operation), controller, Path(directory), **kwargs)
+                    trusted.assert_not_called()
+                    with patch.object(ssh, 'trusted_ssh') as trusted, self.assertRaises(Exception):
+                        ssh.dispatch(path, env, other, Path(directory), **kwargs)
+                    trusted.assert_not_called()
+            env = dict(environment(), PROFILE_OPERATION='retirement-inventory-admin', MYSQL_DATABASE='qs', PROFILE_PACKAGE_SHA256=hashlib.sha256(raw).hexdigest())
+            value = self.support().receipt()
+            value['run_id'] = RUN
+            def capture(args, **kwargs):
+                self.assertTrue(args[-1].endswith('--receive-inventory'))
+                self.assertNotIn(SECRET, str(args))
+                self.assertNotIn(SECRET, str(kwargs['env']))
+                header, transferred = kwargs['payload'].split(b'\n', 1)
+                self.assertEqual(json.loads(header)['env']['MYSQL_PASSWORD'], SECRET)
+                self.assertEqual(transferred, raw)
+                return 0, armor.encode_armored_receipt(value, schema=inv.RECEIPT_SCHEMA).encode()
+            with patch.object(ssh, 'trusted_ssh', return_value=(['ssh'], {})), patch.object(inv, 'capture_private', side_effect=capture):
+                code, sealed = ssh.dispatch(path, env, inv, Path(directory), inventory=True)
+            self.assertEqual(code, 0)
+            self.assertTrue(json.loads(armor.decode_armored_receipt(sealed))['retirement_inventory_only'])
+            for value, schema in ((receipt(), profile.RECEIPT_SCHEMA), (SSHReadinessTests().support().receipt(), ready.RECEIPT_SCHEMA)):
+                with patch.object(ssh, 'trusted_ssh', return_value=(['ssh'], {})), patch.object(inv, 'capture_private', return_value=(0, armor.encode_armored_receipt(value, schema=schema).encode())), self.assertRaises(ssh.ProfileStageFailure):
+                    ssh.dispatch(path, env, inv, Path(directory), inventory=True)
+
+    def test_inventory_requires_its_exact_six_members_and_releases_before_output(self):
+        inv = ssh.load_inventory(DIRECTORY)
+        value = self.support().receipt()
+        value['run_id'] = RUN
+        raw = self.inventory_package()
+        payload = json.dumps(envelope(raw, dict(environment(), MYSQL_DATABASE='qs'))).encode() + b'\n' + raw
+        seen = []
+        def execute(binary, private, runtime):
+            directory = Path(binary).parent
+            seen.append(directory)
+            self.assertFalse((directory / 'profile.env.json').exists())
+            self.assertEqual(set(p.name for p in directory.iterdir()), set(ssh.INVENTORY_MEMBERS))
+            return 0, value
+        with patch.object(ssh, 'receiver_arch', return_value='amd64'), patch.object(ssh, 'load_inventory', return_value=inv), patch.object(inv, 'execute_native', side_effect=execute):
+            code, sealed = ssh.receive(io.BytesIO(payload), inventory=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(json.loads(armor.decode_armored_receipt(sealed))['complete'])
+        self.assertFalse(seen[0].exists())
+        for selected, kwargs in ((package(), {'inventory': True}), (SSHReadinessTests().ready_package(), {'inventory': True}),
+                                 (raw, {}), (raw, {'readiness': True})):
+            with tempfile.TemporaryDirectory() as directory, self.assertRaises(Exception):
+                ssh.extract_archive(selected, Path(directory), **kwargs)
+
+    def test_inventory_interrupt_cleanup_failure_and_mutually_exclusive_modes_never_sign(self):
+        inv = ssh.load_inventory(DIRECTORY)
+        raw = self.inventory_package()
+        payload = json.dumps(envelope(raw, dict(environment(), MYSQL_DATABASE='qs'))).encode() + b'\n' + raw
+        seen = []
+        def interrupt(binary, private, runtime):
+            seen.append(Path(binary).parent)
+            raise RuntimeError(SECRET)
+        with patch.object(ssh, 'receiver_arch', return_value='amd64'), patch.object(ssh, 'load_inventory', return_value=inv), patch.object(inv, 'execute_native', side_effect=interrupt), self.assertRaises(RuntimeError):
+            ssh.receive(io.BytesIO(payload), inventory=True)
+        self.assertFalse(seen[0].exists())
+        cleanup = ssh.remove_owned
+        def fail(directory, **kwargs):
+            cleanup(directory, **kwargs)
+            seen.append(directory)
+            raise OSError(SECRET)
+        with patch.object(ssh, 'receiver_arch', return_value='amd64'), patch.object(ssh, 'load_inventory', return_value=inv), patch.object(inv, 'execute_native', return_value=(0, self.support().receipt())), patch.object(ssh, 'remove_owned', side_effect=fail), self.assertRaises(Exception):
+            ssh.receive(io.BytesIO(payload), inventory=True)
+        self.assertFalse(seen[-1].exists())
+        with patch.object(ssh, 'receiver_arch') as arch, self.assertRaises(Exception):
+            ssh.receive(io.BytesIO(payload), inventory=True, readiness=True)
+        arch.assert_not_called()
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['profile', '--inventory', '--readiness']), contextlib.redirect_stderr(output), self.assertRaises(SystemExit) as status:
+            ssh.main()
+        self.assertEqual(status.exception.code, 2)
+
+    def test_inventory_transport_unknown_is_incomplete_without_counts(self):
+        inv = ssh.load_inventory(DIRECTORY)
+        value = ssh.stage_receipt(inv, environment(), SECRET)
+        self.assertFalse(value['complete'])
+        self.assertFalse(value['freeze_verified'])
+        self.assertNotIn('measurements', value)
+        self.assertNotIn(SECRET, json.dumps(value))
+
+
 if __name__ == '__main__':
     unittest.main()
