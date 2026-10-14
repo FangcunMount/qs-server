@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	totalLimit     = 2 * time.Minute
-	queryLimit     = 15 * time.Second
+	totalLimit     = 45 * time.Second
+	queryLimit     = 5 * time.Second
 	identitySQL    = "SELECT CONNECTION_ID(), @@server_uuid, DATABASE(), VERSION(), CURRENT_ROLE()"
 	currentSQL     = "SHOW GRANTS FOR CURRENT_USER"
 	rdsSQL         = "SHOW GRANTS FOR CURRENT_USER USING `rds_superuser_role`@`%`"
@@ -248,8 +248,8 @@ func currentMetadataGrantFacts(grants []string) (currentGrantFacts, bool) {
 	return facts, true
 }
 
-func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
-	r := baseReceipt(b)
+func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) (r receipt) {
+	r = baseReceipt(b)
 	if !validBinding(b) {
 		return r
 	}
@@ -260,7 +260,7 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 		r.ErrorCategory = "connection_failed"
 		return r
 	}
-	defer func() { _ = c.Close() }()
+	defer func() { r = releaseConnection(c, r) }()
 	before, err := readIdentity(ctx, c)
 	if err != nil {
 		r.ErrorCategory = "identity_read_failed"
@@ -355,6 +355,32 @@ func probe(ctx context.Context, db *sql.DB, cfg connection, b binding) receipt {
 	r.ErrorCategory = "none"
 	return r
 }
+
+// Release failures invalidate every permission conclusion. A complete receipt
+// is emitted only after both the pinned connection and its owned pool close.
+func releaseFailure(r receipt, category string) receipt {
+	r.CurrentUnrestricted = false
+	r.CurrentGlobalSelect, r.CurrentGlobalShowView = nil, nil
+	r.CurrentGlobalTrigger, r.CurrentGlobalEvent, r.CurrentPartialRevocations = nil, nil, nil
+	r.RDSAvailable, r.RDSUnrestricted, r.AssignedRoles, r.MandatoryRoles = nil, nil, nil, nil
+	r.Complete, r.ErrorCategory = false, category
+	return r
+}
+func releaseConnection(c *sql.Conn, r receipt) receipt {
+	if err := c.Close(); err != nil {
+		return releaseFailure(r, "connection_release_failed")
+	}
+	return r
+}
+func releaseDatabase(db *sql.DB, r receipt) receipt {
+	if err := db.Close(); err != nil {
+		return releaseFailure(r, "database_release_failed")
+	}
+	if stats := db.Stats(); stats.OpenConnections != 0 || stats.InUse != 0 {
+		return releaseFailure(r, "database_release_failed")
+	}
+	return r
+}
 func envConnection(get func(string) string) (connection, bool) {
 	port := get("MYSQL_PORT")
 	p, err := strconv.Atoi(port)
@@ -400,11 +426,13 @@ func run(args []string, get func(string) string, out io.Writer) int {
 			} else {
 				db := sql.OpenDB(connector)
 				db.SetMaxOpenConns(1)
-				db.SetMaxIdleConns(0)
+				// Retain the returned connection until DB.Close, whose error includes
+				// driver.Close failure. MaxIdle=0 discards that error in putConn.
+				db.SetMaxIdleConns(1)
 				ctx, cancel := context.WithTimeout(context.Background(), totalLimit)
 				r = probe(ctx, db, c, b)
 				cancel()
-				_ = db.Close()
+				r = releaseDatabase(db, r)
 			}
 		} else {
 			r.ErrorCategory = "connection_input_invalid"
