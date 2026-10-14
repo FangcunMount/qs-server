@@ -94,8 +94,8 @@ go test -count=1 ./internal/pkg/migration
 
 | 批次 | 目标与保留边界 | 发布前冻结与验收 |
 | --- | --- | --- |
-| SQL-only101/39 | assessment.historical_lifecycle_evidence、chk_assessment_historical_lifecycle；evaluation_outcome.historical_committed_evidence、chk_outcome_historical_committed | 原SHOW CREATE/CHECK、PK与NULL分布；完整backup pair恢复；两对象确实缺失，当前事件证据、Outcome及schema3冻结ReportInput保留 |
-| Mongo-only101/40 | answersheets的uk_answersheet_legacy_submission_event_id、idx_answersheet_legacy_submission_audit；report_generations的uk_generation_historical_generated_event_id、idx_generation_historical_generated_audit | 四个实际index spec，包括key顺序/unique/partial/collation；其余索引和业务文档不变；不执行legacy_submission_evidence/historical_generated_evidence的全库unset |
+| SQL-only101/39 | assessment.historical_lifecycle_evidence、chk_assessment_historical_lifecycle；evaluation_outcome.historical_committed_evidence、chk_outcome_historical_committed | 原SHOW CREATE/CHECK、PK与全量原列值/NULL分布；按列保护manifest和隔离恢复；两对象确实缺失，当前事件证据、Outcome及schema3冻结ReportInput保留 |
+| Mongo-only101/40 | answersheets的uk_answersheet_legacy_submission_event_id、idx_answersheet_legacy_submission_audit；report_generations的uk_generation_historical_generated_event_id、idx_generation_historical_generated_audit | 四个实际index spec，包括key顺序/unique/partial/collation；具名索引保护manifest和隔离恢复；其余索引和业务文档不变；不执行legacy_submission_evidence/historical_generated_evidence的全库unset |
 | Actor后续SQL | testee.tags、operators.effective_roles | 外部读取退出，按PK保留原值/roles；PO/Mapper/ReadModel/Domain及现代人员恢复写入完整退出，公开EffectiveRoles继续派生，IAM授权事实保留；NOT NULL旧列不能先停写再留结构 |
 | Testee维护三表 | testee_store_migration_manifests/items/reversions | manifest/state/hash、candidate/deferred与当前ownership/version/history及补偿义务逐项结清；未结默认保留，空reversions不是删除授权 |
 | Operator维护两表 | operator_retirement_manifests、clinician_operator_binding_archive | payload/hash、原绑定、现代退出完成和当前IAM权限/回退义务；未结默认保留。operator_retirement_tasks、operator_recovery_archives和正常历史表继续使用 |
@@ -104,7 +104,11 @@ go test -count=1 ./internal/pkg/migration
 
 legacy operatorretire会对assessment/testee等整行算business hash，删除全NULL历史列或空tags也会改变历史投影。先保存原schema、原manifest/AfterHash及对应源码，区分schema改变与业务漂移；不得重写原manifest为“已验证”。历史工具不直接复制到新schema运行，恢复义务只能在具名完整备份与原schema语境验收。Definition派生字段的真实MBTI差异和未结head属于独立M5，默认保留原发布快照、stored assets及冻结报告。
 
-### 7.2 生产备份对与隔离恢复实操
+### 7.2 按批准范围保护与隔离恢复
+
+离线批准明确 `protection_scope`、`protection_manifest_sha256` 和 `protection_location`。M4-A 的 `m4_sql_historical_columns` 只允许 `100/39 → 101/39`，M4-B 的 `m4_mongo_historical_indexes` 只允许 `101/39 → 101/40`；各自保护原值/结构或完整索引定义，并完成对应隔离恢复，不把完整双库备份作为两批统一前置。`full_database_pair` 仍保留完整双库保护责任，以下完整备份命令和全库恢复要求适用于该 scope。缺失/未知 scope 或对象 scope 的其他版本组合拒绝；没有旧字段兼容。
+
+所有 scope 仍绑定双库身份/clean版本、完整资源摘要、停写范围、责任、真实恢复和启动回执、30天保留、30分钟维护/60分钟恢复及首个 runtime 启动边界。对象保护不自动授权源库恢复，也不能 force、down 或清 dirty；具体失败恢复步骤必须在批次批准中独立可审查，执行器没有恢复 API。
 
 先确定具名data/recovery owner、受限存放位置、源/目标身份、工具版本、完整业务namespace范围、备份hash/数量、恢复点和30天保留期。服务部署脚本的配置tar包不是数据库备份。当前项目清理不能凭历史空值计数或合成对象重建签发“生产完整恢复成功”；实际备份位置、责任或恢复receipt缺失，写批次保持blocked。
 
@@ -132,15 +136,15 @@ mongorestore --config=/restricted/mongo-isolated-target.yaml \
 
 备份前独立核实导出账号对全部 qs 对象的权限与可见性。MySQL 8.0 的 `--routines` 要求 global SELECT，view/trigger/event 另有对应权限；只读取 information_schema 可见数量、当前直接 grants 或业务读写成功，不能签发完整对象范围。未展开角色或未核查 partial revocations 时，范围继续 unknown；Mongo 也须核对全部 namespace 的 list/read/export 覆盖。缺失权限时使用已审定的备份连接或阻断，不临时扩大生产权限、不以忽略错误生成“完整备份”。
 
-每次实际发布在T0重新冻结：入口关闭并排空在途，全部API/Collection/Worker及维护直接写入者已停止、不会自动重启。另外核查数据库自主任务，包含Mongo TTL及当前或窗口内将到期的文档；进程全停不能暂停TTL。未证明该范围无事实变化即停止，不自行关TTL。保留消息、hold、死信、命令及Outbox责任；不清队列。确认无写入后取得最新同窗口完整备份对，核对原schema_migrations与源身份，形成新hash/manifest；旧演练备份不能直接当最新恢复点。
+每次实际发布在T0重新冻结：入口关闭并排空在途，全部API/Collection/Worker及维护直接写入者已停止、不会自动重启。另外核查数据库自主任务，包含Mongo TTL及当前或窗口内将到期的文档；进程全停不能暂停TTL。未证明该范围无事实变化即停止，不自行关TTL。保留消息、hold、死信、命令及Outbox责任；不清队列。确认无写入后按已批准 scope 获取最新同窗口保护材料，核对原schema_migrations与源身份，形成新hash/manifest；完整双库 scope 取得完整备份对，对象 scope 取得其具名完整保护范围。旧演练材料不能直接当最新恢复点。
 
 ### 7.3 执行、提交与失败边界
 
-使用当前exact-source的 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)。只连接所选双库，固定AutoSeed=false，既有Preflight后按SQL→Mongo→VerifyComplete执行；不走普通数据库初始化/业务Container，不自动reconcile额外索引，不启动任何发布者、消费者或调度。执行器默认只读；apply批准独立绑定source、完整资源digest、初始clean pair、身份、目标以及冻结/备份/完整恢复/隔离启动/责任证据。对缺失位置、owner、receipt、过期窗口或已启动runtime拒绝，批准一次消费。
+使用当前exact-source的 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)。只连接所选双库，固定AutoSeed=false，既有Preflight后按SQL→Mongo→VerifyComplete执行；不走普通数据库初始化/业务Container，不自动reconcile额外索引，不启动任何发布者、消费者或调度。执行器默认只读；apply批准独立绑定source、完整资源digest、初始clean pair、身份、目标以及冻结/具名保护/对应scope恢复/隔离启动/责任证据。对缺失位置、owner、receipt、过期窗口或已启动runtime拒绝，批准一次消费。
 
 迁移完成后另行只读检查实际目标对象、完整保留范围和双库身份/版本/dirty，释放执行器连接；全程业务runtime仍停止。正常30分钟包含启动核验，批准预留基于隔离演练的startup时间；到T0+30分钟减预留仍未通过即在提交前作恢复决定，不把DDL用满30分钟后再额外重启。
 
-首个新业务runtime启动命令发出前记录唯一明确commit点。此前失败/超时/dirty：继续停写，确认server侧DDL/事务/锁已结束，保留原始批准和consumed marker，再按已批准路径恢复完整备份对及对应镜像。不得Force、down、改版本或清dirty。SQL第一ALTER成功第二失败、Mongo若干drop完成后失败均可能留下partial状态，退出码或ctx取消不能证明“无改动/服务器已停止”。
+首个新业务runtime启动命令发出前记录唯一明确commit点。此前失败/超时/dirty：继续停写，确认server侧DDL/事务/锁已结束，保留原始批准和consumed marker，再按已批准 scope 的恢复路径处理：完整双库 scope 恢复完整备份对及对应镜像，对象 scope 使用独立审定的对象恢复或目标schema兼容向前恢复步骤。不得Force、down、改版本或清dirty；仅恢复列或索引不能据此宣称迁移元数据已经恢复clean。SQL第一ALTER成功第二失败、Mongo若干drop完成后失败均可能留下partial状态，退出码或ctx取消不能证明“无改动/服务器已停止”。
 
 首个runtime启动命令发出后，即使没有ready或启动失败，也禁止旧全量备份覆盖：构造器、relay、consumer和外部发送可能已产生事实。停止继续扩散并保留新增事实，用相同目标schema兼容镜像/补丁向前恢复。完整备份仅作取证或受控提取，不回滚覆盖当前事实；该阶段的60分钟恢复目标须有实际向前恢复演练。
 

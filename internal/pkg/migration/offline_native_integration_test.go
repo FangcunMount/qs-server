@@ -230,7 +230,7 @@ func TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.BackupPairLocation = ""
+	a.ProtectionLocation = ""
 	writeOfflineApproval(t, &cfg, a)
 	result, err := runOffline(t.Context(), n.db, n.client, cfg, r)
 	if err == nil || result.Stage != "approval" || result.AuthorizationConsumed {
@@ -238,6 +238,33 @@ func TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL(t *testing.T) {
 	}
 	if sql, dirty, mongo, mdirty := n.heads(t); sql != r.sql.head || mongo != r.mongo.head || dirty || mdirty {
 		t.Fatal("rejected approval changed schema metadata")
+	}
+	for _, scope := range []string{"", "unknown", offlineProtectionSQLHistoricalColumns, offlineProtectionMongoHistoricalIndexes} {
+		t.Run("invalid_protection_scope_"+scope, func(t *testing.T) {
+			// The genuinely installed pair is already at this resource head.
+			// Object scopes never authorize a no-op or adopt another transition.
+			candidate := offlineNativeApproval(t, n, r)
+			a, err := readOfflineAuthorization(candidate, s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a.ProtectionScope = scope
+			writeOfflineApproval(t, &candidate, a)
+			before := n.db.Stats().InUse
+			result, err := runOffline(t.Context(), n.db, n.client, candidate, r)
+			if err == nil || result.Stage != "approval" || result.AuthorizationConsumed || result.MigrationOutcomeUnknown {
+				t.Fatal("invalid object protection reached claim or DDL", result, err)
+			}
+			if _, err := os.Lstat(candidate.AuthorizationFile + ".consumed"); !os.IsNotExist(err) {
+				t.Fatal("invalid scope consumed approval", err)
+			}
+			if sql, dirty, mongo, mdirty := n.heads(t); sql != r.sql.head || mongo != r.mongo.head || dirty || mdirty {
+				t.Fatal("invalid scope changed installed metadata")
+			}
+			if n.db.Stats().InUse != before || n.db.PingContext(t.Context()) != nil || n.client.Ping(t.Context(), nil) != nil {
+				t.Fatal("invalid scope leaked or closed borrowed resources")
+			}
+		})
 	}
 	pristine := openNativeSchemaPairWithPrefix(t, "qs_offline_test")
 	cfg.Pair = pristine.cfg

@@ -67,11 +67,12 @@ type offlineAuthorization struct {
 	TargetMongoVersion       uint   `json:"target_mongo_version"`
 	ApprovalSummarySHA256    string `json:"approval_summary_sha256"`
 	FreezeScopeSHA256        string `json:"freeze_scope_sha256"`
-	BackupPairManifestSHA256 string `json:"backup_pair_manifest_sha256"`
+	ProtectionScope          string `json:"protection_scope"`
+	ProtectionManifestSHA256 string `json:"protection_manifest_sha256"`
 	RestoreReceiptSHA256     string `json:"restore_receipt_sha256"`
 	StartupReceiptSHA256     string `json:"startup_receipt_sha256"`
 	ResponsibilitySHA256     string `json:"responsibility_sha256"`
-	BackupPairLocation       string `json:"backup_pair_location"`
+	ProtectionLocation       string `json:"protection_location"`
 	DataOwner                string `json:"data_owner"`
 	RecoveryOwner            string `json:"recovery_owner"`
 	RuntimeFrozen            bool   `json:"runtime_frozen"`
@@ -83,6 +84,12 @@ type offlineAuthorization struct {
 }
 
 var offlineSourceSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+const (
+	offlineProtectionFullDatabasePair       = "full_database_pair"
+	offlineProtectionSQLHistoricalColumns   = "m4_sql_historical_columns"
+	offlineProtectionMongoHistoricalIndexes = "m4_mongo_historical_indexes"
+)
 
 // InspectOffline reads only identities and guarded installed migration metadata.
 // It does not read/consume an approval or initialize any application repository.
@@ -127,6 +134,23 @@ func validOfflineText(s string, max int) bool {
 		!strings.EqualFold(s, "unknown") && !strings.EqualFold(s, "pending") && !strings.EqualFold(s, "todo")
 }
 
+func validOfflineProtectionScope(a offlineAuthorization) bool {
+	switch a.ProtectionScope {
+	case offlineProtectionFullDatabasePair:
+		// The existing resource and M3 preflight checks still determine which
+		// complete, declared version pairs this source can execute.
+		return true
+	case offlineProtectionSQLHistoricalColumns:
+		return a.InitialMySQLVersion == 100 && a.InitialMongoVersion == 39 &&
+			a.TargetMySQLVersion == 101 && a.TargetMongoVersion == 39
+	case offlineProtectionMongoHistoricalIndexes:
+		return a.InitialMySQLVersion == 101 && a.InitialMongoVersion == 39 &&
+			a.TargetMySQLVersion == 101 && a.TargetMongoVersion == 40
+	default:
+		return false
+	}
+}
+
 func validateOfflineAuthorization(a offlineAuthorization, initial OfflineSnapshot, now time.Time) error {
 	expires, expireErr := time.Parse(time.RFC3339, a.ExpiresAt)
 	started, startErr := time.Parse(time.RFC3339, a.WindowStartedAt)
@@ -139,12 +163,12 @@ func validateOfflineAuthorization(a offlineAuthorization, initial OfflineSnapsho
 		a.MySQLIdentitySHA256 != initial.MySQLIdentitySHA256 || a.MongoClusterSHA256 != initial.MongoClusterSHA256 ||
 		a.InitialMySQLVersion != initial.MySQLVersion || a.InitialMongoVersion != initial.MongoVersion ||
 		a.TargetMySQLVersion != initial.TargetMySQLVersion || a.TargetMongoVersion != initial.TargetMongoVersion ||
-		!a.RuntimeFrozen || !a.RuntimeNotStarted || !validOfflineText(a.BackupPairLocation, 1024) ||
+		!validOfflineProtectionScope(a) || !a.RuntimeFrozen || !a.RuntimeNotStarted || !validOfflineText(a.ProtectionLocation, 1024) ||
 		!validOfflineText(a.DataOwner, 128) || !validOfflineText(a.RecoveryOwner, 128) ||
 		a.RestoreDurationSeconds < 1 || a.RestoreDurationSeconds > 3600 || a.BackupRetentionDays < 30 {
 		return retirementError("offline approval binding or recovery evidence missing")
 	}
-	for _, hash := range []string{a.ApprovalSummarySHA256, a.FreezeScopeSHA256, a.BackupPairManifestSHA256, a.RestoreReceiptSHA256, a.StartupReceiptSHA256, a.ResponsibilitySHA256} {
+	for _, hash := range []string{a.ApprovalSummarySHA256, a.FreezeScopeSHA256, a.ProtectionManifestSHA256, a.RestoreReceiptSHA256, a.StartupReceiptSHA256, a.ResponsibilitySHA256} {
 		if !retirementHashRE.MatchString(hash) || hash == strings.Repeat("0", 64) {
 			return retirementError("offline evidence digest missing")
 		}

@@ -26,8 +26,8 @@ func offlineApprovalFixture(t *testing.T, snapshot OfflineSnapshot) (OfflineConf
 		InitialMySQLVersion: snapshot.MySQLVersion, InitialMongoVersion: snapshot.MongoVersion,
 		TargetMySQLVersion: snapshot.TargetMySQLVersion, TargetMongoVersion: snapshot.TargetMongoVersion,
 		ApprovalSummarySHA256: strings.Repeat("b", 64), FreezeScopeSHA256: strings.Repeat("c", 64),
-		BackupPairManifestSHA256: strings.Repeat("d", 64), RestoreReceiptSHA256: strings.Repeat("e", 64), StartupReceiptSHA256: strings.Repeat("e", 64), ResponsibilitySHA256: strings.Repeat("f", 64),
-		BackupPairLocation: "isolated-fixture://not-production-evidence", DataOwner: "fixture-owner", RecoveryOwner: "fixture-recovery",
+		ProtectionScope: offlineProtectionFullDatabasePair, ProtectionManifestSHA256: strings.Repeat("d", 64), RestoreReceiptSHA256: strings.Repeat("e", 64), StartupReceiptSHA256: strings.Repeat("e", 64), ResponsibilitySHA256: strings.Repeat("f", 64),
+		ProtectionLocation: "isolated-fixture://not-production-evidence", DataOwner: "fixture-owner", RecoveryOwner: "fixture-recovery",
 		RuntimeFrozen: true, RuntimeNotStarted: true, RestoreDurationSeconds: 60, StartupReserveSeconds: 300, BackupRetentionDays: 30,
 	}
 	cfg := OfflineConfig{AuthorizationFile: path}
@@ -79,10 +79,10 @@ func TestOfflineApprovalRequiresBoundScopeAndRecovery(t *testing.T) {
 		}},
 		{"unfrozen", func(a *offlineAuthorization) { a.RuntimeFrozen = false }},
 		{"runtime_started", func(a *offlineAuthorization) { a.RuntimeNotStarted = false }},
-		{"location", func(a *offlineAuthorization) { a.BackupPairLocation = "unknown" }},
+		{"location", func(a *offlineAuthorization) { a.ProtectionLocation = "unknown" }},
 		{"data_owner", func(a *offlineAuthorization) { a.DataOwner = "" }},
 		{"recovery_owner", func(a *offlineAuthorization) { a.RecoveryOwner = "pending" }},
-		{"backup", func(a *offlineAuthorization) { a.BackupPairManifestSHA256 = "" }},
+		{"protection_manifest", func(a *offlineAuthorization) { a.ProtectionManifestSHA256 = "" }},
 		{"restore", func(a *offlineAuthorization) { a.RestoreReceiptSHA256 = strings.Repeat("0", 64) }},
 		{"freeze", func(a *offlineAuthorization) { a.FreezeScopeSHA256 = "" }},
 		{"responsibility", func(a *offlineAuthorization) { a.ResponsibilitySHA256 = "" }},
@@ -107,7 +107,7 @@ func TestOfflineApprovalRequiresBoundScopeAndRecovery(t *testing.T) {
 func TestOfflineApprovalPrivateFileSchemaAndExclusiveConsumption(t *testing.T) {
 	s := OfflineSnapshot{SourceSHA: strings.Repeat("a", 40), MigrationResourcesSHA256: strings.Repeat("b", 64)}
 	cfg, a := offlineApprovalFixture(t, s)
-	for _, suffix := range []string{`,"unexpected":true}`, `,"runtime_frozen":true}`} {
+	for _, suffix := range []string{`,"unexpected":true}`, `,"runtime_frozen":true}`, `,"backup_pair_manifest_sha256":"` + strings.Repeat("d", 64) + `"}`, `,"backup_pair_location":"old-pair"}`} {
 		raw, _ := json.Marshal(a)
 		raw = append(raw[:len(raw)-1], []byte(suffix)...)
 		if err := os.WriteFile(cfg.AuthorizationFile, raw, 0600); err != nil {
@@ -146,5 +146,55 @@ func TestOfflineApprovalPrivateFileSchemaAndExclusiveConsumption(t *testing.T) {
 	}
 	if err := claimPrivateRetirementAuthorization(cfg.AuthorizationFile, a.OperationID, cfg.AuthorizationSHA256); err == nil {
 		t.Fatal("duplicate consumption accepted")
+	}
+}
+
+func TestOfflineApprovalProtectionScopesBindExactVersionTransitions(t *testing.T) {
+	for _, test := range []struct {
+		name                     string
+		scope                    string
+		initialSQL, initialMongo uint
+		targetSQL, targetMongo   uint
+		accepted                 bool
+	}{
+		{"full_current_noop", offlineProtectionFullDatabasePair, 100, 39, 100, 39, true},
+		{"full_combined_upgrade", offlineProtectionFullDatabasePair, 100, 39, 101, 40, true},
+		{"sql_only", offlineProtectionSQLHistoricalColumns, 100, 39, 101, 39, true},
+		{"mongo_only", offlineProtectionMongoHistoricalIndexes, 101, 39, 101, 40, true},
+		{"missing_scope", "", 100, 39, 101, 39, false},
+		{"unknown_scope", "m4_actor", 100, 39, 101, 39, false},
+		{"scope_whitespace", "full_database_pair ", 100, 39, 101, 39, false},
+		{"sql_combined_upgrade", offlineProtectionSQLHistoricalColumns, 100, 39, 101, 40, false},
+		{"sql_noop", offlineProtectionSQLHistoricalColumns, 100, 39, 100, 39, false},
+		{"sql_changed_initial", offlineProtectionSQLHistoricalColumns, 101, 39, 102, 39, false},
+		{"sql_skip_version", offlineProtectionSQLHistoricalColumns, 100, 39, 102, 39, false},
+		{"sql_partial_pair", offlineProtectionSQLHistoricalColumns, 100, 38, 101, 39, false},
+		{"sql_other_mongo", offlineProtectionSQLHistoricalColumns, 100, 40, 101, 40, false},
+		{"mongo_wrong_initial", offlineProtectionMongoHistoricalIndexes, 100, 39, 101, 40, false},
+		{"mongo_changes_sql", offlineProtectionMongoHistoricalIndexes, 101, 39, 102, 40, false},
+		{"mongo_skip_version", offlineProtectionMongoHistoricalIndexes, 101, 39, 101, 41, false},
+		{"mongo_noop", offlineProtectionMongoHistoricalIndexes, 101, 40, 101, 40, false},
+		{"mongo_down", offlineProtectionMongoHistoricalIndexes, 101, 40, 101, 39, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Bind the candidate versions to the snapshot as well, so rejecting
+			// an object scope cannot accidentally rely on a separate mismatch.
+			s := OfflineSnapshot{
+				SourceSHA: strings.Repeat("a", 40), MigrationResourcesSHA256: strings.Repeat("b", 64),
+				MySQLDatabase: "qs", MongoDatabase: "qs", MySQLIdentitySHA256: strings.Repeat("c", 64), MongoClusterSHA256: strings.Repeat("d", 64),
+				MySQLVersion: test.initialSQL, MongoVersion: test.initialMongo,
+				TargetMySQLVersion: test.targetSQL, TargetMongoVersion: test.targetMongo,
+			}
+			cfg, a := offlineApprovalFixture(t, s)
+			a.ProtectionScope = test.scope
+			writeOfflineApproval(t, &cfg, a)
+			_, err := readOfflineAuthorization(cfg, s)
+			if (err == nil) != test.accepted {
+				t.Fatalf("scope accepted=%v, want %v: %v", err == nil, test.accepted, err)
+			}
+			if _, err := os.Lstat(cfg.AuthorizationFile + ".consumed"); !os.IsNotExist(err) {
+				t.Fatalf("approval validation consumed authorization: %v", err)
+			}
+		})
 	}
 }

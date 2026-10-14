@@ -2,7 +2,7 @@
 
 `qs-migrate-offline` 只拥有两条数据库连接和一次已批准的嵌入式 up 执行。默认只读；不启动 API、Collection、Worker、业务 Container、Scheduler、relay、NSQ、索引自动 reconcile 或种子数据。它不是业务服务、备份工具、恢复工具或全局维护框架。
 
-完整停写、生产备份对恢复、逐对象责任和首个 runtime 启动边界由 [One-off、恢复与生产证据](../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)维护。本文只定义执行器输入与输出。
+完整停写、按批准范围的保护与恢复、逐对象责任和首个 runtime 启动边界由 [One-off、恢复与生产证据](../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)维护。本文只定义执行器输入与输出。
 
 ## 构建与只读检查
 
@@ -46,11 +46,12 @@ sha256sum /private/task-owned/qs-migrate-offline
   "target_mongo_version": 39,
   "approval_summary_sha256": "<reviewed approval digest>",
   "freeze_scope_sha256": "<all writer and autonomous expiry freeze evidence digest>",
-  "backup_pair_manifest_sha256": "<complete same-window backup-pair manifest digest>",
-  "restore_receipt_sha256": "<complete actual backup-pair restore receipt digest>",
+  "protection_scope": "full_database_pair",
+  "protection_manifest_sha256": "<reviewed same-window protection manifest digest>",
+  "restore_receipt_sha256": "<actual restore rehearsal receipt for the declared protection scope>",
   "startup_receipt_sha256": "<isolated complete runtime startup rehearsal digest>",
   "responsibility_sha256": "<per-object exit responsibility digest>",
-  "backup_pair_location": "<real restricted storage reference, no credentials>",
+  "protection_location": "<actual restricted protection-material reference, no credentials>",
   "data_owner": "<named data owner>",
   "recovery_owner": "<named recovery owner>",
   "runtime_frozen": true,
@@ -64,7 +65,19 @@ sha256sum /private/task-owned/qs-migrate-offline
 
 两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。当前main资源仍为100/39；仅合入执行器不会产生101或40。SQL-only101/39及Mongo-only101/40分别需要独立迁移资源、已审核版本对和各自批准，旧迁移字节保持不变。
 
-执行器验证绑定、时效和字段完整性，不会自动证实外部存储可恢复或进程已停止。证据摘要、备份位置和负责人由批准者核实；缺失、unknown/pending、零摘要、恢复耗时缺失或超过3600秒、保留不足30天、已启动runtime均拒绝。此前四旧对象的恢复例外不能用于本批准。
+`protection_scope` 必须显式声明，范围与版本转换不可互换：
+
+| scope | 唯一对象转换或原有责任 |
+| --- | --- |
+| `full_database_pair` | 保留完整同窗口双库备份、完整恢复和启动责任；版本仍受嵌入资源与 M3 已声明版本对限制 |
+| `m4_sql_historical_columns` | 仅 `100/39 → 101/39`；保护两列历史值、主键、原 schema/CHECK 和具名恢复材料 |
+| `m4_mongo_historical_indexes` | 仅 `101/39 → 101/40`；保护四个完整有序索引定义、集合身份与保留对象核对材料 |
+
+两个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
+
+该文件格式尚未发布，没有旧格式兼容：旧 `backup_pair_manifest_sha256` / `backup_pair_location` 字段、缺失 scope、未知 scope、对象 scope 的其他版本组合直接拒绝。
+
+执行器验证绑定、时效和字段完整性，不会自动证实外部存储可恢复或进程已停止。证据摘要、保护位置和负责人由批准者核实；缺失、unknown/pending、零摘要、恢复耗时缺失或超过3600秒、保留不足30天、已启动runtime均拒绝。此前四旧对象的恢复例外不能用于本批准。
 
 批准在开始DDL前再次绑定实际初始版本对、身份和原始文件，一次消费生成同目录 `.consumed` 并fsync文件及目录。失败、不确定或无DDL的apply也消费；不能删除marker重试。只读检查不会消费。已完成阶段的fresh restart必须有新批准，绑定当前真实clean版本对；dirty绝不接管。
 
