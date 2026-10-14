@@ -30,6 +30,9 @@ const maintenanceTablesUp = "migrations/mysql/000103_retire_legacy_maintenance_t
 func nativeLegacyMaintenancePair(t *testing.T) nativeSchemaPair {
 	t.Helper()
 	n := nativeActorColumnPair(t)
+	// One owned SQL session keeps temporal capture/replay in the same zone.
+	n.db.SetMaxOpenConns(1)
+	n.db.SetMaxIdleConns(1)
 	r := migrationResourcesThrough(t, 102, 40)
 	n.runBoth(t, n.preflight(t, r))
 	seedHistoricalEvidenceRows(t, n)
@@ -59,8 +62,17 @@ type maintenanceTableMaterial struct {
 func maintenanceMaterial(t *testing.T, n nativeSchemaPair, name string) maintenanceTableMaterial {
 	t.Helper()
 	m := maintenanceTableMaterial{Name: name, DDL: historicalQuery(t, n.db, "SHOW CREATE TABLE `"+name+"`")}
-	for _, row := range historicalQuery(t, n.db, "SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='"+name+"' ORDER BY ORDINAL_POSITION") {
+	var selected []string
+	for _, row := range historicalQuery(t, n.db, "SELECT COLUMN_NAME,DATA_TYPE FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='"+name+"' ORDER BY ORDINAL_POSITION") {
 		m.Columns = append(m.Columns, row[0].String)
+		column := "`" + row[0].String + "`"
+		// Preserve the server's original temporal text. parseTime would turn it
+		// into client-zone time.Time/RFC3339, which is not an exact SQL replay.
+		switch row[1].String {
+		case "date", "datetime", "timestamp", "time":
+			column = "CAST(" + column + " AS CHAR)"
+		}
+		selected = append(selected, column)
 	}
 	var primary []string
 	for _, row := range historicalQuery(t, n.db, "SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='"+name+"' AND index_name='PRIMARY' ORDER BY SEQ_IN_INDEX") {
@@ -69,7 +81,7 @@ func maintenanceMaterial(t *testing.T, n nativeSchemaPair, name string) maintena
 	if len(primary) == 0 {
 		t.Fatal("fixed maintenance fixture requires deterministic primary keys", name)
 	}
-	m.Rows = historicalQuery(t, n.db, "SELECT * FROM `"+name+"` ORDER BY "+strings.Join(primary, ","))
+	m.Rows = historicalQuery(t, n.db, "SELECT "+strings.Join(selected, ",")+" FROM `"+name+"` ORDER BY "+strings.Join(primary, ","))
 	return m
 }
 
@@ -234,6 +246,7 @@ func TestLegacyMaintenanceNativePartialDDLRefusesRestartForceAndDown(t *testing.
 
 type maintenanceObjectBackup struct {
 	SQLIdentity, MongoIdentity, InitialResources, FailedResources string
+	SessionTimeZone                                               string
 	Ledger, Objects                                               []maintenanceTableMaterial
 	Retained                                                      []maintenanceTableMaterial
 	MongoHead                                                     []byte
@@ -253,7 +266,11 @@ func captureMaintenanceObjects(t *testing.T, n nativeSchemaPair, failed *migrati
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := maintenanceObjectBackup{SQLIdentity: sqlIdentity, MongoIdentity: mongoIdentity, InitialResources: initial.sha256, FailedResources: failed.sha256, Ledger: []maintenanceTableMaterial{maintenanceMaterial(t, n, "schema_migrations")}, Retained: maintenanceRetained(t, n), MongoHead: head}
+	var zone string
+	if err := n.db.QueryRowContext(t.Context(), "SELECT @@session.time_zone").Scan(&zone); err != nil || zone == "" {
+		t.Fatal("owned temporal session zone unknown", err)
+	}
+	b := maintenanceObjectBackup{SessionTimeZone: zone, SQLIdentity: sqlIdentity, MongoIdentity: mongoIdentity, InitialResources: initial.sha256, FailedResources: failed.sha256, Ledger: []maintenanceTableMaterial{maintenanceMaterial(t, n, "schema_migrations")}, Retained: maintenanceRetained(t, n), MongoHead: head}
 	for _, name := range retiredMaintenanceSQLTables {
 		b.Objects = append(b.Objects, maintenanceMaterial(t, n, name))
 	}
@@ -285,6 +302,10 @@ func replayMaintenanceObjects(t *testing.T, n nativeSchemaPair, raw []byte, appr
 	sqlIdentity, mongoIdentity, err := pairIdentity(t.Context(), n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
 	if err != nil || sqlIdentity != b.SQLIdentity || mongoIdentity != b.MongoIdentity {
 		return errors.New("maintenance backup identity rejected")
+	}
+	var zone string
+	if err := n.db.QueryRowContext(t.Context(), "SELECT @@session.time_zone").Scan(&zone); err != nil || zone == "" || zone != b.SessionTimeZone {
+		return errors.New("maintenance temporal session zone changed")
 	}
 	head, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Raw()
 	sqlVersion, dirty, mongoVersion, mongoDirty := n.heads(t)
