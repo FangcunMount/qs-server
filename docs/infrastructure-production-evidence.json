@@ -6580,6 +6580,101 @@
         "PR364 source merge is separate from production deployment; only its exact8241 head checks were verified. Actual production is the last bound M2 observation, not ab998. Full effective configuration is still not recorded.",
         "Same-window coherent full backup pair, complete isolated restore, old image and three-service startup, interruption/forward recovery and30/60-minute/RPO0 budgets remain incomplete. No production stop/export/restore/DDL/delete or M6 T0."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-bounded-readiness-failures",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T11:14:48.5852110Z",
+      "environment": "Mac mini fixed readonly diagnostic workflow; source-bound MySQL and Mongo candidates",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "These fixed-source one-off reads do not re-decode six runtime instances. The M2 deployed SHA is the last independently bound runtime context; a complete new dual-DB/instance check was not obtained."
+      },
+      "command": "Two workflow_dispatch runs from frozen codex/m4-readiness-profile-39b1df6e4275; exact governance_confirm=39b1df6e4275edfed7d12e58319b13fa396ca1f9, empty backup input. metadata-readiness-admin/mysql and metadata-visibility-admin-profile/mongodb, fixed bounded reads only.",
+      "result": {
+        "status": "findings",
+        "summary": "Both selected jobs failed closed and all other jobs skipped. MySQL stopped at historical Outcome distribution with generic query_failed; Mongo exhausted a bounded transport/read interval before application queries. Full distributions, Mongo FCV/TTL, freeze, export/restore and maintenance budgets remain unverified.",
+        "measurements": {
+          "reviewed_source_sha": "39b1df6e4275edfed7d12e58319b13fa396ca1f9",
+          "profile_source_baseline_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "source_head_success_checks": 28,
+          "source_head_designed_skips": 1,
+          "mysql_run_id": 38554847643,
+          "mysql_job_id": 115821328565,
+          "mysql_other_jobs_skipped": 15,
+          "mysql_complete": false,
+          "mysql_failure_stage": "outcome_distribution",
+          "mysql_error_category": "query_failed",
+          "mysql_queries_attempted": 16,
+          "mysql_connection_released": true,
+          "mysql_database_released": true,
+          "mysql_pool_closed_verified": true,
+          "mysql_partial_measurements_promoted": false,
+          "mongo_run_id": 38555149515,
+          "mongo_job_id": 115822340832,
+          "mongo_other_jobs_skipped": 15,
+          "mongo_complete": false,
+          "mongo_error_category": "reading_budget_exceeded",
+          "mongo_logical_queries": 0,
+          "mongo_elapsed_milliseconds": 5028,
+          "mongo_actual_fcv_or_ttl_known": false,
+          "mongo_temp_key_knownhosts_and_directory_released": true,
+          "mongo_full_process_release_proven": false,
+          "production_stop_export_restore_ddl_or_delete_calls": 0,
+          "production_deploy_paused": true,
+          "evidence_artifacts": [
+            {
+              "file": "qs-m4-production-readiness-39b/mysql-first-job.log",
+              "sha256": "0084872ded66658e31c7c0ac29c34972c49bd4c916a971ec10afec1e3e62995b"
+            },
+            {
+              "file": "qs-m4-production-readiness-39b/mysql-first-receipt.json",
+              "sha256": "e003b3a8510911e28eb7a4d822c4aa5404b55d5629ccd489a95d643572d9256d"
+            },
+            {
+              "file": "qs-m4-production-readiness-39b/mongo-first-job.log",
+              "sha256": "71e11ff89def0c234f73ddfb4a75b4d5a0c6ba13484e4b6e1014b18b08c2ebe0"
+            },
+            {
+              "file": "qs-m4-production-readiness-39b/mongo-first-receipt.json",
+              "sha256": "e073b7f5b6d6c9369141b06af259b599afa2c557ffea6b43614c1979e5dde9ba"
+            },
+            {
+              "file": "qs-m4-production-readiness-39b/dispatch-failure-summary.json",
+              "sha256": "0138b75e3d35cd321341581fa21d381b2de2e2be77088a334cfa70982edc6225"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data/recovery; Codex: source-bound readonly diagnostics",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38554847643"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38555149515"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#628-m4-只读准备-ci-通过生产盘点失败保留"
+        }
+      ],
+      "limitations": [
+        "All original23 record bytes retained. Source/head CI and native tests prove their own scope, not successful production inventory or backup qualification.",
+        "MySQL generic query_failed cannot identify timeout, permissions or another cause. Its failed result intentionally discards partial measurements; no full value distribution, final migration read or final identity proof is promoted.",
+        "Mongo zero application queries and false FCV/TTL known bits do not mean a zero version or disabled TTL. Its full release bits are unproven, not independent proof of leftover live processes; three actual temporary-file/directory releases were attested. Transport-stage detail is being improved without changing the target, budgets or credentials.",
+        "No retry, credential/host fallback, permission grant, TTL/Event change, production stop, export, restore, DDL, data deletion or M6 observation T0. Same-window full backup pair, complete isolated restore and30/60-minute/RPO0 budgets remain incomplete."
+      ]
     }
   ]
 }
