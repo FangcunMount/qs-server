@@ -328,7 +328,7 @@ func (h *nativeFixture) restoreInput() ([]string, string) {
 }
 func (h *nativeFixture) limited(withoutAlter bool) func() {
 	h.t.Helper()
-	name := h.name
+	name := strings.Replace(h.name, "qs_m4_object_test_", "qs_m4_u_", 1)
 	password := "owned-only-synthetic"
 	if _, e := h.root.Exec("CREATE USER '" + name + "'@'%' IDENTIFIED BY '" + password + "'"); e != nil {
 		h.t.Fatal(e)
