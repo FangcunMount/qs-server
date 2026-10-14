@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
-    "verified_on": "2026-10-13"
+    "sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+    "verified_on": "2026-10-14"
   },
   "status_policy": {
     "doc_status": [
@@ -9900,7 +9900,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+        "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -9934,7 +9934,7 @@
           "kind": "command",
           "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
           "result": "passed",
-          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
           "verified_on": "2026-10-13"
         },
         {
@@ -9942,7 +9942,7 @@
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
           "result": "matched",
-          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
           "verified_on": "2026-10-13"
         },
         {
@@ -9950,7 +9950,7 @@
           "path": "internal/pkg/migration/retirement_driver.go",
           "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
           "result": "matched",
-          "source_sha": "13e90828709be7241a7d3f15d93f82fa273e04ec",
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
           "verified_on": "2026-10-13"
         }
       ],

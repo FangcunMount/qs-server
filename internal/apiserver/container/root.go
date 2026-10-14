@@ -242,6 +242,9 @@ func (c *Container) Initialize() error {
 
 	// 初始化 CodesService 与小程序码基础设施
 	c.initPlatformModule()
+	if err := c.SurveyModule.ValidateReadiness(); err != nil {
+		return fmt.Errorf("survey final composition readiness: %w", err)
+	}
 	if c.resilience != nil {
 		c.resilienceCancel = c.resilience.Start(context.Background())
 	}
