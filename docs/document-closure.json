@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+    "sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -3752,7 +3752,7 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -3833,6 +3833,27 @@
           "selector": "func TestRuntimeHistoricalRowsRemainUndated",
           "result": "matched",
           "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
         }
       ],
@@ -9039,7 +9060,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -9117,6 +9138,27 @@
           "selector": "func TestRuntimeHistoricalRowsRemainUndated",
           "result": "matched",
           "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
         }
       ],
@@ -11791,7 +11833,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11845,6 +11887,27 @@
           "selector": "func TestRuntimeHistoricalRowsRemainUndated",
           "result": "matched",
           "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
         }
       ],
