@@ -81,15 +81,16 @@ func TestMetadataProfileInputsExcludeEveryOtherDBOpsJob(t *testing.T) {
 	if err = yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	if len(workflow.Jobs) != 16 {
+	if len(workflow.Jobs) != 17 {
 		t.Fatal("db-ops job inventory changed; review metadata exclusion")
 	}
-	for _, operation := range []string{"metadata-visibility-profile", "metadata-visibility-admin-profile", "metadata-readiness-admin"} {
+	for _, operation := range []string{"metadata-visibility-profile", "metadata-visibility-admin-profile", "metadata-readiness-admin", "retirement-inventory-admin"} {
 		for _, database := range []string{"mysql", "mongodb", "redis", "all"} {
 			for name, job := range workflow.Jobs {
 				got := metadataJobEligible(t, job.If, operation, database)
-				want := name == "mysql-metadata-visibility-profile" && database == "mysql" && operation != "metadata-readiness-admin"
+				want := name == "mysql-metadata-visibility-profile" && database == "mysql" && (operation == "metadata-visibility-profile" || operation == "metadata-visibility-admin-profile")
 				want = want || (name == "mysql-metadata-readiness-admin" && database == "mysql" && operation == "metadata-readiness-admin")
+				want = want || (name == "mysql-retirement-inventory-admin" && database == "mysql" && operation == "retirement-inventory-admin")
 				want = want || (name == "mongodb-metadata-admin-profile" && database == "mongodb" && operation == "metadata-visibility-admin-profile")
 				if got != want {
 					t.Fatalf("%s/%s: job %s eligible=%t want=%t", operation, database, name, got, want)
@@ -123,6 +124,7 @@ func TestBoundedMetadataReadinessRequiresDispatchAndReviewedRevision(t *testing.
 		name, operation, database, confirmKey, backupKey string
 	}{
 		{"mysql-metadata-readiness-admin", "metadata-readiness-admin", "mysql", "PROFILE_REVIEW_SOURCE_SHA", "PROFILE_ARCHIVE_INPUT"},
+		{"mysql-retirement-inventory-admin", "retirement-inventory-admin", "mysql", "PROFILE_REVIEW_SOURCE_SHA", "PROFILE_ARCHIVE_INPUT"},
 		{"mongodb-metadata-admin-profile", "metadata-visibility-admin-profile", "mongodb", "MONGO_PROFILE_CONFIRM_SHA", "MONGO_PROFILE_ARCHIVE_INPUT"},
 	} {
 		t.Run(target.name, func(t *testing.T) {
