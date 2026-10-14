@@ -44,6 +44,29 @@ CI for exact SHA
 - 自动部署必须校验目标 SHA 没有被更新提交取代；手动部署仍须记录调用者、输入、environment 和审批。
 - self-hosted runner 的网络、SSH、Docker 权限和工具版本属于环境前置条件，不能写死为当前事实。
 
+两个有界只读入口只接受手工派发，必须在 checkout 前提交 `governance_confirm=<完整 GitHub SHA>` 且 `backup_name` 为空；不匹配时不进入携带数据库 Secret 的读取步骤。它们使用 production Environment 和 Mac mini 自托管 runner，但 source SHA 只标识工具源码，不是生产应用部署身份。
+
+| operation / database | 只读入口及连接来源 | 证据边界 |
+| --- | --- | --- |
+| `metadata-readiness-admin` / `mysql` | 固定 `root@47.94.204.124:22` 接收器，现有 `MYSQL_METADATA_ADMIN_*`；六成员静态 Linux 包使用独立 `--metadata-readiness` 模式 | 绑定读取前后数据库身份、限定目录及 readiness 读取；原五成员权限 profile 保持独立 |
+| `metadata-visibility-admin-profile` / `mongodb` | 用户已配置的 `root@003-ysj` 解析为固定 `root@81.70.102.15:22`，借用现有身份和可信 known_hosts；保留现有 `MONGODB_*`，认证库固定 `admin` | Mac mini 原生 reader 使用独占 loopback SSH tunnel；仅观测固定 qs / rs0 / member / migration / UUID 目标的身份、FCV、TTL monitor 和认证元数据，不执行日常备份脚本 |
+
+`complete` 只证明本次已声明的有界读取和 owned 连接释放。metadata count、digest、权限及 FCV 不证明对象无业务责任、完整 namespace 导出、备份对可恢复或停写 RPO=0，也不授权停写、恢复、DDL 或删除。`system.profile` 的业务恢复排除范围另须保留定义、索引和计数回执，生产集合继续保留。两个 reader 均不初始化业务容器、迁移 runner、消息消费者或发送端点；现用 backup、validate、restore、status 和 scheduled job 使用各自原入口。
+
+MySQL 独立 readiness 回执为 V2。两个历史列在同一连接、只读 REPEATABLE READ 快照内按主键读取；双表 MAX 上界、实际 InnoDB／unsigned 单列主键、每页1000行、每表最多512个非空页及最终 EOF 都须验证。边界参数使用精确十进制转换，避免 uint64 最大值丢失。`query_count=19+assessment_pages+outcome_pages` 包含固定 SHOW GRANTS 尝试；隔离级别、开始和 ROLLBACK 三条事务控制单独计数，不沿用历史18条计数。保持单条5秒、整体45秒预算；任何截断、未知形状、分页或释放失败均丢弃完整测量。ROLLBACK 成功后另读实时 clean100 和原连接身份，Conn、DB和连接池释放全部成功才允许 complete。旧五查询权限模式保持独立，历史V1回执不由新接收器重新解释为V2成功。
+
+Mongo 最多执行 10 个固定逻辑只读查询，异常时至多释放一个本 reader 拥有的 cursor；driver 握手不计为业务查询。`ttl_monitor.known=false` 表示未知，不能把零值 `enabled=false` 解释为已关闭。TTL 参数仅为本次观测，不扫描 TTL 业务数据、不读取 currentOp、不执行关闭动作，也不证明未来持续状态或维护冻结。
+
+Mongo 使用离线 `ssh -G` 校验既有别名，拒绝代理、替代主机和额外转发；冻结已解析身份后，最终连接使用 `-F /dev/null`、固定 root/IP/22、`StrictHostKeyChecking=yes`、`UpdateHostKeys=no` 和唯一本次 loopback 转发。既有信任文件须归属本用户、非symlink并在读取前后保持相同摘要；只借用、不写入、不删除。最终 V2 回执中，未创建的临时 key/known_hosts/directory 三项严格为 null；cursor/client/tunnel termination/wait/owned tunnel/reader 六项实际释放全部成功才允许 complete 和 exit0。native V1先独立校验，其10次逻辑读取与45秒预算不变；历史失败回执保留自身版本。
+
+Mongo 的最终传输回执保留固定 `failure_stage`，区分既有 SSH 配置、信任材料、路由、隧道、自有监听者、native reader 和释放阶段；native reader 的 JSON 协议保持原样。成功必须为 `none`，未知阶段拒绝；失败不输出命令、连接地址或 stderr。MySQL readiness 对服务端 3024／1317、权限拒绝及 Go context deadline／cancel 使用不同固定错误类别，不根据运行时长猜测原因、调整读取预算或自动重试。失败回执不出具完整测量结论。
+
+实际总耗时超限时，仅最终 `reading_budget_exceeded`／`total_budget` 失败回执可以保留耗时和已证明的释放字段，三个完成标记必须全部为 false；native 回执及所有成功回执仍受原45秒上限约束。该诊断例外不延长执行时间或把未证释放标记设为true。
+
+MySQL未知typed服务端错误使用 `query_mysql_error` 并保留可选uint16号码；仅该类型实际出现时复制Number，旧回执无该字段仍有效。原样的网络错误、InvalidConn、BadConn及失败EOF各自分类，InvalidConn不推定为timeout，正常EOF不失败。不得输出Message、SQLState、网络Op／Addr，释放失败及部分测量规则保持原样。
+
+CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 rs0。必须设置 required 标记，精确 selector 的 JSON 事件必须实际 RUN/PASS；任意 SKIP、缺失 selector 或依赖未就绪均失败。Mongo fixture 使用固定官方 digest、owned network/container label 和唯一 127.0.0.1 随机端口，不复用业务 runtime fixture。
+
 ## 4. 本地非缓存验证
 
 ```bash
@@ -52,6 +75,12 @@ go test -race -count=1 ./scripts/oneoff/mysql_metadata_profile
 python3 -B scripts/dbops/test-mysql-metadata-profile.py
 python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
 python3 -B scripts/dbops/test-receipt-transport.py
+python3 -B scripts/dbops/test-mysql-metadata-readiness.py
+python3 -B scripts/dbops/test-mongodb-metadata-profile.py
+python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
+# 仅在各自独占 fixture 和 required 身份变量已绑定后执行：
+make test-metadata-readiness-mysql-native
+make test-metadata-readiness-mongodb-native
 bash scripts/cd/test-github-action-runtimes.sh
 bash scripts/cd/test-plan-services.sh
 bash scripts/cd/test-prepare-package.sh

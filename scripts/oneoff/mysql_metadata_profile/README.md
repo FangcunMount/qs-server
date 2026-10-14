@@ -1,12 +1,20 @@
-# MySQL 只读权限诊断
+# MySQL 只读元数据诊断
 
-此工具只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合。它不激活角色，不替代现有删除门禁，不证明清理资格，不读取业务记录。
+无 argv 的原权限模式只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合，不读取业务记录。独立 readiness 模式只读取明确限定的目录和分页标量分类。两个模式均不激活角色、不替代现有删除门禁，也不证明清理资格。
 
 工作流提供两个独立的只读入口：`metadata-visibility-profile` 使用现有应用账号；`metadata-visibility-admin-profile` 使用 production 环境中的 `MYSQL_METADATA_ADMIN_USERNAME`、`MYSQL_METADATA_ADMIN_PASSWORD`，复用既有 host/port/database，并保持上述生产目标 hash 校验。管理员 Secret 缺失时停止，绝不回落到应用账号。CBPT 清理四个入口固定使用这组管理员身份，但原有全局元数据、依赖、锁、内容与恢复证明门禁不变。新工作流 source SHA 必须重新归档和隔离恢复，原归档及证明保留。 CBPT 手工入口必须提交 `governance_confirm`，在 checkout 和执行前核对实际 GitHub SHA，防止派发期间分支移动导致执行未审查版本。
 
-固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。没有命令行业务参数；额外 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
+固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。无 argv 时执行本页原权限 profile；唯一另行声明的诊断 argv 为 `--metadata-readiness`。没有命令行业务参数；其它 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
 
-单一 pinned sql.Conn、总 deadline 45 秒、每个 query 5 秒、connect 5 秒，MultiStatements/InterpolateParams=false。配置和 driver 全局 logger 都为 NopLogger。身份 query 读取 session ID/UUID/database/version/CURRENT_ROLE，前后必须完全一致；UUID 仅用于兼容现有 cleanup hashText(host, normalizedPort, database, UUID)，hash 必须匹配 PROFILE_EXPECTED_TARGET_HASH。身份值、角色原文和 SQL 结果不进入输出。
+`metadata-readiness-admin` / `database=mysql` 使用独立 `--metadata-readiness` 模式，只接受固定 `qs` 目标及 clean 100。派发必须在 checkout 前验证完整 `governance_confirm` 等于 GitHub SHA，且 `backup_name` 为空；只使用现有 metadata 管理员 Secret，缺失时停止。SSH 控制器使用显式 `--readiness` 与六成员包，原五成员权限 profile 的格式和行为保持独立。
+
+readiness 当前只接收 `format_version=2`；旧 V1 文件作为历史证据保留，不由当前接收器兼容解析或改写。无 argv 的原五查询权限 profile 及其格式保持独立。V2 成功要求完整读取两个历史 JSON 列、确认一致快照、释放只读事务及 pinned Conn，并关闭 owned DB pool。只输出限定目录的 count/digest、全 schema EVENT 观测、线程/事务/metadata lock 标量、仪表可用性、主键和快照验证布尔、页数、EOF，以及历史列的守恒计数分布；不输出行 ID、上界、JSON 内容、SQL、账号、角色或目录名称。失败不保留 measurements，失败阶段及释放字段保持明确未知/失败。`diagnostic_only=true`、`readiness_only=true`、`freeze_verified=false` 固定不变；一致快照和观测零值不证明停止所有写入、完整备份或 RPO=0，也不授权结构退役。
+
+V2 在同一 pinned Conn 依次执行固定 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`、`START TRANSACTION READ ONLY`，再用单条双表 `MAX(id)` 查询建立同一读视图和两个上界。该读取持有两表的 metadata lock 后，固定目录查询确认 `assessment`、`evaluation_outcome` 仍为 InnoDB，且各有 `id BIGINT UNSIGNED NOT NULL` 单列 PRIMARY KEY；结构不符立即失败。每表固定每页1000行，按 PRIMARY KEY 顺序读取 RAM 内的 ID 和五类标量；首段包含 `id=0`，续段采用 `id>last AND id<=upper`，不计算 `last+1`。两个参数均保持 RAM 内经 `ParseUint` 验证的规范十进制字符串，并用固定 `CAST(? AS DECIMAL(20,0))` 作精确边界比较；不能以浮点数或字符串转 UNSIGNED 替代。隔离8.0.36曾实际暴露字符串参数转 UNSIGNED 截断 uint64 最大值、漏末行的问题，必须保留该最大值与 EOF 回归。最多512个非空页，加1个必需的终止空页；空表也须1个空页。完整 EOF、严格递增主键、最后读取键等于固定 MAX 上界和分类守恒均通过才保留测量；不抽样、不重试、不续跑。RR 中的一致读复用首次一致读建立的快照，参见 [MySQL 8.0 一致性非锁定读](https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html) 和 [SET TRANSACTION](https://dev.mysql.com/doc/refman/8.0/en/set-transaction.html)。
+
+分页结束后，先在总预算内成功 `ROLLBACK`，再于事务外实时重读 clean100 和会话身份；这样版本变化不会被 RR 旧视图遮住。V2 的 `query_count` 仅计只读结果查询（SELECT 与固定 SHOW GRANTS）尝试，成功时精确等于 `19 + assessment_pages + outcome_pages`，范围21～1045；两个页数字段均含终止空页，范围1～513，每表最多512000行，非空页数必须等于总行数除以1000后向上取整。`control_statement_count` 单独计上述两条开始语句和 ROLLBACK 尝试，最大3，成功须为3；`transaction_released` 始终存在，未开始或未核实为 null，成功须为 true。`primary_key_shape_verified`、`consistent_snapshot`、两个 EOF 布尔也须为 true。分页超限为 `pagination_limit_exceeded`，事务释放失败为 `transaction_release_failed`，均清空全部 measurements，不能只保留已完成的一表。
+
+单一 pinned sql.Conn、总 deadline 45 秒、每条读取及事务控制语句5秒、connect 5秒；分页、游标释放和 ROLLBACK 共用原总截止，不因翻页或清理重置。MultiStatements/InterpolateParams=false。配置和 driver 全局 logger 都为 NopLogger。身份 query 读取 session ID/UUID/database/version/CURRENT_ROLE，前后必须完全一致；UUID 仅用于兼容现有 cleanup hashText(host, normalizedPort, database, UUID)，hash 必须匹配 PROFILE_EXPECTED_TARGET_HASH。身份值、角色原文和 SQL 结果不进入输出。
 
 权限与角色诊断字段的含义：
 
@@ -23,17 +31,21 @@ GRANT 解析只认可 bounded 的 privilege/account/scope/role/proxy 语法；�
 
 RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.MySQL.CommonDBATasks.privilege-model.html) 的 8.0.36+ 权限列表。测试包含 APPLICATION_PASSWORD_ADMIN/ROLE_ADMIN/SET_USER_ID/XA_RECOVER_ADMIN；它们单独出现不能假造四项元数据权限。
 
-输出仅受控 receipt 字段：format_version/source_sha/run_id/expected_target_hash/source_target_hash/current_unrestricted_metadata_grants/rds_role_grants_available/rds_role_unrestricted_metadata_grants/assigned_roles_present/mandatory_roles_present/diagnostic_only/complete/error_category。无 raw grant、role/account/host/database/version/UUID/SQL/driver error 或凭据。diagnostic_only 永远为 true；即使两个权限布尔均 true，也不是删表授权或资格。未知错误和身份变化时 current 为 false、四个角色字段为 null，complete=false、exit1；合法 negative（含未授予/partial restriction）为完整诊断，不是权限赋予。
+原权限模式仅输出受控 receipt 字段：format_version/source_sha/run_id/expected_target_hash/source_target_hash/current_unrestricted_metadata_grants/rds_role_grants_available/rds_role_unrestricted_metadata_grants/assigned_roles_present/mandatory_roles_present/diagnostic_only/complete/error_category。无 raw grant、role/account/host/database/version/UUID/SQL/driver error 或凭据。diagnostic_only 永远为 true；即使两个权限布尔均 true，也不是删表授权或资格。未知错误和身份变化时 current 为 false、四个角色字段为 null，complete=false、exit1；合法 negative（含未授予/partial restriction）为完整诊断，不是权限赋予。
 
 离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、current 与固定角色 grant 输入互不混用（不证明真实 active role 权限展开）、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
 
-两个 metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。其余 db-ops job 在两个 metadata 输入下均不符合执行条件。
+三个 MySQL metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。除所选入口外，其余 db-ops job 在这三组 MySQL metadata 输入下均不符合执行条件。
 
 `mysql-metadata-profile-ssh.py` 将唯一固定文件集的 SHA-256 归档及凭据通过 SSH stdin 传入；密码不进入命令行、日志或 Git。远端只在任务拥有的 0700 临时目录解包，使用 Linux 静态 binary，不创建生产 Docker 容器、不拉取镜像。临时 JSON 环境文件为 0600，固定字段经过验证，不经 shell source/eval，并在建立数据库连接前删除该文件；binary 不继承无关凭据或 LD_* 环境。SSH 输出限 256 KiB/90 秒，binary 输出限 64 KiB/50 秒，stderr 只排空不保留，原始异常不输出。只有 task-owned 文件完整释放后才输出安全密封回执，传输、清理或回执错误均失败关闭。封装失败使用四个固定类别：`profile_input_preflight_failed`（操作、输入与绑定）、`profile_package_preflight_failed`（本地包、checksum 与 envelope）、`profile_trusted_ssh_preflight_failed`（本地可信 SSH 预检）、`profile_remote_or_receipt_failed`（实际 SSH、远端执行、回执与释放后输出）。这些类别只描述本次源码的边界，保留 complete=false、权限 false/nullable 字段，不含异常正文、trace、凭据或远端状态猜测；remote 类别不能单独证明是否连接数据库。原来的 `profile_transport_or_receipt_failed` 继续接受为未定位失败。已通过原验证器的具体 SQL 失败回执沿用原类别，不被封装阶段改名。
 
 `complete=true` 还要求 pinned Conn.Close、owned DB.Close 均成功且 pool 的 InUse/OpenConnections 为零。池暂保留最多一个 idle connection，让紧随其后的 DB.Close 能返回底层 driver.Close 错误，避免 MaxIdleConns=0 在 putConn 中忽略该错误。`connection_release_failed` / `database_release_failed` 是封闭失败类别，清空所有权限和角色结论，不输出底层错误。隔离 MySQL8.0.36 required race 门禁验证 schema-only、全局四权限、未激活固定角色、partial revoke、错误目标及会话释放；释放错误使用明确测试 seam，不能冒称真实数据库物理释放失败。
 
 原 `mysql-metadata-profile.py --binary` Docker 路径及其 negative 测试仍保留，但 metadata 工作流通过受限 SSH receiver 调用 `execute_native`。CBPT 删除工具、其他 db-ops 操作和共享传输 helper 保持原样。
+
+readiness 查询失败按固定类别诊断：服务端 MySQL 3024 为 `query_server_timeout`，1317 为 `query_server_interrupted`，1142／1143／1227 为 `query_permission_denied`，Go context deadline／cancel 为 `query_deadline_exceeded`／`query_canceled`；未识别错误保持 `query_failed`。QueryContext、事务控制及读取结果的 Rows.Err 使用相同规则，不输出 Message、SQL、账号或驱动错误正文，不根据耗时推断原因。原五查询 profile 不变；readiness V2 分页仍共享5秒单条／45秒总预算，失败清空部分测量并核验事务和连接释放，不重试或回退认证。本页描述执行协议；隔离 native 的精确证据见下文，生产诊断保持独立验收。
+
+typed MySQL 错误另保留可选 `query_mysql_error_number`，只复制 Number 的0～65535整数，未列入上述类别的号码归 `query_mysql_error`；没有观测到该类型时省略，成功回执禁止带号码。原样保留的网络timeout／其他网络错误、InvalidConn、BadConn及失败Rows.Err中的EOF各有固定类别；正常结果集结束不算失败。driver1.9.3可能先将读取错误统一为InvalidConn，因此 `query_invalid_connection` 不能证明具体网络原因或超时。metadata、事务、Conn 或 DB 释放失败仍优先阻断完成，若此前已有真实MySQL数字码则保留其诊断值；不读取SQLState、Message、网络Op／Addr或原始driver日志。
 
 
 ## 日志回执运输
@@ -45,3 +57,9 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 共享 API：`encode_armored_receipt(value, schema=..., secrets=...)` 返回 frame，`decode_armored_receipt(text)` 返回 JSON 文本，错误为固定类别的 `ReceiptTransportError`。schema 是可选字段白名单；字段完整性与绑定仍由原验证器负责。JSON body 上限 64 KiB、日志上限 4 Mi 字符；解码必须恰有一个完整 frame，字母表和 UTF-8 合法、无重复 JSON key。解码后仍须原 source/run/target/exit 验证，不能把可解码等同于清理资格，也不尝试修补旧的被掩码 JSON。共享与 profile 离线测试覆盖短字符掩码、备用字母表、缺失/重复/混合或超限 frame、凭据碰撞、未知 raw 字段及绑定拒绝。
 
 当前权限不足时，诊断进一步输出四项全局 GRANT 是否存在及是否存在部分 REVOKE，均为布尔字段，不含账号或语句。字段只在目标、查询和最终同一会话身份全部验证后发布；失败均为 null。它们解释现有权限结论，不改变清理门禁。schema 级授权不能代表全局可见性，正向 GRANT 与 REVOKE 同时存在也不能代表完整权限。旧摘要仍可解析；新字段若出现必须五项完整且与原 current_unrestricted_metadata_grants 一致。
+
+## V2 分页真实验收
+
+源码 `4160cc63ac881d1addd3f066d6053301e8d5431e` 在自有 MySQL8.0.36 上实际执行 `bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql`：16项 RUN/PASS、0 SKIP/FAIL。包含同一 RR 快照内并发插入／更新／删除、跨页、主键0及uint64最大值、真实有符号主键拒绝，以及原五查询权限与真实错误／释放场景。字符串参数经 `CAST AS UNSIGNED` 的反例保留原失败回执；固定 `DECIMAL(20,0)` 比较后完整边界及 EOF 通过，5秒单条／45秒总预算不变。
+
+原 native JSONL SHA256 `31d513d2f61f1ccf50a9a0b2326d129c9cb3e5779a8bd8593ce3b0d3ef623265`，最终交付摘要 `678e948624238d08fe7384e287e539c956ac15609d92d0d485706c88c84b64a8`；自有容器、网络和连接文件均已释放，旧CID/image保持。既有本机nsqd运行元数据实际变化，未签整个环境稳定或作因果推断。这证明对应组件隔离读取与释放，不能证明当前生产全量空值、持续停写、对象恢复、三服务启动或30/60分钟预算。
