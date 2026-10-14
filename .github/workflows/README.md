@@ -48,6 +48,7 @@ CI for exact SHA
 
 | operation / database | 只读入口及连接来源 | 证据边界 |
 | --- | --- | --- |
+| `retirement-inventory-admin` / `mysql` | 固定 `root@47.94.204.124:22`、现有 metadata 管理员身份；`--inventory` 六成员包调用独立 `--retirement-inventory` | clean100、九张 InnoDB、固定11条业务计数与前后身份；15 reads＋3 controls，只读RR，5秒单条／45秒总。差异保留，不签清理资格或停写，M7退出工具 |
 | `metadata-readiness-admin` / `mysql` | 固定 `root@47.94.204.124:22` 接收器，现有 `MYSQL_METADATA_ADMIN_*`；六成员静态 Linux 包使用独立 `--metadata-readiness` 模式 | 绑定读取前后数据库身份、限定目录及 readiness 读取；原五成员权限 profile 保持独立 |
 | `metadata-visibility-admin-profile` / `mongodb` | 用户已配置的 `root@003-ysj` 解析为固定 `root@81.70.102.15:22`，借用现有身份和可信 known_hosts；保留现有 `MONGODB_*`，认证库固定 `admin` | Mac mini 原生 reader 使用独占 loopback SSH tunnel；仅观测固定 qs / rs0 / member / migration / UUID 目标的身份、FCV、TTL monitor 和认证元数据，不执行日常备份脚本 |
 
@@ -76,6 +77,7 @@ python3 -B scripts/dbops/test-mysql-metadata-profile.py
 python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
 python3 -B scripts/dbops/test-receipt-transport.py
 python3 -B scripts/dbops/test-mysql-metadata-readiness.py
+python3 -B scripts/dbops/test-mysql-retirement-inventory.py
 python3 -B scripts/dbops/test-mongodb-metadata-profile.py
 python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
 # 仅在各自独占 fixture 和 required 身份变量已绑定后执行：

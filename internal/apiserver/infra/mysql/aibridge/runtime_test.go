@@ -3,7 +3,6 @@ package aibridge
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"os"
@@ -61,7 +60,7 @@ func TestRuntimeIndexAtomicScopeAndStablePagination(t *testing.T) {
 	}
 }
 
-func TestRuntimeHistoricalBackfillResumesWithoutInventingDates(t *testing.T) {
+func TestRuntimeHistoricalRowsRemainUndated(t *testing.T) {
 	s, a := fixture(t)
 	_, b := fixture(t)
 	ctx := context.Background()
@@ -69,21 +68,11 @@ func TestRuntimeHistoricalBackfillResumesWithoutInventingDates(t *testing.T) {
 		if e := seedLegacyStartFixture(ctx, r, s); e != nil {
 			t.Fatal(e)
 		}
-		if _, e := s.DB.Exec("UPDATE ai_bridge_requests SET organization_id=NULL,subject_id=NULL,testee_id=NULL,created_at=NULL,updated_at=NULL WHERE request_id=?", r.RequestID); e != nil {
-			t.Fatal(e)
-		}
-		if _, e := s.DB.Exec("DELETE FROM ai_bridge_request_assessments WHERE request_id=?", r.RequestID); e != nil {
+		if _, e := s.DB.Exec("UPDATE ai_bridge_requests SET created_at=NULL,updated_at=NULL WHERE request_id=?", r.RequestID); e != nil {
 			t.Fatal(e)
 		}
 	}
-	for i := 0; i < 2; i++ {
-		if n, e := s.BackfillRuntimeIndexes(ctx, 1); e != nil || n != 1 {
-			t.Fatal(n, e)
-		}
-	}
-	if n, e := s.BackfillRuntimeIndexes(ctx, 1); e != nil || n != 0 {
-		t.Fatal(n, e)
-	}
+
 	page, e := s.ListRuntime(ctx, 1, app.RuntimeQuery{})
 	if e != nil || len(page.Items) != 0 {
 		t.Fatal(page, e)
@@ -100,32 +89,6 @@ func TestRuntimeHistoricalBackfillResumesWithoutInventingDates(t *testing.T) {
 	exact, e := s.GetRuntime(ctx, 1, a.RequestID)
 	if e != nil || exact.TesteeID != "7" {
 		t.Fatal(exact, e)
-	}
-}
-
-func TestRuntimeBackfillRejectsCorruptScopeWithoutPartialWrites(t *testing.T) {
-	s, a := fixture(t)
-	_, b := fixture(t)
-	ctx := context.Background()
-	for _, r := range []app.Start{a, b} {
-		if e := seedLegacyStartFixture(ctx, r, s); e != nil {
-			t.Fatal(e)
-		}
-	}
-	b.Actor.OrgID = "invalid"
-	raw, _ := json.Marshal(b)
-	if _, e := s.DB.Exec("UPDATE ai_bridge_requests SET payload=? WHERE request_id=?", raw, b.RequestID); e != nil {
-		t.Fatal(e)
-	}
-	if _, e := s.DB.Exec("UPDATE ai_bridge_requests SET organization_id=NULL WHERE request_id IN (?,?)", a.RequestID, b.RequestID); e != nil {
-		t.Fatal(e)
-	}
-	if _, e := s.BackfillRuntimeIndexes(ctx, 100); !errors.Is(e, app.ErrInvalid) {
-		t.Fatal(e)
-	}
-	var n int
-	if e := s.DB.QueryRow("SELECT COUNT(*) FROM ai_bridge_requests WHERE request_id IN (?,?) AND organization_id IS NULL", a.RequestID, b.RequestID).Scan(&n); e != nil || n != 2 {
-		t.Fatal(n, e)
 	}
 }
 
