@@ -30,7 +30,7 @@ m4-sql-historical-protection --action=restore --mysql-database=qs --mongo-databa
 
 以上是调用示例，未作为生产命令执行。连接、工具 binary/source、A 执行器、输入材料和批准均须由执行控制方独立绑定。材料与批准须为绝对路径的私有 0600 普通文件，单硬链接、无符号链接、属当前 UID 或 root；原始 SHA 固定在独立批准中。首次 capture 用 O_EXCL 写入并 fsync，不覆盖旧材料。批准另以 O_EXCL `.consumed` 文件消费一次，恢复输入不能给自己重新授权。
 
-capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/保留列/类型/主键以及全部主键与保留行 SHA；不保存行正文。三个固定对象必须是 InnoDB BASE TABLE。会话时区 `+00:00`、字符集 utf8mb4 与固定 sql_mode 一致；数据库按类型、NULL 标记、字节长度及 HEX 进行散列，不经过 Go 时间重编码。uint64 主键以 DECIMAL(20,0) 参数比较，包含 id0 和最大值；每表 COUNT 守恒且必须实际读取独立空 EOF 页，不用抽样或以短页代替 EOF。上限每表 500,000 行、材料 128MiB，超限拒绝而不签部分完成。只归一化 AUTO_INCREMENT 动态值与明确目标列/CHECK；其他结构须相同。
+capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/保留列/类型/主键以及全部主键与保留行 SHA；不保存行正文。三个固定对象必须是 InnoDB BASE TABLE；目标列必须为原099的最后一列且 json DEFAULT NULL，CHECK必须与不可变099在实际MySQL8.0.36上的完整canonical表达式相同（OCTET_LENGTH按服务器编码为length）。捕获、材料验证及恢复snapshot均在任何DDL前拒绝位置/default/谓词/schema漂移。会话时区 `+00:00`、字符集 utf8mb4 与固定 sql_mode 一致；数据库按类型、NULL 标记、字节长度及 HEX 进行散列，不经过 Go 时间重编码。uint64 主键以 DECIMAL(20,0) 参数比较，包含 id0 和最大值；每表 COUNT 守恒且必须实际读取独立空 EOF 页，不用抽样或以短页代替 EOF。上限每表 500,000 行、材料 128MiB，超限拒绝而不签部分完成。只归一化 AUTO_INCREMENT 动态值与明确目标列/CHECK；其他结构须相同。
 
 ## 恢复边界
 
@@ -48,6 +48,8 @@ restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 下原 101 的 
 
 实际 argv、独立源 hash 与完整结果保存在不可变私有 `qs-m4-a-null-object-native-v6`：harness `bd42eb7bbeeba9ccf7eb52c25087f449c7385f91f10be3b1ea23a9257daec857`，JSONL `48cc28446a4cbbec5b94eb53106c0de2aaef352aa8fe15e3bbc04e6d90d4c3d9`，receipt `aa3c364d8ee727017e48f07a4ad87bb83380f4982551cd42d8cb6db8d7930ae5`。两个自有容器及 bridge 已释放；原容器 IDs/images/volumes 保留，但既有 NSQ 等动态 runtime 元数据发生变化，未声称全部旧服务 runtime 不变。先前夹具失败及真实测试失败均保留，不借用其结果。
 
-CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job 独占 MySQL8.0.36 服务运行实际 A native，注入实际 checkout SHA，必须六 selector 全部 RUN/PASS 且任何 SKIP/FAIL 均失败。普通测试、编译或 `-run='^$'` 不代替 native。新 merged head 必须独立 CI，以上 component 证明不换签新 head。
+CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job 独占 MySQL8.0.36 服务运行实际 A native，注入实际 checkout SHA，必须七 selector 全部 RUN/PASS 且任何 SKIP/FAIL 均失败。普通测试、编译或 `-run='^$'` 不代替 native。新 merged head 必须独立 CI，以上 component 证明不换签新 head。
 
 该证明只限合成、隔离、小规模对象保护与失败边界；未签生产 capture/权限/冻结/恢复、最终镜像、三服务启动、业务验收、RPO0 或生产30/60分钟预算。
+
+后续独立 source `b7ae414a64597bfaf9f35031ec975cfa59f541ec` 增加原结构早拒绝与两个真实漂移用例；普通 race、integration 编译、tagged vet、目标 lint已通过。上述16 native仍只属于d648，不换签新增源码；新增源码的完整19场景原生证明当前待执行，final head仍须独立CI。
