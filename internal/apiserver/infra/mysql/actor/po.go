@@ -18,14 +18,13 @@ type TesteePO struct {
 	StoreID      *uint64 `gorm:"column:store_id;type:bigint unsigned"`
 	StoreVersion uint32  `gorm:"column:store_version;not null;default:1"`
 
-	OrgID      int64          `gorm:"column:org_id;not null"`
-	ProfileID  *uint64        `gorm:"column:profile_id;type:bigint unsigned;index:idx_profile_id"`
-	Name       string         `gorm:"column:name;size:100;not null;index:idx_name"`
-	Gender     int8           `gorm:"column:gender;not null"`
-	Birthday   *time.Time     `gorm:"column:birthday"`
-	Tags       StringSliceCol `gorm:"column:tags;type:json"`
-	Source     string         `gorm:"column:source;size:50;not null;default:unknown"`
-	IsKeyFocus bool           `gorm:"column:is_key_focus;not null;default:false"`
+	OrgID      int64      `gorm:"column:org_id;not null"`
+	ProfileID  *uint64    `gorm:"column:profile_id;type:bigint unsigned;index:idx_profile_id"`
+	Name       string     `gorm:"column:name;size:100;not null;index:idx_name"`
+	Gender     int8       `gorm:"column:gender;not null"`
+	Birthday   *time.Time `gorm:"column:birthday"`
+	Source     string     `gorm:"column:source;size:50;not null;default:unknown"`
+	IsKeyFocus bool       `gorm:"column:is_key_focus;not null;default:false"`
 }
 
 // TableName 指定表名
@@ -59,6 +58,13 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, s)
 }
 
+// CurrentOperatorColumns fixes the current facts used by reviewed maintenance plans.
+// Historical archive JSON is never decoded into this projection or rewritten.
+const CurrentOperatorColumns = "id,created_at,updated_at,deleted_at,created_by,updated_by,deleted_by,version,org_id,user_id,roles,authz_policy_version,authz_projected_at,authz_projection_pending,name,email,phone,is_active"
+
+// OperatorFingerprintSchema invalidates unexecuted plans from the retired column layout.
+const OperatorFingerprintSchema = "actor_columns_sql102"
+
 // OperatorPO 后台操作者持久化对象
 type OperatorPO struct {
 	mysql.AuditFields
@@ -66,7 +72,6 @@ type OperatorPO struct {
 	OrgID                  int64          `gorm:"column:org_id;not null;index:idx_org_id;uniqueIndex:uk_operators_org_user,priority:1"`
 	UserID                 int64          `gorm:"column:user_id;not null;index:idx_user_id;uniqueIndex:uk_operators_org_user,priority:2"`
 	Roles                  StringSliceCol `gorm:"column:roles;type:json;not null"`
-	EffectiveRoles         StringSliceCol `gorm:"column:effective_roles;type:json;not null"`
 	AuthzPolicyVersion     int64          `gorm:"column:authz_policy_version;not null;default:0"`
 	AuthzProjectedAt       *time.Time     `gorm:"column:authz_projected_at;type:datetime(3)"`
 	AuthzProjectionPending bool           `gorm:"column:authz_projection_pending;not null;default:false"`

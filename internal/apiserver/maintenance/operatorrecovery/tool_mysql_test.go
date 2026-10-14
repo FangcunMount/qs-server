@@ -77,7 +77,8 @@ func TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity(t *testing.T) 
 			t.Fatal(err)
 		}
 	}
-	exec("CREATE TABLE operators (id BIGINT UNSIGNED PRIMARY KEY, org_id BIGINT, user_id BIGINT, version INT UNSIGNED, is_active BOOLEAN, name VARCHAR(100), deleted_at DATETIME(3), updated_at DATETIME(3), updated_by BIGINT, roles JSON, effective_roles JSON, authz_policy_version BIGINT, authz_projected_at DATETIME(3), authz_projection_pending BOOLEAN)")
+	exec("CREATE TABLE operators (id BIGINT UNSIGNED PRIMARY KEY, org_id BIGINT, user_id BIGINT, version INT UNSIGNED, is_active BOOLEAN, name VARCHAR(100), email VARCHAR(255), phone VARCHAR(20), created_at DATETIME(3), created_by BIGINT, deleted_by BIGINT, deleted_at DATETIME(3), updated_at DATETIME(3), updated_by BIGINT, roles JSON, authz_policy_version BIGINT, authz_projected_at DATETIME(3), authz_projection_pending BOOLEAN)")
+	exec("CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN); INSERT INTO schema_migrations VALUES(102,FALSE)")
 	for _, name := range []string{"000074_operator_retirement_tasks.up.sql", "000079_operator_recovery_archives.up.sql"} {
 		raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", name))
 		if err != nil {

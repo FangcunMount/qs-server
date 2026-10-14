@@ -4,12 +4,13 @@ import (
 	"context"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
 	"testing"
 )
 
 func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t *testing.T) {
 	db, _, facts := fixture(t)
-	if err := db.Exec("RENAME TABLE staff TO operators; UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
+	if err := db.Exec("RENAME TABLE staff TO operators; ALTER TABLE operators DROP COLUMN effective_roles, ADD COLUMN name VARCHAR(100), ADD COLUMN email VARCHAR(255), ADD COLUMN phone VARCHAR(20), ADD COLUMN created_at DATETIME(3), ADD COLUMN created_by BIGINT, ADD COLUMN deleted_by BIGINT; CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN); INSERT INTO schema_migrations VALUES(102,FALSE); UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
 		t.Fatal(err)
 	}
 	tool, err := New(db, facts, facts, "final")
@@ -28,6 +29,20 @@ func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t 
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, before.Fingerprint, false); err == nil {
 		t.Fatal("maintenance gate skipped")
+	}
+	oldCurrent := make(map[string]interface{}, len(before.CurrentOperator)+1)
+	for key, value := range before.CurrentOperator {
+		oldCurrent[key] = value
+	}
+	oldCurrent["effective_roles"] = []byte(`["qs:result_reviewer"]`)
+	oldPlan := hash(struct {
+		Command  app.Command
+		Operator map[string]interface{}
+		Roles    []authz.AssignmentRoleFact
+		Existing *domain.Task
+	}{cmd, oldCurrent, before.Roles, nil})
+	if _, err = tool.SelectedApply(ctx, cmd, oldPlan, true); err == nil {
+		t.Fatal("old column-layout preflight accepted")
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, "wrong", true); err == nil {
 		t.Fatal("wrong fingerprint accepted")

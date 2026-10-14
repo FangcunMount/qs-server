@@ -24,16 +24,11 @@ func (m *OperatorMapper) ToPO(item *domain.Operator) *OperatorPO {
 	for i, role := range item.Roles() {
 		roles[i] = string(role)
 	}
-	effectiveRoles := make([]string, len(item.EffectiveRoles()))
-	for i, role := range item.EffectiveRoles() {
-		effectiveRoles[i] = string(role)
-	}
 
 	po := &OperatorPO{
 		OrgID:                  item.OrgID(),
 		UserID:                 item.UserID(),
 		Roles:                  roles,
-		EffectiveRoles:         effectiveRoles,
 		AuthzPolicyVersion:     item.AuthzPolicyVersion(),
 		AuthzProjectedAt:       item.AuthzProjectedAt(),
 		AuthzProjectionPending: item.AuthzProjectionPending(),

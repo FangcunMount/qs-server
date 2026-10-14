@@ -151,7 +151,7 @@ func (r *Repository) Recover(ctx context.Context, value domain.Recovery) error {
 			return err
 		}
 		result := tx.Table(r.table).Where("id=? AND org_id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NOT NULL", value.OperatorID, value.OrgID, value.UserID, value.ExpectedVersion).
-			Updates(map[string]interface{}{"is_active": true, "deleted_at": nil, "roles": "[]", "effective_roles": "[]", "authz_policy_version": value.PolicyVersion, "authz_projection_pending": false, "authz_projected_at": value.CreatedAt, "version": gorm.Expr("version+1"), "updated_at": value.CreatedAt, "updated_by": value.ActorID})
+			Updates(map[string]interface{}{"is_active": true, "deleted_at": nil, "roles": "[]", "authz_policy_version": value.PolicyVersion, "authz_projection_pending": false, "authz_projected_at": value.CreatedAt, "version": gorm.Expr("version+1"), "updated_at": value.CreatedAt, "updated_by": value.ActorID})
 		if result.Error != nil {
 			return result.Error
 		}
