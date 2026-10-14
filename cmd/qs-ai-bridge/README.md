@@ -67,7 +67,7 @@ Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCo
 
 当前 component-base 宿主池协商 `utf8`（MySQL 8 对应 utf8mb3），而合法结果含四字节 Unicode。原 JSON 参数写入会报转换错误，普通 JSON 查询还会把这类字符转换成问号；只用驱动默认 utf8mb4 的测试连接不能覆盖该风险。
 
-消息外围对已有请求、历史命令和结果投影的 JSON 参数显式使用 `CONVERT(CAST(? AS BINARY) USING utf8mb4)`，对 JSON 查询、历史移交与索引回填使用二进制结果读取。原 JSON 的 UTF-8 字节在进入数据库 JSON 解释前不经过连接字符集转换，读取仍由原业务解码器处理。首次业务 hash、protobuf body、签名和 wire 不重建；JSON 数据库自身的表示规范化规则不改变。没有 SET NAMES、额外池、连接配置或 schema 修改。
+消息外围对已有请求、历史命令和结果投影的 JSON 参数显式使用 `CONVERT(CAST(? AS BINARY) USING utf8mb4)`，对保留的 JSON 查询使用二进制结果读取。原 JSON 的 UTF-8 字节在进入数据库 JSON 解释前不经过连接字符集转换，读取仍由原业务解码器处理。首次业务 hash、protobuf body、签名和 wire 不重建；JSON 数据库自身的表示规范化规则不改变。没有 SET NAMES、额外池、连接配置或 schema 修改。
 
 必要存储回归必须显式协商宿主的三字节字符集并检查未被适配器更改，覆盖含 emoji/补充平面字符的原接单与历史回答、合法128KiB结果、原hash、重复复用ACK、ACK失败时投影与Inbox共同回滚。正常镜像中失败到技术挂起的旧隔离样本保留原身份、wire与预算；修复验证使用独立合成样本，不重置挂起样本或授予新模型调用。
 
@@ -83,7 +83,7 @@ MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop
 
 ## 隔离 CLI 与正式入口
 
-`qs-ai-bridge` 仅保留原历史投影读取与 runtime-index-backfill 维护，不提供用户认证。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。现用消息审计与门禁由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control` 执行，默认服务入口不改变。
+`qs-ai-bridge` 仅保留原历史投影读取，不提供用户认证。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；runtime-index-backfill 也在开池前明确拒绝，专用回填实现、校验 helper 和 batch-size flag 已退出。隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。现用消息审计与门禁由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control` 执行，默认服务入口不改变。
 
 ## MQ 发布绑定与离线预检
 
@@ -100,3 +100,12 @@ MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop
 当前固定 SDK `v0.3.0-mq-ai.2`（源码 `8633ba585b5a1c8f95fb16b19469fbd0097611c7`）。只对无需业务回执的最终 ACK，成功 PUB 不再消耗技术失败预算；Unknown 仍计入原持久预算，重复事件不能解除已有 held 状态。接收与 Relay 存储回归覆盖两次未知后连续16次成功重发、首次 wire/正文/时间及单次业务投影保留，以及8次失败挂起后的重复接收不能解挂。
 
 旧 ACK 计数可能包含成功发布，补丁无法推断历史失败次数，不自动归零、解挂或重封装。需要按原事实治理历史挂起；技术重发不会授权模型调用。既有 Go subscriber、relay、transport/wire、接口和黄金样例与 alpha1 相同（只读源码差异核对）；不代签 M0～M6 业务验收。宿主正常镜像、兼容回退与生产对账单独取证。
+
+
+## M4-E 历史索引回填退出
+
+本源码批次只退出历史 runtime 索引补写入口，不删除 `ai_bridge_requests`、`ai_bridge_request_assessments`、原 payload、消息账本或正常查询。现用 `GetRuntime`／`ListRuntime`／`RuntimeBacklog`、组织/关联校验、原子关联保存、稳定分页和 UTC 解码保持原规则；历史 NULL 时间行继续通过显式 History 查询，不补造时间。旧回填 resume/corrupt 专属测试随入口退出，原历史读取测试改为验证已成立索引与关联的 NULL 时间读取。
+
+唯一已声明支持环境是生产。源码80f422的独立只读一致快照回执 `73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125` 给出30个请求／30条关系，以及组织/主体/Testee NULL、非法actor、索引identity差异和双向关系缺口均0；用户已确认本批无旧回填责任。该时点证据由既有版本台账登记，未证明request_hash或实际业务授权，也没有 writer freeze/DDL/删除资格。本候选未部署；没有新增迁移，A～D结构批次和当前版本资源仍须各自按已审核顺序完成后发布，不借用旧源码的绿色CI。
+
+实际 source75f4ba4c4 的定向普通race、四服务构建、vet/lint及契约检查通过。新构建的CLI在无真实数据库输入下对旧回填及原四种运输mode均退出1、stdout为空且只给固定失败文字；开池前拒绝的细分分类由runArgs表征测试核实，不能仅由公共失败文字推断内部调用阶段。数据库fixture测试仍由现有AI bridge CI在真实MySQL8.0.36/8.4运行；本地未执行该现代SQL fixture时不写作native通过。合并、发布和现行生产业务验收保持独立。
