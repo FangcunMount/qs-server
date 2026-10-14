@@ -43,7 +43,7 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 原 `mysql-metadata-profile.py --binary` Docker 路径及其 negative 测试仍保留，但 metadata 工作流通过受限 SSH receiver 调用 `execute_native`。CBPT 删除工具、其他 db-ops 操作和共享传输 helper 保持原样。
 
-readiness 查询失败按固定类别诊断：服务端 MySQL 3024 为 `query_server_timeout`，1317 为 `query_server_interrupted`，1142／1143／1227 为 `query_permission_denied`，Go context deadline／cancel 为 `query_deadline_exceeded`／`query_canceled`；未识别错误保持 `query_failed`。QueryContext、事务控制及读取结果的 Rows.Err 使用相同规则，不输出 Message、SQL、账号或驱动错误正文，不根据耗时推断原因。原五查询 profile 不变；readiness V2 分页仍共享5秒单条／45秒总预算，失败清空部分测量并核验事务和连接释放，不重试或回退认证。本页描述执行协议，不声称新的隔离 native 或生产诊断已经完成。
+readiness 查询失败按固定类别诊断：服务端 MySQL 3024 为 `query_server_timeout`，1317 为 `query_server_interrupted`，1142／1143／1227 为 `query_permission_denied`，Go context deadline／cancel 为 `query_deadline_exceeded`／`query_canceled`；未识别错误保持 `query_failed`。QueryContext、事务控制及读取结果的 Rows.Err 使用相同规则，不输出 Message、SQL、账号或驱动错误正文，不根据耗时推断原因。原五查询 profile 不变；readiness V2 分页仍共享5秒单条／45秒总预算，失败清空部分测量并核验事务和连接释放，不重试或回退认证。本页描述执行协议；隔离 native 的精确证据见下文，生产诊断保持独立验收。
 
 typed MySQL 错误另保留可选 `query_mysql_error_number`，只复制 Number 的0～65535整数，未列入上述类别的号码归 `query_mysql_error`；没有观测到该类型时省略，成功回执禁止带号码。原样保留的网络timeout／其他网络错误、InvalidConn、BadConn及失败Rows.Err中的EOF各有固定类别；正常结果集结束不算失败。driver1.9.3可能先将读取错误统一为InvalidConn，因此 `query_invalid_connection` 不能证明具体网络原因或超时。metadata、事务、Conn 或 DB 释放失败仍优先阻断完成，若此前已有真实MySQL数字码则保留其诊断值；不读取SQLState、Message、网络Op／Addr或原始driver日志。
 
@@ -57,3 +57,9 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 共享 API：`encode_armored_receipt(value, schema=..., secrets=...)` 返回 frame，`decode_armored_receipt(text)` 返回 JSON 文本，错误为固定类别的 `ReceiptTransportError`。schema 是可选字段白名单；字段完整性与绑定仍由原验证器负责。JSON body 上限 64 KiB、日志上限 4 Mi 字符；解码必须恰有一个完整 frame，字母表和 UTF-8 合法、无重复 JSON key。解码后仍须原 source/run/target/exit 验证，不能把可解码等同于清理资格，也不尝试修补旧的被掩码 JSON。共享与 profile 离线测试覆盖短字符掩码、备用字母表、缺失/重复/混合或超限 frame、凭据碰撞、未知 raw 字段及绑定拒绝。
 
 当前权限不足时，诊断进一步输出四项全局 GRANT 是否存在及是否存在部分 REVOKE，均为布尔字段，不含账号或语句。字段只在目标、查询和最终同一会话身份全部验证后发布；失败均为 null。它们解释现有权限结论，不改变清理门禁。schema 级授权不能代表全局可见性，正向 GRANT 与 REVOKE 同时存在也不能代表完整权限。旧摘要仍可解析；新字段若出现必须五项完整且与原 current_unrestricted_metadata_grants 一致。
+
+## V2 分页真实验收
+
+源码 `4160cc63ac881d1addd3f066d6053301e8d5431e` 在自有 MySQL8.0.36 上实际执行 `bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql`：16项 RUN/PASS、0 SKIP/FAIL。包含同一 RR 快照内并发插入／更新／删除、跨页、主键0及uint64最大值、真实有符号主键拒绝，以及原五查询权限与真实错误／释放场景。字符串参数经 `CAST AS UNSIGNED` 的反例保留原失败回执；固定 `DECIMAL(20,0)` 比较后完整边界及 EOF 通过，5秒单条／45秒总预算不变。
+
+原 native JSONL SHA256 `31d513d2f61f1ccf50a9a0b2326d129c9cb3e5779a8bd8593ce3b0d3ef623265`，最终交付摘要 `678e948624238d08fe7384e287e539c956ac15609d92d0d485706c88c84b64a8`；自有容器、网络和连接文件均已释放，旧CID/image保持。既有本机nsqd运行元数据实际变化，未签整个环境稳定或作因果推断。这证明对应组件隔离读取与释放，不能证明当前生产全量空值、持续停写、对象恢复、三服务启动或30/60分钟预算。

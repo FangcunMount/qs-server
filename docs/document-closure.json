@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
-    "verified_on": "2026-10-14"
+    "sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+    "verified_on": "2026-10-15"
   },
   "status_policy": {
     "doc_status": [
@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
-        "verified_on": "2026-10-14"
+        "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -564,6 +564,41 @@
           "result": "passed",
           "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11529,8 +11564,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
-        "verified_on": "2026-10-14"
+        "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -11850,6 +11885,41 @@
           "result": "passed",
           "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {

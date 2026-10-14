@@ -53,6 +53,8 @@ CI for exact SHA
 
 `complete` 只证明本次已声明的有界读取和 owned 连接释放。metadata count、digest、权限及 FCV 不证明对象无业务责任、完整 namespace 导出、备份对可恢复或停写 RPO=0，也不授权停写、恢复、DDL 或删除。`system.profile` 的业务恢复排除范围另须保留定义、索引和计数回执，生产集合继续保留。两个 reader 均不初始化业务容器、迁移 runner、消息消费者或发送端点；现用 backup、validate、restore、status 和 scheduled job 使用各自原入口。
 
+MySQL 独立 readiness 回执为 V2。两个历史列在同一连接、只读 REPEATABLE READ 快照内按主键读取；双表 MAX 上界、实际 InnoDB／unsigned 单列主键、每页1000行、每表最多512个非空页及最终 EOF 都须验证。边界参数使用精确十进制转换，避免 uint64 最大值丢失。`query_count=19+assessment_pages+outcome_pages` 包含固定 SHOW GRANTS 尝试；隔离级别、开始和 ROLLBACK 三条事务控制单独计数，不沿用历史18条计数。保持单条5秒、整体45秒预算；任何截断、未知形状、分页或释放失败均丢弃完整测量。ROLLBACK 成功后另读实时 clean100 和原连接身份，Conn、DB和连接池释放全部成功才允许 complete。旧五查询权限模式保持独立，历史V1回执不由新接收器重新解释为V2成功。
+
 Mongo 最多执行 10 个固定逻辑只读查询，异常时至多释放一个本 reader 拥有的 cursor；driver 握手不计为业务查询。`ttl_monitor.known=false` 表示未知，不能把零值 `enabled=false` 解释为已关闭。TTL 参数仅为本次观测，不扫描 TTL 业务数据、不读取 currentOp、不执行关闭动作，也不证明未来持续状态或维护冻结。
 
 Mongo 使用离线 `ssh -G` 校验既有别名，拒绝代理、替代主机和额外转发；冻结已解析身份后，最终连接使用 `-F /dev/null`、固定 root/IP/22、`StrictHostKeyChecking=yes`、`UpdateHostKeys=no` 和唯一本次 loopback 转发。既有信任文件须归属本用户、非symlink并在读取前后保持相同摘要；只借用、不写入、不删除。最终 V2 回执中，未创建的临时 key/known_hosts/directory 三项严格为 null；cursor/client/tunnel termination/wait/owned tunnel/reader 六项实际释放全部成功才允许 complete 和 exit0。native V1先独立校验，其10次逻辑读取与45秒预算不变；历史失败回执保留自身版本。
