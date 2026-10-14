@@ -350,7 +350,7 @@ func captureHistoricalObjectBackup(t *testing.T, n nativeSchemaPair, failed *mig
 	if err != nil {
 		t.Fatal(err)
 	}
-	mongoHead, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).DecodeBytes()
+	mongoHead, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Raw()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +391,7 @@ func replayHistoricalObjectBackup(t *testing.T, n nativeSchemaPair, raw []byte, 
 		return errors.New("object backup selected identity rejected")
 	}
 	sql, dirty, mongo, mongoDirty := n.heads(t)
-	mongoHead, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).DecodeBytes()
+	mongoHead, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Raw()
 	if err != nil || sql != 101 || !dirty || mongo != 39 || mongoDirty || !bytes.Equal(mongoHead, b.MongoHead) {
 		return errors.New("object recovery failed-pair state rejected")
 	}
