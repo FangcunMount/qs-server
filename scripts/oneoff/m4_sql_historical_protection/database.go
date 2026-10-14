@@ -406,8 +406,7 @@ func scanTable(ctx context.Context, r sqlReader, i int, cols []column, present b
 	}
 	return out, nil
 }
-func (d database) snapshot(ctx context.Context, tool string, original bool) (material, observation, error) {
-	var m material
+func (d database) snapshot(ctx context.Context, tool string, original bool) (m material, before observation, resultErr error) {
 	if e := requireTransactionalTables(ctx, d.conn); e != nil {
 		return m, observation{}, e
 	}
@@ -425,7 +424,7 @@ func (d database) snapshot(ctx context.Context, tool string, original bool) (mat
 	done := false
 	defer func() {
 		if !done {
-			_ = tx.Rollback()
+			recordRollback(&resultErr, tx)
 		}
 	}()
 	m = material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: tool, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), SQLName: d.sqlName, MongoName: d.mongoName, SQLIdentity: before.SQLHash, MongoIdentity: before.MongoHash, MongoUUID: before.MongoUUID, MongoHead: before.MongoHead, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode}
@@ -547,7 +546,7 @@ func restorationStatements() ([2]string, error) {
 	out[1] = originalDDL[b:]
 	return out, nil
 }
-func (d database) restore(ctx context.Context, m material, a approval, tool, materialPath, materialHash, approvalPath, approvalHash string) error {
+func (d database) restore(ctx context.Context, m material, a approval, tool, materialPath, materialHash, approvalPath, approvalHash string) (resultErr error) {
 	if e := validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
 	}
@@ -623,7 +622,7 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			recordRollback(&resultErr, tx)
 		}
 	}()
 	if _, e = tx.ExecContext(ctx, "DELETE FROM schema_migrations"); e != nil {
@@ -648,3 +647,16 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	return compareRetained(m, final)
 }
 func normalizeFullDDL(s string) string { return autoIncrementRE.ReplaceAllString(s, "") }
+
+type transactionReleaseFailure struct{ operation error }
+
+func (e *transactionReleaseFailure) Error() string { return e.operation.Error() }
+func (e *transactionReleaseFailure) Unwrap() error { return e.operation }
+func recordRollback(result *error, tx interface{ Rollback() error }) {
+	if e := tx.Rollback(); e != nil && !errors.Is(e, sql.ErrTxDone) {
+		if *result == nil {
+			*result = errors.New("transaction_release_failed")
+		}
+		*result = &transactionReleaseFailure{operation: *result}
+	}
+}

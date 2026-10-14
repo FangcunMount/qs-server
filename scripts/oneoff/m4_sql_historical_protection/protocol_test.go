@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"github.com/DATA-DOG/go-sqlmock"
 	"go.mongodb.org/mongo-driver/bson"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -235,5 +238,66 @@ func TestCaptureFsyncCrossingDeadlineNeverCompletes(t *testing.T) {
 	e := finishCapture(ctx, &r, "private", []byte("captured"), func(string, []byte) error { cancel(); return nil })
 	if e == nil || r.Complete {
 		t.Fatal("late file release was marked complete")
+	}
+}
+
+type rollbackFailure struct{ err error }
+
+func (r rollbackFailure) Rollback() error { return r.err }
+
+type failedReceiptWriter struct{}
+
+func (failedReceiptWriter) Write([]byte) (int, error) {
+	return 0, errors.New("private output detail must not be printed")
+}
+func TestRollbackFailureKeepsOperationCategoryWithoutFalseRelease(t *testing.T) {
+	for _, failure := range []error{nil, sql.ErrTxDone, errors.New("private transport failure")} {
+		operation := errors.New("ledger_commit_outcome_unknown")
+		e := operation
+		recordRollback(&e, rollbackFailure{failure})
+		if e.Error() != operation.Error() {
+			t.Fatal("operation category replaced or raw provider error exposed", e)
+		}
+		want := failure != nil && !errors.Is(failure, sql.ErrTxDone)
+		if hasTransactionReleaseFailure(e) != want {
+			t.Fatal("transaction release was overcertified")
+		}
+	}
+}
+func TestReceiptOutputFailureNeverExitsSuccessfully(t *testing.T) {
+	args := []string{"--mysql-database=qs", "--mongo-database=qs"}
+	if deliverReceipt(receipt{Complete: true}, failedReceiptWriter{}) == 0 {
+		t.Fatal("receipt write error exited0")
+	}
+	if deliverReceipt(receipt{Complete: true}, io.Discard) != 0 {
+		t.Fatal("delivered positive receipt did not exit0")
+	}
+	if serve(t.Context(), args, func(string) string { return "" }, testSource, io.Discard) == 0 {
+		t.Fatal("failed action exited0")
+	}
+}
+
+func TestPoolCloseMustProveNoBorrowedConnectionsRemain(t *testing.T) {
+	db, mock, e := sqlmock.New()
+	if e != nil {
+		t.Fatal(e)
+	}
+	c, e := db.Conn(t.Context())
+	if e != nil {
+		t.Fatal(e)
+	}
+	mock.ExpectClose()
+	if closeSQLPool(db) {
+		t.Fatal("Close(nil) with a still borrowed connection was signed released")
+	}
+	if e := c.Close(); e != nil {
+		t.Fatal(e)
+	}
+	s := db.Stats()
+	if s.OpenConnections != 0 || s.InUse != 0 {
+		t.Fatal("test owner failed to release connection")
+	}
+	if e := mock.ExpectationsWereMet(); e != nil {
+		t.Fatal(e)
 	}
 }

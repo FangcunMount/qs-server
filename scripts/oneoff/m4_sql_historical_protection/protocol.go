@@ -148,7 +148,7 @@ func validateMaterial(m material, tool, sqlName, mongoName string) error {
 	return nil
 }
 func validateApproval(a approval, m material, expected, tool string, now time.Time) error {
-	if a.Format != 1 || a.Kind != "m4_a_pre_start_sql_object_restore" || !operationRE.MatchString(a.Operation) || a.ToolSource != tool || a.ASource != aSource || a.AResources != aResources || a.AResourceFiles != aResourceFiles || a.MaterialHash != expected || !hashRE.MatchString(expected) || !hashRE.MatchString(a.FreezeHash) || !hashRE.MatchString(a.ResponsibilityHash) || a.SQLIdentity != m.SQLIdentity || a.MongoIdentity != m.MongoIdentity || !a.RuntimeFrozen || !a.RuntimeNotStarted || a.RetentionDays < 30 || a.DataOwner != "system (10001)" || a.RecoveryOwner != "system (10001)" {
+	if a.Format != 1 || a.Kind != "m4_a_pre_start_sql_object_restore" || !operationRE.MatchString(a.Operation) || a.ToolSource != tool || a.ASource != aSource || a.AResources != aResources || a.AResourceFiles != aResourceFiles || a.MaterialHash != expected || !hashRE.MatchString(expected) || !nonzeroHash(a.FreezeHash) || !nonzeroHash(a.ResponsibilityHash) || a.SQLIdentity != m.SQLIdentity || a.MongoIdentity != m.MongoIdentity || !a.RuntimeFrozen || !a.RuntimeNotStarted || a.RetentionDays < 30 || a.DataOwner != "system (10001)" || a.RecoveryOwner != "system (10001)" {
 		return errors.New("restore_approval_binding_rejected")
 	}
 	start, e1 := time.Parse(time.RFC3339Nano, a.WindowStarted)
@@ -254,4 +254,8 @@ func checkMarker(path string) error {
 func consumeApproval(path string, a approval, hash string) error {
 	raw, _ := json.Marshal([]string{a.Operation, hash, a.MaterialHash})
 	return writeExclusive(path+".consumed", raw)
+}
+
+func nonzeroHash(s string) bool {
+	return hashRE.MatchString(s) && s != "0000000000000000000000000000000000000000000000000000000000000000"
 }

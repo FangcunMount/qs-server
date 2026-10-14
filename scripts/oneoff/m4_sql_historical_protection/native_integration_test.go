@@ -324,7 +324,7 @@ func (h *nativeFixture) restoreInput() ([]string, string) {
 	}
 	return []string{"--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + p, "--approval-sha256=" + fingerprint(raw)}, a.Marker
 }
-func (h *nativeFixture) limited(ledgerWrites bool) func() {
+func (h *nativeFixture) limited(withoutAlter bool) func() {
 	h.t.Helper()
 	name := h.name
 	password := "owned-only-synthetic"
@@ -332,7 +332,7 @@ func (h *nativeFixture) limited(ledgerWrites bool) func() {
 		h.t.Fatal(e)
 	}
 	grants := "SELECT, ALTER"
-	if ledgerWrites {
+	if withoutAlter {
 		grants = "SELECT"
 	}
 	if _, e := h.root.Exec("GRANT " + grants + " ON `" + h.name + "`.* TO '" + name + "'@'%'"); e != nil {
@@ -428,7 +428,7 @@ func TestM4SQLObjectNativePermissionAndLedgerFailure(t *testing.T) {
 	}
 }
 func TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused(t *testing.T) {
-	for _, kind := range []string{"FirstRuntimeCommandMarker", "RetainedFactChanged", "NonNullCapture"} {
+	for _, kind := range []string{"FirstRuntimeCommandMarker", "RetainedFactChanged", "NewPersistentFact", "NonNullCapture"} {
 		t.Run(kind, func(t *testing.T) {
 			h := newNative(t)
 			if kind == "NonNullCapture" {
@@ -449,6 +449,10 @@ func TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused(t *testing.T) {
 			args, marker := h.restoreInput()
 			if kind == "FirstRuntimeCommandMarker" {
 				if e := writeExclusive(marker, []byte("issued")); e != nil {
+					t.Fatal(e)
+				}
+			} else if kind == "NewPersistentFact" {
+				if _, e := h.db.Exec("INSERT INTO assessment(id,org_id,testee_id,questionnaire_code,questionnaire_version,answer_sheet_id,origin_type,status,evaluation_model_kind,evaluation_model_code,evaluation_model_version,primary_score_value) VALUES(4103,1,2,'owned-new','1',4103,'direct','evaluated','scale','owned-new','1',11.5)"); e != nil {
 					t.Fatal(e)
 				}
 			} else {

@@ -24,20 +24,22 @@ type arguments struct {
 	timeout                                                                             time.Duration
 }
 type receipt struct {
-	Action                    string `json:"action"`
-	ToolSource                string `json:"compiled_tool_source"`
-	ASource                   string `json:"a_execution_source"`
-	AResources                string `json:"a_execution_resources_sha256"`
-	AResourceFiles            int    `json:"a_execution_resource_files"`
-	Complete                  bool   `json:"complete"`
-	ReadOnly                  bool   `json:"database_read_only"`
-	MaterialHash              string `json:"material_sha256,omitempty"`
-	SQLConnectionClosed       bool   `json:"sql_connection_closed"`
-	SQLPoolClosed             bool   `json:"sql_pool_closed"`
-	MongoClosed               bool   `json:"mongo_closed"`
-	Error                     string `json:"error_category"`
-	ReleaseError              string `json:"release_error_category,omitempty"`
-	ProductionFreezeCertified bool   `json:"production_freeze_certified"`
+	Action                     string `json:"action"`
+	ToolSource                 string `json:"compiled_tool_source"`
+	ASource                    string `json:"a_execution_source"`
+	AResources                 string `json:"a_execution_resources_sha256"`
+	AResourceFiles             int    `json:"a_execution_resource_files"`
+	Complete                   bool   `json:"complete"`
+	ReadOnly                   bool   `json:"database_read_only"`
+	MaterialHash               string `json:"material_sha256,omitempty"`
+	SQLConnectionClosed        bool   `json:"sql_connection_closed"`
+	SQLPoolClosed              bool   `json:"sql_pool_closed"`
+	MongoClosed                bool   `json:"mongo_closed"`
+	Error                      string `json:"error_category"`
+	ReleaseError               string `json:"release_error_category,omitempty"`
+	TransactionReleaseUnproven bool   `json:"transaction_release_unproven"`
+	ProductionFreezeCertified  bool   `json:"production_freeze_certified"`
+	BudgetExceeded             bool   `json:"total_budget_exceeded"`
 }
 
 func parseArgs(args []string) (arguments, error) {
@@ -77,12 +79,20 @@ func parseArgs(args []string) (arguments, error) {
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	r := run(ctx, os.Args[1:], os.Getenv, version.GitCommit)
-	_ = json.NewEncoder(os.Stdout).Encode(r)
-	if !r.Complete {
+	if serve(ctx, os.Args[1:], os.Getenv, version.GitCommit, os.Stdout) != 0 {
 		os.Exit(1)
 	}
 }
+func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
+	return deliverReceipt(run(ctx, args, getenv, tool), out)
+}
+func deliverReceipt(r receipt, out io.Writer) int {
+	if json.NewEncoder(out).Encode(r) != nil || !r.Complete {
+		return 1
+	}
+	return 0
+}
+
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
 	r = receipt{ToolSource: tool, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, Error: "arguments_invalid"}
 	a, e := parseArgs(args)
@@ -154,7 +164,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		if d.conn != nil {
 			r.SQLConnectionClosed = d.conn.Close() == nil
 		}
-		r.SQLPoolClosed = db.Close() == nil
+		r.SQLPoolClosed = closeSQLPool(db)
 		if d.mongo != nil {
 			closeCtx, c := context.WithTimeout(context.Background(), queryLimit)
 			r.MongoClosed = d.mongo.Disconnect(closeCtx) == nil
@@ -169,12 +179,16 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		if !ok || ctx.Err() != nil {
 			if ctx.Err() != nil {
-				r.Error = "total_budget_exceeded"
+				r.BudgetExceeded = true
+				if ok {
+					r.Error = "total_budget_exceeded"
+				}
 			}
 			return
 		}
 		if a.action == "capture" {
 			if e := finishCapture(ctx, &r, a.capture, rawMaterial, writeExclusive); e != nil {
+				r.BudgetExceeded = ctx.Err() != nil
 				r.Error = e.Error()
 				return
 			}
@@ -222,6 +236,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		e = d.restore(ctx, m, ap, tool, a.material, a.materialHash, a.approval, a.approvalHash)
 	}
 	if e != nil {
+		r.TransactionReleaseUnproven = hasTransactionReleaseFailure(e)
 		r.Error = e.Error()
 		return r
 	}
@@ -238,4 +253,15 @@ func finishCapture(ctx context.Context, r *receipt, path string, raw []byte, wri
 		return errors.New("total_budget_exceeded")
 	}
 	return nil
+}
+
+func hasTransactionReleaseFailure(e error) bool {
+	var release *transactionReleaseFailure
+	return errors.As(e, &release)
+}
+
+func closeSQLPool(db *sql.DB) bool {
+	e := db.Close()
+	s := db.Stats()
+	return e == nil && s.OpenConnections == 0 && s.InUse == 0
 }
