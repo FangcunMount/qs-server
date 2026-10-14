@@ -43,6 +43,16 @@ func (s *preflightDurableStoreStub) CreateDurably(_ context.Context, sheet *doma
 
 type attributionResolverCaptureStub struct{ calls int }
 
+type frozenAttributionStub struct{}
+
+func (frozenAttributionStub) Resolve(_ context.Context, request attributionport.ResolveRequest) (domainAnswerSheet.AttributionSnapshot, error) {
+	taskID := ""
+	if request.OriginRef.Type == domainAnswerSheet.OriginTypePlanTask {
+		taskID = request.OriginRef.ID
+	}
+	return domainAnswerSheet.NewAttributionSnapshot(request.OriginRef, "", "", "", "", taskID, request.CapturedAt)
+}
+
 func (s *attributionResolverCaptureStub) Resolve(context.Context, attributionport.ResolveRequest) (domainAnswerSheet.AttributionSnapshot, error) {
 	s.calls++
 	return domainAnswerSheet.AttributionSnapshot{}, context.Canceled
@@ -59,7 +69,7 @@ func (s *durableStoreCaptureStub) CreateDurably(_ context.Context, sheet *domain
 
 func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *testing.T) {
 	store := &durableStoreCaptureStub{existing: true}
-	svc := &submissionService{durableStore: store}
+	svc := &submissionService{durableStore: store, binding: admissionBindingStub{}, attribution: frozenAttributionStub{}}
 
 	qnr, err := domainQuestionnaire.NewQuestionnaire(
 		meta.NewCode("QNR-1"),
@@ -105,7 +115,7 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *tes
 
 func TestSubmissionServiceUsesCurrentFilledAndCapturedAt(t *testing.T) {
 	store := &durableStoreCaptureStub{}
-	svc := &submissionService{durableStore: store}
+	svc := &submissionService{durableStore: store, binding: admissionBindingStub{}, attribution: frozenAttributionStub{}}
 	qnr, err := domainQuestionnaire.NewQuestionnaire(
 		meta.NewCode("QNR-1"), "Questionnaire",
 		domainQuestionnaire.WithVersion(domainQuestionnaire.Version("1.0.0")),
@@ -136,7 +146,7 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testin
 		0,
 	)
 	store := &durableStoreCaptureStub{existing: true, returnedSheet: existing}
-	svc := &submissionService{durableStore: store}
+	svc := &submissionService{durableStore: store, binding: admissionBindingStub{}, attribution: frozenAttributionStub{}}
 	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
 	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
 		FillerID:          301,
@@ -157,7 +167,7 @@ func TestSubmissionServiceReturnsIdempotentAnswerBeforeMutableAttributionRevalid
 	existing := domainAnswerSheet.Reconstruct(meta.FromUint64(999), mustQuestionnaireRefForSubmissionTest(t), nil, mustAnswersForSubmissionTest(t), nowForSubmissionTest(), 0)
 	store := &preflightDurableStoreStub{existing: existing}
 	resolver := &attributionResolverCaptureStub{}
-	svc := &submissionService{durableStore: store, attribution: resolver}
+	svc := &submissionService{durableStore: store, binding: admissionBindingStub{}, attribution: resolver}
 	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
 	beforeHit := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit"))
 	beforeEarlyLookup := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit"))

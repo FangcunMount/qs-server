@@ -10,6 +10,7 @@ import (
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
 type resumePlanRepositoryStub struct {
@@ -87,9 +88,12 @@ func TestResumePlanLocksAndCommitsPlanAndRevisionCASInOneTransaction(t *testing.
 	plans := &resumePlanRepositoryStub{plan: plan}
 	tasks := &resumeTaskRepositoryStub{tasks: []*domainPlan.AssessmentTask{task}}
 	tx := &recordingTransactionRunner{}
-	service := NewLifecycleServiceWithEnrollment(plans, tasks, nil, nil, tx, nil)
+	service, err := NewLifecycleService(plans, tasks, enrollmentScaleCatalogStub{}, fixtureEnrollmentLifecycle{}, tx, event.NewNopEventPublisher())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if _, err := service.ResumePlan(context.Background(), 7, plan.GetID().String(), map[string]string{testeeID.String(): startDate.Format("2006-01-02")}); err != nil {
+	if _, err = service.ResumePlan(context.Background(), 7, plan.GetID().String(), map[string]string{testeeID.String(): startDate.Format("2006-01-02")}); err != nil {
 		t.Fatal(err)
 	}
 	if !tx.called || !tx.committed || tx.rolledBack || plans.lockCalls != 1 || tasks.lockCalls != 1 || plans.saveCalls != 1 {
@@ -108,9 +112,12 @@ func TestResumePlanRevisionConflictRollsBackWholeWorkflow(t *testing.T) {
 		saveErr: baseerrors.WithCode(code.ErrConflict, "task schedule revision conflict"),
 	}
 	tx := &recordingTransactionRunner{}
-	service := NewLifecycleServiceWithEnrollment(plans, tasks, nil, nil, tx, nil)
+	service, err := NewLifecycleService(plans, tasks, enrollmentScaleCatalogStub{}, fixtureEnrollmentLifecycle{}, tx, event.NewNopEventPublisher())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	_, err := service.ResumePlan(context.Background(), 7, plan.GetID().String(), map[string]string{testeeID.String(): startDate.Format("2006-01-02")})
+	_, err = service.ResumePlan(context.Background(), 7, plan.GetID().String(), map[string]string{testeeID.String(): startDate.Format("2006-01-02")})
 	if err == nil || !baseerrors.IsCode(err, code.ErrConflict) {
 		t.Fatalf("err=%v want conflict", err)
 	}
@@ -120,13 +127,11 @@ func TestResumePlanRevisionConflictRollsBackWholeWorkflow(t *testing.T) {
 }
 
 func TestResumePlanFailsClosedWithoutTransactionRunner(t *testing.T) {
-	plan, task, testeeID, startDate := newPausedPlanAndCanceledTask(t)
+	plan, task, _, _ := newPausedPlanAndCanceledTask(t)
 	plans := &resumePlanRepositoryStub{plan: plan}
 	tasks := &resumeTaskRepositoryStub{tasks: []*domainPlan.AssessmentTask{task}}
-	service := NewLifecycleServiceWithEnrollment(plans, tasks, nil, nil, nil, nil)
-
-	_, err := service.ResumePlan(context.Background(), 7, plan.GetID().String(), map[string]string{testeeID.String(): startDate.Format("2006-01-02")})
-	if err == nil || !baseerrors.IsCode(err, code.ErrInternalServerError) {
+	_, err := NewLifecycleService(plans, tasks, enrollmentScaleCatalogStub{}, fixtureEnrollmentLifecycle{}, nil, event.NewNopEventPublisher())
+	if err == nil || !baseerrors.IsCode(err, code.ErrModuleInitializationFailed) {
 		t.Fatalf("err=%v want internal transaction configuration error", err)
 	}
 	if !plan.IsPaused() || plans.lockCalls != 0 || plans.saveCalls != 0 || tasks.lockCalls != 0 {
