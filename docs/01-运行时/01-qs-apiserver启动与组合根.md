@@ -43,6 +43,8 @@ flowchart LR
 容器阶段创建 `internal/apiserver/container.Container` 并装配业务模块。当前核心装配收敛在 `internal/apiserver/container/modules`，
 包括 Survey、Actor、ModelCatalog、Evaluation、Interpretation、Plan、Statistics 等模块及其 application/domain/infra 依赖。
 
+ModelCatalog 完成 Survey 的后绑定后，容器在启动服务、标记 initialized 之前执行 Survey 最终 readiness：核心提交服务、持久化、模型绑定、归因、AnsweringStart 与目录同步依赖缺失时拒绝启动。姓名、hotset、缓存 signal 和二维码服务仍是可选能力。
+
 容器承担的是“把实现连接起来”，不是“成为万能 Service Locator”。阅读某个模块时应从模块导出的 service/port 追踪，而不是让业务代码反向依赖整个 Container。
 
 ### 3.3 initialize integrations

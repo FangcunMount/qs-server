@@ -210,6 +210,17 @@ jobs:
           trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_scope_test_enrollment"' EXIT
           go test ./internal/apiserver/infra/mysql/plan -run '^TestPlanEnrollmentOwnershipConcurrencyMySQL$' -count=1 -v
 
+      - name: Verify Plan opening CAS and atomic reminder intent on MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          QS_M5_TASK_OPEN_MYSQL_REQUIRED: '1'
+          QS_M5_TASK_OPEN_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/qs_m5_task_open_test_ci?parseTime=true&loc=UTC'
+        run: |
+          set -euo pipefail
+          docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e 'CREATE DATABASE qs_m5_task_open_test_ci'
+          trap 'docker exec "$MYSQL_CONTAINER" mysql -uroot -proot -e "DROP DATABASE qs_m5_task_open_test_ci"' EXIT
+          bash scripts/testing/m5-plan-open-cas-proof.sh
+
       - name: Verify durable reminder ledger and recipient-set freeze on MySQL
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
