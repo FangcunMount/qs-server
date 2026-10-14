@@ -3882,16 +3882,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestActorColumnsNativeUpgradeRestartAndHistoricalArchive|TestActorColumnsNativePartialDDLRefusesRestartForceAndDown|TestActorColumnsNativeExactObjectValueRestoration|TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim)$' ./internal/pkg/migration -count=1 -timeout=4m",
-          "result": "passed",
-          "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestOperatorActivityRoundTripMySQL|TestMySQLRetirementTaskAndLocalAdmissionAreAtomic|TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange|TestPreparationMySQL|TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation|TestMySQLOrphanRevocationGuardsAndReplay|TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity|TestMySQLRetirementCutoverAndRestore|TestMySQLRetirementResumeAndDrift)$' ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorprepare ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery -count=1 -timeout=4m",
-          "result": "passed",
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
+          "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
         }
@@ -3905,7 +3899,8 @@
         "observed_at": "2026-08-18",
         "limitations": [
           "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
-          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation."
+          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
         ]
       },
       "gaps": [
@@ -4036,16 +4031,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestActorColumnsNativeUpgradeRestartAndHistoricalArchive|TestActorColumnsNativePartialDDLRefusesRestartForceAndDown|TestActorColumnsNativeExactObjectValueRestoration|TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim)$' ./internal/pkg/migration -count=1 -timeout=4m",
-          "result": "passed",
-          "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestOperatorActivityRoundTripMySQL|TestMySQLRetirementTaskAndLocalAdmissionAreAtomic|TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange|TestPreparationMySQL|TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation|TestMySQLOrphanRevocationGuardsAndReplay|TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity|TestMySQLRetirementCutoverAndRestore|TestMySQLRetirementResumeAndDrift)$' ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorprepare ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery -count=1 -timeout=4m",
-          "result": "passed",
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
+          "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
         }
@@ -4059,7 +4048,8 @@
         "observed_at": "2026-08-18",
         "limitations": [
           "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
-          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation."
+          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
         ]
       },
       "gaps": [
@@ -4289,16 +4279,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestActorColumnsNativeUpgradeRestartAndHistoricalArchive|TestActorColumnsNativePartialDDLRefusesRestartForceAndDown|TestActorColumnsNativeExactObjectValueRestoration|TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim)$' ./internal/pkg/migration -count=1 -timeout=4m",
-          "result": "passed",
-          "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestOperatorActivityRoundTripMySQL|TestMySQLRetirementTaskAndLocalAdmissionAreAtomic|TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange|TestPreparationMySQL|TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation|TestMySQLOrphanRevocationGuardsAndReplay|TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity|TestMySQLRetirementCutoverAndRestore|TestMySQLRetirementResumeAndDrift)$' ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorprepare ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery -count=1 -timeout=4m",
-          "result": "passed",
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
+          "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
         }
@@ -4312,7 +4296,8 @@
         "observed_at": "2026-08-18",
         "limitations": [
           "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
-          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation."
+          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
         ]
       },
       "gaps": [
@@ -10285,16 +10270,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestActorColumnsNativeUpgradeRestartAndHistoricalArchive|TestActorColumnsNativePartialDDLRefusesRestartForceAndDown|TestActorColumnsNativeExactObjectValueRestoration|TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim)$' ./internal/pkg/migration -count=1 -timeout=4m",
-          "result": "passed",
-          "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestOperatorActivityRoundTripMySQL|TestMySQLRetirementTaskAndLocalAdmissionAreAtomic|TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange|TestPreparationMySQL|TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation|TestMySQLOrphanRevocationGuardsAndReplay|TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity|TestMySQLRetirementCutoverAndRestore|TestMySQLRetirementResumeAndDrift)$' ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorprepare ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery -count=1 -timeout=4m",
-          "result": "passed",
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
+          "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
         }
@@ -10306,7 +10285,8 @@
         "observed_at": null,
         "limitations": [
           "No per-document production evidence has been recorded in this initial skeleton.",
-          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation."
+          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
         ]
       },
       "gaps": [
@@ -10719,16 +10699,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestActorColumnsNativeUpgradeRestartAndHistoricalArchive|TestActorColumnsNativePartialDDLRefusesRestartForceAndDown|TestActorColumnsNativeExactObjectValueRestoration|TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim)$' ./internal/pkg/migration -count=1 -timeout=4m",
-          "result": "passed",
-          "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestOperatorActivityRoundTripMySQL|TestMySQLRetirementTaskAndLocalAdmissionAreAtomic|TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange|TestPreparationMySQL|TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation|TestMySQLOrphanRevocationGuardsAndReplay|TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity|TestMySQLRetirementCutoverAndRestore|TestMySQLRetirementResumeAndDrift)$' ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorprepare ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery -count=1 -timeout=4m",
-          "result": "passed",
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
+          "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
         }
@@ -10749,7 +10723,8 @@
           "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Original-image full startup, production-scale recovery, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required.",
           "A later owned synthetic fixture using MySQL8.0.36/MongoRS7.0.31 passed the same seven required RUN/PASS with zero SKIP on checkoutb7e6e5cff5977abc7c7b85d4269fb428e5d34a91 and unchanged source94d683c12acca78bc2564c810eae767ed7274674 test bytes. The production-patch-version object gate is covered, but no production connection, original-image full business startup, production-scale recovery or30/60-minute/RPO0 acceptance is attested. Existing IDs/images were preserved and owned resources released; existing runtime metadata stability was not attested.",
           "SQL-A sourcee249641f14d48499e211677e6867709a98fbb18b and CI selectore9bddfe267b87507c59d70564b7fe2d37c6f69ff are now integrated from actual SQL head73dbb045d47a28873ea209c67feb48ce8fca9567. Its nine native RUN/PASS remain bound to the original MySQL8.0.36/Mongo7.0.25 fixture and do not become a new merged-checkout or production proof.",
-          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation."
+          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
         ]
       },
       "gaps": []
@@ -12712,16 +12687,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestActorColumnsNativeUpgradeRestartAndHistoricalArchive|TestActorColumnsNativePartialDDLRefusesRestartForceAndDown|TestActorColumnsNativeExactObjectValueRestoration|TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim)$' ./internal/pkg/migration -count=1 -timeout=4m",
-          "result": "passed",
-          "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p 2 -tags=integration -json -run '^(TestOperatorActivityRoundTripMySQL|TestMySQLRetirementTaskAndLocalAdmissionAreAtomic|TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange|TestPreparationMySQL|TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation|TestMySQLOrphanRevocationGuardsAndReplay|TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity|TestMySQLRetirementCutoverAndRestore|TestMySQLRetirementResumeAndDrift)$' ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mysql/actor/operatorretirement ./internal/apiserver/maintenance/operatorprepare ./internal/apiserver/maintenance/operatorretire ./internal/apiserver/maintenance/operatorrecovery -count=1 -timeout=4m",
-          "result": "passed",
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
+          "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
         }
@@ -12737,7 +12706,8 @@
           "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
           "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
           "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack.",
-          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation."
+          "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
         ]
       },
       "gaps": [
