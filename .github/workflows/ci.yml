@@ -534,6 +534,30 @@ jobs:
             exit 1
           fi
 
+      - name: Verify approved offline execution and interrupted paired DDL
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_offline_test
+        run: |
+          set -euo pipefail
+          proof_log=$(mktemp)
+          trap 'rm -f "$proof_log"' EXIT
+          go test -race -tags=integration -count=1 -timeout=8m -v \
+            -run '^TestOfflineNative' ./internal/pkg/migration | tee "$proof_log"
+          for required in \
+            TestOfflineNativeUpgradeAndFreshNoop \
+            TestOfflineNativeSQLPartialFailureRemainsDirty \
+            TestOfflineNativeMongoPartialFailureRemainsDirty \
+            TestOfflineNativeMongoCancellationRetainsPartialState \
+            TestOfflineNativeSQLDeadlineRetainsUnknownPartialState \
+            TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL \
+            TestOfflineNativeMissingBoundResourcesRefusedBeforeDDL; do
+            grep -F -- "--- PASS: $required " "$proof_log" >/dev/null
+          done
+          if grep -E -- '^--- SKIP:' "$proof_log"; then exit 1; fi
+
       - name: Verify four historical Mongo index retirement and auth failure
         env:
           QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
@@ -655,30 +679,6 @@ jobs:
             docker rm --force --volumes "$auth_cid"
           fi
           rm --force "${RUNNER_TEMP}/qs-m4-auth-config.json"
-
-      - name: Verify approved offline execution and interrupted paired DDL
-        env:
-          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
-          QS_M3_REQUIRE_DATABASE: '1'
-          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
-          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_offline_test
-        run: |
-          set -euo pipefail
-          proof_log=$(mktemp)
-          trap 'rm -f "$proof_log"' EXIT
-          go test -race -tags=integration -count=1 -timeout=8m -v \
-            -run '^TestOfflineNative' ./internal/pkg/migration | tee "$proof_log"
-          for required in \
-            TestOfflineNativeUpgradeAndFreshNoop \
-            TestOfflineNativeSQLPartialFailureRemainsDirty \
-            TestOfflineNativeMongoPartialFailureRemainsDirty \
-            TestOfflineNativeMongoCancellationRetainsPartialState \
-            TestOfflineNativeSQLDeadlineRetainsUnknownPartialState \
-            TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL \
-            TestOfflineNativeMissingBoundResourcesRefusedBeforeDDL; do
-            grep -F -- "--- PASS: $required " "$proof_log" >/dev/null
-          done
-          if grep -E -- '^--- SKIP:' "$proof_log"; then exit 1; fi
 
       - name: Verify committed evidence, retry governance and retirement A on real databases
         env:
