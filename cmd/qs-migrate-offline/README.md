@@ -112,7 +112,7 @@ go test -race -tags=integration -count=1 -timeout=8m -v \
 
 源码 `c334d9b3f2655e7485cc9b817567904c3336dd3d` 在文档 head `09906ae76118f629030b46b7aca9e9cfdb8f753c` 上执行真实隔离 race 门禁。MySQL8.0.36、Mongo replica-set7.0.25 下，现有7个 required Offline 顶层测试及6个子场景全部实际 RUN/PASS，共13项，0 SKIP、exit0；四个scope拒绝场景（缺失、未知、SQL/Mongo对象scope与实际版本转换不符）均在 claim/DDL 前拒绝。3个受影响Go文件前后摘要一致，两自有容器和bridge已释放；现有CI的7个required顶层selector已覆盖，无需改CI。
 
-closure采用参数等价的可重放命令（`-p=2`、`-run=^TestOfflineNative`）；在该源码上它与harness的具名7项selector完全等价，原始argv仍保留在私有harness，不改写原始证据。
+参数等价的可重放命令（`-p=2`、`-run=^TestOfflineNative`）仅供复现参考，本次文档任务没有调用它，closure不将它登记为passed command。在该源码上它与harness的具名7项selector等价，实际原始argv与执行结果保留在私有harness/receipt，不改写原始证据。
 
 私有原始JSONL摘要 `ed4cbaf137c82aa96a281bf8ea9e08d34d45a74fba8dfff3ab5dc5db586c4cd8`、receipt摘要 `70a655cc7e05ebbe6ed6924e83e9a1e079fb36373dc03103f1ab9a64296ea78e`，harness摘要 `6268a020d08771ad4a5e56c5d38251b4472525515e48c074cde1a7dfded4ff0b`。这些是当前源码的隔离逻辑验收，不是生产对象恢复、RPO、30/60分钟预算或三个服务完整启动的证明。
 
