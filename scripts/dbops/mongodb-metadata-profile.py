@@ -117,8 +117,15 @@ def safe_receipt(raw, code, sha, run, tool_hash, source_hash, *, final=False):
         transport()._validate(value, schema)
         if (value["source_sha"], value["run_id"], value["tool_sha256"], value["source_binding_hash"], value["expected_target_hash"]) != (sha, run, tool_hash, source_hash, EXPECTED_TARGET):
             raise ProfileError("receipt_invalid")
-        if value["backup_restore_proven"] or value["business_acceptance_proven"] or value["budget"]["logical_queries"] > 10 or value["budget"]["elapsed_milliseconds"] > 45000:
+        if value["backup_restore_proven"] or value["business_acceptance_proven"] or value["budget"]["logical_queries"] > 10:
             raise ProfileError("receipt_invalid")
+        if value["budget"]["elapsed_milliseconds"] > 45000:
+            # Preserve actual elapsed/release facts only in a final negative
+            # budget receipt. Native and every positive receipt keep the
+            # original 45s gate; this does not extend any execution timeout.
+            budget_failure = (final and code == 1 and value["error_category"] == "reading_budget_exceeded" and value["failure_stage"] == "total_budget" and not any(value[key] for key in ("fcv_observation_complete", "complete", "eligible_fcv_readiness")))
+            if not budget_failure:
+                raise ProfileError("receipt_invalid")
         f = value["feature_compatibility"]
         ttl=value["ttl_monitor"]
         if not ttl["known"] and ttl["enabled"]:

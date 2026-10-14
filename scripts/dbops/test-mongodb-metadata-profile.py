@@ -101,6 +101,26 @@ class ReceiptTests(unittest.TestCase):
         with self.assertRaises(m.ProfileError):
             validate(failed, code=1, final=True)
 
+    def test_actual_total_budget_failure_preserves_negative_diagnostics(self):
+        failed = m.initial_receipt(SHA, RUN, TOOL, SOURCE)
+        failed.update(error_category="reading_budget_exceeded", failure_stage="total_budget")
+        failed["budget"]["elapsed_milliseconds"] = 45001
+        failed["release"]["key_unlinked"] = True
+        actual = validate(failed, code=1, final=True)
+        self.assertEqual(actual["budget"]["elapsed_milliseconds"], 45001)
+        self.assertTrue(actual["release"]["key_unlinked"])
+        self.assertFalse(actual["complete"])
+        for change in (lambda v: v.update(error_category="tool_failed"), lambda v: v.update(failure_stage="native_reader"), lambda v: v.update(complete=True), lambda v: v.update(eligible_fcv_readiness=True), lambda v: v.update(fcv_observation_complete=True)):
+            bad = copy.deepcopy(failed)
+            change(bad)
+            with self.assertRaises(m.ProfileError):
+                validate(bad, code=1, final=True)
+        with self.assertRaises(m.ProfileError):
+            validate(failed, code=0, final=True)
+        failed.pop("failure_stage")
+        with self.assertRaises(m.ProfileError):
+            validate(failed, code=1)  # native budget gate remains unchanged
+
     def test_required_nested_fields_and_forbidden_fields(self):
         for change in (lambda v: v.pop("target_hash"), lambda v: v["release"].pop("client_disconnected"), lambda v: v.update(username="secret"), lambda v: v["authorization"].update(roles=[])):
             value = positive()
