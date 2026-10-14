@@ -6946,6 +6946,102 @@
         "User confirms this is the only supported AI data environment. The30 requests/30 associations have zero pending/invalid/identity/relation gaps at the observation time; code retirement and later final runtime acceptance remain separate.",
         "Actual source80f owned native24 passed and current CI native24 passed; its initial Docs check failed before the final docs update. Full fresh9db source gates were still pending at this record; no prior overall green is borrowed."
       ]
+    },
+    {
+      "id": "infra-2026-10-15-qs-cleanup-m4-a-original099-shape",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T23:45:13.782355+00:00",
+      "environment": "production/serverA qs; fixed MySQL schema-only readonly observation via approved Mac mini root SSH, original M2 API PID1 connection decoder",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Actual API CID/image/PID1 ELF/config/environment/argv and both networks match before and after. Only the fixed source4a connection decoder is exercised; complete in-memory service Options and current all-six identities are not certified."
+      },
+      "command": "Independent frozen schema reader7ffddfbe/binary01c1602e via private preflight --read-only-preflight, source manifest21392c6a and independently fixed target624a87c0; exactly10 metadata SELECT/SHOW operations plus session and RR readonly controls; no business rows or Mongo access.",
+      "result": {
+        "status": "findings",
+        "summary": "Both original099 JSON columns, positions/defaults and enforced CHECK bodies match. The only CHECK SHOW CREATE difference is the saved ASCII schema literal introducer utf8mb3 versus the old tool utf8mb4 golden. Original formal Tool inspect passed clean100/39 but capture failed closed; the independent schema reader passed and released all resources. No production protection or migration approval is inferred.",
+        "measurements": {
+          "reader_source_sha256": "7ffddfbe484a956e08b5c94a4303cceb8d8e1b2e4c58658b1891c18047174396",
+          "reader_binary_sha256": "01c1602ed95e12ed2cdfeed98b5cf567807047bc96bcaec3e3372345e3e6c7b4",
+          "original099_resource_sha256": "575fa26f588e4fb87ee7bbcdc61fc11eeb8fe8ed0234518209e7e3e13b7b0d7a",
+          "mysql_version": "8.0.36",
+          "mysql_version_number": 100,
+          "mysql_dirty": false,
+          "sql_identity_sha256": "833eb55bdcba767dc66f0b02da8315f5ba1fc7c52848fc517edb4a5bd4bf7b32",
+          "query_count": 10,
+          "sql_elapsed_milliseconds": 38,
+          "transport_elapsed_seconds": 19.74440720799612,
+          "same_connection_before_after_identity_and_clean100": true,
+          "rr_readonly_committed": true,
+          "api_runtime_unchanged": true,
+          "all_releases_verified": true,
+          "known_hosts_unchanged": true,
+          "freeze_verified": false,
+          "formal_capture_succeeded": false,
+          "T0_capture": false,
+          "production_stop_ddl_delete_restore_deploy_calls": 0,
+          "objects": [
+            {
+              "table": "assessment",
+              "column": "historical_lifecycle_evidence",
+              "ordinal": 37,
+              "maximum_ordinal": 37,
+              "show_create_sha256": "355ebfbe49bd6a44abbb43e72158d4f23fc19d63f8e98e1d6c51f7ab97336d77",
+              "original_column_exact": true,
+              "original_check_exact_utf8mb3": true,
+              "original_check_exact_utf8mb4": false,
+              "check_enforced": "YES"
+            },
+            {
+              "table": "evaluation_outcome",
+              "column": "historical_committed_evidence",
+              "ordinal": 21,
+              "maximum_ordinal": 21,
+              "show_create_sha256": "946b4e1d0852504e34fa3772a05a12b8061c8fd3130071cfd9fb3ed63d4b26c2",
+              "original_column_exact": true,
+              "original_check_exact_utf8mb3": true,
+              "original_check_exact_utf8mb4": false,
+              "check_enforced": "YES"
+            }
+          ],
+          "artifacts": [
+            {
+              "file": "qs-m4-a-original099-shape-readonly-v1/actual-execution-receipt.json",
+              "sha256": "1ca3fb01988ea8d3d5e367fb6eee17d766d22bfe27c6c0258f36c8d20b5c8b3a"
+            },
+            {
+              "file": "qs-m4-a-original099-shape-readonly-v1/safe-shape-summary.json",
+              "sha256": "f5900b734496208691e0530b1addd9eff934ee3883995dfc2b24df5d7d712301"
+            },
+            {
+              "file": "qs-m4-a-original099-shape-readonly-v1/evidence-index.json",
+              "sha256": "a63cecbf45003cc994240454abd1d7217a39661b6acad7a7dc0f3f5864d3cdb7"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data and recovery; Codex: bounded readonly schema observation and source correction",
+      "expires_on": "2026-11-14",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#654-a实际只读预检定位原099字符集差异"
+        }
+      ],
+      "limitations": [
+        "Raw DDL and CHECK remain only in approved Mac private0700/0600 schema material; no business rows are read. This independent reader is distinct from formal Tool07a and does not turn the failed formal capture into success.",
+        "Clean100 and SQL identity were read again after the RR transaction through the same connection. Mongo39 is only the separate formal inspect observation; the shape reader makes no new Mongo identity or state claim.",
+        "No sustained writer freeze, RPO0, production30/60min, T0, qualified protection material, DDL, restore, supply or deployment was performed. The original26 entries remain unchanged.",
+        "The small source correction must separately pass cross-charset native recovery and current source gates. Immutable099 and A511 images/executor remain unchanged; old07a evidence cannot qualify the new tool."
+      ]
     }
   ]
 }
