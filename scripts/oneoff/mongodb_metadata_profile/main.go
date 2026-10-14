@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -335,9 +334,9 @@ func identityHash(rawUUID primitive.Binary, members []string) string {
 func integer(v bson.RawValue) (uint64, bool) {
 	var n int64
 	switch v.Type {
-	case bsontype.Int32:
+	case bson.TypeInt32:
 		n = int64(v.Int32())
-	case bsontype.Int64:
+	case bson.TypeInt64:
 		n = v.Int64()
 	default:
 		return 0, false
