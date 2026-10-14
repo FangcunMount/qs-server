@@ -5133,6 +5133,1035 @@
         "No Plan backend operator bound, request-level authorization or WeChat subscribe/receipt verified. M2 production batch needs independent approval; M4 backup/restore gates and M6 continuous observation are not completed.",
         "Only owned temporary reader files/container were released. SQL/Mongo identity/clean100/39 point reads and source protocol protection are not backup/restore or application rollback rehearsal; new business facts must be preserved."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m2-release-4a8642b0",
+      "topics": [
+        "deployment_cd_network",
+        "data_migration_transaction",
+        "config_secrets",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T04:05:24.412875+00:00",
+      "environment": "production/serverA API1/Collection2 and serverD Worker3, approved M2 exact4a release and independent final readback",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Six actual startup post-Unmarshal and post-Complete/Validate masked exported Options were parsed and runtime-bound; API reminder false is directly proven. These hashes do not cover plaintext/unexported/resolved resources/process memory or all secrets and cannot sign full effective configuration."
+      },
+      "command": "Explicit M2-only user approval. Fixed ref codex/qs-cleanup-m2-release-4a8642b0, Mac mini SSH/ACR registry, all/API1/Collection2/Worker3, production-deploy and host image-retention locks. Before: pause/env/ref/no-competing-writer,6 M1 instances/retained images and actual-config-bound clean10039 v3 read-only DB preflight. Dispatch38504809360. Preserve first Collection Nginx failure; restore exact approved route bytes under host lock, original full verify-only. Rerun failed jobs at same SHA; no new source dispatch. Final: three original-source v2 validators with per-role real attempt and MQ expected image; independent six-instance metadata/program/readiness, scoped actual startup Options, actual4a v3 dual-DB read-only final; restore/re-read pause=true.",
+      "result": {
+        "status": "passed",
+        "summary": "M2 engineering/deployment and scoped runtime final verification passed after original Collection Nginx failure, exact-config recovery and same-SHA retry. Six instances4a/ready/restart0, exact image digests and original v2 receipts bound; clean10039/identity/resources/retired-object absence unchanged; actual API reminder false; final deployment pause true. Full business/config/restore/M8 acceptance remains incomplete.",
+        "measurements": {
+          "approval": "User explicitly approved only M2 exact4a to six instances",
+          "run_id": 38504809360,
+          "final_run_attempt": 2,
+          "workflow_conclusion": "success",
+          "first_run_attempt1_failure_preserved": true,
+          "workflow_jobs": [
+            {
+              "id": 115672979019,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Build and Push Docker Images (collection)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115672979193,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Deploy Collection Server",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115672979430,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Plan Deploy Services",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115672979664,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Build and Push Docker Images (apiserver)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115672979746,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Deploy Worker",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115672979773,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Deploy API Server",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115673017459,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Build and Push Docker Images (worker)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115673179669,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Verify Worker Governance and K6 Observability",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115673293063,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Send Notification",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "id": 115673294291,
+              "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "name": "Record Automatic Full Deployment",
+              "status": "completed",
+              "conclusion": "skipped"
+            }
+          ],
+          "actual_receipt_attempts": {
+            "apiserver": 1,
+            "worker": 1,
+            "collection": 2
+          },
+          "retry_carried_success_not_counted_as_reexecution": true,
+          "collection_cid_started_at_unchanged_during_retry": true,
+          "configuration_recovery": {
+            "missing_collect_route_observed": true,
+            "restored_config_sha256": "bb122f4c320c1f6f9532b0ee232dba4971e26409f63133accb01c8b0b513b8d5",
+            "same_as_approved_source_and_controlled_backup": true,
+            "application_restarted_by_recovery": false,
+            "database_restored": false,
+            "immediate_post_reload_tls_probe_failed_and_retained": true,
+            "settled_original_nginx_gate_passed": true,
+            "dns_expected_replicas": 2,
+            "routing_probe_requests": 40,
+            "routing_health_delta_per_instance": [
+              20,
+              20
+            ],
+            "tls_health_status_after_settle": 200,
+            "initial_candidate_failure_root_cause_proven": false
+          },
+          "six_instances": [
+            {
+              "name": "qs-apiserver",
+              "component": "apiserver",
+              "container_id": "25fe095532da75f7d57d36bbfb386cd5b35954163d18002ae7dec663770de77d",
+              "compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "image_id": "sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816",
+              "repo_digests": [
+                "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-apiserver@sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816",
+                "ghcr.io/fangcunmount/qs-apiserver@sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816"
+              ],
+              "started_at": "2026-10-14T03:14:42.985823441Z",
+              "restart_count": 0,
+              "running_executable_sha256": "4ed9a8e78dafafaa6fbc41957d5611150d94dbd6fcc4fa27e0d92f049136afac",
+              "binary_sha256": "4ed9a8e78dafafaa6fbc41957d5611150d94dbd6fcc4fa27e0d92f049136afac",
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "apiserver",
+                  "redis_summary": {
+                    "family_total": 8,
+                    "available_count": 8,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-collection-server-1",
+              "component": "collection",
+              "container_id": "b200389f3d6cb6683a1cf5f85d619c4410222cb7b799e234ec6281d0acce8fa9",
+              "compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "image_id": "sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232",
+              "repo_digests": [
+                "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-collection-server@sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232",
+                "ghcr.io/fangcunmount/qs-collection-server@sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232"
+              ],
+              "started_at": "2026-10-14T03:15:38.770257778Z",
+              "restart_count": 0,
+              "running_executable_sha256": "a52fc268e463607b9bdd9f0434b6bd1086dcd0d4dce9b2c419ee2a4282fb90a6",
+              "binary_sha256": "a52fc268e463607b9bdd9f0434b6bd1086dcd0d4dce9b2c419ee2a4282fb90a6",
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                },
+                {
+                  "path": "/serve-readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "serve_ready": true,
+                  "dependency_ready": true,
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-collection-server-2",
+              "component": "collection",
+              "container_id": "215b29b989e9ed881687f72f4adf0241e5470f69d3d317e9d1fa4b9ede30045e",
+              "compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "image_id": "sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232",
+              "repo_digests": [
+                "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-collection-server@sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232",
+                "ghcr.io/fangcunmount/qs-collection-server@sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232"
+              ],
+              "started_at": "2026-10-14T03:15:37.501075544Z",
+              "restart_count": 0,
+              "running_executable_sha256": "a52fc268e463607b9bdd9f0434b6bd1086dcd0d4dce9b2c419ee2a4282fb90a6",
+              "binary_sha256": "a52fc268e463607b9bdd9f0434b6bd1086dcd0d4dce9b2c419ee2a4282fb90a6",
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                },
+                {
+                  "path": "/serve-readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "serve_ready": true,
+                  "dependency_ready": true,
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-worker-runtime-1",
+              "component": "worker",
+              "container_id": "b808d754f1ad49cd32426e9867a2f7a1b3033198af38e813eddb691c0aeb1c71",
+              "compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "image_id": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+              "repo_digests": [
+                "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-worker@sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+                "ghcr.io/fangcunmount/qs-worker@sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4"
+              ],
+              "started_at": "2026-10-14T03:15:36.841490433Z",
+              "restart_count": 0,
+              "running_executable_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+              "binary_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 9092,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "worker",
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-worker-runtime-2",
+              "component": "worker",
+              "container_id": "66acfea9db7beb4da0a9e569a829fbf96b356ed2955bf37cf22d9cc0fdea0395",
+              "compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "image_id": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+              "repo_digests": [
+                "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-worker@sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+                "ghcr.io/fangcunmount/qs-worker@sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4"
+              ],
+              "started_at": "2026-10-14T03:15:38.198164919Z",
+              "restart_count": 0,
+              "running_executable_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+              "binary_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 9092,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "worker",
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-worker-runtime-3",
+              "component": "worker",
+              "container_id": "672855007e620245b3f16fa13c002f915ae313b0b158a13528204ca8057cd9fd",
+              "compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "image_id": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+              "repo_digests": [
+                "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-worker@sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+                "ghcr.io/fangcunmount/qs-worker@sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4"
+              ],
+              "started_at": "2026-10-14T03:15:37.512492425Z",
+              "restart_count": 0,
+              "running_executable_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+              "binary_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 9092,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "worker",
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            }
+          ],
+          "formal_runtime_receipt_validation": {
+            "observed_at": "2026-10-14T04:06:32.064934+00:00",
+            "source_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+            "run_id": 38504809360,
+            "final_workflow_attempt": 2,
+            "formal_cd_runtime_receipts_verified": true,
+            "tool_sha256": "a16ee88d0013f3ded5aade3d915e2ffba4003b6ddf7ee9d48eaad7dfba2531a6",
+            "api_preflight_expected_image_id": "sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816",
+            "six_instances_verified": true,
+            "receipts": [
+              {
+                "role": "apiserver",
+                "job_id": 115660916996,
+                "actual_receipt_run_attempt": 1,
+                "receipt": "m2-cd-runtime-receipt-apiserver.json",
+                "receipt_sha256": "e6ea1e5cede1dedd1f0a139dbbab2118755c2099bfa7701634a7a20eeb588073",
+                "independent_final_ids_programs_images_match": true,
+                "published_tag_digest_matches_runtime": true,
+                "receipt_complete_role_inventory_verified": true
+              },
+              {
+                "role": "collection",
+                "job_id": 115672979193,
+                "actual_receipt_run_attempt": 2,
+                "receipt": "m2-cd-runtime-receipt-collection.json",
+                "receipt_sha256": "fe7db54c2710f0f8739bcebbb1c7448743d6b9dcaf7f7392430d952dc4d29dfc",
+                "independent_final_ids_programs_images_match": true,
+                "published_tag_digest_matches_runtime": true,
+                "receipt_complete_role_inventory_verified": true
+              },
+              {
+                "role": "worker",
+                "job_id": 115661223862,
+                "actual_receipt_run_attempt": 1,
+                "receipt": "m2-cd-runtime-receipt-worker.json",
+                "receipt_sha256": "dd7f426910c5c56ef61797ce84a0b925236cd5013ed2909dce51e24a2a4cd59f",
+                "independent_final_ids_programs_images_match": true,
+                "published_tag_digest_matches_runtime": true,
+                "receipt_complete_role_inventory_verified": true
+              }
+            ],
+            "full_effective_configuration_verified": false,
+            "business_acceptance_verified": false,
+            "limitation": "Formal observer checked complete role inventory twice. Independent final probe binds fixed six running names/CID/program/image/readiness; optional state/instance-set hash not copied from receipt. API/Worker actual receipts belong attempt1; Collection attempt2; original failure preserved."
+          },
+          "published_exact_images": [
+            {
+              "role": "worker",
+              "job_id": 115659882864,
+              "job": {
+                "id": 115659882864,
+                "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                "name": "Build and Push Docker Images (worker)",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              "log_truncated": false,
+              "exact_tag_push_lines": [
+                "2026-10-14T03:12:01.0625621Z 4a8642b045289423b75bca945f2b9b3b4365c01e: digest: sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4 size: 2608",
+                "2026-10-14T03:13:15.2913344Z 4a8642b045289423b75bca945f2b9b3b4365c01e: digest: sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4 size: 2608"
+              ],
+              "published_digest": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4"
+            },
+            {
+              "role": "collection",
+              "job_id": 115659882969,
+              "job": {
+                "id": 115659882969,
+                "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                "name": "Build and Push Docker Images (collection)",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              "log_truncated": false,
+              "exact_tag_push_lines": [
+                "2026-10-14T03:12:09.0396864Z 4a8642b045289423b75bca945f2b9b3b4365c01e: digest: sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232 size: 3028",
+                "2026-10-14T03:13:15.1885981Z 4a8642b045289423b75bca945f2b9b3b4365c01e: digest: sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232 size: 3028"
+              ],
+              "published_digest": "sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232"
+            },
+            {
+              "role": "apiserver",
+              "job_id": 115659882970,
+              "job": {
+                "id": 115659882970,
+                "head_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                "name": "Build and Push Docker Images (apiserver)",
+                "status": "completed",
+                "conclusion": "success"
+              },
+              "log_truncated": false,
+              "exact_tag_push_lines": [
+                "2026-10-14T03:13:06.1831166Z 4a8642b045289423b75bca945f2b9b3b4365c01e: digest: sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816 size: 4084",
+                "2026-10-14T03:13:45.7444471Z 4a8642b045289423b75bca945f2b9b3b4365c01e: digest: sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816 size: 4084"
+              ],
+              "published_digest": "sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816"
+            }
+          ],
+          "database_final_observed_at": "2026-10-14T04:05:21.117049+00:00",
+          "database_final_before": {
+            "mysql": {
+              "selected_database": "qs",
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "version": 100,
+              "dirty": false,
+              "retired_present": []
+            },
+            "mongodb": {
+              "database": "qs",
+              "replica_set": "rs0",
+              "hosts": [
+                "mongo:27017"
+              ],
+              "version": 39,
+              "dirty": false,
+              "retired_present": []
+            }
+          },
+          "database_final_after": {
+            "mysql": {
+              "selected_database": "qs",
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "version": 100,
+              "dirty": false,
+              "retired_present": []
+            },
+            "mongodb": {
+              "database": "qs",
+              "replica_set": "rs0",
+              "hosts": [
+                "mongo:27017"
+              ],
+              "version": 39,
+              "dirty": false,
+              "retired_present": []
+            }
+          },
+          "resource_digest": "1af415423e4382d35108a400d1c93913bb17abb277b860560661710447b8a95b",
+          "actual_source_connection_semantics": {
+            "config_path": "/app/configs/apiserver.prod.yaml",
+            "config_sha256": "63530b49e931d5ce69395b7752cdf6abe3024d83d55883695eff062f476babc3",
+            "docker_and_pid1_args_match": true,
+            "pid1_database_environment_matches_docker": true,
+            "reviewed_database_environment_key_names": [
+              "QS_APISERVER_MONGODB_DATABASE",
+              "QS_APISERVER_MONGODB_HOST",
+              "QS_APISERVER_MONGODB_MAX_CONNECTING",
+              "QS_APISERVER_MONGODB_MAX_CONN_IDLE_TIME",
+              "QS_APISERVER_MONGODB_MAX_POOL_SIZE",
+              "QS_APISERVER_MONGODB_MIN_POOL_SIZE",
+              "QS_APISERVER_MONGODB_PASSWORD",
+              "QS_APISERVER_MONGODB_USERNAME",
+              "QS_APISERVER_MYSQL_DATABASE",
+              "QS_APISERVER_MYSQL_HOST",
+              "QS_APISERVER_MYSQL_PASSWORD",
+              "QS_APISERVER_MYSQL_USERNAME"
+            ],
+            "mongo_connection_semantics": {
+              "url_override_present": false,
+              "tls_enabled": false,
+              "tls_external_files_present": false,
+              "replica_set": "",
+              "direct_connection": false,
+              "database": "qs",
+              "authentication_database": "qs",
+              "authentication_source": "component-base BuildURL database-path default",
+              "compression": [
+                "zstd",
+                "snappy"
+              ],
+              "zstd_compression_level": 1,
+              "service_pool": {
+                "min-pool-size": 16,
+                "max-pool-size": 64,
+                "max-connecting": 8,
+                "max-conn-idle-time-seconds": 600
+              },
+              "audit_pool_override": {
+                "min_pool_size": 0,
+                "max_pool_size": 2
+              },
+              "runtime_command_logging_not_replayed": true
+            },
+            "mysql_connection_semantics": {
+              "ignored_raw_file_key_names": [
+                "max-idle-time"
+              ],
+              "ignored_raw_file_key_reason": "not present in MySQLOptions or component-base MySQLConfig; no runtime consumer at source4a",
+              "database": "qs",
+              "location": "Asia/Shanghai",
+              "session_time_zone": "+08:00",
+              "charset": "utf8",
+              "parse_time": true,
+              "audit_multi_statements": false,
+              "runtime_multi_statements_not_replayed": true,
+              "audit_pool_override": {
+                "max_open": 2,
+                "max_idle": 1
+              },
+              "runtime_sql_logging_not_replayed": true
+            },
+            "database": "qs",
+            "migration_config": {
+              "file": {
+                "enabled": true,
+                "autoseed": false,
+                "database": "qs"
+              },
+              "environment_override_present": false,
+              "cli_present": false
+            },
+            "task_opened_reminder_enabled": false,
+            "database_cli_override_present": false,
+            "input_binding": "actual PID1 environment plus immutable current container config file; decoded in-memory server options not directly inspected"
+          },
+          "connection_inputs_unchanged": true,
+          "connections_released": true,
+          "sql_close_succeeded": true,
+          "sql_open_after_close": 0,
+          "mongo_disconnect_succeeded": true,
+          "owned_audit_container_released": true,
+          "owned_audit_tool_released": true,
+          "owned_outer_directory_released": true,
+          "startup_options_final": [
+            {
+              "read_only": true,
+              "host": "serverA",
+              "captured_at_utc": "2026-10-14T04:04:41.630649+00:00",
+              "records": [
+                {
+                  "name": "qs-apiserver",
+                  "component": "apiserver",
+                  "container_id": "25fe095532da75f7d57d36bbfb386cd5b35954163d18002ae7dec663770de77d",
+                  "started_at": "2026-10-14T03:14:42.985823441Z",
+                  "image_id": "sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816",
+                  "running_executable_sha256": "4ed9a8e78dafafaa6fbc41957d5611150d94dbd6fcc4fa27e0d92f049136afac",
+                  "expected_compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                  "log_window_seconds": 30,
+                  "window_boundary_precision": "microseconds with exact original runtime timestamps retained",
+                  "raw_options_persisted_or_emitted": false,
+                  "full_effective_configuration_verified": false,
+                  "binary_sha_binding_to_after_artifact": true,
+                  "dependency_diagnostics_count_in_bounded_window": {
+                    "survey_application": 0,
+                    "survey_submission": 0,
+                    "plan_module": 0,
+                    "plan_application": 0,
+                    "survey_final_composition": 0
+                  },
+                  "container_initialized_marker_count_in_bounded_window": 1,
+                  "startup_options_line_count": 1,
+                  "post_complete_validate_line_count": 1,
+                  "bounded_log_read_complete": true,
+                  "post_unmarshal_options_status": "unique_parsed",
+                  "post_unmarshal_options_summary": {
+                    "masked_serialized_public_options_sha256": "b5923f6980db90f8c5d0b75bb9262cd31880adfa21b336e6a738ec5c53727b6f",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:14:46.724315789Z",
+                    "stage": "post_unmarshal_and_runtime_context_before_complete_validate"
+                  },
+                  "post_unmarshal_task_opened_reminder": false,
+                  "post_complete_validate_options_status": "unique_parsed",
+                  "post_complete_validate_options_summary": {
+                    "masked_serialized_public_options_sha256": "848519f8a5bf6a4c39499bdd33b95d5174f4ec46daf5598f12d063e4f053b5e0",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:14:46.901394866Z",
+                    "stage": "post_complete_and_validate_masked_printable_options"
+                  },
+                  "post_complete_validate_task_opened_reminder": false,
+                  "metadata_stable_during_read": true,
+                  "status": "passed"
+                },
+                {
+                  "name": "qs-collection-server-1",
+                  "component": "collection",
+                  "container_id": "b200389f3d6cb6683a1cf5f85d619c4410222cb7b799e234ec6281d0acce8fa9",
+                  "started_at": "2026-10-14T03:15:38.770257778Z",
+                  "image_id": "sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232",
+                  "running_executable_sha256": "a52fc268e463607b9bdd9f0434b6bd1086dcd0d4dce9b2c419ee2a4282fb90a6",
+                  "expected_compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                  "log_window_seconds": 30,
+                  "window_boundary_precision": "microseconds with exact original runtime timestamps retained",
+                  "raw_options_persisted_or_emitted": false,
+                  "full_effective_configuration_verified": false,
+                  "binary_sha_binding_to_after_artifact": true,
+                  "dependency_diagnostics_count_in_bounded_window": {
+                    "survey_application": 0,
+                    "survey_submission": 0,
+                    "plan_module": 0,
+                    "plan_application": 0,
+                    "survey_final_composition": 0
+                  },
+                  "container_initialized_marker_count_in_bounded_window": 0,
+                  "startup_options_line_count": 1,
+                  "post_complete_validate_line_count": 1,
+                  "bounded_log_read_complete": true,
+                  "post_unmarshal_options_status": "unique_parsed",
+                  "post_unmarshal_options_summary": {
+                    "masked_serialized_public_options_sha256": "013cf4024f3f6fc574d4f39d278cce17ec2937e55dd608d3a321f2ec88e7fab6",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:40.598915270Z",
+                    "stage": "post_unmarshal_and_runtime_context_before_complete_validate"
+                  },
+                  "post_complete_validate_options_status": "unique_parsed",
+                  "post_complete_validate_options_summary": {
+                    "masked_serialized_public_options_sha256": "828978713cc0b35a8f8f0c9b8d789ed3c797e504061b7b5ecd1fb3c28233f62e",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:40.661875449Z",
+                    "stage": "post_complete_and_validate_masked_printable_options"
+                  },
+                  "metadata_stable_during_read": true,
+                  "status": "passed"
+                },
+                {
+                  "name": "qs-collection-server-2",
+                  "component": "collection",
+                  "container_id": "215b29b989e9ed881687f72f4adf0241e5470f69d3d317e9d1fa4b9ede30045e",
+                  "started_at": "2026-10-14T03:15:37.501075544Z",
+                  "image_id": "sha256:d7e814497273a1585e71336bb5c5e296da89ca86788ace8df921b1087d9de232",
+                  "running_executable_sha256": "a52fc268e463607b9bdd9f0434b6bd1086dcd0d4dce9b2c419ee2a4282fb90a6",
+                  "expected_compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                  "log_window_seconds": 30,
+                  "window_boundary_precision": "microseconds with exact original runtime timestamps retained",
+                  "raw_options_persisted_or_emitted": false,
+                  "full_effective_configuration_verified": false,
+                  "binary_sha_binding_to_after_artifact": true,
+                  "dependency_diagnostics_count_in_bounded_window": {
+                    "survey_application": 0,
+                    "survey_submission": 0,
+                    "plan_module": 0,
+                    "plan_application": 0,
+                    "survey_final_composition": 0
+                  },
+                  "container_initialized_marker_count_in_bounded_window": 0,
+                  "startup_options_line_count": 1,
+                  "post_complete_validate_line_count": 1,
+                  "bounded_log_read_complete": true,
+                  "post_unmarshal_options_status": "unique_parsed",
+                  "post_unmarshal_options_summary": {
+                    "masked_serialized_public_options_sha256": "013cf4024f3f6fc574d4f39d278cce17ec2937e55dd608d3a321f2ec88e7fab6",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:38.859407999Z",
+                    "stage": "post_unmarshal_and_runtime_context_before_complete_validate"
+                  },
+                  "post_complete_validate_options_status": "unique_parsed",
+                  "post_complete_validate_options_summary": {
+                    "masked_serialized_public_options_sha256": "828978713cc0b35a8f8f0c9b8d789ed3c797e504061b7b5ecd1fb3c28233f62e",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:38.902523129Z",
+                    "stage": "post_complete_and_validate_masked_printable_options"
+                  },
+                  "metadata_stable_during_read": true,
+                  "status": "passed"
+                }
+              ],
+              "source_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "helper_sha256": "5e507fc755687b833e73c065951755b12a605e3f1764860ef07a1c71e6e146c7",
+              "runtime_artifact_sha256": "8f54b3e38ab6b32dd218710d5d2198cd70145906b4af3f179dccee34abbdec29",
+              "raw_options_persisted_or_emitted": false,
+              "full_effective_configuration_verified": false,
+              "hash_scope": "canonical JSON of already masked exported Options startup log; not plaintext, unexported state, resolved resources or process memory"
+            },
+            {
+              "read_only": true,
+              "host": "serverD",
+              "captured_at_utc": "2026-10-14T04:04:40.587479+00:00",
+              "records": [
+                {
+                  "name": "qs-worker-runtime-1",
+                  "component": "worker",
+                  "container_id": "b808d754f1ad49cd32426e9867a2f7a1b3033198af38e813eddb691c0aeb1c71",
+                  "started_at": "2026-10-14T03:15:36.841490433Z",
+                  "image_id": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+                  "running_executable_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+                  "expected_compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                  "log_window_seconds": 30,
+                  "window_boundary_precision": "microseconds with exact original runtime timestamps retained",
+                  "raw_options_persisted_or_emitted": false,
+                  "full_effective_configuration_verified": false,
+                  "binary_sha_binding_to_after_artifact": true,
+                  "dependency_diagnostics_count_in_bounded_window": {
+                    "survey_application": 0,
+                    "survey_submission": 0,
+                    "plan_module": 0,
+                    "plan_application": 0,
+                    "survey_final_composition": 0
+                  },
+                  "container_initialized_marker_count_in_bounded_window": 0,
+                  "startup_options_line_count": 1,
+                  "post_complete_validate_line_count": 1,
+                  "bounded_log_read_complete": true,
+                  "post_unmarshal_options_status": "unique_parsed",
+                  "post_unmarshal_options_summary": {
+                    "masked_serialized_public_options_sha256": "205d1903321cdddf4d56405bfc1326fdaf15468dbc8d45e04c3c6b3525d48189",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:37.516158467Z",
+                    "stage": "post_unmarshal_and_runtime_context_before_complete_validate"
+                  },
+                  "post_complete_validate_options_status": "unique_parsed",
+                  "post_complete_validate_options_summary": {
+                    "masked_serialized_public_options_sha256": "205d1903321cdddf4d56405bfc1326fdaf15468dbc8d45e04c3c6b3525d48189",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:37.522938509Z",
+                    "stage": "post_complete_and_validate_masked_printable_options"
+                  },
+                  "metadata_stable_during_read": true,
+                  "status": "passed"
+                },
+                {
+                  "name": "qs-worker-runtime-2",
+                  "component": "worker",
+                  "container_id": "66acfea9db7beb4da0a9e569a829fbf96b356ed2955bf37cf22d9cc0fdea0395",
+                  "started_at": "2026-10-14T03:15:38.198164919Z",
+                  "image_id": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+                  "running_executable_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+                  "expected_compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                  "log_window_seconds": 30,
+                  "window_boundary_precision": "microseconds with exact original runtime timestamps retained",
+                  "raw_options_persisted_or_emitted": false,
+                  "full_effective_configuration_verified": false,
+                  "binary_sha_binding_to_after_artifact": true,
+                  "dependency_diagnostics_count_in_bounded_window": {
+                    "survey_application": 0,
+                    "survey_submission": 0,
+                    "plan_module": 0,
+                    "plan_application": 0,
+                    "survey_final_composition": 0
+                  },
+                  "container_initialized_marker_count_in_bounded_window": 0,
+                  "startup_options_line_count": 1,
+                  "post_complete_validate_line_count": 1,
+                  "bounded_log_read_complete": true,
+                  "post_unmarshal_options_status": "unique_parsed",
+                  "post_unmarshal_options_summary": {
+                    "masked_serialized_public_options_sha256": "205d1903321cdddf4d56405bfc1326fdaf15468dbc8d45e04c3c6b3525d48189",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:38.685651138Z",
+                    "stage": "post_unmarshal_and_runtime_context_before_complete_validate"
+                  },
+                  "post_complete_validate_options_status": "unique_parsed",
+                  "post_complete_validate_options_summary": {
+                    "masked_serialized_public_options_sha256": "205d1903321cdddf4d56405bfc1326fdaf15468dbc8d45e04c3c6b3525d48189",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:38.690910409Z",
+                    "stage": "post_complete_and_validate_masked_printable_options"
+                  },
+                  "metadata_stable_during_read": true,
+                  "status": "passed"
+                },
+                {
+                  "name": "qs-worker-runtime-3",
+                  "component": "worker",
+                  "container_id": "672855007e620245b3f16fa13c002f915ae313b0b158a13528204ca8057cd9fd",
+                  "started_at": "2026-10-14T03:15:37.512492425Z",
+                  "image_id": "sha256:9ed1cf7e9e593617d5d02c9bfa4c6b61fa2e10624c86baac5347293a09f610d4",
+                  "running_executable_sha256": "95cb8dcbd5f691ff509ec9b71b0bcbbd4f8fe9e785c7be0f2595130150183a34",
+                  "expected_compiled_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+                  "log_window_seconds": 30,
+                  "window_boundary_precision": "microseconds with exact original runtime timestamps retained",
+                  "raw_options_persisted_or_emitted": false,
+                  "full_effective_configuration_verified": false,
+                  "binary_sha_binding_to_after_artifact": true,
+                  "dependency_diagnostics_count_in_bounded_window": {
+                    "survey_application": 0,
+                    "survey_submission": 0,
+                    "plan_module": 0,
+                    "plan_application": 0,
+                    "survey_final_composition": 0
+                  },
+                  "container_initialized_marker_count_in_bounded_window": 0,
+                  "startup_options_line_count": 1,
+                  "post_complete_validate_line_count": 1,
+                  "bounded_log_read_complete": true,
+                  "post_unmarshal_options_status": "unique_parsed",
+                  "post_unmarshal_options_summary": {
+                    "masked_serialized_public_options_sha256": "205d1903321cdddf4d56405bfc1326fdaf15468dbc8d45e04c3c6b3525d48189",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:38.202541936Z",
+                    "stage": "post_unmarshal_and_runtime_context_before_complete_validate"
+                  },
+                  "post_complete_validate_options_status": "unique_parsed",
+                  "post_complete_validate_options_summary": {
+                    "masked_serialized_public_options_sha256": "205d1903321cdddf4d56405bfc1326fdaf15468dbc8d45e04c3c6b3525d48189",
+                    "json_object_parsed": true,
+                    "log_timestamp": "2026-10-14T03:15:38.206917990Z",
+                    "stage": "post_complete_and_validate_masked_printable_options"
+                  },
+                  "metadata_stable_during_read": true,
+                  "status": "passed"
+                }
+              ],
+              "source_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+              "helper_sha256": "5e507fc755687b833e73c065951755b12a605e3f1764860ef07a1c71e6e146c7",
+              "runtime_artifact_sha256": "ca9922bd40c22b7388ff728e2e476f502624cd40c74187d47185bf2512a996d1",
+              "raw_options_persisted_or_emitted": false,
+              "full_effective_configuration_verified": false,
+              "hash_scope": "canonical JSON of already masked exported Options startup log; not plaintext, unexported state, resolved resources or process memory"
+            }
+          ],
+          "actual_api_reminder_post_unmarshal": false,
+          "actual_api_reminder_post_complete_validate": false,
+          "final_production_pause_restored": true,
+          "assistant_ddl_calls": 0,
+          "assistant_business_write_calls": 0,
+          "assistant_login_or_session_calls": 0,
+          "assistant_wechat_notification_calls": 0,
+          "m4_production_retirement_started": false,
+          "m6_t0_started": false,
+          "real_plan_business_acceptance_complete": false,
+          "full_effective_configuration_verified": false,
+          "business_acceptance_verified": false,
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m2-approved-runtime-before.json",
+              "sha256": "ab5608b70823bf6d3e932733ad5afbf30fb2efdc9b863c122077418199d2a84e"
+            },
+            {
+              "name": "qs-server-cleanup-m2-approved-host-lock-images-before.json",
+              "sha256": "ea415c3b42ca7f2a00067991495429bdf43102a857e440d1db683030ca86ee9e"
+            },
+            {
+              "name": "qs-server-cleanup-m2-approved-dispatch-active-guard.json",
+              "sha256": "51305c21a7ea57ae9aaef100661bd62bab145116b96830e4dece782c204be300"
+            },
+            {
+              "name": "qs-server-cleanup-m2-release-readonly-preflight.json",
+              "sha256": "94f5d3fb05179b6ba29f0ab0084be4ecd79053aeffd80581676ce2c274b7afe8"
+            },
+            {
+              "name": "qs-server-cleanup-m2-release-readonly-preflight-v2.json",
+              "sha256": "3f232be16f1062ef9d3ccd0724bec78cb2d0fd99621a8f88cb1691b1e33e952b"
+            },
+            {
+              "name": "qs-server-cleanup-m2-release-readonly-preflight-v3.json",
+              "sha256": "d227679fbba847c8e8313f279b7647b90d46df305d2b4dce06effef5c8669cff"
+            },
+            {
+              "name": "m2-published-exact-image-digests.json",
+              "sha256": "1da1e2864aa5c54ea7cbe3d4584bf0ac9517656ff882145a5c88d1dfcf0d3c3e"
+            },
+            {
+              "name": "m2-cd-first-attempt-terminal-preserved.json",
+              "sha256": "87ff90a270f58bf37994dfc8511e331fc764a946d548b6bd9c25891cfd0f2350"
+            },
+            {
+              "name": "m2-collection-first-failure-diagnostics.json",
+              "sha256": "034106bd122c04b383198dbf7f5f5c78437eb084e6c599388932881b33c5b3da"
+            },
+            {
+              "name": "m2-collection-nginx-verify-only-first.json",
+              "sha256": "d5e82ffb2266ca630b4c06d96709989dfa085d07d43cca0d047f6221e0444658"
+            },
+            {
+              "name": "m2-nginx-current-metadata-diagnostic.json",
+              "sha256": "250b923e0891c70e727c5602879c9fe0dc8657082455115c10565d8eed456a89"
+            },
+            {
+              "name": "m2-nginx-mount-backup-metadata.json",
+              "sha256": "77e9f51711899e5b2064e83694136ba5cc27398e07987e56ddc7fed4fe383338"
+            },
+            {
+              "name": "m2-collection-approved-config-recovery.json",
+              "sha256": "971da25532028d524000ce17693f7c60f63bc5fae24c30361d6931cde61a68d1"
+            },
+            {
+              "name": "m2-collection-nginx-verify-only-after-recovery.json",
+              "sha256": "ac7d534c68f8a9e417481db7c3f76fa6aaf0d51e859fa3563778d8dda7b1b65d"
+            },
+            {
+              "name": "m2-collection-health-after-reload-settle.json",
+              "sha256": "bc9a3f6bf114af7737b1d318b158245a6b157bc843874fb2dbc628a5023bd7da"
+            },
+            {
+              "name": "m2-cd-terminal-verification.json",
+              "sha256": "948db761d649ce3326378a67441cd98049490d675ad2e57bcd73c5e6ad1e9dd5"
+            },
+            {
+              "name": "m2-mq-preflight-frozen-metadata-readonly.json",
+              "sha256": "f38acd5436d5819f3b6baba44b3d603d23a94bc28ee2a8e523da4f60a9562488"
+            },
+            {
+              "name": "m2-cd-runtime-receipts-validation.json",
+              "sha256": "1363275603c98fc196c755da8e0715392f4b1be4e7d7d17ae0e10fb3a4997e5d"
+            },
+            {
+              "name": "m2-cd-runtime-receipt-apiserver.json",
+              "sha256": "e6ea1e5cede1dedd1f0a139dbbab2118755c2099bfa7701634a7a20eeb588073"
+            },
+            {
+              "name": "m2-cd-runtime-receipt-collection.json",
+              "sha256": "fe7db54c2710f0f8739bcebbb1c7448743d6b9dcaf7f7392430d952dc4d29dfc"
+            },
+            {
+              "name": "m2-cd-runtime-receipt-worker.json",
+              "sha256": "dd7f426910c5c56ef61797ce84a0b925236cd5013ed2909dce51e24a2a4cd59f"
+            },
+            {
+              "name": "m2-runtime-final-validation.json",
+              "sha256": "70ee47ca214061aa162601b8e5a967b54901382f473a76eb6a40d9fb27b31347"
+            },
+            {
+              "name": "qs-server-cleanup-m2-release-readonly-readback-v3.json",
+              "sha256": "01b4e577a667818caf0c8ed4f3deba0961382a675c8141c6111b0d2a4fff0ffc"
+            },
+            {
+              "name": "qs-server-cleanup-m2-release-readonly-final-v3.json",
+              "sha256": "4489e4e66e9e36e0ccad3f29dd3c83f8fbba693a722402149c4089e075fd0cec"
+            },
+            {
+              "name": "m2-startup-options-serverD.json",
+              "sha256": "9e5a933e42463deae7decbaea4ed2beeac1d14ab8bab9e88a8591def3a6a6618"
+            },
+            {
+              "name": "m2-startup-options-serverD-v2.json",
+              "sha256": "f8f0c93cf89120b5dafe410ce98259f3e3108bad5d0d9bd04c4463d8b4047e3f"
+            },
+            {
+              "name": "m2-startup-options-final-serverA.json",
+              "sha256": "e448e73516427ffd177f290d26d58777febaca862bb38de4a1a1bc1e0457f2e1"
+            },
+            {
+              "name": "m2-startup-options-final-serverD.json",
+              "sha256": "4d9695c69cee2e7f8ad135743f77778ec72b6235c234ae457bc6e274506c391e"
+            },
+            {
+              "name": "m2-startup-reader-evidence/manifest-initial.json",
+              "sha256": "c7d699227cce62062314c70d4579d6789bbb81df2ecba1c3339dec769320e328"
+            },
+            {
+              "name": "m2-startup-reader-evidence/manifest.json",
+              "sha256": "5f274ef0c9539d01e0b3c35bec14885930d7735f668dcedf3421b571639886f0"
+            }
+          ]
+        }
+      },
+      "owner": "Codex; M2 production approval by user",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38504809360"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38498361178"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#617-m2-独立发布与失败后恢复收尾"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/10-基础设施生产证据台账.md"
+        }
+      ],
+      "limitations": [
+        "Dated scoped passed record only, not full infrastructure ready or M2/M8 business/config signoff. Original18 records remain unaltered. Actual deployed source4a and stable source baseline806 are distinct from later documentation/source-verifier commits.",
+        "First Collection job failed despite app serving readiness. Subsequent missing Nginx route and TLS failure were observed and recovered using exact approved config bytes. The initial candidate error cause is not conclusively determined; local large-dump SIGPIPE/subshell-rollback reproduction is a separate proven risk, not asserted incident root cause.",
+        "Immediate post-reload probe failed and is retained; after settling original Nginx/DNS/TLS/40-request/two-positive-counters gate passed, then formal same-SHA retry succeeded. No original failure was replaced or Collection job1 receipt invented.",
+        "API/Worker formal runtime receipts genuinely belong attempt1; Collection attempt2. Retry listing copied successful job IDs does not prove all jobs reexecuted. Final CIDs/start times show Collection containers were reused, not guessed recreated.",
+        "Formal observer checks complete role inventory twice; independent final probe binds fixed six running names/IDs/programs/images/readiness. Optional state/set hash is not copied from receipt as independent proof. Published exact-tag registry digest is checked separately from locally named image descriptor metadata.",
+        "Startup log window is Start-1s through Start+30s with2MiB limit. Program/proc1 hash checked once before logs, metadata rechecked after; not double-program-hash observation or complete effective config. Masked Options hash equality proves only that exported representation. Missing dependency diagnostics are confined to that window.",
+        "Worker first startup-reader failure was Python3.10 nanosecond timestamp parsing before log read, not a service failure. Failure/capability/v2/final receipts and initial manifest bytes retained.",
+        "DB audit source connection authqs/MySQLutf8/timezone matches approved actual startup inputs with bounded audit pools and no multiStatements/SQL logging. Earlier M1 auditclient admin/utf8mb4 route proved target cluster/schema metadata but not exact service authentication semantics; this final proof realigns it without grants/credentials changes.",
+        "No source migration/contract/config-default changes, DDL/force/down/dirty reset, production fault injection, synthetic business facts, reminder enable/send/replay or old full DB restore. Normal business facts preserved; app runtime remains4a.",
+        "Actual backend Plan operator still unbound, request-level Plan/Enrollment effects and real reminder subscribe/receive not signed. No compatibility observation T0 or M4 deletion authorized. M4 needs object responsibility, capacity, coherent backup pair, isolation restore and measured window/recovery gate."
+      ]
     }
   ]
 }
