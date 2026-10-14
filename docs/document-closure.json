@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+    "sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 45,
+      "expected_count": 46,
       "budgeted": false
     }
   },
@@ -10529,7 +10529,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+        "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12747,7 +12747,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+        "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12995,6 +12995,74 @@
           "severity": "high",
           "summary": "Production named protection location, responsibility, scope-specific restore and startup/freeze receipts remain unbound.",
           "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, explicit full-database-pair or approved M4 object scope, per-object responsibility, scope-specific restoration within60min, startup reserve and whole writer/TTL freeze before a separately authorized production apply."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/m4_sql_historical_protection/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+        "verified_on": "2026-10-15"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_sql_historical_protection/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_sql_historical_protection/historical_columns.sql"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./scripts/oneoff/m4_sql_historical_protection",
+          "result": "passed",
+          "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/database.go",
+          "selector": "func requireTransactionalTables(",
+          "result": "matched",
+          "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+          "verified_on": "2026-10-15"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Code source d64886d52c67e6c87d475e1fb549ee047d944d06 passed actual owned MySQL8.0.36/MongoRS7.0.31 native race: six required tops plus ten children,16 RUN/PASS,0FAIL/SKIP,exit0. Harnessbd42eb7/JSONL48cc284/receiptaa3c364 preserve exact actual argv and source hashes. This is component evidence; final head requires fresh CI.",
+          "Only the two named SQL historical columns/CHECK and the original genuine ledger are protected, with complete all-SQL-NULL and retained-fact proof. First-runtime boundary, independent raw material/approval SHA and transaction outcome remain fail closed. No production mutation/freeze/capture, final image, three-service startup, real business, RPO0 or30/60min budget is signed.",
+          "Two owned containers and bridge were released. Prior IDs/images/volumes were preserved, but dynamic metadata of existing services changed; all-runtime stability is not attested. Earlier setup and native failures remain immutable."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "M4-A-OBJECT-PROTECTION-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Actual T0 protection, independently approved six-instance writer freeze and production-scale deadline remain unproved.",
+          "exit_criteria": "Bind approved exact A execution/tool/images, original clean10039 identities, T0 allNULL proof and private materials, six-instanceAPI1/Collection2/Worker3 freeze and startup marker, independently rehearsed scoped restore and startup reserve before separately authorized production mutation."
         }
       ]
     }
