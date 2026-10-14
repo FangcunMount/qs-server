@@ -6481,6 +6481,105 @@
         "Complete source privileges, Mongo FCV, continuous writer control, coherent same-window backup pair, full isolated recovery and three-service startup, interruption and forward recovery and30/60-minute budgets remain incomplete.",
         "User M4-A and M4-B responsibility closure and system.profile preservation remain scoped as separately recorded. They do not extend to Actor, five historical tables or claims deletion. No production stop, export, restore, DDL, pause change or release; M6 T0 not begun."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-admin-grants-and-writer-scope",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T09:43:35.965460+00:00",
+      "environment": "Mac mini fixed SSH root@47.94.204.124/serverA and production MySQL metadata administrator; direct-writer owner declaration",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The public SSH marker and five-query administrator diagnostic do not re-decode runtime configuration; deployed SHA is the last independently bound M2 runtime observation."
+      },
+      "command": "One public root marker through the user-configured fixed Mac mini SSH route; one exact frozen3fdc21f6 metadata-visibility-admin-profile/mysql dispatch with no backup input. Identity, four global grant bits, partial revocations and fixed RDS-role potential only; raw account/grants/error bodies are never emitted. Conn/DB release and empty-pool gate before positive armored receipt. Separately record owner direct-writer declaration and source-only PR merge metadata.",
+      "result": {
+        "status": "findings",
+        "summary": "Root route and administrator grant diagnostic passed; source-only PR364 merged with deployment still paused. Owner declared no other direct writers and manual writes stop during a future window. Full catalog/PROCESS/Event/value distribution, Mongo FCV, actual freeze, backup pair and restore remain incomplete.",
+        "measurements": {
+          "profile_source_sha": "3fdc21f6a2e009e036040422f219a4e155edbb34",
+          "profile_run_id": 38535455685,
+          "profile_job_id": 115757139744,
+          "profile_other_jobs_skipped": 13,
+          "profile_complete": true,
+          "profile_error_category": "none",
+          "current_global_select_grant": true,
+          "current_global_show_view_grant": true,
+          "current_global_trigger_grant": true,
+          "current_global_event_grant": true,
+          "current_partial_revocations_present": false,
+          "assigned_roles_present": false,
+          "mandatory_roles_present": false,
+          "rds_role_grants_available": false,
+          "rds_role_unrestricted_metadata_grants": null,
+          "source_and_run_and_target_bound": true,
+          "physical_owned_connection_and_pool_release_verified": true,
+          "application_credential_privileges_upgraded": false,
+          "complete_process_visibility_or_catalog_measured": false,
+          "historical_field_value_distribution_measured": false,
+          "mongo_fcv_measured": false,
+          "no_other_direct_writers_declared_by_owner": true,
+          "manual_writes_stopped_during_window_required": true,
+          "actual_processes_stopped_or_inflight_settled": false,
+          "autonomous_event_ttl_control_verified": false,
+          "source_pr_364_merge_sha": "ab998bdcae7c5d15ac518872580ff6eddaafed15",
+          "source_pr_364_validated_head": "8241f8519639a27071a545d1fabd0d42066de0f6",
+          "source_pr_364_head_success_checks": 26,
+          "source_pr_364_head_designed_skips": 1,
+          "merge_sha_engineering_checks_independently_verified": false,
+          "production_deploy_paused": true,
+          "backup_pair_captured_or_restore_verified": false,
+          "maintenance_and_recovery_budget_verified": false,
+          "production_stop_export_restore_ddl_or_delete_calls": 0,
+          "evidence_artifacts": [
+            {
+              "file": "qs-server-cleanup-m4-direct-root-public-probe-receipt.json",
+              "sha256": "da39fd1bb9a6ccbbbfbb42d6e547025e75b9529f75fcf5b5b050ec26b9662500"
+            },
+            {
+              "file": "qs-server-cleanup-m4-admin-profile-direct-root-success-receipt.json",
+              "sha256": "c0d643dfc08d5abb8c96c33cdf476fb2d473375675255bb4b970c8aa289712e8"
+            },
+            {
+              "file": "qs-server-cleanup-m4-admin-profile-direct-root-success.log",
+              "sha256": "915eaf4baf27d9e5f48dca263b05881661840b3d0a92532951477beca9f270fd"
+            },
+            {
+              "file": "qs-server-cleanup-m4-direct-writer-owner-confirmation.json",
+              "sha256": "8e2a8a0aad51441f8da892239b6b5643e77a2ad064e4a13e1a8d0d7ab5969064"
+            },
+            {
+              "file": "qs-server-cleanup-m4-source-profile-merge-readback.json",
+              "sha256": "08c04c5709cea625d2a3c4d7e23758f2d57a4061681e2b545f45ca9da8632a83"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data/recovery; Codex: bounded readonly metadata and source diagnostics",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38535455685"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#625-m4-root-通路及管理员权限实际通过写入者范围确认"
+        }
+      ],
+      "limitations": [
+        "Original22 records are byte-preserved; failed diagnostics remain scoped and historical. This is not production signoff or maintenance/backup/DDL approval.",
+        "The original five-query profile measures directly reported grants; SHOW GRANTS without USING does not expand all role privileges. Fixed USING measures potential, not role activation. Administrator success does not upgrade application credentials.",
+        "PROCESS/full catalog, all-schema Event state, scalar field distributions, Mongo FCV and export scope remain unknown. The owner declaration does not prove actual process exit, in-flight settlement, continuous freeze or autonomous Event/TTL/message/external responsibility control.",
+        "PR364 source merge is separate from production deployment; only its exact8241 head checks were verified. Actual production is the last bound M2 observation, not ab998. Full effective configuration is still not recorded.",
+        "Same-window coherent full backup pair, complete isolated restore, old image and three-service startup, interruption/forward recovery and30/60-minute/RPO0 budgets remain incomplete. No production stop/export/restore/DDL/delete or M6 T0."
+      ]
     }
   ]
 }
