@@ -41,6 +41,8 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 readiness 查询失败按固定类别诊断：服务端 MySQL 3024 为 `query_server_timeout`，1317 为 `query_server_interrupted`，1142／1143／1227 为 `query_permission_denied`，Go context deadline／cancel 为 `query_deadline_exceeded`／`query_canceled`；未识别错误保持 `query_failed`。QueryContext 和读取结果的 Rows.Err 使用相同规则，不输出 Message、SQL、账号或驱动错误正文，不根据耗时推断原因。原五查询 profile 及 readiness 的18个固定读取、5秒单条／45秒总预算不变，失败仍清空部分测量并核验连接释放，不重试或回退认证。
 
+typed MySQL 错误另保留可选 `query_mysql_error_number`，只复制 Number 的0～65535整数，未列入上述类别的号码归 `query_mysql_error`；没有观测到该类型时省略，旧V1回执继续有效，成功回执禁止带号码。原样保留的网络timeout／其他网络错误、InvalidConn、BadConn及失败Rows.Err中的EOF各有固定类别；正常结果集结束不算失败。driver1.9.3可能先将读取错误统一为InvalidConn，因此 `query_invalid_connection` 不能证明具体网络原因或超时。释放失败仍优先阻断完成，若此前已有真实MySQL数字码则保留其诊断值；不读取SQLState、Message、网络Op／Addr或原始driver日志。
+
 
 ## 日志回执运输
 

@@ -59,6 +59,8 @@ Mongo 的最终传输回执增加固定 `failure_stage`，区分 SSH keyscan、�
 
 实际总耗时超限时，仅最终 `reading_budget_exceeded`／`total_budget` 失败回执可以保留耗时和已证明的释放字段，三个完成标记必须全部为 false；native 回执及所有成功回执仍受原45秒上限约束。该诊断例外不延长执行时间或把未证释放标记设为true。
 
+MySQL未知typed服务端错误使用 `query_mysql_error` 并保留可选uint16号码；仅该类型实际出现时复制Number，旧回执无该字段仍有效。原样的网络错误、InvalidConn、BadConn及失败EOF各自分类，InvalidConn不推定为timeout，正常EOF不失败。不得输出Message、SQLState、网络Op／Addr，释放失败及部分测量规则保持原样。
+
 CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 rs0。必须设置 required 标记，精确 selector 的 JSON 事件必须实际 RUN/PASS；任意 SKIP、缺失 selector 或依赖未就绪均失败。Mongo fixture 使用固定官方 digest、owned network/container label 和唯一 127.0.0.1 随机端口，不复用业务 runtime fixture。
 
 ## 4. 本地非缓存验证
