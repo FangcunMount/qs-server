@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0b43da3ff3f115951a4d98a484b53dfaa96b0048",
-    "verified_on": "2026-10-14"
+    "sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
+    "verified_on": "2026-10-15"
   },
   "status_policy": {
     "doc_status": [
@@ -9919,8 +9919,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0b43da3ff3f115951a4d98a484b53dfaa96b0048",
-        "verified_on": "2026-10-14"
+        "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -10034,6 +10034,13 @@
           "result": "matched",
           "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/pkg/configcontract ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
