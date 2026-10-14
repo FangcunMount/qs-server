@@ -5,6 +5,7 @@ import (
 	"fmt"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	actorrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	actorfixture "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/testfixture"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	driver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
@@ -75,19 +76,20 @@ func (f *facts) ReplaceManagedOperatorRoles(context.Context, int64, int64, []str
 func TestPreparationMySQL(t *testing.T) {
 	db := isolatedMySQL(t)
 	require.NoError(t, db.AutoMigrate(&actorrepo.OperatorPO{}))
+	// Add the original column before the real102 resource removes it.
+	require.NoError(t, db.Exec("ALTER TABLE operators ADD COLUMN effective_roles JSON NOT NULL AFTER roles; CREATE TABLE testee(id BIGINT PRIMARY KEY,tags JSON)").Error)
+	actorUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000102_retire_actor_compatibility_columns.up.sql"))
+	require.NoError(t, err)
+	actorfixture.RetireActorColumns(t, db, actorUp)
 	raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000074_operator_retirement_tasks.up.sql"))
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(raw)).Error)
 	require.NoError(t, db.Exec("INSERT INTO operators(id,org_id,user_id,version,is_active,name,roles) VALUES(9,1,900029,1,TRUE,'admin','[]')").Error)
-	require.NoError(t, db.Exec("CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN); INSERT INTO schema_migrations VALUES(101,FALSE)").Error)
 	f := &facts{admin: true}
 	identityErr := error(nil)
 	tool := New(db, f, f, func(_ context.Context, user int64) error { require.Equal(t, int64(800028), user); return identityErr })
 	cmd := Command{OrgID: 1, UserID: 800028, ActorID: 900029, Name: "store account", RequestID: "prepare-1", Reason: "reviewed store preparation"}
 	ctx := context.Background()
-	_, err = tool.Preflight(ctx, cmd)
-	require.Error(t, err, "new preflight must reject the pre-DDL layout")
-	require.NoError(t, db.Exec("UPDATE schema_migrations SET version=102").Error)
 	plan, err := tool.Preflight(ctx, cmd)
 	require.NoError(t, err)
 	require.Equal(t, "pending", plan.State)

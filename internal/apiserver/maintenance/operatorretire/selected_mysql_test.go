@@ -10,9 +10,10 @@ import (
 
 func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t *testing.T) {
 	db, _, facts := fixture(t)
-	if err := db.Exec("RENAME TABLE staff TO operators; ALTER TABLE operators DROP COLUMN effective_roles, ADD COLUMN name VARCHAR(100), ADD COLUMN email VARCHAR(255), ADD COLUMN phone VARCHAR(20), ADD COLUMN created_at DATETIME(3), ADD COLUMN created_by BIGINT, ADD COLUMN deleted_by BIGINT; CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN); INSERT INTO schema_migrations VALUES(102,FALSE); UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
+	if err := db.Exec("RENAME TABLE staff TO operators; UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
 		t.Fatal(err)
 	}
+	installCurrentActorColumns(t, db)
 	tool, err := New(db, facts, facts, "final")
 	if err != nil {
 		t.Fatal(err)

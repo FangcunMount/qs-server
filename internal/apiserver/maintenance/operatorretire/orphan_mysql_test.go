@@ -10,7 +10,8 @@ import (
 
 func TestMySQLOrphanRevocationGuardsAndReplay(t *testing.T) {
 	db, _, facts := fixture(t)
-	require.NoError(t, db.Exec("RENAME TABLE staff TO operators; ALTER TABLE operators DROP COLUMN effective_roles; CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN); INSERT INTO schema_migrations VALUES(102,FALSE)").Error)
+	require.NoError(t, db.Exec("RENAME TABLE staff TO operators").Error)
+	installCurrentActorColumns(t, db)
 	tool, err := New(db, facts, facts, "final")
 	require.NoError(t, err)
 	cmd := OrphanCommand{OrgID: 1, ActorID: 9, UserID: 800038, RequestID: "orphan-1", Reason: "reviewed access removal"}
