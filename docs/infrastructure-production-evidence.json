@@ -6162,6 +6162,116 @@
         "No source migration/contract/config-default changes, DDL/force/down/dirty reset, production fault injection, synthetic business facts, reminder enable/send/replay or old full DB restore. Normal business facts preserved; app runtime remains4a.",
         "Actual backend Plan operator still unbound, request-level Plan/Enrollment effects and real reminder subscribe/receive not signed. No compatibility observation T0 or M4 deletion authorized. M4 needs object responsibility, capacity, coherent backup pair, isolation restore and measured window/recovery gate."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-ab-readonly-readiness",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T05:25:35.707530+00:00",
+      "environment": "production/serverA exact4a metadata-only read; Mac mini approved private destination metadata and owned TCP fixture; direct user M4-A responsibility confirmation",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Actual PID1 configuration bytes and database input semantics were bound before/after. File digest/scoped input equality does not cover the full effective runtime configuration."
+      },
+      "command": "Reviewed metadata reader v3: fixed root@001-ysj, actual PID1/config/ENV/source4a guard, foreground1/query5s/total45s, readonly identity/clean10039/table metadata/direct-grant hints/listCollections/listIndexes, no business-field or TTL-window queries. Separate Mac mini private directory/client-cache metadata and owned loopback TCP fixture; owner explicitly closes only M4-A online old-tool and unregistered consumer obligations. No production stop/dump/restore/DDL/release.",
+      "result": {
+        "status": "findings",
+        "summary": "Scoped metadata procedure and owned cleanup passed. Visible62 application tables plus schema_migrations, estimated SQL data/index6.43GiB,17 Mongo namespaces/82 indexes and exact4 target definitions saved; actual qs TTL list has1. M4-A owner responsibility closed by user with historical material preserved. Full permissions, values, capacity, coherent backup pair, actual isolated restore/startup/budgets and separate production approval remain incomplete.",
+        "measurements": {
+          "metadata_reader_source_sha256": "24ff3d5d225d800a95faba5e9483382d60b50e4c824adff2141782b450f9d3cc",
+          "metadata_reader_binary_sha256": "7238aa073dc847acdf239568601c2165666bd487c962676c0be6ca6ba634c95b",
+          "readonly_procedure_accepted": true,
+          "metadata_inventory_complete": false,
+          "metadata_permission_scope_complete": false,
+          "remote_reading_milliseconds": 5056,
+          "mysql_clean_version": 100,
+          "mongo_clean_version": 39,
+          "runtime_configuration_and_inputs_stable": true,
+          "sql_pool_close_succeeded": true,
+          "sql_connections_after_close": 0,
+          "mongo_disconnect_succeeded": true,
+          "owned_reader_container_and_tool_released": true,
+          "visible_mysql_base_tables": 63,
+          "visible_application_tables_excluding_schema_migrations": 62,
+          "mysql_estimated_data_bytes": 4136337408,
+          "mysql_estimated_index_bytes": 2762620928,
+          "mysql_estimates_are_backup_size": false,
+          "mysql_metadata_permission_scope": "unknown; direct grant hints only, active roles not present, mandatory/partial-revoke scope not proven",
+          "mysql_global_select_direct_hint": false,
+          "mysql_routine_event_trigger_visible_counts": 0,
+          "zero_visible_counts_prove_absence": false,
+          "mongo_namespaces_covered": 17,
+          "mongo_indexes_covered": 82,
+          "mongo_target_full_index_specs": 4,
+          "mongo_actual_qs_ttl_indexes": 1,
+          "mongo_ttl_due_or_window_queries": 0,
+          "business_field_value_queries": 0,
+          "mac_mini_approved_path": "/Users/yangshujie/backups/qs-server/cleanup-m4/",
+          "private_directory_mode": "0700",
+          "mac_mini_available_bytes_at_directory_read": 71610613760,
+          "mac_client_loopback_tcp_fixture_passed": true,
+          "mac_fixture_owned_resources_released": true,
+          "backup_capacity_sufficiency_verified": false,
+          "m4_a_responsibility_closed_by_user": true,
+          "m4_b_c_d_responsibility_closed": false,
+          "original_manifest_hash_and_schema_material_preservation_required": true,
+          "coherent_backup_pair_captured": false,
+          "isolated_real_backup_restore_verified": false,
+          "maintenance_and_recovery_budget_measured": false,
+          "production_ddl_calls": 0,
+          "production_business_writes": 0,
+          "production_structure_retirement_approved": false,
+          "evidence_artifacts": [
+            {
+              "file": "qs-server-cleanup-m4-backup-capability-final-readonly.json",
+              "sha256": "2f325cbc53f33c2d55b27df856f96d1adcf4113c996b684eb30ee9de67896c5e"
+            },
+            {
+              "file": "qs-server-cleanup-m4-client-loopback-transport.json",
+              "sha256": "d3b2193102a1e0afa3a012ed786e726fca7d108e457e36fea2662cf50b0b5f5c"
+            },
+            {
+              "file": "qs-server-cleanup-m4-a-owner-confirmation.json",
+              "sha256": "3e16b8e70278fefa9ec175b3c9cd23fff5cd3a54ce5728b74737db2864f94c19"
+            },
+            {
+              "file": "qs-server-cleanup-m4-backup-rehearsal-preparation.json",
+              "sha256": "1057d97c08f302b12aebc6657b2cd5171448c1c5d4b53198d29caac2c9254a3f"
+            },
+            {
+              "file": "qs-server-cleanup-m4-production-metadata-readonly.json",
+              "sha256": "fedcdb4465e0f1d3cea12a48604ae16b2306a376ab4a8a530d6657ff52d8689a"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data/recovery; Codex: bounded read-only preparation",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#618-m4-源码整合与逐对象备份前置准备"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/10-基础设施生产证据台账.md"
+        }
+      ],
+      "limitations": [
+        "This is a dated scoped metadata/preparation record, not M4 readiness, backup/restore certification, production DDL approval or project signoff. Original19 entries remain byte-preserved.",
+        "Direct MySQL grant hints do not rule out partial revocations or mandatory/active role restrictions; full object visibility and mysqldump routines privilege are unknown. Visible zero routines/events/triggers cannot prove absence.",
+        "Data/index sizes are estimates. Mongo size, actual archive bytes, restore expansion, paired backups and30-day retention need independent measurement; Mac free disk alone does not prove capacity.",
+        "Mongo full index metadata covers actual qs17 namespaces/82 indexes, preserving4 targets and1 TTL definition. Source-known AI TTLs do not imply their presence here or facts about another database/environment. No field distribution or TTL expiry data were read.",
+        "The responsibility statement applies only to two SQL historical fields/CHECKs and online old-tool/unregistered consumer obligations. Preserve original manifests/hash/old schema explanation; historical material capture and restore remain incomplete. Do not extend it to Mongo index, Actor or five-table retirement.",
+        "No production services stopped, writer/TTL/event configuration changed, backup captured/restored, historical facts rewritten, force/down/dirty reset, reminder sent or deployment pause changed. M2 remains4a/clean10039; M6 observation T0 not begun."
+      ]
     }
   ]
 }
