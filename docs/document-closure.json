@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+    "sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -744,7 +744,8 @@
           "No per-document production evidence has been recorded in this initial skeleton.",
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
-          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -3793,7 +3794,7 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -3906,7 +3907,8 @@
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
         "limitations": [
-          "Historical evidence does not cover the reviewed source baseline or local documentation changes."
+          "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -4475,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4682,7 +4684,8 @@
           "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
-          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -9148,7 +9151,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -9301,7 +9304,8 @@
           "M4-D removed sidecar registration because its authorized legacy CLI/package/only-consumer tests were retired; it had no verified or production signoff. Original full registration retained: {\"class\":\"sidecar\",\"doc_status\":\"needs_review\",\"fact_sources\":[{\"kind\":\"source\",\"path\":\"cmd/testee-store-migrate/main.go\"}],\"gaps\":[{\"exit_criteria\":\"Verify release revision, private preflight, maintenance cutover and business acceptance.\",\"id\":\"TESTEE-MIGRATION-CLI-RELEASE\",\"kind\":\"verification\",\"severity\":\"medium\",\"summary\":\"Local migration and rollback checks completed; committed-revision and production evidence pending.\"}],\"owner\":\"runtime\",\"path\":\"cmd/testee-store-migrate/README.md\",\"production_evidence\":{\"deployed_sha\":null,\"level\":\"none\",\"limitations\":[\"Maintenance migration not yet executed in production.\"],\"observed_at\":null,\"refs\":[]},\"verification\":[],\"verified\":{\"source_sha\":null,\"verified_on\":null}}",
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
-          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -10921,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11350,6 +11354,13 @@
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11381,7 +11392,8 @@
           "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
-          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": []
@@ -12022,7 +12034,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12106,7 +12118,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "No per-document production evidence has been recorded in this initial skeleton.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -13335,7 +13348,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13616,7 +13629,8 @@
           "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
-          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
