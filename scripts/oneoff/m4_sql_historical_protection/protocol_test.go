@@ -26,11 +26,13 @@ func privateTestDir(t *testing.T) string {
 	return p
 }
 
-func testMaterial() material {
+func testMaterial() material { return testMaterialEncoding(originalUTF8MB4) }
+
+func testMaterialEncoding(encoding originalEncoding) material {
 	now := time.Now().UTC()
 	m := material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: testSource, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: now.Format(time.RFC3339Nano), SQLName: "qs_fixture", MongoName: "qs_fixture", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), MongoUUID: strings.Repeat("c", 64), MongoHead: []byte{1}, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE schema_migrations", Ledger: []ledgerRow{{100, false}}}
 	for i, o := range objects {
-		check, e := originalCheckDefinition(i)
+		check, e := originalCheckDefinition(i, encoding)
 		if e != nil {
 			panic(e)
 		}
@@ -43,7 +45,7 @@ func testMaterial() material {
 func TestOriginalDefinitionDriftRefusedBeforeRestoration(t *testing.T) {
 	for i := range objects {
 		original := testMaterial().Tables[i].OriginalDDL
-		if e := validateOriginalObjectDefinition(original, i); e != nil {
+		if _, e := validateOriginalObjectDefinition(original, i); e != nil {
 			t.Fatal(e)
 		}
 		for _, changed := range []string{
@@ -53,7 +55,8 @@ func TestOriginalDefinitionDriftRefusedBeforeRestoration(t *testing.T) {
 			strings.Replace(original, "is null", "is not null", 1),
 			strings.Replace(original, "\"maxItems\":128", "\"maxItems\":127", 1),
 		} {
-			if changed == original || validateOriginalObjectDefinition(changed, i) == nil {
+			_, definitionError := validateOriginalObjectDefinition(changed, i)
+			if changed == original || definitionError == nil {
 				t.Fatal("unrestorable definition accepted")
 			}
 			m := testMaterial()
@@ -63,6 +66,52 @@ func TestOriginalDefinitionDriftRefusedBeforeRestoration(t *testing.T) {
 				t.Fatal("bound material may not authorize an unknown original definition")
 			}
 		}
+	}
+}
+
+func TestOriginalKnownCharsetEncodingsRemainBoundToFullDefinition(t *testing.T) {
+	for _, encoding := range []originalEncoding{originalUTF8MB3, originalUTF8MB4} {
+		m := testMaterialEncoding(encoding)
+		if e := validateMaterial(m, testSource, m.SQLName, m.MongoName); e != nil {
+			t.Fatal(e)
+		}
+		statements, e := restorationStatements(m)
+		if e != nil {
+			t.Fatal(e)
+		}
+		for i := range objects {
+			got, e := validateOriginalObjectDefinition(m.Tables[i].OriginalDDL, i)
+			if e != nil || got != encoding {
+				t.Fatal("known original encoding not identified", e)
+			}
+			intro := "_utf8mb3'"
+			if encoding == originalUTF8MB4 {
+				intro = "_utf8mb4'"
+			}
+			if strings.Count(statements[i], "JSON_SCHEMA_VALID("+intro) != 1 || !strings.Contains(statements[i], "AS CHAR CHARACTER SET utf8mb4") {
+				t.Fatal("inverse DDL does not explicitly preserve material encoding")
+			}
+			for _, altered := range []string{
+				strings.Replace(m.Tables[i].OriginalDDL, intro, "_utf8'", 1),
+				strings.Replace(m.Tables[i].OriginalDDL, intro, "_latin1'", 1),
+				strings.Replace(m.Tables[i].OriginalDDL, "char charset utf8mb4", "char charset utf8mb3", 1),
+				strings.Replace(m.Tables[i].OriginalDDL, "<= 524288", "<= 524289", 1),
+				strings.Replace(m.Tables[i].OriginalDDL, "\"maxItems\":128", "\"maxItems\":127", 1),
+				strings.Replace(m.Tables[i].OriginalDDL, "json_schema_valid(", "json_schema_valid(/*unproved*/", 1),
+			} {
+				if _, e := validateOriginalObjectDefinition(altered, i); e == nil {
+					t.Fatal("unknown CHECK accepted through encoding support")
+				}
+			}
+		}
+	}
+	if _, e := originalCheckDefinition(0, 0); e == nil {
+		t.Fatal("unbounded encoding enum accepted")
+	}
+	m := testMaterial()
+	m.Tables[0].OriginalDDL = strings.Replace(m.Tables[0].OriginalDDL, "_utf8mb4'", "_latin1'", 1)
+	if _, e := restorationStatements(m); e == nil {
+		t.Fatal("material cannot supply arbitrary inverse DDL")
 	}
 }
 func testApproval(t *testing.T, m material, hash string) approval {
@@ -169,7 +218,7 @@ func TestFirstCaptureExclusiveExternalHashAndApprovalSingleUse(t *testing.T) {
 	}
 }
 func TestNoArbitraryRestorationResourceOrDDLNormalization(t *testing.T) {
-	got, e := restorationStatements()
+	got, e := restorationStatements(testMaterial())
 	if e != nil {
 		t.Fatal(e)
 	}
