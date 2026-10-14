@@ -291,7 +291,7 @@ MySQL `96` 在既有 `evaluation_outcome` 增加原提交事件引用、JSON 证
 
 ## M4-02 四个历史 Mongo 索引退役（源码准备，生产阻断）
 
-新增 MongoDB `40` 只执行以下四个具名 `dropIndexes`。SQL101 资源在本批不变；SQL101 的 PR #358 独立审查和发布，本批 PR 暂以其分支为 base，须在 SQL 合入实际 main 后重新 retarget、整合并验证最终资源/source digest。
+新增 MongoDB `40` 只执行以下四个具名 `dropIndexes`。SQL101 资源在本批不变；SQL101 的 PR #358 独立审查和发布，本批 PR 暂以其分支为 base，须在 SQL 合入实际 main 后重新 retarget、整合并验证最终资源/source digest。当前已整合实际发布的 M2 main `4a8642b0` 和 SQL-A 的 `d1fa6ade`（含旧批次人员 CLI 入口退役）；现代 selected/orphan 入口保留，旧四动作在配置和连接创建前明确拒绝。
 
 | 集合 | 精确索引名 |
 | --- | --- |
@@ -307,3 +307,5 @@ M4-A 先把 `100/39` 升到 `101/39`，独立只读验证后按已批准的 runt
 四条索引DDL逐项提交。第三条失败可留下前两索引已删、后两仍在及 `101 clean/40 dirty`；权限拒绝也可能发生在元数据已写dirty之后。保留实际索引清单、元数据和错误证据，不以force、清dirty、down或重建空字段掩盖中断。业务 runtime 尚未启动时只能按审批恢复完整一致backup pair，或执行另行审查的向前修复；首个业务runtime启动命令一旦发出，禁止旧全量备份覆盖新增事实。恢复和30/60分钟门槛见[生产恢复与证据](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md)。独立离线执行器的 PR #360 不混入本批diff；实际执行必须用已合入的执行器和本批资源编译同一批准SHA。
 
 真实隔离测试覆盖 Mongo-only升级/无DDL重启、捕获完整 live index spec 并逐项恢复、unique冲突和partial缺失/非string键约束、第三条失败保留dirty、未知元数据拒绝，以及自有认证replica set中实际Unauthorized13。比较其他索引完整spec、所有business namespace UUID/options、业务BSON与SQL版本元数据；provider自身重建schema_migrations集合的UUID变化通过head/dirty和VerifyComplete另行验证，不冒充业务集合变化。恢复夹具包含synthetic非空历史字段和冻结报告，属于对象恢复证明，不是生产完整backup pair演练或业务验收。CI要求五项实际PASS，无auth配置、缺依赖或SKIP均失败。
+
+2026-10-14 重新整合后的源码 `ffee9817` 在任务独占的 MySQL 8.0.36、MongoDB 7.0.25 plain/auth replica set 上，以 race 执行索引五项、SQL 历史字段三项、版本对四项和关闭 DDL 两项，共十四个顶层用例全部 PASS、无 SKIP；任务自有三容器、网络和认证配置已精确释放。此前已有的本机 NSQ 容器在执行期间继续重启，额外环境稳定性总标志未通过；该观察与迁移用例通过、自有资源释放分别保留，不能声明所有已有容器稳定或 NSQ 验收通过。新版 PR 的 CI、生产完整备份恢复、冻结窗口和生产发布继续独立验收。
