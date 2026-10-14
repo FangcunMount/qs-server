@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+    "sha": "670c981e6b1b76c4619674140867273b9be1eec4",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+        "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -337,6 +337,62 @@
         {
           "kind": "source",
           "path": ".github/workflows/db-ops.yml"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/mysql_metadata_profile_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-metadata-readiness-native-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/main_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mongodb-metadata-profile.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mongodb-metadata-profile.py"
         }
       ],
       "verification": [
@@ -352,6 +408,70 @@
           "command": "bash scripts/cd/test-github-action-runtimes.sh",
           "result": "passed",
           "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mongodb",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go",
+          "selector": "func TestMetadataReadinessNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
           "verified_on": "2026-10-14"
         }
       ],
@@ -9919,8 +10039,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
-        "verified_on": "2026-10-13"
+        "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+        "verified_on": "2026-10-14"
       },
       "fact_sources": [
         {
@@ -9971,6 +10091,13 @@
           "result": "matched",
           "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
           "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -11211,7 +11338,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+        "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11257,6 +11384,13 @@
           "result": "passed",
           "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/dbops/test-production-inventory.sh",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -11276,7 +11410,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "298fd002469af63db4880c553bab86088083fc17",
+        "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11323,6 +11457,38 @@
         {
           "kind": "source",
           "path": "internal/pkg/configcontract/mysql_metadata_profile_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-metadata-readiness-native-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-readiness.py"
         }
       ],
       "verification": [
@@ -11458,6 +11624,56 @@
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "298fd002469af63db4880c553bab86088083fc17",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go",
+          "selector": "func TestMetadataReadinessNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
           "verified_on": "2026-10-14"
         }
       ],
