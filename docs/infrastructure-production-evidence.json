@@ -6272,6 +6272,124 @@
         "The responsibility statement applies only to two SQL historical fields/CHECKs and online old-tool/unregistered consumer obligations. Preserve original manifests/hash/old schema explanation; historical material capture and restore remain incomplete. Do not extend it to Mongo index, Actor or five-table retirement.",
         "No production services stopped, writer/TTL/event configuration changed, backup captured/restored, historical facts rewritten, force/down/dirty reset, reminder sent or deployment pause changed. M2 remains4a/clean10039; M6 observation T0 not begun."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-capacity-and-diagnostic-scope",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T06:34:14.828905+00:00",
+      "environment": "production/serverA readonly capacity metadata; Mac mini runner6 exact0cca diagnostic first failure; user M4-B and system.profile named scope confirmations",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Exact API PID1/file/ENV and database input semantics before/after are scoped; no full six-instance effective configuration digest."
+      },
+      "command": "One reviewed v2 capacity reader: source4a, foreground1/query5s/total45s, identity/clean10039, scalar dbStats/collStats, buildInfo, FCV metadata, complete system.profile ListCollections definition plus ListIndexes. One frozen0cca db-ops metadata-visibility-admin-profile dispatch through existing production secrets and trusted root@001-ysj; generic transport/receipt failure retained. No export, stop, DDL or release.",
+      "result": {
+        "status": "findings",
+        "summary": "Mongo scoped procedure/cleanup passed;17 namespaces/82 indexes, Mongo7.0.31, actual diagnostic definition/index/count captured; user closes only M4-B responsibilities and excludes diagnostic documents from complete business restoration while retaining production collection. MySQL admin diagnostic failed with no permission conclusion; FCV, complete backup/restore/freeze/startup and measured budgets remain incomplete.",
+        "measurements": {
+          "capacity_readonly_procedure_accepted": true,
+          "capacity_remote_reading_ms": 5217,
+          "capacity_logical_serial_reads": 34,
+          "runtime_sha_and_configuration_inputs_stable": true,
+          "mysql_clean_version": 100,
+          "mongo_clean_version": 39,
+          "mongo_server_version": "7.0.31",
+          "mongo_fcv_known": false,
+          "mongo_fcv_failure": "Unauthorized13; no fallback or elevation",
+          "mongo_namespace_count": 17,
+          "mongo_index_count": 82,
+          "mongo_catalog_objects": 1240884,
+          "mongo_estimated_data_bytes": 2448708935,
+          "mongo_estimated_storage_bytes": 1185402880,
+          "mongo_estimated_index_bytes": 582676480,
+          "mongo_estimated_total_bytes": 1768079360,
+          "catalog_estimates_are_backup_size_or_atomic_snapshot": false,
+          "ttl_repair_plan_catalog_count": 0,
+          "ttl_repair_plan_future_window_proven": false,
+          "system_profile_production_retained": true,
+          "system_profile_business_restore_excluded_by_user": true,
+          "system_profile_complete_definition_and_indexes_saved": true,
+          "system_profile_catalog_count": 596,
+          "system_profile_capped_size_bytes": 1048576,
+          "system_profile_actual_index_count": 0,
+          "system_profile_document_bodies_read": 0,
+          "other_business_namespaces_complete_restore_required": 16,
+          "sql_pool_close_and_open0": true,
+          "mongo_disconnect_succeeded": true,
+          "capacity_owned_container_and_tools_released": true,
+          "m4_b_responsibility_closed_by_user": true,
+          "actor_and_five_table_responsibilities_closed": false,
+          "admin_profile_source_sha": "0cca6c5a272898eb73337074b679fc7fb6a8f9c8",
+          "admin_profile_run_id": 38522933840,
+          "admin_profile_job_id": 115716575845,
+          "admin_profile_other_jobs_skipped": 13,
+          "admin_profile_complete": false,
+          "admin_profile_error": "profile_transport_or_receipt_failed",
+          "admin_grant_scope_known": false,
+          "admin_profile_reached_database_known": false,
+          "backup_restore_verified": false,
+          "maintenance_recovery_budget_verified": false,
+          "production_ddl_stop_or_delete_calls": 0,
+          "evidence_artifacts": [
+            {
+              "file": "qs-server-cleanup-m4-system-profile-scope-confirmation.json",
+              "sha256": "0ee11fea51984565ca6cd215511432a66bebbbb3b3df87dd641c6921fa2c6742"
+            },
+            {
+              "file": "qs-server-cleanup-m4-b-owner-confirmation.json",
+              "sha256": "2edaaf3eaa3b3ff74e27774660ccee3e1c0ef2dac1f3bb75d5ee59ed14086ef9"
+            },
+            {
+              "file": "qs-server-cleanup-m4-backup-rehearsal-scope-addendum.json",
+              "sha256": "cc1662c51faa5239b0c0b5a3f6cdbf0eec437bde36bb7f402ad1279126a0d3f8"
+            },
+            {
+              "file": "qs-server-cleanup-m4-production-capacity-metadata-readonly-v2.json",
+              "sha256": "0c385f808f8f2f4d4708eeb675a6a498ea513d07ce633f5f7fbabe001c1190aa"
+            },
+            {
+              "file": "qs-server-cleanup-m4-admin-profile-dispatch.json",
+              "sha256": "bf6c00740868fa4d8cbc94fd96b48d3f2206ba37947967e73f842257b2ed25a5"
+            },
+            {
+              "file": "qs-server-cleanup-m4-admin-profile-first-failed-receipt.json",
+              "sha256": "44acad0669bb59f64a50cb6a295923335364256de99d884bfd6b118056eededf"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data/recovery; Codex: readonly/source preparation",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38522933840"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#619-m4-诊断集合恢复范围具名确认"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#620-m4-b-责任确认与停写验收边界"
+        }
+      ],
+      "limitations": [
+        "Original20 records remain byte preserved; this new scoped finding is not M4 readiness or permission to operate production.",
+        "Catalog statistics are sequential estimates. Current empty TTL repairplans does not prove an entire future freeze interval without autonomous writes; no expiry fields were queried.",
+        "Only diagnostic metadata retained, no system.profile document bodies/configuration changed. Actual namespace changes at backup time require fresh scope review.",
+        "The complete profile joblog proves only generic transport-or-receipt failure after tests/packaging. Cannot infer no SSH/database call occurred, successful release, or any positive admin grants.",
+        "Complete MySQL namespace visibility/export privilege, Mongo FCV, full coherent backup pair, isolated recovery/equality/three-service startup, interruption and forward recovery/budgets remain unproven.",
+        "M4-B closure does not extend to Actor, five historical tables, AI supported environments or claims deletion. Production remains4a and M6 T0 not begun."
+      ]
     }
   ]
 }
