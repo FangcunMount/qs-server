@@ -186,6 +186,9 @@ func (h *nativeFixture) toolCharset(charset string) {
 	if e != nil {
 		h.t.Fatal(e)
 	}
+	if cfg.Params == nil {
+		cfg.Params = map[string]string{}
+	}
 	cfg.Params["charset"] = charset
 	h.dsn = cfg.FormatDSN()
 	pool, e := sql.Open("mysql", h.dsn)
