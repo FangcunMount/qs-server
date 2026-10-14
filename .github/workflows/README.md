@@ -49,13 +49,15 @@ CI for exact SHA
 | operation / database | 只读入口及连接来源 | 证据边界 |
 | --- | --- | --- |
 | `metadata-readiness-admin` / `mysql` | 固定 `root@47.94.204.124:22` 接收器，现有 `MYSQL_METADATA_ADMIN_*`；六成员静态 Linux 包使用独立 `--metadata-readiness` 模式 | 绑定读取前后数据库身份、限定目录及 readiness 读取；原五成员权限 profile 保持独立 |
-| `metadata-visibility-admin-profile` / `mongodb` | 原 Mongo 日常备份的 `MONGO_BACKUP_*` / `MONGODB_*` 候选配置；Mac mini 原生 reader 使用独占 loopback SSH tunnel，认证库固定 `admin` | 仅观测固定 qs / rs0 / member / migration / UUID 目标的身份、FCV、TTL monitor 和认证元数据；不执行日常备份脚本，不回退其它连接 |
+| `metadata-visibility-admin-profile` / `mongodb` | 用户已配置的 `root@003-ysj` 解析为固定 `root@81.70.102.15:22`，借用现有身份和可信 known_hosts；保留现有 `MONGODB_*`，认证库固定 `admin` | Mac mini 原生 reader 使用独占 loopback SSH tunnel；仅观测固定 qs / rs0 / member / migration / UUID 目标的身份、FCV、TTL monitor 和认证元数据，不执行日常备份脚本 |
 
 `complete` 只证明本次已声明的有界读取和 owned 连接释放。metadata count、digest、权限及 FCV 不证明对象无业务责任、完整 namespace 导出、备份对可恢复或停写 RPO=0，也不授权停写、恢复、DDL 或删除。`system.profile` 的业务恢复排除范围另须保留定义、索引和计数回执，生产集合继续保留。两个 reader 均不初始化业务容器、迁移 runner、消息消费者或发送端点；现用 backup、validate、restore、status 和 scheduled job 使用各自原入口。
 
 Mongo 最多执行 10 个固定逻辑只读查询，异常时至多释放一个本 reader 拥有的 cursor；driver 握手不计为业务查询。`ttl_monitor.known=false` 表示未知，不能把零值 `enabled=false` 解释为已关闭。TTL 参数仅为本次观测，不扫描 TTL 业务数据、不读取 currentOp、不执行关闭动作，也不证明未来持续状态或维护冻结。
 
-Mongo 的最终传输回执增加固定 `failure_stage`，区分 SSH keyscan、指纹、路由、隧道、自有监听者、native reader 和释放阶段；native reader 的 JSON 协议保持原样。成功必须为 `none`，未知阶段拒绝；失败不输出命令、连接地址或 stderr。MySQL readiness 对服务端 3024／1317、权限拒绝及 Go context deadline／cancel 使用不同固定错误类别，其余继续为 `query_failed`；不会根据运行时长猜测原因、调整读取预算或自动重试。失败回执不出具完整测量结论。
+Mongo 使用离线 `ssh -G` 校验既有别名，拒绝代理、替代主机和额外转发；冻结已解析身份后，最终连接使用 `-F /dev/null`、固定 root/IP/22、`StrictHostKeyChecking=yes`、`UpdateHostKeys=no` 和唯一本次 loopback 转发。既有信任文件须归属本用户、非symlink并在读取前后保持相同摘要；只借用、不写入、不删除。最终 V2 回执中，未创建的临时 key/known_hosts/directory 三项严格为 null；cursor/client/tunnel termination/wait/owned tunnel/reader 六项实际释放全部成功才允许 complete 和 exit0。native V1先独立校验，其10次逻辑读取与45秒预算不变；历史失败回执保留自身版本。
+
+Mongo 的最终传输回执保留固定 `failure_stage`，区分既有 SSH 配置、信任材料、路由、隧道、自有监听者、native reader 和释放阶段；native reader 的 JSON 协议保持原样。成功必须为 `none`，未知阶段拒绝；失败不输出命令、连接地址或 stderr。MySQL readiness 对服务端 3024／1317、权限拒绝及 Go context deadline／cancel 使用不同固定错误类别，不根据运行时长猜测原因、调整读取预算或自动重试。失败回执不出具完整测量结论。
 
 实际总耗时超限时，仅最终 `reading_budget_exceeded`／`total_budget` 失败回执可以保留耗时和已证明的释放字段，三个完成标记必须全部为 false；native 回执及所有成功回执仍受原45秒上限约束。该诊断例外不延长执行时间或把未证释放标记设为true。
 
