@@ -417,6 +417,9 @@ func run(args []string, get func(string) string, out io.Writer) int {
 	if len(args) == 1 && args[0] == "--metadata-readiness" {
 		return runReadiness(get, out)
 	}
+	if len(args) == 1 && args[0] == "--retirement-inventory" {
+		return runInventory(get, out)
+	}
 	_ = mysql.SetLogger(&mysql.NopLogger{})
 	b := binding{SHA: get("PROFILE_SOURCE_SHA"), RunID: get("PROFILE_RUN_ID"), Expected: get("PROFILE_EXPECTED_TARGET_HASH")}
 	r := baseReceipt(b)
