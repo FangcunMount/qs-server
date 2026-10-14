@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -81,6 +83,7 @@ type readinessReceipt struct {
 	Complete           bool                   `json:"complete"`
 	ErrorCategory      string                 `json:"error_category"`
 	FailureStage       string                 `json:"failure_stage"`
+	QueryMySQLNumber   *uint16                `json:"query_mysql_error_number,omitempty"`
 	QueryCount         uint64                 `json:"query_count"`
 	ConnectionReleased *bool                  `json:"connection_released"`
 	DatabaseReleased   *bool                  `json:"database_released"`
@@ -97,27 +100,61 @@ func invalidateReadiness(r readinessReceipt, category, stage string) readinessRe
 	return r
 }
 
-// Only typed errors contribute a more specific public category. Driver text,
-// account names and SQL never enter this closed diagnostic classification.
+// Classification keeps only a closed category and an optional typed server
+// number. It deliberately retains no raw error, SQLState, message or address.
+type readinessQueryFailure struct {
+	category string
+	number   *uint16
+}
+
+func (f *readinessQueryFailure) Error() string { return f.category }
 func readinessQueryError(err error) error {
+	failure := &readinessQueryFailure{category: "query_failed"}
 	var server *mysql.MySQLError
 	if errors.As(err, &server) && server != nil {
-		switch server.Number {
+		number := server.Number
+		failure.number = &number
+		failure.category = "query_mysql_error"
+		switch number {
 		case 3024:
-			return errors.New("query_server_timeout")
+			failure.category = "query_server_timeout"
 		case 1317:
-			return errors.New("query_server_interrupted")
+			failure.category = "query_server_interrupted"
 		case 1142, 1143, 1227:
-			return errors.New("query_permission_denied")
+			failure.category = "query_permission_denied"
+		}
+		return failure
+	}
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		failure.category = "query_deadline_exceeded"
+	case errors.Is(err, context.Canceled):
+		failure.category = "query_canceled"
+	case errors.Is(err, mysql.ErrInvalidConn):
+		failure.category = "query_invalid_connection"
+	case errors.Is(err, driver.ErrBadConn):
+		failure.category = "query_bad_connection"
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		failure.category = "query_unexpected_eof"
+	case errors.Is(err, io.EOF):
+		failure.category = "query_eof"
+	default:
+		var network net.Error
+		if errors.As(err, &network) {
+			failure.category = "query_network_error"
+			if network.Timeout() {
+				failure.category = "query_network_timeout"
+			}
 		}
 	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return errors.New("query_deadline_exceeded")
+	return failure
+}
+func invalidateReadinessQuery(r readinessReceipt, err error, stage string) readinessReceipt {
+	var failure *readinessQueryFailure
+	if errors.As(err, &failure) && failure != nil {
+		r.QueryMySQLNumber = failure.number
 	}
-	if errors.Is(err, context.Canceled) {
-		return errors.New("query_canceled")
-	}
-	return errors.New("query_failed")
+	return invalidateReadiness(r, err.Error(), stage)
 }
 
 // Every returned row is consumed and every cursor release is checked. A
@@ -133,7 +170,12 @@ func readinessRows(ctx context.Context, c *sql.Conn, query string, width int) (r
 	}
 	defer func() {
 		if rows.Close() != nil {
-			result, err = nil, errors.New("metadata_release_failed")
+			var failure *readinessQueryFailure
+			var number *uint16
+			if errors.As(err, &failure) && failure != nil {
+				number = failure.number
+			}
+			result, err = nil, &readinessQueryFailure{category: "metadata_release_failed", number: number}
 		}
 	}()
 	columns, err := rows.Columns()
@@ -270,7 +312,7 @@ func probeReadiness(ctx context.Context, db *sql.DB, cfg connection, b binding) 
 		r.QueryCount++
 		rows, e := readinessRows(ctx, c, query, width)
 		if e != nil {
-			r = invalidateReadiness(r, e.Error(), stage)
+			r = invalidateReadinessQuery(r, e, stage)
 			return nil, false
 		}
 		return rows, true

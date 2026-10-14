@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"strings"
 	"testing"
 
@@ -305,7 +307,15 @@ func TestMetadataReadinessQueryErrorsRemainPrivateAndIncomplete(t *testing.T) {
 		{"process_permission", &mysql.MySQLError{Number: 1227, Message: fixtureSecret}, "query_permission_denied"},
 		{"context_deadline", context.DeadlineExceeded, "query_deadline_exceeded"},
 		{"context_cancel", context.Canceled, "query_canceled"},
-		{"unknown_server", &mysql.MySQLError{Number: 1205, Message: fixtureSecret + " 3024 timeout"}, "query_failed"},
+		{"server_zero", &mysql.MySQLError{Number: 0, Message: fixtureSecret}, "query_mysql_error"},
+		{"server_max", &mysql.MySQLError{Number: 65535, Message: fixtureSecret}, "query_mysql_error"},
+		{"network_timeout", &net.OpError{Op: fixtureSecret, Net: fixtureSecret, Err: readinessPrivateNetworkError{timeout: true}}, "query_network_timeout"},
+		{"network_error", &net.OpError{Op: fixtureSecret, Net: fixtureSecret, Err: readinessPrivateNetworkError{}}, "query_network_error"},
+		{"invalid_connection", mysql.ErrInvalidConn, "query_invalid_connection"},
+		{"bad_connection", driver.ErrBadConn, "query_bad_connection"},
+		{"failure_eof", io.EOF, "query_eof"},
+		{"failure_unexpected_eof", io.ErrUnexpectedEOF, "query_unexpected_eof"},
+		{"unknown_server", &mysql.MySQLError{Number: 1205, Message: fixtureSecret + " 3024 timeout"}, "query_mysql_error"},
 		{"text_is_not_typed_error", errors.New(fixtureSecret + " 3024 context deadline exceeded"), "query_failed"},
 		{"server_before_context", errors.Join(&mysql.MySQLError{Number: 1142, Message: fixtureSecret}, context.DeadlineExceeded), "query_permission_denied"},
 	}
@@ -324,17 +334,56 @@ func TestMetadataReadinessQueryErrorsRemainPrivateAndIncomplete(t *testing.T) {
 				} else {
 					q.WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}).RowError(0, private))
 				}
+				if tc.name == "bad_connection" {
+					m.ExpectClose()
+				}
 				r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
-				m.ExpectClose()
+				if tc.name != "bad_connection" {
+					m.ExpectClose()
+				}
 				r = releaseReadinessDatabase(db, r)
-				if r.Complete || r.Measurements != nil || r.ErrorCategory != tc.category || r.FailureStage != "outcome_distribution" || r.QueryCount != 16 {
+				expectedCategory, expectedStage := tc.category, "outcome_distribution"
+				badQuery := tc.name == "bad_connection" && phase == "query"
+				if badQuery {
+					expectedCategory, expectedStage = "connection_release_failed", "connection_release"
+				}
+				if r.Complete || r.Measurements != nil || r.ErrorCategory != expectedCategory || r.FailureStage != expectedStage || r.QueryCount != 16 {
 					t.Fatalf("query error classification failed: %s/%s/%d", r.ErrorCategory, r.FailureStage, r.QueryCount)
 				}
-				if r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
+				var server *mysql.MySQLError
+				if errors.As(tc.err, &server) && server != nil {
+					if r.QueryMySQLNumber == nil || *r.QueryMySQLNumber != server.Number {
+						t.Fatal("typed_mysql_number_lost")
+					}
+				} else if r.QueryMySQLNumber != nil {
+					t.Fatal("non_server_error_gained_number")
+				}
+				if r.ConnectionReleased == nil || *r.ConnectionReleased != !badQuery || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
 					t.Fatal("classified_failure_release_unverified")
 				}
 				assertReadinessPrivate(t, r)
 			})
 		}
+	}
+}
+
+type readinessPrivateNetworkError struct{ timeout bool }
+
+func (e readinessPrivateNetworkError) Error() string   { return fixtureSecret }
+func (e readinessPrivateNetworkError) Timeout() bool   { return e.timeout }
+func (e readinessPrivateNetworkError) Temporary() bool { return false }
+func TestMetadataReadinessServerNumberSurvivesReleaseFailure(t *testing.T) {
+	err := readinessQueryError(&mysql.MySQLError{Number: 1064, Message: fixtureSecret})
+	r := invalidateReadinessQuery(baseReadinessReceipt(fixtureBinding()), err, "outcome_distribution")
+	r.QueryCount = 16
+	for _, release := range []struct{ category, stage string }{{"metadata_release_failed", "outcome_distribution"}, {"connection_release_failed", "connection_release"}, {"database_release_failed", "database_release"}} {
+		failed := invalidateReadiness(r, release.category, release.stage)
+		if failed.QueryMySQLNumber == nil || *failed.QueryMySQLNumber != 1064 {
+			t.Fatal("observed_number_lost_on_release_failure")
+		}
+		assertReadinessPrivate(t, failed)
+	}
+	if readinessQueryError(driver.ErrBadConn).Error() != "query_bad_connection" {
+		t.Fatal("bad_connection_classification_failed")
 	}
 }

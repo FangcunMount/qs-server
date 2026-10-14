@@ -115,6 +115,42 @@ class ReadinessTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 self.validate(value, 0)
 
+    def test_typed_mysql_number_is_optional_bounded_and_never_positive(self):
+        def failure(category='query_mysql_error', number=1064):
+            value = readiness.stage_failure(environment(), category)
+            value.update(failure_stage='outcome_distribution', query_count=16,
+                         connection_released=True, database_released=True, pool_closed_verified=True)
+            if number is not None:
+                value['query_mysql_error_number'] = number
+            return value
+        for number in (0, 1064, 65535):
+            self.assertEqual(self.validate(failure(number=number), 1)['query_mysql_error_number'], number)
+        for number in (None, True, False, -1, 65536, 1064.0, '1064', 3024, 1317, 1142, 1143, 1227):
+            with self.assertRaises(Exception):
+                self.validate(failure(number=number), 1)
+        for category, number in (('query_server_timeout', 3024), ('query_server_interrupted', 1317), ('query_permission_denied', 1142)):
+            self.assertEqual(self.validate(failure(category, number), 1)['query_mysql_error_number'], number)
+            with self.assertRaises(Exception):
+                self.validate(failure(category, 1064), 1)
+            self.assertFalse(self.validate(failure(category, None), 1)['complete'])  # Old V1 remains valid.
+        for category in ('query_network_timeout', 'query_network_error', 'query_invalid_connection', 'query_bad_connection', 'query_eof', 'query_unexpected_eof'):
+            self.assertFalse(self.validate(failure(category, None), 1)['complete'])
+            with self.assertRaises(Exception):
+                self.validate(failure(category), 1)
+        for category in ('metadata_release_failed', 'connection_release_failed', 'database_release_failed'):
+            value = failure(category)
+            if category != 'metadata_release_failed':
+                value['failure_stage'] = category.removesuffix('_failed')
+            self.assertFalse(self.validate(value, 1)['complete'])
+        value = receipt()
+        value['query_mysql_error_number'] = 0
+        with self.assertRaises(Exception):
+            self.validate(value)
+        value = failure()
+        value['query_count'] = 0
+        with self.assertRaises(Exception):
+            self.validate(value, 1)
+
     def test_unknown_raw_fields_and_tokens_cannot_cross_armor(self):
         for key in ('grants', 'roles', 'username', 'sql_text', 'body', 'connection_id'):
             value = receipt()

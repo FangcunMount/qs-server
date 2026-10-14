@@ -140,16 +140,89 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		}
 		_, err = readinessRows(ctx, c, "SELECT /*+ MAX_EXECUTION_TIME(50) */ 1 FROM assessment WHERE SLEEP(1)", 1)
 		r := baseReadinessReceipt(b)
+		r.QueryCount = 1
 		if err == nil {
 			r = invalidateReadiness(r, "metadata_invalid", "tables")
 		} else {
-			r = invalidateReadiness(r, err.Error(), "tables")
+			r = invalidateReadinessQuery(r, err, "tables")
 		}
 		r = releaseReadinessDatabase(db, releaseReadinessConnection(c, r))
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_server_timeout" || r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
 			t.Fatalf("native server timeout classification or release failed: %s", r.ErrorCategory)
 		}
 		assertReadinessPrivate(t, r)
+	})
+
+	t.Run("unknown_server_real_1064_and_release", func(t *testing.T) {
+		db := open("readiness_global")
+		c, err := db.Conn(ctx)
+		if err != nil {
+			_ = db.Close()
+			t.Fatal("owned_syntax_connection_failed")
+		}
+		_, err = readinessRows(ctx, c, "SELECT FROM", 1)
+		r := baseReadinessReceipt(b)
+		r.QueryCount = 1
+		if err == nil {
+			r = invalidateReadiness(r, "metadata_invalid", "tables")
+		} else {
+			r = invalidateReadinessQuery(r, err, "tables")
+		}
+		r = releaseReadinessDatabase(db, releaseReadinessConnection(c, r))
+		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_mysql_error" || r.QueryMySQLNumber == nil || *r.QueryMySQLNumber != 1064 || r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
+			t.Fatal("native_unknown_server_number_or_release_failed")
+		}
+		assertReadinessPrivate(t, r)
+	})
+	t.Run("read_timeout_real_invalid_connection_without_number", func(t *testing.T) {
+		// Only this fixture's client deadline is shortened. Production remains
+		// five seconds; a live context cannot turn this packet timeout into a
+		// claimed context/server timeout after the driver has generalized it.
+		copy := cfg
+		copy.User, copy.Password = "readiness_global", "native-readiness-private-fixture"
+		options := mysqlConfig(copy)
+		options.ReadTimeout = 250 * time.Millisecond
+		connector, err := mysql.NewConnector(options)
+		if err != nil {
+			t.Fatal("owned_short_read_connector_failed")
+		}
+		db := sql.OpenDB(connector)
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+		c, err := db.Conn(ctx)
+		if err != nil {
+			_ = db.Close()
+			t.Fatal("owned_short_read_connection_failed")
+		}
+		_, err = readinessRows(ctx, c, "SELECT SLEEP(1)", 1)
+		r := baseReadinessReceipt(b)
+		r.QueryCount = 1
+		if err == nil {
+			r = invalidateReadiness(r, "metadata_invalid", "tables")
+		} else {
+			r = invalidateReadinessQuery(r, err, "tables")
+		}
+		r = releaseReadinessDatabase(db, releaseReadinessConnection(c, r))
+		if ctx.Err() != nil || r.Complete || r.Measurements != nil || r.ErrorCategory != "query_invalid_connection" || r.QueryMySQLNumber != nil || r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
+			t.Fatal("native_read_timeout_was_misclassified_or_unreleased")
+		}
+		assertReadinessPrivate(t, r)
+		// Server-side SLEEP may finish after the client disconnects. Observe only
+		// this fixture's exact account and require its native session to settle.
+		deadline := time.Now().Add(3 * time.Second)
+		for {
+			var remaining int
+			if admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.processlist WHERE USER = ?", copy.User).Scan(&remaining) != nil {
+				t.Fatal("owned_short_read_session_check_failed")
+			}
+			if remaining == 0 {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("owned_short_read_server_session_unsettled")
+			}
+			time.Sleep(25 * time.Millisecond)
+		}
 	})
 
 	t.Run("all_schema_event_and_other_user_held_transaction", func(t *testing.T) {

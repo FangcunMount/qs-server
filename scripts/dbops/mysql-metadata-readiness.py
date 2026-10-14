@@ -21,7 +21,7 @@ receipt_transport_module = profile.receipt_transport_module
 capture_private = profile.capture_private
 
 STAGES = frozenset({"none", "input", "connect", "identity_before", "global_grants", "migration_before", "tables", "views", "routines", "triggers", "events", "columns", "checks", "threads", "transactions", "locks", "instrument", "assessment_distribution", "outcome_distribution", "migration_after", "identity_after", "connection_release", "database_release", "transport"})
-ERRORS = frozenset({"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "target_identity_mismatch", "target_hash_mismatch", "identity_read_failed", "identity_final_failed", "session_identity_changed", "query_failed", "query_server_timeout", "query_server_interrupted", "query_permission_denied", "query_deadline_exceeded", "query_canceled", "metadata_invalid", "metadata_truncated", "metadata_release_failed", "grants_unverified", "migration_pair_rejected", "storage_observation_unavailable", "connection_release_failed", "database_release_failed", "profile_input_preflight_failed", "profile_package_preflight_failed", "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed", "profile_transport_or_receipt_failed"})
+ERRORS = frozenset({"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "target_identity_mismatch", "target_hash_mismatch", "identity_read_failed", "identity_final_failed", "session_identity_changed", "query_failed", "query_server_timeout", "query_server_interrupted", "query_permission_denied", "query_deadline_exceeded", "query_canceled", "query_mysql_error", "query_network_timeout", "query_network_error", "query_invalid_connection", "query_bad_connection", "query_unexpected_eof", "query_eof", "metadata_invalid", "metadata_truncated", "metadata_release_failed", "grants_unverified", "migration_pair_rejected", "storage_observation_unavailable", "connection_release_failed", "database_release_failed", "profile_input_preflight_failed", "profile_package_preflight_failed", "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed", "profile_transport_or_receipt_failed"})
 CATALOG_KEYS = frozenset({"tables", "views", "routines", "triggers", "events", "columns", "checks"})
 PARTITION_KEYS = frozenset({"total", "sql_null", "non_null", "json_null", "empty_object", "non_empty_object", "other"})
 MEASUREMENTS_SCHEMA = {
@@ -38,7 +38,7 @@ RECEIPT_SCHEMA = {
     "source_target_hash": "hash64", "diagnostic_only": "bool", "readiness_only": "bool", "freeze_verified": "bool",
     "complete": "bool", "error_category": ERRORS, "failure_stage": STAGES, "query_count": "uint",
     "connection_released": "nullable_bool", "database_released": "nullable_bool", "pool_closed_verified": "nullable_bool",
-    "measurements": MEASUREMENTS_SCHEMA,
+    "measurements": MEASUREMENTS_SCHEMA, "query_mysql_error_number": "uint",
 }
 FAILURE_RECEIPT = {"format_version": 1, "diagnostic_only": True, "readiness_only": True, "freeze_verified": False,
                    "complete": False, "error_category": "profile_transport_or_receipt_failed", "failure_stage": "transport",
@@ -65,11 +65,27 @@ def safe_receipt(module, raw, code, sha, run, expected):
     value = module.load_json_bytes(raw)
     # Existing armor's nested field/type/size bounds also validate native JSON.
     receipt_transport_module().encode_armored_receipt(value, schema=RECEIPT_SCHEMA)
-    required = set(RECEIPT_SCHEMA) - {"source_target_hash", "measurements"}
+    required = set(RECEIPT_SCHEMA) - {"source_target_hash", "measurements", "query_mysql_error_number"}
     if not required <= set(value) or value["format_version"] != 1 or value["source_sha"] != sha or value["run_id"] != run or value["expected_target_hash"] != expected:
         raise ValueError("readiness_receipt_binding")
     if value["diagnostic_only"] is not True or value["readiness_only"] is not True or value["freeze_verified"] is not False or value["query_count"] > 18:
         raise ValueError("readiness_receipt_scope")
+    number = value.get("query_mysql_error_number")
+    category = value["error_category"]
+    if "query_mysql_error_number" in value:
+        if type(number) is not int or not 0 <= number <= 65535 or value["complete"] or value["query_count"] == 0:
+            raise ValueError("readiness_mysql_number_invalid")
+        known = {"query_server_timeout": {3024}, "query_server_interrupted": {1317}, "query_permission_denied": {1142, 1143, 1227}}
+        if category in known:
+            if number not in known[category]:
+                raise ValueError("readiness_mysql_number_category")
+        elif category == "query_mysql_error":
+            if number in {3024, 1317, 1142, 1143, 1227}:
+                raise ValueError("readiness_mysql_number_category")
+        elif category not in {"metadata_release_failed", "connection_release_failed", "database_release_failed"}:
+            raise ValueError("readiness_mysql_number_category")
+    elif category == "query_mysql_error":
+        raise ValueError("readiness_mysql_number_missing")
     if value["complete"]:
         if code != 0 or value["error_category"] != "none" or value["failure_stage"] != "none" or value.get("source_target_hash") != expected or value["query_count"] != 18:
             raise ValueError("readiness_receipt_success")
