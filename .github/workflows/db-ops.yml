@@ -16,6 +16,7 @@ on:
           - inventory
           - metadata-visibility-profile
           - metadata-visibility-admin-profile
+          - metadata-readiness-admin
           - cbpt-audit
           - cbpt-archive
           - cbpt-apply
@@ -73,7 +74,7 @@ on:
         default: false
         type: boolean
       governance_confirm:
-        description: 'Governance write confirmation, or exact reviewed source SHA for cbpt cleanup'
+        description: 'Governance write confirmation, or exact reviewed source SHA for bounded metadata/cleanup'
         required: false
         type: string
 
@@ -84,11 +85,11 @@ permissions:
   contents: read
 
 # Mutating operations, persistent audits/backups and status scans must exclude
-# app deployment and compatibility retirement. Only the three reviewed,
+# app deployment and compatibility retirement. Only the four reviewed,
 # bounded metadata-only operations use the diagnostic group. New/unknown
 # operations default to the production lock; their job must also reject them.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'metadata-readiness-admin' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
   cancel-in-progress: false
 
 jobs:
@@ -301,6 +302,146 @@ jobs:
           set -Eeuo pipefail
           [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
           python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --archive "qs-mysql-metadata-profile-${GITHUB_RUN_ID}.tar.gz"
+
+  mysql-metadata-readiness-admin:
+    name: Read Only MySQL Metadata and Backup Readiness
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'metadata-readiness-admin' && github.event.inputs.database == 'mysql'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Validate exact reviewed readiness revision and empty archive input
+        env:
+          PROFILE_REVIEW_SOURCE_SHA: ${{ github.event.inputs.governance_confirm }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$PROFILE_REVIEW_SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$PROFILE_REVIEW_SOURCE_SHA" == "$GITHUB_SHA" ]] || { echo "readiness source revision mismatch" >&2; exit 1; }
+          [[ -z "$PROFILE_ARCHIVE_INPUT" ]] || { echo "readiness does not accept a backup input" >&2; exit 1; }
+
+      - name: Checkout immutable readiness source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go for the read-only readiness reader
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check and package read-only readiness reader
+        id: package
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          GOMAXPROCS=2 go test -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile
+          python3 -B scripts/dbops/test-mysql-metadata-readiness.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+          profile_package=$(mktemp -d "$RUNNER_TEMP/qs-metadata-readiness-package.XXXXXX")
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/profile-linux-arm64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-metadata-readiness.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-arm64" ./scripts/oneoff/mysql_metadata_profile
+          cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/mysql-metadata-readiness.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
+          profile_archive="qs-mysql-metadata-readiness-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 profile-linux-arm64 mysql-metadata-profile.py mysql-metadata-readiness.py cbpt-cleanup.py receipt-transport.py
+          echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Read fixed MySQL metadata and readiness over trusted SSH
+        env:
+          PROFILE_OPERATION: ${{ github.event.inputs.operation }}
+          PROFILE_DATABASE: ${{ github.event.inputs.database }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+          PROFILE_SOURCE_SHA: ${{ github.sha }}
+          PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
+          python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --readiness --archive "qs-mysql-metadata-readiness-${GITHUB_RUN_ID}.tar.gz"
+
+  mongodb-metadata-admin-profile:
+    name: Read Only MongoDB Identity, FCV and TTL Metadata
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'metadata-visibility-admin-profile' && github.event.inputs.database == 'mongodb'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Validate exact reviewed MongoDB revision and empty archive input
+        env:
+          MONGO_PROFILE_CONFIRM_SHA: ${{ github.event.inputs.governance_confirm }}
+          MONGO_PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$MONGO_PROFILE_CONFIRM_SHA" =~ ^[0-9a-f]{40}$ && "$MONGO_PROFILE_CONFIRM_SHA" == "$GITHUB_SHA" ]] || { echo "MongoDB metadata source revision mismatch" >&2; exit 1; }
+          [[ -z "$MONGO_PROFILE_ARCHIVE_INPUT" ]] || { echo "MongoDB metadata does not accept a backup input" >&2; exit 1; }
+
+      - name: Checkout immutable MongoDB metadata source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Go for the read-only MongoDB metadata reader
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check and build the host-native MongoDB metadata reader
+        id: package
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          GOMAXPROCS=2 go test -p=2 -count=1 ./scripts/oneoff/mongodb_metadata_profile
+          python3 -B scripts/dbops/test-mongodb-metadata-profile.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+          profile_package=$(mktemp -d "$RUNNER_TEMP/qs-mongodb-metadata-profile.XXXXXX")
+          trap 'package_exit=$?; if [ "$package_exit" -ne 0 ]; then rm -f -- "$profile_package/mongodb-metadata-profile"; rmdir -- "$profile_package"; fi' EXIT
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$profile_package/mongodb-metadata-profile" ./scripts/oneoff/mongodb_metadata_profile
+          chmod 0700 "$profile_package/mongodb-metadata-profile"
+          printf 'binary=%s/mongodb-metadata-profile\n' "$profile_package" >> "$GITHUB_OUTPUT"
+
+      - name: Read fixed MongoDB metadata through the owned loopback tunnel
+        env:
+          PROFILE_BINARY: ${{ steps.package.outputs.binary }}
+          MONGO_PROFILE_SOURCE_SHA: ${{ github.sha }}
+          MONGO_PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          MONGO_PROFILE_EXPECTED_TARGET_HASH: 'ab3c60ccc9106a110d85946468f0cec60a18614e54fde49dadfa8701a362036f'
+          MONGO_PROFILE_CONFIRM_SHA: ${{ github.event.inputs.governance_confirm }}
+          MONGO_PROFILE_OPERATION: ${{ github.event.inputs.operation }}
+          MONGO_PROFILE_DATABASE: ${{ github.event.inputs.database }}
+          MONGO_PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$MONGO_PROFILE_SOURCE_SHA" ]] || exit 1
+          python3 -B scripts/dbops/mongodb-metadata-profile.py --binary "$PROFILE_BINARY"
+
+      - name: Release the exact host-native binary
+        if: always()
+        env:
+          PROFILE_BINARY: ${{ steps.package.outputs.binary }}
+        run: |
+          set -Eeuo pipefail
+          if [ -z "$PROFILE_BINARY" ]; then exit 0; fi
+          [[ "$PROFILE_BINARY" == "$RUNNER_TEMP"/qs-mongodb-metadata-profile.*/mongodb-metadata-profile ]] || exit 1
+          rm -f -- "$PROFILE_BINARY"
+          rmdir -- "${PROFILE_BINARY%/mongodb-metadata-profile}"
 
   database-inventory:
     name: MySQL and MongoDB Metadata Inventory

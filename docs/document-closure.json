@@ -3,7 +3,7 @@
   "checkout_ref": "git:HEAD",
   "source_baseline": {
     "sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
-    "verified_on": "2026-10-14"
+    "verified_on": "2026-10-15"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 45,
       "budgeted": false
     }
   },
@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
-        "verified_on": "2026-10-14"
+        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -337,6 +337,62 @@
         {
           "kind": "source",
           "path": ".github/workflows/db-ops.yml"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/mysql_metadata_profile_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-metadata-readiness-native-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/main_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mongodb-metadata-profile.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mongodb-metadata-profile.py"
         }
       ],
       "verification": [
@@ -353,6 +409,196 @@
           "result": "passed",
           "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mongodb",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go",
+          "selector": "func TestMetadataReadinessNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -8367,7 +8613,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "627fefa44c22c36ef722a3d3d82cfd107b5f72b2",
+        "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
         "verified_on": "2026-10-13"
       },
       "fact_sources": [
@@ -9919,8 +10165,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
-        "verified_on": "2026-10-14"
+        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -9961,7 +10207,30 @@
           "kind": "command",
           "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
           "result": "passed",
-          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
+          "result": "matched",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/retirement_driver.go",
+          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
+          "result": "matched",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
           "verified_on": "2026-10-14"
         },
         {
@@ -9969,6 +10238,145 @@
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
           "result": "matched",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/retirement_driver.go",
+          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
+          "result": "matched",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -tags=integration -count=1 -timeout=8m -v -run=^TestOfflineNative ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -tags=integration -count=1 -timeout=8m -v -run=^TestSchemaPairNative ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -tags=integration -count=1 -timeout=8m -v -run=^TestDisabledDDLNative ./internal/apiserver/bootstrap",
+          "result": "passed",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -tags=integration ./internal/pkg/migration -run=^TestOfflineApproval -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline_native_integration_test.go",
+          "selector": "func TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL(",
+          "result": "matched",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
+          "result": "passed",
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
+          "result": "matched",
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/retirement_driver.go",
+          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
+          "result": "matched",
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+          "result": "passed",
+          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+          "result": "passed",
           "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
           "verified_on": "2026-10-14"
         },
@@ -9995,6 +10403,21 @@
           "result": "matched",
           "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
+          "result": "passed",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
+          "result": "matched",
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
+          "verified_on": "2026-10-13"
         }
       ],
       "production_evidence": {
@@ -10003,6 +10426,11 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
+          "Source and isolated database verification describe the migration guard only. This M3 change has no production deployment or business acceptance proof.",
+          "The current source c334 ran 7 required Offline native top-level tests plus 6 subtests on owned MySQL8.0.36/Mongo replica-set7.0.25: 13 RUN/PASS, no SKIP, exit0. Before/after hashes of all 3 affected Go sources matched; 2 owned containers and their bridge were released. The isolated synthetic fixture does not certify production object recovery, writer freeze, RPO, the30/60min budget or three-service startup.",
+          "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
+          "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
+          "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack.",
           "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only 101/39 preparation and its guards. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
           "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Production7.0.31, original-image full startup, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required."
         ]
@@ -11236,7 +11664,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+        "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11282,6 +11710,27 @@
           "result": "passed",
           "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/dbops/test-production-inventory.sh",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/dbops/test-production-inventory.sh",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -11301,8 +11750,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "298fd002469af63db4880c553bab86088083fc17",
-        "verified_on": "2026-10-14"
+        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -11348,6 +11797,38 @@
         {
           "kind": "source",
           "path": "internal/pkg/configcontract/mysql_metadata_profile_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-metadata-readiness-native-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-readiness.py"
         }
       ],
       "verification": [
@@ -11484,6 +11965,147 @@
           "result": "passed",
           "source_sha": "298fd002469af63db4880c553bab86088083fc17",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/readiness_native_test.go",
+          "selector": "func TestMetadataReadinessNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11602,6 +12224,157 @@
           "severity": "medium",
           "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
           "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
+        }
+      ]
+    },
+    {
+      "path": "cmd/qs-migrate-offline/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "verified_on": "2026-10-15"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "cmd/qs-migrate-offline/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -tags=integration -count=1 -timeout=8m -run=^TestOfflineNative ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func RunOffline(",
+          "result": "matched",
+          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+          "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func RunOffline(",
+          "result": "matched",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -tags=integration -count=1 -timeout=8m -v -run=^TestOfflineNative ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -tags=integration ./internal/pkg/migration -run=^TestOfflineApproval -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline_native_integration_test.go",
+          "selector": "func TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL(",
+          "result": "matched",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+          "result": "passed",
+          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+          "verified_on": "2026-10-15"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Isolated migration tests and synthetic approval claims do not certify a production writer freeze, complete production backup-pair restore, startup time budget, destructive authorization, or runtime commit.",
+          "The current source c334 ran 7 required Offline native top-level tests plus 6 subtests on owned MySQL8.0.36/Mongo replica-set7.0.25: 13 RUN/PASS, no SKIP, exit0. Before/after hashes of all 3 affected Go sources matched; 2 owned containers and their bridge were released. The isolated synthetic fixture does not certify production object recovery, writer freeze, RPO, the30/60min budget or three-service startup.",
+          "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
+          "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
+          "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "OFFLINE-EXECUTION-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Production named protection location, responsibility, scope-specific restore and startup/freeze receipts remain unbound.",
+          "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, explicit full-database-pair or approved M4 object scope, per-object responsibility, scope-specific restoration within60min, startup reserve and whole writer/TTL freeze before a separately authorized production apply."
         }
       ]
     }
