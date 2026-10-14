@@ -88,13 +88,32 @@ class ReadinessTests(unittest.TestCase):
             capture.assert_not_called()
 
     def test_partial_query_or_release_failure_retains_no_measurements(self):
-        for category in ('query_failed', 'metadata_truncated', 'connection_release_failed', 'database_release_failed'):
+        for category in ('query_failed', 'query_server_timeout', 'query_server_interrupted', 'query_permission_denied', 'query_deadline_exceeded', 'query_canceled', 'metadata_truncated', 'connection_release_failed', 'database_release_failed'):
             value = readiness.stage_failure(environment(), category)
             value['failure_stage'] = 'transactions'
             self.assertFalse(self.validate(value, 1)['complete'])
             value['measurements'] = receipt()['measurements']
             with self.assertRaises(Exception):
                 self.validate(value, 1)
+
+    def test_new_query_categories_do_not_authorize_success_or_raw_error_fields(self):
+        for category in ('query_server_timeout', 'query_server_interrupted', 'query_permission_denied', 'query_deadline_exceeded', 'query_canceled'):
+            value = readiness.stage_failure(environment(), category)
+            value.update(failure_stage='outcome_distribution', query_count=16,
+                         connection_released=True, database_released=True, pool_closed_verified=True)
+            safe = self.validate(value, 1)
+            self.assertFalse(safe['complete'])
+            self.assertNotIn('measurements', safe)
+            frame = readiness.receipt_transport_module().encode_armored_receipt(safe, schema=readiness.RECEIPT_SCHEMA, secrets=(SECRET,))
+            self.assertNotIn(SECRET, frame)
+            for key in ('message', 'mysql_error_number', 'sqlstate', 'account'):
+                raw = dict(value)
+                raw[key] = SECRET
+                with self.assertRaises(Exception):
+                    self.validate(raw, 1)
+            value['complete'] = True
+            with self.assertRaises(Exception):
+                self.validate(value, 0)
 
     def test_unknown_raw_fields_and_tokens_cannot_cross_armor(self):
         for key in ('grants', 'roles', 'username', 'sql_text', 'body', 'connection_id'):

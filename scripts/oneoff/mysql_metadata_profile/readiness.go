@@ -97,6 +97,29 @@ func invalidateReadiness(r readinessReceipt, category, stage string) readinessRe
 	return r
 }
 
+// Only typed errors contribute a more specific public category. Driver text,
+// account names and SQL never enter this closed diagnostic classification.
+func readinessQueryError(err error) error {
+	var server *mysql.MySQLError
+	if errors.As(err, &server) && server != nil {
+		switch server.Number {
+		case 3024:
+			return errors.New("query_server_timeout")
+		case 1317:
+			return errors.New("query_server_interrupted")
+		case 1142, 1143, 1227:
+			return errors.New("query_permission_denied")
+		}
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return errors.New("query_deadline_exceeded")
+	}
+	if errors.Is(err, context.Canceled) {
+		return errors.New("query_canceled")
+	}
+	return errors.New("query_failed")
+}
+
 // Every returned row is consumed and every cursor release is checked. A
 // 1001st row is a sentinel, never a silently omitted member of a directory.
 // Operational rows remain RAM-only and are reduced to counts, not hashes of
@@ -106,7 +129,7 @@ func readinessRows(ctx context.Context, c *sql.Conn, query string, width int) (r
 	defer cancel()
 	rows, err := c.QueryContext(ctx, query)
 	if err != nil {
-		return nil, errors.New("query_failed")
+		return nil, readinessQueryError(err)
 	}
 	defer func() {
 		if rows.Close() != nil {
@@ -138,8 +161,8 @@ func readinessRows(ctx context.Context, c *sql.Conn, query string, width int) (r
 		}
 		result = append(result, values)
 	}
-	if rows.Err() != nil {
-		return nil, errors.New("query_failed")
+	if err := rows.Err(); err != nil {
+		return nil, readinessQueryError(err)
 	}
 	return result, nil
 }

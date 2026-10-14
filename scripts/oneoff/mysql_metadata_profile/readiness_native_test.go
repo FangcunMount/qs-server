@@ -124,10 +124,34 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 	}
 	t.Run("missing_process_real_privilege_error", func(t *testing.T) {
 		r := reader("readiness_no_process")
-		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_failed" || r.FailureStage != "transactions" {
+		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_permission_denied" || r.FailureStage != "transactions" {
 			t.Fatalf("native missing PROCESS not rejected: %s/%s", r.ErrorCategory, r.FailureStage)
 		}
 	})
+	t.Run("server_timeout_real_3024_and_release", func(t *testing.T) {
+		// Sole SELECT SLEEP can return a normal row when interrupted. This
+		// fixture-only predicate forces a real server 3024, below the unchanged
+		// five-second client deadline, without changing production SQL.
+		db := open("readiness_global")
+		c, err := db.Conn(ctx)
+		if err != nil {
+			_ = db.Close()
+			t.Fatal("owned_timeout_connection_failed")
+		}
+		_, err = readinessRows(ctx, c, "SELECT /*+ MAX_EXECUTION_TIME(50) */ 1 FROM assessment WHERE SLEEP(1)", 1)
+		r := baseReadinessReceipt(b)
+		if err == nil {
+			r = invalidateReadiness(r, "metadata_invalid", "tables")
+		} else {
+			r = invalidateReadiness(r, err.Error(), "tables")
+		}
+		r = releaseReadinessDatabase(db, releaseReadinessConnection(c, r))
+		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_server_timeout" || r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
+			t.Fatalf("native server timeout classification or release failed: %s", r.ErrorCategory)
+		}
+		assertReadinessPrivate(t, r)
+	})
+
 	t.Run("all_schema_event_and_other_user_held_transaction", func(t *testing.T) {
 		writer := open("readiness_writer")
 		defer func() {

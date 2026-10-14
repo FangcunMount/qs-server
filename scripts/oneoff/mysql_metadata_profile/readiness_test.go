@@ -113,7 +113,7 @@ func TestMetadataReadinessMissingProcessDoesNotBecomeZero(t *testing.T) {
 	r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
 	m.ExpectClose()
 	r = releaseReadinessDatabase(db, r)
-	if r.Complete || r.ErrorCategory != "query_failed" || r.FailureStage != "transactions" {
+	if r.Complete || r.ErrorCategory != "query_permission_denied" || r.FailureStage != "transactions" {
 		t.Fatal("process_failure_became_empty_view")
 	}
 	assertReadinessPrivate(t, r)
@@ -290,4 +290,51 @@ func TestMetadataReadinessPublicInputRequiresQSWithoutConnecting(t *testing.T) {
 		t.Fatal("input_guard_not_early")
 	}
 	assertReadinessPrivate(t, r)
+}
+
+func TestMetadataReadinessQueryErrorsRemainPrivateAndIncomplete(t *testing.T) {
+	cases := []struct {
+		name     string
+		err      error
+		category string
+	}{
+		{"server_timeout", &mysql.MySQLError{Number: 3024, Message: fixtureSecret}, "query_server_timeout"},
+		{"server_interrupted", &mysql.MySQLError{Number: 1317, Message: fixtureSecret}, "query_server_interrupted"},
+		{"table_permission", &mysql.MySQLError{Number: 1142, Message: fixtureSecret}, "query_permission_denied"},
+		{"column_permission", &mysql.MySQLError{Number: 1143, Message: fixtureSecret}, "query_permission_denied"},
+		{"process_permission", &mysql.MySQLError{Number: 1227, Message: fixtureSecret}, "query_permission_denied"},
+		{"context_deadline", context.DeadlineExceeded, "query_deadline_exceeded"},
+		{"context_cancel", context.Canceled, "query_canceled"},
+		{"unknown_server", &mysql.MySQLError{Number: 1205, Message: fixtureSecret + " 3024 timeout"}, "query_failed"},
+		{"text_is_not_typed_error", errors.New(fixtureSecret + " 3024 context deadline exceeded"), "query_failed"},
+		{"server_before_context", errors.Join(&mysql.MySQLError{Number: 1142, Message: fixtureSecret}, context.DeadlineExceeded), "query_permission_denied"},
+	}
+	for _, tc := range cases {
+		for _, phase := range []string{"query", "iteration"} {
+			t.Run(tc.name+"/"+phase, func(t *testing.T) {
+				db, m := readinessMock(t)
+				readinessPrefix(m)
+				readinessCatalogExpectations(m)
+				readinessOperationExpectations(m)
+				m.ExpectQuery(readinessAssessmentSQL).WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}))
+				q := m.ExpectQuery(readinessOutcomeSQL)
+				private := fmt.Errorf("%s: %w", fixtureSecret, tc.err)
+				if phase == "query" {
+					q.WillReturnError(private)
+				} else {
+					q.WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}).RowError(0, private))
+				}
+				r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
+				m.ExpectClose()
+				r = releaseReadinessDatabase(db, r)
+				if r.Complete || r.Measurements != nil || r.ErrorCategory != tc.category || r.FailureStage != "outcome_distribution" || r.QueryCount != 16 {
+					t.Fatalf("query error classification failed: %s/%s/%d", r.ErrorCategory, r.FailureStage, r.QueryCount)
+				}
+				if r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
+					t.Fatal("classified_failure_release_unverified")
+				}
+				assertReadinessPrivate(t, r)
+			})
+		}
+	}
 }
