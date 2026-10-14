@@ -629,7 +629,13 @@ jobs:
             TestActorColumnsNativeExactObjectValueRestoration \
             TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim \
             TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim/m4_sql_historical_columns \
-            TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim/m4_mongo_historical_indexes; do
+            TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim/m4_mongo_historical_indexes \
+            TestActorColumnsNativeDirtyObjectBackupRestore \
+            TestActorColumnsNativeDirtyObjectBackupRestore/restore \
+            TestActorColumnsNativeDirtyObjectBackupRestore/wrong_backup \
+            TestActorColumnsNativeDirtyObjectBackupRestore/retained_fact_changed \
+            TestActorColumnsNativeDirtyObjectBackupRestore/value_restore_failed \
+            TestActorColumnsNativeDirtyObjectBackupRestore/ledger_replay_failed; do
             grep -q -- "=== RUN   ${test_name}$" "${RUNNER_TEMP}/actor-columns.log"
             grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/actor-columns.log"
           done
