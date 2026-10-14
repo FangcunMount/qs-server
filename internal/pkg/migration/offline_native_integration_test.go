@@ -239,7 +239,7 @@ func TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL(t *testing.T) {
 	if sql, dirty, mongo, mdirty := n.heads(t); sql != r.sql.head || mongo != r.mongo.head || dirty || mdirty {
 		t.Fatal("rejected approval changed schema metadata")
 	}
-	for _, scope := range []string{"", "unknown", offlineProtectionSQLHistoricalColumns, offlineProtectionMongoHistoricalIndexes} {
+	for _, scope := range []string{"", "unknown", offlineProtectionSQLHistoricalColumns, offlineProtectionMongoHistoricalIndexes, offlineProtectionActorColumns} {
 		t.Run("invalid_protection_scope_"+scope, func(t *testing.T) {
 			// The genuinely installed pair is already at this resource head.
 			// Object scopes never authorize a no-op or adopt another transition.

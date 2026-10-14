@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	actorfixture "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/testfixture"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	driver "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
@@ -221,4 +222,17 @@ func TestMySQLRetirementResumeAndDrift(t *testing.T) {
 	if f.writes != 1 {
 		t.Fatal("unexpected authorization writes", f.writes)
 	}
+}
+
+func installCurrentActorColumns(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	// Only modern tests call this after renaming the original synthetic staff shape.
+	if err := db.Exec("ALTER TABLE operators ADD COLUMN name VARCHAR(100), ADD COLUMN email VARCHAR(255), ADD COLUMN phone VARCHAR(20), ADD COLUMN created_at DATETIME(3), ADD COLUMN created_by BIGINT, ADD COLUMN deleted_by BIGINT; ALTER TABLE testee ADD COLUMN tags JSON").Error; err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000102_retire_actor_compatibility_columns.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	actorfixture.RetireActorColumns(t, db, raw)
 }

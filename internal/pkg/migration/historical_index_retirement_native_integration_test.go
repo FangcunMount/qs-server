@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	migratedb "github.com/golang-migrate/migrate/v4/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -145,7 +146,8 @@ func TestHistoricalIndexNativeMongoOnlyUpgradeAndRestart(t *testing.T) {
 		}
 		delete(before, target.collection+"/"+target.name)
 	}
-	r := testCurrentResources(t)
+	// Keep the historical Mongo-only release independent of later SQL DDL.
+	r := migrationResourcesThrough(t, 101, 40)
 	p := n.preflight(t, r)
 	if version, changed, err := NewMigrator(n.db, p.MySQLConfig(false)).Run(); err != nil || changed || version != 101 {
 		t.Fatal("Mongo-only release changed SQL", version, changed, err)
@@ -287,9 +289,10 @@ func TestHistoricalIndexNativeDirtyObjectBackupRestore(t *testing.T) {
 
 			// Fixed FS seam: real MongoMigrator writes40dirty and successfully
 			// drops the first two indexes before the third command fails in Mongo.
-			source := embeddedMigrationSource(t)
+			release := migrationResourcesThrough(t, 101, 40)
+			source := release.source.(fstest.MapFS)
 			source[historicalIndexUp].Data = bytes.Replace(source[historicalIndexUp].Data, []byte(`"index":"uk_generation_historical_generated_event_id"`), []byte(`"index":"m4_missing_index"`), 1)
-			r, err := readMigrationResources(source, declaredSchemaPairs)
+			r, err := readMigrationResources(source, release.pairs)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -455,9 +458,10 @@ func TestHistoricalIndexNativeDirtyObjectBackupRestore(t *testing.T) {
 func TestHistoricalIndexNativePartialFailureAndDirtyRefuseRepairByForce(t *testing.T) {
 	n := nativeHistoricalIndexPair(t)
 	before, documents := mongoIndexInventory(t, n.mongoDB), mongoFrozenDocuments(t, n.mongoDB)
-	source := embeddedMigrationSource(t)
+	release := migrationResourcesThrough(t, 101, 40)
+	source := release.source.(fstest.MapFS)
 	source[historicalIndexUp].Data = bytes.Replace(source[historicalIndexUp].Data, []byte(`"index":"uk_generation_historical_generated_event_id"`), []byte(`"index":"m4_missing_index"`), 1)
-	r, err := readMigrationResources(source, declaredSchemaPairs)
+	r, err := readMigrationResources(source, release.pairs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -555,7 +559,8 @@ func TestHistoricalIndexNativePermissionDeniedAfterMetadataWrite(t *testing.T) {
 		t.Fatal("restricted fixture connection failed")
 	}
 	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
-	r := testCurrentResources(t)
+	// Keep the historical Mongo-only release independent of later SQL DDL.
+	r := migrationResourcesThrough(t, 101, 40)
 	p, err := preflightCompatibilityPair(t.Context(), n.db, client, n.cfg, r)
 	if err != nil {
 		t.Fatal("read/catalog preflight must be authorized before the drop denial", err)

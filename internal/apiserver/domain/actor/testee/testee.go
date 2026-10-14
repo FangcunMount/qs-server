@@ -27,8 +27,7 @@ type Testee struct {
 	createdAt time.Time  // 创建时间
 	updatedAt time.Time  // 更新时间
 
-	// === 历史标签与关注 ===
-	tags       []Tag  // 历史兼容字段；当前产品不展示、不筛选
+	// === 来源与关注 ===
 	source     Source // 数据来源
 	isKeyFocus bool   // 是否重点关注对象
 }
@@ -47,7 +46,6 @@ func NewTestee(
 		gender:       gender,
 		birthday:     birthday,
 		source:       SourceUnknown,
-		tags:         make([]Tag, 0),
 	}
 }
 
@@ -129,17 +127,6 @@ func (t *Testee) GetAge() int {
 	return age
 }
 
-// === 历史标签持久化 ===
-
-// TagsAsStrings 获取历史标签的字符串列表（仅用于持久化保留）
-func (t *Testee) TagsAsStrings() []string {
-	tags := make([]string, len(t.tags))
-	for i, tag := range t.tags {
-		tags[i] = string(tag)
-	}
-	return tags
-}
-
 // === 关注度管理 ===
 
 // IsKeyFocus 是否重点关注对象
@@ -181,26 +168,12 @@ func (t *Testee) SetKeyFocus(isKeyFocus bool) {
 	t.isKeyFocus = isKeyFocus
 }
 
-// SetTagsFromStrings 从字符串列表设置历史标签（仅用于从数据库加载）
-func (t *Testee) SetTagsFromStrings(tags []string) {
-	if tags == nil {
-		t.tags = make([]Tag, 0)
-		return
-	}
-	t.tags = make([]Tag, len(tags))
-	for i, tag := range tags {
-		t.tags[i] = Tag(tag)
-	}
-}
-
 // RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
 // 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
 func (t *Testee) RestoreFromRepository(
 	profileID *uint64,
-	tags []string,
 	isKeyFocus bool,
 ) {
 	t.profileID = profileID
-	t.SetTagsFromStrings(tags)
 	t.SetKeyFocus(isKeyFocus)
 }
