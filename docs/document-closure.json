@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+    "sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10165,7 +10165,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+        "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10463,6 +10463,13 @@
           "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
           "result": "passed",
           "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+          "result": "passed",
+          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
         }
       ],
@@ -12285,7 +12292,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+        "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12411,6 +12418,13 @@
           "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
           "result": "passed",
           "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+          "result": "passed",
+          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
         }
       ],
