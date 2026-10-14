@@ -48,6 +48,10 @@ CI for exact SHA
 
 ```bash
 go test -count=1 ./internal/pkg/configcontract
+go test -race -count=1 ./scripts/oneoff/mysql_metadata_profile
+python3 -B scripts/dbops/test-mysql-metadata-profile.py
+python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
+python3 -B scripts/dbops/test-receipt-transport.py
 bash scripts/cd/test-github-action-runtimes.sh
 bash scripts/cd/test-plan-services.sh
 bash scripts/cd/test-prepare-package.sh
