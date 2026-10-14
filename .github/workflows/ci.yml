@@ -381,6 +381,7 @@ jobs:
             TestHistoricalEvidenceNativeSQLOnlyUpgradeAndRestart \
             TestHistoricalEvidenceNativePartialDDLRemainsDirtyAndRefusesDown \
             TestHistoricalEvidenceNativeSchemaObjectRestoreWithSyntheticNonNull \
+            TestHistoricalEvidenceNativeDirtyObjectBackupRestore \
             TestSchemaPairNativeColdBootstrapAndRestart \
             TestDisabledDDLNativeValidatesCurrentHeadsAndNeverCreatesMetadata; do
             if ! grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/schema-pair.log"; then

@@ -290,12 +290,14 @@ MySQL `96` 在既有 `evaluation_outcome` 增加原提交事件引用、JSON 证
 
 `TestHistoricalEvidenceNativeSQLOnlyUpgradeAndRestart` 从真实执行历史资源所得的 clean100/39 升级，核对列/CHECK消失、Mongo元数据不变、业务/冻结报告/现用事件内容不变及无DDL重启。部分DDL测试故障注入第二条ALTER，核对dirty保留、Mongo停止、freshpreflight及force/down拒绝。对象恢复测试在隔离数据库重建原99版对象，恢复合法synthetic非NULL与NULL样本，比较完整SHOW CREATE TABLE、JSON值和CHECK拒绝语义。该演练只证明两个结构对象及synthetic值恢复，未验证生产完整backup pair恢复。
 
-`TestHistoricalEvidenceNativeDirtyObjectBackupRestore` 的源码与真实 dirty 恢复证据在 SQL-A 独立 PR #358 登记；本 Mongo 分支尚未整合该后续测试及 SQL CI selector，不借用其源码验收。未来版本夹具从嵌入头计算下一个版本，真实101不会与假101相撞。CI继续要求本分支上述三项 SQL 真实测试和启动保护实际PASS，禁止SKIP或空selector通过。SQL-only release 自动DDL关闭时必须已经安装其完整101/39。进入本批 Mongo-only release 后完整目标为101/40；声明的旧clean pair只是可升级起点，不能绕过当前完整head校验。
+`TestHistoricalEvidenceNativeDirtyObjectBackupRestore` 在真正第二条 ALTER 失败所得的 `101 dirty/39 clean` 上，使用此前捕获的对象结构、完整列值和真实 `schema_migrations` 结构／行备份：对象与保留事实核对通过后，最后在显式事务中回放原账本。错误备份、保留事实变化、真实 CHECK 3819 及账本重复主键 1062 均拒绝提前完成，账本写失败回滚后保留原 dirty 状态；成功后 fresh `100/39` preflight 通过。这是固定测试 seam，未增加生产恢复入口。源码 `e249641f14d48499e211677e6867709a98fbb18b` 在 MySQL 8.0.36／MongoDB 7.0.25 隔离 replica-set 上实际执行四个顶层、五个子场景，共九项 RUN／PASS、零 SKIP；完整证据按 `sql-final-result.json` 摘要 `8c2682c8b8b00a574fca9a9e0b8a1fd477a9239d133c1fa9a34ee5ca6b75e4ae` 登记在既有版本验收台账。该测试没有启动三个业务服务，不能签发生产 7.0.31、完整业务或恢复时间预算验收。
+
+未来版本夹具从嵌入头计算下一个版本，真实101不会与假101相撞。CI要求上述四项 SQL 真实测试和启动保护实际 PASS，禁止 SKIP 或空 selector 通过。SQL-only release 自动 DDL 关闭时必须已经安装其完整101/39。进入本批 Mongo-only release 后完整目标为101/40；声明的旧clean pair只是可升级起点，不能绕过当前完整head校验。
 
 
 ## M4-02 四个历史 Mongo 索引退役（源码准备，生产阻断）
 
-新增 MongoDB `40` 只执行以下四个具名 `dropIndexes`。SQL101 资源在本批不变；SQL101 的 PR #358 独立审查和发布，本批 PR 暂以其分支为 base，须在 SQL 合入实际 main 后重新 retarget、整合并验证最终资源/source digest。当前已整合实际发布的 M2 main `4a8642b0` 和 SQL-A 的 `d1fa6ade`（含旧批次人员 CLI 入口退役）；现代 selected/orphan 入口保留，旧四动作在配置和连接创建前明确拒绝。
+新增 MongoDB `40` 只执行以下四个具名 `dropIndexes`。SQL101 资源在本批不变；SQL101 的 PR #358 独立审查和发布，本批 PR 暂以其分支为 base，须在 SQL 合入实际 main 后重新 retarget、整合并验证最终资源/source digest。当前已整合实际 main `ab998bdcae7c5d15ac518872580ff6eddaafed15` 和 SQL-A 精确 head `73dbb045d47a28873ea209c67feb48ce8fca9567`；已发布的 M2 SHA 为 `4a8642b0`，SQL-A 的 `d1fa6ade` 旧批次人员 CLI 入口退役保持；现代 selected/orphan 入口保留，旧四动作在配置和连接创建前明确拒绝。
 
 | 集合 | 精确索引名 |
 | --- | --- |

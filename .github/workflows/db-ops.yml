@@ -268,8 +268,10 @@ jobs:
         id: package
         run: |
           set -Eeuo pipefail
+          umask 077
           go test ./scripts/oneoff/mysql_metadata_profile
           python3 -B scripts/dbops/test-mysql-metadata-profile.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
           python3 -B scripts/dbops/test-receipt-transport.py
           profile_package=$(mktemp -d "$RUNNER_TEMP/qs-metadata-profile-package.XXXXXX")
           trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/profile-linux-arm64" "$profile_package/mysql-metadata-profile.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
@@ -280,41 +282,11 @@ jobs:
           tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 profile-linux-arm64 mysql-metadata-profile.py cbpt-cleanup.py receipt-transport.py
           echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
-      - name: Validate read-only operation and production SSH binding
+      - name: Read current and fixed granted-role metadata permissions over trusted SSH
         env:
           PROFILE_OPERATION: ${{ github.event.inputs.operation }}
           PROFILE_DATABASE: ${{ github.event.inputs.database }}
           PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
-          MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
-          MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
-        run: |
-          set -Eeuo pipefail
-          [[ ( "$PROFILE_OPERATION" == metadata-visibility-profile || "$PROFILE_OPERATION" == metadata-visibility-admin-profile ) && "$PROFILE_DATABASE" == mysql && -z "$PROFILE_ARCHIVE_INPUT" ]] || exit 1
-          : "${SVRA_HOST:?production host binding is empty}"
-          : "${SVRA_USERNAME:?production SSH binding is empty}"
-          : "${SVRA_SSH_KEY:?production SSH key is empty}"
-          : "${SVRA_SSH_FINGERPRINT:?production fingerprint is empty}"
-          : "${MYSQL_USERNAME:?selected MySQL username binding is empty}"
-          : "${MYSQL_PASSWORD:?selected MySQL password binding is empty}"
-
-      - name: Upload checksummed read-only diagnostic
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          source: qs-mysql-metadata-profile-${{ github.run_id }}.tar.gz
-          target: /tmp
-
-      - name: Read current and fixed granted-role metadata permissions
-        uses: appleboy/ssh-action@v1.2.2
-        env:
           PROFILE_SOURCE_SHA: ${{ github.sha }}
           PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
@@ -325,37 +297,10 @@ jobs:
           MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
           MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 10m
-          envs: PROFILE_SOURCE_SHA,PROFILE_RUN_ID,PROFILE_PACKAGE_SHA256,PROFILE_EXPECTED_TARGET_HASH,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
-          script: |
-            set -Eeuo pipefail
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-            umask 077
-            [[ "$PROFILE_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ && "$PROFILE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
-            [[ "$PROFILE_PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ && "$PROFILE_EXPECTED_TARGET_HASH" =~ ^[0-9a-f]{64}$ ]] || exit 1
-            profile_archive="/tmp/qs-mysql-metadata-profile-${PROFILE_RUN_ID%-*}.tar.gz"
-            profile_dir=$(mktemp -d /tmp/qs-mysql-metadata-profile.XXXXXX)
-            cleanup_profile_tools() {
-              rm -f -- "$profile_dir/profile-linux-amd64" "$profile_dir/profile-linux-arm64" "$profile_dir/mysql-metadata-profile.py" "$profile_dir/cbpt-cleanup.py" "$profile_dir/receipt-transport.py" "$profile_archive"
-              rmdir -- "$profile_dir"
-            }
-            trap cleanup_profile_tools EXIT
-            [[ "$(sha256sum "$profile_archive" | awk '{print $1}')" == "$PROFILE_PACKAGE_SHA256" ]] || exit 1
-            tar -xzf "$profile_archive" -C "$profile_dir" --no-same-owner
-            chmod 0700 "$profile_dir" "$profile_dir/profile-linux-amd64" "$profile_dir/profile-linux-arm64"
-            chmod 0600 "$profile_dir/mysql-metadata-profile.py" "$profile_dir/cbpt-cleanup.py" "$profile_dir/receipt-transport.py"
-            case "$(uname -m)" in
-              x86_64) profile_binary="$profile_dir/profile-linux-amd64" ;;
-              aarch64|arm64) profile_binary="$profile_dir/profile-linux-arm64" ;;
-              *) exit 1 ;;
-            esac
-            python3 -B "$profile_dir/mysql-metadata-profile.py" --binary "$profile_binary"
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
+          python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --archive "qs-mysql-metadata-profile-${GITHUB_RUN_ID}.tar.gz"
 
   database-inventory:
     name: MySQL and MongoDB Metadata Inventory

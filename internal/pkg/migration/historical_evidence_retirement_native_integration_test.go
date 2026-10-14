@@ -4,6 +4,7 @@ package migration
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -298,5 +299,259 @@ func TestHistoricalEvidenceNativeSchemaObjectRestoreWithSyntheticNonNull(t *test
 	}
 	if sql, dirty, mongo, mongoDirty := n.heads(t); sql != 100 || mongo != 39 || dirty || mongoDirty {
 		t.Fatalf("object-only rehearsal changed clean fixture metadata: heads=%d/%d dirty=%v/%v", sql, mongo, dirty, mongoDirty)
+	}
+}
+
+// These fixed seams belong only to the disposable native proof. They are not
+// a production restore command, an approval protocol, or an arbitrary-version
+// metadata writer. No business runtime is started anywhere in this fixture.
+type historicalTableFacts struct {
+	Columns []string
+	Rows    [][]sql.NullString
+}
+
+func historicalRetainedFacts(t *testing.T, n nativeSchemaPair) []historicalTableFacts {
+	t.Helper()
+	var facts []historicalTableFacts
+	for _, item := range []struct{ table, historical string }{
+		{"assessment", "historical_lifecycle_evidence"},
+		{"evaluation_outcome", "historical_committed_evidence"},
+	} {
+		columns := historicalQuery(t, n.db, "SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='"+item.table+"' ORDER BY ORDINAL_POSITION")
+		var fact historicalTableFacts
+		var selected []string
+		for _, column := range columns {
+			if column[0].String != item.historical {
+				fact.Columns = append(fact.Columns, column[0].String)
+				selected = append(selected, "`"+strings.ReplaceAll(column[0].String, "`", "``")+"`")
+			}
+		}
+		fact.Rows = historicalQuery(t, n.db, "SELECT "+strings.Join(selected, ",")+" FROM `"+item.table+"` ORDER BY id")
+		facts = append(facts, fact)
+	}
+	return facts
+}
+
+type historicalObjectBackup struct {
+	SQLIdentity, MongoIdentity, InitialResources, FailedResources string
+	MigrationDDL, MigrationRows                                   [][]sql.NullString
+	TableDDLs, Values                                             [][][]sql.NullString
+	RetainedFacts                                                 []historicalTableFacts
+	MongoHead                                                     []byte
+}
+
+func captureHistoricalObjectBackup(t *testing.T, n nativeSchemaPair, failed *migrationResources) []byte {
+	t.Helper()
+	initial := migrationResourcesThrough(t, 100, 39)
+	if err := n.preflight(t, initial).VerifyComplete(t.Context()); err != nil {
+		t.Fatal("backup requires a real clean historical pair", err)
+	}
+	sqlIdentity, mongoIdentity, err := pairIdentity(t.Context(), n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mongoHead, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := historicalObjectBackup{
+		SQLIdentity: sqlIdentity, MongoIdentity: mongoIdentity, InitialResources: initial.sha256, FailedResources: failed.sha256,
+		MigrationDDL:  historicalQuery(t, n.db, "SHOW CREATE TABLE schema_migrations"),
+		MigrationRows: historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations ORDER BY version"),
+		TableDDLs:     [][][]sql.NullString{historicalQuery(t, n.db, "SHOW CREATE TABLE assessment"), historicalQuery(t, n.db, "SHOW CREATE TABLE evaluation_outcome")},
+		Values:        [][][]sql.NullString{historicalQuery(t, n.db, "SELECT id,CAST(historical_lifecycle_evidence AS CHAR) FROM assessment ORDER BY id"), historicalQuery(t, n.db, "SELECT id,CAST(historical_committed_evidence AS CHAR) FROM evaluation_outcome ORDER BY id")},
+		RetainedFacts: historicalRetainedFacts(t, n), MongoHead: mongoHead,
+	}
+	raw, err := json.Marshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+type historicalRestoreFault uint8
+
+const (
+	historicalRestoreNoFault historicalRestoreFault = iota
+	historicalRestoreRejectValue
+	historicalRestoreDuplicateLedgerRow
+)
+
+func replayHistoricalObjectBackup(t *testing.T, n nativeSchemaPair, raw []byte, approved [32]byte, failed *migrationResources, fault historicalRestoreFault) (err error) {
+	t.Helper()
+	if sha256.Sum256(raw) != approved {
+		return errors.New("object backup fingerprint rejected")
+	}
+	var b historicalObjectBackup
+	if json.Unmarshal(raw, &b) != nil || b.InitialResources != migrationResourcesThrough(t, 100, 39).sha256 || b.FailedResources != failed.sha256 {
+		return errors.New("object backup resources rejected")
+	}
+	sqlIdentity, mongoIdentity, err := pairIdentity(t.Context(), n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
+	if err != nil || sqlIdentity != b.SQLIdentity || mongoIdentity != b.MongoIdentity {
+		return errors.New("object backup selected identity rejected")
+	}
+	sql, dirty, mongo, mongoDirty := n.heads(t)
+	mongoHead, err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Raw()
+	if err != nil || sql != 101 || !dirty || mongo != 39 || mongoDirty || !bytes.Equal(mongoHead, b.MongoHead) {
+		return errors.New("object recovery failed-pair state rejected")
+	}
+	if !reflect.DeepEqual(b.RetainedFacts, historicalRetainedFacts(t, n)) || !reflect.DeepEqual(b.MigrationDDL, historicalQuery(t, n.db, "SHOW CREATE TABLE schema_migrations")) {
+		return errors.New("object recovery retained facts or ledger DDL changed")
+	}
+	// This test only admits the actual second-ALTER failure produced below.
+	assertHistoricalObjects(t, n, false, true)
+	restore, err := migrations.ReadFile("migrations/mysql/000099_business_historical_references.up.sql")
+	if err != nil {
+		return err
+	}
+	boundary := bytes.Index(restore, []byte("ALTER TABLE `evaluation_outcome`"))
+	if boundary < 0 {
+		return errors.New("original restoration DDL unavailable")
+	}
+	// Outcome is still intact; only the missing assessment object is recreated.
+	// Never blindly replay both ALTERs when one original object already exists.
+	if _, err = n.db.ExecContext(t.Context(), string(restore[:boundary])); err != nil {
+		return err
+	}
+	if fault == historicalRestoreRejectValue {
+		// A real CHECK failure after restoring the schema must leave101 dirty;
+		// the migration-table replay has not yet been reached.
+		_, err = n.db.ExecContext(t.Context(), "UPDATE assessment SET historical_lifecycle_evidence='{}' ORDER BY id LIMIT 1")
+		if err == nil {
+			return errors.New("restored CHECK unexpectedly accepted invalid fixture value")
+		}
+		return err
+	}
+	for i, item := range []struct{ table, column string }{{"assessment", "historical_lifecycle_evidence"}, {"evaluation_outcome", "historical_committed_evidence"}} {
+		for _, row := range b.Values[i] {
+			set := "`" + item.column + "`=?"
+			if item.table == "assessment" {
+				// Restore only historical data; do not let its ON UPDATE timestamp
+				// replace a retained business fact with the recovery time.
+				set += ",updated_at=updated_at"
+			}
+			if _, err = n.db.ExecContext(t.Context(), "UPDATE `"+item.table+"` SET "+set+" WHERE id=?", row[1], row[0].String); err != nil {
+				return err
+			}
+		}
+		if !reflect.DeepEqual(b.Values[i], historicalQuery(t, n.db, "SELECT id,CAST(`"+item.column+"` AS CHAR) FROM `"+item.table+"` ORDER BY id")) || !reflect.DeepEqual(b.TableDDLs[i], historicalQuery(t, n.db, "SHOW CREATE TABLE `"+item.table+"`")) {
+			return errors.New("restored object DDL or complete values differ from backup")
+		}
+	}
+	if !reflect.DeepEqual(b.RetainedFacts, historicalRetainedFacts(t, n)) {
+		return errors.New("restored objects changed retained business facts")
+	}
+	// Replay the complete captured table data only after all original objects,
+	// NULL/non-NULL values and retained facts have matched. There is no supplied
+	// version/dirty argument and no Force, SetVersion or UPDATE-dirty shortcut.
+	tx, err := n.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			err = errors.Join(err, tx.Rollback())
+		}
+	}()
+	if _, err = tx.ExecContext(t.Context(), "DELETE FROM schema_migrations"); err != nil {
+		return err
+	}
+	for _, row := range b.MigrationRows {
+		if _, err = tx.ExecContext(t.Context(), "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", row[0].String, row[1].String); err != nil {
+			return err
+		}
+	}
+	if fault == historicalRestoreDuplicateLedgerRow {
+		row := b.MigrationRows[0]
+		if _, err = tx.ExecContext(t.Context(), "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", row[0].String, row[1].String); err != nil {
+			return err
+		}
+		return errors.New("duplicate fixture ledger row unexpectedly accepted")
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	if !reflect.DeepEqual(b.MigrationRows, historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations ORDER BY version")) || !reflect.DeepEqual(b.MigrationDDL, historicalQuery(t, n.db, "SHOW CREATE TABLE schema_migrations")) {
+		return errors.New("restored complete ledger differs from real backup")
+	}
+	return nil
+}
+
+func TestHistoricalEvidenceNativeDirtyObjectBackupRestore(t *testing.T) {
+	for _, scenario := range []string{"restore", "object_restore_failure", "ledger_replay_failure", "wrong_backup", "changed_business_fact"} {
+		t.Run(scenario, func(t *testing.T) {
+			n := nativeHistoricalEvidencePair(t)
+			seedHistoricalEvidenceRows(t, n)
+			for _, item := range []struct{ table, column, event string }{{"assessment", "historical_lifecycle_evidence", "evaluation.requested"}, {"evaluation_outcome", "historical_committed_evidence", "evaluation.outcome.committed"}} {
+				if _, err := n.db.ExecContext(t.Context(), "UPDATE `"+item.table+"` SET `"+item.column+"`=? ORDER BY id LIMIT 1", syntheticHistoricalEvidence(t, item.event)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			release := migrationResourcesThrough(t, 101, 39)
+			source := release.source.(fstest.MapFS)
+			source[historicalEvidenceUp].Data = bytes.Replace(source[historicalEvidenceUp].Data, []byte("DROP CHECK `chk_outcome_historical_committed`"), []byte("DROP CHECK `m4_missing_check`"), 1)
+			failed, err := readMigrationResources(source, release.pairs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			backup := captureHistoricalObjectBackup(t, n, failed)
+			approved := sha256.Sum256(backup)
+			if _, _, err := NewMigrator(n.db, n.preflight(t, failed).MySQLConfig(false)).Run(); err == nil {
+				t.Fatal("actual second ALTER did not fail")
+			}
+			assertHistoricalObjects(t, n, false, true)
+			if sql, dirty, mongo, mongoDirty := n.heads(t); sql != 101 || !dirty || mongo != 39 || mongoDirty {
+				t.Fatal("actual failed migration did not retain101 dirty/39 clean")
+			}
+			fault := historicalRestoreNoFault
+			switch scenario {
+			case "object_restore_failure":
+				fault = historicalRestoreRejectValue
+			case "ledger_replay_failure":
+				fault = historicalRestoreDuplicateLedgerRow
+			case "wrong_backup":
+				backup = append(append([]byte(nil), backup...), ' ')
+			case "changed_business_fact":
+				if _, err := n.db.ExecContext(t.Context(), "UPDATE assessment SET primary_score_value=99 ORDER BY id LIMIT 1"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = replayHistoricalObjectBackup(t, n, backup, approved, failed, fault)
+			initial := migrationResourcesThrough(t, 100, 39)
+			if scenario != "restore" {
+				if err == nil {
+					t.Fatal("failed or mismatched restore accepted")
+				}
+				if scenario == "object_restore_failure" || scenario == "ledger_replay_failure" {
+					var serverError *drivermysql.MySQLError
+					code := uint16(3819) // actual restored CHECK rejection
+					if scenario == "ledger_replay_failure" {
+						code = 1062 // actual PK failure after the transactional DELETE
+					}
+					if !errors.As(err, &serverError) || serverError.Number != code {
+						t.Fatal("restore fault did not exercise the required real server failure", err)
+					}
+				}
+				if sql, dirty, mongo, mongoDirty := n.heads(t); sql != 101 || !dirty || mongo != 39 || mongoDirty {
+					t.Fatal("restore failure replayed migration backup prematurely")
+				}
+				if _, err := preflightCompatibilityPair(t.Context(), n.db, n.client, n.cfg, initial); err == nil {
+					t.Fatal("fresh original release accepted incomplete dirty recovery")
+				}
+				if scenario == "wrong_backup" || scenario == "changed_business_fact" {
+					assertHistoricalObjects(t, n, false, true)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal("fixed object backup recovery failed", err)
+			}
+			assertHistoricalObjects(t, n, true, true)
+			if err := n.preflight(t, initial).VerifyComplete(t.Context()); err != nil {
+				t.Fatal("fresh100/39 verification rejected restored real backup", err)
+			}
+		})
 	}
 }
