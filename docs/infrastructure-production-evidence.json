@@ -4150,6 +4150,989 @@
         "User must complete normal iPhone Air login/answer/subscribe/receive flows for real device acceptance. Current metadata proof does not start compatibility observation or authorize an M2/M4 production batch.",
         "Latest IAM source and binary, plus both Python wrapper generators, are preserved as private evidence. Prior QS source/binary are retained only as immutable receipt hashes; review of current source is not a byte-for-byte verification of that earlier QS build source."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m1-business-smoke-before-m2",
+      "topics": [
+        "deployment_cd_network",
+        "cache_redis_signal",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T02:40:40.947188+00:00",
+      "environment": "production/serverA-serverD M1; clack user-reported iPhone Air report/trend and bounded SELF read-only SQL/Mongo metadata",
+      "deployed_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Actual same-CID startup config/PID1 inputs, file hash and scoped runtime samples are bound; no fully decoded effective options hash for all six instances, original startup file stability or source-level config assumptions promoted to runtime proof."
+      },
+      "command": "Known root SSH routes001-ysj/serverA and004-ysj/serverD. SQL fixed SELF/Org1 newest10 evaluated plus supplied Assessment: READ ONLY REPEATABLE READ,40s context,5s SELECT limit, full index/EXPLAIN guards, parameterized metadata projections, rollback/physical conn/db.Close checked. Mongo same verified Assessment/Outcome pairs: primary snapshot Find with exact unique indexes and2s maxTime; owned cached immutable reader container, nonroot/read-only/cap-drop/no-new-privileges, secrets source RAM/stdin, no database daemon, data-VOLUME paths covered by readonly tmpfs. /metrics and /readyz plus immutable program/container binding only. No assistant login, send, business mutation, DDL or deployment.",
+      "result": {
+        "status": "passed",
+        "summary": "Scoped M1 business smoke: participant reports SNAP-IV historical report and trend normal; supplied sensory-SPM has matching canonical Outcome and generated report metadata. Current M1 cache hits/version-token success observed, all six M1 instances reverified ready. This is neither M2 deployment nor full M8/four-family acceptance.",
+        "measurements": {
+          "participant": {
+            "label": "clack",
+            "iam_user_id": "618855329043591726",
+            "self_testee_id": "632367179051840046",
+            "org_id": "1",
+            "device": "iPhone Air",
+            "feedback": "SNAP-IV量表（18项），生成时间2026-10-12，报告及趋势展示正常；用户完成SPM并提供该Assessment后台URL。",
+            "exact_snap_report_opened_id_verified": false,
+            "spm_report_phone_readback_verified": false
+          },
+          "sql_observed_at": "2026-10-14T02:29:28.010758+00:00",
+          "sql_initial_success_observed_at": "2026-10-14T02:05:52.640384+00:00",
+          "mongo_observed_at": "2026-10-14T02:19:41.570709+00:00",
+          "sql_database": [
+            {
+              "database_name": "qs",
+              "server_uuid": "83df0988-3e1b-11f1-b09e-00163e3ab5b1",
+              "server_version": "8.0.36",
+              "session_time_zone": "Asia/Shanghai",
+              "system_time_zone": "CST"
+            }
+          ],
+          "sql_migration": [
+            {
+              "dirty": "0",
+              "version": "100"
+            }
+          ],
+          "mongo_database": {
+            "hosts": [
+              "mongo:27017"
+            ],
+            "primary": "mongo:27017",
+            "process_id": "6a7e9eb34b88a6c3a3e2e780",
+            "replica_set": "rs0"
+          },
+          "mongo_migration": [
+            {
+              "dirty": false,
+              "version": "39"
+            }
+          ],
+          "bound_business_chains": [
+            {
+              "assessment": {
+                "answersheet_id": "641583343900570158",
+                "assessment_id": "641583344772985390",
+                "evaluated_at": "2026-10-14 09:57:54",
+                "evaluation_model_algorithm": "spm_sensory",
+                "evaluation_model_code": "bJFKi3",
+                "evaluation_model_kind": "behavioral_rating",
+                "evaluation_model_title": "SPM 感觉统合量表",
+                "evaluation_model_version": "v16-report-202608-v1",
+                "origin_type": "adhoc",
+                "questionnaire_code": "bJFKi3",
+                "questionnaire_version": "6.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-14 09:57:54"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641583344772985390",
+                  "created_at": "2026-10-14 09:57:54.214",
+                  "evaluated_at": "2026-10-14 09:57:54.214",
+                  "evaluation_run_id": "641583344772985390:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "c184d8f195883674c3cc1a954b3cd7ebd2f53471ef01fa51520ef9248af71b33",
+                  "model_algorithm": "spm_sensory",
+                  "model_code": "bJFKi3",
+                  "model_kind": "behavioral_rating",
+                  "model_version": "v16-report-202608-v1",
+                  "outcome_id": "641583345813172782",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641583344772985390",
+                  "generation_id": "641583345947390510",
+                  "model_code": "bJFKi3",
+                  "org_id": "1",
+                  "outcome_id": "641583345813172782",
+                  "sort_at": "2026-10-14T01:57:54.338Z",
+                  "source_id": "641583346014499374",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-14T01:57:54.338Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641583344772985390",
+                  "created_at": "2026-10-14T01:57:54.338Z",
+                  "domain_id": "641583346014499374",
+                  "generated_at": "2026-10-14T01:57:54.338Z",
+                  "generation_id": "641583345947390510",
+                  "interpretation_run_id": "641583345947456046",
+                  "model": {
+                    "algorithm": "spm_sensory",
+                    "code": "bJFKi3",
+                    "kind": "behavioral_rating",
+                    "version": "v16-report-202608-v1"
+                  },
+                  "outcome_id": "641583345813172782",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-14T01:57:54.338Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641583345947390510",
+                  "latest_run_id": "641583345947456046",
+                  "outcome_id": "641583345813172782",
+                  "report_id": "641583346014499374",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-14T01:57:54.338Z",
+                  "version": "3"
+                }
+              ]
+            },
+            {
+              "assessment": {
+                "answersheet_id": "641337496600326702",
+                "assessment_id": "641337496868762158",
+                "evaluated_at": "2026-10-12 17:15:37",
+                "evaluation_model_algorithm": "scale_default",
+                "evaluation_model_code": "3adyDE",
+                "evaluation_model_kind": "scale",
+                "evaluation_model_title": "SNAP-IV量表（18项）",
+                "evaluation_model_version": "v138-report-202608-v1",
+                "origin_type": "adhoc",
+                "questionnaire_code": "3adyDE",
+                "questionnaire_version": "34.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-12 17:15:37"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641337496868762158",
+                  "created_at": "2026-10-12 17:15:36.988",
+                  "evaluated_at": "2026-10-12 17:15:36.988",
+                  "evaluation_run_id": "641337496868762158:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "a70603953173fc64efe6c7c224b0d94b42c54334952ea1e1ceaec82069378008",
+                  "model_algorithm": "scale_default",
+                  "model_code": "3adyDE",
+                  "model_kind": "scale",
+                  "model_version": "v138-report-202608-v1",
+                  "outcome_id": "641337497137197614",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641337496868762158",
+                  "generation_id": "641337497271415342",
+                  "model_code": "3adyDE",
+                  "org_id": "1",
+                  "outcome_id": "641337497137197614",
+                  "sort_at": "2026-10-12T09:15:37.084Z",
+                  "source_id": "641337497304969774",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-12T09:15:37.084Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641337496868762158",
+                  "created_at": "2026-10-12T09:15:37.084Z",
+                  "domain_id": "641337497304969774",
+                  "generated_at": "2026-10-12T09:15:37.084Z",
+                  "generation_id": "641337497271415342",
+                  "interpretation_run_id": "641337497271480878",
+                  "model": {
+                    "algorithm": "scale_default",
+                    "code": "3adyDE",
+                    "kind": "scale",
+                    "version": "v138-report-202608-v1"
+                  },
+                  "outcome_id": "641337497137197614",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T09:15:37.084Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641337497271415342",
+                  "latest_run_id": "641337497271480878",
+                  "outcome_id": "641337497137197614",
+                  "report_id": "641337497304969774",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T09:15:37.084Z",
+                  "version": "3"
+                }
+              ]
+            },
+            {
+              "assessment": {
+                "answersheet_id": "641312135959294510",
+                "assessment_id": "641312136245359150",
+                "evaluated_at": "2026-10-12 13:03:41",
+                "evaluation_model_algorithm": "scale_default",
+                "evaluation_model_code": "3adyDE",
+                "evaluation_model_kind": "scale",
+                "evaluation_model_title": "SNAP-IV量表（18项）",
+                "evaluation_model_version": "v138-report-202608-v1",
+                "origin_type": "adhoc",
+                "questionnaire_code": "3adyDE",
+                "questionnaire_version": "34.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-12 13:03:41"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641312136245359150",
+                  "created_at": "2026-10-12 13:03:40.887",
+                  "evaluated_at": "2026-10-12 13:03:40.887",
+                  "evaluation_run_id": "641312136245359150:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "a70603953173fc64efe6c7c224b0d94b42c54334952ea1e1ceaec82069378008",
+                  "model_algorithm": "scale_default",
+                  "model_code": "3adyDE",
+                  "model_kind": "scale",
+                  "model_version": "v138-report-202608-v1",
+                  "outcome_id": "641312136529719854",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641312136245359150",
+                  "generation_id": "641312136680714798",
+                  "model_code": "3adyDE",
+                  "org_id": "1",
+                  "outcome_id": "641312136529719854",
+                  "sort_at": "2026-10-12T05:03:41.004Z",
+                  "source_id": "641312136731046446",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-12T05:03:41.004Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641312136245359150",
+                  "created_at": "2026-10-12T05:03:41.004Z",
+                  "domain_id": "641312136731046446",
+                  "generated_at": "2026-10-12T05:03:41.004Z",
+                  "generation_id": "641312136680714798",
+                  "interpretation_run_id": "641312136680780334",
+                  "model": {
+                    "algorithm": "scale_default",
+                    "code": "3adyDE",
+                    "kind": "scale",
+                    "version": "v138-report-202608-v1"
+                  },
+                  "outcome_id": "641312136529719854",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T05:03:41.004Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641312136680714798",
+                  "latest_run_id": "641312136680780334",
+                  "outcome_id": "641312136529719854",
+                  "report_id": "641312136731046446",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T05:03:41.004Z",
+                  "version": "3"
+                }
+              ]
+            },
+            {
+              "assessment": {
+                "answersheet_id": "641308838884028974",
+                "assessment_id": "641308839203648046",
+                "evaluated_at": "2026-10-12 12:30:56",
+                "evaluation_model_algorithm": "scale_default",
+                "evaluation_model_code": "3adyDE",
+                "evaluation_model_kind": "scale",
+                "evaluation_model_title": "SNAP-IV量表（18项）",
+                "evaluation_model_version": "v138-report-202608-v1",
+                "origin_type": "adhoc",
+                "questionnaire_code": "3adyDE",
+                "questionnaire_version": "34.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-12 12:30:56"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641308839203648046",
+                  "created_at": "2026-10-12 12:30:55.663",
+                  "evaluated_at": "2026-10-12 12:30:55.663",
+                  "evaluation_run_id": "641308839203648046:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "a70603953173fc64efe6c7c224b0d94b42c54334952ea1e1ceaec82069378008",
+                  "model_algorithm": "scale_default",
+                  "model_code": "3adyDE",
+                  "model_kind": "scale",
+                  "model_version": "v138-report-202608-v1",
+                  "outcome_id": "641308839437677102",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641308839203648046",
+                  "generation_id": "641308839555117614",
+                  "model_code": "3adyDE",
+                  "org_id": "1",
+                  "outcome_id": "641308839437677102",
+                  "sort_at": "2026-10-12T04:30:55.754Z",
+                  "source_id": "641308839588672046",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-12T04:30:55.754Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641308839203648046",
+                  "created_at": "2026-10-12T04:30:55.754Z",
+                  "domain_id": "641308839588672046",
+                  "generated_at": "2026-10-12T04:30:55.754Z",
+                  "generation_id": "641308839555117614",
+                  "interpretation_run_id": "641308839555183150",
+                  "model": {
+                    "algorithm": "scale_default",
+                    "code": "3adyDE",
+                    "kind": "scale",
+                    "version": "v138-report-202608-v1"
+                  },
+                  "outcome_id": "641308839437677102",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T04:30:55.754Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641308839555117614",
+                  "latest_run_id": "641308839555183150",
+                  "outcome_id": "641308839437677102",
+                  "report_id": "641308839588672046",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T04:30:55.754Z",
+                  "version": "3"
+                }
+              ]
+            },
+            {
+              "assessment": {
+                "answersheet_id": "641301539402625582",
+                "assessment_id": "641301539905876526",
+                "evaluated_at": "2026-10-12 11:18:25",
+                "evaluation_model_algorithm": "scale_default",
+                "evaluation_model_code": "3adyDE",
+                "evaluation_model_kind": "scale",
+                "evaluation_model_title": "SNAP-IV量表（18项）",
+                "evaluation_model_version": "v138-report-202608-v1",
+                "origin_type": "adhoc",
+                "questionnaire_code": "3adyDE",
+                "questionnaire_version": "34.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-12 11:18:25"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641301539905876526",
+                  "created_at": "2026-10-12 11:18:24.981",
+                  "evaluated_at": "2026-10-12 11:18:24.981",
+                  "evaluation_run_id": "641301539905876526:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "a70603953173fc64efe6c7c224b0d94b42c54334952ea1e1ceaec82069378008",
+                  "model_algorithm": "scale_default",
+                  "model_code": "3adyDE",
+                  "model_kind": "scale",
+                  "model_version": "v138-report-202608-v1",
+                  "outcome_id": "641301540207866414",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641301539905876526",
+                  "generation_id": "641301540392415790",
+                  "model_code": "3adyDE",
+                  "org_id": "1",
+                  "outcome_id": "641301540207866414",
+                  "sort_at": "2026-10-12T03:18:25.119Z",
+                  "source_id": "641301540425970222",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-12T03:18:25.119Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641301539905876526",
+                  "created_at": "2026-10-12T03:18:25.119Z",
+                  "domain_id": "641301540425970222",
+                  "generated_at": "2026-10-12T03:18:25.119Z",
+                  "generation_id": "641301540392415790",
+                  "interpretation_run_id": "641301540392481326",
+                  "model": {
+                    "algorithm": "scale_default",
+                    "code": "3adyDE",
+                    "kind": "scale",
+                    "version": "v138-report-202608-v1"
+                  },
+                  "outcome_id": "641301540207866414",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T03:18:25.119Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641301540392415790",
+                  "latest_run_id": "641301540392481326",
+                  "outcome_id": "641301540207866414",
+                  "report_id": "641301540425970222",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T03:18:25.119Z",
+                  "version": "3"
+                }
+              ]
+            },
+            {
+              "assessment": {
+                "answersheet_id": "641283695054959150",
+                "assessment_id": "641283695440835118",
+                "evaluated_at": "2026-10-12 08:21:09",
+                "evaluation_model_algorithm": "scale_default",
+                "evaluation_model_code": "3adyDE",
+                "evaluation_model_kind": "scale",
+                "evaluation_model_title": "SNAP-IV量表（18项）",
+                "evaluation_model_version": "v138-report-202608-v1",
+                "origin_type": "adhoc",
+                "questionnaire_code": "3adyDE",
+                "questionnaire_version": "34.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-12 08:21:09"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641283695440835118",
+                  "created_at": "2026-10-12 08:21:08.871",
+                  "evaluated_at": "2026-10-12 08:21:08.871",
+                  "evaluation_run_id": "641283695440835118:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "a70603953173fc64efe6c7c224b0d94b42c54334952ea1e1ceaec82069378008",
+                  "model_algorithm": "scale_default",
+                  "model_code": "3adyDE",
+                  "model_kind": "scale",
+                  "model_version": "v138-report-202608-v1",
+                  "outcome_id": "641283695776379438",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641283695440835118",
+                  "generation_id": "641283695927374382",
+                  "model_code": "3adyDE",
+                  "org_id": "1",
+                  "outcome_id": "641283695776379438",
+                  "sort_at": "2026-10-12T00:21:09.001Z",
+                  "source_id": "641283695994483246",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-12T00:21:09.001Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641283695440835118",
+                  "created_at": "2026-10-12T00:21:09.001Z",
+                  "domain_id": "641283695994483246",
+                  "generated_at": "2026-10-12T00:21:09.001Z",
+                  "generation_id": "641283695927374382",
+                  "interpretation_run_id": "641283695927439918",
+                  "model": {
+                    "algorithm": "scale_default",
+                    "code": "3adyDE",
+                    "kind": "scale",
+                    "version": "v138-report-202608-v1"
+                  },
+                  "outcome_id": "641283695776379438",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T00:21:09.001Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641283695927374382",
+                  "latest_run_id": "641283695927439918",
+                  "outcome_id": "641283695776379438",
+                  "report_id": "641283695994483246",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-12T00:21:09.001Z",
+                  "version": "3"
+                }
+              ]
+            },
+            {
+              "assessment": {
+                "answersheet_id": "641181908323021358",
+                "assessment_id": "641181908843115054",
+                "evaluated_at": "2026-10-11 15:29:59",
+                "evaluation_model_algorithm": "scale_default",
+                "evaluation_model_code": "3adyDE",
+                "evaluation_model_kind": "scale",
+                "evaluation_model_title": "SNAP-IV量表（18项）",
+                "evaluation_model_version": "v138-report-202608-v1",
+                "origin_type": "plan",
+                "questionnaire_code": "3adyDE",
+                "questionnaire_version": "34.0.1",
+                "status": "evaluated",
+                "submitted_at": "2026-10-11 15:29:59"
+              },
+              "canonical_outcome": [
+                {
+                  "assessment_id": "641181908843115054",
+                  "created_at": "2026-10-11 15:29:59.285",
+                  "evaluated_at": "2026-10-11 15:29:59.285",
+                  "evaluation_run_id": "641181908843115054:1",
+                  "frozen_report_input_present": "1",
+                  "frozen_report_input_sha256": "a70603953173fc64efe6c7c224b0d94b42c54334952ea1e1ceaec82069378008",
+                  "model_algorithm": "scale_default",
+                  "model_code": "3adyDE",
+                  "model_kind": "scale",
+                  "model_version": "v138-report-202608-v1",
+                  "outcome_id": "641181909094773294",
+                  "schema_version": "2"
+                }
+              ],
+              "report_catalog": [
+                {
+                  "assessment_id": "641181908843115054",
+                  "generation_id": "641181909296099886",
+                  "model_code": "3adyDE",
+                  "org_id": "1",
+                  "outcome_id": "641181909094773294",
+                  "sort_at": "2026-10-11T07:29:59.488Z",
+                  "source_id": "641181909430317614",
+                  "source_kind": "artifact",
+                  "testee_id": "632367179051840046",
+                  "updated_at": "2026-10-11T07:29:59.488Z"
+                }
+              ],
+              "report_artifact": [
+                {
+                  "assessment_id": "641181908843115054",
+                  "created_at": "2026-10-11T07:29:59.488Z",
+                  "domain_id": "641181909430317614",
+                  "generated_at": "2026-10-11T07:29:59.488Z",
+                  "generation_id": "641181909296099886",
+                  "interpretation_run_id": "641181909296165422",
+                  "model": {
+                    "algorithm": "scale_default",
+                    "code": "3adyDE",
+                    "kind": "scale",
+                    "version": "v138-report-202608-v1"
+                  },
+                  "outcome_id": "641181909094773294",
+                  "report_type": "standard",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-11T07:29:59.488Z"
+                }
+              ],
+              "report_generation": [
+                {
+                  "domain_id": "641181909296099886",
+                  "latest_run_id": "641181909296165422",
+                  "outcome_id": "641181909094773294",
+                  "report_id": "641181909430317614",
+                  "status": "generated",
+                  "template_version": "2026-08-v1",
+                  "updated_at": "2026-10-11T07:29:59.488Z",
+                  "version": "3"
+                }
+              ]
+            }
+          ],
+          "latest_evaluated_scope_count": 10,
+          "same_cross_database_atomic_snapshot": false,
+          "cache_observation": {
+            "observed_at": "2026-10-14T02:22:44.463130+00:00",
+            "read_only": true,
+            "scope": "M1 API/Collection current cache counters and availability only; no per-user attribution or invalidation claim",
+            "business_writes": 0,
+            "instances": [
+              {
+                "name": "qs-apiserver",
+                "binding": {
+                  "cid": "11fb6047351d78681fa243d537ca236d81b6c1f1dea276e85db47ad84b0cf760",
+                  "image_id": "sha256:f95d238c11aded1018c7ec0fabd1702ff2ff57acd57760db313ecdc8b87dfbd4",
+                  "started_at": "2026-10-13T21:36:38.362290662Z",
+                  "running": true
+                },
+                "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+                "binding_unchanged": true,
+                "samples": [
+                  "qs_cache_family_available{component=\"apiserver\",family=\"business_rank\",profile=\"rank_cache\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"lock_lease\",profile=\"lock_cache\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"meta_hotset\",profile=\"meta_cache\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"object_view\",profile=\"object_cache\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"ops_runtime\",profile=\"ops_runtime\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"query_result\",profile=\"query_cache\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"sdk_token\",profile=\"sdk_cache\"} 1",
+                  "qs_cache_family_available{component=\"apiserver\",family=\"static_meta\",profile=\"static_cache\"} 1",
+                  "qs_cache_get_total{family=\"object_view\",policy=\"assessment_access\",result=\"hit\"} 29",
+                  "qs_cache_get_total{family=\"object_view\",policy=\"assessment_access\",result=\"miss\"} 4",
+                  "qs_cache_get_total{family=\"object_view\",policy=\"assessment_detail\",result=\"hit\"} 3",
+                  "qs_cache_get_total{family=\"object_view\",policy=\"assessment_detail\",result=\"miss\"} 2",
+                  "qs_cache_get_total{family=\"static_meta\",policy=\"published_model\",result=\"hit\"} 18",
+                  "qs_cache_get_total{family=\"static_meta\",policy=\"published_model\",result=\"miss\"} 6",
+                  "qs_cache_get_total{family=\"static_meta\",policy=\"questionnaire\",result=\"hit\"} 5",
+                  "qs_cache_get_total{family=\"static_meta\",policy=\"questionnaire\",result=\"miss\"} 3",
+                  "qs_query_cache_version_total{kind=\"published_model\",op=\"current\",result=\"ok\"} 8",
+                  "qs_runtime_component_ready{component=\"apiserver\"} 1"
+                ]
+              },
+              {
+                "name": "qs-collection-server-1",
+                "binding": {
+                  "cid": "1df682335775991de714359aebec3daf5e0382539cc661850c9cd09df359ef74",
+                  "image_id": "sha256:35ea85f898dcee539fabe0e626dde795380414d2e5279a957ef44965ef3ed719",
+                  "started_at": "2026-10-13T21:37:39.099522966Z",
+                  "running": true
+                },
+                "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+                "binding_unchanged": true,
+                "samples": [
+                  "qs_cache_family_available{component=\"collection-server\",family=\"lock_lease\",profile=\"lock_cache\"} 1",
+                  "qs_cache_family_available{component=\"collection-server\",family=\"ops_runtime\",profile=\"ops_runtime\"} 1",
+                  "qs_runtime_component_ready{component=\"collection-server\"} 1"
+                ]
+              },
+              {
+                "name": "qs-collection-server-2",
+                "binding": {
+                  "cid": "8576ada9cb8a9441765fe9539b26a9c6d0beefac8af1403a04a3f4ceb266cbd5",
+                  "image_id": "sha256:35ea85f898dcee539fabe0e626dde795380414d2e5279a957ef44965ef3ed719",
+                  "started_at": "2026-10-13T21:37:40.258244205Z",
+                  "running": true
+                },
+                "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+                "binding_unchanged": true,
+                "samples": [
+                  "qs_cache_family_available{component=\"collection-server\",family=\"lock_lease\",profile=\"lock_cache\"} 1",
+                  "qs_cache_family_available{component=\"collection-server\",family=\"ops_runtime\",profile=\"ops_runtime\"} 1",
+                  "qs_runtime_component_ready{component=\"collection-server\"} 1"
+                ]
+              }
+            ],
+            "remote_script_sha256": "8584e01e11f39ad2813a6e9592e26dc54578f8e3f8f0308b3ff59a34957d7c36"
+          },
+          "six_instance_observation_at": "2026-10-14T02:40:40.947188+00:00",
+          "six_instances": [
+            {
+              "name": "qs-apiserver",
+              "component": "apiserver",
+              "container_id": "11fb6047351d78681fa243d537ca236d81b6c1f1dea276e85db47ad84b0cf760",
+              "image_id": "sha256:f95d238c11aded1018c7ec0fabd1702ff2ff57acd57760db313ecdc8b87dfbd4",
+              "started_at": "2026-10-13T21:36:38.362290662Z",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "restart_count": 0,
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "apiserver",
+                  "redis_summary": {
+                    "family_total": 8,
+                    "available_count": 8,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-collection-server-1",
+              "component": "collection",
+              "container_id": "1df682335775991de714359aebec3daf5e0382539cc661850c9cd09df359ef74",
+              "image_id": "sha256:35ea85f898dcee539fabe0e626dde795380414d2e5279a957ef44965ef3ed719",
+              "started_at": "2026-10-13T21:37:39.099522966Z",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "restart_count": 0,
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                },
+                {
+                  "path": "/serve-readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "serve_ready": true,
+                  "dependency_ready": true,
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-collection-server-2",
+              "component": "collection",
+              "container_id": "8576ada9cb8a9441765fe9539b26a9c6d0beefac8af1403a04a3f4ceb266cbd5",
+              "image_id": "sha256:35ea85f898dcee539fabe0e626dde795380414d2e5279a957ef44965ef3ed719",
+              "started_at": "2026-10-13T21:37:40.258244205Z",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "restart_count": 0,
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                },
+                {
+                  "path": "/serve-readyz",
+                  "port": 8080,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "service": "collection-server",
+                  "version": "2.0.0",
+                  "serve_ready": true,
+                  "dependency_ready": true,
+                  "resilience_control_synchronized": true,
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-worker-runtime-1",
+              "component": "worker",
+              "container_id": "e2b2ef2fe2a983d0d25e2f3fe8c70a6f627b79ab453829ab2c8fe70a4f15b794",
+              "image_id": "sha256:37a35ba8aecb8b1d11c13293440d7fefc3f010ca951e51596900b4c78549047a",
+              "started_at": "2026-10-13T21:37:34.590634543Z",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "restart_count": 0,
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 9092,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "worker",
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-worker-runtime-2",
+              "component": "worker",
+              "container_id": "e50ca29aeb655dd7227f3e0cca83129cb6b747c94ffbecdc2100d0f7f416af95",
+              "image_id": "sha256:37a35ba8aecb8b1d11c13293440d7fefc3f010ca951e51596900b4c78549047a",
+              "started_at": "2026-10-13T21:37:33.465107792Z",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "restart_count": 0,
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 9092,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "worker",
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            },
+            {
+              "name": "qs-worker-runtime-3",
+              "component": "worker",
+              "container_id": "6c5378c2064f42c62469c82a0eb245935ac75316137cf61d5a4c850eeab88171",
+              "image_id": "sha256:37a35ba8aecb8b1d11c13293440d7fefc3f010ca951e51596900b4c78549047a",
+              "started_at": "2026-10-13T21:37:34.112380421Z",
+              "compiled_sha": "249788c6d4a0095d4d6f9007560b27eebf1b5b96",
+              "restart_count": 0,
+              "probes": [
+                {
+                  "path": "/readyz",
+                  "port": 9092,
+                  "command_exit": 0,
+                  "http_status": 200,
+                  "status": "ready",
+                  "component": "worker",
+                  "redis_summary": {
+                    "family_total": 2,
+                    "available_count": 2,
+                    "degraded_count": 0,
+                    "unavailable_count": 0,
+                    "ready": true
+                  }
+                }
+              ]
+            }
+          ],
+          "candidate_m2_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+          "candidate_merged_tree_equals_tested_pr_tree": true,
+          "current_production_m1": true,
+          "m2_production_deployed": false,
+          "m6_t0_started": false,
+          "production_business_writes": 0,
+          "notifications_sent": 0,
+          "login_or_token_session_calls": 0,
+          "sql_transaction_rolled_back": true,
+          "sql_physical_connection_closed": true,
+          "sql_db_closed": true,
+          "mongo_client_disconnected": true,
+          "mongo_owned_client_container_released": true,
+          "all_temporary_tools_released": true,
+          "initial_sql_guard_failed_before_business_query": true,
+          "initial_sql_failure_retained": true,
+          "artifacts": [
+            {
+              "name": "qs-server-cleanup-m2-clack-business-readonly-4d6dcda2d71955962b051633.json",
+              "sha256": "59d96d4d33f218131decf2772cb86603f4e8368d421104c8a6caee2cd0ef9414"
+            },
+            {
+              "name": "qs-server-cleanup-m2-clack-report-mongo-readonly-6d2b6df24a3f788199687720.json",
+              "sha256": "085f3a16881f7b93fa38e96dc1399bc4d72cc02f65293310f9174ba5a8f042ec"
+            },
+            {
+              "name": "qs-server-cleanup-m2-m1-cache-runtime-readonly-cfa929baf2a7d5e0.json",
+              "sha256": "6a1b2b0ebe9dd18325fbf78aeb874d230586c6906110b43ec7ae811a6af03c5d"
+            },
+            {
+              "name": "qs-server-cleanup-m2-prepublish-six-instance-readonly-e8bcf419043292dd.json",
+              "sha256": "f81ad6102baa29b59c5992658ebff2065cbef2fb4902fb7e9286b3356f0cd2f2"
+            },
+            {
+              "name": "qs-server-cleanup-m2-main-4a8642b0-ci-verification.json",
+              "sha256": "4115efc021079a915c3706a398d565edbb5bd32774c92163a6edbf146679e1b7"
+            },
+            {
+              "name": "qs-server-cleanup-m2-clack-business-readonly-e7c97fdd86c4234824b41d03.json",
+              "sha256": "5728bbd7d5d19611fe8a9f8f208d7106f2c361edd028e429446ff670d4f200d1"
+            },
+            {
+              "name": "qs-server-cleanup-m2-clack-business-readonly-5553bf3a209d02e631b5c44c.json",
+              "sha256": "70766e4e9fb5912365b05e104c22db00fbfbb1543c18b57c45d7797a323301d0"
+            },
+            {
+              "name": "qs-server-cleanup-m2-clack-final-readonly-tool-evidence/manifest.json",
+              "sha256": "f299c6ac46b83bc7b71d602f5f49cb80edc893506b1357d81c5981efd883be24"
+            },
+            {
+              "name": "qs-server-cleanup-m2-preapproval-dispatch-guard-4a8642b0.json",
+              "sha256": "4330b827a49ecea7a91889b0c61caf0bed1b274f96ecd25a796a1d5a4025825c"
+            },
+            {
+              "name": "qs-server-cleanup-m2-paused-automatic-cd-38499366994.json",
+              "sha256": "0926f9eefc97077abb12730ee7cfc5aac6f363d7ca5442476fc477087e1bd515"
+            }
+          ]
+        }
+      },
+      "owner": "Codex; business feedback by user-designated clack",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#616-m1-现用业务与-clack-真实结果绑定"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/10-基础设施生产证据台账.md"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38498361178"
+        }
+      ],
+      "limitations": [
+        "Dated scoped evidence, not infrastructure ready, full M1/M2/M8 acceptance or clinical scoring/content correctness. The CI run belongs to candidate M2 main4a and does not prove M2 production deployment; production remains M1249.",
+        "SPM is behavioral_rating/spm_sensory/bJFKi3 v16, not cognitive/spm Raven. Earlier Raven formal-client prerequisite was an assistant scope error and withdrawn; Cognitive actual execution remains M5/M8.",
+        "User reported SNAP-IV report/trend normal on iPhone Air; bounded data contains six comparable version reports, five generatedOct12. No exact opened ReportID or request/page tracing is inferred. SPM phone report reread was not explicitly reported.",
+        "SQL/Mongo metadata snapshots are independent; raw inputs, scores, report bodies, private names and secrets were not read. Newest10 is not a full-history absence audit. Canonical Outcome/frozen input/report metadata do not independently validate scoring rules or report text.",
+        "Cache counters are one cumulative global sample, not clack-attributed deltas, invalidation/warm-start, latency, peak-memory or complete Redis/Signal acceptance. Missing error series are not zero failures. Historical scoped cache record does not qualify current signoff.",
+        "All six M1 runtime identities/images/ready are bound; full effective config hash remains unknown. Actual existing reminder is false per separate startup-options evidence; no enable/send/replay was performed for acceptance.",
+        "Initial SQL information_schema label guard rejected before business queries; failure artifact and rollback/conn/db/tool release are retained. Later normalized guard and title-only query passed. Earlier003-ysj SSH route failed; only001/004 complete observation qualifies.",
+        "No Plan backend operator bound, request-level authorization or WeChat subscribe/receipt verified. M2 production batch needs independent approval; M4 backup/restore gates and M6 continuous observation are not completed.",
+        "Only owned temporary reader files/container were released. SQL/Mongo identity/clean100/39 point reads and source protocol protection are not backup/restore or application rollback rehearsal; new business facts must be preserved."
+      ]
     }
   ]
 }
