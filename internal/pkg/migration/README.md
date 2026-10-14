@@ -256,6 +256,8 @@ Apply 另需 `OPERATOR_RECOVERY_FINGERPRINT` 与 `OPERATOR_RECOVERY_MAINTENANCE=
 
 79 版新增 `operator_recovery_archives`。归档包含恢复记录、原退出任务、退出前身份及恢复前身份的原始值和校验和。归档有数据时向下迁移会拒绝删除，必须先安排保留证据的结构恢复方案；普通回滚不得自动重新授予权限。
 
+历史医生批次 `operator-retire preflight|apply|status|verify` 已退出当前 CLI，在 Options/App、配置读取、报告创建及 DB/IAM 连接之前明确拒绝。原 library 和隔离 MySQL 夹具保留历史核验语义，不能用于当前生产库重签旧清单摘要；`assessment` 整行摘要会因历史列删除发生结构漂移，即使该列全部 NULL。`evaluation_outcome` 不在该工具的业务摘要表清单中。本批不改旧 manifest、原 hash 或历史归档/明细表；它们的退出责任属于后续独立批次。源码中的业务读写无字段字面引用，不代表所有维护工具或外部消费者的引用均为零。
+
 对于已明确选择、与历史医生绑定清单无关的退出人员，使用 `operator-retire selected-preflight|selected-apply|selected-verify`。`OPERATOR_RETIRE_LAYOUT=final`，`OPERATOR_RETIRE_INPUT` 指向包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`RequestID`、`Reason` 的受限 JSON；报告仍使用 `OPERATOR_RETIRE_REPORT`。Apply 要求预演指纹及 `OPERATOR_RETIRE_MAINTENANCE=true`，调用统一退出用例，失败保持停用并按原任务恢复。Verify 同时检查当前 IAM 后台角色已清空、本地身份已停用并软删除，不能仅凭任务历史完成判定通过。每人独立保存退出任务及原始事实，不改写此前医生退役清单，也不修改医生、门店、受试者或二维码。
 
 对于任何公司都没有 Operator 记录、但仍有后台授权的用户，使用 `operator-retire orphan-preflight|orphan-apply|orphan-verify`。输入改为 `OrgID`、`ActorID`、`UserID`、`RequestID`、`Reason`，文件须为私有权限；公司用于校验总部操作人，目标用户必须在所有公司都没有 Operator，包括软删除历史。工具仅允许已确认的运营员、结果评估员和计划管理员标准角色，保留 `user` 自服务角色；发现其他权限或人员关联即停止。
@@ -281,6 +283,8 @@ MySQL `96` 在既有 `evaluation_outcome` 增加原提交事件引用、JSON 证
 新增 MySQL `101` 只删除 `assessment.historical_lifecycle_evidence`、`evaluation_outcome.historical_committed_evidence` 及对应的两个 CHECK，声明完整版本对 `101/39`。SQL-only 发布批次保持 MongoDB `39`；下一批 Mongo40 独立退出四个历史索引，见下节。所有历史迁移字节保留。现用提交事件证据、canonical Outcome、冻结的 schema 3 ReportInput、报告历史以及历史归档/明细表继续保留。
 
 生产部署暂停仍有效。生产配置启用了自动迁移，因此在启动这版二进制前，必须完成以下部署 gate：消费者与历史读取者退出证据、当前事件与命令责任核查、覆盖两库的一致备份与可用性校验、隔离恢复演练、维护窗口及具名恢复责任人。只读盘点中两个列全部 NULL，只能支持结构及零值分布证据；不能证明完整数据库备份或恢复通过。101 的源码和测试通过也不授权执行生产 DDL。
+
+维护与恢复门槛必须在实际完整双库备份对及隔离完整启动演练中验证：正常窗口 30 分钟，从关闭入口到恢复服务并完成启动核验计时；恢复预算 60 分钟，从作出恢复决定开始计时。所有业务进程、直接写入者及数据库自主写入任务的完整冻结证据缺失时阻断。独立准备的 [离线执行器 PR #360](https://github.com/FangcunMount/qs-server/pull/360) 获批并合并后，先完成 DDL、版本与目标结构只读检查，再明确提交并启动业务 runtime。首个业务 runtime 启动命令发出之前，失败恢复需保持停写、确认 server 侧 DDL/事务/锁已结束，再恢复获批的完整备份对及对应镜像；该命令一旦发出，即使启动失败或尚未 ready，也禁止旧全量备份覆盖新增事实，只能保留新增事实后前向恢复。当前仅有 synthetic 对象恢复证明，不是该完整备份对或 30/60 分钟门槛的验收。
 
 两条 ALTER 各自提交，不能保证跨表原子性。第二条失败时可能出现第一列已删除、第二列仍存在的 `101 dirty/39 clean`；现有启动保护会拒绝继续，Mongo 不推进。保留失败结构、元数据和日志，由另行审查的向前修复协议处理，或受控恢复完整备份到已声明的 clean pair。禁止 `force`、清 dirty、向下迁移或先 DROP 再 force100 制造成功状态。新增 down 文件以 SQLSTATE `45000` 明确拒绝，不重建空历史列。
 

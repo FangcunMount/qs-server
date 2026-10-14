@@ -9927,12 +9927,20 @@
         {
           "kind": "source",
           "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/operator-retire/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorretire/*.go"
         }
       ],
       "verification": [
         {
           "kind": "command",
-          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
           "result": "passed",
           "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
           "verified_on": "2026-10-14"
@@ -9960,7 +9968,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Source and isolated MySQL/Mongo tests verify SQL-only101/39 and Mongo-only101/40 with exact index-object restoration and real scoped auth denial. No production DDL, complete production backup-pair restore, freeze receipt, deployment or business acceptance is attested."
+          "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only101/39 and Mongo-only101/40 preparation, exact index-object restoration and real scoped auth denial. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
+          "Fourteen migration native tests passed with exact owned-resource release; a pre-existing local NSQ restart loop prevented the extra all-existing-container stability observation. This is not NSQ integration acceptance."
         ]
       },
       "gaps": []
