@@ -6390,6 +6390,97 @@
         "Complete MySQL namespace visibility/export privilege, Mongo FCV, full coherent backup pair, isolated recovery/equality/three-service startup, interruption and forward recovery/budgets remain unproven.",
         "M4-B closure does not extend to Actor, five historical tables, AI supported environments or claims deletion. Production remains4a and M6 T0 not begun."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-root-transport-diagnostic",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T07:49:54.221804+00:00",
+      "environment": "Mac mini ordinary root@001-ysj public marker; separately recorded runner6 frozen396fe readonly metadata profile failure",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "No production runtime configuration was refreshed by the transport diagnostic; deployed SHA refers to the last separately bound M2 runtime observation."
+      },
+      "command": "One frozen396fe metadata profile dispatch through existing secret input and trusted root SSH; sealed remote_or_receipt failure retained. Separately one bounded public marker from Mac mini ordinary SSH session, existing identity/strict known_hosts, five-second execution and32KiB memory capture; only fixed error classification returned, no raw stderr, database call, package or DB credential inspection. No identity or SSH configuration mutation.",
+      "result": {
+        "status": "findings",
+        "summary": "Second profile failed at remote_or_receipt after input/package/trusted-SSH preflight; original database stage and permission scope unknown. Separate ordinary Mac root marker failed with auth_denied, exit255, no marker and no timeout. This does not prove the original runner step environment or whether either original profile entered the database. Existing working Mac mini root SSH configuration requested; backup/restore remains incomplete.",
+        "measurements": {
+          "profile_source_sha": "396fe041c8fbacb3f2cefa0f198bbd1d7b295041",
+          "profile_run_id": 38526754228,
+          "profile_job_id": 115728816906,
+          "profile_other_jobs_skipped": 13,
+          "profile_complete": false,
+          "profile_error_category": "profile_remote_or_receipt_failed",
+          "profile_input_package_trusted_ssh_preflight_passed": true,
+          "profile_ssh_invoked": true,
+          "profile_physical_database_stage_known": false,
+          "profile_permission_scope_known": false,
+          "profile_grant_and_role_measurements_unavailable": true,
+          "profile_unrestricted_false_is_failure_default_not_permission_fact": true,
+          "ordinary_mac_ssh_marker_exit_code": 255,
+          "ordinary_mac_ssh_error_category": "auth_denied",
+          "ordinary_mac_remote_marker_received": false,
+          "ordinary_mac_ssh_timed_out": false,
+          "public_marker_database_called": false,
+          "public_marker_raw_stderr_published_or_persisted": false,
+          "public_probe_proves_original_workflow_environment": false,
+          "first_package_readonly_five_regular_members_verified": true,
+          "first_package_appledouble_or_pax_members": false,
+          "first_package_metadata_proves_original_step_environment": false,
+          "ssh_identity_hostkeys_or_database_roles_changed": false,
+          "backup_pair_captured_or_restore_verified": false,
+          "maintenance_and_recovery_budget_verified": false,
+          "production_stop_export_restore_ddl_or_delete_calls": 0,
+          "evidence_artifacts": [
+            {
+              "file": "qs-server-cleanup-m4-admin-profile-stage-followup-dispatch.json",
+              "sha256": "eccc706ae606ff6abe20159492285381093a5a482ecf9a916bdcd0787b29f85b"
+            },
+            {
+              "file": "qs-server-cleanup-m4-admin-profile-stage-failed-receipt.json",
+              "sha256": "aa237db0e371902d4aba60f728a2f6b3073ebc176adf353ab3c7d1c1345b6c09"
+            },
+            {
+              "file": "qs-server-cleanup-m4-runner6-package-readonly.json",
+              "sha256": "321e314337543886084ac30ba1370e950358cb0feb5e8de153217fc8a778fb23"
+            },
+            {
+              "file": "qs-server-cleanup-m4-public-ssh-capability-readonly.json",
+              "sha256": "2c36cd27278e7094f57f6be554290d3d94650035c6ba5276e7be9de53a94efae"
+            },
+            {
+              "file": "qs-server-cleanup-m4-public-ssh-marker-classification-readonly.json",
+              "sha256": "e9d32c7ac014c012e8ef8486eb8d8483e548e89f42d062af7f383118c0560c1d"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data/recovery; Codex: bounded readonly transport diagnosis",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38526754228"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#623-m4-权限诊断第二次失败与-mac-mini-root-通路"
+        }
+      ],
+      "limitations": [
+        "Original21 machine records remain byte-preserved. This is a historical finding, not M4 readiness, positive permission proof or production-operation approval.",
+        "Ordinary Mac mini SSH authentication denial is scoped to that public probe. CD uses a separate temporary identity. No original workflow environment, root key cause, remote host execution condition or physical database stage is inferred.",
+        "The existing five-member package was read only for stable metadata; it does not prove the original workflow step environment and does not justify an archive-format failure claim.",
+        "Complete source privileges, Mongo FCV, continuous writer control, coherent same-window backup pair, full isolated recovery and three-service startup, interruption and forward recovery and30/60-minute budgets remain incomplete.",
+        "User M4-A and M4-B responsibility closure and system.profile preservation remain scoped as separately recorded. They do not extend to Actor, five historical tables or claims deletion. No production stop, export, restore, DDL, pause change or release; M6 T0 not begun."
+      ]
     }
   ]
 }
