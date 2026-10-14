@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Fixed-target Mongo FCV observation using the declared backup SSH route.
+"""Fixed-target Mongo FCV observation using the existing trusted ServerC SSH route.
 
 No backup, retention, production mutation or privilege change is implemented.
-Only this invocation's tunnel, temporary key and known_hosts are owned here.
+Only this invocation's tunnel and native reader process are owned here.
 """
 import argparse
 import hashlib
@@ -17,17 +17,19 @@ import socket
 import stat
 import subprocess
 import sys
-import tempfile
 import time
 
 EXPECTED_TARGET = "ab3c60ccc9106a110d85946468f0cec60a18614e54fde49dadfa8701a362036f"
 SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 RUN = re.compile(r"^[0-9]{1,20}-[0-9]{1,4}$")
-HOST = re.compile(r"^(?:[A-Za-z0-9][A-Za-z0-9.-]{0,252}|[0-9A-Fa-f:]{2,64})$")
-ACCOUNT = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]{0,63}$")
-FINGERPRINT = re.compile(r"^SHA256:[A-Za-z0-9+/]{43}=?$")
-INPUT_ENV = ("MONGO_PROFILE_SOURCE_SHA", "MONGO_PROFILE_CONFIRM_SHA", "MONGO_PROFILE_RUN_ID", "MONGO_PROFILE_EXPECTED_TARGET_HASH", "MONGO_PROFILE_OPERATION", "MONGO_PROFILE_DATABASE", "MONGO_PROFILE_ARCHIVE_INPUT", "GITHUB_SHA", "MONGO_BACKUP_HOST", "MONGO_BACKUP_USERNAME", "MONGO_BACKUP_SSH_PORT", "MONGO_BACKUP_SSH_KEY", "MONGO_BACKUP_SSH_FINGERPRINT", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")
+SSH_ALIAS = "003-ysj"
+SSH_HOST = "81.70.102.15"
+SSH_PORT = 22
+REMOTE_PORT = 27017
+UNOWNED_MATERIAL = frozenset({"key_unlinked", "known_hosts_unlinked", "temp_directory_released"})
+OWNED_RELEASE = frozenset({"cursors_closed", "client_disconnected", "tunnel_terminated", "tunnel_waited", "owned_tunnel_process_released", "reader_process_released"})
+INPUT_ENV = ("MONGO_PROFILE_SOURCE_SHA", "MONGO_PROFILE_CONFIRM_SHA", "MONGO_PROFILE_RUN_ID", "MONGO_PROFILE_EXPECTED_TARGET_HASH", "MONGO_PROFILE_OPERATION", "MONGO_PROFILE_DATABASE", "MONGO_PROFILE_ARCHIVE_INPUT", "GITHUB_SHA", "MONGODB_PORT", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")
 ERRORS = frozenset({"none", "input_invalid", "source_binding_failed", "ssh_route_invalid", "fingerprint_mismatch", "tunnel_port_busy", "tunnel_unavailable", "tool_failed", "receipt_invalid", "authorization_unknown", "authentication_mismatch", "target_identity_mismatch", "identity_changed", "migration_state_invalid", "build_metadata_invalid", "build_version_mismatch", "fcv_permission_denied", "fcv_read_failed", "fcv_shape_invalid", "fcv_transition_observed", "ttl_metadata_invalid", "reading_budget_exceeded", "cursor_release_failed", "client_release_failed", "owned_resource_release_failed", "interrupted"})
 
 RECEIPT_SCHEMA = {
@@ -47,10 +49,13 @@ RECEIPT_SCHEMA = {
 }
 
 # The native reader retains its existing protocol. Only the final transport
-# receipt adds a fixed stage, so a pre-database timeout cannot be mistaken for
-# an observed database failure. No command, address or stderr is published.
-TRANSPORT_STAGES = frozenset({"none", "preflight", "temporary_material", "ssh_keyscan", "ssh_fingerprint", "ssh_route", "port_reservation", "tunnel_start", "tunnel_listener", "tunnel_ownership", "native_reader", "source_recheck", "tunnel_recheck", "owned_resource_release", "total_budget"})
-FINAL_RECEIPT_SCHEMA = {**RECEIPT_SCHEMA, "failure_stage": TRANSPORT_STAGES}
+# receipt has a distinct V2 boundary: existing keys/trust files are borrowed,
+# never created or removed, and their owned-material release fields are null.
+# No command, address or stderr is published.
+TRANSPORT_STAGES = frozenset({"none", "preflight", "trusted_ssh", "port_reservation", "tunnel_start", "tunnel_listener", "tunnel_ownership", "native_reader", "source_recheck", "tunnel_recheck", "owned_resource_release", "total_budget"})
+FINAL_RECEIPT_SCHEMA = {**RECEIPT_SCHEMA, "protocol": frozenset({"mongo_admin_metadata_transport_v2"}),
+                        "release": {**RECEIPT_SCHEMA["release"], **{key: "nullable_bool" for key in UNOWNED_MATERIAL}},
+                        "failure_stage": TRANSPORT_STAGES}
 
 
 class ProfileError(ValueError):
@@ -106,6 +111,18 @@ def initial_receipt(sha, run, tool_hash="0" * 64, source_hash="0" * 64):
     return value
 
 
+def final_receipt(value):
+    value["protocol"] = "mongo_admin_metadata_transport_v2"
+    for key in UNOWNED_MATERIAL:
+        value["release"][key] = None
+    value["failure_stage"] = "none"
+    return value
+
+
+def owned_released(value):
+    return all(value["release"][key] for key in OWNED_RELEASE)
+
+
 def safe_receipt(raw, code, sha, run, tool_hash, source_hash, *, final=False):
     try:
         if type(code) is not int or code not in (0, 1) or type(raw) is not bytes or not 0 < len(raw) <= 65536:
@@ -153,8 +170,10 @@ def safe_receipt(raw, code, sha, run, tool_hash, source_hash, *, final=False):
         if final:
             if (code == 0) != (value["failure_stage"] == "none"):
                 raise ProfileError("receipt_invalid")
-            eligible = observed and all(value["release"].values())
-            if value["complete"] != eligible or value["eligible_fcv_readiness"] != eligible:
+            if any(value["release"][key] is not None for key in UNOWNED_MATERIAL):
+                raise ProfileError("receipt_invalid")
+            eligible = observed and owned_released(value)
+            if value["complete"] != eligible or value["eligible_fcv_readiness"] != eligible or (code == 0) != eligible:
                 raise ProfileError("receipt_invalid")
         elif value["complete"] or value["eligible_fcv_readiness"] or any(value["release"][key] for key in set(value["release"]) - {"cursors_closed", "client_disconnected"}):
             raise ProfileError("receipt_invalid")
@@ -176,21 +195,17 @@ def inputs(env):
         raise ProfileError("input_invalid")
     if (env.get("GITHUB_SHA") or sha) != sha:
         raise ProfileError("source_binding_failed")
-    host, account, fingerprint = (env.get(key, "") for key in ("MONGO_BACKUP_HOST", "MONGO_BACKUP_USERNAME", "MONGO_BACKUP_SSH_FINGERPRINT"))
-    if not HOST.fullmatch(host) or not ACCOUNT.fullmatch(account) or not FINGERPRINT.fullmatch(fingerprint):
+    if not 1 <= len(env.get("MONGODB_USERNAME", "")) <= 256 or any(c in env.get("MONGODB_USERNAME", "") for c in "\0\r\n") or not 1 <= len(env.get("MONGODB_PASSWORD", "")) <= 4096 or port(env.get("MONGODB_PORT", ""), REMOTE_PORT) != REMOTE_PORT:
         raise ProfileError("input_invalid")
-    if not env.get("MONGO_BACKUP_SSH_KEY") or len(env["MONGO_BACKUP_SSH_KEY"]) > 65536 or not 1 <= len(env.get("MONGODB_USERNAME", "")) <= 256 or any(c in env.get("MONGODB_USERNAME", "") for c in "\0\r\n") or not 1 <= len(env.get("MONGODB_PASSWORD", "")) <= 4096:
-        raise ProfileError("input_invalid")
-    return {"sha": sha, "run": run, "host": host, "account": account, "fingerprint": fingerprint,
-            "ssh_port": port(env.get("MONGO_BACKUP_SSH_PORT", ""), 22), "remote_port": port(env.get("MONGODB_PORT", ""), 27017)}
+    return {"sha": sha, "run": run, "host": SSH_HOST, "account": "root", "ssh_port": SSH_PORT, "remote_port": REMOTE_PORT}
 
 
 def child_env():
     return {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"}
 
 
-def capture_private(args, *, payload=None, timeout=5, limit=65536):
-    process = subprocess.Popen(args, env=child_env(), stdin=subprocess.PIPE if payload is not None else subprocess.DEVNULL,
+def capture_private(args, *, payload=None, timeout=5, limit=65536, env=None):
+    process = subprocess.Popen(args, env=child_env() if env is None else env, stdin=subprocess.PIPE if payload is not None else subprocess.DEVNULL,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, bufsize=0)
     selector = selectors.DefaultSelector()
     output, offset, total = bytearray(), 0, 0
@@ -233,19 +248,6 @@ def capture_private(args, *, payload=None, timeout=5, limit=65536):
                 stream.close()
 
 
-def write_owned(path, payload):
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(payload)
-    except BaseException:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        raise
-
-
 def binary_hash(binary):
     path = Path(binary)
     if not path.is_absolute():
@@ -260,65 +262,82 @@ def binary_hash(binary):
         return hashlib.sha256(handle.read()).hexdigest()
 
 
-def ssh_args(config, key, known):
-    return ["/usr/bin/ssh", "-F", "/dev/null", "-i", str(key), "-l", config["account"], "-p", str(config["ssh_port"]),
-            "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none",
-            "-o", "PasswordAuthentication=no", "-o", "KbdInteractiveAuthentication=no",
-            "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=" + str(known),
-            "-o", "GlobalKnownHostsFile=/dev/null", "-o", "ForwardAgent=no", "-o", "ForwardX11=no",
-            "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "PermitLocalCommand=no",
-            "-o", "ExitOnForwardFailure=yes", "-o", "ConnectTimeout=5", "-o", "ConnectionAttempts=1"]
+def trusted_file(path, limit):
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid() or before.st_mode & 0o022 or not 0 < before.st_size <= limit:
+        raise ProfileError("ssh_route_invalid")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as stream:
+        if os.fstat(stream.fileno()) != before:
+            raise ProfileError("ssh_route_invalid")
+        raw = stream.read(limit + 1)
+        if len(raw) > limit or os.fstat(stream.fileno()) != before:
+            raise ProfileError("ssh_route_invalid")
+    return hashlib.sha256(raw).hexdigest()
 
 
-def validate_ssh(raw, config, key, known):
+def validate_ssh(raw):
     try:
         values = {}
-        for line in raw.decode("ascii").splitlines():
+        for line in raw.decode("utf-8").splitlines():
             field, value = line.split(None, 1)
-            if field in values:
+            values.setdefault(field, []).append(value)
+        for field, expected in (("hostname", SSH_HOST), ("user", "root"), ("port", str(SSH_PORT))):
+            if values.get(field) != [expected]:
                 raise ProfileError("ssh_route_invalid")
-            values[field] = value
-        if values.get("hostname") != config["host"] or values.get("user") != config["account"] or values.get("port") != str(config["ssh_port"]):
-            raise ProfileError("ssh_route_invalid")
         for field in ("proxycommand", "proxyjump", "hostkeyalias", "localcommand"):
-            if values.get(field, "none") != "none":
+            if values.get(field, ["none"]) != ["none"]:
                 raise ProfileError("ssh_route_invalid")
-        if values.get("identityfile") != str(key) or values.get("userknownhostsfile") != str(known) or values.get("identityagent") != "none" or values.get("globalknownhostsfile") != "/dev/null":
+        if any(field in values for field in ("localforward", "remoteforward", "dynamicforward")):
             raise ProfileError("ssh_route_invalid")
-        if values.get("stricthostkeychecking") != "true" or values.get("forwardagent") != "no" or values.get("forwardx11") != "no":
-            raise ProfileError("ssh_route_invalid")
-        if any(key in values for key in ("localforward", "remoteforward", "dynamicforward")):
-            raise ProfileError("ssh_route_invalid")
+        return values
     except (ValueError, UnicodeError):
         raise ProfileError("ssh_route_invalid") from None
 
 
-def match_known_hosts(raw, fingerprint, directory, remaining):
-    if not raw or len(raw) > 65536:
-        raise ProfileError("fingerprint_mismatch")
-    candidates = []
-    for line in raw.splitlines():
-        if line.startswith(b"#"):
-            continue
-        parts = line.split()
-        if len(parts) != 3 or parts[1] not in (b"ssh-ed25519", b"ssh-rsa", b"ecdsa-sha2-nistp256", b"ecdsa-sha2-nistp384", b"ecdsa-sha2-nistp521") or len(candidates) >= 3:
-            raise ProfileError("fingerprint_mismatch")
-        candidates.append(line)
-    matched = []
-    path = directory / "known_hosts"
-    for line in candidates:
-        write_owned(path, line + b"\n")
-        try:
-            code, metadata = capture_private(["/usr/bin/ssh-keygen", "-E", "sha256", "-lf", str(path)], timeout=remaining())
-            fields = metadata.decode("ascii").split()
-            if code == 0 and len(fields) >= 2 and fields[1] == fingerprint:
-                matched.append(line)
-        finally:
-            path.unlink()
-    if not matched:
-        raise ProfileError("fingerprint_mismatch")
-    write_owned(path, b"\n".join(matched) + b"\n")
-    return path
+def trusted_ssh(home, remaining):
+    known = home / ".ssh" / "known_hosts"
+    known_hash = trusted_file(known, 4 << 20)
+    local = {**child_env(), "HOME": str(home)}
+    agent = os.environ.get("SSH_AUTH_SOCK", "")
+    if agent:
+        info = Path(agent).lstat()
+        if not Path(agent).is_absolute() or not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+            raise ProfileError("ssh_route_invalid")
+        local["SSH_AUTH_SOCK"] = agent
+    options = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+               "-o", "UserKnownHostsFile=" + str(known), "-o", "GlobalKnownHostsFile=/dev/null",
+               "-o", "UpdateHostKeys=no", "-o", "VerifyHostKeyDNS=no", "-o", "CanonicalizeHostname=no",
+               "-o", "AddKeysToAgent=no",
+               "-o", "ConnectTimeout=5", "-o", "ConnectionAttempts=1", "-o", "PasswordAuthentication=no",
+               "-o", "KbdInteractiveAuthentication=no", "-o", "ControlMaster=no", "-o", "ControlPath=none",
+               "-o", "ControlPersist=no", "-o", "ForwardAgent=no", "-o", "ForwardX11=no",
+               "-o", "ForwardX11Trusted=no", "-o", "PermitLocalCommand=no", "-o", "LogLevel=ERROR",
+               "-o", "ExitOnForwardFailure=yes", "-o", "IdentityAgent=" + (agent or "none")]
+    code, raw = capture_private(["/usr/bin/ssh", "-G", *options, "-l", "root", "-p", str(SSH_PORT), SSH_ALIAS], env=local, timeout=remaining())
+    if code != 0:
+        raise ProfileError("ssh_route_invalid")
+    values = validate_ssh(raw)
+    # Freeze only the approved alias's existing identity references. The final
+    # connection does not re-parse mutable config or inherit any forwarding.
+    identities = values.get("identityfile", [])
+    if not identities or len(identities) > 32 or any(not path or "\0" in path or "%" in path or path == "none" for path in identities):
+        raise ProfileError("ssh_route_invalid")
+    identity_options = []
+    for path in identities:
+        identity_options.extend(["-i", path])
+    # $SSH_SK_PROVIDER is OpenSSH's default token, but our SSH environment
+    # never imports that variable. Freeze the native default, not a provider.
+    if values.get("certificatefile", ["none"]) != ["none"] or values.get("pkcs11provider", ["none"]) != ["none"] or values.get("securitykeyprovider", ["internal"]) not in (["internal"], ["none"], ["$SSH_SK_PROVIDER"]):
+        raise ProfileError("ssh_route_invalid")
+    options.extend(["-o", "SecurityKeyProvider=internal"])
+    code, raw = capture_private(["/usr/bin/ssh-keygen", "-F", SSH_HOST, "-f", str(known)], env=local, timeout=remaining())
+    if code != 0 or not any(line and not line.startswith(b"#") for line in raw.splitlines()):
+        raise ProfileError("ssh_route_invalid")
+    if trusted_file(known, 4 << 20) != known_hash:
+        raise ProfileError("ssh_route_invalid")
+    base = ["/usr/bin/ssh", "-F", "/dev/null", "-T", *options, *identity_options, "-l", "root", "-p", str(SSH_PORT)]
+    return base, local, known, known_hash
 
 
 def source_check(sha):
@@ -346,14 +365,11 @@ def execute(binary, env):
     config = inputs(env)
     source_check(config["sha"])
     tool_hash = binary_hash(binary)
-    binding = {key: config[key] for key in ("host", "ssh_port", "remote_port", "fingerprint")}
-    binding["expected_target_hash"] = EXPECTED_TARGET
-    source_hash = hashlib.sha256(json.dumps(binding, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    value = initial_receipt(config["sha"], config["run"], tool_hash, source_hash)
-    directory = None
+    value = final_receipt(initial_receipt(config["sha"], config["run"], tool_hash))
     tunnel = None
     child_code = 1
-    stage, failure_stage = "temporary_material", "none"
+    source_hash = "0" * 64
+    stage, failure_stage = "trusted_ssh", "none"
 
     def remaining():
         left = 40 - (time.monotonic() - start)
@@ -362,22 +378,11 @@ def execute(binary, env):
         return min(5, left)
 
     try:
-        directory = Path(tempfile.mkdtemp(prefix="qs-mongo-profile-"))
-        os.chmod(directory, 0o700)
-        key = directory / "ssh_key"
-        write_owned(key, env["MONGO_BACKUP_SSH_KEY"].encode())
-        stage = "ssh_keyscan"
-        code, raw = capture_private(["/usr/bin/ssh-keyscan", "-T", "3", "-p", str(config["ssh_port"]), "-t", "ed25519,ecdsa,rsa", config["host"]], timeout=remaining())
-        if code != 0:
-            raise ProfileError("fingerprint_mismatch")
-        stage = "ssh_fingerprint"
-        known = match_known_hosts(raw, config["fingerprint"], directory, remaining)
-        base = ssh_args(config, key, known)
-        stage = "ssh_route"
-        code, raw = capture_private([*base, "-G", config["host"]], timeout=remaining())
-        if code != 0:
-            raise ProfileError("ssh_route_invalid")
-        validate_ssh(raw, config, key, known)
+        base, ssh_env, known, known_hash = trusted_ssh(Path.home(), remaining)
+        binding = {key: config[key] for key in ("host", "account", "ssh_port", "remote_port")}
+        binding.update(alias=SSH_ALIAS, known_hosts_sha256=known_hash, expected_target_hash=EXPECTED_TARGET)
+        source_hash = hashlib.sha256(json.dumps(binding, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        value["source_binding_hash"] = source_hash
         stage = "port_reservation"
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
@@ -385,7 +390,7 @@ def execute(binary, env):
         # ExitOnForwardFailure handles a race after reservation release. Only
         # this new process is ever signalled; foreign listeners are not touched.
         stage = "tunnel_start"
-        tunnel = subprocess.Popen([*base, "-N", "-L", "127.0.0.1:" + str(local_port) + ":127.0.0.1:" + str(config["remote_port"]), config["host"]], env=child_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        tunnel = subprocess.Popen([*base, "-N", "-L", "127.0.0.1:" + str(local_port) + ":127.0.0.1:" + str(config["remote_port"]), config["host"]], env=ssh_env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         stage = "tunnel_listener"
         deadline = time.monotonic() + remaining()
         while True:
@@ -406,12 +411,12 @@ def execute(binary, env):
             raise ProfileError("reading_budget_exceeded")
         stage = "native_reader"
         child_code, raw = capture_private([str(Path(binary))], payload=payload, timeout=min(35, available))
-        value = safe_receipt(raw, child_code, config["sha"], config["run"], tool_hash, source_hash)
+        value = final_receipt(safe_receipt(raw, child_code, config["sha"], config["run"], tool_hash, source_hash))
         if child_code != 0:
             failure_stage = stage
         value["release"]["reader_process_released"] = True
         stage = "source_recheck"
-        if tunnel.poll() is not None or binary_hash(binary) != tool_hash:
+        if tunnel.poll() is not None or binary_hash(binary) != tool_hash or trusted_file(known, 4 << 20) != known_hash:
             raise ProfileError("source_binding_failed")
         stage = "tunnel_recheck"
         owned_listener(tunnel.pid, local_port, remaining())
@@ -441,22 +446,8 @@ def execute(binary, env):
                 releases["owned_tunnel_process_released"] = True
             except (OSError, subprocess.SubprocessError):
                 pass
-        if directory is not None:
-            for filename, flag in (("ssh_key", "key_unlinked"), ("known_hosts", "known_hosts_unlinked")):
-                try:
-                    path = directory / filename
-                    if path.exists():
-                        path.unlink()
-                    releases[flag] = not path.exists()
-                except OSError:
-                    pass
-            try:
-                directory.rmdir()
-                releases["temp_directory_released"] = True
-            except OSError:
-                pass
         value["budget"]["elapsed_milliseconds"] = int((time.monotonic() - start) * 1000)
-        if child_code == 0 and not all(releases.values()):
+        if child_code == 0 and not owned_released(value):
             failure_stage = "owned_resource_release"
             value["error_category"] = "owned_resource_release_failed"
             value["fcv_observation_complete"] = False
@@ -466,7 +457,7 @@ def execute(binary, env):
             value["error_category"] = "reading_budget_exceeded"
             value["fcv_observation_complete"] = False
             child_code = 1
-        value["complete"] = value["fcv_observation_complete"] and all(releases.values())
+        value["complete"] = value["fcv_observation_complete"] and owned_released(value)
         value["eligible_fcv_readiness"] = value["complete"]
         value["failure_stage"] = failure_stage
     raw = json.dumps(value, separators=(",", ":")).encode()
@@ -494,16 +485,16 @@ def main():
     try:
         code, value = execute(args.binary, env)
     except ProfileError as exc:
-        value = initial_receipt(sha, run)
+        value = final_receipt(initial_receipt(sha, run))
         value["failure_stage"] = "preflight"
         value["error_category"] = str(exc) if str(exc) in ERRORS else "tool_failed"
         code = 1
     except Exception:
-        value = initial_receipt(sha, run)
+        value = final_receipt(initial_receipt(sha, run))
         value["failure_stage"] = "preflight"
         value["error_category"] = "input_invalid"
         code = 1
-    secrets = [env.get(key, "") for key in ("MONGO_BACKUP_HOST", "MONGO_BACKUP_USERNAME", "MONGO_BACKUP_SSH_KEY", "MONGO_BACKUP_SSH_FINGERPRINT", "MONGODB_USERNAME", "MONGODB_PASSWORD")]
+    secrets = [env.get(key, "") for key in ("MONGODB_USERNAME", "MONGODB_PASSWORD")]
     try:
         require_fields(value, FINAL_RECEIPT_SCHEMA)
         print(armor.encode_armored_receipt(value, schema=FINAL_RECEIPT_SCHEMA, secrets=secrets))

@@ -423,11 +423,6 @@ jobs:
           MONGO_PROFILE_OPERATION: ${{ github.event.inputs.operation }}
           MONGO_PROFILE_DATABASE: ${{ github.event.inputs.database }}
           MONGO_PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
-          MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
-          MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
-          MONGO_BACKUP_SSH_PORT: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
-          MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
-          MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}

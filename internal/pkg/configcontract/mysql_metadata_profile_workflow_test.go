@@ -207,3 +207,49 @@ func TestMetadataNativeCIUsesOwnedRequiredFixtures(t *testing.T) {
 		}
 	}
 }
+
+// The Mongo metadata job borrows the approved Mac mini SSH identity. Daily
+// backup/restore still own their existing secret-based transport separately.
+func TestMongoMetadataUsesExistingTrustedSSHWithoutBackupCredentials(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github/workflows/db-ops.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Run string            `yaml:"run"`
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err = yaml.Unmarshal(raw, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	job := workflow.Jobs["mongodb-metadata-admin-profile"]
+	if len(job.Steps) == 0 {
+		t.Fatal("Mongo metadata job missing")
+	}
+	executions := 0
+	for _, step := range job.Steps {
+		for key := range step.Env {
+			if strings.HasPrefix(key, "MONGO_BACKUP_") || strings.Contains(key, "SSH_KEY") || strings.Contains(key, "SSH_FINGERPRINT") {
+				t.Fatal("metadata job must not consume daily-backup SSH credentials")
+			}
+		}
+		if strings.Contains(step.Run, "scripts/dbops/mongodb-metadata-profile.py --binary") {
+			executions++
+			for _, key := range []string{"MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME"} {
+				if step.Env[key] != "${{ secrets."+key+" }}" {
+					t.Fatal("Mongo metadata authentication candidate changed")
+				}
+			}
+		}
+		if strings.Contains(step.Run, "backup.sh") || strings.Contains(step.Run, "ssh-keyscan") {
+			t.Fatal("metadata job must not invoke daily backup or bootstrap SSH trust")
+		}
+	}
+	if executions != 1 {
+		t.Fatal("Mongo metadata must have one host-native execution")
+	}
+}
