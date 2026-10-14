@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
+    "sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10165,7 +10165,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10206,6 +10206,45 @@
         {
           "kind": "command",
           "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+          "result": "passed",
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
+          "result": "matched",
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/retirement_driver.go",
+          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
+          "result": "matched",
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestHistoricalEvidenceNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/historical_evidence_retirement_native_integration_test.go",
+          "selector": "tx, err := n.db.BeginTx(t.Context(), nil)",
+          "result": "matched",
+          "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
           "result": "passed",
           "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
           "verified_on": "2026-10-13"
@@ -10334,8 +10373,8 @@
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
           "result": "matched",
-          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
-          "verified_on": "2026-10-14"
+          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
+          "verified_on": "2026-10-13"
         },
         {
           "kind": "source_selector",
@@ -10375,49 +10414,10 @@
         },
         {
           "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
           "result": "passed",
-          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/migration/retirement_driver.go",
-          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
-          "result": "matched",
-          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestHistoricalEvidenceNativeDirtyObjectBackupRestore",
-          "result": "matched",
-          "source_sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/migration/historical_evidence_retirement_native_integration_test.go",
-          "selector": "tx, err := n.db.BeginTx(t.Context(), nil)",
-          "result": "matched",
-          "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
-          "result": "passed",
-          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
-          "verified_on": "2026-10-13"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
-          "result": "matched",
-          "source_sha": "9bfd0acf32ef9cd672242d7b98894c29593c58c2",
-          "verified_on": "2026-10-13"
+          "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10432,7 +10432,8 @@
           "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
           "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack.",
           "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only 101/39 preparation and its guards. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
-          "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Production7.0.31, original-image full startup, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required."
+          "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Production7.0.31, original-image full startup, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required.",
+          "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery."
         ]
       },
       "gaps": []
@@ -12233,7 +12234,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12353,6 +12354,13 @@
           "result": "passed",
           "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+          "result": "passed",
+          "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -12365,7 +12373,8 @@
           "The current source c334 ran 7 required Offline native top-level tests plus 6 subtests on owned MySQL8.0.36/Mongo replica-set7.0.25: 13 RUN/PASS, no SKIP, exit0. Before/after hashes of all 3 affected Go sources matched; 2 owned containers and their bridge were released. The isolated synthetic fixture does not certify production object recovery, writer freeze, RPO, the30/60min budget or three-service startup.",
           "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
           "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
-          "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack."
+          "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack.",
+          "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery."
         ]
       },
       "gaps": [
