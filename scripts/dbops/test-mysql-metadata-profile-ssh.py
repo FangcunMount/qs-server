@@ -206,6 +206,26 @@ class SSHProfileTests(unittest.TestCase):
                 with patch.object(profile, 'capture_private', return_value=(0, config)), self.assertRaises(Exception):
                     ssh.trusted_ssh(profile, home)
 
+    def test_real_offline_ssh_config_rejects_hostkeyalias_before_key_or_secret_transport(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / '.ssh').mkdir()
+            (home / '.ssh/known_hosts').write_text('owned fixture, not a real host key\n')
+            config = home / 'owned-ssh-config'
+            config.write_text('Host 001-ysj\n  HostName example.invalid\n  User root\n  HostKeyAlias unexpected-key-identity\n')
+            capture = profile.capture_private
+            calls = []
+            def offline(args, **kwargs):
+                calls.append(args)
+                self.assertIn('-G', args)
+                self.assertEqual(args[0], '/usr/bin/ssh')
+                # Real OpenSSH parses only this owned config; -G never connects.
+                return capture([args[0], '-F', str(config), *args[1:]], **kwargs)
+            with patch.object(profile, 'capture_private', side_effect=offline), self.assertRaisesRegex(ValueError, '^ssh_alias_binding$'):
+                ssh.trusted_ssh(profile, home)
+            self.assertEqual(len(calls), 1)
+            self.assertNotIn('-F', calls[0])  # Fixture injection never alters production arguments.
+
     def test_native_capture_discards_stderr_and_limits_timeout_and_output(self):
         code, raw = profile.capture_private([sys.executable, '-c', 'import sys;print("safe");sys.stderr.write("' + SECRET + '")'], env={})
         self.assertEqual((code, raw), (0, b'safe\n'))

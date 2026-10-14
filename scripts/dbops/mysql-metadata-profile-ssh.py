@@ -169,7 +169,7 @@ def trusted_ssh(profile, home):
     for line in raw.decode().splitlines():
         key, _, value = line.partition(" ")
         config.setdefault(key, []).append(value)
-    if config.get("user") != ["root"] or config.get("hostname") in (None, [ALIAS]) or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"]:
+    if config.get("user") != ["root"] or config.get("hostname") in (None, [ALIAS]) or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
         raise ValueError("ssh_alias_binding")
     host = config["hostname"][0]
     port = config.get("port", ["22"])[0]
