@@ -458,7 +458,7 @@ func TestMetadataReadinessPrimaryShapeRequiresUnsignedSingleInnoDBKey(t *testing
 	}
 }
 func TestMetadataReadinessPagesUseAllUnsignedKeysAndRequireTerminatingEOF(t *testing.T) {
-	for _, name := range []string{"zero", "uintmax", "missing_upper", "bad_class", "duplicate", "short_then_more", "eof_error"} {
+	for _, name := range []string{"zero", "above_int64", "uintmax", "missing_upper", "bad_class", "duplicate", "short_then_more", "eof_error"} {
 		t.Run(name, func(t *testing.T) {
 			db, m := readinessMock(t)
 			c, e := db.Conn(context.Background())
@@ -467,8 +467,11 @@ func TestMetadataReadinessPagesUseAllUnsignedKeysAndRequireTerminatingEOF(t *tes
 			}
 			high := "0"
 			rows := readinessRowsFixture(2, []any{"0", "0"})
-			if name == "uintmax" {
-				high = "18446744073709551615"
+			if name == "above_int64" || name == "uintmax" {
+				high = "9223372036854775808"
+				if name == "uintmax" {
+					high = "18446744073709551615"
+				}
 				rows = readinessRowsFixture(2, []any{high, "0"})
 			}
 			switch name {
@@ -480,7 +483,7 @@ func TestMetadataReadinessPagesUseAllUnsignedKeysAndRequireTerminatingEOF(t *tes
 				rows = readinessRowsFixture(2, []any{0, 0}, []any{0, 0})
 			}
 			m.ExpectQuery(readinessPageSQL(false, false)).WithArgs(high).WillReturnRows(rows)
-			if name == "zero" || name == "uintmax" || name == "missing_upper" || name == "short_then_more" || name == "eof_error" {
+			if name == "zero" || name == "above_int64" || name == "uintmax" || name == "missing_upper" || name == "short_then_more" || name == "eof_error" {
 				q := m.ExpectQuery(readinessPageSQL(false, true)).WithArgs(high, high)
 				if name == "missing_upper" { // Last observed key was zero, below the fixed upper bound.
 					// Amend this query's exact argument to the actual last key.
@@ -497,7 +500,7 @@ func TestMetadataReadinessPagesUseAllUnsignedKeysAndRequireTerminatingEOF(t *tes
 			}
 			r := baseReadinessReceipt(fixtureBinding())
 			p, pages, eof, err := readinessPartitionPages(context.Background(), c, &r, false, sql.NullString{String: high, Valid: true})
-			if name == "zero" || name == "uintmax" {
+			if name == "zero" || name == "above_int64" || name == "uintmax" {
 				if err != nil || !eof || p.Total != 1 || p.SQLNull != 1 || pages != 2 {
 					t.Fatal("unsigned_key_coverage_failed")
 				}

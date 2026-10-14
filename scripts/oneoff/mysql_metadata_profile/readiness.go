@@ -44,7 +44,8 @@ const readinessPageSize = 1000
 const readinessNonEmptyPageLimit = 512
 
 // Only two literal tables and their fixed classification are supported. Keys
-// stay in RAM and decimal strings are cast to unsigned, including uint64 max.
+// stay in RAM. Exact decimal bounds avoid MySQL prepared string-to-UNSIGNED
+// narrowing above MaxInt64; ParseUint still binds them to the uint64 domain.
 func readinessPageSQL(outcome, after bool) string {
 	table, column := "assessment", "historical_lifecycle_evidence"
 	if outcome {
@@ -52,9 +53,9 @@ func readinessPageSQL(outcome, after bool) string {
 	}
 	lower := "id >= 0"
 	if after {
-		lower = "id > CAST(? AS UNSIGNED)"
+		lower = "id > CAST(? AS DECIMAL(20,0))"
 	}
-	return "SELECT /*+ MAX_EXECUTION_TIME(5000) */ id,CASE WHEN " + column + " IS NULL THEN 0 WHEN JSON_TYPE(" + column + ")='NULL' THEN 1 WHEN JSON_TYPE(" + column + ")='OBJECT' AND JSON_LENGTH(" + column + ")=0 THEN 2 WHEN JSON_TYPE(" + column + ")='OBJECT' THEN 3 ELSE 4 END FROM " + table + " FORCE INDEX(PRIMARY) WHERE " + lower + " AND id <= CAST(? AS UNSIGNED) ORDER BY id LIMIT 1000"
+	return "SELECT /*+ MAX_EXECUTION_TIME(5000) */ id,CASE WHEN " + column + " IS NULL THEN 0 WHEN JSON_TYPE(" + column + ")='NULL' THEN 1 WHEN JSON_TYPE(" + column + ")='OBJECT' AND JSON_LENGTH(" + column + ")=0 THEN 2 WHEN JSON_TYPE(" + column + ")='OBJECT' THEN 3 ELSE 4 END FROM " + table + " FORCE INDEX(PRIMARY) WHERE " + lower + " AND id <= CAST(? AS DECIMAL(20,0)) ORDER BY id LIMIT 1000"
 }
 
 type readinessIdentity struct {
