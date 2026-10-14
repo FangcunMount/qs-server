@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+    "sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12758,7 +12758,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13348,7 +13348,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13649,7 +13649,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b7ae414a64597bfaf9f35031ec975cfa59f541ec",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13707,7 +13707,8 @@
           "Only the two named SQL historical columns/CHECK and the original genuine ledger are protected, with complete all-SQL-NULL and retained-fact proof. First-runtime boundary, independent raw material/approval SHA and transaction outcome remain fail closed. No production mutation/freeze/capture, final image, three-service startup, real business, RPO0 or30/60min budget is signed.",
           "Two owned containers and bridge were released. Prior IDs/images/volumes were preserved, but dynamic metadata of existing services changed; all-runtime stability is not attested. Earlier setup and native failures remain immutable.",
           "Merge 3645c76e7c7756c5c8a15b5d370bbd39596c55b7 integrates actual origin/main4c49e633dd937bbe837afa10b0ef1251efb7d19b. All six native-bound tool Go/resource files remain byte-identical to d648. Its actual component native is preserved; fresh exact merged-head CI is required and no native command is relabelled as this checkout.",
-          "Sourceb7ae414a64597bfaf9f35031ec975cfa59f541ec adds early immutable099 CHECK/default/last-column verification and two original-schema drift native cases. Ordinary race, integration compilation, tagged vet and target lint passed; prior16 native stays bound to d648 and the new19-case native is pending."
+          "Sourceb7ae414a64597bfaf9f35031ec975cfa59f541ec adds early immutable099 CHECK/default/last-column verification and two original-schema drift native cases. Ordinary race, integration compilation, tagged vet and target lint passed; prior16 native stays bound to d648 and the new19-case native is pending.",
+          "Merge31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d integrates actual mainc335b2a1a34dd69830261e2d8e11b16da3f8befb with SQL103/Mongo40 current source and retires the removed legacy CLI sidecar. Coverage becomes45 sidecars after this A README. A511/77e/280 and all six A tool Go/resource bytes remain unchanged from early-refusal sourceb7; existing16 native is not this merged-head or new19-case proof."
         ]
       },
       "gaps": [
