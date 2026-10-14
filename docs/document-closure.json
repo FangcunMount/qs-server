@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+    "sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -326,16 +326,35 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "e83c9eb8958e3b5d155b31dd114364c161d24ede",
-        "verified_on": "2026-10-13"
+        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+        "verified_on": "2026-10-14"
       },
       "fact_sources": [
         {
           "kind": "source",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/db-ops.yml"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/cd/test-github-action-runtimes.sh",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -11192,8 +11211,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
-        "verified_on": "2026-10-08"
+        "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+        "verified_on": "2026-10-14"
       },
       "fact_sources": [
         {
@@ -11231,6 +11250,13 @@
           "result": "passed",
           "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/dbops/test-production-inventory.sh",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -11250,8 +11276,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
-        "verified_on": "2026-10-08"
+        "source_sha": "298fd002469af63db4880c553bab86088083fc17",
+        "verified_on": "2026-10-14"
       },
       "fact_sources": [
         {
@@ -11281,6 +11307,22 @@
         {
           "kind": "source",
           "path": "scripts/dbops/test-receipt-transport.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-profile-ssh.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-profile-ssh.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/mysql_metadata_profile_workflow_test.go"
         }
       ],
       "verification": [
@@ -11325,6 +11367,98 @@
           "result": "passed",
           "source_sha": "5b5dc2778f8f93f09d17c68736c3134a794cba08",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/native_test.go",
+          "selector": "func TestMetadataProfileNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "06244260b9acadd60bf2fe1f2b3f182479f01c1b",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "3ab1d90f9dd9f2af90764c375433c282b1ccc9bb",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "f22c3f26bc88c213ebab670313acc76819cb121d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "f22c3f26bc88c213ebab670313acc76819cb121d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "f22c3f26bc88c213ebab670313acc76819cb121d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "298fd002469af63db4880c553bab86088083fc17",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
