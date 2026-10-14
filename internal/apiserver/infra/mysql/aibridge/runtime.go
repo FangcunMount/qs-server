@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strconv"
-	"strings"
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -145,75 +143,6 @@ func (s *Store) ListRuntime(ctx context.Context, org int64, q app.RuntimeQuery) 
 		page.NextCursor = app.EncodeRuntimeCursor(app.RuntimeCursor{OrganizationID: org, Query: q, CreatedAt: last.CreatedAt, RequestID: last.RequestID})
 	}
 	return page, nil
-}
-
-// BackfillRuntimeIndexes is bounded and resumable. It never invents historical timestamps.
-func (s *Store) BackfillRuntimeIndexes(ctx context.Context, limit int) (int, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if limit < 1 || limit > 500 {
-		return 0, app.ErrInvalid
-	}
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, "SELECT request_id,CAST(payload AS BINARY),request_hash FROM ai_bridge_requests WHERE organization_id IS NULL ORDER BY request_id LIMIT ? FOR UPDATE", limit)
-	if err != nil {
-		return 0, err
-	}
-	requests := []app.Start{}
-	for rows.Next() {
-		var id, storedHash string
-		var raw []byte
-		var r app.Start
-		if err = rows.Scan(&id, &raw, &storedHash); err != nil {
-			_ = rows.Close()
-			return 0, err
-		}
-		if json.Unmarshal(raw, &r) != nil || r.RequestID != id || !validExternal(r.Actor.OrgID) || !validExternal(r.TesteeID) || r.Actor.SubjectID == "" || len(r.Actor.SubjectID) > 128 || strings.ContainsRune(r.Actor.SubjectID, 0) || len(r.AssessmentIDs) == 0 {
-			_ = rows.Close()
-			return 0, app.ErrInvalid
-		}
-		_, actualHash, hashErr := encode(r)
-		if hashErr != nil || actualHash != storedHash {
-			_ = rows.Close()
-			return 0, app.ErrConflict
-		}
-		for _, a := range r.AssessmentIDs {
-			if !validExternal(a) {
-				_ = rows.Close()
-				return 0, app.ErrInvalid
-			}
-		}
-		requests = append(requests, r)
-	}
-	err = rows.Err()
-	if closeErr := rows.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return 0, err
-	}
-	for _, r := range requests {
-		if _, err = tx.ExecContext(ctx, "UPDATE ai_bridge_requests SET organization_id=?,subject_id=?,testee_id=? WHERE request_id=? AND organization_id IS NULL", r.Actor.OrgID, r.Actor.SubjectID, r.TesteeID, r.RequestID); err != nil {
-			return 0, err
-		}
-		for _, a := range r.AssessmentIDs {
-			if _, err = tx.ExecContext(ctx, "INSERT IGNORE INTO ai_bridge_request_assessments(request_id,assessment_id) VALUES(?,?)", r.RequestID, a); err != nil {
-				return 0, err
-			}
-		}
-	}
-	if err = tx.Commit(); err != nil {
-		return 0, err
-	}
-	return len(requests), nil
-}
-func validExternal(v string) bool {
-	n, e := strconv.ParseUint(v, 10, 64)
-	return e == nil && n > 0 && strconv.FormatUint(n, 10) == v
 }
 
 func (s *Store) RuntimeBacklog(ctx context.Context, org int64) (map[string]int64, error) {
