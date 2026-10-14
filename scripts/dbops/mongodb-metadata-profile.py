@@ -46,6 +46,12 @@ RECEIPT_SCHEMA = {
     "budget": {"elapsed_milliseconds": "uint", "logical_queries": "uint"},
 }
 
+# The native reader retains its existing protocol. Only the final transport
+# receipt adds a fixed stage, so a pre-database timeout cannot be mistaken for
+# an observed database failure. No command, address or stderr is published.
+TRANSPORT_STAGES = frozenset({"none", "preflight", "temporary_material", "ssh_keyscan", "ssh_fingerprint", "ssh_route", "port_reservation", "tunnel_start", "tunnel_listener", "tunnel_ownership", "native_reader", "source_recheck", "tunnel_recheck", "owned_resource_release", "total_budget"})
+FINAL_RECEIPT_SCHEMA = {**RECEIPT_SCHEMA, "failure_stage": TRANSPORT_STAGES}
+
 
 class ProfileError(ValueError):
     pass
@@ -106,8 +112,9 @@ def safe_receipt(raw, code, sha, run, tool_hash, source_hash, *, final=False):
             raise ProfileError("receipt_invalid")
         value = json.loads(raw, object_pairs_hook=unique_object,
                            parse_constant=lambda _v: (_ for _ in ()).throw(ProfileError("receipt_invalid")))
-        require_fields(value, RECEIPT_SCHEMA)
-        transport()._validate(value, RECEIPT_SCHEMA)
+        schema = FINAL_RECEIPT_SCHEMA if final else RECEIPT_SCHEMA
+        require_fields(value, schema)
+        transport()._validate(value, schema)
         if (value["source_sha"], value["run_id"], value["tool_sha256"], value["source_binding_hash"], value["expected_target_hash"]) != (sha, run, tool_hash, source_hash, EXPECTED_TARGET):
             raise ProfileError("receipt_invalid")
         if value["backup_restore_proven"] or value["business_acceptance_proven"] or value["budget"]["logical_queries"] > 10 or value["budget"]["elapsed_milliseconds"] > 45000:
@@ -137,6 +144,8 @@ def safe_receipt(raw, code, sha, run, tool_hash, source_hash, *, final=False):
         elif code == 0 or value["error_category"] == "none":
             raise ProfileError("receipt_invalid")
         if final:
+            if (code == 0) != (value["failure_stage"] == "none"):
+                raise ProfileError("receipt_invalid")
             eligible = observed and all(value["release"].values())
             if value["complete"] != eligible or value["eligible_fcv_readiness"] != eligible:
                 raise ProfileError("receipt_invalid")
@@ -337,6 +346,7 @@ def execute(binary, env):
     directory = None
     tunnel = None
     child_code = 1
+    stage, failure_stage = "temporary_material", "none"
 
     def remaining():
         left = 40 - (time.monotonic() - start)
@@ -349,21 +359,27 @@ def execute(binary, env):
         os.chmod(directory, 0o700)
         key = directory / "ssh_key"
         write_owned(key, env["MONGO_BACKUP_SSH_KEY"].encode())
+        stage = "ssh_keyscan"
         code, raw = capture_private(["/usr/bin/ssh-keyscan", "-T", "3", "-p", str(config["ssh_port"]), "-t", "ed25519,ecdsa,rsa", config["host"]], timeout=remaining())
         if code != 0:
             raise ProfileError("fingerprint_mismatch")
+        stage = "ssh_fingerprint"
         known = match_known_hosts(raw, config["fingerprint"], directory, remaining)
         base = ssh_args(config, key, known)
+        stage = "ssh_route"
         code, raw = capture_private([*base, "-G", config["host"]], timeout=remaining())
         if code != 0:
             raise ProfileError("ssh_route_invalid")
         validate_ssh(raw, config, key, known)
+        stage = "port_reservation"
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
             local_port = reservation.getsockname()[1]
         # ExitOnForwardFailure handles a race after reservation release. Only
         # this new process is ever signalled; foreign listeners are not touched.
+        stage = "tunnel_start"
         tunnel = subprocess.Popen([*base, "-N", "-L", "127.0.0.1:" + str(local_port) + ":127.0.0.1:" + str(config["remote_port"]), config["host"]], env=child_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        stage = "tunnel_listener"
         deadline = time.monotonic() + remaining()
         while True:
             if tunnel.poll() is not None:
@@ -375,22 +391,30 @@ def execute(binary, env):
                 if time.monotonic() >= deadline:
                     raise ProfileError("tunnel_unavailable")
                 time.sleep(0.05)
+        stage = "tunnel_ownership"
         owned_listener(tunnel.pid, local_port, remaining())
         payload = json.dumps({"source_sha": config["sha"], "run_id": config["run"], "expected_target_hash": EXPECTED_TARGET, "source_binding_hash": source_hash, "tool_sha256": tool_hash, "port": local_port, "username": env["MONGODB_USERNAME"], "password": env["MONGODB_PASSWORD"], "database": "qs"}, separators=(",", ":")).encode()
         available = 40 - (time.monotonic() - start)
         if available <= 0:
             raise ProfileError("reading_budget_exceeded")
+        stage = "native_reader"
         child_code, raw = capture_private([str(Path(binary))], payload=payload, timeout=min(35, available))
         value = safe_receipt(raw, child_code, config["sha"], config["run"], tool_hash, source_hash)
+        if child_code != 0:
+            failure_stage = stage
         value["release"]["reader_process_released"] = True
+        stage = "source_recheck"
         if tunnel.poll() is not None or binary_hash(binary) != tool_hash:
             raise ProfileError("source_binding_failed")
+        stage = "tunnel_recheck"
         owned_listener(tunnel.pid, local_port, remaining())
     except ProfileError as exc:
+        failure_stage = stage
         value["error_category"] = str(exc) if str(exc) in ERRORS else "tool_failed"
         value["fcv_observation_complete"] = False
         child_code = 1
     except (OSError, ValueError, subprocess.SubprocessError, UnicodeError):
+        failure_stage = stage
         value["error_category"] = "tool_failed"
         value["fcv_observation_complete"] = False
         child_code = 1
@@ -426,15 +450,18 @@ def execute(binary, env):
                 pass
         value["budget"]["elapsed_milliseconds"] = int((time.monotonic() - start) * 1000)
         if child_code == 0 and not all(releases.values()):
+            failure_stage = "owned_resource_release"
             value["error_category"] = "owned_resource_release_failed"
             value["fcv_observation_complete"] = False
             child_code = 1
         if value["budget"]["elapsed_milliseconds"] > 45000:
+            failure_stage = "total_budget"
             value["error_category"] = "reading_budget_exceeded"
             value["fcv_observation_complete"] = False
             child_code = 1
         value["complete"] = value["fcv_observation_complete"] and all(releases.values())
         value["eligible_fcv_readiness"] = value["complete"]
+        value["failure_stage"] = failure_stage
     raw = json.dumps(value, separators=(",", ":")).encode()
     value = safe_receipt(raw, child_code, config["sha"], config["run"], tool_hash, source_hash, final=True)
     return (0 if value["complete"] else 1), value
@@ -461,16 +488,18 @@ def main():
         code, value = execute(args.binary, env)
     except ProfileError as exc:
         value = initial_receipt(sha, run)
+        value["failure_stage"] = "preflight"
         value["error_category"] = str(exc) if str(exc) in ERRORS else "tool_failed"
         code = 1
     except Exception:
         value = initial_receipt(sha, run)
+        value["failure_stage"] = "preflight"
         value["error_category"] = "input_invalid"
         code = 1
     secrets = [env.get(key, "") for key in ("MONGO_BACKUP_HOST", "MONGO_BACKUP_USERNAME", "MONGO_BACKUP_SSH_KEY", "MONGO_BACKUP_SSH_FINGERPRINT", "MONGODB_USERNAME", "MONGODB_PASSWORD")]
     try:
-        require_fields(value, RECEIPT_SCHEMA)
-        print(armor.encode_armored_receipt(value, schema=RECEIPT_SCHEMA, secrets=secrets))
+        require_fields(value, FINAL_RECEIPT_SCHEMA)
+        print(armor.encode_armored_receipt(value, schema=FINAL_RECEIPT_SCHEMA, secrets=secrets))
     except Exception:
         return 1
     return code

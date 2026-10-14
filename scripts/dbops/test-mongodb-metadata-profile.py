@@ -63,6 +63,7 @@ class ReceiptTests(unittest.TestCase):
         value = positive()
         value["release"] = {key: True for key in value["release"]}
         value["complete"] = value["eligible_fcv_readiness"] = True
+        value["failure_stage"] = "none"
         validate(value, final=True)
         for key in value["release"]:
             with self.subTest(key=key):
@@ -75,7 +76,30 @@ class ReceiptTests(unittest.TestCase):
         value = positive()
         value["fcv_observation_complete"] = False
         value["error_category"] = "owned_resource_release_failed"
+        value["failure_stage"] = "owned_resource_release"
         validate(value, code=1, final=True)
+
+    def test_final_stage_is_required_fixed_and_consistent(self):
+        value = positive()
+        value["release"] = {key: True for key in value["release"]}
+        value["complete"] = value["eligible_fcv_readiness"] = True
+        for stage in (None, "ssh_keyscan", "private host or stderr"):
+            bad = copy.deepcopy(value)
+            if stage is not None:
+                bad["failure_stage"] = stage
+            with self.subTest(stage=stage), self.assertRaises(m.ProfileError):
+                validate(bad, final=True)
+        value["failure_stage"] = "none"
+        with self.assertRaises(m.ProfileError):
+            validate(value)  # transport fields are not accepted from the native child
+
+        failed = m.initial_receipt(SHA, RUN, TOOL, SOURCE)
+        failed["error_category"] = "reading_budget_exceeded"
+        failed["failure_stage"] = "ssh_keyscan"
+        validate(failed, code=1, final=True)
+        failed["failure_stage"] = "none"
+        with self.assertRaises(m.ProfileError):
+            validate(failed, code=1, final=True)
 
     def test_required_nested_fields_and_forbidden_fields(self):
         for change in (lambda v: v.pop("target_hash"), lambda v: v["release"].pop("client_disconnected"), lambda v: v.update(username="secret"), lambda v: v["authorization"].update(roles=[])):
@@ -230,6 +254,12 @@ class TransportTests(unittest.TestCase):
     def test_early_tunnel_exit_does_not_connect_database(self):
         self.owned_flow("early_exit")
 
+    def test_keyscan_timeout_records_pre_database_stage(self):
+        self.owned_flow("keyscan_timeout")
+
+    def test_fingerprint_timeout_records_pre_database_stage(self):
+        self.owned_flow("fingerprint_timeout")
+
     def owned_flow(self, mode):
         # SSH, keyscan and DB process responses are protocol fixtures. The real
         # filesystem permissions/deletion and offline SSH-G are exercised;
@@ -259,8 +289,12 @@ class TransportTests(unittest.TestCase):
 
         def capture(args, **kw):
             if args[0] == "/usr/bin/ssh-keyscan":
+                if mode == "keyscan_timeout":
+                    raise m.ProfileError("reading_budget_exceeded")
                 return 0, b"127.0.0.1 ssh-ed25519 QUJD\n"
             if args[0] == "/usr/bin/ssh-keygen":
+                if mode == "fingerprint_timeout":
+                    raise m.ProfileError("reading_budget_exceeded")
                 return 0, ("256 " + env["MONGO_BACKUP_SSH_FINGERPRINT"] + " fixture (ED25519)\n").encode()
             if args[0] in ("/usr/sbin/lsof", "/usr/bin/lsof"):
                 port = next(arg.split(":")[-1] for arg in args if arg.startswith("-iTCP@"))
@@ -305,12 +339,28 @@ class TransportTests(unittest.TestCase):
                 self.assertEqual(code, 1)
                 self.assertFalse(value["complete"])
                 self.assertFalse(value["eligible_fcv_readiness"])
-            if mode == "early_exit":
+            if mode in ("keyscan_timeout", "fingerprint_timeout"):
                 self.assertNotIn("database", seen)
+                self.assertNotIn("tunnel", seen)
+                killed.assert_not_called()
+                self.assertEqual(value["failure_stage"], "ssh_keyscan" if mode == "keyscan_timeout" else "ssh_fingerprint")
+                self.assertEqual(value["error_category"], "reading_budget_exceeded")
+                self.assertEqual(value["budget"]["logical_queries"], 0)
+                self.assertTrue(value["release"]["key_unlinked"])
+                self.assertTrue(value["release"]["known_hosts_unlinked"])
+                self.assertTrue(value["release"]["temp_directory_released"])
+            elif mode == "early_exit":
+                self.assertNotIn("database", seen)
+                self.assertEqual(value["failure_stage"], "tunnel_listener")
             else:
                 killed.assert_called_once_with(tunnel.pid, m.signal.SIGTERM)
+            if mode == "success":
+                self.assertEqual(value["failure_stage"], "none")
+            if mode == "interrupted":
+                self.assertEqual(value["failure_stage"], "native_reader")
             if mode == "release_failure":
                 self.assertEqual(value["error_category"], "owned_resource_release_failed")
+                self.assertEqual(value["failure_stage"], "owned_resource_release")
                 self.assertFalse(value["release"]["temp_directory_released"])
             for path in directories:
                 if path.exists():
