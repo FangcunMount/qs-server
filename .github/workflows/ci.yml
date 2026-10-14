@@ -119,6 +119,20 @@ jobs:
     name: MongoDB Authenticated Native Metadata
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0.36
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        env:
+          MYSQL_ROOT_PASSWORD: m4-owned-object-fixture
+        ports:
+          - 3306/tcp
+        options: >-
+          --memory=1g --cpus=1
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pm4-owned-object-fixture"
+          --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -139,6 +153,8 @@ jobs:
           python3 -B scripts/dbops/test-mongodb-metadata-profile.py
           python3 -B scripts/dbops/test-receipt-transport.py
       - name: Verify an owned authenticated MongoDB 7.0.31 replica set
+        env:
+          OBJECT_MYSQL_PORT: ${{ job.services.mysql.ports['3306'] }}
         run: |
           set -Eeuo pipefail
           fixture_owner="${GITHUB_RUN_ID}${GITHUB_RUN_ATTEMPT}"
@@ -205,6 +221,37 @@ jobs:
           export QS_MONGO_METADATA_NATIVE_PORT
           export QS_MONGO_METADATA_NATIVE_PASSWORD=m4-owned-mongo-fixture
           make test-metadata-readiness-mongodb-native
+          # Reuse this owned replica set and the job-owned MySQL for the A-only tool.
+          [[ "$OBJECT_MYSQL_PORT" =~ ^[0-9]+$ && "$OBJECT_MYSQL_PORT" != 3306 ]] || exit 1
+          export QS_M4_OBJECT_NATIVE_REQUIRED=1
+          export QS_M4_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only
+          export QS_M4_OBJECT_NATIVE_MYSQL_DSN="root:m4-owned-object-fixture@tcp(127.0.0.1:${OBJECT_MYSQL_PORT})/mysql?multiStatements=true"
+          export QS_M4_OBJECT_NATIVE_MONGO_URI="mongodb://metadata_fixture:m4-owned-mongo-fixture@127.0.0.1:${QS_MONGO_METADATA_NATIVE_PORT}/?replicaSet=rs0&directConnection=true&authSource=admin"
+          object_source="$(git rev-parse HEAD)"
+          [[ "$object_source" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^TestM4SQLObjectNative' ./scripts/oneoff/m4_sql_historical_protection | tee object-native.jsonl
+          python3 - object-native.jsonl <<'PY_OBJECT_PROOF'
+          import json, sys
+          expected = {
+              'TestM4SQLObjectNativeCaptureAndTargetVerification',
+              'TestM4SQLObjectNativeOriginalDefinitionDriftRefused',
+              'TestM4SQLObjectNativeRecoveryMatrix',
+              'TestM4SQLObjectNativePermissionAndLedgerFailure',
+              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused',
+              'TestM4SQLObjectNativeCommitResponseLossRemainsUnknown',
+              'TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF',
+          }
+          events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
+          if any(event.get('Action') in ('skip', 'fail') for event in events):
+              raise SystemExit('A object native proof cannot skip or fail')
+          for action in ('run', 'pass'):
+              actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
+              if actual != expected:
+                  raise SystemExit('A object native selectors did not all RUN/PASS')
+          print('A object native: seven required top-level selectors RUN/PASS; zero SKIP')
+          PY_OBJECT_PROOF
 
   action-audit-mysql:
     name: Action audit MySQL JSON lifecycle

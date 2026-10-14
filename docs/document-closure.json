@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+    "sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 45,
       "budgeted": false
     }
   },
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12758,7 +12758,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13348,7 +13348,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13640,6 +13640,86 @@
           "severity": "high",
           "summary": "Production named protection location, responsibility, scope-specific restore and startup/freeze receipts remain unbound.",
           "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, explicit full-database-pair or approved M4 object scope, per-object responsibility, scope-specific restoration within60min, startup reserve and whole writer/TTL freeze before a separately authorized production apply."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/m4_sql_historical_protection/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "56c598337578537aa75319f7612dd9690948ef3c",
+        "verified_on": "2026-10-15"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_sql_historical_protection/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_sql_historical_protection/historical_columns.sql"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./scripts/oneoff/m4_sql_historical_protection",
+          "result": "passed",
+          "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/database.go",
+          "selector": "func requireTransactionalTables(",
+          "result": "matched",
+          "source_sha": "baa7ab6c29e9e3f48780a86328ca54ebf5312268",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./scripts/oneoff/m4_sql_historical_protection",
+          "result": "passed",
+          "source_sha": "b7ae414a64597bfaf9f35031ec975cfa59f541ec",
+          "verified_on": "2026-10-15"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Code source d64886d52c67e6c87d475e1fb549ee047d944d06 passed actual owned MySQL8.0.36/MongoRS7.0.31 native race: six required tops plus ten children,16 RUN/PASS,0FAIL/SKIP,exit0. Harnessbd42eb7/JSONL48cc284/receiptaa3c364 preserve exact actual argv and source hashes. This is component evidence; final head requires fresh CI.",
+          "Only the two named SQL historical columns/CHECK and the original genuine ledger are protected, with complete all-SQL-NULL and retained-fact proof. First-runtime boundary, independent raw material/approval SHA and transaction outcome remain fail closed. No production mutation/freeze/capture, final image, three-service startup, real business, RPO0 or30/60min budget is signed.",
+          "Two owned containers and bridge were released. Prior IDs/images/volumes were preserved, but dynamic metadata of existing services changed; all-runtime stability is not attested. Earlier setup and native failures remain immutable.",
+          "Merge 3645c76e7c7756c5c8a15b5d370bbd39596c55b7 integrates actual origin/main4c49e633dd937bbe837afa10b0ef1251efb7d19b. All six native-bound tool Go/resource files remain byte-identical to d648. Its actual component native is preserved; fresh exact merged-head CI is required and no native command is relabelled as this checkout.",
+          "Sourceb7ae414a64597bfaf9f35031ec975cfa59f541ec adds early immutable099 CHECK/default/last-column verification and two original-schema drift native cases. Ordinary race, integration compilation, tagged vet and target lint passed; prior16 native stays bound to d648. Its then-pending new19-case native is separately recorded below on actual merged checkout56c.",
+          "Merge31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d integrates actual mainc335b2a1a34dd69830261e2d8e11b16da3f8befb with SQL103/Mongo40 current source and retires the removed legacy CLI sidecar. Coverage becomes45 sidecars after this A README. A511/77e/280 and all six A tool Go/resource bytes remain unchanged from early-refusal sourceb7; existing16 native is not this merged-head or new19-case proof.",
+          "Actual merged checkout56c598337578537aa75319f7612dd9690948ef3c independently passed seven required tops plus twelve children:19RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/MongoRS7.0.31. All six Go/SQL files remain identical to early-refusal sourceb7. Immutable native-v8 harness6851c251/JSONLe50d9506/receipt6ba23dff preserve exact argv and source bindings;79.090s is only this synthetic fixture wall clock. Both owned containers and bridge were released with no cleanup errors; old IDs/images/volumes remain but selected old runtime metadata changed. No production or budget signoff, and no later head borrows this native result.",
+          "A separate LinuxAMD64 CGO0 formal tool was actually compiled from56c with the same six source hashes and independent fixedA511/77e/280 identity. BinarySHA07a964a6b47ac24b76cd5abb3e2af38e0229ae974ea5d897d37c097030cb0afa and build receipt28a46e6d6c8e687a95688cdb473542dccd73a70defbde71e14d6549dd60fd1a9 preserve actual build argv and go-version metadata. AMD64 runtime, production use, freeze, startup reserve and RPO remain unverified."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "M4-A-OBJECT-PROTECTION-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Actual T0 protection, independently approved six-instance writer freeze and production-scale deadline remain unproved.",
+          "exit_criteria": "Bind approved exact A execution/tool/images, original clean10039 identities, T0 allNULL proof and private materials, six-instanceAPI1/Collection2/Worker3 freeze and startup marker, independently rehearsed scoped restore and startup reserve before separately authorized production mutation."
         }
       ]
     }
