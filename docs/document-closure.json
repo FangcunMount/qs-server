@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+    "sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -3777,7 +3777,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -3918,6 +3918,13 @@
           "result": "passed",
           "source_sha": "24de8f5fedf11302d357064faa5ce5f20d9783dc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -3933,7 +3940,8 @@
           "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
-          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof."
+          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
         ]
       },
       "gaps": [
@@ -3959,7 +3967,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4100,6 +4108,13 @@
           "result": "passed",
           "source_sha": "24de8f5fedf11302d357064faa5ce5f20d9783dc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4115,7 +4130,8 @@
           "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
-          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof."
+          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
         ]
       },
       "gaps": [
@@ -4240,7 +4256,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4381,6 +4397,13 @@
           "result": "passed",
           "source_sha": "24de8f5fedf11302d357064faa5ce5f20d9783dc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4396,7 +4419,8 @@
           "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
-          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof."
+          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
         ]
       },
       "gaps": [
@@ -10295,7 +10319,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10405,6 +10429,13 @@
           "result": "passed",
           "source_sha": "24de8f5fedf11302d357064faa5ce5f20d9783dc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10418,7 +10449,8 @@
           "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
-          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof."
+          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
         ]
       },
       "gaps": [
@@ -10497,7 +10529,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10881,6 +10913,13 @@
           "result": "passed",
           "source_sha": "24de8f5fedf11302d357064faa5ce5f20d9783dc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10906,7 +10945,8 @@
           "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery.",
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
-          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof."
+          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
         ]
       },
       "gaps": []
@@ -12707,7 +12747,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12919,6 +12959,13 @@
           "result": "passed",
           "source_sha": "24de8f5fedf11302d357064faa5ce5f20d9783dc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -12937,7 +12984,8 @@
           "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery.",
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
-          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof."
+          "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
         ]
       },
       "gaps": [
