@@ -26,6 +26,8 @@ const compatibilitySQLVersion uint = 100
 const compatibilityMongoVersion uint = 39
 
 var retirementSQLNames = []string{"domain_event_outbox", "ai_bridge_commands", "ai_messaging_legacy_commands"}
+
+var retiredMaintenanceSQLTables = []string{"testee_store_migration_reversions", "testee_store_migration_items", "testee_store_migration_manifests", "clinician_operator_binding_archive", "operator_retirement_manifests"}
 var retirementHashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var retirementUUIDRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 var retirementOpRE = regexp.MustCompile(`^[0-9]{1,20}-[0-9]{1,4}$`)
@@ -293,6 +295,13 @@ func observeSQLPair(ctx context.Context, db retirementSQLReader, name string, re
 	for _, n := range retirementSQLNames {
 		if _, ok := catalog[n]; ok {
 			return s, retirementError("installed mysql retirement target present")
+		}
+	}
+	if s.version >= 103 {
+		for _, name := range retiredMaintenanceSQLTables {
+			if _, exists := catalog[name]; exists {
+				return s, retirementError("retired maintenance table present")
+			}
 		}
 	}
 	return s, nil
