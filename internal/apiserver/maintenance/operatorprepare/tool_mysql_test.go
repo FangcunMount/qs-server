@@ -5,6 +5,7 @@ import (
 	"fmt"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	actorrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	actorfixture "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/testfixture"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	driver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
@@ -75,10 +76,15 @@ func (f *facts) ReplaceManagedOperatorRoles(context.Context, int64, int64, []str
 func TestPreparationMySQL(t *testing.T) {
 	db := isolatedMySQL(t)
 	require.NoError(t, db.AutoMigrate(&actorrepo.OperatorPO{}))
+	// Add the original column before the real102 resource removes it.
+	require.NoError(t, db.Exec("ALTER TABLE operators ADD COLUMN effective_roles JSON NOT NULL AFTER roles; CREATE TABLE testee(id BIGINT PRIMARY KEY,tags JSON)").Error)
+	actorUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000102_retire_actor_compatibility_columns.up.sql"))
+	require.NoError(t, err)
+	actorfixture.RetireActorColumns(t, db, actorUp)
 	raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000074_operator_retirement_tasks.up.sql"))
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(raw)).Error)
-	require.NoError(t, db.Exec("INSERT INTO operators(id,org_id,user_id,version,is_active,name,roles,effective_roles) VALUES(9,1,900029,1,TRUE,'admin','[]','[]')").Error)
+	require.NoError(t, db.Exec("INSERT INTO operators(id,org_id,user_id,version,is_active,name,roles) VALUES(9,1,900029,1,TRUE,'admin','[]')").Error)
 	f := &facts{admin: true}
 	identityErr := error(nil)
 	tool := New(db, f, f, func(_ context.Context, user int64) error { require.Equal(t, int64(800028), user); return identityErr })
@@ -119,8 +125,13 @@ func TestPreparationMySQL(t *testing.T) {
 	require.False(t, row.IsActive)
 	require.Equal(t, cmd.ActorID, int64(row.CreatedBy))
 	require.Empty(t, row.Roles)
-	require.Empty(t, row.EffectiveRoles)
-	repeated, err := tool.Apply(ctx, cmd, plan.Fingerprint)
+	_, err = tool.Apply(ctx, cmd, plan.Fingerprint)
+	require.Error(t, err, "unexecuted old facts must be refreshed after registration")
+	current, err := tool.Preflight(ctx, cmd)
+	require.NoError(t, err)
+	_, err = tool.Apply(ctx, cmd, "wrong")
+	require.Error(t, err, "existing inactive identities still require the reviewed fingerprint")
+	repeated, err := tool.Apply(ctx, cmd, current.Fingerprint)
 	require.NoError(t, err)
 	require.Equal(t, "existing_inactive", repeated.State)
 	var unchanged actorrepo.OperatorPO

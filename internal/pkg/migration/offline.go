@@ -89,6 +89,7 @@ const (
 	offlineProtectionFullDatabasePair       = "full_database_pair"
 	offlineProtectionSQLHistoricalColumns   = "m4_sql_historical_columns"
 	offlineProtectionMongoHistoricalIndexes = "m4_mongo_historical_indexes"
+	offlineProtectionActorColumns           = "m4_actor_columns"
 )
 
 // InspectOffline reads only identities and guarded installed migration metadata.
@@ -146,6 +147,9 @@ func validOfflineProtectionScope(a offlineAuthorization) bool {
 	case offlineProtectionMongoHistoricalIndexes:
 		return a.InitialMySQLVersion == 101 && a.InitialMongoVersion == 39 &&
 			a.TargetMySQLVersion == 101 && a.TargetMongoVersion == 40
+	case offlineProtectionActorColumns:
+		return a.InitialMySQLVersion == 101 && a.InitialMongoVersion == 40 &&
+			a.TargetMySQLVersion == 102 && a.TargetMongoVersion == 40
 	default:
 		return false
 	}

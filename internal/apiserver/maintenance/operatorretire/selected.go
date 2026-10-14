@@ -9,6 +9,7 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
+	actorrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 )
 
 // SelectedReport is separate from the historical doctor retirement manifest.
@@ -26,6 +27,9 @@ type SelectedReport struct {
 func (t *Tool) selectedActor(ctx context.Context, cmd app.Command) (context.Context, error) {
 	if t.table != "operators" || t.loader == nil || t.gateway == nil {
 		return ctx, fmt.Errorf("selected retirement requires final schema and IAM")
+	}
+	if err := actorrepo.RequireCurrentOperatorPlanSchema(ctx, t.db); err != nil {
+		return ctx, err
 	}
 	snapshot, err := t.loader.LoadFresh(ctx, strconv.FormatInt(cmd.ActorID, 10))
 	if err != nil {
@@ -68,7 +72,7 @@ func (t *Tool) SelectedPreflight(ctx context.Context, cmd app.Command) (*Selecte
 	if existing != nil {
 		report.State = string(existing.Stage)
 	}
-	if err = t.db.WithContext(ctx).Table(t.table).Where("id=? AND org_id=?", cmd.OperatorID, cmd.OrgID).Take(&report.CurrentOperator).Error; err != nil {
+	if err = t.db.WithContext(ctx).Table(t.table).Select(actorrepo.CurrentOperatorColumns).Where("id=? AND org_id=?", cmd.OperatorID, cmd.OrgID).Take(&report.CurrentOperator).Error; err != nil {
 		return report, err
 	}
 	facts, err := t.loader.LoadAssignmentFacts(ctx, strconv.FormatInt(task.UserID, 10))
@@ -83,11 +87,12 @@ func (t *Tool) SelectedPreflight(ctx context.Context, cmd app.Command) (*Selecte
 	// Global policy versions change as other explicitly selected users exit; this digest
 	// covers this user's reviewed facts. The application revalidates IAM before revocation.
 	report.Fingerprint = hash(struct {
+		Schema   string
 		Command  app.Command
 		Operator map[string]interface{}
 		Roles    []authz.AssignmentRoleFact
 		Existing *domain.Task
-	}{cmd, report.CurrentOperator, report.Roles, existing})
+	}{actorrepo.OperatorFingerprintSchema, cmd, report.CurrentOperator, report.Roles, existing})
 	return report, nil
 }
 func (t *Tool) SelectedApply(ctx context.Context, cmd app.Command, fingerprint string, paused bool) (*SelectedReport, error) {

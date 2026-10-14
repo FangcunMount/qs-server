@@ -6,14 +6,13 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 )
 
-func TestOperatorMapperKeepsHistoricalInheritedRolesOutOfProjection(t *testing.T) {
+func TestOperatorMapperAndReadModelDeriveEffectiveRolesFromDirectRoles(t *testing.T) {
 	mapper := NewOperatorMapper()
 	historical := &OperatorPO{
 		OrgID:              1,
 		UserID:             10,
 		Name:               "operator",
 		Roles:              StringSliceCol{string(domain.RoleAssessmentOperator)},
-		EffectiveRoles:     StringSliceCol{string(domain.RoleAssessmentOperator), string(domain.RoleQSAdmin)},
 		AuthzPolicyVersion: 7,
 		IsActive:           true,
 	}
@@ -23,8 +22,16 @@ func TestOperatorMapperKeepsHistoricalInheritedRolesOutOfProjection(t *testing.T
 		t.Fatalf("historical inherited roles entered the projection: %v", got)
 	}
 	persisted := mapper.ToPO(restored)
-	if got := persisted.EffectiveRoles; len(got) != 1 || got[0] != string(domain.RoleAssessmentOperator) {
-		t.Fatalf("compatibility column must contain direct roles only: %v", got)
+	if got := persisted.Roles; len(got) != 1 || got[0] != string(domain.RoleAssessmentOperator) {
+		t.Fatalf("canonical column must contain direct roles only: %v", got)
+	}
+	row := operatorRowFromPO(historical)
+	if len(row.EffectiveRoles) != 1 || row.EffectiveRoles[0] != string(domain.RoleAssessmentOperator) {
+		t.Fatal("read model must derive effective roles from direct roles")
+	}
+	row.EffectiveRoles[0] = string(domain.RoleQSAdmin)
+	if historical.Roles[0] != string(domain.RoleAssessmentOperator) {
+		t.Fatal("derived role slice aliases persisted roles")
 	}
 	if restored.AuthzPolicyVersion() != historical.AuthzPolicyVersion || !restored.IsActive() {
 		t.Fatal("restoring historical roles changed projection version or activity")

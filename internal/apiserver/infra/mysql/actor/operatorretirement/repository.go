@@ -172,8 +172,14 @@ func (r *Repository) Finish(ctx context.Context, task domain.Task) error {
 		return fmt.Errorf("retirement has not completed")
 	}
 	return r.dbFor(ctx).Transaction(func(tx *gorm.DB) error {
+		updates := map[string]interface{}{"roles": "[]", "authz_policy_version": task.PolicyVersion, "authz_projected_at": task.UpdatedAt, "authz_projection_pending": false, "deleted_at": task.UpdatedAt, "updated_at": task.UpdatedAt, "updated_by": task.ActorID, "version": gorm.Expr("version+1")}
+		// The unregistered historical cutover library retains its original staff
+		// layout only for isolated original-schema recovery materials.
+		if r.table == "staff" {
+			updates["effective_roles"] = "[]"
+		}
 		result := tx.Table(r.table).Where("org_id=? AND id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.UserID, task.ExpectedVersion+1).
-			Updates(map[string]interface{}{"roles": "[]", "effective_roles": "[]", "authz_policy_version": task.PolicyVersion, "authz_projected_at": task.UpdatedAt, "authz_projection_pending": false, "deleted_at": task.UpdatedAt, "updated_at": task.UpdatedAt, "updated_by": task.ActorID, "version": gorm.Expr("version+1")})
+			Updates(updates)
 		if result.Error != nil {
 			return result.Error
 		}

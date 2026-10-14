@@ -11,6 +11,7 @@ import (
 func TestMySQLOrphanRevocationGuardsAndReplay(t *testing.T) {
 	db, _, facts := fixture(t)
 	require.NoError(t, db.Exec("RENAME TABLE staff TO operators").Error)
+	installCurrentActorColumns(t, db)
 	tool, err := New(db, facts, facts, "final")
 	require.NoError(t, err)
 	cmd := OrphanCommand{OrgID: 1, ActorID: 9, UserID: 800038, RequestID: "orphan-1", Reason: "reviewed access removal"}
@@ -20,6 +21,13 @@ func TestMySQLOrphanRevocationGuardsAndReplay(t *testing.T) {
 	require.Equal(t, "pending", plan.State)
 	_, err = tool.OrphanApply(ctx, cmd, plan.Fingerprint, false)
 	require.Error(t, err)
+	oldPlan := hash(struct {
+		Command OrphanCommand
+		Roles   []authz.AssignmentRoleFact
+		Version int64
+	}{cmd, plan.Roles, plan.PolicyVersion})
+	_, err = tool.OrphanApply(ctx, cmd, oldPlan, true)
+	require.Error(t, err, "old unexecuted preflight must be reviewed after actor-column migration")
 	_, err = tool.OrphanApply(ctx, cmd, "wrong", true)
 	require.Error(t, err)
 	facts.version++

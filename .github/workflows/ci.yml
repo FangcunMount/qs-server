@@ -636,6 +636,38 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Actor SQL102 retirement and guarded object material restoration
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m4_actor_ci_test
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=8m -v \
+            -run '^TestActorColumnsNative' ./internal/pkg/migration \
+            | tee "${RUNNER_TEMP}/actor-columns.log"
+          for test_name in \
+            TestActorColumnsNativeUpgradeRestartAndHistoricalArchive \
+            TestActorColumnsNativePartialDDLRefusesRestartForceAndDown \
+            TestActorColumnsNativeExactObjectValueRestoration \
+            TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim \
+            TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim/m4_sql_historical_columns \
+            TestActorColumnsNativeOtherObjectScopesRefusedBeforeClaim/m4_mongo_historical_indexes \
+            TestActorColumnsNativeDirtyObjectBackupRestore \
+            TestActorColumnsNativeDirtyObjectBackupRestore/restore \
+            TestActorColumnsNativeDirtyObjectBackupRestore/wrong_backup \
+            TestActorColumnsNativeDirtyObjectBackupRestore/retained_fact_changed \
+            TestActorColumnsNativeDirtyObjectBackupRestore/value_restore_failed \
+            TestActorColumnsNativeDirtyObjectBackupRestore/ledger_replay_failed; do
+            grep -q -- "=== RUN   ${test_name}$" "${RUNNER_TEMP}/actor-columns.log"
+            grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/actor-columns.log"
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/actor-columns.log"; then
+            echo 'Actor retirement proof must not skip' >&2
+            exit 1
+          fi
+
       - name: Stop owned Mongo index auth fixture
         if: always()
         run: |

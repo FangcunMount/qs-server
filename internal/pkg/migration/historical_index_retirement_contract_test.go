@@ -30,7 +30,7 @@ func TestHistoricalIndexRetirementResources(t *testing.T) {
 		t.Fatal("historical index down must explicitly refuse automatic recreation", err)
 	}
 	r := testCurrentResources(t)
-	if r.sql.head != 101 || r.mongo.head != 40 || !r.accepts(101, 39) || !r.accepts(101, 40) || r.accepts(100, 40) {
+	if !r.sql.contains(101) || !r.mongo.contains(40) || !r.accepts(101, 39) || !r.accepts(101, 40) || r.accepts(100, 40) {
 		t.Fatal("Mongo-only retirement requires101/40 and the safe101/39 start")
 	}
 }

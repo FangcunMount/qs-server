@@ -49,7 +49,7 @@ func (r *operatorRepository) save(ctx context.Context, item *domain.Operator) er
 func (r *operatorRepository) update(ctx context.Context, item *domain.Operator) error {
 	po := r.mapper.ToPO(item)
 	result := r.WithContext(ctx).Model(&OperatorPO{}).Where("id=? AND org_id=? AND version=? AND deleted_at IS NULL", po.ID, po.OrgID, po.Version).
-		Updates(map[string]interface{}{"roles": po.Roles, "effective_roles": po.EffectiveRoles, "authz_policy_version": po.AuthzPolicyVersion,
+		Updates(map[string]interface{}{"roles": po.Roles, "authz_policy_version": po.AuthzPolicyVersion,
 			"authz_projected_at": po.AuthzProjectedAt, "authz_projection_pending": po.AuthzProjectionPending, "name": po.Name, "email": po.Email, "phone": po.Phone,
 			"is_active": po.IsActive, "version": gorm.Expr("version+1"), "updated_at": time.Now().UTC(), "updated_by": middleware.GetUserIDFromContext(ctx)})
 	if result.Error != nil {

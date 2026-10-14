@@ -50,7 +50,7 @@ func isolatedMySQL(t *testing.T) *gorm.DB {
 
 func TestMySQLRetirementTaskAndLocalAdmissionAreAtomic(t *testing.T) {
 	db := isolatedMySQL(t)
-	if err := db.Exec("CREATE TABLE operators (id BIGINT UNSIGNED PRIMARY KEY, org_id BIGINT, user_id BIGINT, version INT UNSIGNED, is_active BOOLEAN, deleted_at DATETIME(3), updated_at DATETIME(3), updated_by BIGINT, roles JSON, effective_roles JSON, authz_policy_version BIGINT, authz_projected_at DATETIME(3), authz_projection_pending BOOLEAN)").Error; err != nil {
+	if err := db.Exec("CREATE TABLE operators (id BIGINT UNSIGNED PRIMARY KEY, org_id BIGINT, user_id BIGINT, version INT UNSIGNED, is_active BOOLEAN, deleted_at DATETIME(3), updated_at DATETIME(3), updated_by BIGINT, roles JSON, authz_policy_version BIGINT, authz_projected_at DATETIME(3), authz_projection_pending BOOLEAN)").Error; err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(filepath.Join("../../../../../pkg/migration/migrations/mysql/000074_operator_retirement_tasks.up.sql"))

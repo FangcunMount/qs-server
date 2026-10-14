@@ -9,6 +9,7 @@ import (
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	actorrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 )
 
 type OrphanCommand struct {
@@ -84,10 +85,11 @@ func (t *Tool) OrphanPreflight(ctx context.Context, cmd OrphanCommand) (*OrphanR
 	// Include global policy version: a later regrant cannot reuse an old plan even
 	// when the role names match. Any concurrent authorization write requires preview.
 	r.Fingerprint = hash(struct {
+		Schema  string
 		Command OrphanCommand
 		Roles   []authz.AssignmentRoleFact
 		Version int64
-	}{cmd, r.Roles, r.PolicyVersion})
+	}{actorrepo.OperatorFingerprintSchema, cmd, r.Roles, r.PolicyVersion})
 	return r, nil
 }
 
