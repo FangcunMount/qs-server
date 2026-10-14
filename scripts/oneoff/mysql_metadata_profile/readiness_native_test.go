@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"os"
 	"regexp"
 	"strconv"
@@ -341,11 +342,19 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		}
 		a, ap, ae, err := readinessPartitionPages(snapshot, c, &r, false, upper[0][0])
 		if err != nil {
-			t.Fatal("owned_assessment_snapshot_page_failed")
+			var failure *readinessQueryFailure
+			if errors.As(err, &failure) && failure != nil && failure.number != nil {
+				t.Fatalf("owned_assessment_snapshot_page_failed category=%s pages=%d eof=%t queries=%d mysql_number=%d", err.Error(), ap, ae, r.QueryCount, *failure.number)
+			}
+			t.Fatalf("owned_assessment_snapshot_page_failed category=%s pages=%d eof=%t queries=%d", err.Error(), ap, ae, r.QueryCount)
 		}
 		o, op, oe, err := readinessPartitionPages(snapshot, c, &r, true, upper[0][1])
 		if err != nil {
-			t.Fatal("owned_outcome_snapshot_page_failed")
+			var failure *readinessQueryFailure
+			if errors.As(err, &failure) && failure != nil && failure.number != nil {
+				t.Fatalf("owned_outcome_snapshot_page_failed category=%s pages=%d eof=%t queries=%d mysql_number=%d", err.Error(), op, oe, r.QueryCount, *failure.number)
+			}
+			t.Fatalf("owned_outcome_snapshot_page_failed category=%s pages=%d eof=%t queries=%d", err.Error(), op, oe, r.QueryCount)
 		}
 		if a != (scalarPartition{Total: 1006, SQLNull: 1003, NonNull: 3, EmptyObject: 2, NonEmptyObject: 1}) || o != (scalarPartition{Total: 3, SQLNull: 2, NonNull: 1, EmptyObject: 1}) || ap != 3 || op != 2 || !ae || !oe {
 			t.Fatal("concurrent_facts_changed_rr_snapshot")
