@@ -86,9 +86,6 @@ func (r *Repository) Recover(ctx context.Context, value domain.Recovery) error {
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if r.table != operatorTable {
-		return fmt.Errorf("operator recovery requires final schema")
-	}
 	if held, ok := ctx.Value(userLockKey{}).(int64); !ok || held != value.UserID {
 		return fmt.Errorf("operator recovery requires user exclusion")
 	}
@@ -109,11 +106,11 @@ func (r *Repository) Recover(ctx context.Context, value domain.Recovery) error {
 			return fmt.Errorf("retirement changed before recovery")
 		}
 		var before map[string]interface{}
-		if err := tx.Table(r.table).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id=? AND org_id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NOT NULL", value.OperatorID, value.OrgID, value.UserID, value.ExpectedVersion).Take(&before).Error; err != nil {
+		if err := tx.Table(operatorTable).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id=? AND org_id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NOT NULL", value.OperatorID, value.OrgID, value.UserID, value.ExpectedVersion).Take(&before).Error; err != nil {
 			return err
 		}
 		var others int64
-		if err := tx.Table(r.table).Where("user_id=? AND id<>? AND deleted_at IS NULL", value.UserID, value.OperatorID).Count(&others).Error; err != nil {
+		if err := tx.Table(operatorTable).Where("user_id=? AND id<>? AND deleted_at IS NULL", value.UserID, value.OperatorID).Count(&others).Error; err != nil {
 			return err
 		}
 		if others != 0 {
@@ -121,7 +118,7 @@ func (r *Repository) Recover(ctx context.Context, value domain.Recovery) error {
 		}
 		// An authenticated HQ snapshot is checked by the application. Its local identity must still be active.
 		var actors int64
-		if err := tx.Table(r.table).Where("org_id=? AND user_id=? AND is_active=TRUE AND deleted_at IS NULL", value.OrgID, value.ActorID).Count(&actors).Error; err != nil {
+		if err := tx.Table(operatorTable).Where("org_id=? AND user_id=? AND is_active=TRUE AND deleted_at IS NULL", value.OrgID, value.ActorID).Count(&actors).Error; err != nil {
 			return err
 		}
 		if actors != 1 {
@@ -150,7 +147,7 @@ func (r *Repository) Recover(ctx context.Context, value domain.Recovery) error {
 		if err := tx.Create(&archive).Error; err != nil {
 			return err
 		}
-		result := tx.Table(r.table).Where("id=? AND org_id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NOT NULL", value.OperatorID, value.OrgID, value.UserID, value.ExpectedVersion).
+		result := tx.Table(operatorTable).Where("id=? AND org_id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NOT NULL", value.OperatorID, value.OrgID, value.UserID, value.ExpectedVersion).
 			Updates(map[string]interface{}{"is_active": true, "deleted_at": nil, "roles": "[]", "authz_policy_version": value.PolicyVersion, "authz_projection_pending": false, "authz_projected_at": value.CreatedAt, "version": gorm.Expr("version+1"), "updated_at": value.CreatedAt, "updated_by": value.ActorID})
 		if result.Error != nil {
 			return result.Error

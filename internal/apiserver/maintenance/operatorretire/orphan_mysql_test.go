@@ -9,11 +9,9 @@ import (
 )
 
 func TestMySQLOrphanRevocationGuardsAndReplay(t *testing.T) {
-	db, _, facts := fixture(t)
-	require.NoError(t, db.Exec("RENAME TABLE staff TO operators").Error)
+	db, facts := fixture(t)
 	installCurrentActorColumns(t, db)
-	tool, err := New(db, facts, facts, "final")
-	require.NoError(t, err)
+	tool := New(db, facts, facts)
 	cmd := OrphanCommand{OrgID: 1, ActorID: 9, UserID: 800038, RequestID: "orphan-1", Reason: "reviewed access removal"}
 	ctx := context.Background()
 	plan, err := tool.OrphanPreflight(ctx, cmd)

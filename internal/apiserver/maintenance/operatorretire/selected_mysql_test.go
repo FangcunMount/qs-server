@@ -9,15 +9,12 @@ import (
 )
 
 func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t *testing.T) {
-	db, _, facts := fixture(t)
-	if err := db.Exec("RENAME TABLE staff TO operators; UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
+	db, facts := fixture(t)
+	if err := db.Exec("UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
 		t.Fatal(err)
 	}
 	installCurrentActorColumns(t, db)
-	tool, err := New(db, facts, facts, "final")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tool := New(db, facts, facts)
 	ctx := context.Background()
 	cmd := app.Command{OrgID: 1, ActorID: 900019, OperatorID: 7, ExpectedVersion: 3, RequestID: "selected-exit", Reason: "explicitly reviewed personnel exit"}
 	before, err := tool.SelectedPreflight(ctx, cmd)
