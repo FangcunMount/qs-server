@@ -35,6 +35,8 @@ MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来�
 
 ## 新空库的批准
 
+现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4两列或M4四索引；两个对象scope分别只允许 `100/39 → 101/39` 和 `101/39 → 101/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
+
 新空双库继续使用 `migration.retirement-bootstrap-authorization-file` 和 `migration.retirement-bootstrap-authorization-sha256`，不新增 CLI。文件须为真实私有绝对路径、`0600` 单链接文件，摘要绑定已批准的原始字节；目录为空不构成批准。
 
 当前批准格式为 `format_version: 2`、`kind: qs_schema_pair_pristine_bootstrap`。它绑定实际编译 SHA、选定 MySQL 库与 Mongo 集群身份、该二进制的两个目标 head、完整嵌入迁移资源摘要和有效期。资源摘要是按 MySQL、MongoDB 目录及文件名顺序，将全部 up/down 文件记录为 `[backend, path, sha256]` 的 JSON 数组后再计算 SHA256。原 v1 仅绑定退役末尾资源，不能授权当前格式。

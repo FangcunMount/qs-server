@@ -25,6 +25,10 @@ type nativeSchemaPair struct {
 }
 
 func openNativeSchemaPair(t *testing.T) nativeSchemaPair {
+	return openNativeSchemaPairWithPrefix(t, "qs_m3_test")
+}
+
+func openNativeSchemaPairWithPrefix(t *testing.T, prefix string) nativeSchemaPair {
 	t.Helper()
 	dsn := os.Getenv("QS_M3_TEST_MYSQL_DSN")
 	if dsn == "" {
@@ -42,7 +46,7 @@ func openNativeSchemaPair(t *testing.T) nativeSchemaPair {
 	if err != nil {
 		t.Fatal("isolated MySQL unavailable")
 	}
-	name := fmt.Sprintf("qs_m3_test_%d", time.Now().UnixNano())
+	name := fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 	if _, err := server.ExecContext(t.Context(), "CREATE DATABASE `"+name+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
 		_ = server.Close()
 		t.Fatal(err)
