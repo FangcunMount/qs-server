@@ -460,6 +460,7 @@ jobs:
           for test_name in \
             TestHistoricalIndexNativeMongoOnlyUpgradeAndRestart \
             TestHistoricalIndexNativeExactObjectRestoreAndConstraints \
+            TestHistoricalIndexNativeDirtyObjectBackupRestore \
             TestHistoricalIndexNativePartialFailureAndDirtyRefuseRepairByForce \
             TestHistoricalIndexNativeUnknownMetadataStopsBeforeDDL \
             TestHistoricalIndexNativePermissionDeniedAfterMetadataWrite; do
