@@ -11276,7 +11276,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+        "source_sha": "298fd002469af63db4880c553bab86088083fc17",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11451,6 +11451,13 @@
           "command": "python3 -B scripts/dbops/test-receipt-transport.py",
           "result": "passed",
           "source_sha": "49b4239346856bedacc904975db33b7dfe337187",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "298fd002469af63db4880c553bab86088083fc17",
           "verified_on": "2026-10-14"
         }
       ],
