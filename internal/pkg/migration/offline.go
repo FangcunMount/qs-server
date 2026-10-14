@@ -86,10 +86,11 @@ type offlineAuthorization struct {
 var offlineSourceSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 const (
-	offlineProtectionFullDatabasePair       = "full_database_pair"
-	offlineProtectionSQLHistoricalColumns   = "m4_sql_historical_columns"
-	offlineProtectionMongoHistoricalIndexes = "m4_mongo_historical_indexes"
-	offlineProtectionActorColumns           = "m4_actor_columns"
+	offlineProtectionFullDatabasePair        = "full_database_pair"
+	offlineProtectionSQLHistoricalColumns    = "m4_sql_historical_columns"
+	offlineProtectionMongoHistoricalIndexes  = "m4_mongo_historical_indexes"
+	offlineProtectionActorColumns            = "m4_actor_columns"
+	offlineProtectionLegacyMaintenanceTables = "m4_legacy_maintenance_tables"
 )
 
 // InspectOffline reads only identities and guarded installed migration metadata.
@@ -150,6 +151,9 @@ func validOfflineProtectionScope(a offlineAuthorization) bool {
 	case offlineProtectionActorColumns:
 		return a.InitialMySQLVersion == 101 && a.InitialMongoVersion == 40 &&
 			a.TargetMySQLVersion == 102 && a.TargetMongoVersion == 40
+	case offlineProtectionLegacyMaintenanceTables:
+		return a.InitialMySQLVersion == 102 && a.InitialMongoVersion == 40 &&
+			a.TargetMySQLVersion == 103 && a.TargetMongoVersion == 40
 	default:
 		return false
 	}

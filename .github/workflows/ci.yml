@@ -669,6 +669,41 @@ jobs:
             exit 1
           fi
 
+      - name: Verify SQL103 legacy maintenance retirement and original object recovery
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m4_maintenance_ci_test
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=8m -v \
+            -run '^TestLegacyMaintenanceNative' ./internal/pkg/migration \
+            | tee "${RUNNER_TEMP}/legacy-maintenance.log"
+          for test_name in \
+            TestLegacyMaintenanceNativeUpgradeRestartAndCurrentWrites \
+            TestLegacyMaintenanceNativePartialDDLRefusesRestartForceAndDown \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/restore \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/wrong_backup \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/retained_fact_changed \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/object_restore_failed \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/before_ledger_interrupted \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/ledger_replay_failed \
+            TestLegacyMaintenanceNativeDirtyObjectBackupRestore/runtime_started \
+            TestLegacyMaintenanceNativeWrongObjectScopesRefusedBeforeClaim \
+            TestLegacyMaintenanceNativeWrongObjectScopesRefusedBeforeClaim/m4_sql_historical_columns \
+            TestLegacyMaintenanceNativeWrongObjectScopesRefusedBeforeClaim/m4_mongo_historical_indexes \
+            TestLegacyMaintenanceNativeWrongObjectScopesRefusedBeforeClaim/m4_actor_columns \
+            TestLegacyMaintenanceNativeReappearedTableFailsClosed; do
+            grep -q -- "=== RUN   ${test_name}$" "${RUNNER_TEMP}/legacy-maintenance.log"
+            grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/legacy-maintenance.log"
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/legacy-maintenance.log"; then
+            echo 'Maintenance retirement proof must not skip' >&2
+            exit 1
+          fi
+
       - name: Stop owned Mongo index auth fixture
         if: always()
         run: |

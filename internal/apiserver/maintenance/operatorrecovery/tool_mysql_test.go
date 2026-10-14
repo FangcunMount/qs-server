@@ -85,6 +85,21 @@ func TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity(t *testing.T) 
 		t.Fatal(err)
 	}
 	actorfixture.RetireActorColumns(t, db, actorUp)
+
+	for _, name := range []string{"000075_operator_retirement_manifests.up.sql", "000078_testee_store_migration_manifest.up.sql"} {
+		raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Exec(string(raw)).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	maintenanceUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000103_retire_legacy_maintenance_tables.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	actorfixture.RetireMaintenanceTables(t, db, actorUp, maintenanceUp)
 	for _, name := range []string{"000074_operator_retirement_tasks.up.sql", "000079_operator_recovery_archives.up.sql"} {
 		raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", name))
 		if err != nil {

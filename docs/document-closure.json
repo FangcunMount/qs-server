@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+    "sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 45,
+      "expected_count": 44,
       "budgeted": false
     }
   },
@@ -78,8 +78,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 102,
-        "version_count": 102
+        "max_version": 103,
+        "version_count": 103
       },
       "mongodb": {
         "max_version": 40,
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -633,6 +633,30 @@
           "verified_on": "2026-10-15"
         },
         {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "offlineProtectionLegacyMaintenanceTables",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/legacy_maintenance_retirement_native_integration_test.go",
+          "selector": "func TestLegacyMaintenanceNativeDirtyObjectBackupRestore(",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
+          "selector": "*rows[0].Version != 103",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
           "kind": "command",
           "command": "go test -race -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile ./internal/pkg/configcontract",
           "result": "passed",
@@ -702,6 +726,13 @@
           "result": "passed",
           "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -710,7 +741,11 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "No per-document production evidence has been recorded in this initial skeleton.",
+          "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
+          "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -1150,8 +1185,8 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b51c4e31ca6dace97aefab835ce2c9fdc13585f7",
-        "verified_on": "2026-10-13"
+        "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -1178,6 +1213,13 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -3752,7 +3794,7 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -3865,7 +3907,8 @@
         "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
         "observed_at": "2026-08-18",
         "limitations": [
-          "Historical evidence does not cover the reviewed source baseline or local documentation changes."
+          "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -4042,9 +4085,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
-          "selector": "*rows[0].Version != 102",
+          "selector": "*rows[0].Version != 103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -4058,9 +4101,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/po.go",
-          "selector": "actor_columns_sql102",
+          "selector": "actor_maintenance_sql103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -4115,7 +4158,9 @@
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
           "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
-          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof.",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/operator_plan.go\",\"result\":\"matched\",\"selector\":\"*rows[0].Version != 102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -4232,9 +4277,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
-          "selector": "*rows[0].Version != 102",
+          "selector": "*rows[0].Version != 103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -4248,9 +4293,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/po.go",
-          "selector": "actor_columns_sql102",
+          "selector": "actor_maintenance_sql103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -4305,7 +4350,9 @@
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
           "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
-          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof.",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/operator_plan.go\",\"result\":\"matched\",\"selector\":\"*rows[0].Version != 102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -4430,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4521,9 +4568,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
-          "selector": "*rows[0].Version != 102",
+          "selector": "*rows[0].Version != 103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -4537,9 +4584,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/po.go",
-          "selector": "actor_columns_sql102",
+          "selector": "actor_maintenance_sql103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -4578,6 +4625,44 @@
           "result": "passed",
           "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "offlineProtectionLegacyMaintenanceTables",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/legacy_maintenance_retirement_native_integration_test.go",
+          "selector": "func TestLegacyMaintenanceNativeDirtyObjectBackupRestore(",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
+          "selector": "*rows[0].Version != 103",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4594,7 +4679,13 @@
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
           "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
-          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof.",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/operator_plan.go\",\"result\":\"matched\",\"selector\":\"*rows[0].Version != 102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
+          "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -9060,7 +9151,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -9110,6 +9201,44 @@
         }
       ],
       "verification": [
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "offlineProtectionLegacyMaintenanceTables",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/legacy_maintenance_retirement_native_integration_test.go",
+          "selector": "func TestLegacyMaintenanceNativeDirtyObjectBackupRestore(",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
+          "selector": "*rows[0].Version != 103",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
+        },
         {
           "kind": "command",
           "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
@@ -9171,7 +9300,12 @@
         "observed_at": null,
         "limitations": [
           "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance.",
-          "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored."
+          "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
+          "M4-D removed sidecar registration because its authorized legacy CLI/package/only-consumer tests were retired; it had no verified or production signoff. Original full registration retained: {\"class\":\"sidecar\",\"doc_status\":\"needs_review\",\"fact_sources\":[{\"kind\":\"source\",\"path\":\"cmd/testee-store-migrate/main.go\"}],\"gaps\":[{\"exit_criteria\":\"Verify release revision, private preflight, maintenance cutover and business acceptance.\",\"id\":\"TESTEE-MIGRATION-CLI-RELEASE\",\"kind\":\"verification\",\"severity\":\"medium\",\"summary\":\"Local migration and rollback checks completed; committed-revision and production evidence pending.\"}],\"owner\":\"runtime\",\"path\":\"cmd/testee-store-migrate/README.md\",\"production_evidence\":{\"deployed_sha\":null,\"level\":\"none\",\"limitations\":[\"Maintenance migration not yet executed in production.\"],\"observed_at\":null,\"refs\":[]},\"verification\":[],\"verified\":{\"source_sha\":null,\"verified_on\":null}}",
+          "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
+          "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -10463,8 +10597,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
-        "verified_on": "2026-10-09"
+        "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -10487,6 +10621,13 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10514,8 +10655,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "9ff123e8ac43e7adffe23bdfcfa4704682ea9473",
-        "verified_on": "2026-10-09"
+        "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -10538,6 +10679,13 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10625,9 +10773,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
-          "selector": "*rows[0].Version != 102",
+          "selector": "*rows[0].Version != 103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -10641,9 +10789,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/po.go",
-          "selector": "actor_columns_sql102",
+          "selector": "actor_maintenance_sql103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -10696,7 +10844,9 @@
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
           "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
-          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof.",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/operator_plan.go\",\"result\":\"matched\",\"selector\":\"*rows[0].Version != 102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -10775,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11095,9 +11245,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
-          "selector": "*rows[0].Version != 102",
+          "selector": "*rows[0].Version != 103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -11111,9 +11261,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/po.go",
-          "selector": "actor_columns_sql102",
+          "selector": "actor_maintenance_sql103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -11166,6 +11316,51 @@
           "result": "passed",
           "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "offlineProtectionLegacyMaintenanceTables",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/legacy_maintenance_retirement_native_integration_test.go",
+          "selector": "func TestLegacyMaintenanceNativeDirtyObjectBackupRestore(",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
+          "selector": "*rows[0].Version != 103",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11192,7 +11387,13 @@
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
           "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
-          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof.",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/operator_plan.go\",\"result\":\"matched\",\"selector\":\"*rows[0].Version != 102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
+          "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": []
@@ -11833,7 +12034,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11917,7 +12118,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "No per-document production evidence has been recorded in this initial skeleton.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [
@@ -11927,41 +12129,6 @@
           "severity": "medium",
           "summary": "Internal bridge contract and entry are implemented; production integration remains pending.",
           "exit_criteria": "Review the real authorization and product entry integration before marking production readiness."
-        }
-      ]
-    },
-    {
-      "path": "cmd/testee-store-migrate/README.md",
-      "class": "sidecar",
-      "owner": "runtime",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "source",
-          "path": "cmd/testee-store-migrate/main.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "Maintenance migration not yet executed in production."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "TESTEE-MIGRATION-CLI-RELEASE",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Local migration and rollback checks completed; committed-revision and production evidence pending.",
-          "exit_criteria": "Verify release revision, private preflight, maintenance cutover and business acceptance."
         }
       ]
     },
@@ -12497,7 +12664,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12564,6 +12731,13 @@
           "result": "passed",
           "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -12572,7 +12746,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Offline contract verification only; production connectivity and metadata are not yet observed. Counts never authorize deletion."
+          "Offline contract verification only; production connectivity and metadata are not yet observed. Counts never authorize deletion.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
         ]
       },
       "gaps": []
@@ -12583,7 +12758,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13038,6 +13213,13 @@
           "result": "passed",
           "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13046,7 +13228,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Offline diagnostic and safe receipt contracts do not prove current production permissions, archive validity or cleanup eligibility."
+          "Offline diagnostic and safe receipt contracts do not prove current production permissions, archive validity or cleanup eligibility.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
         ]
       },
       "gaps": []
@@ -13165,7 +13348,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13313,9 +13496,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
-          "selector": "*rows[0].Version != 102",
+          "selector": "*rows[0].Version != 103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -13329,9 +13512,9 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/po.go",
-          "selector": "actor_columns_sql102",
+          "selector": "actor_maintenance_sql103",
           "result": "matched",
-          "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
           "verified_on": "2026-10-15"
         },
         {
@@ -13384,6 +13567,44 @@
           "result": "passed",
           "source_sha": "9245c45887c28915d7c5319e11ee2b392224c4cf",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "offlineProtectionLegacyMaintenanceTables",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/legacy_maintenance_retirement_native_integration_test.go",
+          "selector": "func TestLegacyMaintenanceNativeDirtyObjectBackupRestore(",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
+          "selector": "*rows[0].Version != 103",
+          "result": "matched",
+          "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13403,7 +13624,13 @@
           "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run.",
           "Actor checkout24de8f5fedf11302d357064faa5ce5f20d9783dc includes actual mainc6ad16329863a4aed7b8003d0c351db280be22a0. No Go/module/migration bytes changed from ea26d7f4570942fa5d04a4c9af160652e6e4bc6a, where the full ordinary suite passed. Exact4287 CI failed at the intentionally historical SQL98 statistics seed because current Operator persistence omitted the original NOTNULL effective_roles column; later native gates did not run. Test-only source9b3bfebb5ce7daa16a3048a97f10a370c40f316b seeds the original98 shape without restoring production compatibility writes or advancing schema. Fresh final-head CI must execute all retained M3/A/B/Offline/C required native scenarios. These source checks do not attest production mutation, targeted protection/freeze, full startup or time/RPO budgets.",
           "The owned local source-check receipt4cc774be5dbe1aaf8c98a8cb224b7599784d25927cdf11bd872d92559f52a0a5 binds checkout24de8f5fedf11302d357064faa5ce5f20d9783dc: affected Actor/migration race, full build/vet/lint and full integration compilation passed, with source HEAD unchanged. GOMAXPROCS2 and -p2 bounded Go execution. The ordinary suite remains bound to unchanged-source ea26; integration compilation selected no database tests and is never substituted for actual native proof.",
-          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof."
+          "Exact013e33182 CI38618692856 still failed in historical Mongo-B fixtures: current full resources incorrectly advanced SQL to102 while B retained its101/39-to101/40 contract. The successful-upgrade assertion observed changed=true; partial/permission failures actually left102clean/40dirty, not the required101clean/40dirty. The SQL98 statistics fixture now passed. Core log responseea946dbe5c6a1cf808b3f6a0b4e3e046082ddb33aa195f53d5d5322ff484f1f1 is preserved, and the later C stage did not run. Test-only source9245c45887c28915d7c5319e11ee2b392224c4cf pins original SQL1..101/Mongo1..40 resources and the corresponding declared pairs before fault injection, retaining all original assertions and all historical bytes. No runtime, migration guard, DDL or approval semantics changed. Fresh final-head CI remains required; old native components are not this merged-run proof.",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/operator_plan.go\",\"result\":\"matched\",\"selector\":\"*rows[0].Version != 102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D retained historical source review (original item, not current SQL103 matched evidence): {\"kind\":\"source_selector\",\"path\":\"internal/apiserver/infra/mysql/actor/po.go\",\"result\":\"matched\",\"selector\":\"actor_columns_sql102\",\"source_sha\":\"c6329a3eb6eb3754be2d303669fa0064376a0736\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
+          "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
         ]
       },
       "gaps": [

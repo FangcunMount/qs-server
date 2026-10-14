@@ -62,3 +62,58 @@ func RetireActorColumns(t testing.TB, db *gorm.DB, up []byte) {
 		t.Fatal("fixed Actor fixture did not finish at clean SQL102", err)
 	}
 }
+
+// RetireMaintenanceTables executes only original SQL103 on a genuine clean102
+// disposable fixture with all five original maintenance tables present.
+func RetireMaintenanceTables(t testing.TB, db *gorm.DB, actorUp, up []byte) {
+	t.Helper()
+	var initial []struct {
+		Version uint64
+		Dirty   bool
+	}
+	if err := db.Raw("SELECT version,dirty FROM schema_migrations LIMIT 2").Scan(&initial).Error; err != nil || len(initial) != 1 || initial[0].Version != 102 || initial[0].Dirty {
+		t.Fatal("fixed maintenance fixture requires real clean SQL102", err)
+	}
+	pool, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	conn, err := pool.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := migratemysql.WithConnection(ctx, conn, &migratemysql.Config{StatementTimeout: 5 * time.Second})
+	if err != nil {
+		_ = conn.Close()
+		t.Fatal(err)
+	}
+	source, err := iofs.New(fstest.MapFS{
+		// The provider validates its already-applied current resource without rerunning it.
+		"000102_retire_actor_compatibility_columns.up.sql": &fstest.MapFile{Data: actorUp},
+		"000103_retire_legacy_maintenance_tables.up.sql":   &fstest.MapFile{Data: up},
+	}, ".")
+	if err != nil {
+		_ = provider.Close()
+		t.Fatal(err)
+	}
+	m, err := migrate.NewWithInstance("iofs", source, "mysql", provider)
+	if err != nil {
+		_ = source.Close()
+		_ = provider.Close()
+		t.Fatal(err)
+	}
+	runErr := m.Migrate(103)
+	sourceErr, closeErr := m.Close()
+	if runErr != nil || sourceErr != nil || closeErr != nil {
+		t.Fatalf("fixed maintenance fixture migration or release failed: %v / %v / %v", runErr, sourceErr, closeErr)
+	}
+	var rows []struct {
+		Version uint64
+		Dirty   bool
+	}
+	if err := db.Raw("SELECT version,dirty FROM schema_migrations").Scan(&rows).Error; err != nil || len(rows) != 1 || rows[0].Version != 103 || rows[0].Dirty {
+		t.Fatal("fixed maintenance fixture did not finish at clean SQL103", err)
+	}
+}

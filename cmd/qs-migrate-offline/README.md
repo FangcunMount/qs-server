@@ -63,7 +63,7 @@ sha256sum /private/task-owned/qs-migrate-offline
 }
 ```
 
-两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。本候选资源目标为102/40；生产实际版本仍须只读核实。SQL-only101/39、Mongo-only101/40及Actor-only102/40分别需要独立迁移资源、已审核初始版本对和各自批准，旧迁移字节保持不变。
+两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。本候选资源目标为103/40；生产实际版本仍须只读核实。SQL-only101/39、Mongo-only101/40、Actor-only102/40及维护表-only103/40分别需要独立迁移资源、已审核初始版本对和各自批准，旧迁移字节保持不变。
 
 `protection_scope` 必须显式声明，范围与版本转换不可互换：
 
@@ -73,8 +73,9 @@ sha256sum /private/task-owned/qs-migrate-offline
 | `m4_sql_historical_columns` | 仅 `100/39 → 101/39`；保护两列历史值、主键、原 schema/CHECK 和具名恢复材料 |
 | `m4_mongo_historical_indexes` | 仅 `101/39 → 101/40`；保护四个完整有序索引定义、集合身份与保留对象核对材料 |
 | `m4_actor_columns` | 仅 `101/40 → 102/40`；保护 tags/effective_roles 的完整原列定义、主键和值及真实版本表材料，不包含五张历史维护表 |
+| `m4_legacy_maintenance_tables` | 仅 `102/40 → 103/40`；保护五表完整原DDL/值及真实完整原版本表，保留现代任务、恢复归档和业务历史 |
 
-三个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
+四个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
 
 该文件格式尚未发布，没有旧格式兼容：旧 `backup_pair_manifest_sha256` / `backup_pair_location` 字段、缺失 scope、未知 scope、对象 scope 的其他版本组合直接拒绝。
 

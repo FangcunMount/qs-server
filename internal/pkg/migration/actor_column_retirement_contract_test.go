@@ -18,7 +18,7 @@ func TestActorColumnRetirementResourcesAndClosedProtectionScope(t *testing.T) {
 		t.Fatal("down cannot recreate empty columns as data recovery")
 	}
 	r := testCurrentResources(t)
-	if r.sql.head != 102 || r.mongo.head != 40 || !r.accepts(101, 40) || !r.accepts(102, 40) || r.accepts(102, 39) || r.accepts(100, 40) {
+	if !r.sql.contains(102) || !r.mongo.contains(40) || !r.accepts(101, 40) || !r.accepts(102, 40) || r.accepts(102, 39) || r.accepts(100, 40) {
 		t.Fatal("actor retirement requires its exact SQL-only release pair")
 	}
 }
