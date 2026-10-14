@@ -127,13 +127,13 @@ collection_tls_server_block() {
       closes = gsub(/\}/, "", copy)
       return opens - closes
     }
-    !inside && /^[[:space:]]*server[[:space:]]*\{/ {
+    !finished && !inside && /^[[:space:]]*server[[:space:]]*\{/ {
       inside = 1
       depth = 0
       block = ""
       matched = 0
     }
-    inside {
+    !finished && inside {
       block = block $0 ORS
       depth += brace_delta($0)
       if ($0 ~ /^[[:space:]]*server_name[[:space:]]+collect[.]fangcunmount[.]cn[[:space:]]*;/) {
@@ -142,7 +142,9 @@ collection_tls_server_block() {
       if (depth == 0) {
         if (matched && block ~ /listen[[:space:]]+443[[:space:]]+ssl/) {
           printf "%s", block
-          exit
+          # Keep reading so the producer of a large nginx -T dump does not
+          # receive SIGPIPE under pipefail after the first matching block.
+          finished = 1
         }
         inside = 0
       }
@@ -186,13 +188,14 @@ verify_effective_config() {
   upstream="$(
     printf '%s\n' "$effective" |
       awk '
-        /^[[:space:]]*upstream[[:space:]]+collect-api[[:space:]]*\{/ {
+        !finished && /^[[:space:]]*upstream[[:space:]]+collect-api[[:space:]]*\{/ {
           inside = 1
         }
         inside {
           print
           if ($0 ~ /^[[:space:]]*}[[:space:]]*$/) {
-            exit
+            inside = 0
+            finished = 1
           }
         }
       '
@@ -331,18 +334,39 @@ verify_runtime() {
 
 PREVIOUS_CONFIG_PATH=""
 BACKUP_CONFIG_PATH=""
+PREVIOUS_CONFIG_SHA256=""
+INSTALL_OWNER_BASHPID=""
+ROLLBACK_STARTED=false
+
+config_file_sha256() {
+  local value
+  value="$(sha256sum "$1")" || return
+  value="${value%% *}"
+  [[ "$value" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s\n' "$value"
+}
 
 restore_previous_config() {
   run_privileged rm -f "$NGINX_CONFIG_DEST"
   if [ -n "$BACKUP_CONFIG_PATH" ] && [ -n "$PREVIOUS_CONFIG_PATH" ]; then
     run_privileged rsync -a "$BACKUP_CONFIG_PATH" "$PREVIOUS_CONFIG_PATH"
     run_privileged chmod 0644 "$PREVIOUS_CONFIG_PATH"
+    if [ "$(config_file_sha256 "$PREVIOUS_CONFIG_PATH")" != "$PREVIOUS_CONFIG_SHA256" ]; then
+      echo "Restored collection Nginx config does not match the saved previous SHA256" >&2
+      return 1
+    fi
   fi
 }
 
 rollback_config() {
   local original_status="$1"
   trap - ERR
+  # ERR is inherited by command substitutions. Only the installing shell may
+  # restore files; a failing child propagates its status to that shell instead.
+  if [ "$BASHPID" != "$INSTALL_OWNER_BASHPID" ] || [ "$ROLLBACK_STARTED" = true ]; then
+    exit "$original_status"
+  fi
+  ROLLBACK_STARTED=true
   echo "Collection Nginx verification failed; restoring previous config" >&2
   if ! restore_previous_config; then
     echo "CRITICAL: failed to restore the previous Nginx configuration" >&2
@@ -381,12 +405,15 @@ install_and_verify() {
     PREVIOUS_CONFIG_PATH="$NGINX_CONFIG_LEGACY_DEST"
   fi
   if [ -n "$PREVIOUS_CONFIG_PATH" ]; then
+    PREVIOUS_CONFIG_SHA256="$(config_file_sha256 "$PREVIOUS_CONFIG_PATH")"
     BACKUP_CONFIG_PATH="${NGINX_CONFIG_BACKUP_DIR}/collect-nginx-${timestamp}.conf"
     run_privileged rsync -a "$PREVIOUS_CONFIG_PATH" "$BACKUP_CONFIG_PATH"
     run_privileged chmod 0600 "$BACKUP_CONFIG_PATH"
-    echo "Backed up ${PREVIOUS_CONFIG_PATH} to ${BACKUP_CONFIG_PATH}"
+    echo "Backed up ${PREVIOUS_CONFIG_PATH} to ${BACKUP_CONFIG_PATH} (sha256=${PREVIOUS_CONFIG_SHA256})"
   fi
 
+  INSTALL_OWNER_BASHPID="$BASHPID"
+  ROLLBACK_STARTED=false
   trap 'rollback_config $?' ERR
   if [ "$PREVIOUS_CONFIG_PATH" = "$NGINX_CONFIG_LEGACY_DEST" ]; then
     run_privileged rm -f "$NGINX_CONFIG_LEGACY_DEST"
