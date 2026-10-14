@@ -27,6 +27,7 @@ type retirementDatabaseDriver struct {
 	database      string
 	version       int
 	dirty         bool
+	offline       bool
 	upHash        string
 	downHash      string
 	bodyValid     bool
@@ -58,7 +59,7 @@ func newRetirementDatabaseDriver(driver migratedb.Driver, backend Backend, cfg *
 	if cfg.retirementPair != nil {
 		sourceValid = sourceValid && resources.sha256 == cfg.retirementPair.resources.sha256
 	}
-	return &retirementDatabaseDriver{resources: resources, sourceValid: sourceValid, Driver: driver, backend: backend, pair: cfg.retirementPair, ctx: migrationRunContext(cfg), sqlConn: conn, client: client, database: cfg.Database, upHash: retirementHash(canonical), downHash: retirementHash(down), bodyValid: exact}
+	return &retirementDatabaseDriver{resources: resources, sourceValid: sourceValid, Driver: driver, backend: backend, pair: cfg.retirementPair, ctx: migrationRunContext(cfg), offline: cfg.offline, sqlConn: conn, client: client, database: cfg.Database, upHash: retirementHash(canonical), downHash: retirementHash(down), bodyValid: exact}
 }
 func (d *retirementDatabaseDriver) tailVersion() int {
 	if d.backend == BackendMongo {
@@ -145,7 +146,13 @@ func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 		if err := d.verifyPostRetirementStep(); err != nil {
 			return err
 		}
-		if err := d.Driver.Run(bytes.NewReader(raw)); err != nil {
+		var err error
+		if d.offline {
+			err = d.runOfflineStep(raw)
+		} else {
+			err = d.Driver.Run(bytes.NewReader(raw))
+		}
+		if err != nil {
 			return err
 		}
 		d.stepSucceeded = true

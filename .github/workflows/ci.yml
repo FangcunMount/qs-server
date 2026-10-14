@@ -65,6 +65,146 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  metadata-readiness-mysql-native:
+    name: MySQL Native Metadata and Readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0.36
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        env:
+          MYSQL_ROOT_PASSWORD: m4-owned-mysql-fixture
+        ports:
+          - 3306/tcp
+        options: >-
+          --memory=1g --cpus=1
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pm4-owned-mysql-fixture"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Run wrapper and receipt contracts
+        run: |
+          python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
+          python3 -B scripts/dbops/test-mysql-metadata-readiness.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+      - name: Verify owned MySQL metadata selectors really run
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_HOST: '127.0.0.1'
+          MYSQL_PORT: ${{ job.services.mysql.ports['3306'] }}
+          MYSQL_USERNAME: root
+          MYSQL_PASSWORD: m4-owned-mysql-fixture
+          QS_METADATA_PROFILE_NATIVE_REQUIRED: '1'
+        run: |
+          set -Eeuo pipefail
+          export MYSQL_DATABASE="qs_profile_owned_${GITHUB_RUN_ID}"
+          [[ "$MYSQL_DATABASE" =~ ^qs_profile_owned_[a-z0-9]{8,24}$ && "$MYSQL_PORT" != 3306 ]] || exit 1
+          docker exec --env MYSQL_PWD="$MYSQL_PASSWORD" "$MYSQL_CONTAINER" mysql -uroot -e \
+            "CREATE DATABASE $MYSQL_DATABASE; SET GLOBAL partial_revokes=ON; UPDATE performance_schema.setup_instruments SET ENABLED='YES', TIMED='YES' WHERE NAME='wait/lock/metadata/sql/mdl';"
+          QS_METADATA_PROFILE_NATIVE_UUID="$(docker exec --env MYSQL_PWD="$MYSQL_PASSWORD" "$MYSQL_CONTAINER" mysql -uroot -N -e 'SELECT @@server_uuid')"
+          export QS_METADATA_PROFILE_NATIVE_UUID
+          make test-metadata-readiness-mysql-native
+
+  metadata-readiness-mongodb-native:
+    name: MongoDB Authenticated Native Metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Log in for the pinned fixture image
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
+      - name: Run MongoDB wrapper and receipt contracts
+        run: |
+          python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
+          python3 -B scripts/dbops/test-mongodb-metadata-profile.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+      - name: Verify an owned authenticated MongoDB 7.0.31 replica set
+        run: |
+          set -Eeuo pipefail
+          fixture_owner="${GITHUB_RUN_ID}${GITHUB_RUN_ATTEMPT}"
+          [[ "$fixture_owner" =~ ^[a-z0-9]{8,24}$ ]] || exit 1
+          fixture_name="qs-mongo-profile-owned-${fixture_owner}"
+          fixture_network="$fixture_name"
+          fixture_cid=''
+          fixture_network_created=false
+          fixture_image='mongo@sha256:43fddee7e532a920f3dfdee9e8f4834398c155c26bcb92d790cc1cd3c630fc40'
+          cleanup_owned_fixture() {
+            fixture_status=$?
+            if [ -n "$fixture_cid" ]; then
+              [[ "$fixture_cid" =~ ^[0-9a-f]{64}$ ]] || return 1
+              [[ "$(docker inspect --format '{{index .Config.Labels "qs.mongo-metadata.fixture"}}' "$fixture_cid")" == "$fixture_owner" ]] || return 1
+              [[ "$(docker inspect --format '{{.Name}}' "$fixture_cid")" == "/$fixture_name" ]] || return 1
+              docker rm -f "$fixture_cid" >/dev/null
+              fixture_remaining="$(docker ps --all --no-trunc --filter "id=$fixture_cid" --format '{{.ID}}')" || return 1
+              [[ -z "$fixture_remaining" ]] || return 1
+            fi
+            if [ "$fixture_network_created" == true ]; then
+              [[ "$(docker network inspect --format '{{index .Labels "qs.mongo-metadata.fixture"}}' "$fixture_network")" == "$fixture_owner" ]] || return 1
+              [[ "$(docker network inspect --format '{{len .Containers}}' "$fixture_network")" == 0 ]] || return 1
+              docker network rm "$fixture_network" >/dev/null
+            fi
+            return "$fixture_status"
+          }
+          trap cleanup_owned_fixture EXIT
+          if docker inspect "$fixture_name" >/dev/null 2>&1 || docker network inspect "$fixture_network" >/dev/null 2>&1; then exit 1; fi
+          docker network create --label "qs.mongo-metadata.fixture=$fixture_owner" "$fixture_network" >/dev/null
+          fixture_network_created=true
+          fixture_cid="$(docker run --detach --name "$fixture_name" \
+            --label "qs.mongo-metadata.fixture=$fixture_owner" \
+            --network "$fixture_network" --network-alias mongo \
+            --publish 127.0.0.1::27017 --memory=1g --cpus=1 \
+            --tmpfs /data/db:rw,nosuid,nodev,size=1g \
+            --tmpfs /data/configdb:rw,nosuid,nodev,size=128m \
+            --env MONGO_INITDB_ROOT_USERNAME=metadata_fixture \
+            --env MONGO_INITDB_ROOT_PASSWORD=m4-owned-mongo-fixture \
+            --entrypoint bash "$fixture_image" -c \
+            'set -Eeuo pipefail; umask 077; head -c 512 /dev/urandom | base64 > /tmp/metadata-fixture.key; chown 999:999 /tmp/metadata-fixture.key; chmod 0400 /tmp/metadata-fixture.key; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/metadata-fixture.key')"
+          [[ "$fixture_cid" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          fixture_shell='const admin=db.getSiblingDB("admin"); const auth=admin.auth(process.env.MONGO_INITDB_ROOT_USERNAME,process.env.MONGO_INITDB_ROOT_PASSWORD); if(!(auth===1||auth.ok===1))quit(1);'
+          fixture_ready=false
+          fixture_attempt=0
+          while (( fixture_attempt < 45 )); do
+            fixture_attempt=$((fixture_attempt + 1))
+            if docker exec "$fixture_cid" mongosh --quiet --eval "$fixture_shell quit(admin.runCommand({ping:1}).ok===1?0:1)" >/dev/null 2>&1; then fixture_ready=true; break; fi
+            sleep 2
+          done
+          [[ "$fixture_ready" == true ]] || exit 1
+          docker exec "$fixture_cid" mongosh --quiet --eval "$fixture_shell const build=admin.runCommand({buildInfo:1}); const h=admin.runCommand({hello:1}); if(build.version!=='7.0.31'||h.isreplicaset!==true||h.setName)quit(1); admin.runCommand({replSetInitiate:{_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}})" >/dev/null
+          fixture_ready=false
+          fixture_attempt=0
+          while (( fixture_attempt < 45 )); do
+            fixture_attempt=$((fixture_attempt + 1))
+            if docker exec "$fixture_cid" mongosh --quiet --eval "$fixture_shell quit(admin.runCommand({hello:1}).isWritablePrimary?0:1)" >/dev/null 2>&1; then fixture_ready=true; break; fi
+            sleep 2
+          done
+          [[ "$fixture_ready" == true ]] || exit 1
+          export QS_MONGO_METADATA_NATIVE_REQUIRED=1
+          export QS_MONGO_METADATA_NATIVE_OWNER="$fixture_owner"
+          export QS_MONGO_METADATA_NATIVE_CONTAINER="$fixture_name"
+          QS_MONGO_METADATA_NATIVE_PORT="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "27017/tcp") 0).HostPort}}' "$fixture_cid")"
+          export QS_MONGO_METADATA_NATIVE_PORT
+          export QS_MONGO_METADATA_NATIVE_PASSWORD=m4-owned-mongo-fixture
+          make test-metadata-readiness-mongodb-native
+
   action-audit-mysql:
     name: Action audit MySQL JSON lifecycle
     runs-on: ubuntu-latest
@@ -393,6 +533,30 @@ jobs:
             echo 'Schema pair verification must not skip' >&2
             exit 1
           fi
+
+      - name: Verify approved offline execution and interrupted paired DDL
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_offline_test
+        run: |
+          set -euo pipefail
+          proof_log=$(mktemp)
+          trap 'rm -f "$proof_log"' EXIT
+          go test -race -tags=integration -count=1 -timeout=8m -v \
+            -run '^TestOfflineNative' ./internal/pkg/migration | tee "$proof_log"
+          for required in \
+            TestOfflineNativeUpgradeAndFreshNoop \
+            TestOfflineNativeSQLPartialFailureRemainsDirty \
+            TestOfflineNativeMongoPartialFailureRemainsDirty \
+            TestOfflineNativeMongoCancellationRetainsPartialState \
+            TestOfflineNativeSQLDeadlineRetainsUnknownPartialState \
+            TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL \
+            TestOfflineNativeMissingBoundResourcesRefusedBeforeDDL; do
+            grep -F -- "--- PASS: $required " "$proof_log" >/dev/null
+          done
+          if grep -E -- '^--- SKIP:' "$proof_log"; then exit 1; fi
 
       - name: Verify four historical Mongo index retirement and auth failure
         env:

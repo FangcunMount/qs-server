@@ -365,5 +365,106 @@ class SSHProfileTests(unittest.TestCase):
                 profile.safe_receipt(profile.runtime_module(), json.dumps(invalid), 1, SHA, RUN, HASH)
 
 
+class SSHReadinessTests(unittest.TestCase):
+    def support(self):
+        spec = importlib.util.spec_from_file_location('readiness_fixtures', DIRECTORY / 'test-mysql-metadata-readiness.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def ready_package(self):
+        return package([(n, b'owned-fixture', tarfile.REGTYPE) for n in sorted(ssh.READINESS_MEMBERS)])
+
+    def test_fixed_mode_dispatch_never_crosses_into_original_profile(self):
+        support = self.support()
+        ready = ssh.load_readiness(DIRECTORY)
+        env = dict(environment(), PROFILE_OPERATION='metadata-readiness-admin', MYSQL_DATABASE='qs')
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'package.tar.gz'
+            raw = self.ready_package()
+            path.write_bytes(raw)
+            path.chmod(0o600)
+            env['PROFILE_PACKAGE_SHA256'] = hashlib.sha256(raw).hexdigest()
+            value = support.receipt()
+            value['run_id'] = RUN
+            calls = []
+            def capture(args, **kwargs):
+                self.assertTrue(args[-1].endswith('--receive-readiness'))
+                self.assertNotIn(SECRET, str(args))
+                self.assertNotIn(SECRET, str(kwargs['env']))
+                header, transferred = kwargs['payload'].split(b'\n', 1)
+                self.assertEqual(json.loads(header)['env']['MYSQL_PASSWORD'], SECRET)
+                self.assertEqual(transferred, raw)
+                calls.append(args)
+                return 0, armor.encode_armored_receipt(value, schema=ready.RECEIPT_SCHEMA).encode()
+            with patch.object(ssh, 'trusted_ssh', return_value=(['ssh'], {})), patch.object(ready, 'capture_private', side_effect=capture):
+                code, sealed = ssh.dispatch(path, env, ready, Path(directory), readiness=True)
+            self.assertEqual(code, 0)
+            self.assertTrue(json.loads(armor.decode_armored_receipt(sealed))['readiness_only'])
+            self.assertEqual(len(calls), 1)
+            for controller, selected, mode in ((profile, env, False), (ready, dict(env, PROFILE_OPERATION='metadata-visibility-admin-profile'), True)):
+                with patch.object(ssh, 'trusted_ssh') as trusted, self.assertRaises(Exception):
+                    ssh.dispatch(path, selected, controller, Path(directory), readiness=mode)
+                trusted.assert_not_called()
+
+    def test_readiness_requires_exact_six_members_and_releases_before_output(self):
+        ready = ssh.load_readiness(DIRECTORY)
+        value = self.support().receipt()
+        value['run_id'] = RUN
+        raw = self.ready_package()
+        env = dict(environment(), MYSQL_DATABASE='qs')
+        payload = json.dumps(envelope(raw, env)).encode() + b'\n' + raw
+        seen = []
+        def execute(binary, private, runtime):
+            seen.append(Path(binary).parent)
+            self.assertFalse((Path(binary).parent / 'profile.env.json').exists())
+            self.assertEqual(private['MYSQL_DATABASE'], 'qs')
+            self.assertEqual(set(p.name for p in Path(binary).parent.iterdir()), set(ssh.READINESS_MEMBERS))
+            return 0, value
+        with patch.object(ssh, 'receiver_arch', return_value='amd64'), patch.object(ssh, 'load_readiness', return_value=ready), patch.object(ready, 'execute_native', side_effect=execute):
+            code, sealed = ssh.receive(io.BytesIO(payload), readiness=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(json.loads(armor.decode_armored_receipt(sealed))['complete'])
+        self.assertFalse(seen[0].exists())
+        with tempfile.TemporaryDirectory() as directory, self.assertRaises(Exception):
+            ssh.extract_archive(package(), Path(directory), readiness=True)
+        with tempfile.TemporaryDirectory() as directory, self.assertRaises(Exception):
+            ssh.extract_archive(raw, Path(directory))
+
+    def test_readiness_receiver_interrupt_and_cleanup_failure_never_sign(self):
+        ready = ssh.load_readiness(DIRECTORY)
+        value = self.support().receipt()
+        value['run_id'] = RUN
+        raw = self.ready_package()
+        env = dict(environment(), MYSQL_DATABASE='qs')
+        payload = json.dumps(envelope(raw, env)).encode() + b'\n' + raw
+        seen = []
+        def interrupt(binary, private, runtime):
+            import signal
+            seen.append(Path(binary).parent)
+            signal.getsignal(signal.SIGHUP)(signal.SIGHUP, None)
+        with patch.object(ssh, 'receiver_arch', return_value='amd64'), patch.object(ssh, 'load_readiness', return_value=ready), patch.object(ready, 'execute_native', side_effect=interrupt), self.assertRaises(RuntimeError):
+            ssh.receive(io.BytesIO(payload), readiness=True)
+        self.assertFalse(seen[0].exists())
+        cleanup = ssh.remove_owned
+        def fail(path, **kwargs):
+            cleanup(path, **kwargs)
+            seen.append(path)
+            raise OSError(SECRET)
+        with patch.object(ssh, 'receiver_arch', return_value='amd64'), patch.object(ssh, 'load_readiness', return_value=ready), patch.object(ready, 'execute_native', return_value=(0, value)), patch.object(ssh, 'remove_owned', side_effect=fail), self.assertRaises(Exception):
+            ssh.receive(io.BytesIO(payload), readiness=True)
+        self.assertFalse(seen[-1].exists())
+
+    def test_readiness_stage_unknown_is_not_zero(self):
+        ready = ssh.load_readiness(DIRECTORY)
+        env = dict(environment(), PROFILE_OPERATION='metadata-readiness-admin')
+        result = ssh.stage_receipt(ready, env, SECRET)
+        self.assertFalse(result['complete'])
+        self.assertNotIn('measurements', result)
+        self.assertIsNone(result['connection_released'])
+        self.assertIsNone(result['database_released'])
+        self.assertNotIn(SECRET, json.dumps(result))
+
+
 if __name__ == '__main__':
     unittest.main()
