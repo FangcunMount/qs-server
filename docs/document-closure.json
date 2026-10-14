@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+    "sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -9900,7 +9900,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+        "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -9996,6 +9996,28 @@
           "result": "passed",
           "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -tags=integration ./internal/pkg/migration -run=^TestOfflineApproval -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -10004,10 +10026,19 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Source and isolated database verification describe the migration guard only. This M3 change has no production deployment or business acceptance proof."
+          "Source and isolated database verification describe the migration guard only. This M3 change has no production deployment or business acceptance proof.",
+          "The current object-protection scope guards passed ordinary race and authorization tests; integration-tag compilation/authorization tests did not execute the native database matrix. Prior native evidence remains bound to its original source, and current native execution is pending."
         ]
       },
-      "gaps": []
+      "gaps": [
+        {
+          "id": "OFFLINE-PROTECTION-SCOPE-NATIVE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The new serialized scope and pre-claim rejection matrix has not run on the current source with real owned MySQL/Mongo dependencies.",
+          "exit_criteria": "Execute the current TestOfflineNative matrix on isolated owned MySQL and Mongo replica-set dependencies, prove RUN/PASS without target SKIP and release the owned resources; do not reuse prior source results."
+        }
+      ]
     },
     {
       "path": "internal/pkg/migration/migrations/mongodb/README.md",
@@ -11496,7 +11527,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+        "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11557,6 +11588,28 @@
           "result": "passed",
           "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -tags=integration ./internal/pkg/migration -run=^TestOfflineApproval -count=1",
+          "result": "passed",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -11565,7 +11618,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Isolated migration tests and synthetic approval claims do not certify a production writer freeze, complete production backup-pair restore, startup time budget, destructive authorization, or runtime commit."
+          "Isolated migration tests and synthetic approval claims do not certify a production writer freeze, complete production backup-pair restore, startup time budget, destructive authorization, or runtime commit.",
+          "The current object-protection scope guards passed ordinary race and authorization tests; integration-tag compilation/authorization tests did not execute the native database matrix. Prior native evidence remains bound to its original source, and current native execution is pending."
         ]
       },
       "gaps": [
@@ -11573,8 +11627,15 @@
           "id": "OFFLINE-EXECUTION-PRODUCTION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Production backup location, named responsibility, complete restore and startup/freeze receipts remain unbound.",
-          "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, per-object responsibility, complete backup-pair restoration within60min, runtime startup reserve and whole writer/TTL freeze before a separately authorized production apply."
+          "summary": "Production named protection location, responsibility, scope-specific restore and startup/freeze receipts remain unbound.",
+          "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, explicit full-database-pair or approved M4 object scope, per-object responsibility, scope-specific restoration within60min, startup reserve and whole writer/TTL freeze before a separately authorized production apply."
+        },
+        {
+          "id": "OFFLINE-PROTECTION-SCOPE-NATIVE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The new serialized scope and pre-claim rejection matrix has not run on the current source with real owned MySQL/Mongo dependencies.",
+          "exit_criteria": "Execute the current TestOfflineNative matrix on isolated owned MySQL and Mongo replica-set dependencies, prove RUN/PASS without target SKIP and release the owned resources; do not reuse prior source results."
         }
       ]
     }
