@@ -6796,6 +6796,156 @@
         "Public serverA container list refreshes only the scoped local identities and images, not all six-instance SHA/digest/ready or complete effective configuration.",
         "Private first-capture addendum is unexecuted. Exact exporter config/scope/privileges, continuous Event/TTL/writer/inflight control, full coherent backup pair, complete isolated restore and30/60-minute/RPO0 proof remain incomplete. No production stop/export/restore/DDL/delete or M6T0."
       ]
+    },
+    {
+      "id": "infra-2026-10-15-qs-cleanup-m4-cde-fixed-inventory",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T20:01:34.020264+00:00",
+      "environment": "production/serverA qs; one bounded readonly RR snapshot over nine named MySQL objects, via the approved Mac mini root SSH route",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The deployed and baseline SHA retain the last independently verified M2 runtime/schema anchor. The actual diagnostic source80f is separately bound in measurements; this observation does not inspect complete service config or refresh all six runtime SHAs."
+      },
+      "command": "gh workflow run db-ops.yml --ref codex/m4-retirement-inventory-80f422101 -f operation=retirement-inventory-admin -f database=mysql -f governance_confirm=80f422101ccfd83b4c4eb5bd165272145afe7afd; only the fixed readonly inventory job entered, all16 other db-ops jobs skipped.",
+      "result": {
+        "status": "passed",
+        "summary": "Only the bounded observation passed: actual MySQL8.0.36 clean100, complete15 reads/3 readonly controls and all resource releases. Tags are all empty JSON arrays, duplicated roles match, five historical tables retain named nonempty data/states, and all30 AI requests have matching actor indexes and complete30 associations. No freeze, retirement, backup, restore or deployment qualification is inferred.",
+        "measurements": {
+          "diagnostic_source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "run_id": 38628472662,
+          "run_attempt": 1,
+          "job_id": 116073674171,
+          "other_jobs_skipped": 16,
+          "mysql_version": "8.0.36",
+          "mysql_version_number": 100,
+          "mysql_dirty": false,
+          "expected_target_hash": "8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0",
+          "complete": true,
+          "consistent_snapshot": true,
+          "query_count": 15,
+          "control_statement_count": 3,
+          "freeze_verified": false,
+          "all_releases_verified": true,
+          "counts": {
+            "ai_actual_relation_gaps": {
+              "actual_relation_rows": 30,
+              "orphan_relations": 0,
+              "relation_not_in_request_payload": 0,
+              "zero_assessment_relations": 0
+            },
+            "ai_backfill_scope": {
+              "actual_backfill_pending": 0,
+              "indexed_identity_mismatch": 0,
+              "invalid_actor_field_shape": 0,
+              "invalid_assessment_array_shape": 0,
+              "nonempty_assessment_arrays": 30,
+              "subject_index_null": 0,
+              "testee_index_null": 0,
+              "total": 30
+            },
+            "ai_expected_relation_gaps": {
+              "invalid_expected_id_entries": 0,
+              "payload_relation_entries": 30,
+              "valid_expected_entries_without_relation": 0
+            },
+            "five_table_counts": {
+              "clinician_operator_binding_archive": 119,
+              "operator_retirement_manifests": 1,
+              "testee_store_migration_items": 83797,
+              "testee_store_migration_manifests": 1,
+              "testee_store_migration_reversions": 0
+            },
+            "historical_reference_gaps": {
+              "archives_without_manifest": 0,
+              "items_without_manifest": 0,
+              "reversions_without_item": 0
+            },
+            "operator_manifest_stages": {
+              "applied_drifted": 0,
+              "applied_unchanged": 1,
+              "executing": 0,
+              "invalid": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "operators_role_duplication": {
+              "both_arrays": 136,
+              "different_canonical_json_bytes": 0,
+              "effective_sql_null": 0,
+              "roles_sql_null": 0,
+              "same_canonical_json_bytes": 136,
+              "total": 136
+            },
+            "testee_item_dispositions": {
+              "already_assigned": 0,
+              "candidate": 55577,
+              "deferred": 28220,
+              "unknown": 0
+            },
+            "testee_manifest_states": {
+              "applied": 1,
+              "rolled_back": 0,
+              "unknown": 0
+            },
+            "testee_tags_partition": {
+              "empty_array": 83798,
+              "json_null": 0,
+              "non_empty_array": 0,
+              "non_null": 83798,
+              "other": 0,
+              "sql_null": 0,
+              "total": 83798
+            }
+          },
+          "user_confirmed_no_five_table_tasks": true,
+          "user_confirmed_only_supported_ai_environment_is_production": true,
+          "source_native_required_run_pass": 24,
+          "source_native_target_skips": 0,
+          "source_head_full_ci_completed": false,
+          "production_stop_ddl_delete_restore_deploy_calls": 0,
+          "artifacts": [
+            {
+              "file": "qs-m4-production-retirement-inventory-80f422/inventory-receipt.json",
+              "sha256": "73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125"
+            },
+            {
+              "file": "qs-m4-production-retirement-inventory-80f422/job-response.json",
+              "sha256": "ef7adc17edc991e4a94825b20c007e1b628fe6541002c1d6fea79bbbcd9f527a"
+            },
+            {
+              "file": "qs-m4-production-retirement-inventory-80f422/job-log.txt",
+              "sha256": "daa6bac6aa9d60033505cd09c3814b3ceeedd9e2659eb6b5da85c7ffa8fd7954"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data and recovery; Codex: bounded readonly observation and source preparation",
+      "expires_on": "2026-11-14",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38628472662"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#646-cde-完整固定盘点与逐对象责任确认"
+        }
+      ],
+      "limitations": [
+        "Record is historical/scoped passed because complete effective service config and current all-instance runtime identity are not refreshed. Runtime anchor4a is distinct from diagnostic source80f and later PR head9db; the old25 record objects are preserved unchanged.",
+        "The15-query readonly RR snapshot releases before live head/identity rereads. freeze_verified=false; it proves no continuous stop, RPO0, production30/60min, targeted backups or production retirement.",
+        "Five historical tables and Actor values require same-window object protection and actual restore. User confirms no remaining tasks and retaining isolated original manifests/hashes/schema; that reply is not deletion or deployment approval.",
+        "User confirms this is the only supported AI data environment. The30 requests/30 associations have zero pending/invalid/identity/relation gaps at the observation time; code retirement and later final runtime acceptance remain separate.",
+        "Actual source80f owned native24 passed and current CI native24 passed; its initial Docs check failed before the final docs update. Full fresh9db source gates were still pending at this record; no prior overall green is borrowed."
+      ]
     }
   ]
 }
