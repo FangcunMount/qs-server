@@ -44,7 +44,8 @@ func taskForEntryTest(at time.Time, status domainplan.TaskStatus, token string) 
 	openAt := at.Add(-30 * time.Minute)
 	expireAt := at.Add(time.Hour)
 	task := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 1, 19, testee.NewID(31), "scale-1", plannedAt, plannedAt)
-	task.RestoreFromRepository(task.GetID(), 0, status, &openAt, &expireAt, nil, nil, nil, nil, token, "https://collect.example.com/entry")
+	task.AssignEnrollment(domainplan.NewEnrollment(task.GetOrgID(), task.GetPlanID(), task.GetTesteeID(), 1, at, at).ID())
+	task.RestoreFromRepository(task.GetID(), task.GetEnrollmentID(), status, &openAt, &expireAt, nil, nil, nil, nil, token, "https://collect.example.com/entry")
 	return task
 }
 
@@ -54,7 +55,7 @@ func TestTaskEntryResolverRequiresCurrentTaskWithLegacyTokenIgnored(t *testing.T
 	task := taskForEntryTest(at, domainplan.TaskStatusOpened, token)
 	repo := &taskEntryRepoStub{task: task}
 	scales := &taskEntryScaleStub{published: true}
-	resolver := NewTaskEntryResolver(repo, scales).(*taskEntryResolver)
+	resolver := newTestTaskEntryResolver(t, repo, scales).(*taskEntryResolver)
 	resolver.now = func() time.Time { return at }
 
 	got, err := resolver.ResolveTaskEntry(context.Background(), task.GetID().String(), "")
@@ -95,7 +96,7 @@ func TestTaskEntryResolverDistinguishesUnpublishedFromUnavailableCatalog(t *test
 	task := taskForEntryTest(at, domainplan.TaskStatusOpened, token)
 	repo := &taskEntryRepoStub{task: task}
 	scales := &taskEntryScaleStub{}
-	resolver := NewTaskEntryResolver(repo, scales).(*taskEntryResolver)
+	resolver := newTestTaskEntryResolver(t, repo, scales).(*taskEntryResolver)
 	resolver.now = func() time.Time { return at }
 
 	if _, err := resolver.ResolveTaskEntry(context.Background(), task.GetID().String(), token); !componenterrors.IsCode(err, code.ErrPageNotFound) {
@@ -115,7 +116,7 @@ func TestTaskEntryResolverDistinguishesUnpublishedFromUnavailableCatalog(t *test
 func TestTaskEntryIgnoresLegacyToken(t *testing.T) {
 	at := time.Now()
 	task := taskForEntryTest(at, domainplan.TaskStatusOpened, "old-secret")
-	resolver := NewTaskEntryResolver(&taskEntryRepoStub{task: task}, &taskEntryScaleStub{published: true})
+	resolver := newTestTaskEntryResolver(t, &taskEntryRepoStub{task: task}, &taskEntryScaleStub{published: true})
 	for _, token := range []string{"", "old-secret", "untrusted", "ae_doctor"} {
 		got, err := resolver.ResolveTaskEntry(t.Context(), task.GetID().String(), token)
 		if err != nil || got.TaskID != task.GetID().String() {
@@ -139,7 +140,7 @@ func TestParticipantTaskListFiltersTerminalAndTimeBoundaries(t *testing.T) {
 	expired := taskForEntryTest(at.Add(-2*time.Hour), domainplan.TaskStatusOpened, "")
 	completed := taskForEntryTest(at, domainplan.TaskStatusCompleted, "")
 	canceled := taskForEntryTest(at, domainplan.TaskStatusCanceled, "")
-	resolver := NewTaskEntryResolver(&participantTasksStub{tasks: []*domainplan.AssessmentTask{opened, pending, expired, completed, canceled}}, &taskEntryScaleStub{published: true}).(*taskEntryResolver)
+	resolver := newTestTaskEntryResolver(t, &participantTasksStub{tasks: []*domainplan.AssessmentTask{opened, pending, expired, completed, canceled}}, &taskEntryScaleStub{published: true}).(*taskEntryResolver)
 	resolver.now = func() time.Time { return at }
 	got, err := resolver.ListParticipantTasks(t.Context(), "31")
 	if err != nil || len(got) != 2 || !got[0].CanStart || got[1].CanStart || got[0].PlanID == "" || got[0].DueAt.IsZero() {
@@ -160,7 +161,7 @@ func TestTaskEntryRequiresItsActiveEnrollment(t *testing.T) {
 		"foreign plan":    domainplan.NewEnrollment(task.GetOrgID(), domainplan.NewAssessmentPlanID(), task.GetTesteeID(), 1, at, at),
 	} {
 		t.Run(name, func(t *testing.T) {
-			resolver := NewTaskEntryResolver(&taskEntryRepoStub{task: task}, &taskEntryScaleStub{published: true}, &enrollmentRepoStub{active: enrollment})
+			resolver := newTestTaskEntryResolver(t, &taskEntryRepoStub{task: task}, &taskEntryScaleStub{published: true}, &enrollmentRepoStub{active: enrollment})
 			_, err := resolver.ResolveTaskEntry(t.Context(), task.GetID().String(), "")
 			if (err == nil) != (name == "valid") {
 				t.Fatalf("enrollment scope: %v", err)

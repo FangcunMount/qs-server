@@ -161,19 +161,8 @@ func (s *submissionService) resolveAttribution(ctx context.Context, dto SubmitAn
 	if err != nil {
 		return answersheet.AttributionSnapshot{}, err
 	}
-	if s.attribution == nil {
-		if ref.Type == answersheet.OriginTypePlanTask {
-			// Compatibility for isolated unit/bootstrap environments. Production
-			// wiring always installs the MySQL resolver and therefore never takes
-			// this unvalidated legacy path.
-			return answersheet.ReconstructAttributionSnapshot(
-				ref.Type, ref.ID, "", "", "", "", ref.ID, capturedAt, 1, answersheet.AttributionModeDerivedLegacy,
-			), nil
-		}
-		if ref.Type != answersheet.OriginTypeSelfService {
-			return answersheet.AttributionSnapshot{}, errors.WithCode(errorCode.ErrInternalServerError, "答卷归属解析器未配置")
-		}
-		return answersheet.NewAttributionSnapshot(ref, "", "", "", "", "", capturedAt)
+	if s == nil || s.attribution == nil {
+		return answersheet.AttributionSnapshot{}, errors.WithCode(errorCode.ErrModuleInitializationFailed, "答卷归属解析器未配置")
 	}
 	snapshot, err := s.attribution.Resolve(ctx, attributionport.ResolveRequest{
 		OriginRef: ref, OrgID: dto.OrgID, TesteeID: dto.TesteeID,
