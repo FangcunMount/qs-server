@@ -13649,7 +13649,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
+        "source_sha": "56c598337578537aa75319f7612dd9690948ef3c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13707,8 +13707,10 @@
           "Only the two named SQL historical columns/CHECK and the original genuine ledger are protected, with complete all-SQL-NULL and retained-fact proof. First-runtime boundary, independent raw material/approval SHA and transaction outcome remain fail closed. No production mutation/freeze/capture, final image, three-service startup, real business, RPO0 or30/60min budget is signed.",
           "Two owned containers and bridge were released. Prior IDs/images/volumes were preserved, but dynamic metadata of existing services changed; all-runtime stability is not attested. Earlier setup and native failures remain immutable.",
           "Merge 3645c76e7c7756c5c8a15b5d370bbd39596c55b7 integrates actual origin/main4c49e633dd937bbe837afa10b0ef1251efb7d19b. All six native-bound tool Go/resource files remain byte-identical to d648. Its actual component native is preserved; fresh exact merged-head CI is required and no native command is relabelled as this checkout.",
-          "Sourceb7ae414a64597bfaf9f35031ec975cfa59f541ec adds early immutable099 CHECK/default/last-column verification and two original-schema drift native cases. Ordinary race, integration compilation, tagged vet and target lint passed; prior16 native stays bound to d648 and the new19-case native is pending.",
-          "Merge31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d integrates actual mainc335b2a1a34dd69830261e2d8e11b16da3f8befb with SQL103/Mongo40 current source and retires the removed legacy CLI sidecar. Coverage becomes45 sidecars after this A README. A511/77e/280 and all six A tool Go/resource bytes remain unchanged from early-refusal sourceb7; existing16 native is not this merged-head or new19-case proof."
+          "Sourceb7ae414a64597bfaf9f35031ec975cfa59f541ec adds early immutable099 CHECK/default/last-column verification and two original-schema drift native cases. Ordinary race, integration compilation, tagged vet and target lint passed; prior16 native stays bound to d648. Its then-pending new19-case native is separately recorded below on actual merged checkout56c.",
+          "Merge31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d integrates actual mainc335b2a1a34dd69830261e2d8e11b16da3f8befb with SQL103/Mongo40 current source and retires the removed legacy CLI sidecar. Coverage becomes45 sidecars after this A README. A511/77e/280 and all six A tool Go/resource bytes remain unchanged from early-refusal sourceb7; existing16 native is not this merged-head or new19-case proof.",
+          "Actual merged checkout56c598337578537aa75319f7612dd9690948ef3c independently passed seven required tops plus twelve children:19RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/MongoRS7.0.31. All six Go/SQL files remain identical to early-refusal sourceb7. Immutable native-v8 harness6851c251/JSONLe50d9506/receipt6ba23dff preserve exact argv and source bindings;79.090s is only this synthetic fixture wall clock. Both owned containers and bridge were released with no cleanup errors; old IDs/images/volumes remain but selected old runtime metadata changed. No production or budget signoff, and no later head borrows this native result.",
+          "A separate LinuxAMD64 CGO0 formal tool was actually compiled from56c with the same six source hashes and independent fixedA511/77e/280 identity. BinarySHA07a964a6b47ac24b76cd5abb3e2af38e0229ae974ea5d897d37c097030cb0afa and build receipt28a46e6d6c8e687a95688cdb473542dccd73a70defbde71e14d6549dd60fd1a9 preserve actual build argv and go-version metadata. AMD64 runtime, production use, freeze, startup reserve and RPO remain unverified."
         ]
       },
       "gaps": [

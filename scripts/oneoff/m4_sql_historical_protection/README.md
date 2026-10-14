@@ -52,4 +52,10 @@ CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job
 
 该证明只限合成、隔离、小规模对象保护与失败边界；未签生产 capture/权限/冻结/恢复、最终镜像、三服务启动、业务验收、RPO0 或生产30/60分钟预算。
 
-后续独立 source `b7ae414a64597bfaf9f35031ec975cfa59f541ec` 增加原结构早拒绝与两个真实漂移用例；普通 race、integration 编译、tagged vet、目标 lint已通过。上述16 native仍只属于d648，不换签新增源码；新增源码的完整19场景原生证明当前待执行，final head仍须独立CI。
+后续独立 source `b7ae414a64597bfaf9f35031ec975cfa59f541ec` 增加原结构早拒绝与两个真实漂移用例；普通 race、integration 编译、tagged vet、目标 lint已通过。上述16 native仍只属于d648，不换签新增源码。
+
+整合实际 main `c335b2a1a34dd69830261e2d8e11b16da3f8befb` 后，工具 checkout `56c598337578537aa75319f7612dd9690948ef3c` 在 owned MySQL8.0.36/MongoRS7.0.31 上独立完成七个 required top-level 加十二个 child，**19 RUN/PASS、0 FAIL/SKIP、exit0**。原 CHECK 变更和历史列位置变更均在 capture 写材料及 restore 消费批准/执行 DDL 前被实际拒绝。六个 Go/SQL 文件保持与 b7 source 相同，A511/77e/280 绑定不变；当前主线103/40不被当作 A 目标。
+
+实际 argv 与源文件摘要保存在新不可变私有 `qs-m4-a-null-object-native-v8`：harness `6851c25107a19ed7b55235e598e715b62016572ebf5c75a7589c6b6f251c4d39`，JSONL `e50d9506bc04729c39d91ad82891e0eac5dafed4a8576babeb9198fd97a29a7e`，receipt `6ba23dff77f0e56cb829e7dfc0bad97fc7a49b1c477ba463d47e82446f299d9a`。79.090秒仅是本次小规模隔离夹具总耗时。两个自有容器及 bridge 已释放、cleanup errors为空，原 IDs/images/volumes 保留；既有 runtime 动态元数据仍发生变化，未签全部旧服务稳定。旧成功及失败材料均保留。
+
+独立 Linux/amd64 正式 tool 以实际 `56c598337578537aa75319f7612dd9690948ef3c` 编译，六个源文件与上述 native 前后摘要相同；binary SHA-256 为 `07a964a6b47ac24b76cd5abb3e2af38e0229ae974ea5d897d37c097030cb0afa`。私有 `qs-m4-a-null-object-tool-amd64-56c598` 构建 receipt 为 `28a46e6d6c8e687a95688cdb473542dccd73a70defbde71e14d6549dd60fd1a9`，保存实际 argv 和 `go version -m`。这只证明该 binary 的构建，未证明其 amd64 实际运行或生产调用；工具编译 SHA 不替代 A 执行器511。后续文档 head仍须独立CI，不换签56c的真实native。
