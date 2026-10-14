@@ -62,8 +62,8 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 // Historical archive JSON is never decoded into this projection or rewritten.
 const CurrentOperatorColumns = "id,created_at,updated_at,deleted_at,created_by,updated_by,deleted_by,version,org_id,user_id,roles,authz_policy_version,authz_projected_at,authz_projection_pending,name,email,phone,is_active"
 
-// OperatorFingerprintSchema invalidates unexecuted plans from the retired column layout.
-const OperatorFingerprintSchema = "actor_columns_sql102"
+// OperatorFingerprintSchema requires a fresh review after maintenance-table retirement.
+const OperatorFingerprintSchema = "actor_maintenance_sql103"
 
 // OperatorPO 后台操作者持久化对象
 type OperatorPO struct {

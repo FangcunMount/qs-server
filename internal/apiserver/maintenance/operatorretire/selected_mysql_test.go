@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t *testing.T) {
+func TestMySQLSelectedExitPreflightResumeVerifyWithoutHistoricalTables(t *testing.T) {
 	db, facts := fixture(t)
 	if err := db.Exec("UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
 		t.Fatal(err)
@@ -27,6 +27,16 @@ func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t 
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, before.Fingerprint, false); err == nil {
 		t.Fatal("maintenance gate skipped")
+	}
+	oldSQL102 := hash(struct {
+		Schema   string
+		Command  app.Command
+		Operator map[string]interface{}
+		Roles    []authz.AssignmentRoleFact
+		Existing *domain.Task
+	}{"actor_columns_sql102", cmd, before.CurrentOperator, before.Roles, nil})
+	if _, err = tool.SelectedApply(ctx, cmd, oldSQL102, true); err == nil {
+		t.Fatal("SQL102 reviewed preflight crossed maintenance retirement")
 	}
 	oldCurrent := make(map[string]interface{}, len(before.CurrentOperator)+1)
 	for key, value := range before.CurrentOperator {
@@ -70,9 +80,6 @@ func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t 
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, resumed.Fingerprint, true); err != nil || facts.writes != 1 {
 		t.Fatal("replay performed revocation", facts.writes, err)
-	}
-	if err = db.Table("operator_retirement_manifests").Count(&count).Error; err != nil || count != 0 {
-		t.Fatal("historical doctor manifest modified", count, err)
 	}
 	facts.facts = append(facts.facts, authz.AssignmentRoleFact{RoleID: "new", RoleName: "qs:result_reviewer", ManagementProtection: "standard"})
 	if _, err = tool.SelectedVerify(ctx, cmd); err == nil {

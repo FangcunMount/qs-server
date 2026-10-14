@@ -138,8 +138,8 @@ func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(t *testing.T) {
 	if err != nil || !bytes.Equal(mongoBefore, mongoAfter) {
 		t.Fatal("actor SQL release changed Mongo metadata", err)
 	}
-	if actor.RequireCurrentOperatorPlanSchema(t.Context(), db) != nil {
-		t.Fatal("post-DDL plans rejected clean SQL102")
+	if actor.RequireCurrentOperatorPlanSchema(t.Context(), db) == nil {
+		t.Fatal("current SQL103 plans accepted the historical SQL102 release")
 	}
 	restart := n.preflight(t, r)
 	for _, m := range []*Migrator{NewMigrator(n.db, restart.MySQLConfig(false)), NewMongoMigrator(n.client, restart.MongoConfig(false))} {

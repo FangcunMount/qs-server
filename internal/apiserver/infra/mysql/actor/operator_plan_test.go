@@ -18,13 +18,14 @@ func TestOperatorPlansRequireOneKnownCleanPostRetirementSchema(t *testing.T) {
 		queryError bool
 		accepted   bool
 	}{
-		{"clean102", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(102, false), false, true},
+		{"clean103", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(103, false), false, true},
+		{"preDDL102", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(102, false), false, false},
 		{"preDDL101", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(101, false), false, false},
-		{"dirty102", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(102, true), false, false},
-		{"unknownFuture", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(103, false), false, false},
+		{"dirty103", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(103, true), false, false},
+		{"unknownFuture", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(104, false), false, false},
 		{"empty", sqlmock.NewRows([]string{"version", "dirty"}), false, false},
-		{"ambiguous", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(102, false).AddRow(102, false), false, false},
-		{"nullDirty", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(102, nil), false, false},
+		{"ambiguous", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(103, false).AddRow(103, false), false, false},
+		{"nullDirty", sqlmock.NewRows([]string{"version", "dirty"}).AddRow(103, nil), false, false},
 		{"unavailable", nil, true, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {

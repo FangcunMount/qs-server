@@ -113,7 +113,7 @@ func fixture(t *testing.T) (*gorm.DB, *factsFake) {
 			t.Fatal(e)
 		}
 	}
-	for _, n := range []int{74, 75} {
+	for _, n := range []int{74} {
 		if e := migration(t, db, n, "up"); e != nil {
 			t.Fatal(e)
 		}
@@ -132,6 +132,21 @@ func installCurrentActorColumns(t *testing.T, db *gorm.DB) {
 		t.Fatal(err)
 	}
 	actorfixture.RetireActorColumns(t, db, raw)
+
+	for _, name := range []string{"000075_operator_retirement_manifests.up.sql", "000078_testee_store_migration_manifest.up.sql"} {
+		raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Exec(string(raw)).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	maintenanceUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000103_retire_legacy_maintenance_tables.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	actorfixture.RetireMaintenanceTables(t, db, maintenanceUp)
 }
 
 func retained(facts []authz.AssignmentRoleFact) []authz.AssignmentRoleFact {
