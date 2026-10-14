@@ -246,3 +246,38 @@ func TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL(t *testing.T) {
 		t.Fatal("offline bootstrap accepted", result, err)
 	}
 }
+
+func TestOfflineNativeMissingBoundResourcesRefusedBeforeDDL(t *testing.T) {
+	t.Setenv("QS_M3_REQUIRE_DATABASE", "1")
+	for _, backend := range []Backend{BackendMySQL, BackendMongo} {
+		t.Run(string(backend), func(t *testing.T) {
+			n, current := offlineCurrentNativePair(t)
+			r := offlineNativeResources(t, "CREATE TABLE offline_sql_probe(id BIGINT PRIMARY KEY);", `[{"create":"offline_mongo_probe"}]`)
+			cfg := offlineNativeApproval(t, n, r)
+			// Remove one body after the reviewed inventory and approval were bound.
+			// The real migrators must reject the changed source before dirty/DDL.
+			source := r.source.(fstest.MapFS)
+			path := fmt.Sprintf("migrations/mysql/%06d_offline_fixture.up.sql", r.sql.head)
+			if backend == BackendMongo {
+				path = fmt.Sprintf("migrations/mongodb/%06d_offline_fixture.up.json", r.mongo.head)
+			}
+			delete(source, path)
+			before := n.db.Stats().InUse
+			result, err := runOffline(t.Context(), n.db, n.client, cfg, r)
+			if err == nil || result.Stage != "mysql" || !result.AuthorizationConsumed || !result.MigrationOutcomeUnknown || result.Verified || result.MySQLChanged != nil || result.MongoChanged != nil {
+				t.Fatal("missing approved body accepted", result, err)
+			}
+			if sql, dirty, mongo, mdirty := n.heads(t); sql != current.sql.head || mongo != current.mongo.head || dirty || mdirty {
+				t.Fatal("missing resource changed version metadata", sql, dirty, mongo, mdirty)
+			}
+			assertMySQLTable(t, n.db, n.cfg.MySQLDatabase, "offline_sql_probe", false)
+			names, err := n.mongoDB.ListCollectionNames(t.Context(), bson.D{{Key: "name", Value: "offline_mongo_probe"}})
+			if err != nil || len(names) != 0 {
+				t.Fatal("missing resource executed Mongo body", names, err)
+			}
+			if n.db.Stats().InUse != before || n.db.PingContext(t.Context()) != nil || n.client.Ping(t.Context(), nil) != nil {
+				t.Fatal("missing resource leaked run connection or closed borrowed pools")
+			}
+		})
+	}
+}

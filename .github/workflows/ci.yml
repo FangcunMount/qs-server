@@ -394,7 +394,8 @@ jobs:
             TestOfflineNativeMongoPartialFailureRemainsDirty \
             TestOfflineNativeMongoCancellationRetainsPartialState \
             TestOfflineNativeSQLDeadlineRetainsUnknownPartialState \
-            TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL; do
+            TestOfflineNativeMissingRecoveryAndPristineRefusedBeforeDDL \
+            TestOfflineNativeMissingBoundResourcesRefusedBeforeDDL; do
             grep -F -- "--- PASS: $required " "$proof_log" >/dev/null
           done
           if grep -E -- '^--- SKIP:' "$proof_log"; then exit 1; fi
