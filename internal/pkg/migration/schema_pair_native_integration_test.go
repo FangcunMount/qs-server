@@ -141,7 +141,7 @@ func TestSchemaPairNativeColdBootstrapAndRestart(t *testing.T) {
 		t.Run(fmt.Sprintf("future_%v", future), func(t *testing.T) {
 			r, err := compiledMigrationResources()
 			if future {
-				r, err = readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 39}, {101, 40}})
+				r, err = readMigrationResources(futureMigrationSource(t), futureMigrationPairs(t))
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -172,7 +172,7 @@ func TestSchemaPairNativeColdBootstrapAndRestart(t *testing.T) {
 
 func TestSchemaPairNativeIndependentReleaseRestart(t *testing.T) {
 	n, _ := currentNativeSchemaPair(t)
-	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 39}, {101, 40}})
+	r, err := readMigrationResources(futureMigrationSource(t), futureMigrationPairs(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,13 +185,13 @@ func TestSchemaPairNativeIndependentReleaseRestart(t *testing.T) {
 		t.Fatal("failed live pair reused")
 	}
 	p = n.preflight(t, r)
-	if version, _, err := NewMigrator(n.db, p.MySQLConfig(false)).Run(); err != nil || version != 101 {
+	if version, _, err := NewMigrator(n.db, p.MySQLConfig(false)).Run(); err != nil || version != r.sql.head {
 		t.Fatal(version, err)
 	}
 	if err := p.VerifyComplete(t.Context()); err == nil {
-		t.Fatal("101/39 claimed to be final 101/40")
+		t.Fatal("SQL-only checkpoint claimed to be the final future pair")
 	}
-	// 101/39 is an independently reviewed release, so a new process may continue.
+	// The declared SQL-only checkpoint permits a fresh process to continue.
 	n.runBoth(t, n.preflight(t, r))
 	assertMySQLTable(t, n.db, n.cfg.MySQLDatabase, "migration_future_probe", true)
 	names, err := n.mongoDB.ListCollectionNames(t.Context(), bson.M{"name": "migration_future_probe"})
@@ -245,7 +245,13 @@ func TestSchemaPairNativeLegacyBoundaryRejectsFreshPartial(t *testing.T) {
 			_, e := n.mongoDB.Collection("schema_migrations").UpdateOne(t.Context(), bson.D{}, bson.M{"$set": bson.M{"dirty": false}})
 			return e
 		}},
-		{"future_head", func() error { _, e := n.db.Exec("UPDATE schema_migrations SET version=101"); return e }, func() error { _, e := n.db.Exec("UPDATE schema_migrations SET version=100"); return e }},
+		{"future_head", func() error {
+			_, e := n.db.Exec(fmt.Sprintf("UPDATE schema_migrations SET version=%d", r.sql.head+1))
+			return e
+		}, func() error {
+			_, e := n.db.Exec(fmt.Sprintf("UPDATE schema_migrations SET version=%d", r.sql.head))
+			return e
+		}},
 		{"old_sql_reappears", func() error { _, e := n.db.Exec("CREATE TABLE domain_event_outbox (id BIGINT PRIMARY KEY)"); return e }, func() error { _, e := n.db.Exec("DROP TABLE domain_event_outbox"); return e }},
 		{"old_mongo_reappears", func() error { return n.mongoDB.CreateCollection(t.Context(), "domain_event_outbox") }, func() error { return n.mongoDB.Collection("domain_event_outbox").Drop(t.Context()) }},
 	} {
@@ -270,12 +276,14 @@ func TestSchemaPairNativeFailedFutureDDLDoesNotAdvanceOtherBackend(t *testing.T)
 		t.Run(string(failedBackend), func(t *testing.T) {
 			n, _ := currentNativeSchemaPair(t)
 			source := futureMigrationSource(t)
+			sqlPath, mongoPath := futureMigrationPaths(t)
+			current := testCurrentResources(t)
 			if failedBackend == BackendMySQL {
-				source["migrations/mysql/000101_future_test.up.sql"].Data = []byte("CREATE TABLE migration_future_probe (id BIGINT PRIMARY KEY); SELECT * FROM missing_m3_probe;")
+				source[sqlPath].Data = []byte("CREATE TABLE migration_future_probe (id BIGINT PRIMARY KEY); SELECT * FROM missing_m3_probe;")
 			} else {
-				source["migrations/mongodb/000040_future_test.up.json"].Data = []byte(`[{"create":"migration_future_probe"},{"unknown_m3_command":1}]`)
+				source[mongoPath].Data = []byte(`[{"create":"migration_future_probe"},{"unknown_m3_command":1}]`)
 			}
-			r, err := readMigrationResources(source, []schemaVersionPair{{100, 39}, {101, 39}, {101, 40}})
+			r, err := readMigrationResources(source, futureMigrationPairs(t))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -291,7 +299,7 @@ func TestSchemaPairNativeFailedFutureDDLDoesNotAdvanceOtherBackend(t *testing.T)
 				t.Fatal("failed/unknown phase accepted")
 			}
 			sqlVersion, sqlDirty, mongoVersion, mongoDirty := n.heads(t)
-			if sqlVersion != 101 || sqlDirty != (failedBackend == BackendMySQL) || mongoVersion != map[Backend]uint{BackendMySQL: 39, BackendMongo: 40}[failedBackend] || mongoDirty != (failedBackend == BackendMongo) {
+			if sqlVersion != r.sql.head || sqlDirty != (failedBackend == BackendMySQL) || mongoVersion != map[Backend]uint{BackendMySQL: current.mongo.head, BackendMongo: r.mongo.head}[failedBackend] || mongoDirty != (failedBackend == BackendMongo) {
 				t.Fatalf("heads=%d/%d dirty=%v/%v", sqlVersion, mongoVersion, sqlDirty, mongoDirty)
 			}
 			if _, err := preflightCompatibilityPair(t.Context(), n.db, n.client, n.cfg, r); err == nil {

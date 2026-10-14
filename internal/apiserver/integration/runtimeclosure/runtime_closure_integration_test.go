@@ -126,12 +126,16 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	// be observed before either migration creates a version namespace.
 	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
 	pair := runtimeClosurePristinePair(t, sqlDB, databaseName, mongoClient, mongoDB.Name())
+	sqlHead, mongoHead, _, err := migrationpkg.EmbeddedMigrationResources()
+	if err != nil {
+		t.Fatal(err)
+	}
 	mysqlVersion, changed, err := migrationpkg.NewMigrator(sqlDB, pair.MySQLConfig(false)).Run()
-	if err != nil || !changed || mysqlVersion != 100 {
+	if err != nil || !changed || mysqlVersion != sqlHead {
 		t.Fatalf("migrate empty MySQL: version=%d changed=%v err=%v", mysqlVersion, changed, err)
 	}
 	mongoVersion, changed, err := migrationpkg.NewMongoMigrator(mongoClient, pair.MongoConfig(false)).Run()
-	if err != nil || !changed || mongoVersion != 39 {
+	if err != nil || !changed || mongoVersion != mongoHead {
 		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
 	}
 	// The consumed pristine authorization is not reusable. A restart gets a
