@@ -221,6 +221,198 @@ func TestHistoricalIndexNativeExactObjectRestoreAndConstraints(t *testing.T) {
 	}
 }
 
+// This proves only an isolated, fixed-object backup replay. It does not start
+// an application image or provide production freeze, permissions or RTO proof.
+func TestHistoricalIndexNativeDirtyObjectBackupRestore(t *testing.T) {
+	for _, interrupted := range []bool{false, true} {
+		name := "restore"
+		if interrupted {
+			name = "interrupt_before_metadata_then_restore"
+		}
+		t.Run(name, func(t *testing.T) {
+			n := nativeHistoricalIndexPair(t)
+			if _, err := n.mongoDB.Collection("rm_outbox").InsertOne(t.Context(), bson.D{
+				{Key: "_id", Value: "m4-preserved-current-responsibility"},
+				{Key: "message_id", Value: "m4-preserved-current-responsibility"},
+				{Key: "payload", Value: bson.D{{Key: "frozen", Value: "current responsibility"}}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			indexes, namespaces := mongoIndexInventory(t, n.mongoDB), mongoBusinessNamespaceInventory(t, n.mongoDB)
+			businessDocuments := func() map[string][]bson.Raw {
+				result := make(map[string][]bson.Raw)
+				for collection := range namespaces {
+					cursor, err := n.mongoDB.Collection(collection).Find(t.Context(), bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+					if err != nil {
+						t.Fatal(err)
+					}
+					var rows []bson.Raw
+					if err := cursor.All(t.Context(), &rows); err != nil {
+						t.Fatal(err)
+					}
+					result[collection] = rows
+				}
+				return result
+			}
+			documents := businessDocuments()
+			sqlBefore := historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations")
+			sqlIdentity, mongoIdentity, err := pairIdentity(t.Context(), n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Capture real BSON, including its original _id, integer encoding and
+			// field order. No version/dirty document is constructed for replay.
+			cursor, err := n.mongoDB.Collection("schema_migrations").Find(t.Context(), bson.D{}, options.Find().SetLimit(2))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var headRows []bson.Raw
+			if err := cursor.All(t.Context(), &headRows); err != nil || len(headRows) != 1 {
+				t.Fatal("complete clean version BSON backup requires exactly one row", err)
+			}
+			headBackup := append(bson.Raw(nil), headRows[0]...)
+			cursor, err = n.mongoDB.ListCollections(t.Context(), bson.D{{Key: "name", Value: "schema_migrations"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var catalogs []bson.Raw
+			if err := cursor.All(t.Context(), &catalogs); err != nil || len(catalogs) != 1 {
+				t.Fatal("capture complete version namespace failed", err)
+			}
+			var headOptions bson.D
+			if err := bson.Unmarshal(catalogs[0].Lookup("options").Document(), &headOptions); err != nil {
+				t.Fatal(err)
+			}
+			var headIndexes []bson.D
+			for index, spec := range indexes {
+				if strings.HasPrefix(index, "schema_migrations/") {
+					headIndexes = append(headIndexes, spec)
+				}
+			}
+			if len(headIndexes) == 0 || headBackup.Lookup("_id").Type == 0 {
+				t.Fatal("version object backup incomplete")
+			}
+
+			// Fixed FS seam: real MongoMigrator writes40dirty and successfully
+			// drops the first two indexes before the third command fails in Mongo.
+			source := embeddedMigrationSource(t)
+			source[historicalIndexUp].Data = bytes.Replace(source[historicalIndexUp].Data, []byte(`"index":"uk_generation_historical_generated_event_id"`), []byte(`"index":"m4_missing_index"`), 1)
+			r, err := readMigrationResources(source, declaredSchemaPairs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := n.preflight(t, r)
+			if _, _, err := NewMigrator(n.db, p.MySQLConfig(false)).Run(); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := NewMongoMigrator(n.client, p.MongoConfig(false)).Run(); err == nil {
+				t.Fatal("real partial index migration unexpectedly succeeded")
+			}
+			assertDirty := func() {
+				if sql, dirty, head, mongoDirty := n.heads(t); sql != 101 || dirty || head != 40 || !mongoDirty {
+					t.Fatal("fixed-object replay must leave101clean/40dirty until its final step")
+				}
+				if _, err := preflightCompatibilityPair(t.Context(), n.db, n.client, n.cfg, r); err == nil {
+					t.Fatal("fresh process adopted the interrupted dirty migration")
+				}
+			}
+			assertDirty()
+			afterFailure := mongoIndexInventory(t, n.mongoDB)
+			for _, target := range historicalIndexTargets[:2] {
+				if afterFailure[target.collection+"/"+target.name] != nil {
+					t.Fatal("real migration did not complete the required partial drops")
+				}
+			}
+			var dirtyHead bson.Raw
+			if err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Decode(&dirtyHead); err != nil {
+				t.Fatal(err)
+			}
+			dirtyHead = append(bson.Raw(nil), dirtyHead...)
+			createExactIndex := func(collection string, backup bson.D) error {
+				var spec bson.D
+				for _, field := range backup {
+					if field.Key != "ns" {
+						spec = append(spec, field)
+					}
+				}
+				return n.mongoDB.RunCommand(t.Context(), bson.D{{Key: "createIndexes", Value: collection}, {Key: "indexes", Value: bson.A{spec}}}).Err()
+			}
+			restore := func(beforeMetadata func() error) error {
+				assertDirty()
+				for _, target := range historicalIndexTargets {
+					if err := createExactIndex(target.collection, indexes[target.collection+"/"+target.name]); err != nil {
+						return err
+					}
+				}
+				if !reflect.DeepEqual(indexes, mongoIndexInventory(t, n.mongoDB)) || !reflect.DeepEqual(namespaces, mongoBusinessNamespaceInventory(t, n.mongoDB)) || !reflect.DeepEqual(documents, businessDocuments()) || !reflect.DeepEqual(sqlBefore, historicalQuery(t, n.db, "SELECT version,dirty FROM schema_migrations")) {
+					return errors.New("business objects differ before metadata replay")
+				}
+				a, b, err := pairIdentity(t.Context(), n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
+				if err != nil || a != sqlIdentity || b != mongoIdentity {
+					return errors.New("source identity differs before metadata replay")
+				}
+				if beforeMetadata != nil {
+					if err := beforeMetadata(); err != nil {
+						return err
+					}
+				}
+				// The provider itself recreates this metadata namespace for every
+				// version write. Record its new UUID; all business UUIDs stay intact.
+				if err := n.mongoDB.Collection("schema_migrations").Drop(t.Context()); err != nil {
+					return err
+				}
+				create := bson.D{{Key: "create", Value: "schema_migrations"}}
+				create = append(create, headOptions...)
+				if err := n.mongoDB.RunCommand(t.Context(), create).Err(); err != nil {
+					return err
+				}
+				for _, spec := range headIndexes {
+					if err := createExactIndex("schema_migrations", spec); err != nil {
+						return err
+					}
+				}
+				_, err = n.mongoDB.Collection("schema_migrations").InsertOne(t.Context(), headBackup)
+				return err
+			}
+			if interrupted {
+				if err := restore(func() error { return context.Canceled }); !errors.Is(err, context.Canceled) {
+					t.Fatal("fixed interruption was not respected before metadata replay", err)
+				}
+				var stillDirty bson.Raw
+				if err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Decode(&stillDirty); err != nil || !bytes.Equal(dirtyHead, stillDirty) {
+					t.Fatal("interrupted restoration changed the original40dirty BSON", err)
+				}
+				assertDirty()
+			}
+			if err := restore(nil); err != nil {
+				t.Fatal("fixed-object backup replay failed", err)
+			}
+			var restoredHead bson.Raw
+			if err := n.mongoDB.Collection("schema_migrations").FindOne(t.Context(), bson.D{}).Decode(&restoredHead); err != nil || !bytes.Equal(headBackup, restoredHead) {
+				t.Fatal("original version BSON/_id/type was not restored exactly", err)
+			}
+			cursor, err = n.mongoDB.ListCollections(t.Context(), bson.D{{Key: "name", Value: "schema_migrations"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var restoredCatalogs []bson.Raw
+			if err := cursor.All(t.Context(), &restoredCatalogs); err != nil || len(restoredCatalogs) != 1 || !bytes.Equal(catalogs[0].Lookup("options").Value, restoredCatalogs[0].Lookup("options").Value) {
+				t.Fatal("version collection options not restored", err)
+			}
+			if bytes.Equal(catalogs[0].Lookup("info").Document().Lookup("uuid").Value, restoredCatalogs[0].Lookup("info").Document().Lookup("uuid").Value) {
+				t.Fatal("metadata namespace replay did not expose its new UUID")
+			}
+			if !reflect.DeepEqual(indexes, mongoIndexInventory(t, n.mongoDB)) || !reflect.DeepEqual(namespaces, mongoBusinessNamespaceInventory(t, n.mongoDB)) || !reflect.DeepEqual(documents, businessDocuments()) {
+				t.Fatal("replay changed business BSON/namespaces or exact index specs")
+			}
+			oldResources := migrationResourcesThrough(t, 101, 39)
+			if err := n.preflight(t, oldResources).VerifyComplete(t.Context()); err != nil {
+				t.Fatal("fresh101/39 preflight rejected the actual restored pair", err)
+			}
+		})
+	}
+}
+
 func TestHistoricalIndexNativePartialFailureAndDirtyRefuseRepairByForce(t *testing.T) {
 	n := nativeHistoricalIndexPair(t)
 	before, documents := mongoIndexInventory(t, n.mongoDB), mongoFrozenDocuments(t, n.mongoDB)
