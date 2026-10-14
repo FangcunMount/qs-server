@@ -393,6 +393,38 @@
         {
           "kind": "source",
           "path": "scripts/dbops/test-mongodb-metadata-profile.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_queries.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-retirement-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-retirement-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-metadata-profile-ssh.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-metadata-profile-ssh.py"
         }
       ],
       "verification": [
@@ -622,6 +654,77 @@
           "selector": "*rows[0].Version != 103",
           "result": "matched",
           "source_sha": "f562abfa057405a34f718ae635ead3c77b8c5153",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-retirement-inventory.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_native_test.go",
+          "selector": "func TestRetirementInventoryNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
           "verified_on": "2026-10-15"
         }
       ],
@@ -12301,8 +12404,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "397317c55a73bc9e4ff4596af3668349afdcdcc1",
-        "verified_on": "2026-10-14"
+        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -12387,7 +12490,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+        "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12466,6 +12569,34 @@
         {
           "kind": "source",
           "path": "scripts/dbops/test-mysql-metadata-readiness.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_queries.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-retirement-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-retirement-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
         }
       ],
       "verification": [
@@ -12742,6 +12873,77 @@
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "4160cc63ac881d1addd3f066d6053301e8d5431e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-retirement-inventory.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_native_test.go",
+          "selector": "func TestRetirementInventoryNativeOwnedMySQL",
+          "result": "matched",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "80f422101ccfd83b4c4eb5bd165272145afe7afd",
           "verified_on": "2026-10-15"
         }
       ],

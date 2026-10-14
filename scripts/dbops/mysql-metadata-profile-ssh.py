@@ -20,6 +20,7 @@ import tempfile
 MEMBERS = frozenset(("profile-linux-amd64", "profile-linux-arm64", "mysql-metadata-profile.py",
                      "cbpt-cleanup.py", "receipt-transport.py"))
 READINESS_MEMBERS = MEMBERS | {"mysql-metadata-readiness.py"}
+INVENTORY_MEMBERS = MEMBERS | {"mysql-retirement-inventory.py"}
 ARCHIVE_LIMIT = 32 * 1024 * 1024
 HEADER_LIMIT = 32768
 SSH_HOST = "47.94.204.124"
@@ -37,6 +38,19 @@ def load_readiness(directory):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def load_inventory(directory):
+    spec = importlib.util.spec_from_file_location("owned_mysql_retirement_inventory", directory / "mysql-retirement-inventory.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def mode_members(*, readiness=False, inventory=False):
+    if readiness and inventory:
+        raise ValueError("mode_conflict")
+    return INVENTORY_MEMBERS if inventory else READINESS_MEMBERS if readiness else MEMBERS
 
 
 def unique_object(pairs):
@@ -68,8 +82,8 @@ def validate_envelope(value):
     return env
 
 
-def extract_archive(raw, directory, *, readiness=False):
-    members = READINESS_MEMBERS if readiness else MEMBERS
+def extract_archive(raw, directory, *, readiness=False, inventory=False):
+    members = mode_members(readiness=readiness, inventory=inventory)
     # Do not call tar.extract: only exact, unique plain files can enter this owned directory.
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
         seen, total = set(), 0
@@ -96,8 +110,8 @@ def extract_archive(raw, directory, *, readiness=False):
             raise ValueError("package_missing_member")
 
 
-def remove_owned(directory, *, readiness=False):
-    members = READINESS_MEMBERS if readiness else MEMBERS
+def remove_owned(directory, *, readiness=False, inventory=False):
+    members = mode_members(readiness=readiness, inventory=inventory)
     # A symlink created by an unexpected child is unlinked, never traversed.
     for name in (*sorted(members), "profile.env.json"):
         path = directory / name
@@ -115,7 +129,8 @@ def receiver_arch():
     return arch
 
 
-def receive(stream, *, readiness=False):
+def receive(stream, *, readiness=False, inventory=False):
+    mode_members(readiness=readiness, inventory=inventory)
     arch = receiver_arch()
     line = stream.readline(HEADER_LIMIT + 1)
     if len(line) > HEADER_LIMIT or not line.endswith(b"\n"):
@@ -133,7 +148,10 @@ def receive(stream, *, readiness=False):
     for number in previous:
         signal.signal(number, interrupted)
     try:
-        if readiness:
+        if inventory:
+            extract_archive(raw, directory, inventory=True)
+            profile = load_inventory(directory)
+        elif readiness:
             extract_archive(raw, directory, readiness=True)
             profile = load_readiness(directory)
         else:
@@ -152,7 +170,12 @@ def receive(stream, *, readiness=False):
     finally:
         # No positive output before all task-owned files have been released.
         try:
-            remove_owned(directory, readiness=True) if readiness else remove_owned(directory)
+            if inventory:
+                remove_owned(directory, inventory=True)
+            elif readiness:
+                remove_owned(directory, readiness=True)
+            else:
+                remove_owned(directory)
         finally:
             for number, handler in previous.items():
                 signal.signal(number, handler)
@@ -200,7 +223,7 @@ class ProfileStageFailure(Exception):
 
 
 def stage_receipt(profile, env, category):
-    if getattr(profile, "READINESS", False):
+    if getattr(profile, "READINESS", False) or getattr(profile, "INVENTORY", False):
         return profile.stage_failure(env, category)
     value = dict(profile.FAILURE_RECEIPT)
     value["error_category"] = category if category in TRANSPORT_ERRORS else "profile_transport_or_receipt_failed"
@@ -216,9 +239,12 @@ def stage_receipt(profile, env, category):
     return value
 
 
-def dispatch(archive, env, profile, home, *, readiness=False):
+def dispatch(archive, env, profile, home, *, readiness=False, inventory=False):
     try:
-        operations = ("metadata-readiness-admin",) if readiness else ("metadata-visibility-profile", "metadata-visibility-admin-profile")
+        mode_members(readiness=readiness, inventory=inventory)
+        if bool(getattr(profile, "READINESS", False)) != readiness or bool(getattr(profile, "INVENTORY", False)) != inventory:
+            raise ValueError("mode_binding")
+        operations = ("retirement-inventory-admin",) if inventory else ("metadata-readiness-admin",) if readiness else ("metadata-visibility-profile", "metadata-visibility-admin-profile")
         if env.get("PROFILE_OPERATION") not in operations or env.get("PROFILE_DATABASE") != "mysql" or env.get("PROFILE_ARCHIVE_INPUT", ""):
             raise ValueError("operation_binding")
         private = {key: env.get(key, "") for key in profile.PROFILE_KEYS}
@@ -239,7 +265,7 @@ def dispatch(archive, env, profile, home, *, readiness=False):
             raise ValueError("local_package_checksum")
         # Public receiver code only enters argv; package and secrets travel solely over stdin.
         receiver = base64.b64encode(Path(__file__).read_bytes()).decode("ascii")
-        command = "/usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + (" --receive-readiness" if readiness else " --receive")
+        command = "/usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + (" --receive-inventory" if inventory else " --receive-readiness" if readiness else " --receive")
         payload = json.dumps(envelope, separators=(",", ":"), ensure_ascii=True).encode() + b"\n" + raw
         if len(payload) - len(raw) > HEADER_LIMIT:
             raise ValueError("envelope_limit")
@@ -266,20 +292,22 @@ def main():
     mode.add_argument("--receive", action="store_true")
     mode.add_argument("--receive-readiness", action="store_true")
     mode.add_argument("--readiness", action="store_true")
+    mode.add_argument("--receive-inventory", action="store_true")
+    mode.add_argument("--inventory", action="store_true")
     args = parser.parse_args()
-    if args.receive or args.receive_readiness:
+    if args.receive or args.receive_readiness or args.receive_inventory:
         try:
-            code, output = receive(sys.stdin.buffer, readiness=True) if args.receive_readiness else receive(sys.stdin.buffer)
+            code, output = receive(sys.stdin.buffer, readiness=args.receive_readiness, inventory=args.receive_inventory)
         except Exception:
             # Public failure is generated by the local caller; no exception/raw child output.
             return 1
     else:
         try:
-            profile = load_readiness(Path(__file__).parent) if args.readiness else load_profile(Path(__file__).parent)
+            profile = load_inventory(Path(__file__).parent) if args.inventory else load_readiness(Path(__file__).parent) if args.readiness else load_profile(Path(__file__).parent)
         except Exception:
             return 1
         try:
-            code, output = dispatch(args.archive, os.environ, profile, Path.home(), readiness=True) if args.readiness else dispatch(args.archive, os.environ, profile, Path.home())
+            code, output = dispatch(args.archive, os.environ, profile, Path.home(), readiness=args.readiness, inventory=args.inventory)
         except Exception as failure:
             try:
                 category = failure.args[0] if isinstance(failure, ProfileStageFailure) and failure.args else "profile_transport_or_receipt_failed"

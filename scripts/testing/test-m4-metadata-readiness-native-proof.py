@@ -40,7 +40,7 @@ class NativeSelectorProofTests(unittest.TestCase):
         self.assertNotIn("RUN/PASS; zero SKIP", result.stdout)
 
     def test_every_mysql_selector_must_run_and_pass(self):
-        names = ("TestMetadataProfileNativeOwnedMySQL", "TestMetadataReadinessNativeOwnedMySQL")
+        names = ("TestMetadataProfileNativeOwnedMySQL", "TestMetadataReadinessNativeOwnedMySQL", "TestRetirementInventoryNativeOwnedMySQL")
         events = [{"Action": action, "Test": name} for name in names for action in ("run", "pass")]
         result, _ = self.run_fixture("mysql", events)
         self.assertEqual(result.returncode, 0, result.stderr)

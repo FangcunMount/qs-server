@@ -93,6 +93,7 @@ jobs:
         run: |
           python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
           python3 -B scripts/dbops/test-mysql-metadata-readiness.py
+          python3 -B scripts/dbops/test-mysql-retirement-inventory.py
           python3 -B scripts/dbops/test-mysql-metadata-profile.py
           python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
           python3 -B scripts/dbops/test-receipt-transport.py
