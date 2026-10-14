@@ -281,7 +281,9 @@ func (h *nativeFixture) upgrade(drops int, clean bool) {
 		fault += "ALTER TABLE `evaluation_outcome`" + parts[1]
 	}
 	fault += "\nSIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='owned fixture interrupted101';\n"
-	source := fstest.MapFS{"000101_owned_fault.up.sql": &fstest.MapFile{Data: []byte(fault)}, "000101_owned_fault.down.sql": &fstest.MapFile{Data: []byte("SELECT 1;")}}
+	source := nativeSource(h.t, "mysql", 100)
+	source["000101_owned_fault.up.sql"] = &fstest.MapFile{Data: []byte(fault)}
+	source["000101_owned_fault.down.sql"] = &fstest.MapFile{Data: []byte("SELECT 1;")}
 	sd, e := iofs.New(source, ".")
 	if e != nil {
 		h.t.Fatal(e)
