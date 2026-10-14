@@ -39,7 +39,11 @@ SQL102 仅删除 `testee.tags` 与 `operators.effective_roles`；历史迁移1..
 
 本候选必须先离线完成DDL，再启动新runtime；旧有效角色列无默认值，新PO省略它后不能在旧schema写入。现代prepare/exit/recover只能在cleanSQL102预检，旧未执行指纹重做。旧raw archive和checksum不重写；旧镜像对SQL102未来head会拒绝。SQL102down明确拒绝，不提供Force、SetVersion、手清dirty或空列重建替代真实数据恢复。
 
-Actor原生四主场景及两个范围拒绝子场景已在独占 MySQL8.0.36/MongoRS7.0.31 实际 RUN/PASS；现代工具及原历史隔离 SQL 九场景亦通过，均零 SKIP。schema/value恢复场景的版本表保持clean101/40，未证明从102dirty回放真实原ledger。生产值分布、定向备份、dirty失败对象和版本表恢复、原/新完整服务启动、完整冻结与30/60分钟/RPO0仍待具名证明。五张历史维护表不在SQL102范围。
+Actor原生四主场景及两个范围拒绝子场景在源码 `7f131c9e` 的独占 MySQL8.0.36/MongoRS7.0.31 夹具上实际 RUN/PASS；现代工具及原历史隔离 SQL 九场景亦通过，均零 SKIP。该轮 schema/value 恢复的版本表保持 clean101/40，不作为 dirty 恢复证明。
+
+后续源码 `c11faebf3c715f511e8b936f46f28bcc1f757150` 的 `TestActorColumnsNativeDirtyObjectBackupRestore` 在同补丁版本的另一套自有夹具上捕获首次 clean101/40 的原列定义、完整列值、保留事实和真实版本账本，并冻结原材料 SHA。真正第二条 ALTER 失败留下 dirty102 后，先恢复两列及原值、核对完整保留事实，最后显式事务回放完整原版本账本；成功后 fresh101/40 preflight 通过。错误备份、保留事实变化、列值恢复失败和账本重复主键失败均拒绝提前完成，回放失败保留 dirty102。该轮五个顶层、七个子场景共十二项 RUN/PASS、零 SKIP，耗时46.51秒；原生日志摘要 `d122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe`，自有容器、网络和私有连接材料已释放。这是固定测试 seam，没有新增生产恢复入口、启动业务 runtime 或证明候选启动后覆盖旧备份合法。
+
+合并后的源码仍须通过当前完整 CI，旧组件证明不签为新合并头的原生执行。生产值分布、定向备份、原/新完整服务启动、完整冻结与30/60分钟/RPO0仍待具名证明。五张历史维护表不在SQL102范围。
 
 ## 新空库的批准
 

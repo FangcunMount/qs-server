@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
+    "sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -3777,7 +3777,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -3832,6 +3832,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
         }
       ],
       "verification": [
@@ -3888,6 +3896,21 @@
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "c11faebf3c715f511e8b936f46f28bcc1f757150",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -3900,7 +3923,8 @@
         "limitations": [
           "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
           "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
-          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
+          "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run."
         ]
       },
       "gaps": [
@@ -3926,7 +3950,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -3981,6 +4005,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
         }
       ],
       "verification": [
@@ -4037,6 +4069,21 @@
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "c11faebf3c715f511e8b936f46f28bcc1f757150",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4049,7 +4096,8 @@
         "limitations": [
           "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
           "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
-          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
+          "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run."
         ]
       },
       "gaps": [
@@ -4174,7 +4222,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4229,6 +4277,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
         }
       ],
       "verification": [
@@ -4285,6 +4341,21 @@
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "c11faebf3c715f511e8b936f46f28bcc1f757150",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4297,7 +4368,8 @@
         "limitations": [
           "Historical evidence does not cover the reviewed source baseline or local documentation changes.",
           "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
-          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
+          "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run."
         ]
       },
       "gaps": [
@@ -10196,7 +10268,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10235,6 +10307,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
         }
       ],
       "verification": [
@@ -10276,6 +10356,21 @@
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "c11faebf3c715f511e8b936f46f28bcc1f757150",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10286,7 +10381,8 @@
         "limitations": [
           "No per-document production evidence has been recorded in this initial skeleton.",
           "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
-          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head."
+          "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
+          "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run."
         ]
       },
       "gaps": [
@@ -10365,7 +10461,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10416,6 +10512,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
         }
       ],
       "verification": [
@@ -10719,6 +10823,21 @@
           "result": "passed",
           "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "c11faebf3c715f511e8b936f46f28bcc1f757150",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10741,7 +10860,8 @@
           "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
           "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only 101/39 preparation and its guards. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
           "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Production7.0.31, original-image full startup, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required.",
-          "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery."
+          "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery.",
+          "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run."
         ]
       },
       "gaps": []
@@ -12542,7 +12662,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c6329a3eb6eb3754be2d303669fa0064376a0736",
+        "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12573,6 +12693,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/actor_column_retirement_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
         }
       ],
       "verification": [
@@ -12724,6 +12852,21 @@
           "result": "passed",
           "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
+          "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "c11faebf3c715f511e8b936f46f28bcc1f757150",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "ea26d7f4570942fa5d04a4c9af160652e6e4bc6a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -12739,7 +12882,8 @@
           "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack.",
           "M4-C source7f131c9e996d6b5405a28414bee7547fc00cc522 passed six required migration RUN/PASS and nine modern/historical isolated SQL RUN/PASS with zero SKIP on owned MySQL8.0.36/MongoRS7.0.31. Raw archive bytes/checksum and current inserts were verified. Exact schema/value restoration kept clean101/40 metadata; dirty102 ledger recovery, full old/new runtime startup, production distributions/protection/freeze/RPO and30/60min remain unproven. Owned containers/network/private connection file were released; prior IDs/images/volumes were preserved, but the pre-existing NSQ restart loop prevents all-runtime-metadata stability attestation.",
           "The actual native argv, JSONL and source hashes are retained in private harnessb0db1220 / receiptfbddd344 / migration8c5322db / modern2bb8aa71. The existing manifest command grammar rejects quoted selector regexes, so no equivalent replay is labelled passed here. The actual six and nine RUN/PASS are described as separately bound component evidence; CI must execute its exact new selector on the candidate head.",
-          "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery."
+          "The 078c14 ordinary race verification records the exact Go process argv; its actual caller supplied GOMAXPROCS=2 in the environment. It did not run native database tests or certify production recovery.",
+          "A later owned MySQL8.0.36/MongoRS7.0.31 fixture on exact sourcec11faebf3c715f511e8b936f46f28bcc1f757150 passed five top-level and seven child scenarios:12 RUN/PASS,0SKIP,exit0. It captured original101/40 column definitions/values, all retained facts and full genuine ledger before DDL with an independently frozen SHA. Actual second-ALTER failure produced dirty102; objects and facts were restored/checked before explicit transactional original-ledger replay last. Wrong backup, changed facts, failed value restoration or ledger replay refused completion and retained dirty. Raw logd122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe and receipt8e1b907338601e2bfc2aca30c4aa2cba7c780f56df59922788a846eb5fbe0206 bind this component proof. Owned containers/network/private connection material were released. No business runtime, production recovery entry, production values/protection/freeze,30/60min or RPO0 is attested. Merged checkout requires fresh full CI and is not represented as this native run."
         ]
       },
       "gaps": [
