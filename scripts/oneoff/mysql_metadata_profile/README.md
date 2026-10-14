@@ -39,6 +39,8 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 原 `mysql-metadata-profile.py --binary` Docker 路径及其 negative 测试仍保留，但 metadata 工作流通过受限 SSH receiver 调用 `execute_native`。CBPT 删除工具、其他 db-ops 操作和共享传输 helper 保持原样。
 
+readiness 查询失败按固定类别诊断：服务端 MySQL 3024 为 `query_server_timeout`，1317 为 `query_server_interrupted`，1142／1143／1227 为 `query_permission_denied`，Go context deadline／cancel 为 `query_deadline_exceeded`／`query_canceled`；未识别错误保持 `query_failed`。QueryContext 和读取结果的 Rows.Err 使用相同规则，不输出 Message、SQL、账号或驱动错误正文，不根据耗时推断原因。原五查询 profile 及 readiness 的18个固定读取、5秒单条／45秒总预算不变，失败仍清空部分测量并核验连接释放，不重试或回退认证。
+
 
 ## 日志回执运输
 

@@ -55,6 +55,8 @@ CI for exact SHA
 
 Mongo 最多执行 10 个固定逻辑只读查询，异常时至多释放一个本 reader 拥有的 cursor；driver 握手不计为业务查询。`ttl_monitor.known=false` 表示未知，不能把零值 `enabled=false` 解释为已关闭。TTL 参数仅为本次观测，不扫描 TTL 业务数据、不读取 currentOp、不执行关闭动作，也不证明未来持续状态或维护冻结。
 
+Mongo 的最终传输回执增加固定 `failure_stage`，区分 SSH keyscan、指纹、路由、隧道、自有监听者、native reader 和释放阶段；native reader 的 JSON 协议保持原样。成功必须为 `none`，未知阶段拒绝；失败不输出命令、连接地址或 stderr。MySQL readiness 对服务端 3024／1317、权限拒绝及 Go context deadline／cancel 使用不同固定错误类别，其余继续为 `query_failed`；不会根据运行时长猜测原因、调整读取预算或自动重试。失败回执不出具完整测量结论。
+
 CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 rs0。必须设置 required 标记，精确 selector 的 JSON 事件必须实际 RUN/PASS；任意 SKIP、缺失 selector 或依赖未就绪均失败。Mongo fixture 使用固定官方 digest、owned network/container label 和唯一 127.0.0.1 随机端口，不复用业务 runtime fixture。
 
 ## 4. 本地非缓存验证
