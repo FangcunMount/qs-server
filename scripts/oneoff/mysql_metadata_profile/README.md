@@ -6,11 +6,11 @@
 
 固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。没有命令行业务参数；额外 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
 
-单一 pinned sql.Conn、总 deadline 2 分钟、每个 query 15 秒、connect 5 秒，MultiStatements/InterpolateParams=false。配置和 driver 全局 logger 都为 NopLogger。身份 query 读取 session ID/UUID/database/version/CURRENT_ROLE，前后必须完全一致；UUID 仅用于兼容现有 cleanup hashText(host, normalizedPort, database, UUID)，hash 必须匹配 PROFILE_EXPECTED_TARGET_HASH。身份值、角色原文和 SQL 结果不进入输出。
+单一 pinned sql.Conn、总 deadline 45 秒、每个 query 5 秒、connect 5 秒，MultiStatements/InterpolateParams=false。配置和 driver 全局 logger 都为 NopLogger。身份 query 读取 session ID/UUID/database/version/CURRENT_ROLE，前后必须完全一致；UUID 仅用于兼容现有 cleanup hashText(host, normalizedPort, database, UUID)，hash 必须匹配 PROFILE_EXPECTED_TARGET_HASH。身份值、角色原文和 SQL 结果不进入输出。
 
 权限与角色诊断字段的含义：
 
-- current_unrestricted_metadata_grants：固定 SHOW GRANTS FOR CURRENT_USER 的当前有效集；绝不称它仅为 direct grants。
+- current_unrestricted_metadata_grants：仅诊断固定、不带 USING 的 SHOW GRANTS FOR CURRENT_USER 返回的账号直接 grant 中四项全局权限及 partial revocations。该输出会列出已授予角色，但不展开角色权限，不能代表全部 active roles 的有效权限；参见 [MySQL 8.0 SHOW GRANTS](https://dev.mysql.com/doc/refman/8.0/en/show-grants.html)。
 - rds_role_grants_available：固定 SHOW GRANTS FOR CURRENT_USER USING `rds_superuser_role`@`%` 查询成功为 true；只有 MySQL 数字错误 3530 且 SQLState 为 HY000 才为 false；其它查询错误为 null 并失败。
 - rds_role_unrestricted_metadata_grants：上述 USING 查询的账号直接权限加固定角色的潜在集，不能称当前有效集，也不把其它 active roles 并入它。角色未授予或查询失败时为 null。角色输出格式不被识别时为 null、complete=false；不输出角色结论。
 
@@ -25,9 +25,15 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 输出仅受控 receipt 字段：format_version/source_sha/run_id/expected_target_hash/source_target_hash/current_unrestricted_metadata_grants/rds_role_grants_available/rds_role_unrestricted_metadata_grants/assigned_roles_present/mandatory_roles_present/diagnostic_only/complete/error_category。无 raw grant、role/account/host/database/version/UUID/SQL/driver error 或凭据。diagnostic_only 永远为 true；即使两个权限布尔均 true，也不是删表授权或资格。未知错误和身份变化时 current 为 false、四个角色字段为 null，complete=false、exit1；合法 negative（含未授予/partial restriction）为完整诊断，不是权限赋予。
 
-离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、其它 active role current=true/potential=false、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
+离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、current 与固定角色 grant 输入互不混用（不证明真实 active role 权限展开）、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
 
-Python 传输使用 0700 临时目录中的 0600 环境文件向只读短时容器传入凭据，文件随退出删除；容器仅挂载诊断 binary，不挂载归档或数据库数据卷。当前 cbpt 删除工具与门禁保持原样。
+两个 metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。其余 db-ops job 在两个 metadata 输入下均不符合执行条件。
+
+`mysql-metadata-profile-ssh.py` 将唯一固定文件集的 SHA-256 归档及凭据通过 SSH stdin 传入；密码不进入命令行、日志或 Git。远端只在任务拥有的 0700 临时目录解包，使用 Linux 静态 binary，不创建生产 Docker 容器、不拉取镜像。临时 JSON 环境文件为 0600，固定字段经过验证，不经 shell source/eval，并在建立数据库连接前删除该文件；binary 不继承无关凭据或 LD_* 环境。SSH 输出限 256 KiB/90 秒，binary 输出限 64 KiB/50 秒，stderr 只排空不保留，原始异常不输出。只有 task-owned 文件完整释放后才输出安全密封回执，传输、清理或回执错误均失败关闭。封装失败使用四个固定类别：`profile_input_preflight_failed`（操作、输入与绑定）、`profile_package_preflight_failed`（本地包、checksum 与 envelope）、`profile_trusted_ssh_preflight_failed`（本地可信 SSH 预检）、`profile_remote_or_receipt_failed`（实际 SSH、远端执行、回执与释放后输出）。这些类别只描述本次源码的边界，保留 complete=false、权限 false/nullable 字段，不含异常正文、trace、凭据或远端状态猜测；remote 类别不能单独证明是否连接数据库。原来的 `profile_transport_or_receipt_failed` 继续接受为未定位失败。已通过原验证器的具体 SQL 失败回执沿用原类别，不被封装阶段改名。
+
+`complete=true` 还要求 pinned Conn.Close、owned DB.Close 均成功且 pool 的 InUse/OpenConnections 为零。池暂保留最多一个 idle connection，让紧随其后的 DB.Close 能返回底层 driver.Close 错误，避免 MaxIdleConns=0 在 putConn 中忽略该错误。`connection_release_failed` / `database_release_failed` 是封闭失败类别，清空所有权限和角色结论，不输出底层错误。隔离 MySQL8.0.36 required race 门禁验证 schema-only、全局四权限、未激活固定角色、partial revoke、错误目标及会话释放；释放错误使用明确测试 seam，不能冒称真实数据库物理释放失败。
+
+原 `mysql-metadata-profile.py --binary` Docker 路径及其 negative 测试仍保留，但 metadata 工作流通过受限 SSH receiver 调用 `execute_native`。CBPT 删除工具、其他 db-ops 操作和共享传输 helper 保持原样。
 
 
 ## 日志回执运输
