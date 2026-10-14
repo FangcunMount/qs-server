@@ -570,7 +570,7 @@ func TestMetadataReadinessSnapshotFailureNeverRunsLiveChecks(t *testing.T) {
 					readinessPrimaryExpectations(m)
 					m.ExpectQuery(readinessPageSQL(false, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2, []any{0, 0}))
 					if phase == "eof" || phase == "eof_and_rollback" {
-						var failure error = context.DeadlineExceeded
+						failure := context.DeadlineExceeded
 						if phase == "eof_and_rollback" {
 							failure = &mysql.MySQLError{Number: 1064, Message: fixtureSecret}
 						}
@@ -582,11 +582,12 @@ func TestMetadataReadinessSnapshotFailureNeverRunsLiveChecks(t *testing.T) {
 				}
 			}
 			q := m.ExpectExec(readinessRollbackSQL)
-			if phase == "eof_and_rollback" {
+			switch phase {
+			case "eof_and_rollback":
 				q.WillReturnError(context.DeadlineExceeded)
-			} else if phase == "rollback" {
+			case "rollback":
 				q.WillReturnError(&mysql.MySQLError{Number: 1064, Message: fixtureSecret})
-			} else {
+			default:
 				q.WillReturnResult(sqlmock.NewResult(0, 0))
 			}
 			r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
