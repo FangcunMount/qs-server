@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+        "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -507,6 +507,20 @@
           "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
           "result": "passed",
           "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mongodb-metadata-profile.py",
+          "result": "passed",
+          "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
           "verified_on": "2026-10-14"
         }
       ],
