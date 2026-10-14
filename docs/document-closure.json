@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "401783c7df73f41beda4cfaa9d6c9f004e31330b",
+    "sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -9919,7 +9919,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+        "source_sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -9979,6 +9979,22 @@
           "result": "matched",
           "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestHistoricalEvidenceNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "e9bddfe267b87507c59d70564b7fe2d37c6f69ff",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/historical_evidence_retirement_native_integration_test.go",
+          "selector": "tx, err := n.db.BeginTx(t.Context(), nil)",
+          "result": "matched",
+          "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -9987,7 +10003,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only 101/39 preparation and its guards. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested."
+          "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only 101/39 preparation and its guards. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
+          "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Production7.0.31, original-image full startup, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required."
         ]
       },
       "gaps": []
