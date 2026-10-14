@@ -30,40 +30,27 @@ type taskSchedulerService struct {
 	persistence    taskPersistence
 }
 
-// NewTaskSchedulerService 创建任务调度服务
+// NewTaskSchedulerService requires the complete Plan task persistence and admission boundary.
 func NewTaskSchedulerService(
-	taskRepo plan.AssessmentTaskRepository,
-	planRepo plan.AssessmentPlanRepository,
-	entryGenerator planentryport.Generator,
-	eventPublisher event.EventPublisher,
-) TaskSchedulerService {
-	taskLifecycle := plan.NewTaskLifecycle()
-	return &taskSchedulerService{
-		taskRepo:       taskRepo,
-		planRepo:       planRepo,
-		taskLifecycle:  taskLifecycle,
-		entryGenerator: entryGenerator,
-		eventPublisher: eventPublisher,
-		persistence:    taskPersistence{tasks: taskRepo},
-	}
-}
-
-func NewTaskSchedulerServiceWithEnrollment(
 	taskRepo plan.AssessmentTaskRepository,
 	planRepo plan.AssessmentPlanRepository,
 	enrollmentRepo plan.EnrollmentRepository,
 	txRunner apptransaction.Runner,
 	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
-	openedOutbox ...eventing.ProfileBinding,
-) TaskSchedulerService {
-	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, eventPublisher).(*taskSchedulerService)
-	service.enrollmentRepo = enrollmentRepo
-	service.persistence = taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner}
-	if len(openedOutbox) > 0 {
-		service.persistence.openedOutbox = openedOutbox[0]
+	openingOptions TaskOpeningOptions,
+) (TaskSchedulerService, error) {
+	if err := validateTaskServiceDependencies("plan task scheduler", taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, eventPublisher); err != nil {
+		return nil, err
 	}
-	return service
+	if err := openingOptions.validate(); err != nil {
+		return nil, err
+	}
+	return &taskSchedulerService{
+		taskRepo: taskRepo, planRepo: planRepo, enrollmentRepo: enrollmentRepo,
+		taskLifecycle: plan.NewTaskLifecycle(), entryGenerator: entryGenerator, eventPublisher: eventPublisher,
+		persistence: taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner, openingOptions: openingOptions},
+	}, nil
 }
 
 // SchedulePendingTasks 调度待推送的任务
@@ -726,9 +713,6 @@ func oldestTaskAgeSeconds(now time.Time, tasks []*plan.AssessmentTask, taskTime 
 }
 
 func (s *taskSchedulerService) enrollmentIsActive(ctx context.Context, cache map[string]*plan.Enrollment, task *plan.AssessmentTask) (bool, error) {
-	if s.enrollmentRepo == nil {
-		return true, nil
-	}
 	key := task.GetEnrollmentID().String()
 	if enrollment, ok := cache[key]; ok {
 		return enrollment != nil && enrollment.IsActive() && enrollment.OrgID() == task.GetOrgID(), nil
@@ -765,9 +749,6 @@ func (s *taskSchedulerService) loadPlanForTask(
 	cache map[string]*plan.AssessmentPlan,
 	task *plan.AssessmentTask,
 ) (*plan.AssessmentPlan, error) {
-	if s.planRepo == nil {
-		return nil, nil
-	}
 	if task == nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "任务不能为空")
 	}
