@@ -95,7 +95,7 @@ func TestPreparationMySQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actorfixture.RetireMaintenanceTables(t, db, maintenanceUp)
+	actorfixture.RetireMaintenanceTables(t, db, actorUp, maintenanceUp)
 	raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000074_operator_retirement_tasks.up.sql"))
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(raw)).Error)

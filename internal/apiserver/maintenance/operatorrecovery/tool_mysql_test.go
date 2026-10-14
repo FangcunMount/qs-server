@@ -99,7 +99,7 @@ func TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	actorfixture.RetireMaintenanceTables(t, db, maintenanceUp)
+	actorfixture.RetireMaintenanceTables(t, db, actorUp, maintenanceUp)
 	for _, name := range []string{"000074_operator_retirement_tasks.up.sql", "000079_operator_recovery_archives.up.sql"} {
 		raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", name))
 		if err != nil {

@@ -146,7 +146,7 @@ func installCurrentActorColumns(t *testing.T, db *gorm.DB) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actorfixture.RetireMaintenanceTables(t, db, maintenanceUp)
+	actorfixture.RetireMaintenanceTables(t, db, raw, maintenanceUp)
 }
 
 func retained(facts []authz.AssignmentRoleFact) []authz.AssignmentRoleFact {

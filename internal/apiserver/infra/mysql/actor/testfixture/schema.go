@@ -65,7 +65,7 @@ func RetireActorColumns(t testing.TB, db *gorm.DB, up []byte) {
 
 // RetireMaintenanceTables executes only original SQL103 on a genuine clean102
 // disposable fixture with all five original maintenance tables present.
-func RetireMaintenanceTables(t testing.TB, db *gorm.DB, up []byte) {
+func RetireMaintenanceTables(t testing.TB, db *gorm.DB, actorUp, up []byte) {
 	t.Helper()
 	var initial []struct {
 		Version uint64
@@ -90,7 +90,9 @@ func RetireMaintenanceTables(t testing.TB, db *gorm.DB, up []byte) {
 		t.Fatal(err)
 	}
 	source, err := iofs.New(fstest.MapFS{
-		"000103_retire_legacy_maintenance_tables.up.sql": &fstest.MapFile{Data: up},
+		// The provider validates its already-applied current resource without rerunning it.
+		"000102_retire_actor_compatibility_columns.up.sql": &fstest.MapFile{Data: actorUp},
+		"000103_retire_legacy_maintenance_tables.up.sql":   &fstest.MapFile{Data: up},
 	}, ".")
 	if err != nil {
 		_ = provider.Close()
