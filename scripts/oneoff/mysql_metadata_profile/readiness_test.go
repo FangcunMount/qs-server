@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-sql-driver/mysql"
@@ -65,9 +67,32 @@ func readinessOperationExpectations(m sqlmock.Sqlmock) {
 	m.ExpectQuery(readinessLocksSQL).WillReturnRows(readinessRowsFixture(7, []any{"TABLE", fixtureConnection.Database, "assessment", "SHARED_WRITE", "TRANSACTION", "GRANTED", 15}))
 	m.ExpectQuery(readinessInstrumentSQL).WillReturnRows(readinessRowsFixture(2, []any{"wait/lock/metadata/sql/mdl", "YES"}))
 }
+func readinessPrimaryExpectations(m sqlmock.Sqlmock) {
+	m.ExpectQuery(readinessPrimaryColumnsSQL).WillReturnRows(readinessRowsFixture(6,
+		[]any{"assessment", "id", "bigint", "bigint unsigned", "NO", "InnoDB"},
+		[]any{"evaluation_outcome", "id", "bigint", "bigint unsigned", "NO", "InnoDB"}))
+	m.ExpectQuery(readinessPrimaryIndexesSQL).WillReturnRows(readinessRowsFixture(8,
+		[]any{"assessment", 1, "id", 0, "BTREE", nil, nil, "YES"},
+		[]any{"evaluation_outcome", 1, "id", 0, "BTREE", nil, nil, "YES"}))
+}
+func readinessSnapshotExpectations(m sqlmock.Sqlmock, assessment, outcome any) {
+	m.ExpectExec(readinessIsolationSQL).WillReturnResult(sqlmock.NewResult(0, 0))
+	m.ExpectExec(readinessBeginSQL).WillReturnResult(sqlmock.NewResult(0, 0))
+	m.ExpectQuery(readinessUpperSQL).WillReturnRows(readinessRowsFixture(2, []any{assessment, outcome}))
+	readinessPrimaryExpectations(m)
+}
+func readinessEmptyPagesExpectations(m sqlmock.Sqlmock) {
+	readinessSnapshotExpectations(m, nil, nil)
+	m.ExpectQuery(readinessPageSQL(false, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2))
+	m.ExpectQuery(readinessPageSQL(true, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2))
+	m.ExpectExec(readinessRollbackSQL).WillReturnResult(sqlmock.NewResult(0, 0))
+}
 func readinessFinishExpectations(m sqlmock.Sqlmock) {
-	m.ExpectQuery(readinessAssessmentSQL).WillReturnRows(readinessRowsFixture(7, []any{5, 1, 4, 1, 1, 1, 1}))
-	m.ExpectQuery(readinessOutcomeSQL).WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}))
+	readinessSnapshotExpectations(m, 4, nil)
+	m.ExpectQuery(readinessPageSQL(false, false)).WithArgs("4").WillReturnRows(readinessRowsFixture(2, []any{0, 0}, []any{1, 1}, []any{2, 2}, []any{3, 3}, []any{4, 4}))
+	m.ExpectQuery(readinessPageSQL(false, true)).WithArgs("4", "4").WillReturnRows(readinessRowsFixture(2))
+	m.ExpectQuery(readinessPageSQL(true, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2))
+	m.ExpectExec(readinessRollbackSQL).WillReturnResult(sqlmock.NewResult(0, 0))
 	m.ExpectQuery(readinessMigrationSQL).WillReturnRows(readinessRowsFixture(2, []any{100, false}))
 	m.ExpectQuery(readinessIdentitySQL).WillReturnRows(readinessIdentities(10, "NONE"))
 }
@@ -96,7 +121,7 @@ func TestMetadataReadinessObservesNonzeroFactsAndCompletesOnlyAfterRelease(t *te
 	readinessOperationExpectations(m)
 	readinessFinishExpectations(m)
 	r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
-	if r.Complete || r.ErrorCategory != "none" || r.Measurements == nil || r.Measurements.Transactions != 1 || r.Measurements.EnabledEvents != 1 || r.QueryCount != 18 {
+	if r.Complete || r.ErrorCategory != "none" || r.Measurements == nil || r.Measurements.Transactions != 1 || r.Measurements.EnabledEvents != 1 || r.QueryCount != 22 || r.ControlStatementCount != 3 || r.TransactionReleased == nil || !*r.TransactionReleased || r.FormatVersion != 2 || !r.Measurements.PrimaryKeyShapeVerified || !r.Measurements.ConsistentSnapshot || !r.Measurements.AssessmentEOF || !r.Measurements.OutcomeEOF {
 		t.Fatalf("readiness observation failed: %s/%s", r.ErrorCategory, r.FailureStage)
 	}
 	m.ExpectClose()
@@ -217,8 +242,7 @@ func TestMetadataReadinessFinalIdentityDiscardsMeasurements(t *testing.T) {
 		readinessPrefix(m)
 		readinessCatalogExpectations(m)
 		readinessOperationExpectations(m)
-		m.ExpectQuery(readinessAssessmentSQL).WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}))
-		m.ExpectQuery(readinessOutcomeSQL).WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}))
+		readinessEmptyPagesExpectations(m)
 		m.ExpectQuery(readinessMigrationSQL).WillReturnRows(readinessRowsFixture(2, []any{100, false}))
 		m.ExpectQuery(readinessIdentitySQL).WillReturnRows(readinessIdentities(11, roles))
 		r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
@@ -267,16 +291,18 @@ func TestMetadataReadinessReleaseFailuresRevokeMeasurements(t *testing.T) {
 	})
 }
 func TestMetadataReadinessScalarPartitionCannotOverflowOrInventZero(t *testing.T) {
-	for _, value := range [][]any{{5, 1, 4, 1, 1, 1, 1}, {0, 0, 0, 0, 0, 0, 0}, {5, 1, 4, 1, 1, 1, 0}, {"18446744073709551615", 0, "18446744073709551615", "18446744073709551615", 1, 0, 0}, {0, nil, 0, 0, 0, 0, 0}, {0, -1, 0, 0, 0, 0, 0}} {
-		rows := make([]sql.NullString, 7)
-		for i, v := range value {
-			if v != nil {
-				rows[i] = sql.NullString{String: fmt.Sprint(v), Valid: true}
-			}
-		}
-		_, ok := readScalarPartition([][]sql.NullString{rows})
-		want := fmt.Sprint(value) == "[5 1 4 1 1 1 1]" || fmt.Sprint(value) == "[0 0 0 0 0 0 0]"
-		if ok != want {
+	cases := []struct {
+		p    scalarPartition
+		want bool
+	}{
+		{scalarPartition{Total: 5, SQLNull: 1, NonNull: 4, JSONNull: 1, EmptyObject: 1, NonEmptyObject: 1, Other: 1}, true},
+		{scalarPartition{}, true},
+		{scalarPartition{Total: 5, SQLNull: 1, NonNull: 4, JSONNull: 1, EmptyObject: 1, NonEmptyObject: 1}, false},
+		{scalarPartition{Total: ^uint64(0), NonNull: ^uint64(0), JSONNull: ^uint64(0), EmptyObject: 1}, false},
+		{scalarPartition{SQLNull: 1}, false},
+	}
+	for _, tc := range cases {
+		if scalarPartitionConserved(tc.p) != tc.want {
 			t.Fatal("scalar_partition_not_conserved")
 		}
 	}
@@ -326,16 +352,22 @@ func TestMetadataReadinessQueryErrorsRemainPrivateAndIncomplete(t *testing.T) {
 				readinessPrefix(m)
 				readinessCatalogExpectations(m)
 				readinessOperationExpectations(m)
-				m.ExpectQuery(readinessAssessmentSQL).WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}))
-				q := m.ExpectQuery(readinessOutcomeSQL)
+				readinessSnapshotExpectations(m, nil, nil)
+				m.ExpectQuery(readinessPageSQL(false, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2))
+				q := m.ExpectQuery(readinessPageSQL(true, false)).WithArgs("0")
 				private := fmt.Errorf("%s: %w", fixtureSecret, tc.err)
 				if phase == "query" {
 					q.WillReturnError(private)
 				} else {
-					q.WillReturnRows(readinessRowsFixture(7, []any{0, 0, 0, 0, 0, 0, 0}).RowError(0, private))
+					q.WillReturnRows(readinessRowsFixture(2, []any{0, 0}).RowError(0, private))
 				}
-				if tc.name == "bad_connection" {
+				if tc.name == "bad_connection" && phase == "query" {
 					m.ExpectClose()
+				} else {
+					m.ExpectExec(readinessRollbackSQL).WillReturnResult(sqlmock.NewResult(0, 0))
+					if tc.name == "bad_connection" {
+						m.ExpectClose()
+					}
 				}
 				r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
 				if tc.name != "bad_connection" {
@@ -347,7 +379,7 @@ func TestMetadataReadinessQueryErrorsRemainPrivateAndIncomplete(t *testing.T) {
 				if badQuery {
 					expectedCategory, expectedStage = "connection_release_failed", "connection_release"
 				}
-				if r.Complete || r.Measurements != nil || r.ErrorCategory != expectedCategory || r.FailureStage != expectedStage || r.QueryCount != 16 {
+				if r.Complete || r.Measurements != nil || r.ErrorCategory != expectedCategory || r.FailureStage != expectedStage || r.QueryCount != 19 {
 					t.Fatalf("query error classification failed: %s/%s/%d", r.ErrorCategory, r.FailureStage, r.QueryCount)
 				}
 				var server *mysql.MySQLError
@@ -386,4 +418,241 @@ func TestMetadataReadinessServerNumberSurvivesReleaseFailure(t *testing.T) {
 	if readinessQueryError(driver.ErrBadConn).Error() != "query_bad_connection" {
 		t.Fatal("bad_connection_classification_failed")
 	}
+}
+
+func TestMetadataReadinessPrimaryShapeRequiresUnsignedSingleInnoDBKey(t *testing.T) {
+	for _, field := range []string{"valid", "signed", "engine", "nullable", "composite", "expression", "invisible"} {
+		t.Run(field, func(t *testing.T) {
+			columns := [][]sql.NullString{}
+			indexes := [][]sql.NullString{}
+			for _, name := range []string{"assessment", "evaluation_outcome"} {
+				c := []sql.NullString{}
+				for _, v := range []string{name, "id", "bigint", "bigint unsigned", "NO", "InnoDB"} {
+					c = append(c, sql.NullString{String: v, Valid: true})
+				}
+				columns = append(columns, c)
+				k := []sql.NullString{}
+				for _, v := range []string{name, "1", "id", "0", "BTREE", "", "", "YES"} {
+					k = append(k, sql.NullString{String: v, Valid: v != ""})
+				}
+				indexes = append(indexes, k)
+			}
+			switch field {
+			case "signed":
+				columns[0][3].String = "bigint"
+			case "engine":
+				columns[1][5].String = "MyISAM"
+			case "nullable":
+				columns[0][4].String = "YES"
+			case "composite":
+				indexes = append(indexes, indexes[1])
+			case "expression":
+				indexes[0][6] = sql.NullString{String: fixtureSecret, Valid: true}
+			case "invisible":
+				indexes[1][7].String = "NO"
+			}
+			if readinessPrimaryShape(columns, indexes) != (field == "valid") {
+				t.Fatal("unsafe_primary_shape_accepted")
+			}
+		})
+	}
+}
+func TestMetadataReadinessPagesUseAllUnsignedKeysAndRequireTerminatingEOF(t *testing.T) {
+	for _, name := range []string{"zero", "uintmax", "missing_upper", "bad_class", "duplicate", "short_then_more", "eof_error"} {
+		t.Run(name, func(t *testing.T) {
+			db, m := readinessMock(t)
+			c, e := db.Conn(context.Background())
+			if e != nil {
+				t.Fatal("fixture_connection_failed")
+			}
+			high := "0"
+			rows := readinessRowsFixture(2, []any{"0", "0"})
+			if name == "uintmax" {
+				high = "18446744073709551615"
+				rows = readinessRowsFixture(2, []any{high, "0"})
+			}
+			switch name {
+			case "missing_upper":
+				high = "1"
+			case "bad_class":
+				rows = readinessRowsFixture(2, []any{0, 5})
+			case "duplicate":
+				rows = readinessRowsFixture(2, []any{0, 0}, []any{0, 0})
+			}
+			m.ExpectQuery(readinessPageSQL(false, false)).WithArgs(high).WillReturnRows(rows)
+			if name == "zero" || name == "uintmax" || name == "missing_upper" || name == "short_then_more" || name == "eof_error" {
+				q := m.ExpectQuery(readinessPageSQL(false, true)).WithArgs(high, high)
+				if name == "missing_upper" { // Last observed key was zero, below the fixed upper bound.
+					// Amend this query's exact argument to the actual last key.
+					q.WithArgs("0", high)
+				}
+				switch name {
+				case "short_then_more":
+					q.WillReturnRows(readinessRowsFixture(2, []any{0, 0}))
+				case "eof_error":
+					q.WillReturnError(io.EOF)
+				default:
+					q.WillReturnRows(readinessRowsFixture(2))
+				}
+			}
+			r := baseReadinessReceipt(fixtureBinding())
+			p, pages, eof, err := readinessPartitionPages(context.Background(), c, &r, false, sql.NullString{String: high, Valid: true})
+			if name == "zero" || name == "uintmax" {
+				if err != nil || !eof || p.Total != 1 || p.SQLNull != 1 || pages != 2 {
+					t.Fatal("unsigned_key_coverage_failed")
+				}
+			} else if err == nil || eof || p != (scalarPartition{}) {
+				t.Fatal("partial_pages_retained")
+			}
+			if c.Close() != nil {
+				t.Fatal("fixture_release_failed")
+			}
+			m.ExpectClose()
+			if db.Close() != nil {
+				t.Fatal("fixture_pool_release_failed")
+			}
+		})
+	}
+}
+func TestMetadataReadinessPageLimitCannotBecomeComplete(t *testing.T) {
+	db, m := readinessMock(t)
+	c, e := db.Conn(context.Background())
+	if e != nil {
+		t.Fatal("fixture_connection_failed")
+	}
+	const high = readinessNonEmptyPageLimit * readinessPageSize
+	for page := 0; page <= readinessNonEmptyPageLimit; page++ {
+		q := m.ExpectQuery(readinessPageSQL(false, page != 0))
+		if page == 0 {
+			q.WithArgs(strconv.Itoa(high))
+		} else {
+			q.WithArgs(strconv.Itoa(page*readinessPageSize-1), strconv.Itoa(high))
+		}
+		rows := readinessRowsFixture(2)
+		limit := readinessPageSize
+		if page == readinessNonEmptyPageLimit {
+			limit = 1
+		}
+		for row := 0; row < limit; row++ {
+			rows.AddRow(page*readinessPageSize+row, 0)
+		}
+		q.WillReturnRows(rows)
+	}
+	r := baseReadinessReceipt(fixtureBinding())
+	p, pages, eof, err := readinessPartitionPages(context.Background(), c, &r, false, sql.NullString{String: strconv.Itoa(high), Valid: true})
+	if err == nil || err.Error() != "pagination_limit_exceeded" || eof || p != (scalarPartition{}) || pages != 513 || r.QueryCount != 513 {
+		t.Fatal("pagination_limit_became_complete")
+	}
+	if c.Close() != nil {
+		t.Fatal("fixture_release_failed")
+	}
+	m.ExpectClose()
+	if db.Close() != nil {
+		t.Fatal("fixture_pool_release_failed")
+	}
+}
+func TestMetadataReadinessSnapshotFailureNeverRunsLiveChecks(t *testing.T) {
+	for _, phase := range []string{"begin", "upper", "eof", "rollback", "eof_and_rollback"} {
+		t.Run(phase, func(t *testing.T) {
+			db, m := readinessMock(t)
+			readinessPrefix(m)
+			readinessCatalogExpectations(m)
+			readinessOperationExpectations(m)
+			m.ExpectExec(readinessIsolationSQL).WillReturnResult(sqlmock.NewResult(0, 0))
+			if phase == "begin" {
+				m.ExpectExec(readinessBeginSQL).WillReturnError(context.Canceled)
+			} else {
+				m.ExpectExec(readinessBeginSQL).WillReturnResult(sqlmock.NewResult(0, 0))
+				if phase == "upper" {
+					m.ExpectQuery(readinessUpperSQL).WillReturnError(context.DeadlineExceeded)
+				} else {
+					m.ExpectQuery(readinessUpperSQL).WillReturnRows(readinessRowsFixture(2, []any{0, nil}))
+					readinessPrimaryExpectations(m)
+					m.ExpectQuery(readinessPageSQL(false, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2, []any{0, 0}))
+					if phase == "eof" || phase == "eof_and_rollback" {
+						var failure error = context.DeadlineExceeded
+						if phase == "eof_and_rollback" {
+							failure = &mysql.MySQLError{Number: 1064, Message: fixtureSecret}
+						}
+						m.ExpectQuery(readinessPageSQL(false, true)).WithArgs("0", "0").WillReturnError(failure)
+					} else {
+						m.ExpectQuery(readinessPageSQL(false, true)).WithArgs("0", "0").WillReturnRows(readinessRowsFixture(2))
+						m.ExpectQuery(readinessPageSQL(true, false)).WithArgs("0").WillReturnRows(readinessRowsFixture(2))
+					}
+				}
+			}
+			q := m.ExpectExec(readinessRollbackSQL)
+			if phase == "eof_and_rollback" {
+				q.WillReturnError(context.DeadlineExceeded)
+			} else if phase == "rollback" {
+				q.WillReturnError(&mysql.MySQLError{Number: 1064, Message: fixtureSecret})
+			} else {
+				q.WillReturnResult(sqlmock.NewResult(0, 0))
+			}
+			r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
+			m.ExpectClose()
+			r = releaseReadinessDatabase(db, r)
+			if r.Complete || r.Measurements != nil || r.ControlStatementCount != 3 || r.TransactionReleased == nil || *r.TransactionReleased != (phase != "rollback" && phase != "eof_and_rollback") {
+				t.Fatal("snapshot_failure_became_complete")
+			}
+			if (phase == "rollback" || phase == "eof_and_rollback") && (r.ErrorCategory != "transaction_release_failed" || r.QueryMySQLNumber == nil || *r.QueryMySQLNumber != 1064) {
+				t.Fatal("rollback_failure_not_preserved")
+			}
+			assertReadinessPrivate(t, r)
+		})
+	}
+}
+func TestMetadataReadinessPostRollbackVersionAndWholeDeadlineRemainLive(t *testing.T) {
+	t.Run("version_changed_after_snapshot", func(t *testing.T) {
+		db, m := readinessMock(t)
+		readinessPrefix(m)
+		readinessCatalogExpectations(m)
+		readinessOperationExpectations(m)
+		readinessEmptyPagesExpectations(m)
+		m.ExpectQuery(readinessMigrationSQL).WillReturnRows(readinessRowsFixture(2, []any{101, true}))
+		r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
+		m.ExpectClose()
+		r = releaseReadinessDatabase(db, r)
+		if r.Complete || r.Measurements != nil || r.ErrorCategory != "migration_pair_rejected" || r.FailureStage != "migration_after" || r.TransactionReleased == nil || !*r.TransactionReleased {
+			t.Fatal("snapshot_hid_live_version_change")
+		}
+		assertReadinessPrivate(t, r)
+	})
+	t.Run("release_beyond_original_deadline", func(t *testing.T) {
+		db, m := readinessMock(t)
+		readinessPrefix(m)
+		readinessCatalogExpectations(m)
+		readinessOperationExpectations(m)
+		readinessFinishExpectations(m)
+		r := probeReadiness(context.Background(), db, fixtureConnection, fixtureBinding())
+		r.deadline = time.Now().Add(-time.Nanosecond)
+		m.ExpectClose()
+		r = releaseReadinessDatabase(db, r)
+		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_deadline_exceeded" {
+			t.Fatal("release_reset_whole_deadline")
+		}
+		assertReadinessPrivate(t, r)
+	})
+	t.Run("page_uses_parent_deadline", func(t *testing.T) {
+		db, m := readinessMock(t)
+		c, e := db.Conn(context.Background())
+		if e != nil {
+			t.Fatal("fixture_connection_failed")
+		}
+		m.ExpectQuery(readinessPageSQL(false, false)).WithArgs("0").WillDelayFor(50 * time.Millisecond).WillReturnRows(readinessRowsFixture(2))
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
+		r := baseReadinessReceipt(fixtureBinding())
+		p, _, eof, err := readinessPartitionPages(ctx, c, &r, false, sql.NullString{})
+		if err == nil || eof || p != (scalarPartition{}) || ctx.Err() != context.DeadlineExceeded {
+			t.Fatal("page_reset_whole_deadline")
+		}
+		if c.Close() != nil {
+			t.Fatal("fixture_release_failed")
+		}
+		m.ExpectClose()
+		if db.Close() != nil {
+			t.Fatal("fixture_pool_release_failed")
+		}
+	})
 }

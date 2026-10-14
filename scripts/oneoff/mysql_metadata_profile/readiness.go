@@ -12,6 +12,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/go-sql-driver/mysql"
@@ -33,8 +34,28 @@ const readinessThreadsSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ THREAD_ID, N
 const readinessTransactionsSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ TRX_MYSQL_THREAD_ID, TRX_STATE, TRX_STARTED, TRX_ROWS_MODIFIED, TRX_ROWS_LOCKED, TRX_IS_READ_ONLY FROM information_schema.INNODB_TRX WHERE TRX_MYSQL_THREAD_ID <> CONNECTION_ID() ORDER BY TRX_MYSQL_THREAD_ID LIMIT 1001"
 const readinessLocksSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ OBJECT_TYPE, OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_DURATION, LOCK_STATUS, OWNER_THREAD_ID FROM performance_schema.metadata_locks WHERE OBJECT_SCHEMA = DATABASE() ORDER BY OWNER_THREAD_ID, OBJECT_TYPE, OBJECT_NAME LIMIT 1001"
 const readinessInstrumentSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ NAME, ENABLED FROM performance_schema.setup_instruments WHERE NAME = 'wait/lock/metadata/sql/mdl' LIMIT 1001"
-const readinessAssessmentSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ COUNT(*), COALESCE(SUM(historical_lifecycle_evidence IS NULL),0), COALESCE(SUM(historical_lifecycle_evidence IS NOT NULL),0), COALESCE(SUM(JSON_TYPE(historical_lifecycle_evidence) = 'NULL'),0), COALESCE(SUM(JSON_TYPE(historical_lifecycle_evidence) = 'OBJECT' AND JSON_LENGTH(historical_lifecycle_evidence) = 0),0), COALESCE(SUM(JSON_TYPE(historical_lifecycle_evidence) = 'OBJECT' AND JSON_LENGTH(historical_lifecycle_evidence) > 0),0), COALESCE(SUM(historical_lifecycle_evidence IS NOT NULL AND JSON_TYPE(historical_lifecycle_evidence) NOT IN ('NULL','OBJECT')),0) FROM assessment"
-const readinessOutcomeSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ COUNT(*), COALESCE(SUM(historical_committed_evidence IS NULL),0), COALESCE(SUM(historical_committed_evidence IS NOT NULL),0), COALESCE(SUM(JSON_TYPE(historical_committed_evidence) = 'NULL'),0), COALESCE(SUM(JSON_TYPE(historical_committed_evidence) = 'OBJECT' AND JSON_LENGTH(historical_committed_evidence) = 0),0), COALESCE(SUM(JSON_TYPE(historical_committed_evidence) = 'OBJECT' AND JSON_LENGTH(historical_committed_evidence) > 0),0), COALESCE(SUM(historical_committed_evidence IS NOT NULL AND JSON_TYPE(historical_committed_evidence) NOT IN ('NULL','OBJECT')),0) FROM evaluation_outcome"
+const readinessPrimaryColumnsSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ c.TABLE_NAME,c.COLUMN_NAME,c.DATA_TYPE,c.COLUMN_TYPE,c.IS_NULLABLE,t.ENGINE FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME IN ('assessment','evaluation_outcome') AND c.COLUMN_NAME='id' ORDER BY c.TABLE_NAME LIMIT 1001"
+const readinessPrimaryIndexesSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ TABLE_NAME,SEQ_IN_INDEX,COLUMN_NAME,NON_UNIQUE,INDEX_TYPE,SUB_PART,EXPRESSION,IS_VISIBLE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('assessment','evaluation_outcome') AND INDEX_NAME='PRIMARY' ORDER BY TABLE_NAME,SEQ_IN_INDEX LIMIT 1001"
+const readinessUpperSQL = "SELECT /*+ MAX_EXECUTION_TIME(5000) */ (SELECT MAX(id) FROM assessment FORCE INDEX(PRIMARY)),(SELECT MAX(id) FROM evaluation_outcome FORCE INDEX(PRIMARY))"
+const readinessIsolationSQL = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+const readinessBeginSQL = "START TRANSACTION READ ONLY"
+const readinessRollbackSQL = "ROLLBACK"
+const readinessPageSize = 1000
+const readinessNonEmptyPageLimit = 512
+
+// Only two literal tables and their fixed classification are supported. Keys
+// stay in RAM and decimal strings are cast to unsigned, including uint64 max.
+func readinessPageSQL(outcome, after bool) string {
+	table, column := "assessment", "historical_lifecycle_evidence"
+	if outcome {
+		table, column = "evaluation_outcome", "historical_committed_evidence"
+	}
+	lower := "id >= 0"
+	if after {
+		lower = "id > CAST(? AS UNSIGNED)"
+	}
+	return "SELECT /*+ MAX_EXECUTION_TIME(5000) */ id,CASE WHEN " + column + " IS NULL THEN 0 WHEN JSON_TYPE(" + column + ")='NULL' THEN 1 WHEN JSON_TYPE(" + column + ")='OBJECT' AND JSON_LENGTH(" + column + ")=0 THEN 2 WHEN JSON_TYPE(" + column + ")='OBJECT' THEN 3 ELSE 4 END FROM " + table + " FORCE INDEX(PRIMARY) WHERE " + lower + " AND id <= CAST(? AS UNSIGNED) ORDER BY id LIMIT 1000"
+}
 
 type readinessIdentity struct {
 	identity
@@ -55,6 +76,12 @@ type scalarPartition struct {
 	Other          uint64 `json:"other"`
 }
 type readinessMeasurements struct {
+	PrimaryKeyShapeVerified  bool                      `json:"primary_key_shape_verified"`
+	ConsistentSnapshot       bool                      `json:"consistent_snapshot"`
+	AssessmentPages          uint64                    `json:"assessment_pages"`
+	OutcomePages             uint64                    `json:"outcome_pages"`
+	AssessmentEOF            bool                      `json:"assessment_eof"`
+	OutcomeEOF               bool                      `json:"outcome_eof"`
 	GlobalGrantRowsVerified  bool                      `json:"global_metadata_grant_rows_verified"`
 	MigrationVersion         uint64                    `json:"migration_version"`
 	MigrationDirty           bool                      `json:"migration_dirty"`
@@ -72,28 +99,31 @@ type readinessMeasurements struct {
 	Outcome                  scalarPartition           `json:"outcome_distribution"`
 }
 type readinessReceipt struct {
-	FormatVersion      int                    `json:"format_version"`
-	SourceSHA          string                 `json:"source_sha,omitempty"`
-	RunID              string                 `json:"run_id,omitempty"`
-	ExpectedTargetHash string                 `json:"expected_target_hash,omitempty"`
-	SourceTargetHash   string                 `json:"source_target_hash,omitempty"`
-	DiagnosticOnly     bool                   `json:"diagnostic_only"`
-	ReadinessOnly      bool                   `json:"readiness_only"`
-	FreezeVerified     bool                   `json:"freeze_verified"`
-	Complete           bool                   `json:"complete"`
-	ErrorCategory      string                 `json:"error_category"`
-	FailureStage       string                 `json:"failure_stage"`
-	QueryMySQLNumber   *uint16                `json:"query_mysql_error_number,omitempty"`
-	QueryCount         uint64                 `json:"query_count"`
-	ConnectionReleased *bool                  `json:"connection_released"`
-	DatabaseReleased   *bool                  `json:"database_released"`
-	PoolClosedVerified *bool                  `json:"pool_closed_verified"`
-	Measurements       *readinessMeasurements `json:"measurements,omitempty"`
+	deadline              time.Time
+	ControlStatementCount uint64                 `json:"control_statement_count"`
+	TransactionReleased   *bool                  `json:"transaction_released"`
+	FormatVersion         int                    `json:"format_version"`
+	SourceSHA             string                 `json:"source_sha,omitempty"`
+	RunID                 string                 `json:"run_id,omitempty"`
+	ExpectedTargetHash    string                 `json:"expected_target_hash,omitempty"`
+	SourceTargetHash      string                 `json:"source_target_hash,omitempty"`
+	DiagnosticOnly        bool                   `json:"diagnostic_only"`
+	ReadinessOnly         bool                   `json:"readiness_only"`
+	FreezeVerified        bool                   `json:"freeze_verified"`
+	Complete              bool                   `json:"complete"`
+	ErrorCategory         string                 `json:"error_category"`
+	FailureStage          string                 `json:"failure_stage"`
+	QueryMySQLNumber      *uint16                `json:"query_mysql_error_number,omitempty"`
+	QueryCount            uint64                 `json:"query_count"`
+	ConnectionReleased    *bool                  `json:"connection_released"`
+	DatabaseReleased      *bool                  `json:"database_released"`
+	PoolClosedVerified    *bool                  `json:"pool_closed_verified"`
+	Measurements          *readinessMeasurements `json:"measurements,omitempty"`
 }
 
 func baseReadinessReceipt(b binding) readinessReceipt {
 	old := baseReceipt(b)
-	return readinessReceipt{FormatVersion: 1, SourceSHA: old.SourceSHA, RunID: old.RunID, ExpectedTargetHash: old.ExpectedTargetHash, DiagnosticOnly: true, ReadinessOnly: true, ErrorCategory: "input_invalid", FailureStage: "input"}
+	return readinessReceipt{FormatVersion: 2, SourceSHA: old.SourceSHA, RunID: old.RunID, ExpectedTargetHash: old.ExpectedTargetHash, DiagnosticOnly: true, ReadinessOnly: true, ErrorCategory: "input_invalid", FailureStage: "input"}
 }
 func invalidateReadiness(r readinessReceipt, category, stage string) readinessReceipt {
 	r.Complete, r.Measurements, r.ErrorCategory, r.FailureStage = false, nil, category, stage
@@ -161,10 +191,10 @@ func invalidateReadinessQuery(r readinessReceipt, err error, stage string) readi
 // 1001st row is a sentinel, never a silently omitted member of a directory.
 // Operational rows remain RAM-only and are reduced to counts, not hashes of
 // connection, transaction, role or account identifiers.
-func readinessRows(ctx context.Context, c *sql.Conn, query string, width int) (result [][]sql.NullString, err error) {
+func readinessRows(ctx context.Context, c *sql.Conn, query string, width int, args ...any) (result [][]sql.NullString, err error) {
 	ctx, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()
-	rows, err := c.QueryContext(ctx, query)
+	rows, err := c.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, readinessQueryError(err)
 	}
@@ -258,27 +288,111 @@ func readinessTargetShape(columns, checks [][]sql.NullString) bool {
 	}
 	return true
 }
-func readScalarPartition(rows [][]sql.NullString) (scalarPartition, bool) {
-	var p scalarPartition
-	if len(rows) != 1 {
-		return p, false
+func scalarPartitionConserved(p scalarPartition) bool {
+	return p.SQLNull <= p.Total && p.NonNull == p.Total-p.SQLNull && p.JSONNull <= p.NonNull && p.EmptyObject <= p.NonNull-p.JSONNull && p.NonEmptyObject <= p.NonNull-p.JSONNull-p.EmptyObject && p.Other == p.NonNull-p.JSONNull-p.EmptyObject-p.NonEmptyObject
+}
+func readinessPrimaryShape(columns, indexes [][]sql.NullString) bool {
+	if len(columns) != 2 || len(indexes) != 2 {
+		return false
 	}
-	destinations := []*uint64{&p.Total, &p.SQLNull, &p.NonNull, &p.JSONNull, &p.EmptyObject, &p.NonEmptyObject, &p.Other}
-	for i, destination := range destinations {
-		if !rows[0][i].Valid {
-			return scalarPartition{}, false
+	for i, table := range []string{"assessment", "evaluation_outcome"} {
+		c, k := columns[i], indexes[i]
+		if len(c) != 6 || len(k) != 8 {
+			return false
 		}
-		value, err := strconv.ParseUint(rows[0][i].String, 10, 64)
-		if err != nil || value > p.Total && i > 0 {
-			return scalarPartition{}, false
+		for _, v := range c {
+			if !v.Valid {
+				return false
+			}
 		}
-		*destination = value
+		if c[0].String != table || c[1].String != "id" || c[2].String != "bigint" || (c[3].String != "bigint unsigned" && c[3].String != "bigint(20) unsigned") || c[4].String != "NO" || c[5].String != "InnoDB" {
+			return false
+		}
+		for _, j := range []int{0, 1, 2, 3, 4, 7} {
+			if !k[j].Valid {
+				return false
+			}
+		}
+		if k[0].String != table || k[1].String != "1" || k[2].String != "id" || k[3].String != "0" || k[4].String != "BTREE" || k[5].Valid || k[6].Valid || k[7].String != "YES" {
+			return false
+		}
 	}
-	// Subtraction avoids uint64 overflow even for malformed driver responses.
-	if p.SQLNull > p.Total || p.NonNull != p.Total-p.SQLNull || p.JSONNull > p.NonNull || p.EmptyObject > p.NonNull-p.JSONNull || p.NonEmptyObject > p.NonNull-p.JSONNull-p.EmptyObject || p.Other != p.NonNull-p.JSONNull-p.EmptyObject-p.NonEmptyObject {
-		return scalarPartition{}, false
+	return true
+}
+func readinessControl(ctx context.Context, c *sql.Conn, r *readinessReceipt, query string) error {
+	r.ControlStatementCount++
+	ctx, cancel := context.WithTimeout(ctx, queryLimit)
+	defer cancel()
+	_, err := c.ExecContext(ctx, query)
+	if err != nil {
+		return readinessQueryError(err)
 	}
-	return p, true
+	return nil
+}
+func readinessPartitionPages(ctx context.Context, c *sql.Conn, r *readinessReceipt, outcome bool, upper sql.NullString) (p scalarPartition, pages uint64, eof bool, err error) {
+	var high, last uint64
+	if upper.Valid {
+		high, err = strconv.ParseUint(upper.String, 10, 64)
+		if err != nil || strconv.FormatUint(high, 10) != upper.String {
+			return p, 0, false, errors.New("metadata_invalid")
+		}
+	}
+	hasLast, short := false, false
+	for i := 0; i <= readinessNonEmptyPageLimit; i++ {
+		args := []any{strconv.FormatUint(high, 10)}
+		if hasLast {
+			args = []any{strconv.FormatUint(last, 10), strconv.FormatUint(high, 10)}
+		}
+		r.QueryCount++
+		pages++
+		rows, e := readinessRows(ctx, c, readinessPageSQL(outcome, hasLast), 2, args...)
+		if e != nil {
+			return scalarPartition{}, pages, false, e
+		}
+		if len(rows) == 0 {
+			if !scalarPartitionConserved(p) || (upper.Valid && (!hasLast || last != high)) {
+				return scalarPartition{}, pages, false, errors.New("metadata_invalid")
+			}
+			return p, pages, true, nil
+		}
+		if i == readinessNonEmptyPageLimit {
+			return scalarPartition{}, pages, false, errors.New("pagination_limit_exceeded")
+		}
+		if !upper.Valid || short {
+			return scalarPartition{}, pages, false, errors.New("metadata_invalid")
+		}
+		for _, row := range rows {
+			if !row[0].Valid || !row[1].Valid {
+				return scalarPartition{}, pages, false, errors.New("metadata_invalid")
+			}
+			key, e := strconv.ParseUint(row[0].String, 10, 64)
+			if e != nil || strconv.FormatUint(key, 10) != row[0].String || key > high || (hasLast && key <= last) {
+				return scalarPartition{}, pages, false, errors.New("metadata_invalid")
+			}
+			p.Total++
+			switch row[1].String {
+			case "0":
+				p.SQLNull++
+			case "1":
+				p.NonNull++
+				p.JSONNull++
+			case "2":
+				p.NonNull++
+				p.EmptyObject++
+			case "3":
+				p.NonNull++
+				p.NonEmptyObject++
+			case "4":
+				p.NonNull++
+				p.Other++
+			default:
+				return scalarPartition{}, pages, false, errors.New("metadata_invalid")
+			}
+			last, hasLast = key, true
+		}
+		short = len(rows) < readinessPageSize
+	}
+	return scalarPartition{}, pages, false, errors.New("pagination_limit_exceeded")
 }
 func probeReadiness(ctx context.Context, db *sql.DB, cfg connection, b binding) (r readinessReceipt) {
 	r = baseReadinessReceipt(b)
@@ -287,6 +401,7 @@ func probeReadiness(ctx context.Context, db *sql.DB, cfg connection, b binding) 
 	}
 	ctx, cancel := context.WithTimeout(ctx, totalLimit)
 	defer cancel()
+	r.deadline, _ = ctx.Deadline()
 	c, err := db.Conn(ctx)
 	if err != nil {
 		return invalidateReadiness(r, "connection_failed", "connect")
@@ -431,22 +546,63 @@ func probeReadiness(ctx context.Context, db *sql.DB, cfg connection, b binding) 
 		return invalidateReadiness(r, "storage_observation_unavailable", "instrument")
 	}
 	m.MDLInstrumentEnabled = true
-	distribution, ok := read(readinessAssessmentSQL, "assessment_distribution", 7)
+	if err = readinessControl(ctx, c, &r, readinessIsolationSQL); err != nil {
+		return invalidateReadinessQuery(r, err, "snapshot_begin")
+	}
+	active := true
+	notReleased := false
+	r.TransactionReleased = &notReleased
+	rollback := func() bool {
+		if !active {
+			return true
+		}
+		active = false
+		e := readinessControl(ctx, c, &r, readinessRollbackSQL)
+		released := e == nil
+		r.TransactionReleased = &released
+		if e != nil {
+			if r.QueryMySQLNumber == nil {
+				r = invalidateReadinessQuery(r, e, "snapshot_release")
+			}
+			r = invalidateReadiness(r, "transaction_release_failed", "snapshot_release")
+		}
+		return released
+	}
+	defer func() { rollback() }()
+	if err = readinessControl(ctx, c, &r, readinessBeginSQL); err != nil {
+		return invalidateReadinessQuery(r, err, "snapshot_begin")
+	}
+	upper, ok := read(readinessUpperSQL, "snapshot_upper", 2)
 	if !ok {
 		return r
 	}
-	m.Assessment, ok = readScalarPartition(distribution)
-	if !ok {
-		return invalidateReadiness(r, "metadata_invalid", "assessment_distribution")
+	if len(upper) != 1 {
+		return invalidateReadiness(r, "metadata_invalid", "snapshot_upper")
 	}
-	distribution, ok = read(readinessOutcomeSQL, "outcome_distribution", 7)
+	primaryColumns, ok := read(readinessPrimaryColumnsSQL, "primary_columns", 6)
 	if !ok {
 		return r
 	}
-	m.Outcome, ok = readScalarPartition(distribution)
+	primaryIndexes, ok := read(readinessPrimaryIndexesSQL, "primary_indexes", 8)
 	if !ok {
-		return invalidateReadiness(r, "metadata_invalid", "outcome_distribution")
+		return r
 	}
+	if !readinessPrimaryShape(primaryColumns, primaryIndexes) {
+		return invalidateReadiness(r, "metadata_invalid", "primary_indexes")
+	}
+	m.PrimaryKeyShapeVerified = true
+	m.Assessment, m.AssessmentPages, m.AssessmentEOF, err = readinessPartitionPages(ctx, c, &r, false, upper[0][0])
+	if err != nil {
+		return invalidateReadinessQuery(r, err, "assessment_distribution")
+	}
+	m.Outcome, m.OutcomePages, m.OutcomeEOF, err = readinessPartitionPages(ctx, c, &r, true, upper[0][1])
+	if err != nil {
+		return invalidateReadinessQuery(r, err, "outcome_distribution")
+	}
+	if !rollback() {
+		return r
+	}
+	m.ConsistentSnapshot = true
 	migrations, ok = read(readinessMigrationSQL, "migration_after", 2)
 	if !ok {
 		return r
@@ -483,7 +639,10 @@ func releaseReadinessDatabase(db *sql.DB, r readinessReceipt) readinessReceipt {
 	if !success || !closed {
 		return invalidateReadiness(r, "database_release_failed", "database_release")
 	}
-	if r.ErrorCategory == "none" && r.ConnectionReleased != nil && *r.ConnectionReleased && r.Measurements != nil {
+	if r.ErrorCategory == "none" && !r.deadline.IsZero() && !time.Now().Before(r.deadline) {
+		return invalidateReadiness(r, "query_deadline_exceeded", "database_release")
+	}
+	if r.ErrorCategory == "none" && r.ConnectionReleased != nil && *r.ConnectionReleased && r.TransactionReleased != nil && *r.TransactionReleased && r.Measurements != nil {
 		r.Complete = true
 	}
 	return r

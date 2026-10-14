@@ -65,8 +65,8 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 	for _, statement := range []string{
 		"CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN NOT NULL) ENGINE=InnoDB",
 		"INSERT INTO schema_migrations VALUES(100,false)",
-		"CREATE TABLE assessment(id BIGINT PRIMARY KEY,historical_lifecycle_evidence JSON NULL,CONSTRAINT chk_assessment_historical_lifecycle CHECK(historical_lifecycle_evidence IS NULL OR JSON_TYPE(historical_lifecycle_evidence)='OBJECT')) ENGINE=InnoDB",
-		"CREATE TABLE evaluation_outcome(id BIGINT PRIMARY KEY,historical_committed_evidence JSON NULL,CONSTRAINT chk_outcome_historical_committed CHECK(historical_committed_evidence IS NULL OR JSON_TYPE(historical_committed_evidence)='OBJECT')) ENGINE=InnoDB",
+		"CREATE TABLE assessment(id BIGINT UNSIGNED PRIMARY KEY,historical_lifecycle_evidence JSON NULL,CONSTRAINT chk_assessment_historical_lifecycle CHECK(historical_lifecycle_evidence IS NULL OR JSON_TYPE(historical_lifecycle_evidence)='OBJECT')) ENGINE=InnoDB",
+		"CREATE TABLE evaluation_outcome(id BIGINT UNSIGNED PRIMARY KEY,historical_committed_evidence JSON NULL,CONSTRAINT chk_outcome_historical_committed CHECK(historical_committed_evidence IS NULL OR JSON_TYPE(historical_committed_evidence)='OBJECT')) ENGINE=InnoDB",
 		"INSERT INTO assessment VALUES(1,NULL),(2,JSON_OBJECT()),(3,JSON_OBJECT('fixture','native-readiness-private-body'))",
 		"INSERT INTO evaluation_outcome VALUES(1,NULL)",
 		"CREATE VIEW readiness_owned_view AS SELECT id FROM assessment",
@@ -245,15 +245,135 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 			t.Fatal("owned_writer_mutation_failed")
 		}
 		r := reader("readiness_global")
-		if !r.Complete || r.QueryCount != 18 || r.Measurements == nil {
+		if !r.Complete || r.QueryCount != 23 || r.ControlStatementCount != 3 || r.TransactionReleased == nil || !*r.TransactionReleased || r.FormatVersion != 2 || r.Measurements == nil {
 			t.Fatalf("native readiness incomplete: %s/%s", r.ErrorCategory, r.FailureStage)
 		}
 		m := r.Measurements
+		if !m.PrimaryKeyShapeVerified || !m.ConsistentSnapshot || !m.AssessmentEOF || !m.OutcomeEOF || m.AssessmentPages != 2 || m.OutcomePages != 2 {
+			t.Fatal("native_pagination_not_complete")
+		}
 		if m.Transactions < 1 || m.ModifyingTransactions < 1 || m.MetadataLocks < 1 || m.EnabledEvents < 1 || m.Catalogs["events"].Count < 1 || m.Catalogs["tables"].Count != 4 || m.Catalogs["views"].Count != 1 || m.Catalogs["routines"].Count != 1 || m.Catalogs["triggers"].Count != 1 {
 			t.Fatal("native_readiness_hidden_metadata")
 		}
 		if m.Assessment != (scalarPartition{Total: 3, SQLNull: 1, NonNull: 2, EmptyObject: 1, NonEmptyObject: 1}) || m.Outcome != (scalarPartition{Total: 1, SQLNull: 1}) || r.FreezeVerified {
 			t.Fatal("native_scalar_partition_or_scope_failed")
+		}
+	})
+	t.Run("same_rr_snapshot_survives_concurrent_insert_update_delete", func(t *testing.T) {
+		// Only this owned fixture is changed. Both MAX values are established by
+		// one consistent read; later page reads must not see committed new facts.
+		for _, statement := range []string{
+			"INSERT INTO assessment VALUES(0,NULL),(18446744073709551615,JSON_OBJECT())",
+			"INSERT INTO evaluation_outcome VALUES(0,JSON_OBJECT()),(18446744073709551615,NULL)",
+		} {
+			if _, err := admin.ExecContext(ctx, statement); err != nil {
+				t.Fatal("owned_snapshot_setup_failed")
+			}
+		}
+		defer func() {
+			for _, statement := range []string{
+				"DELETE FROM assessment WHERE id IN (0,4,18446744073709551615) OR id BETWEEN 1000 AND 2000",
+				"INSERT INTO assessment VALUES(1,NULL)",
+				"UPDATE assessment SET historical_lifecycle_evidence=JSON_OBJECT() WHERE id=2",
+				"DELETE FROM evaluation_outcome WHERE id IN (0,2,18446744073709551615)",
+				"INSERT INTO evaluation_outcome VALUES(1,NULL)",
+			} {
+				if _, err := admin.ExecContext(ctx, statement); err != nil {
+					t.Error("owned_snapshot_fact_restore_failed")
+				}
+			}
+		}()
+		values := make([]string, 0, 1001)
+		for id := 1000; id <= 2000; id++ {
+			values = append(values, "("+strconv.Itoa(id)+",NULL)")
+		}
+		if _, err := admin.ExecContext(ctx, "INSERT INTO assessment VALUES"+strings.Join(values, ",")); err != nil {
+			t.Fatal("owned_multiple_page_setup_failed")
+		}
+		db := open("readiness_global")
+		defer func() {
+			if db.Close() != nil {
+				t.Error("owned_snapshot_pool_release_failed")
+			}
+		}()
+		c, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal("owned_snapshot_connection_failed")
+		}
+		defer func() {
+			if c.Close() != nil {
+				t.Error("owned_snapshot_connection_release_failed")
+			}
+		}()
+		snapshot, stop := context.WithTimeout(ctx, totalLimit)
+		defer stop()
+		r := baseReadinessReceipt(b)
+		if readinessControl(snapshot, c, &r, readinessIsolationSQL) != nil || readinessControl(snapshot, c, &r, readinessBeginSQL) != nil {
+			t.Fatal("owned_readonly_rr_begin_failed")
+		}
+		active := true
+		defer func() {
+			if active && readinessControl(snapshot, c, &r, readinessRollbackSQL) != nil {
+				t.Error("owned_snapshot_abort_failed")
+			}
+		}()
+		upper, err := readinessRows(snapshot, c, readinessUpperSQL, 2)
+		if err != nil || len(upper) != 1 || upper[0][0].String != "18446744073709551615" || upper[0][1].String != "18446744073709551615" {
+			t.Fatal("owned_snapshot_anchor_failed")
+		}
+		columns, err := readinessRows(snapshot, c, readinessPrimaryColumnsSQL, 6)
+		if err != nil {
+			t.Fatal("owned_snapshot_column_guard_failed")
+		}
+		indexes, err := readinessRows(snapshot, c, readinessPrimaryIndexesSQL, 8)
+		if err != nil || !readinessPrimaryShape(columns, indexes) {
+			t.Fatal("owned_snapshot_primary_guard_failed")
+		}
+		for _, statement := range []string{
+			"UPDATE assessment SET historical_lifecycle_evidence=JSON_OBJECT('fixture','changed-private-value') WHERE id=2",
+			"DELETE FROM assessment WHERE id=1", "INSERT INTO assessment VALUES(4,NULL)",
+			"UPDATE evaluation_outcome SET historical_committed_evidence=NULL WHERE id=0",
+			"DELETE FROM evaluation_outcome WHERE id=1", "INSERT INTO evaluation_outcome VALUES(2,JSON_OBJECT())",
+		} {
+			if _, err := admin.ExecContext(ctx, statement); err != nil {
+				t.Fatal("owned_concurrent_fact_change_failed")
+			}
+		}
+		a, ap, ae, err := readinessPartitionPages(snapshot, c, &r, false, upper[0][0])
+		if err != nil {
+			t.Fatal("owned_assessment_snapshot_page_failed")
+		}
+		o, op, oe, err := readinessPartitionPages(snapshot, c, &r, true, upper[0][1])
+		if err != nil {
+			t.Fatal("owned_outcome_snapshot_page_failed")
+		}
+		if a != (scalarPartition{Total: 1006, SQLNull: 1003, NonNull: 3, EmptyObject: 2, NonEmptyObject: 1}) || o != (scalarPartition{Total: 3, SQLNull: 2, NonNull: 1, EmptyObject: 1}) || ap != 3 || op != 2 || !ae || !oe {
+			t.Fatal("concurrent_facts_changed_rr_snapshot")
+		}
+		if readinessControl(snapshot, c, &r, readinessRollbackSQL) != nil {
+			t.Fatal("owned_snapshot_rollback_failed")
+		}
+		active = false
+		var live int
+		if c.QueryRowContext(snapshot, "SELECT /*+ MAX_EXECUTION_TIME(5000) */ COUNT(*) FROM assessment WHERE id=4").Scan(&live) != nil || live != 1 {
+			t.Fatal("owned_rollback_did_not_return_live_view")
+		}
+		if r.ControlStatementCount != 3 {
+			t.Fatal("owned_snapshot_control_count_changed")
+		}
+	})
+	t.Run("actual_signed_primary_shape_rejected", func(t *testing.T) {
+		if _, err := admin.ExecContext(ctx, "ALTER TABLE assessment MODIFY id BIGINT NOT NULL"); err != nil {
+			t.Fatal("owned_primary_mutation_failed")
+		}
+		defer func() {
+			if _, err := admin.ExecContext(ctx, "ALTER TABLE assessment MODIFY id BIGINT UNSIGNED NOT NULL"); err != nil {
+				t.Error("owned_primary_restore_failed")
+			}
+		}()
+		r := reader("readiness_global")
+		if r.Complete || r.Measurements != nil || r.ErrorCategory != "metadata_invalid" || r.FailureStage != "primary_indexes" || r.TransactionReleased == nil || !*r.TransactionReleased {
+			t.Fatal("native_signed_primary_shape_accepted")
 		}
 	})
 	t.Run("dirty_version_rejected", func(t *testing.T) {

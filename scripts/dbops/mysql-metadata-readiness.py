@@ -20,16 +20,20 @@ runtime_module = profile.runtime_module
 receipt_transport_module = profile.receipt_transport_module
 capture_private = profile.capture_private
 
-STAGES = frozenset({"none", "input", "connect", "identity_before", "global_grants", "migration_before", "tables", "views", "routines", "triggers", "events", "columns", "checks", "threads", "transactions", "locks", "instrument", "assessment_distribution", "outcome_distribution", "migration_after", "identity_after", "connection_release", "database_release", "transport"})
-ERRORS = frozenset({"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "target_identity_mismatch", "target_hash_mismatch", "identity_read_failed", "identity_final_failed", "session_identity_changed", "query_failed", "query_server_timeout", "query_server_interrupted", "query_permission_denied", "query_deadline_exceeded", "query_canceled", "query_mysql_error", "query_network_timeout", "query_network_error", "query_invalid_connection", "query_bad_connection", "query_unexpected_eof", "query_eof", "metadata_invalid", "metadata_truncated", "metadata_release_failed", "grants_unverified", "migration_pair_rejected", "storage_observation_unavailable", "connection_release_failed", "database_release_failed", "profile_input_preflight_failed", "profile_package_preflight_failed", "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed", "profile_transport_or_receipt_failed"})
+STAGES = frozenset({"none", "input", "connect", "identity_before", "global_grants", "migration_before", "tables", "views", "routines", "triggers", "events", "columns", "checks", "primary_columns", "primary_indexes", "threads", "transactions", "locks", "instrument", "snapshot_begin", "snapshot_upper", "snapshot_release", "assessment_distribution", "outcome_distribution", "migration_after", "identity_after", "connection_release", "database_release", "transport"})
+ERRORS = frozenset({"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "target_identity_mismatch", "target_hash_mismatch", "identity_read_failed", "identity_final_failed", "session_identity_changed", "query_failed", "query_server_timeout", "query_server_interrupted", "query_permission_denied", "query_deadline_exceeded", "query_canceled", "query_mysql_error", "query_network_timeout", "query_network_error", "query_invalid_connection", "query_bad_connection", "query_unexpected_eof", "query_eof", "metadata_invalid", "metadata_truncated", "metadata_release_failed", "pagination_limit_exceeded", "transaction_release_failed", "grants_unverified", "migration_pair_rejected", "storage_observation_unavailable", "connection_release_failed", "database_release_failed", "profile_input_preflight_failed", "profile_package_preflight_failed", "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed", "profile_transport_or_receipt_failed"})
 CATALOG_KEYS = frozenset({"tables", "views", "routines", "triggers", "events", "columns", "checks"})
 PARTITION_KEYS = frozenset({"total", "sql_null", "non_null", "json_null", "empty_object", "non_empty_object", "other"})
+PAGE_SIZE, MAX_NONEMPTY_PAGES = 1000, 512
+MAX_QUERY_COUNT = 19 + 2 * (MAX_NONEMPTY_PAGES + 1)
 MEASUREMENTS_SCHEMA = {
     "global_metadata_grant_rows_verified": "bool", "migration_version": "uint", "migration_dirty": "bool",
     "performance_schema_enabled": "bool", "event_scheduler": frozenset({"on", "off", "disabled"}),
     "catalogs": {key: {"count": "uint", "digest": "hash64"} for key in CATALOG_KEYS},
     "enabled_events": "uint", "threads": "uint", "event_threads": "uint", "transactions": "uint",
     "modifying_transactions": "uint", "metadata_locks": "uint", "mdl_instrument_enabled": "bool",
+    "primary_key_shape_verified": "bool", "consistent_snapshot": "bool",
+    "assessment_pages": "uint", "outcome_pages": "uint", "assessment_eof": "bool", "outcome_eof": "bool",
     "assessment_distribution": {key: "uint" for key in PARTITION_KEYS},
     "outcome_distribution": {key: "uint" for key in PARTITION_KEYS},
 }
@@ -37,12 +41,14 @@ RECEIPT_SCHEMA = {
     "format_version": "uint", "source_sha": "sha40", "run_id": "run_id", "expected_target_hash": "hash64",
     "source_target_hash": "hash64", "diagnostic_only": "bool", "readiness_only": "bool", "freeze_verified": "bool",
     "complete": "bool", "error_category": ERRORS, "failure_stage": STAGES, "query_count": "uint",
+    "control_statement_count": "uint", "transaction_released": "nullable_bool",
     "connection_released": "nullable_bool", "database_released": "nullable_bool", "pool_closed_verified": "nullable_bool",
     "measurements": MEASUREMENTS_SCHEMA, "query_mysql_error_number": "uint",
 }
-FAILURE_RECEIPT = {"format_version": 1, "diagnostic_only": True, "readiness_only": True, "freeze_verified": False,
+FAILURE_RECEIPT = {"format_version": 2, "diagnostic_only": True, "readiness_only": True, "freeze_verified": False,
                    "complete": False, "error_category": "profile_transport_or_receipt_failed", "failure_stage": "transport",
-                   "query_count": 0, "connection_released": None, "database_released": None, "pool_closed_verified": None}
+                   "query_count": 0, "control_statement_count": 0, "transaction_released": None,
+                   "connection_released": None, "database_released": None, "pool_closed_verified": None}
 
 
 def stage_failure(env, category):
@@ -61,14 +67,24 @@ def conserved_partition(value):
     return value["total"] == value["sql_null"] + value["non_null"] and value["non_null"] == sum(value[key] for key in ("json_null", "empty_object", "non_empty_object", "other"))
 
 
+def complete_pagination(measurements, table):
+    total = measurements[table + "_distribution"]["total"]
+    pages = measurements[table + "_pages"]
+    # The terminating empty query is mandatory, including for an empty table.
+    return (measurements[table + "_eof"] is True
+            and 1 <= pages <= MAX_NONEMPTY_PAGES + 1
+            and total <= PAGE_SIZE * MAX_NONEMPTY_PAGES
+            and pages - 1 == (total + PAGE_SIZE - 1) // PAGE_SIZE)
+
+
 def safe_receipt(module, raw, code, sha, run, expected):
     value = module.load_json_bytes(raw)
     # Existing armor's nested field/type/size bounds also validate native JSON.
     receipt_transport_module().encode_armored_receipt(value, schema=RECEIPT_SCHEMA)
     required = set(RECEIPT_SCHEMA) - {"source_target_hash", "measurements", "query_mysql_error_number"}
-    if not required <= set(value) or value["format_version"] != 1 or value["source_sha"] != sha or value["run_id"] != run or value["expected_target_hash"] != expected:
+    if not required <= set(value) or value["format_version"] != 2 or value["source_sha"] != sha or value["run_id"] != run or value["expected_target_hash"] != expected:
         raise ValueError("readiness_receipt_binding")
-    if value["diagnostic_only"] is not True or value["readiness_only"] is not True or value["freeze_verified"] is not False or value["query_count"] > 18:
+    if value["diagnostic_only"] is not True or value["readiness_only"] is not True or value["freeze_verified"] is not False or value["query_count"] > MAX_QUERY_COUNT or value["control_statement_count"] > 3:
         raise ValueError("readiness_receipt_scope")
     number = value.get("query_mysql_error_number")
     category = value["error_category"]
@@ -82,19 +98,19 @@ def safe_receipt(module, raw, code, sha, run, expected):
         elif category == "query_mysql_error":
             if number in {3024, 1317, 1142, 1143, 1227}:
                 raise ValueError("readiness_mysql_number_category")
-        elif category not in {"metadata_release_failed", "connection_release_failed", "database_release_failed"}:
+        elif category not in {"metadata_release_failed", "transaction_release_failed", "connection_release_failed", "database_release_failed"}:
             raise ValueError("readiness_mysql_number_category")
     elif category == "query_mysql_error":
         raise ValueError("readiness_mysql_number_missing")
     if value["complete"]:
-        if code != 0 or value["error_category"] != "none" or value["failure_stage"] != "none" or value.get("source_target_hash") != expected or value["query_count"] != 18:
+        if code != 0 or value["error_category"] != "none" or value["failure_stage"] != "none" or value.get("source_target_hash") != expected or value["control_statement_count"] != 3:
             raise ValueError("readiness_receipt_success")
-        if any(value[key] is not True for key in ("connection_released", "database_released", "pool_closed_verified")):
+        if any(value[key] is not True for key in ("transaction_released", "connection_released", "database_released", "pool_closed_verified")):
             raise ValueError("readiness_release_unverified")
         m = value.get("measurements")
         if type(m) is not dict or set(m) != set(MEASUREMENTS_SCHEMA) or set(m["catalogs"]) != CATALOG_KEYS:
             raise ValueError("readiness_measurements_incomplete")
-        if m["migration_version"] != 100 or m["migration_dirty"] is not False or any(m[key] is not True for key in ("global_metadata_grant_rows_verified", "performance_schema_enabled", "mdl_instrument_enabled")):
+        if m["migration_version"] != 100 or m["migration_dirty"] is not False or any(m[key] is not True for key in ("global_metadata_grant_rows_verified", "performance_schema_enabled", "mdl_instrument_enabled", "primary_key_shape_verified", "consistent_snapshot")):
             raise ValueError("readiness_capability_unverified")
         if any(set(summary) != {"count", "digest"} or summary["count"] > 1000 for summary in m["catalogs"].values()) or m["catalogs"]["columns"]["count"] != 2 or m["catalogs"]["checks"]["count"] != 2 or m["catalogs"]["tables"]["count"] < 3 or m["catalogs"]["views"]["count"] > m["catalogs"]["tables"]["count"]:
             raise ValueError("readiness_catalog_incomplete")
@@ -102,6 +118,8 @@ def safe_receipt(module, raw, code, sha, run, expected):
             raise ValueError("readiness_observation_invalid")
         if not all(conserved_partition(m[key]) for key in ("assessment_distribution", "outcome_distribution")):
             raise ValueError("readiness_partition_invalid")
+        if not all(complete_pagination(m, table) for table in ("assessment", "outcome")) or value["query_count"] != 19 + m["assessment_pages"] + m["outcome_pages"]:
+            raise ValueError("readiness_pagination_incomplete")
     elif code == 0 or value["error_category"] == "none" or value["failure_stage"] == "none" or "measurements" in value:
         raise ValueError("readiness_failure_retained_measurements")
     return value
