@@ -10165,7 +10165,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10357,6 +10357,13 @@
           "result": "passed",
           "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+          "result": "passed",
+          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -12170,7 +12177,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+        "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12282,6 +12289,13 @@
           "selector": "func validOfflineProtectionScope(",
           "result": "matched",
           "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+          "result": "passed",
+          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
           "verified_on": "2026-10-15"
         }
       ],
