@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One bounded metadata diagnostic over the existing root@001-ysj SSH alias."""
+"""One bounded metadata diagnostic over the approved root@47.94.204.124 target."""
 import argparse
 import base64
 import hashlib
@@ -21,7 +21,7 @@ MEMBERS = frozenset(("profile-linux-amd64", "profile-linux-arm64", "mysql-metada
                      "cbpt-cleanup.py", "receipt-transport.py"))
 ARCHIVE_LIMIT = 32 * 1024 * 1024
 HEADER_LIMIT = 32768
-ALIAS = "001-ysj"
+SSH_HOST = "47.94.204.124"
 
 
 def load_profile(directory):
@@ -162,22 +162,19 @@ def trusted_ssh(profile, home):
         if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
             raise ValueError("ssh_agent_binding")
         local["SSH_AUTH_SOCK"] = agent
-    code, raw = profile.capture_private(["/usr/bin/ssh", "-G", *options, "-l", "root", ALIAS], env=local, timeout=10)
+    code, raw = profile.capture_private(["/usr/bin/ssh", "-G", *options, "-l", "root", "-p", "22", SSH_HOST], env=local, timeout=10)
     if code != 0:
         raise ValueError("ssh_alias_unavailable")
     config = {}
     for line in raw.decode().splitlines():
         key, _, value = line.partition(" ")
         config.setdefault(key, []).append(value)
-    if config.get("user") != ["root"] or config.get("hostname") in (None, [ALIAS]) or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
+    if config.get("user") != ["root"] or config.get("hostname") != [SSH_HOST] or config.get("port") != ["22"] or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
         raise ValueError("ssh_alias_binding")
-    host = config["hostname"][0]
-    port = config.get("port", ["22"])[0]
-    host_key_name = host if port == "22" else "[" + host + "]:" + port
-    code, raw = profile.capture_private(["/usr/bin/ssh-keygen", "-F", host_key_name, "-f", str(known)], env=local, timeout=10)
+    code, raw = profile.capture_private(["/usr/bin/ssh-keygen", "-F", SSH_HOST, "-f", str(known)], env=local, timeout=10)
     if code != 0 or not any(line and not line.startswith(b"#") for line in raw.splitlines()):
         raise ValueError("ssh_host_key_unavailable")
-    return ["/usr/bin/ssh", "-T", *options, "-l", "root", ALIAS], local
+    return ["/usr/bin/ssh", "-T", *options, "-l", "root", "-p", "22", SSH_HOST], local
 
 
 TRANSPORT_ERRORS = frozenset(("profile_input_preflight_failed", "profile_package_preflight_failed",
