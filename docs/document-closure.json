@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ff2ab27684876ce9ed2d81b5c526841c0208634c",
-    "verified_on": "2026-10-13"
+    "sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+    "verified_on": "2026-10-14"
   },
   "status_policy": {
     "doc_status": [
@@ -9900,8 +9900,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ff2ab27684876ce9ed2d81b5c526841c0208634c",
-        "verified_on": "2026-10-13"
+        "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+        "verified_on": "2026-10-14"
       },
       "fact_sources": [
         {
@@ -9927,31 +9927,39 @@
         {
           "kind": "source",
           "path": "internal/apiserver/integration/runtimeclosure/pristine_pair_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/operator-retire/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorretire/*.go"
         }
       ],
       "verification": [
         {
           "kind": "command",
-          "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
           "result": "passed",
-          "source_sha": "ff2ab27684876ce9ed2d81b5c526841c0208634c",
-          "verified_on": "2026-10-13"
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
         },
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
           "result": "matched",
-          "source_sha": "ff2ab27684876ce9ed2d81b5c526841c0208634c",
-          "verified_on": "2026-10-13"
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
         },
         {
           "kind": "source_selector",
           "path": "internal/pkg/migration/retirement_driver.go",
           "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
           "result": "matched",
-          "source_sha": "ff2ab27684876ce9ed2d81b5c526841c0208634c",
-          "verified_on": "2026-10-13"
+          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -9960,7 +9968,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Source and isolated MySQL/Mongo tests verify the M4-01 SQL-only retirement and its guard. No production DDL, complete production backup-pair restore, deployment or business acceptance is attested."
+          "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only 101/39 preparation and its guards. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested."
         ]
       },
       "gaps": []
