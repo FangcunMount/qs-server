@@ -672,6 +672,9 @@ jobs:
       - name: Validate public observability convergence gate
         run: bash scripts/cd/test-verify-observability-nginx.sh
 
+      - name: Validate Collection Nginx parsing and recovery gate
+        run: python3 scripts/cd/test-verify-collection-nginx.py
+
       - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 
