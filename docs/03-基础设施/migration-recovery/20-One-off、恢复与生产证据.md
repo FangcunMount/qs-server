@@ -130,6 +130,8 @@ mongorestore --config=/restricted/mongo-isolated-target.yaml \
 
 隔离MySQL目标数据库须预先由该任务分配且为空，隔离Mongo目标namespace也须为空；拒绝静默覆盖，不能用drop清理共享目标。若备份中的view/routine含源库限定名，必须由恢复演练显式核验目标绑定，不能机械替换文本。工具失败、权限缺口、partial archive或未覆盖namespace均阻断。system.profile等非业务诊断对象如需排除，要在manifest具名批准；不放宽生产权限。恢复环境的event scheduler、TTL、队列消费者和外发保持隔离/受控，不让恢复自带的任务抢先写事实。
 
+备份前独立核实导出账号对全部 qs 对象的权限与可见性。MySQL 8.0 的 `--routines` 要求 global SELECT，view/trigger/event 另有对应权限；只读取 information_schema 可见数量、当前直接 grants 或业务读写成功，不能签发完整对象范围。未展开角色或未核查 partial revocations 时，范围继续 unknown；Mongo 也须核对全部 namespace 的 list/read/export 覆盖。缺失权限时使用已审定的备份连接或阻断，不临时扩大生产权限、不以忽略错误生成“完整备份”。
+
 每次实际发布在T0重新冻结：入口关闭并排空在途，全部API/Collection/Worker及维护直接写入者已停止、不会自动重启。另外核查数据库自主任务，包含Mongo TTL及当前或窗口内将到期的文档；进程全停不能暂停TTL。未证明该范围无事实变化即停止，不自行关TTL。保留消息、hold、死信、命令及Outbox责任；不清队列。确认无写入后取得最新同窗口完整备份对，核对原schema_migrations与源身份，形成新hash/manifest；旧演练备份不能直接当最新恢复点。
 
 ### 7.3 执行、提交与失败边界
