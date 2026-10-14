@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+    "sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
+        "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -521,6 +521,27 @@
           "command": "python3 -B scripts/dbops/test-receipt-transport.py",
           "result": "passed",
           "source_sha": "91d202120aacd6e909d8e88aa71df76eadd78bd6",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
           "verified_on": "2026-10-14"
         }
       ],
@@ -11473,7 +11494,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+        "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -11751,6 +11772,27 @@
           "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
           "result": "passed",
           "source_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-mysql-metadata-readiness.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/dbops/test-receipt-transport.py",
+          "result": "passed",
+          "source_sha": "1f2d96f378a4d361c2a0bea35598cd4b38b0ef8f",
           "verified_on": "2026-10-14"
         }
       ],
