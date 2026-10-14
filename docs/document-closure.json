@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+    "sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -326,7 +326,7 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+        "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -472,6 +472,20 @@
           "selector": "func TestMetadataReadinessNativeOwnedMySQL",
           "result": "matched",
           "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
           "verified_on": "2026-10-14"
         }
       ],
@@ -10039,7 +10053,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+        "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -10097,6 +10111,20 @@
           "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap",
           "result": "passed",
           "source_sha": "670c981e6b1b76c4619674140867273b9be1eec4",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
           "verified_on": "2026-10-14"
         }
       ],
