@@ -13,7 +13,9 @@ import (
 	"testing/fstest"
 	"time"
 
+	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
+	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	actor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	retirement "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/operatorretirement"
 	driver "github.com/go-sql-driver/mysql"
@@ -151,6 +153,18 @@ func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(t *testing.T) {
 	old := migrationResourcesThrough(t, 101, 40)
 	if _, err := preflightCompatibilityPair(t.Context(), n.db, n.client, cfg.Pair, old); err == nil {
 		t.Fatal("old binary accepted the future SQL head")
+	}
+	// Current repositories must also create records on the actual post-DDL shape.
+	// These new facts are never covered by the earlier capture or restored over.
+	op := operatorDomain.NewOperator(1, 800010, "post-DDL")
+	op.SetID(10)
+	if err := actor.NewOperatorRepository(db).Save(t.Context(), op); err != nil {
+		t.Fatal("current Operator insert referenced the retired column", err)
+	}
+	subject := testeeDomain.NewTestee(1, "post-DDL", testeeDomain.GenderUnknown, nil)
+	subject.SetID(10)
+	if err := actor.NewTesteeRepository(db).Save(t.Context(), subject); err != nil {
+		t.Fatal("current Testee insert referenced the retired column", err)
 	}
 	recovery, err := domain.NewRecovery(task, 900009, 3, 10, "actor-recovery", "reviewed synthetic identity recovery", now)
 	if err != nil {
