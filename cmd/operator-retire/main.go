@@ -19,7 +19,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: operator-retire selected-preflight|selected-apply|selected-verify|orphan-preflight|orphan-apply|orphan-verify [QS config flags]; required environment: OPERATOR_RETIRE_LAYOUT=final, OPERATOR_RETIRE_INPUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
+		fmt.Fprintln(os.Stderr, "usage: operator-retire selected-preflight|selected-apply|selected-verify|orphan-preflight|orphan-apply|orphan-verify [QS config flags]; required environment: OPERATOR_RETIRE_INPUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
 		os.Exit(1)
 	}
 	action := os.Args[1]
@@ -62,10 +62,7 @@ func main() {
 			return fmt.Errorf("IAM connection unavailable")
 		}
 		defer func() { _ = module.Close() }()
-		tool, err := operatorretire.New(db, module.AuthzSnapshotLoader(), iam.NewOperatorRetirementAuthzGateway(iam.NewAuthzAssignmentClient(module.Client()), module.AuthzSnapshotLoader()), os.Getenv("OPERATOR_RETIRE_LAYOUT"))
-		if err != nil {
-			return err
-		}
+		tool := operatorretire.New(db, module.AuthzSnapshotLoader(), iam.NewOperatorRetirementAuthzGateway(iam.NewAuthzAssignmentClient(module.Client()), module.AuthzSnapshotLoader()))
 		if strings.HasPrefix(action, "orphan-") {
 			return runOrphan(ctx, tool, action, output)
 		}

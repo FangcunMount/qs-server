@@ -14,18 +14,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Runtime uses the final table; the maintenance tool chooses its explicit migration layout.
+// Runtime and reviewed maintenance exits use the same Operator table.
 const operatorTable = "operators"
 
-type Repository struct {
-	db    *gorm.DB
-	table string
-}
+type Repository struct{ db *gorm.DB }
 
-func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db, table: operatorTable} }
-
-// NewLegacyRepository is only for the cutover maintenance tool before table rename.
-func NewLegacyRepository(db *gorm.DB) *Repository { return &Repository{db: db, table: "staff"} }
+func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 var _ port.Repository = (*Repository)(nil)
 
@@ -39,7 +33,7 @@ func (r *Repository) dbFor(ctx context.Context) *gorm.DB {
 }
 func (r *Repository) WithOperatorLock(ctx context.Context, org int64, id uint64, fn func(context.Context) error) error {
 	var row struct{ UserID int64 }
-	if err := r.db.WithContext(ctx).Table(r.table).Select("user_id").Where("org_id=? AND id=?", org, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table(operatorTable).Select("user_id").Where("org_id=? AND id=?", org, id).Take(&row).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return errors.WithCode(code.ErrUserNotFound, "operator not found in current company")
 		}
@@ -74,7 +68,7 @@ func (r *Repository) withUserLock(ctx context.Context, userID int64, fn func(con
 }
 func (r *Repository) Find(ctx context.Context, org int64, id uint64) (port.Target, error) {
 	var row port.Target
-	err := r.dbFor(ctx).Table(r.table).Select("id,org_id,user_id,version").Where("org_id=? AND id=? AND deleted_at IS NULL", org, id).Take(&row).Error
+	err := r.dbFor(ctx).Table(operatorTable).Select("id,org_id,user_id,version").Where("org_id=? AND id=? AND deleted_at IS NULL", org, id).Take(&row).Error
 	if err == gorm.ErrRecordNotFound {
 		return row, errors.WithCode(code.ErrUserNotFound, "operator not found in current company")
 	}
@@ -112,7 +106,7 @@ func (r *Repository) FindTask(ctx context.Context, org int64, id uint64) (*domai
 }
 func (r *Repository) OtherMemberships(ctx context.Context, user int64, id uint64) (int64, error) {
 	var count int64
-	err := r.dbFor(ctx).Table(r.table).Where("user_id=? AND id<>? AND deleted_at IS NULL", user, id).Count(&count).Error
+	err := r.dbFor(ctx).Table(operatorTable).Where("user_id=? AND id<>? AND deleted_at IS NULL", user, id).Count(&count).Error
 	return count, err
 }
 func (r *Repository) Begin(ctx context.Context, task domain.Task) error {
@@ -121,7 +115,7 @@ func (r *Repository) Begin(ctx context.Context, task domain.Task) error {
 	}
 	return r.dbFor(ctx).Transaction(func(tx *gorm.DB) error {
 		var before map[string]interface{}
-		if err := tx.Table(r.table).Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id=? AND id=? AND version=? AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.ExpectedVersion).Take(&before).Error; err != nil {
+		if err := tx.Table(operatorTable).Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id=? AND id=? AND version=? AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.ExpectedVersion).Take(&before).Error; err != nil {
 			return err
 		}
 		raw, err := json.Marshal(before)
@@ -135,7 +129,7 @@ func (r *Repository) Begin(ctx context.Context, task domain.Task) error {
 		if err := tx.Create(&taskPO{OperatorID: task.OperatorID, OrgID: task.OrgID, UserID: task.UserID, Stage: string(task.Stage), Payload: string(payload), BeforeState: string(raw), UpdatedAt: task.UpdatedAt}).Error; err != nil {
 			return err
 		}
-		result := tx.Table(r.table).Where("org_id=? AND id=? AND version=? AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.ExpectedVersion).
+		result := tx.Table(operatorTable).Where("org_id=? AND id=? AND version=? AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.ExpectedVersion).
 			Updates(map[string]interface{}{"is_active": false, "version": gorm.Expr("version+1"), "updated_at": task.UpdatedAt, "updated_by": task.ActorID})
 		if result.Error != nil {
 			return result.Error
@@ -173,12 +167,7 @@ func (r *Repository) Finish(ctx context.Context, task domain.Task) error {
 	}
 	return r.dbFor(ctx).Transaction(func(tx *gorm.DB) error {
 		updates := map[string]interface{}{"roles": "[]", "authz_policy_version": task.PolicyVersion, "authz_projected_at": task.UpdatedAt, "authz_projection_pending": false, "deleted_at": task.UpdatedAt, "updated_at": task.UpdatedAt, "updated_by": task.ActorID, "version": gorm.Expr("version+1")}
-		// The unregistered historical cutover library retains its original staff
-		// layout only for isolated original-schema recovery materials.
-		if r.table == "staff" {
-			updates["effective_roles"] = "[]"
-		}
-		result := tx.Table(r.table).Where("org_id=? AND id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.UserID, task.ExpectedVersion+1).
+		result := tx.Table(operatorTable).Where("org_id=? AND id=? AND user_id=? AND version=? AND is_active=FALSE AND deleted_at IS NULL", task.OrgID, task.OperatorID, task.UserID, task.ExpectedVersion+1).
 			Updates(updates)
 		if result.Error != nil {
 			return result.Error

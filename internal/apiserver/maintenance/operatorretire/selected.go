@@ -12,7 +12,6 @@ import (
 	actorrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 )
 
-// SelectedReport is separate from the historical doctor retirement manifest.
 // Each reviewed exit uses the ordinary durable exit task and keeps its own before-state.
 type SelectedReport struct {
 	State           string                     `json:"state"`
@@ -25,7 +24,7 @@ type SelectedReport struct {
 }
 
 func (t *Tool) selectedActor(ctx context.Context, cmd app.Command) (context.Context, error) {
-	if t.table != "operators" || t.loader == nil || t.gateway == nil {
+	if t.loader == nil || t.gateway == nil {
 		return ctx, fmt.Errorf("selected retirement requires final schema and IAM")
 	}
 	if err := actorrepo.RequireCurrentOperatorPlanSchema(ctx, t.db); err != nil {
@@ -39,7 +38,7 @@ func (t *Tool) selectedActor(ctx context.Context, cmd app.Command) (context.Cont
 		return ctx, fmt.Errorf("headquarters permission required")
 	}
 	var count int64
-	if err = t.db.WithContext(ctx).Table(t.table).Where("org_id=? AND user_id=? AND is_active=TRUE AND deleted_at IS NULL", cmd.OrgID, cmd.ActorID).Count(&count).Error; err != nil {
+	if err = t.db.WithContext(ctx).Table(operatorTable).Where("org_id=? AND user_id=? AND is_active=TRUE AND deleted_at IS NULL", cmd.OrgID, cmd.ActorID).Count(&count).Error; err != nil {
 		return ctx, err
 	}
 	if count != 1 {
@@ -72,7 +71,7 @@ func (t *Tool) SelectedPreflight(ctx context.Context, cmd app.Command) (*Selecte
 	if existing != nil {
 		report.State = string(existing.Stage)
 	}
-	if err = t.db.WithContext(ctx).Table(t.table).Select(actorrepo.CurrentOperatorColumns).Where("id=? AND org_id=?", cmd.OperatorID, cmd.OrgID).Take(&report.CurrentOperator).Error; err != nil {
+	if err = t.db.WithContext(ctx).Table(operatorTable).Select(actorrepo.CurrentOperatorColumns).Where("id=? AND org_id=?", cmd.OperatorID, cmd.OrgID).Take(&report.CurrentOperator).Error; err != nil {
 		return report, err
 	}
 	facts, err := t.loader.LoadAssignmentFacts(ctx, strconv.FormatInt(task.UserID, 10))
@@ -141,7 +140,7 @@ func (t *Tool) SelectedVerify(ctx context.Context, cmd app.Command) (*SelectedRe
 		}
 	}
 	var count int64
-	if err = t.db.WithContext(ctx).Table(t.table).Where("org_id=? AND id=? AND is_active=FALSE AND deleted_at IS NOT NULL", cmd.OrgID, cmd.OperatorID).Count(&count).Error; err != nil {
+	if err = t.db.WithContext(ctx).Table(operatorTable).Where("org_id=? AND id=? AND is_active=FALSE AND deleted_at IS NOT NULL", cmd.OrgID, cmd.OperatorID).Count(&count).Error; err != nil {
 		return report, err
 	}
 	if count != 1 {
