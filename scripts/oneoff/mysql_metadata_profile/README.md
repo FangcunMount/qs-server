@@ -10,7 +10,7 @@
 
 权限与角色诊断字段的含义：
 
-- current_unrestricted_metadata_grants：固定 SHOW GRANTS FOR CURRENT_USER 的当前有效集；绝不称它仅为 direct grants。
+- current_unrestricted_metadata_grants：仅诊断固定、不带 USING 的 SHOW GRANTS FOR CURRENT_USER 返回的账号直接 grant 中四项全局权限及 partial revocations。该输出会列出已授予角色，但不展开角色权限，不能代表全部 active roles 的有效权限；参见 [MySQL 8.0 SHOW GRANTS](https://dev.mysql.com/doc/refman/8.0/en/show-grants.html)。
 - rds_role_grants_available：固定 SHOW GRANTS FOR CURRENT_USER USING `rds_superuser_role`@`%` 查询成功为 true；只有 MySQL 数字错误 3530 且 SQLState 为 HY000 才为 false；其它查询错误为 null 并失败。
 - rds_role_unrestricted_metadata_grants：上述 USING 查询的账号直接权限加固定角色的潜在集，不能称当前有效集，也不把其它 active roles 并入它。角色未授予或查询失败时为 null。角色输出格式不被识别时为 null、complete=false；不输出角色结论。
 
@@ -25,7 +25,7 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 输出仅受控 receipt 字段：format_version/source_sha/run_id/expected_target_hash/source_target_hash/current_unrestricted_metadata_grants/rds_role_grants_available/rds_role_unrestricted_metadata_grants/assigned_roles_present/mandatory_roles_present/diagnostic_only/complete/error_category。无 raw grant、role/account/host/database/version/UUID/SQL/driver error 或凭据。diagnostic_only 永远为 true；即使两个权限布尔均 true，也不是删表授权或资格。未知错误和身份变化时 current 为 false、四个角色字段为 null，complete=false、exit1；合法 negative（含未授予/partial restriction）为完整诊断，不是权限赋予。
 
-离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、其它 active role current=true/potential=false、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
+离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、current 与固定角色 grant 输入互不混用（不证明真实 active role 权限展开）、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
 
 两个 metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。其余 db-ops job 在两个 metadata 输入下均不符合执行条件。
 
