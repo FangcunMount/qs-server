@@ -33,7 +33,7 @@ func writeBootstrapApproval(t *testing.T, cfg *PairConfig, a bootstrapAuthorizat
 }
 
 func TestBootstrapV2BindsFullResourcesHeadsAndOneUse(t *testing.T) {
-	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 40}})
+	r, err := readMigrationResources(futureMigrationSource(t), futureMigrationPairs(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,7 +12,7 @@ type schemaVersionPair struct{ SQL, Mongo uint }
 
 // Add a pair only when both schemas are independently safe for this release.
 // This is deliberately not the cross product of the backend version inventories.
-var declaredSchemaPairs = []schemaVersionPair{{99, 38}, {100, 39}}
+var declaredSchemaPairs = []schemaVersionPair{{99, 38}, {100, 39}, {101, 39}, {101, 40}}
 
 type backendResources struct {
 	head uint

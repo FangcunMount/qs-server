@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,12 +19,15 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: operator-retire preflight|apply|status|verify [QS config flags]; selected-preflight|selected-apply|selected-verify and orphan-preflight|orphan-apply|orphan-verify use OPERATOR_RETIRE_INPUT; required environment: OPERATOR_RETIRE_ID, OPERATOR_RETIRE_LAYOUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_ACTOR_ID, OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
+		fmt.Fprintln(os.Stderr, "usage: operator-retire selected-preflight|selected-apply|selected-verify|orphan-preflight|orphan-apply|orphan-verify [QS config flags]; required environment: OPERATOR_RETIRE_LAYOUT=final, OPERATOR_RETIRE_INPUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
 		os.Exit(1)
 	}
 	action := os.Args[1]
 	switch action {
-	case "preflight", "apply", "status", "verify", "selected-preflight", "selected-apply", "selected-verify", "orphan-preflight", "orphan-apply", "orphan-verify":
+	case "preflight", "apply", "status", "verify":
+		fmt.Fprintln(os.Stderr, "historical batch retirement actions are retired; archived tools are restricted to isolated historical databases")
+		os.Exit(1)
+	case "selected-preflight", "selected-apply", "selected-verify", "orphan-preflight", "orphan-apply", "orphan-verify":
 	default:
 		fmt.Fprintln(os.Stderr, "unknown retirement action")
 		os.Exit(1)
@@ -68,40 +69,6 @@ func main() {
 		if strings.HasPrefix(action, "orphan-") {
 			return runOrphan(ctx, tool, action, output)
 		}
-		if strings.HasPrefix(action, "selected-") {
-			return runSelected(ctx, tool, action, output)
-		}
-		id := os.Getenv("OPERATOR_RETIRE_ID")
-		actor, _ := strconv.ParseInt(os.Getenv("OPERATOR_RETIRE_ACTOR_ID"), 10, 64)
-		var report *operatorretire.Report
-		switch action {
-		case "preflight":
-			report, err = tool.Preflight(ctx, id, actor)
-		case "apply":
-			report, err = tool.Apply(ctx, id, os.Getenv("OPERATOR_RETIRE_FINGERPRINT"), actor, os.Getenv("OPERATOR_RETIRE_MAINTENANCE") == "true")
-		case "status":
-			report, err = tool.Status(ctx, id)
-		case "verify":
-			report, err = tool.Verify(ctx, id)
-		}
-		if report == nil {
-			report = &operatorretire.Report{MigrationID: id, State: "invalid"}
-		}
-		if err != nil {
-			report.LastError = err.Error()
-		}
-		if report != nil {
-			if writeErr := json.NewEncoder(output).Encode(report); writeErr != nil {
-				return writeErr
-			}
-			fmt.Printf("retirement state=%s candidates=%d issues=%d; detailed report saved privately\n", report.State, len(report.Candidates), len(report.Issues))
-		}
-		if err != nil {
-			if syncErr := output.Sync(); syncErr != nil {
-				return syncErr
-			}
-			return fmt.Errorf("retirement action stopped; inspect restricted report")
-		}
-		return output.Sync()
+		return runSelected(ctx, tool, action, output)
 	})).Run()
 }
