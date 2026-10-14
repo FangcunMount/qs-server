@@ -558,6 +558,96 @@ jobs:
           done
           if grep -E -- '^--- SKIP:' "$proof_log"; then exit 1; fi
 
+      - name: Verify four historical Mongo index retirement and auth failure
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m4_index_ci_test
+        run: |
+          set -euo pipefail
+          QS_M4_AUTH_PASSWORD="$(openssl rand -hex 24)"
+          export QS_M4_AUTH_PASSWORD
+          echo "::add-mask::${QS_M4_AUTH_PASSWORD}"
+          auth_cid="$(docker run --detach \
+            --name qs-m4-index-auth --label qs.cleanup.owner=m4-index-ci \
+            --cpus 2 --memory 1g \
+            --tmpfs /data/db:rw,nosuid,size=536870912 \
+            --tmpfs /data/configdb:rw,nosuid,size=16777216 \
+            --tmpfs /run/qs-m4-keydir:rw,nosuid,size=1048576 \
+            --publish 127.0.0.1:27018:27017 --entrypoint bash \
+            --env MONGO_INITDB_ROOT_USERNAME=qs_m4_ci_root \
+            --env "MONGO_INITDB_ROOT_PASSWORD=${QS_M4_AUTH_PASSWORD}" \
+            mongo:7.0 -ceu \
+            'umask 077; openssl rand -base64 756 > /run/qs-m4-keydir/key; chown mongodb:mongodb /run/qs-m4-keydir/key; chmod 400 /run/qs-m4-keydir/key; exec docker-entrypoint.sh "$@"' \
+            -- mongod --replSet qs-m4-auth-rs --keyFile /run/qs-m4-keydir/key --bind_ip_all)"
+          [[ "$auth_cid" =~ ^[0-9a-f]{64}$ ]]
+          printf 'QS_M4_MONGO_AUTH_CONTAINER=%s\n' "$auth_cid" >> "$GITHUB_ENV"
+          auth_shell() {
+            docker exec "$auth_cid" mongosh --quiet --username qs_m4_ci_root \
+              --password "$QS_M4_AUTH_PASSWORD" --authenticationDatabase admin --eval "$1"
+          }
+          ready=false
+          for attempt in $(seq 1 60); do
+            if auth_shell 'rs.initiate({_id:"qs-m4-auth-rs",members:[{_id:0,host:"127.0.0.1:27017"}]})' >/dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "Owned auth fixture initialization failed after ${attempt} attempts" >&2
+            exit 1
+          fi
+          ready=false
+          for attempt in $(seq 1 60); do
+            if auth_shell 'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "Owned auth fixture primary unavailable after ${attempt} attempts" >&2
+            exit 1
+          fi
+          auth_shell 'print(db.version())'
+          export QS_M4_TEST_MONGO_AUTH_CONFIG="${RUNNER_TEMP}/qs-m4-auth-config.json"
+          python3 - <<'PYCONFIG'
+          import json, os
+          fd = os.open(os.environ["QS_M4_TEST_MONGO_AUTH_CONFIG"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+          with os.fdopen(fd, "w") as output:
+              json.dump({"mongo_uri": "mongodb://qs_m4_ci_root:" + os.environ["QS_M4_AUTH_PASSWORD"] + "@127.0.0.1:27018/?authSource=admin&replicaSet=qs-m4-auth-rs&directConnection=true"}, output)
+          PYCONFIG
+          go test -race -tags=integration -count=1 -timeout=8m -v \
+            -run '^TestHistoricalIndexNative' ./internal/pkg/migration \
+            | tee "${RUNNER_TEMP}/historical-index.log"
+          for test_name in \
+            TestHistoricalIndexNativeMongoOnlyUpgradeAndRestart \
+            TestHistoricalIndexNativeExactObjectRestoreAndConstraints \
+            TestHistoricalIndexNativeDirtyObjectBackupRestore \
+            TestHistoricalIndexNativePartialFailureAndDirtyRefuseRepairByForce \
+            TestHistoricalIndexNativeUnknownMetadataStopsBeforeDDL \
+            TestHistoricalIndexNativePermissionDeniedAfterMetadataWrite; do
+            grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/historical-index.log"
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/historical-index.log"; then
+            echo 'Historical index retirement proof must not skip' >&2
+            exit 1
+          fi
+
+      - name: Stop owned Mongo index auth fixture
+        if: always()
+        run: |
+          set -euo pipefail
+          auth_cid="${QS_M4_MONGO_AUTH_CONTAINER:-}"
+          if [ -n "$auth_cid" ]; then
+            [[ "$auth_cid" =~ ^[0-9a-f]{64}$ ]]
+            [ "$(docker inspect --format '{{ index .Config.Labels "qs.cleanup.owner" }}' "$auth_cid")" = m4-index-ci ]
+            docker rm --force --volumes "$auth_cid"
+          fi
+          rm --force "${RUNNER_TEMP}/qs-m4-auth-config.json"
+
       - name: Verify committed evidence, retry governance and retirement A on real databases
         env:
           QS_COMPAT_OUTCOME_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true

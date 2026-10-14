@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+    "sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -82,8 +82,8 @@
         "version_count": 101
       },
       "mongodb": {
-        "max_version": 39,
-        "version_count": 39
+        "max_version": 40,
+        "version_count": 40
       }
     },
     "events": {
@@ -10165,7 +10165,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+        "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -10207,6 +10207,45 @@
           "kind": "command",
           "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
           "result": "passed",
+          "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "go test -race -tags=integration -count=1 -timeout=8m",
+          "result": "matched",
+          "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/retirement_driver.go",
+          "selector": "if !currentDirty || current != version || !d.dirty || d.version != version || !d.stepSucceeded",
+          "result": "matched",
+          "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestHistoricalIndexNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "0b43da3ff3f115951a4d98a484b53dfaa96b0048",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/historical_index_retirement_native_integration_test.go",
+          "selector": "session.StartTransaction",
+          "result": "matched",
+          "source_sha": "94d683c12acca78bc2564c810eae767ed7274674",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+          "result": "passed",
           "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
           "verified_on": "2026-10-14"
         },
@@ -10241,6 +10280,13 @@
           "result": "matched",
           "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/pkg/configcontract ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
+          "verified_on": "2026-10-15"
         },
         {
           "kind": "command",
@@ -10418,6 +10464,13 @@
           "result": "passed",
           "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+          "result": "passed",
+          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10426,6 +10479,11 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
+          "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only101/39 and Mongo-only101/40 preparation, exact index-object restoration and real scoped auth denial. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
+          "Fourteen migration native tests passed with exact owned-resource release; a pre-existing local NSQ restart loop prevented the extra all-existing-container stability observation. This is not NSQ integration acceptance.",
+          "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Original-image full startup, production-scale recovery, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required.",
+          "A later owned synthetic fixture using MySQL8.0.36/MongoRS7.0.31 passed the same seven required RUN/PASS with zero SKIP on checkoutb7e6e5cff5977abc7c7b85d4269fb428e5d34a91 and unchanged source94d683c12acca78bc2564c810eae767ed7274674 test bytes. The production-patch-version object gate is covered, but no production connection, original-image full business startup, production-scale recovery or30/60-minute/RPO0 acceptance is attested. Existing IDs/images were preserved and owned resources released; existing runtime metadata stability was not attested.",
+          "SQL-A sourcee249641f14d48499e211677e6867709a98fbb18b and CI selectore9bddfe267b87507c59d70564b7fe2d37c6f69ff are now integrated from actual SQL head73dbb045d47a28873ea209c67feb48ce8fca9567. Its nine native RUN/PASS remain bound to the original MySQL8.0.36/Mongo7.0.25 fixture and do not become a new merged-checkout or production proof.",
           "Source and isolated database verification describe the migration guard only. This M3 change has no production deployment or business acceptance proof.",
           "The current source c334 ran 7 required Offline native top-level tests plus 6 subtests on owned MySQL8.0.36/Mongo replica-set7.0.25: 13 RUN/PASS, no SKIP, exit0. Before/after hashes of all 3 affected Go sources matched; 2 owned containers and their bridge were released. The isolated synthetic fixture does not certify production object recovery, writer freeze, RPO, the30/60min budget or three-service startup.",
           "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
@@ -12234,7 +12292,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+        "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12360,6 +12418,13 @@
           "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
           "result": "passed",
           "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+          "result": "passed",
+          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
         }
       ],
