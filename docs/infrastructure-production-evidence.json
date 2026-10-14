@@ -6675,6 +6675,127 @@
         "Mongo zero application queries and false FCV/TTL known bits do not mean a zero version or disabled TTL. Its full release bits are unproven, not independent proof of leftover live processes; three actual temporary-file/directory releases were attested. Transport-stage detail is being improved without changing the target, budgets or credentials.",
         "No retry, credential/host fallback, permission grant, TTL/Event change, production stop, export, restore, DDL, data deletion or M6 observation T0. Same-window full backup pair, complete isolated restore and30/60-minute/RPO0 budgets remain incomplete."
       ]
+    },
+    {
+      "id": "infra-2026-10-14-qs-cleanup-m4-readiness-diagnostic-followup",
+      "topics": [
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-14T13:10:54.711693+00:00",
+      "environment": "Mac mini exact-source bounded production diagnostics; fixed serverA public container inventory and existingserverC SSH candidate metadata",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "80663e51d6585f6ee249368e1da5dcc23b04209f",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "One-off diagnostics and public host/container metadata do not decode complete effective runtime config. M2 SHA is the last complete six-instance runtime binding, with fresh serverA public container identities only."
+      },
+      "command": "Two fixed frozen d308a23398e0 workflow_dispatch metadata reads; one public fixedroot serverA Dockerps; offline Mac serverC/003 SSH-G and one existingroot003 public marker candidate, zero DB commands for public SSH diagnostics. No host-key writes, endpoint/credential fallback or mutations.",
+      "result": {
+        "status": "findings",
+        "summary": "Current source CI/native gates passed. Both production readiness jobs failed closed: MySQL query16 remains an unclassified error; Mongo is now specifically SSH keyscan timeout before application queries. Existing source/alias evidence assigns Mongo toserverC, but that candidate root probe did not authenticate/return a marker. Full readiness and backup qualification remain blocked.",
+        "measurements": {
+          "profile_source_sha": "d308a23398e0d05c07dc013d01cce303da1a391e",
+          "profile_source_baseline_sha": "3b0a20f770e22134198773faefc8597a7b40eb9c",
+          "source_head_success_checks": 28,
+          "source_head_designed_skips": 1,
+          "mysql_run_id": 38568550841,
+          "mysql_job_id": 115867396010,
+          "mysql_other_jobs_skipped": 15,
+          "mysql_query_count": 16,
+          "mysql_complete": false,
+          "mysql_error_category": "query_failed",
+          "mysql_failure_stage": "outcome_distribution",
+          "mysql_query_cause_known": false,
+          "mysql_connection_database_pool_released": true,
+          "mongo_run_id": 38568803772,
+          "mongo_job_id": 115868270555,
+          "mongo_other_jobs_skipped": 15,
+          "mongo_complete": false,
+          "mongo_error_category": "reading_budget_exceeded",
+          "mongo_failure_stage": "ssh_keyscan",
+          "mongo_elapsed_milliseconds": 5025,
+          "mongo_logical_queries": 0,
+          "mongo_fcv_or_ttl_known": false,
+          "mongo_temp_key_knownhosts_directory_released": true,
+          "mongo_tunnel_reader_start_or_full_release_proven": false,
+          "serverA_public_root_inventory_complete": true,
+          "serverA_local_containers": 6,
+          "serverA_public_db_commands": 0,
+          "mac_003_alias_metadata_resolved": true,
+          "existing_root_003_public_probe_complete": false,
+          "existing_root_003_public_probe_exit_code": 255,
+          "existing_root_003_db_commands": 0,
+          "source_native_mysql_run_pass": 12,
+          "source_native_mongo_run_pass": 7,
+          "source_native_target_skips": 0,
+          "production_deploy_paused": true,
+          "backup_pair_or_isolated_full_restore_proven": false,
+          "production_stop_export_restore_ddl_delete_calls": 0,
+          "evidence_artifacts": [
+            {
+              "file": "qs-m4-production-readiness-d308/exact-source-ci-final.json",
+              "sha256": "2e560ebca94f90a5be1bd3e00bea6d7d251effe34ce5e31705d0406e8809c06f"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/mysql-receipt.json",
+              "sha256": "613311927aa2d6c14f8540d19f359a23c20d0b2218bd6c0ab262f87864bc5f5e"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/mysql-job.log",
+              "sha256": "249dc6f803f85097e1b3aed4fbf17a2089d03e549439d157d51430c5509732a8"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/mongo-receipt.json",
+              "sha256": "340138210a0d1dd167d0118f2a0034414d27c91e1ab34163b85786606702c7ad"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/mongo-job.log",
+              "sha256": "fd1e2b5374281ffa86fa2f308c795e8ffaa6b246e8ec909956b2440be7216111"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/fixed-root-container-inventory.json",
+              "sha256": "56c9ef98326211da0462b0c6713e02b5f1f6b3f0bf79541749d629320c495f80"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/mac-mongo-ssh-alias-metadata.json",
+              "sha256": "6a667b621829b273aafc4e304935437e1524ee4446150816f233c38f6b77054b"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/existing-serverc-root-public-probe.json",
+              "sha256": "77c7579a9f8e5992f821509bf86dc31e2c976f1924146a7f202598bced21163e"
+            },
+            {
+              "file": "qs-m4-production-readiness-d308/readonly-failure-followup-summary.json",
+              "sha256": "742e1f8d5dec6cb0c140a51c9cd9fee000e350efa97a4d88a9569e21ca5d338f"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data/recovery; Codex: bounded diagnostics/source preparation",
+      "expires_on": "2026-11-13",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38568550841"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/38568803772"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#630-m4-诊断版本-ci-通过具名连接失败继续闭合"
+        }
+      ],
+      "limitations": [
+        "Original24 record bytes retained; failed39b/d308 results do not become complete. Typeddriver cause analysis and native tests cannot infer the actual production failure.",
+        "Mongo FCV/TTL remain unknown; keyscan failure does not prove DB authorization or identity. Public serverC candidate probe failure is not an authenticated Mongo host binding. No route fallback, new hostkey or privilege change.",
+        "Public serverA container list refreshes only the scoped local identities and images, not all six-instance SHA/digest/ready or complete effective configuration.",
+        "Private first-capture addendum is unexecuted. Exact exporter config/scope/privileges, continuous Event/TTL/writer/inflight control, full coherent backup pair, complete isolated restore and30/60-minute/RPO0 proof remain incomplete. No production stop/export/restore/DDL/delete or M6T0."
+      ]
     }
   ]
 }
