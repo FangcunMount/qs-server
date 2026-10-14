@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
-    "verified_on": "2026-10-14"
+    "sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+    "verified_on": "2026-10-15"
   },
   "status_policy": {
     "doc_status": [
@@ -9919,8 +9919,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
-        "verified_on": "2026-10-14"
+        "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -10052,6 +10052,21 @@
           "result": "matched",
           "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -10063,7 +10078,8 @@
           "Source and isolated database verification describe the migration guard only. This M3 change has no production deployment or business acceptance proof.",
           "The current source c334 ran 7 required Offline native top-level tests plus 6 subtests on owned MySQL8.0.36/Mongo replica-set7.0.25: 13 RUN/PASS, no SKIP, exit0. Before/after hashes of all 3 affected Go sources matched; 2 owned containers and their bridge were released. The isolated synthetic fixture does not certify production object recovery, writer freeze, RPO, the30/60min budget or three-service startup.",
           "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
-          "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings."
+          "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
+          "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack."
         ]
       },
       "gaps": []
@@ -11670,8 +11686,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
-        "verified_on": "2026-10-14"
+        "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -11768,6 +11784,21 @@
           "result": "matched",
           "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+          "result": "passed",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/offline.go",
+          "selector": "func validOfflineProtectionScope(",
+          "result": "matched",
+          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11779,7 +11810,8 @@
           "Isolated migration tests and synthetic approval claims do not certify a production writer freeze, complete production backup-pair restore, startup time budget, destructive authorization, or runtime commit.",
           "The current source c334 ran 7 required Offline native top-level tests plus 6 subtests on owned MySQL8.0.36/Mongo replica-set7.0.25: 13 RUN/PASS, no SKIP, exit0. Before/after hashes of all 3 affected Go sources matched; 2 owned containers and their bridge were released. The isolated synthetic fixture does not certify production object recovery, writer freeze, RPO, the30/60min budget or three-service startup.",
           "Existing container IDs/images were preserved, but the existing nsqd restarted during this test interval. Runtime metadata for all prior services was not stable; no claim of all existing services remaining unchanged or causation is made.",
-          "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings."
+          "The exact native invocation and result are preserved in the immutable private harness6268a020 / JSONLed4cbaf / receipt70a655cc evidence. An equivalent prefix-selector replay is documented for reference only; it was not executed in this documentation task and is not recorded as a passed command. This task actually ran docs-check and reviewed source/hash bindings.",
+          "Merge25b1dd1 integrates actual mainab998 and preserves the main fixed SSH/profile workflow bytes. All 3 object-protection Go files and historical migration resources remain byte-identical. The c334 native receipt is retained as component-code evidence only; the new merged head requires independent CI and is not declared to have rerun the entire native stack."
         ]
       },
       "gaps": [
