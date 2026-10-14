@@ -3793,8 +3793,8 @@
       "owner": "interpretation",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "verified_on": "2026-10-15"
       },
       "fact_sources": [
         {
@@ -3816,6 +3816,26 @@
         {
           "kind": "contract",
           "path": "api/schema/interpretation/ai-explanation-*.schema.json"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-bridge/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-bridge/main_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ai-bridge.yml"
         }
       ],
       "verification": [
@@ -3825,6 +3845,57 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-ai-bridge/main.go",
+          "selector": "historical AI runtime index backfill retired",
+          "result": "matched",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go",
+          "selector": "func TestRuntimeHistoricalRowsRemainUndated",
+          "result": "matched",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -9104,6 +9175,26 @@
         {
           "kind": "source",
           "path": ".github/workflows/cd.yml"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-bridge/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-bridge/main_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ai-bridge.yml"
         }
       ],
       "verification": [
@@ -9143,6 +9234,57 @@
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-ai-bridge/main.go",
+          "selector": "historical AI runtime index backfill retired",
+          "result": "matched",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go",
+          "selector": "func TestRuntimeHistoricalRowsRemainUndated",
+          "result": "matched",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
         }
       ],
@@ -11880,11 +12022,84 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+        "verified_on": "2026-10-15"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-bridge/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-bridge/main_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ai-bridge.yml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "cmd/qs-ai-bridge/main.go",
+          "selector": "historical AI runtime index backfill retired",
+          "result": "matched",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go",
+          "selector": "func TestRuntimeHistoricalRowsRemainUndated",
+          "result": "matched",
+          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+          "verified_on": "2026-10-15"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],

@@ -99,7 +99,7 @@ go test -count=1 ./internal/pkg/migration
 | Actor后续SQL | testee.tags、operators.effective_roles | 外部读取退出，按PK保留原值/roles；PO/Mapper/ReadModel/Domain及现代人员恢复写入完整退出，公开EffectiveRoles继续派生，IAM授权事实保留；NOT NULL旧列不能先停写再留结构 |
 | M4-D / SQL103 Testee维护三表 | testee_store_migration_manifests/items/reversions | manifest/state/hash、candidate/deferred与当前ownership/version/history及补偿义务逐项结清；未结默认保留，空reversions不是删除授权 |
 | M4-D / SQL103 Operator维护两表 | operator_retirement_manifests、clinician_operator_binding_archive | payload/hash、原绑定、现代退出完成和当前IAM权限/回退义务；未结默认保留。operator_retirement_tasks、operator_recovery_archives和正常历史表继续使用 |
-| AI索引回填入口 | qs-ai-bridge runtime-index-backfill、BackfillRuntimeIndexes | 全部受支持环境organization_id NULL为0，Subject/Testee/assessment关联与现用MQ责任完整；退出入口，不删除ai_bridge_requests及正常payload/MQ账本 |
+| M4-E AI索引回填入口 | 候选源码退出qs-ai-bridge runtime-index-backfill及其专用写实现 | 唯一受支持环境生产的source80f只读盘点30请求/30关系、固定NULL/shape/identity/关系缺口0，用户确认旧职责结清；候选尚未部署。不删除ai_bridge_requests、正常关联/payload/MQ账本，不据该snapshot签freeze/DDL/RPO |
 | 临时验收claims | evaluation_acceptance_failure_claims、interpretation_acceptance_failure_claims、qrcode_acceptance_failure_claims | 探针源码及全部运行实例退出、真实失败/重试/重启验收完成；冻结三集合实际文档/spec/身份后独立清除，不删除正常Run/Generation/Outbox责任 |
 
 legacy operatorretire会对assessment/testee等整行算business hash，删除全NULL历史列或空tags也会改变历史投影。先保存原schema、原manifest/AfterHash及对应源码，区分schema改变与业务漂移；不得重写原manifest为“已验证”。历史工具不直接复制到新schema运行，恢复义务只能在具名完整备份与原schema语境验收。Definition派生字段的真实MBTI差异和未结head属于独立M5，默认保留原发布快照、stored assets及冻结报告。
