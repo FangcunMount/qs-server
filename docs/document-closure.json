@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+    "sha": "0b43da3ff3f115951a4d98a484b53dfaa96b0048",
     "verified_on": "2026-10-14"
   },
   "status_policy": {
@@ -9900,7 +9900,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+        "source_sha": "0b43da3ff3f115951a4d98a484b53dfaa96b0048",
         "verified_on": "2026-10-14"
       },
       "fact_sources": [
@@ -9960,6 +9960,22 @@
           "result": "matched",
           "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestHistoricalIndexNativeDirtyObjectBackupRestore",
+          "result": "matched",
+          "source_sha": "0b43da3ff3f115951a4d98a484b53dfaa96b0048",
+          "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/migration/historical_index_retirement_native_integration_test.go",
+          "selector": "session.StartTransaction",
+          "result": "matched",
+          "source_sha": "94d683c12acca78bc2564c810eae767ed7274674",
+          "verified_on": "2026-10-14"
         }
       ],
       "production_evidence": {
@@ -9969,7 +9985,8 @@
         "observed_at": null,
         "limitations": [
           "Source, actual CLI early rejection, and isolated MySQL/Mongo tests verify SQL-only101/39 and Mongo-only101/40 preparation, exact index-object restoration and real scoped auth denial. Historical batch tooling is restricted to isolated original-schema materials. No production DDL, complete production backup-pair restore, 30/60-minute recovery, deployment or business acceptance is attested.",
-          "Fourteen migration native tests passed with exact owned-resource release; a pre-existing local NSQ restart loop prevented the extra all-existing-container stability observation. This is not NSQ integration acceptance."
+          "Fourteen migration native tests passed with exact owned-resource release; a pre-existing local NSQ restart loop prevented the extra all-existing-container stability observation. This is not NSQ integration acceptance.",
+          "Real partial-DDL dirty recovery from captured fixed-object and original migration-ledger backups was proven only in an owned MySQL8.0.36/Mongo7.0.25 fixture. The ledger was replayed last in an explicit transaction; failed replay retained dirty metadata. Production7.0.31, original-image full startup, production permissions/capacity and30/60-minute/RPO0 acceptance remain unproven. Complete dual-database backup is no longer a uniform M4-A/B prerequisite; actual approved per-object backups, freeze evidence, named ownership and no-new-runtime boundaries remain required."
         ]
       },
       "gaps": []
