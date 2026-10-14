@@ -6,6 +6,10 @@ import json
 import os
 from pathlib import Path
 import re
+import selectors
+import signal
+import subprocess
+import time
 import sys
 import tempfile
 
@@ -16,7 +20,7 @@ KEYS = {"format_version", "source_sha", "run_id", "expected_target_hash", "sourc
 FACT_KEYS = {"current_global_select_grant", "current_global_show_view_grant", "current_global_trigger_grant", "current_global_event_grant", "current_partial_revocations_present"}
 ALLOWED_KEYS = KEYS | FACT_KEYS
 
-ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed"}
+ERRORS = {"none", "input_invalid", "connection_input_invalid", "connection_config_failed", "connection_failed", "identity_read_failed", "target_identity_mismatch", "target_hash_mismatch", "current_grants_query_failed", "current_grants_rejected", "rds_role_query_failed", "rds_role_grants_rejected", "identity_final_failed", "session_identity_changed", "mandatory_roles_query_failed", "connection_release_failed", "database_release_failed", "profile_input_preflight_failed", "profile_package_preflight_failed", "profile_trusted_ssh_preflight_failed", "profile_remote_or_receipt_failed"}
 
 
 FAILURE_RECEIPT = {"format_version": 1, "diagnostic_only": True, "complete": False,
@@ -127,6 +131,74 @@ def execute(binary, env, module):
     finally:
         runtime.cleanup()
     return code, value
+
+
+PROFILE_KEYS = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+                "PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH")
+
+
+def capture_private(args, *, env, payload=None, timeout=50, limit=65536):
+    """Bound one owned child; drain stderr without retaining or publishing it."""
+    process = subprocess.Popen(args, env=env, stdin=subprocess.PIPE if payload is not None else subprocess.DEVNULL,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, bufsize=0)
+    selector = selectors.DefaultSelector()
+    output, offset, total = bytearray(), 0, 0
+    deadline = time.monotonic() + timeout
+    try:
+        for stream in (process.stdout, process.stderr):
+            os.set_blocking(stream.fileno(), False)
+            selector.register(stream, selectors.EVENT_READ)
+        if payload is not None:
+            os.set_blocking(process.stdin.fileno(), False)
+            selector.register(process.stdin, selectors.EVENT_WRITE)
+        while selector.get_map():
+            if time.monotonic() >= deadline:
+                raise TimeoutError("profile_child_timeout")
+            for key, _ in selector.select(min(0.2, max(0, deadline - time.monotonic()))):
+                if key.fileobj is process.stdin:
+                    if offset < len(payload):
+                        offset += os.write(process.stdin.fileno(), payload[offset:offset + 65536])
+                    if offset == len(payload):
+                        selector.unregister(process.stdin)
+                        process.stdin.close()
+                    continue
+                block = os.read(key.fileobj.fileno(), 65536)
+                if not block:
+                    selector.unregister(key.fileobj)
+                else:
+                    total += len(block)
+                    if total > limit:
+                        raise ValueError("profile_child_output_limit")
+                    if key.fileobj is process.stdout:
+                        output.extend(block)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("profile_child_timeout")
+        return process.wait(timeout=remaining), bytes(output)
+    finally:
+        # Only this call's new session is signalled; no host-wide process cleanup.
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=5)
+        selector.close()
+        for stream in (process.stdin, process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
+
+
+def execute_native(binary, env, module):
+    sha, run, expected = (env.get(k, "") for k in ("PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH"))
+    if not SHA.fullmatch(sha) or not RUN.fullmatch(run) or not HASH.fullmatch(expected):
+        raise ValueError("input_invalid")
+    module.validate_source(env)
+    path = Path(binary)
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise ValueError("binary_invalid")
+    # No inherited LD_*, Go, shell or unrelated production credential variables.
+    private = {key: env.get(key, "") for key in PROFILE_KEYS}
+    private["MYSQL_PORT"] = private["MYSQL_PORT"] or "3306"
+    code, raw = capture_private([str(path)], env=private)
+    return code, safe_receipt(module, raw, code, sha, run, expected)
 
 
 def main():
