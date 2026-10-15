@@ -40,8 +40,59 @@ jobs:
         run: python3 scripts/check_service_token_retirement.py
 
       - name: Run tests
+        id: go_tests
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          set -Eeuo pipefail
+          umask 077
+          test_log="$(mktemp "${RUNNER_TEMP}/qs-go-tests.XXXXXX")"
+          printf 'log_path=%s\n' "$test_log" >> "$GITHUB_OUTPUT"
+          set +e
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee "$test_log"
+          test_status=("${PIPESTATUS[@]}")
+          set -e
+          if (( test_status[0] != 0 || test_status[1] != 0 )); then
+            summary_status=0
+            python3 - "$test_log" <<'PY' || summary_status=$?
+          import json, pathlib, re, sys
+          lines = pathlib.Path(sys.argv[1]).read_bytes().splitlines()
+          failure = re.compile(rb'(^\s*--- FAIL:|^FAIL(?:\s|$)|^panic:|^fatal error:|^WARNING: DATA RACE(?:\s|$))')
+          hits = [i for i, line in enumerate(lines) if failure.search(line)]
+          anchor_kind = 'hard_failure'
+          if not hits:
+              diagnostic = re.compile(rb'^[^\s:]+\.go:[0-9]+(?::[0-9]+)?:')
+              hits = [i for i, line in enumerate(lines) if diagnostic.search(line)]
+              anchor_kind = 'compiler_fallback'
+          windows = []
+          for i in hits:
+              start, end = max(0, i - 16), min(len(lines), i + 17)
+              if windows and start <= windows[-1][1]: windows[-1][1] = max(end, windows[-1][1])
+              else: windows.append([start, end])
+          body, cap, emitted, truncated, clipped = bytearray(), 64000, 0, False, 0
+          for start, end in windows:
+              chunk = ('--- lines %d-%d ---\n' % (start + 1, end)).encode()
+              for line in lines[start:end]:
+                  clipped += len(line) > 1024
+                  chunk += b'| ' + line[:1024] + (b' [line clipped to 1024 bytes]' if len(line) > 1024 else b'') + b'\n'
+              remaining = cap - len(body)
+              body.extend(chunk[:remaining]); emitted += 1; truncated = len(chunk) > remaining
+              if truncated or len(body) == cap: break
+          truncated = truncated or emitted < len(windows) or clipped > 0
+          header = {'kind':'go_test_failure_context', 'anchor_kind':anchor_kind, 'source_lines':len(lines), 'matched_lines':len(hits), 'context_windows':len(windows), 'emitted_windows':emitted, 'truncated':truncated, 'clipped_lines_in_examined_windows':clipped, 'source_line_limit_bytes':1024, 'context_bytes':len(body), 'output_limit_bytes':65536}
+          sys.stdout.buffer.write(b'GO_TEST_FAILURE_SUMMARY_BEGIN\n' + json.dumps(header).encode() + b'\n' + body + b'\nGO_TEST_FAILURE_SUMMARY_END\n')
+          PY
+            printf 'GO_TEST_EXIT=%s TEE_EXIT=%s SUMMARY_EXIT=%s\n' "${test_status[0]}" "${test_status[1]}" "$summary_status"
+            if (( test_status[0] != 0 )); then exit "${test_status[0]}"; fi
+            exit "${test_status[1]}"
+          fi
+
+      - name: Upload failed ordinary test log
+        if: failure() && steps.go_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ordinary-go-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.go_tests.outputs.log_path }}
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Compile all integration-tag contracts
         run: |
