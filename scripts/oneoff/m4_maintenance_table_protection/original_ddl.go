@@ -21,14 +21,18 @@ func originalResourceBytesValid() bool {
 	return fingerprint(original075) == "4e75a3480897c84a8b91141fe5a2da2b6e08919400ce1ea01da6f83d2294b339" && fingerprint(original078) == "75ddef7f5be0b05a19f8da77db4dba81d41493c7d8ac6970a638746ece127720"
 }
 
-// MySQL 8.0.36 SHOW CREATE rendering is closed over the original five schemas.
-// The three explicit table collations do not permit column-level overrides,
-// extra keys/checks, normalization or material-provided SQL.
+// MySQL 8.0.36 SHOW CREATE rendering is closed over the observed five schemas
+// for these three collations. The two non-default collations explicitly repeat
+// the table collation on each fixed text column. Different column overrides,
+// extra keys/checks, normalization and material-provided SQL remain rejected.
 func originalDDL(i int, collation string) string {
 	s := scope[i]
 	lines := make([]string, 0, len(s.columns)+3)
 	for _, c := range s.columns {
 		line := "  `" + c.Name + "` " + c.Type
+		if (collation == "utf8mb4_general_ci" || collation == "utf8mb4_unicode_ci") && (c.Type == "longtext" || strings.HasPrefix(c.Type, "char(") || strings.HasPrefix(c.Type, "varchar(")) {
+			line += " COLLATE " + collation
+		}
 		if c.Nullable {
 			line += " DEFAULT NULL"
 		} else {
