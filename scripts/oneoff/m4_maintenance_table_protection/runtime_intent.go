@@ -61,6 +61,18 @@ func noRecoveryState(m material, hash string) error {
 }
 
 func validateRuntimeIntent(v runtimeIntent, m material, hash, tool string, ap *approval, now time.Time) error {
+	if e := validateRuntimeIntentScope(v, m, hash, tool, ap, now); e != nil {
+		return e
+	}
+	if v.Mode == "restored102" && markerAbsent(ap.Marker) != nil {
+		return errors.New("runtime_original_recovery_scope_rejected")
+	}
+	return markerAbsent(v.Marker)
+}
+
+// This shared field/window check does not grant a new mark or restore right.
+// The live entry above always retains its marker-absence requirement.
+func validateRuntimeIntentScope(v runtimeIntent, m material, hash, tool string, ap *approval, now time.Time) error {
 	if v.Format != 1 || v.Kind != "m4_d_first_runtime_intent" || !operationRE.MatchString(v.Operation) || v.ToolSource != tool || v.DSource != dSource || v.DResources != dResources || v.DResourceFiles != dResourceFiles || v.MaterialHash != hash || !nonzeroHash(hash) || v.CapturePath != m.CapturePath || v.Marker != derivedRuntimeMarker(m) || v.Binding != m.Binding || !nonzeroHash(v.FreezeHash) || !nonzeroHash(v.ResponsibilityHash) || !v.RuntimeFrozen || !v.RuntimeNotStarted || !v.AllowMarker {
 		return errors.New("runtime_intent_binding_rejected")
 	}
@@ -88,13 +100,13 @@ func validateRuntimeIntent(v runtimeIntent, m material, hash, tool string, ap *a
 			return e
 		}
 	case "restored102":
-		if ap == nil || v.ApplyNotDispatched || v.WindowStarted != ap.WindowStarted || v.Deadline != ap.Deadline || v.FreezeHash != ap.FreezeHash || v.ResponsibilityHash != ap.ResponsibilityHash || expiry.After(mustTime(ap.Expires)) || validateApproval(*ap, m, hash, tool, now) != nil {
+		if ap == nil || v.ApplyNotDispatched || v.WindowStarted != ap.WindowStarted || v.Deadline != ap.Deadline || v.FreezeHash != ap.FreezeHash || v.ResponsibilityHash != ap.ResponsibilityHash || expiry.After(mustTime(ap.Expires)) || validateApprovalScope(*ap, m, hash, tool, now) != nil {
 			return errors.New("runtime_original_recovery_scope_rejected")
 		}
 	default:
 		return errors.New("runtime_intent_mode_rejected")
 	}
-	return markerAbsent(v.Marker)
+	return nil
 }
 
 func mustTime(text string) time.Time {

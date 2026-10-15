@@ -63,6 +63,15 @@ func markerAbsent(path string) error {
 }
 
 func validateApproval(a approval, m material, materialHash, tool string, now time.Time) error {
+	if e := validateApprovalScope(a, m, materialHash, tool, now); e != nil {
+		return e
+	}
+	return markerAbsent(a.Marker)
+}
+
+// Scope validation has no marker or current-authority side effects. Completion
+// uses it only at the original committed record time, under a new approval.
+func validateApprovalScope(a approval, m material, materialHash, tool string, now time.Time) error {
 	if a.Format != 1 || a.Kind != "m4_d_pre_start_maintenance_table_restore" || !operationRE.MatchString(a.Operation) || a.ToolSource != tool || a.DSource != dSource || a.DResources != dResources || a.DResourceFiles != dResourceFiles || a.MaterialHash != materialHash || !nonzeroHash(materialHash) || !nonzeroHash(a.FreezeHash) || !nonzeroHash(a.ResponsibilityHash) || a.Binding != m.Binding || a.Marker != derivedRuntimeMarker(m) || !a.RuntimeFrozen || !a.RuntimeNotStarted || a.RetentionDays < 30 || a.DataOwner != "system (10001)" || a.RecoveryOwner != "system (10001)" {
 		return errors.New("restore_approval_binding_rejected")
 	}
@@ -74,7 +83,7 @@ func validateApproval(a approval, m material, materialHash, tool string, now tim
 	if e1 != nil || e2 != nil || e3 != nil || e4 != nil || e5 != nil || start.After(captured) || captured.After(decision) || decision.After(now) || !deadline.After(now) || deadline.After(decision.Add(time.Hour)) || !expiry.After(now) || expiry.After(now.Add(24*time.Hour)) {
 		return errors.New("restore_approval_budget_rejected")
 	}
-	return markerAbsent(a.Marker)
+	return nil
 }
 
 func recoveryPaths(m material, materialHash, operation string) (boundary, consumed string, err error) {

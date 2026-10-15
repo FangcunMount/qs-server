@@ -169,8 +169,8 @@ jobs:
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
     runs-on: ubuntu-latest
-    # 6 x 8m tests + 6 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 86m; ceil90.
-    timeout-minutes: 90
+    # 7 x 8m tests + 7 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 97m; ceil100.
+    timeout-minutes: 100
     services:
       mysql:
         image: mysql:8.0.36
@@ -271,7 +271,7 @@ jobs:
           trap cleanup_owned_fixture EXIT
           start_owned_fixture() {
             [[ -z "$fixture_cid" && "$fixture_network_created" == false && -z "$fixture_owner" && -z "$fixture_name" && -z "$fixture_network" ]] || exit 1
-            case "$1" in m|a|b|c|d|g) fixture_phase="$1" ;; *) exit 1 ;; esac
+            case "$1" in m|a|b|c|d|g|h) fixture_phase="$1" ;; *) exit 1 ;; esac
             fixture_owner="${fixture_run_owner}${fixture_phase}"
             [[ "$fixture_owner" =~ ^[a-z0-9]{8,24}$ ]] || exit 1
             fixture_name="qs-mongo-profile-owned-${fixture_owner}"
@@ -662,6 +662,95 @@ jobs:
           cleanup_owned_fixture
           unset TMPDIR
           d_native_proof union maintenance-object-native.jsonl runtime-generation-native.jsonl "$object_source"
+
+          # Completion13 is independent of the original74 union and has a third fresh D Mongo/tmpfs.
+          start_owned_fixture h
+          export QS_M4_D_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"
+          d_native_tmp="$(mktemp -d "$HOME/qs-m4-d-native-${fixture_run_owner}.XXXXXX")"
+          export TMPDIR="$d_native_tmp"
+          # Build only the fixed historical CLI; shallow checkouts may fetch that exact object.
+          old_completion_source='5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c'
+          if ! git cat-file -e "${old_completion_source}^{commit}" 2>/dev/null; then
+            timeout 60s git fetch --no-tags --depth=1 origin "$old_completion_source"
+          fi
+          [[ "$(git rev-parse "${old_completion_source}^{commit}")" == "$old_completion_source" ]]
+          [[ "$(git rev-parse HEAD)" == "$object_source" ]]
+          mkdir -m 700 "$d_native_tmp/old-source"
+          git archive --format=tar --output="$d_native_tmp/old-source.tar" "$old_completion_source"
+          tar -xf "$d_native_tmp/old-source.tar" -C "$d_native_tmp/old-source"
+          timeout 120s env GOMAXPROCS=2 go -C "$d_native_tmp/old-source" build -p=2 \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$old_completion_source" \
+            -o "$d_native_tmp/old-d-cli" ./scripts/oneoff/m4_maintenance_table_protection
+          chmod 700 "$d_native_tmp/old-d-cli"
+          export QS_M4_D_COMPLETION_OLD_CLI_REQUIRED=1
+          export QS_M4_D_COMPLETION_OLD_CLI_FILE="$d_native_tmp/old-d-cli"
+          QS_M4_D_COMPLETION_OLD_CLI_SHA256="$(sha256sum "$QS_M4_D_COMPLETION_OLD_CLI_FILE" | awk '{print $1}')"
+          export QS_M4_D_COMPLETION_OLD_CLI_SHA256
+          [[ "$QS_M4_D_COMPLETION_OLD_CLI_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          printf 'D_COMPLETION_FIXED_OLD_CLI source=%s binary_sha256=%s archive_sha256=%s\n' "$old_completion_source" "$QS_M4_D_COMPLETION_OLD_CLI_SHA256" "$(sha256sum "$d_native_tmp/old-source.tar" | awk '{print $1}')"
+          old_probe_status=0
+          env -i GOMAXPROCS=2 "$QS_M4_D_COMPLETION_OLD_CLI_FILE" --fixed-old-cli-pre-environment-probe-must-be-invalid > "$d_native_tmp/old-probe.json" || old_probe_status=$?
+          [[ "$old_probe_status" == 1 ]]
+          python3 - "$d_native_tmp/old-probe.json" "$old_completion_source" <<'PY_D_OLD_CLI_PROBE'
+          import json, sys
+          raw = open(sys.argv[1], 'rb').read(65537)
+          if not raw or len(raw) > 65536:
+              raise SystemExit('fixed old CLI probe output is missing or oversized')
+          probe = json.loads(raw)
+          if probe.get('compiled_tool_source') != sys.argv[2] or probe.get('error_category') != 'arguments_invalid' or probe.get('complete') is not False or any(probe.get(k) is not False for k in ('sql_connection_closed', 'sql_pool_closed', 'mongo_closed', 'runtime_gate_acquired', 'approval_consumed', 'runtime_marker_written', 'runtime_database_boundary_advanced')):
+              raise SystemExit('fixed old CLI must prove its actual compiled source before database ENV')
+          PY_D_OLD_CLI_PROBE
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^TestM4MaintenanceTablesCommittedRuntimeCompletionNative$' ./scripts/oneoff/m4_maintenance_table_protection | tee runtime-completion-native.jsonl
+          [[ "$(sha256sum "$QS_M4_D_COMPLETION_OLD_CLI_FILE" | awk '{print $1}')" == "$QS_M4_D_COMPLETION_OLD_CLI_SHA256" ]]
+          [[ "$(git rev-parse HEAD)" == "$object_source" ]]
+          printf 'D_COMPLETION_FIXED_OLD_CLI_FINAL binary_sha256=%s\n' "$QS_M4_D_COMPLETION_OLD_CLI_SHA256"
+          python3 - runtime-completion-native.jsonl "$object_source" <<'PY_D_RUNTIME_COMPLETION_PROOF'
+          import collections, json, re, sys
+          expected = {
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/CreateACKUnknown_cancel102',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/CreateACKUnknown_target103',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/CreateACKUnknown_restored102',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/UpdateCommitACKUnknown',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/ExistingOriginalMarkerAfterOutputLoss',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/CompletionOutputLossThenIdempotentExisting',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/PartialMarkerRemainsBlocked',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/RetainedDriftBlocked',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/NewGenerationBlocked',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/ReleaseUnknownWithholdsTypedConfirmation',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/SharedServerGateBlocksConfirmation',
+              'TestM4MaintenanceTablesCommittedRuntimeCompletionNative/DirtyTargetIsNotRepaired',
+          }
+          source = sys.argv[2]
+          package = 'github.com/FangcunMount/qs-server/scripts/oneoff/m4_maintenance_table_protection'
+          if len(expected) != 13 or not re.fullmatch(r'[0-9a-f]{40}', source):
+              raise SystemExit('D completion requires its exact13 selectors and checkout source')
+          events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
+          counts = {action: collections.Counter(event['Test'] for event in events if event.get('Action') == action and event.get('Test')) for action in ('run', 'pass')}
+          failures = sum(event.get('Action') == 'fail' for event in events)
+          skips = sum(event.get('Action') == 'skip' for event in events)
+          packages = collections.Counter(event.get('Package') for event in events if event.get('Action') == 'pass' and not event.get('Test'))
+          streams = collections.defaultdict(str)
+          for event in events:
+              if event.get('Package') != package:
+                  raise SystemExit('D completion log contains a missing or foreign package')
+              if event.get('Test') and 'Output' in event:
+                  streams[event['Test']] += event['Output']
+          entries, sources = set(), set()
+          for output in streams.values():
+              entries.update(re.findall(r'actual compiled D fixture tool=([0-9a-f]{40}) phase=before_dependency_binding', output))
+              sources.update(re.findall(r'actual owned dependencies mysql=8\.0\.36 mongo=7\.0\.31 rs0; Dsource=c335b2a1a34dd69830261e2d8e11b16da3f8befb resources=20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d files=286; tool=([0-9a-f]{40})', output))
+          summary = {'proof': 'D committed-intent completion native', 'compiled_tool_sources': sorted(sources), 'entry_tool_sources': sorted(entries), 'required': len(expected), 'actual': {action: dict(counts[action]) for action in counts}, 'fail_events': failures, 'skip_events': skips, 'package_pass': dict(packages)}
+          print(json.dumps(summary, sort_keys=True))
+          if failures or skips or entries != {source} or sources != {source} or packages != collections.Counter({package: 1}):
+              raise SystemExit('D completion requires actual checkout/dependency/terminal package proof and zero FAIL/SKIP')
+          if any(counts[action] != collections.Counter({name: 1 for name in expected}) for action in counts):
+              raise SystemExit('D completion requires every exact selector once RUN/PASS in its own fresh phase')
+          PY_D_RUNTIME_COMPLETION_PROOF
+          cleanup_owned_fixture
+          unset TMPDIR
 
 
   action-audit-mysql:

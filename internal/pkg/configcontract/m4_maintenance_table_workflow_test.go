@@ -36,11 +36,11 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 	for _, step := range job.Steps {
 		runs += step.Run
 	}
-	if job.Timeout != ((6*8+6*3+20+9)/10)*10 {
-		t.Fatal("six bounded phases need 48m tests,18m readiness sleeps,20m setup/proof/cleanup rounded to90m")
+	if job.Timeout != ((7*8+7*3+20+9)/10)*10 {
+		t.Fatal("seven bounded phases need56m tests,21m readiness sleeps,20m setup/proof/cleanup rounded to100m")
 	}
 	for _, required := range []string{
-		`case "$1" in m|a|b|c|d|g)`,
+		`case "$1" in m|a|b|c|d|g|h)`,
 		`start_owned_fixture d`, `start_owned_fixture g`,
 		`export QS_M4_D_OBJECT_NATIVE_REQUIRED=1`,
 		`export QS_M4_D_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only`,
@@ -53,17 +53,17 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 			t.Fatal("D native phase lost its real selector or owned dependency boundary", required)
 		}
 	}
-	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdg])$`).FindAllStringSubmatch(runs, -1)
-	if len(phases) != 6 {
-		t.Fatal("metadata/A/B/C/D/combined each need exactly one fresh phase")
+	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdgh])$`).FindAllStringSubmatch(runs, -1)
+	if len(phases) != 7 {
+		t.Fatal("metadata/A/B/C/D/combined/completion each need exactly one fresh phase")
 	}
-	for i, phase := range []string{"m", "a", "b", "c", "d", "g"} {
+	for i, phase := range []string{"m", "a", "b", "c", "d", "g", "h"} {
 		if phases[i][1] != phase {
 			t.Fatal("fresh-phase order must preserve every existing stage", phase)
 		}
 	}
-	if strings.Count(runs, "-timeout=8m -json") != 5 {
-		t.Fatal("five tool commands plus metadata retain six original8m budgets")
+	if strings.Count(runs, "-timeout=8m -json") != 6 {
+		t.Fatal("six tool commands plus metadata retain seven original8m budgets")
 	}
 	bEnd := strings.LastIndex(runs, "PY_MONGO_OBJECT_PROOF")
 	cStart := strings.Index(runs, "start_owned_fixture c\n")
@@ -159,7 +159,7 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 	if !expected["TestM4MaintenanceTablesNativeFirstRuntimeGate"] || !expected["TestM4MaintenanceTablesNativeRuntimeGeneration"] || !expected["TestM4MaintenanceTablesReadOnlyInspectNative"] || len(tops) != 18 || len(expected) != 74 {
 		t.Fatal("D proof must retain original sixteen plus generation and independent inspection tops")
 	}
-	selectors := regexp.MustCompile(`-run='([^']+)' ./scripts/oneoff/m4_maintenance_table_protection`).FindAllStringSubmatch(runs, -1)
+	selectors := regexp.MustCompile(`-run='([^']+)' ./scripts/oneoff/m4_maintenance_table_protection`).FindAllStringSubmatch(runs[:unionProof], -1)
 	if len(selectors) != 2 {
 		t.Fatal("D must run exactly two bounded selectors")
 	}
