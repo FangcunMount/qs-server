@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -106,6 +107,9 @@ func parseArgs(args []string) (arguments, error) {
 	case "capture":
 		if a.capture == "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
+		}
+		if filepath.Base(a.capture) == "first-runtime" {
+			return a, errors.New("capture_runtime_marker_path_conflict")
 		}
 	case "verify-target", "restore", "verify-restored":
 		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") || a.action != "verify-target" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {

@@ -174,7 +174,7 @@ func validateRow(s tableSpec, row rowProof) error {
 		}
 		size += len(v.Bytes)
 	}
-	if size > maxRowBytes || row.Hash != rowHash(s.columns, row.Values) {
+	if size > maxRowBytes || size > insertBatchBytes || row.Hash != rowHash(s.columns, row.Values) {
 		return errors.New("material_row_hash_or_limit_rejected")
 	}
 	for n, key := range s.keys {
