@@ -7042,6 +7042,128 @@
         "No sustained writer freeze, RPO0, production30/60min, T0, qualified protection material, DDL, restore, supply or deployment was performed. The original26 entries remain unchanged.",
         "The small source correction must separately pass cross-charset native recovery and current source gates. Immutable099 and A511 images/executor remain unchanged; old07a evidence cannot qualify the new tool."
       ]
+    },
+    {
+      "id": "infra-2026-10-15-qs-cleanup-m4-a-full-readonly-preflight",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-15T00:00:31.274526785Z",
+      "environment": "production/serverA qs dual-store readonly inspect/capture; approved Mac mini root SSH, existing M2 API image used only as owned CLI carriers",
+      "deployed_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "source_baseline_sha": "4a8642b045289423b75bca945f2b9b3b4365c01e",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "Original API CID/image/PID1 ELF/config/environment/argv and both networks match before/after using fixed source4a decoder. This is not complete in-memory Options or an all-six-instance refresh."
+      },
+      "command": "Private frozen v9 --read-only-preflight source manifest84870c79/Tool94ab3a7c binary7df1c9d6/target624a87c0; fixed inspect and capture only, no window or restore arguments.",
+      "result": {
+        "status": "passed",
+        "summary": "Scoped online readonly preflight passed. Both original NULL columns accepted exactly; all247463 rows per table and mandatory EOF captured, external SQL/Mongo/ledger UUID identities match, clean100/39 and all releases proved. No sustained writer freeze, T0, migration or production maintenance qualification is inferred.",
+        "measurements": {
+          "tool_source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "tool_binary_sha256": "7df1c9d6da4b6cbe1425c1867c7d5916562818d7dc9881266b17fc542d9ae1f2",
+          "a_execution_source": "51163edab7038adcdb6b8f1712d6dc434f361dc6",
+          "a_resources_sha256": "77e11d801d270ef7b12f86261a05217a95bd8f8049f20d2e5f14ee0c0a20083b",
+          "a_resource_file_count": 280,
+          "external_identity_matches": {
+            "mysql_identity_sha256": {
+              "expected": "833eb55bdcba767dc66f0b02da8315f5ba1fc7c52848fc517edb4a5bd4bf7b32",
+              "actual": "833eb55bdcba767dc66f0b02da8315f5ba1fc7c52848fc517edb4a5bd4bf7b32",
+              "match": true
+            },
+            "mongo_identity_sha256": {
+              "expected": "318f0d870223acb5a967888e425ee93650567cf1260d5023081889286966762d",
+              "actual": "318f0d870223acb5a967888e425ee93650567cf1260d5023081889286966762d",
+              "match": true
+            },
+            "mongo_ledger_uuid_sha256": {
+              "expected": "41001a66d87e9ffc2cab156f526145faba8b249910c43e8010cadb11893b3bbc",
+              "actual": "41001a66d87e9ffc2cab156f526145faba8b249910c43e8010cadb11893b3bbc",
+              "match": true
+            }
+          },
+          "mysql_version_number": 100,
+          "mysql_dirty": false,
+          "mongo_version_number": 39,
+          "mongo_dirty": false,
+          "tables": [
+            {
+              "table": "assessment",
+              "retained_row_count": 247463,
+              "historical_column_SQL_NULL_count": 247463,
+              "historical_column_non_NULL_count": 0,
+              "pages_including_empty_eof": 249,
+              "mandatory_eof": true,
+              "all_historical_values_SQL_NULL": true,
+              "retained_column_count": 36,
+              "original_ddl_sha256": "355ebfbe49bd6a44abbb43e72158d4f23fc19d63f8e98e1d6c51f7ab97336d77",
+              "retained_ddl_sha256": "5edb36dd71a5b6ec0d88bd465cc84ad4a70a89d584794f1698987ee29c8e97bb"
+            },
+            {
+              "table": "evaluation_outcome",
+              "retained_row_count": 247463,
+              "historical_column_SQL_NULL_count": 247463,
+              "historical_column_non_NULL_count": 0,
+              "pages_including_empty_eof": 249,
+              "mandatory_eof": true,
+              "all_historical_values_SQL_NULL": true,
+              "retained_column_count": 20,
+              "original_ddl_sha256": "946b4e1d0852504e34fa3772a05a12b8061c8fd3130071cfd9fb3ed63d4b26c2",
+              "retained_ddl_sha256": "973c0b72344815c543f665b19c114b6ee585165cb8b8e10d6e903f215aee2484"
+            }
+          ],
+          "total_pages_with_mandatory_eof": 498,
+          "material_bytes": 54963794,
+          "material_sha256": "beb9036da76c0b56355b11be46dd6bef11c87fb8fc96975614e679b0b224df43",
+          "material_is_online_preflight_not_T0": true,
+          "outer_elapsed_seconds": 194.2913,
+          "server_elapsed_seconds": 167.3012,
+          "api_runtime_unchanged": true,
+          "all_owned_and_connection_releases_verified": true,
+          "known_hosts_unchanged": true,
+          "freeze_verified": false,
+          "T0_capture": false,
+          "production_stop_ddl_delete_restore_deploy_calls": 0,
+          "new_tool_native_required_run_pass": 25,
+          "new_tool_native_skips_failures": 0,
+          "new_source_PR_number": 371,
+          "new_source_PR_head": "e93282a7be74a5c284c0554c39fa04fcbb8baeb2",
+          "new_source_PR_full_CI_completed": false,
+          "artifacts": [
+            {
+              "file": "qs-m4-a-readonly-preflight-wrapper-v9/actual-execution-receipt.json",
+              "sha256": "d26e2c955a66062e684c31d1b81c289d38922b25d76c0c5cf0202567cea91c0b"
+            },
+            {
+              "file": "qs-m4-a-readonly-preflight-wrapper-v9/safe-capture-metadata.json",
+              "sha256": "0b5a0d1d59c542d6c526f132421f628c284a231a414666a9d4a91dedd22204e0"
+            },
+            {
+              "file": "qs-m4-a-readonly-preflight-wrapper-v9/execution-evidence-index.json",
+              "sha256": "64fc453a9eb57b5e80602f81887e0e6992a8c9e3d29fce6632958004f96fcfd8"
+            }
+          ]
+        }
+      },
+      "owner": "system (10001): data and recovery; Codex: bounded readonly preflight and source preparation",
+      "expires_on": "2026-11-14",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#656-a原编码工具修复25场景原生回归与生产全量只读预检"
+        }
+      ],
+      "limitations": [
+        "Online material is not the first frozen-window material and must never be used to rewind a later migration ledger. Raw material remains only in approved Mac private storage.",
+        "Fresh source e932 CI remains pending at this record; actual native source94 and operational binary7df are distinct frozen identities. The old27 entry objects remain unchanged.",
+        "Readonly full scan elapsed time and synthetic native100s do not prove production30min/RTO60min/RPO0. No runtime stop/start, DDL, deletion, restore, image load/tag or deployment was performed.",
+        "Only the original API runtime/input fingerprint is reread. Complete effective in-memory configuration, all six instance freshness and real business acceptance remain separate."
+      ]
     }
   ]
 }
