@@ -83,22 +83,23 @@ type binding struct {
 	MongoUUID     string `json:"mongo_ledger_uuid_sha256"`
 }
 type material struct {
-	Format         int           `json:"format_version"`
-	Kind           string        `json:"kind"`
-	ToolSource     string        `json:"compiled_tool_source"`
-	CSource        string        `json:"c_execution_source"`
-	CResources     string        `json:"c_execution_resources_sha256"`
-	CResourceFiles int           `json:"c_execution_resource_files"`
-	CapturedAt     string        `json:"captured_at"`
-	CapturePath    string        `json:"first_capture_path"`
-	Binding        binding       `json:"binding"`
-	SessionZone    string        `json:"session_time_zone"`
-	SessionCharset string        `json:"session_character_set_results"`
-	SessionSQLMode string        `json:"session_sql_mode"`
-	LedgerDDL      string        `json:"original_sql_ledger_ddl"`
-	Ledger         []ledgerRow   `json:"original_complete_sql_ledger"`
-	MongoHead      []byte        `json:"independently_observed_mongo40_bson"`
-	Tables         [4]tableProof `json:"tables"`
+	Format          int                  `json:"format_version"`
+	Kind            string               `json:"kind"`
+	ToolSource      string               `json:"compiled_tool_source"`
+	CSource         string               `json:"c_execution_source"`
+	CResources      string               `json:"c_execution_resources_sha256"`
+	CResourceFiles  int                  `json:"c_execution_resource_files"`
+	CapturedAt      string               `json:"captured_at"`
+	CapturePath     string               `json:"first_capture_path"`
+	Binding         binding              `json:"binding"`
+	SessionZone     string               `json:"session_time_zone"`
+	SessionCharset  string               `json:"session_character_set_results"`
+	SessionSQLMode  string               `json:"session_sql_mode"`
+	LedgerDDL       string               `json:"original_sql_ledger_ddl"`
+	Ledger          []ledgerRow          `json:"original_complete_sql_ledger"`
+	MongoHead       []byte               `json:"independently_observed_mongo40_bson"`
+	Tables          [4]tableProof        `json:"tables"`
+	RuntimeBoundary runtimeBoundaryState `json:"runtime_database_boundary"`
 }
 
 func fingerprint(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
@@ -187,7 +188,7 @@ func validateMaterial(m material, tool string, b binding) error {
 	if !absolutePath(m.CapturePath) {
 		return errors.New("material_first_capture_path_required")
 	}
-	if m.Format != 1 || m.Kind != "m4_c_actor_column_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.Binding != b || !validBinding(b) || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || m.LedgerDDL == "" || len(m.LedgerDDL) > 65536 || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{101, false}) || !cleanMongo40(m.MongoHead) {
+	if m.Format != 2 || !validRuntimeBoundaryState(m.RuntimeBoundary, b) || m.Kind != "m4_c_actor_column_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.Binding != b || !validBinding(b) || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || m.LedgerDDL == "" || len(m.LedgerDDL) > 65536 || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{101, false}) || !cleanMongo40(m.MongoHead) {
 		return errors.New("material_binding_rejected")
 	}
 	if _, e := time.Parse(time.RFC3339Nano, m.CapturedAt); e != nil {

@@ -96,7 +96,7 @@ func sameValue(a, b *originalValue) bool {
 // nullable column or partial row population on its own.
 func validateRecoveryState(original material, current recoveryState, allowContinuation bool) error {
 	m := current.Material
-	if m.Format != original.Format || m.Kind != original.Kind || m.Binding != original.Binding || m.ToolSource != original.ToolSource || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.SessionZone != original.SessionZone || m.SessionCharset != original.SessionCharset || m.SessionSQLMode != original.SessionSQLMode || m.LedgerDDL != original.LedgerDDL || len(m.Ledger) != 1 || m.Ledger[0].Version != 102 || !bytes.Equal(m.MongoHead, original.MongoHead) {
+	if m.Format != original.Format || m.RuntimeBoundary != original.RuntimeBoundary || m.Kind != original.Kind || m.Binding != original.Binding || m.ToolSource != original.ToolSource || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.SessionZone != original.SessionZone || m.SessionCharset != original.SessionCharset || m.SessionSQLMode != original.SessionSQLMode || m.LedgerDDL != original.LedgerDDL || len(m.Ledger) != 1 || m.Ledger[0].Version != 102 || !bytes.Equal(m.MongoHead, original.MongoHead) {
 		return errors.New("restore_identity_or_original_ledger_rejected")
 	}
 	tags, roles := current.Columns[0], current.Columns[1]
@@ -165,13 +165,16 @@ func (d database) recoverySnapshot(ctx context.Context, tool string) (out recove
 			recordRollback(&resultErr, tx)
 		}
 	}()
-	m := material{Format: 1, Kind: "m4_c_actor_column_protection", ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
+	m := material{Format: 2, RuntimeBoundary: before.RuntimeBoundary, Kind: "m4_c_actor_column_protection", ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
 	if e := requireLedgerShape(ctx, tx); e != nil {
 		return out, e
 	}
 	m.Ledger, e = readLedger(ctx, tx)
 	if e != nil || m.Ledger[0] != before.Ledger {
 		return out, errors.New("restore_snapshot_ledger_changed")
+	}
+	if e := requireRuntimeBoundary(ctx, tx, before.Binding, before.RuntimeBoundary); e != nil {
+		return out, e
 	}
 	m.LedgerDDL, e = ddl(ctx, tx, "schema_migrations")
 	if e != nil {

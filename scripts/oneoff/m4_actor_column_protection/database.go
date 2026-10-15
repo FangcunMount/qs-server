@@ -31,9 +31,10 @@ type database struct {
 	gate    *recoveryGate
 }
 type observation struct {
-	Binding binding
-	Ledger  ledgerRow
-	Mongo   []byte
+	Binding         binding
+	Ledger          ledgerRow
+	Mongo           []byte
+	RuntimeBoundary runtimeBoundaryState
 }
 
 func primaryReplicaHosts(raw bson.Raw) ([]string, error) {
@@ -187,6 +188,11 @@ func (d database) observe(ctx context.Context, r sqlReader) (out observation, er
 	if re != nil || ce != nil || cur.ID() != 0 || count != 1 || !valid || out.Binding != d.binding {
 		return out, errors.New("external_database_binding_or_uuid_release_rejected")
 	}
+	state, e := readRuntimeBoundary(ctx, r, out.Binding)
+	if e != nil {
+		return out, e
+	}
+	out.RuntimeBoundary = state.State
 	return out, nil
 }
 func requireTransactionalTables(ctx context.Context, r sqlReader) error {
@@ -440,13 +446,16 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 			}
 		}
 	}()
-	m = material{Format: 1, Kind: "m4_c_actor_column_protection", ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
+	m = material{Format: 2, RuntimeBoundary: before.RuntimeBoundary, Kind: "m4_c_actor_column_protection", ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
 	if e := requireLedgerShape(ctx, tx); e != nil {
 		return m, e
 	}
 	m.Ledger, e = readLedger(ctx, tx)
 	if e != nil || m.Ledger[0] != before.Ledger {
 		return m, errors.New("snapshot_sql_ledger_changed")
+	}
+	if e := requireRuntimeBoundary(ctx, tx, before.Binding, before.RuntimeBoundary); e != nil {
+		return m, e
 	}
 	m.LedgerDDL, e = ddl(ctx, tx, "schema_migrations")
 	if e != nil {
@@ -486,7 +495,7 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 	return m, nil
 }
 func verifyTarget(original, target material) error {
-	if original.Format != target.Format || original.Kind != target.Kind || original.ToolSource != target.ToolSource || original.CSource != target.CSource || original.CResources != target.CResources || original.CResourceFiles != target.CResourceFiles || original.SessionZone != target.SessionZone || original.SessionCharset != target.SessionCharset || original.SessionSQLMode != target.SessionSQLMode || original.Binding != target.Binding || !bytes.Equal(original.MongoHead, target.MongoHead) || original.LedgerDDL != target.LedgerDDL || len(target.Ledger) != 1 || target.Ledger[0] != (ledgerRow{102, false}) {
+	if original.Format != target.Format || original.RuntimeBoundary != target.RuntimeBoundary || original.Kind != target.Kind || original.ToolSource != target.ToolSource || original.CSource != target.CSource || original.CResources != target.CResources || original.CResourceFiles != target.CResourceFiles || original.SessionZone != target.SessionZone || original.SessionCharset != target.SessionCharset || original.SessionSQLMode != target.SessionSQLMode || original.Binding != target.Binding || !bytes.Equal(original.MongoHead, target.MongoHead) || original.LedgerDDL != target.LedgerDDL || len(target.Ledger) != 1 || target.Ledger[0] != (ledgerRow{102, false}) {
 		return errors.New("target_identity_or_ledger_rejected")
 	}
 	for i, a := range original.Tables {
