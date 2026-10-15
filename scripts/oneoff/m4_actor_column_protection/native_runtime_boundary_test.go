@@ -179,6 +179,7 @@ func (h *actorNative) assertOldRuntimeMaterialRejected() {
 // This selector is intentionally distinct from all original30 selectors. It
 // must be listed explicitly by the next owned runner/CI qualification task.
 func TestM4ActorColumnsNativeRuntimeGeneration(t *testing.T) {
+	t.Logf("actual compiled C fixture tool=%s phase=before_dependency_binding", version.GitCommit)
 	t.Run("TwoCapturesAfterIndependentProcessExit", func(t *testing.T) {
 		h := newActorNative(t)
 		h.capture()
