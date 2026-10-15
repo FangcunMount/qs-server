@@ -145,6 +145,10 @@ Mac 全仓普通测试的 `-race` / coverage 执行从 `3f296fb304c14c94c42b6070
 
 该提交49包输入逐字匹配本地冻结QA：普通297/race297均一次RUN/PASS、0FAIL/SKIP，纯参数tag普通/race各1项通过，tag仅编译/vet/pinned lint2.5/格式通过。私有 `qs-m4-d-fed27-native-fixture-input-v1` 保留原失败、red/green与QA回执 `baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56`、输入绑定 `10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8`；实际命令在fed27工作区执行，未改写原source归属。fed27失败仍为失败，5aa2后的真实53项及最终head CI/AI仍待独立验收，生产继续暂停；未执行Docker、SSH、数据库、生产操作或全仓Go。
 
+后续旧 push head `3e5a860639d65790026235842f6168b3422714e7` 的真实CI原生job `116475245327` 已成功；保全的截断后端尾包含完整严格摘要，固定53名各一次RUN/PASS、0FAIL/SKIP，实际编译工具仍记为 `313062a1a7e3112234577133f4084b93c06543f0`。原始后端 SHA `8815be6055bb31eafa8248016d749896722fa3cf2c10f0f55834a481dc2a3683` 与具名读取证明 `04ed9e08e24538f4cd441cae1c4e8770b50084f06a65a600e2e7d8783269044e` 保留该来源及截断界限；不是补造全量原生日志，不把旧fed27失败改签，也不移签为下述新合并头。
+
+合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 

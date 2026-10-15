@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+    "sha": "d4b61353b909657d056077716b51a9308d0853f0",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+        "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4856,6 +4856,34 @@
           "result": "matched",
           "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4904,7 +4932,11 @@
           "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged.",
           "Prior complete verified marker preserved before D native socket-loss fixture input review: {\"source_sha\":\"ef43851a8b4226245e6d638c407e9833509af08d\",\"verified_on\":\"2026-10-15\"}",
           "Actual fed27d59b7d01449854681c2f66c7493ff39d91d native CI job116463170837 FAILED; retained truncated backend log records ConnectionLossKeepsServerGate at native_runtime_gate_test.go:272 owned upstream connection not created. Its direct run bypassed actionContext and omitted both capture evidence flags. Original raw restore receipt is not retained; independent exact-parameter noDB red separately proves original_capture_evidence_required with zero ENV reads, not a reconstructed CI receipt. The historical failure remains failed.",
-          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged."
+          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged.",
+          "M4-D integration retained prior verified marker without relabelling historical commands: {\"source_sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}",
+          "后续旧 push head `3e5a860639d65790026235842f6168b3422714e7` 的真实CI原生job `116475245327` 已成功；保全的截断后端尾包含完整严格摘要，固定53名各一次RUN/PASS、0FAIL/SKIP，实际编译工具仍记为 `313062a1a7e3112234577133f4084b93c06543f0`。原始后端 SHA `8815be6055bb31eafa8248016d749896722fa3cf2c10f0f55834a481dc2a3683` 与具名读取证明 `04ed9e08e24538f4cd441cae1c4e8770b50084f06a65a600e2e7d8783269044e` 保留该来源及截断界限；不是补造全量原生日志，不把旧fed27失败改签，也不移签为下述新合并头。",
+          "合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。",
+          "Previous top source_baseline retained as original JSON: {\"sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -11144,7 +11176,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+        "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11873,6 +11905,34 @@
           "result": "matched",
           "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11951,7 +12011,11 @@
           "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged.",
           "Prior complete verified marker preserved before D native socket-loss fixture input review: {\"source_sha\":\"ef43851a8b4226245e6d638c407e9833509af08d\",\"verified_on\":\"2026-10-15\"}",
           "Actual fed27d59b7d01449854681c2f66c7493ff39d91d native CI job116463170837 FAILED; retained truncated backend log records ConnectionLossKeepsServerGate at native_runtime_gate_test.go:272 owned upstream connection not created. Its direct run bypassed actionContext and omitted both capture evidence flags. Original raw restore receipt is not retained; independent exact-parameter noDB red separately proves original_capture_evidence_required with zero ENV reads, not a reconstructed CI receipt. The historical failure remains failed.",
-          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged."
+          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged.",
+          "M4-D integration retained prior verified marker without relabelling historical commands: {\"source_sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}",
+          "后续旧 push head `3e5a860639d65790026235842f6168b3422714e7` 的真实CI原生job `116475245327` 已成功；保全的截断后端尾包含完整严格摘要，固定53名各一次RUN/PASS、0FAIL/SKIP，实际编译工具仍记为 `313062a1a7e3112234577133f4084b93c06543f0`。原始后端 SHA `8815be6055bb31eafa8248016d749896722fa3cf2c10f0f55834a481dc2a3683` 与具名读取证明 `04ed9e08e24538f4cd441cae1c4e8770b50084f06a65a600e2e7d8783269044e` 保留该来源及截断界限；不是补造全量原生日志，不把旧fed27失败改签，也不移签为下述新合并头。",
+          "合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。",
+          "Previous top source_baseline retained as original JSON: {\"sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": []
@@ -14479,7 +14543,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+        "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14705,14 +14769,6 @@
         },
         {
           "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 45",
-          "result": "matched",
-          "source_sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
           "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence.go",
           "selector": "func readCaptureEvidence(",
           "result": "matched",
@@ -14741,6 +14797,14 @@
           "selector": "f.Visit(func(v *flag.Flag)",
           "result": "matched",
           "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "timeout-minutes: 60",
+          "result": "matched",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
           "verified_on": "2026-10-15"
         }
       ],
@@ -14796,7 +14860,10 @@
           "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
           "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "M4-D merge retained original verified from D parent3e5 (incoming602 qualification remains active): {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}",
-          "M4-D merge retained original gaps from D parent3e5 (incoming602 qualification remains active): [{\"exit_criteria\":\"Bind approved exact A execution/tool/images, original clean10039 identities, T0 allNULL proof and private materials, six-instanceAPI1/Collection2/Worker3 freeze and startup marker, independently rehearsed scoped restore and startup reserve before separately authorized production mutation.\",\"id\":\"M4-A-OBJECT-PROTECTION-PRODUCTION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Actual T0 protection, independently approved six-instance writer freeze and production-scale deadline remain unproved.\"},{\"exit_criteria\":\"Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff.\",\"id\":\"M4-A-CURRENT-TOOL-QUALIFICATION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.\"}]"
+          "M4-D merge retained original gaps from D parent3e5 (incoming602 qualification remains active): [{\"exit_criteria\":\"Bind approved exact A execution/tool/images, original clean10039 identities, T0 allNULL proof and private materials, six-instanceAPI1/Collection2/Worker3 freeze and startup marker, independently rehearsed scoped restore and startup reserve before separately authorized production mutation.\",\"id\":\"M4-A-OBJECT-PROTECTION-PRODUCTION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Actual T0 protection, independently approved six-instance writer freeze and production-scale deadline remain unproved.\"},{\"exit_criteria\":\"Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff.\",\"id\":\"M4-A-CURRENT-TOOL-QUALIFICATION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.\"}]",
+          "M4-D integration retained prior verified marker without relabelling historical commands: {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D integration preserved incoming A historical timeout selector as complete original JSON; D workflow60min remains active, not reverified45min: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Read-only source review on merged4b61353b909657d056077716b51a9308d0853f0 retains all incoming A602 proof Go/SQL bytes, exact16GoSQL/main25028 source bridge and original204/native/capacity/production records. D49 bytes and entire CI remain original3e5, including native53 and hard-anchor ordinary failure wrapper; incoming timeout45 historical selector is explicitly archived, current60min selector matched. No A or D local native run/production status is promoted; fresh final-head CI/AI remain required."
         ]
       },
       "gaps": [
