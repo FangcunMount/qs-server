@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
+    "sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
+        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11361,6 +11361,14 @@
           "result": "passed",
           "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestSchemaPairNativeColdBootstrapAndRestart",
+          "result": "matched",
+          "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11393,7 +11401,8 @@
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
-          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
+          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff."
         ]
       },
       "gaps": []
@@ -12758,7 +12767,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
+        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13220,6 +13229,14 @@
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "make test-metadata-readiness-mysql-native",
+          "result": "matched",
+          "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13229,7 +13246,8 @@
         "observed_at": null,
         "limitations": [
           "Offline diagnostic and safe receipt contracts do not prove current production permissions, archive validity or cleanup eligibility.",
-          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
+          "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
+          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff."
         ]
       },
       "gaps": []
@@ -13348,7 +13366,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d",
+        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13605,6 +13623,14 @@
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "Verify approved offline execution and interrupted paired DDL",
+          "result": "matched",
+          "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13630,7 +13656,8 @@
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
-          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
+          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff."
         ]
       },
       "gaps": [
@@ -13649,7 +13676,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "56c598337578537aa75319f7612dd9690948ef3c",
+        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13695,6 +13722,28 @@
           "result": "passed",
           "source_sha": "b7ae414a64597bfaf9f35031ec975cfa59f541ec",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=1 -race -count=1 ./scripts/oneoff/m4_sql_historical_protection",
+          "result": "passed",
+          "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=1 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/protocol.go",
+          "selector": "func originalCheckDefinition(",
+          "result": "matched",
+          "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13710,7 +13759,11 @@
           "Sourceb7ae414a64597bfaf9f35031ec975cfa59f541ec adds early immutable099 CHECK/default/last-column verification and two original-schema drift native cases. Ordinary race, integration compilation, tagged vet and target lint passed; prior16 native stays bound to d648. Its then-pending new19-case native is separately recorded below on actual merged checkout56c.",
           "Merge31b0ea5eeb3ee5194e5ede7005816477ccb7cd2d integrates actual mainc335b2a1a34dd69830261e2d8e11b16da3f8befb with SQL103/Mongo40 current source and retires the removed legacy CLI sidecar. Coverage becomes45 sidecars after this A README. A511/77e/280 and all six A tool Go/resource bytes remain unchanged from early-refusal sourceb7; existing16 native is not this merged-head or new19-case proof.",
           "Actual merged checkout56c598337578537aa75319f7612dd9690948ef3c independently passed seven required tops plus twelve children:19RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/MongoRS7.0.31. All six Go/SQL files remain identical to early-refusal sourceb7. Immutable native-v8 harness6851c251/JSONLe50d9506/receipt6ba23dff preserve exact argv and source bindings;79.090s is only this synthetic fixture wall clock. Both owned containers and bridge were released with no cleanup errors; old IDs/images/volumes remain but selected old runtime metadata changed. No production or budget signoff, and no later head borrows this native result.",
-          "A separate LinuxAMD64 CGO0 formal tool was actually compiled from56c with the same six source hashes and independent fixedA511/77e/280 identity. BinarySHA07a964a6b47ac24b76cd5abb3e2af38e0229ae974ea5d897d37c097030cb0afa and build receipt28a46e6d6c8e687a95688cdb473542dccd73a70defbde71e14d6549dd60fd1a9 preserve actual build argv and go-version metadata. AMD64 runtime, production use, freeze, startup reserve and RPO remain unverified."
+          "A separate LinuxAMD64 CGO0 formal tool was actually compiled from56c with the same six source hashes and independent fixedA511/77e/280 identity. BinarySHA07a964a6b47ac24b76cd5abb3e2af38e0229ae974ea5d897d37c097030cb0afa and build receipt28a46e6d6c8e687a95688cdb473542dccd73a70defbde71e14d6549dd60fd1a9 preserve actual build argv and go-version metadata. AMD64 runtime, production use, freeze, startup reserve and RPO remain unverified.",
+          "Source94ab3a7cf090839da5283c7f09e9b7653f92b0e0 accepts only the two complete immutable099 CHECK goldens with JSON schema literal intro utf8mb3 or utf8mb4. OriginalDDL binds each original encoding; existing alternate valid encoding is rejected before approval consume/DDL; inverse ADD comes only from pinned099 and explicit matching intro; both full original SHOW CREATE strings must equal the material before original ledger replay. Historical099 bytes remain575fa26f588e4fb87ee7bbcdc61fc11eeb8fe8ed0234518209e7e3e13b7b0d7a. No generic DDL normalization or new material schema.",
+          "Exact clean source94ab independently passed9tops plus16children:25RUN/PASS,0FAIL/SKIP on owned MySQL8.0.36/MongoRS7.0.31. Cross-charset mb3/mb4 creation versus opposite tool connection covered real dirty-first-DDL and clean-both-DDL; immutable native-charset-v2 harnessbc67a8831f9133526fcda9a51bae6ca9c5d6558c6a35759a20e38fb3a3af0514, JSONL5ba064d92b73301f08efaae70276b51ca4cbaadca77d3e88d0c8d489c7e3b541, receipt13a12fe449f25a9a2bf1725b8462ff9067d63f032acf6f6ae60d44bda2a17167 bind actual argv and all six Go/SQL hashes.100.021s is only this synthetic fixture duration. Two owned containers/network released; old IDs/images/volumes preserved, dynamic runtime metadata not stable. First native fixture nil-map failure remains separately retained, not passed.",
+          "Separate LinuxAMD64 tool built from clean94ab has binarySHA7df1c9d6da4b6cbe1425c1867c7d5916562818d7dc9881266b17fc542d9ae1f2 and receipt9e87ed4ee54ac3f4447cf1d0390d2725cc647d38657a28c699be1ecc98e52fe9. Six Go/SQL hashes exactly match actual25-case native; tool/source and fixed A511/77e/280 remain independent. This proves compilation only; AMD64 runtime/production is not signed. Old56c/07a and staged custody remain unchanged. Final documentation/PR head needs fresh CI and must not relabel native or compiled SHA.",
+          "Additional integration-tag full target lint on94ab found pre-existing QF1003 in the unchanged FirstRuntimeCommandMarker conditional, byte-identical to origin/main f294. That additional command failed and is not signed passed; its original log is retained. Normal CI lint and tagged changed-code gate are verified separately without rewriting that historical test."
         ]
       },
       "gaps": [
