@@ -191,7 +191,7 @@ func assertOwnedPartialFactsUnchanged(t *testing.T, h *nativeFixture) {
 	}
 	q, stop = context.WithTimeout(ctx, queryLimit)
 	defer stop()
-	head, e := h.client.Database(h.name).Collection("schema_migrations").FindOne(q, bson.D{}).DecodeBytes()
+	head, e := h.client.Database(h.name).Collection("schema_migrations").FindOne(q, bson.D{}).Raw()
 	if e != nil || !bytes.Equal(head, h.material.MongoHead) {
 		t.Fatal("original Mongo ledger BSON changed during rejected SQL recovery")
 	}
