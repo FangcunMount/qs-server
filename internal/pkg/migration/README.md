@@ -63,6 +63,17 @@ SQL103 只删除 `testee_store_migration_reversions`、`testee_store_migration_i
 
 定向保护、生产迁移/恢复及30/60分钟/RPO0仍未验收。固定测试seam不提供生产备份/恢复入口；首个新runtime命令后只允许保留新事实的向前恢复，不能回放旧表/账本覆盖新事实。SQL103down只明确拒绝，不用Force、SetVersion或手清dirty替代恢复。
 
+D 定向只读工具 `scripts/oneoff/m4_maintenance_table_protection` 已准备源码，状态为 `read_only_prepared / no_native / restore_not_implemented`。固定执行源 `c335b2a1a34dd69830261e2d8e11b16da3f8befb`，原 SQL1..103/Mongo1..40 的286个 up/down 资源按 `[backend,path,rawSHA256]` 顺序编码后的摘要为 `20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d`；这与独立编译的工具 SHA 分别登记，不用后续 main 的资源替换。工具未调用迁移 provider、DDL、恢复、批准或 journal。
+
+默认 `inspect` 只检查 clean102/40、五张原 InnoDB BASE TABLE 的列/主键形状和原 DDL。`capture` 在同一 SQL 只读 RR 中完整保存五表原 DDL、固定列与完整主键、逐行服务端 `CAST AS BINARY` 原值及 SQL NULL 标记、行摘要、完整原 SQL 账本及其 DDL；`ParseTime=false`、固定 UTC/结果字符集/SQL mode，DATETIME(6) 微秒、LONGTEXT 空白/键顺序、已有摘要均不经 Go 时间或 JSON map 重编码、不重签。字符串主键按完整 binary bytes 排序；复合主键再按 uint64 数值排序，边界使用 `DECIMAL(20,0)`，保留空字符串、0 与 Uint64MAX，每表额外读取空 EOF 并在同 RR 执行完整 COUNT 守恒。
+
+保护边界是单值8MiB、单行原值12MiB、每表行 JSON 完整编码128MiB、总材料256MiB、每表250000行/总500000行，分页500，单个 DDL 上限64KiB。超限整次拒绝，不截断、不写成功材料；这些是工具限额，不推断生产实际内容一定能容纳。普通元数据/分页请求各5秒；只有末端完整 COUNT 使用有限 action 剩余绝对期限及正值服务端 MAX_EXECUTION_TIME，action 最长20分钟，不能据此签30分钟窗口/60分钟恢复预算。
+
+`capture` 需要调用方提供独立 SQL/Mongo 选库身份及 Mongo 账本 UUID 摘要，连接仅来自 `QS_M4_D_OBJECT_MYSQL_DSN` / `QS_M4_D_OBJECT_MONGO_URI` 环境；不在 argv、回执或材料保存连接凭据。SQL 同 RR 与 Mongo 原40账本严格三字段 BSON/UUID 的前后独立观测分别记录，不声称双库原子 RR；Mongo options/index 未保存或核验。新材料必须在当前 UID 的0700叶目录以 O_EXCL/0600 写入、fsync、重开核对 SHA；写前后同一个真实目录/UID和总期限通过、所有事务/连接释放后才输出成功摘要。旧文件、未知/重复 schema 成员、身份/原材料 SHA 或首录绝对路径不符均拒绝。
+
+`verify-target` 只接受独立冻结的完整材料及外部 SHA，确认 clean103/40、五表全部缺失、原账本 DDL和双库身份/Mongo 原 BSON 不变；它不保存或证明五表之外的业务行值不变，不把 ready/账本状态替代业务验收。`restore` 在读取环境/连接前明确拒绝，尚无批准消费或恢复入口。本轮源码 `f571d36d7e755d7ae843d7e02c7c7245acf1e7b2` 的普通/race、编译/vet/lint与固定资源/NULL/原字节/复合键/EOF/COUNT分类/私有文件边界测试只证明本地代码；D 新工具真实 MySQL/Mongo 夹具、生产102/40全量材料、五表各 DROP 前缀及恢复、窗口与业务验收仍未完成。原 d253 固定 seam 的15项证明不移签给此工具。D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
+
+
 ## 新空库的批准
 
 现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4历史两列、M4四索引、Actor两列或五张历史维护表；四个对象scope分别只允许 `100/39 → 101/39`、`101/39 → 101/40`、`101/40 → 102/40` 和 `102/40 → 103/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
