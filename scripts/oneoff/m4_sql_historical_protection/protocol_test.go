@@ -370,11 +370,22 @@ func TestTransactionalTableScopeMustBeCompleteAndInnoDB(t *testing.T) {
 	}
 }
 func TestCaptureFsyncCrossingDeadlineNeverCompletes(t *testing.T) {
+	path := filepath.Join(privateTestDir(t), "material.json")
+	parent, e := captureParent(path)
+	if e != nil {
+		t.Fatal(e)
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	r := receipt{}
-	e := finishCapture(ctx, &r, "private", []byte("captured"), func(string, []byte) error { cancel(); return nil })
-	if e == nil || r.Complete {
-		t.Fatal("late file release was marked complete")
+	e = finishCapture(ctx, &r, path, parent, []byte("captured"), func(p string, raw []byte) error {
+		if e := writeExclusive(p, raw); e != nil {
+			return e
+		}
+		cancel()
+		return nil
+	})
+	if e == nil || r.Complete || r.MaterialHash != "" {
+		t.Fatal("late file release was certified")
 	}
 }
 
