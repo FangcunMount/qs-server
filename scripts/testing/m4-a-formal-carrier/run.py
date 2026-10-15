@@ -163,14 +163,14 @@ class Fixture:
             remaining = min(remaining, self.phase_deadline - time.monotonic())
         return remaining
 
-    def cmd(self, argv, seconds=15, raw=None, child_env=None):
+    def cmd(self, argv, seconds=15, raw=None, child_env=None, output_limit=150 << 20):
         need(self.remaining() > 0, "fixed_fixture_budget_exhausted")
         # Fixed synthetic credentials only; no process environment is inherited.
         process = subprocess.run(argv, input=raw, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  timeout=min(seconds, self.remaining()),
                                  env=dict({"PATH": os.environ["PATH"], "HOME": "/root",
                                            "DOCKER_HOST": "unix:///var/run/docker.sock"}, **(child_env or {})), check=False)
-        need(len(process.stdout) <= 150 << 20 and len(process.stderr) <= 65536,
+        need(len(process.stdout) <= output_limit and len(process.stderr) <= 65536,
              "fixture_output_bound")
         row = {"argv": argv, "exit_code": process.returncode,
                "stdout_sha256": digest(process.stdout), "stderr_sha256": digest(process.stderr)}
@@ -243,7 +243,10 @@ class Fixture:
              and image["Config"]["User"] == "www"
              and image["Config"]["Entrypoint"] == ["/app/qs-apiserver"], "old_M2_image_mismatch")
         # Digest/config are different authorities on containerd-backed daemons.
-        archive = self.docker("image", "save", self.binding["registry_ref"], seconds=60)
+        # Fixed original M2 image content is230144789B plus tar metadata.
+        # Only this archive read gets256MiB; other command output stays150MiB.
+        archive = self.docker("image", "save", self.binding["registry_ref"], seconds=60,
+                              output_limit=256 << 20)
         with tarfile.open(fileobj=io.BytesIO(archive)) as stream:
             manifest = decode(stream.extractfile("manifest.json").read())
             need(len(manifest) == 1, "single_original_image_required")
