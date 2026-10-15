@@ -1185,7 +1185,7 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
+        "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -1204,6 +1204,10 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/migrations/**/*"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_actor_column_protection/*.go"
         }
       ],
       "verification": [
@@ -1220,6 +1224,29 @@
           "result": "passed",
           "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
+          "selector": "func TestM4ActorColumnsNativeRestoreOriginalStates(",
+          "result": "matched",
+          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
+          "selector": "func TestM4ActorColumnsNativeRestoreContinuation(",
+          "result": "matched",
+          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -1228,7 +1255,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Current CI, deployment and runtime evidence is unbound. Prior deployment and Mongo audit observations are preserved in the separate historical production ledger."
+          "Current CI, deployment and runtime evidence is unbound. Prior deployment and Mongo audit observations are preserved in the separate historical production ledger.",
+          "Actual C-tool native source/compiled716aa7008f4821f78abbff4a8e268e874791163b passed8 required database tops plus13 children,21 unique RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/Mongo7.0.31rs0. The13 children include6 original rejected-material cases,4 genuine dirty102/clean102 original-DROP states and3 actual-server-OK response-loss continuations. Raw JSONLe21cecbde9a925f2496540d057c0186d99d80985d509fd8c0b4c79b9c1aa7c9f/receipt07633956eba5e2c097fd515e623c1c2d6dcc2acec607df6e4318a1eec995305e/independent summary6d3a59b66ba110be019418aa34046e38f87b189d90089502627c7f396fafa3c3 retain exact actual argv, all required names, source/binary/runner bindings and owned cleanup. These prove formal C capture/verify/original raw values and four-table facts, genuine ledger-last restoration, partial100-row/nullable continuation with new operation, valid immutable modern FindTask/FindRecovery reads and foreign-partial refusal. Earlier6973 ordinary/source-only and historical native records remain bound to their own sources. Both owned containers/bridge/child group released, prior IDs/images/volumes retained; old NSQ Restart2777-to2779 means global runtime metadata stability is false.84.170656s is only this small synthetic suite (including209-row-per-target scenarios), not production window/recovery/RPO. No production access/T0 material/freeze/business runtime/full three-service startup/current CI/release is attested; other unexecuted recovery failures and read-only unknown-ledger-commit terminal proof remain open. Equivalent replay is not recorded as an actual passed command."
         ]
       },
       "gaps": [
@@ -4477,7 +4505,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+        "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4821,6 +4849,29 @@
           "result": "passed",
           "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
+          "selector": "func TestM4ActorColumnsNativeRestoreOriginalStates(",
+          "result": "matched",
+          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
+          "selector": "func TestM4ActorColumnsNativeRestoreContinuation(",
+          "result": "matched",
+          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4853,7 +4904,8 @@
           "M4-C obsolete current selector retained as a complete historical record, not evidence for the new restore source: {\"kind\":\"source_selector\",\"path\":\"scripts/oneoff/m4_actor_column_protection/main.go\",\"result\":\"matched\",\"selector\":\"restore_not_implemented\",\"source_sha\":\"db7db9b9ac30b86f1d2307e7ca888e369816b293\",\"verified_on\":\"2026-10-15\"}",
           "C local restore-source commits d3f22c60c0e1fb5aeba1fdbf0a592ff2a623b2f3 and64c15b00b354227daa11dfb67a1517ec78c55e90 replace the earlier unsupported restore action with a real pre-start fixed102/40 entry. Immutable CapturePath/raw SHA and independent approved first deadline/marker bind a durable boundary, append-only bounded operation journal and all consumed claims; missing/partial records are not rebuilt. Initial strict DROP prefixes remain distinct from prior-authorized nullable/partial-value continuation. Reverse fixed001/070 ADD, original raw JSON-only CAS batches of100 rows/1MiB with updated_at preserved, NOTNULL restoration, four-table complete facts and original ledger-last are implemented. Receiptfd36ac03ddb63a8fbcf0587b09229aeba36297c2d1869349262b734caecefb3d binds64c actual29top/134 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and integration compilation only. No native database, production restoration, runtime, freeze or budget acceptance follows; older read-only/unsupported-source evidence remains historical rather than rewritten.",
           "C COUNT source2844971f700881c44ade1b987c319fd2bd127be5 locally adopts independently verified A8357 aggregate budgeting without a shared framework: terminal COUNT stays on the same RR reader, positive server MAX_EXECUTION_TIME is bounded by the remaining finite action, all action socket reads are finite, and ordinary metadata/page/dial/write limits remain5s. Typed server3024, context deadline/cancel, query failure and count mismatch are separate closed categories. Receipt3de6d72b9c93b1f4c7887daa28e7a275ab0e3c2f8906f29c75f37f166f19cbd9 binds32top/150 total ordinary race RUN/PASS,0FAIL/SKIP, target vet/lint and integration compilation. This is not C native or scale proof and borrows no A database PASS.",
-          "C test-only source6973dff1ba06b013f445280e76c9a06b44c5b7c7 prepares8 database tops with13 children, not15 total events: the6 original unbound-input children remain in addition to4 original102 DROP-prefix recovery and3 actual-OK response-loss continuation children. Original historical providers generate real101/40 and dirty102/clean102 states; no Force/SetVersion or fixture ledger writes. The valued fixtures include SQLNULL/JSONnull/array order/four-byte/0/MAX,205 additional rows for100-row CAS batches, valid immutable modern task/recovery payloads and real FindTask/FindRecovery assertions; first foreign nullable state is refused. Receipt37abe5c19de5cfd59ee6d36dbd2671bfedb40c79ed3977145c606510b202df0e binds actual32top/150 ordinary race RUN/PASS and2 source/in-memory tops+4children=6 RUN/PASS,0FAIL/SKIP, tagged vet/lint and integration compilation. All8 database tops remain unexecuted; no current C-tool capture or recovery database qualification, three-service startup, T0 material, freeze, production approval, window or RPO is supplied. A read-only verify-restored terminal entry is still absent from C. Source/CI/production/signoff history is preserved; no push or PR occurred."
+          "C test-only source6973dff1ba06b013f445280e76c9a06b44c5b7c7 prepares8 database tops with13 children, not15 total events: the6 original unbound-input children remain in addition to4 original102 DROP-prefix recovery and3 actual-OK response-loss continuation children. Original historical providers generate real101/40 and dirty102/clean102 states; no Force/SetVersion or fixture ledger writes. The valued fixtures include SQLNULL/JSONnull/array order/four-byte/0/MAX,205 additional rows for100-row CAS batches, valid immutable modern task/recovery payloads and real FindTask/FindRecovery assertions; first foreign nullable state is refused. Receipt37abe5c19de5cfd59ee6d36dbd2671bfedb40c79ed3977145c606510b202df0e binds actual32top/150 ordinary race RUN/PASS and2 source/in-memory tops+4children=6 RUN/PASS,0FAIL/SKIP, tagged vet/lint and integration compilation. All8 database tops remain unexecuted; no current C-tool capture or recovery database qualification, three-service startup, T0 material, freeze, production approval, window or RPO is supplied. A read-only verify-restored terminal entry is still absent from C. Source/CI/production/signoff history is preserved; no push or PR occurred.",
+          "Actual C-tool native source/compiled716aa7008f4821f78abbff4a8e268e874791163b passed8 required database tops plus13 children,21 unique RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/Mongo7.0.31rs0. The13 children include6 original rejected-material cases,4 genuine dirty102/clean102 original-DROP states and3 actual-server-OK response-loss continuations. Raw JSONLe21cecbde9a925f2496540d057c0186d99d80985d509fd8c0b4c79b9c1aa7c9f/receipt07633956eba5e2c097fd515e623c1c2d6dcc2acec607df6e4318a1eec995305e/independent summary6d3a59b66ba110be019418aa34046e38f87b189d90089502627c7f396fafa3c3 retain exact actual argv, all required names, source/binary/runner bindings and owned cleanup. These prove formal C capture/verify/original raw values and four-table facts, genuine ledger-last restoration, partial100-row/nullable continuation with new operation, valid immutable modern FindTask/FindRecovery reads and foreign-partial refusal. Earlier6973 ordinary/source-only and historical native records remain bound to their own sources. Both owned containers/bridge/child group released, prior IDs/images/volumes retained; old NSQ Restart2777-to2779 means global runtime metadata stability is false.84.170656s is only this small synthetic suite (including209-row-per-target scenarios), not production window/recovery/RPO. No production access/T0 material/freeze/business runtime/full three-service startup/current CI/release is attested; other unexecuted recovery failures and read-only unknown-ledger-commit terminal proof remain open. Equivalent replay is not recorded as an actual passed command."
         ]
       },
       "gaps": [
