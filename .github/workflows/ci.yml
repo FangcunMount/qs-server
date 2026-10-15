@@ -517,6 +517,18 @@ jobs:
               'TestM4MaintenanceTablesNativeFirstRuntimeGate/MarkerBlocksRestoreBeforeConsume',
               'TestM4MaintenanceTablesNativeFirstRuntimeGate/ConnectionLossKeepsServerGate',
               'TestM4MaintenanceTablesNativeFirstRuntimeGate/ReleaseUnknownNeverAuthorizesStart',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/TwoCapturesAfterIndependentProcessRelease',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/NewT0After_cancel102',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/NewT0After_restored102',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/ForeignTable',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/ForeignView',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/EmptyTable',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/HiddenBoundaryPermissionRejected',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/CreateExecuteACKUnknown',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/UpdateCommitACKUnknown',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/AdvanceThenLocalFailure',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/CreateMDLDeadline',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
           counts = {action: collections.Counter(event['Test'] for event in events if event.get('Action') == action and event.get('Test')) for action in ('run', 'pass')}

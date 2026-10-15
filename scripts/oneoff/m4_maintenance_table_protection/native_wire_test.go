@@ -38,6 +38,13 @@ func nativeACKStep(step, query string, command byte) (arm, drop, lock bool) {
 	if step == "runtime_release_prepare_loss" && command == 22 && strings.HasPrefix(s, "SELECT RELEASE_LOCK(") {
 		drop = true // actual PREPARE OK loss; never claim RELEASE_LOCK executed
 	}
+	if command == 22 && strings.HasPrefix(s, "CREATE TABLE `M4_D_RUNTIME_BOUNDARY`") {
+		arm = step == "runtime_boundary_create_ack_loss"
+		lock = step == "runtime_boundary_create_marker_failure"
+	}
+	if command == 22 && strings.HasPrefix(s, "UPDATE `M4_D_RUNTIME_BOUNDARY`") && step == "runtime_boundary_commit_ack_loss" {
+		arm = true
+	}
 	for i, spec := range scope {
 		if step == "create_"+string(rune('0'+i))+"_ack_loss" && command == 3 && strings.HasPrefix(s, "CREATE TABLE "+strings.ToUpper(spec.name)+" (") {
 			drop = true
@@ -54,6 +61,15 @@ func nativeACKStep(step, query string, command byte) (arm, drop, lock bool) {
 }
 
 func (c *maintenanceACKConn) Write(p []byte) (int, error) {
+	// CTAS has bound values: consume the real COM_STMT_EXECUTE OK, never the
+	// earlier successful PREPARE OK. Other prepared operations are unchanged.
+	if len(p) > 5 && int(p[0])|int(p[1])<<8|int(p[2])<<16 == len(p)-4 && p[4] == 23 {
+		c.mu.Lock()
+		if c.step == "runtime_boundary_create_ack_loss" && c.armed && !c.observed.Load() {
+			c.drop = true
+		}
+		c.mu.Unlock()
+	}
 	if len(p) > 5 && int(p[0])|int(p[1])<<8|int(p[2])<<16 == len(p)-4 && (p[4] == 3 || p[4] == 22) {
 		query := string(p[5:])
 		arm, drop, lock := nativeACKStep(c.step, query, p[4])
@@ -157,6 +173,7 @@ func TestMaintenanceRestoreWireObservationIsBoundedAndSelective(t *testing.T) {
 		{"server_error", "create_4_ack_loss", "CREATE TABLE operator_retirement_manifests (id bigint)", 3, false, true, false},
 		{"actual_rollback_ACK", "items_prepare_lock_marker", "ROLLBACK", 3, false, false, true},
 		{"release_prepare_ACK", "runtime_release_prepare_loss", "SELECT RELEASE_LOCK(?)", 22, false, false, false},
+		{"runtime_boundary_update_commit", "runtime_boundary_commit_ack_loss", "UPDATE `m4_d_runtime_boundary` SET generation=?", 22, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client, server := net.Pipe()
@@ -217,6 +234,64 @@ func TestMaintenanceRestoreWireObservationIsBoundedAndSelective(t *testing.T) {
 			}
 			if e := <-done; e != nil {
 				t.Fatal(e)
+			}
+		})
+	}
+}
+
+func TestRuntimeBoundaryCreateACKDropsOnlyExecute(t *testing.T) {
+	for _, reply := range []struct {
+		name string
+		code byte
+	}{{"server_ok", 0}, {"server_error", 0xff}} {
+		t.Run(reply.name, func(t *testing.T) {
+			client, server := net.Pipe()
+			defer func() { _ = client.Close(); _ = server.Close() }()
+			if client.SetDeadline(time.Now().Add(queryLimit)) != nil || server.SetDeadline(time.Now().Add(queryLimit)) != nil {
+				t.Fatal("owned CTAS observation deadline unavailable")
+			}
+			observed := &atomic.Bool{}
+			conn := &maintenanceACKConn{Conn: client, step: "runtime_boundary_create_ack_loss", observed: observed, rollbackObserved: &atomic.Bool{}, prepareOnce: &atomic.Bool{}}
+			packet := func(command byte, body string) []byte {
+				raw := append([]byte{command}, []byte(body)...)
+				return append([]byte{byte(len(raw)), byte(len(raw) >> 8), byte(len(raw) >> 16), 0}, raw...)
+			}
+			requests := [][]byte{packet(22, runtimeBoundaryCreate), packet(23, "owned statement id and encoded parameters")}
+			done := make(chan error, 1)
+			go func() {
+				for i, expected := range requests {
+					actual := make([]byte, len(expected))
+					if _, e := io.ReadFull(server, actual); e != nil {
+						done <- e
+						return
+					}
+					if !bytes.Equal(actual, expected) {
+						done <- errors.New("owned_ctas_request_changed")
+						return
+					}
+					code := byte(0)
+					if i == 1 {
+						code = reply.code
+					}
+					if _, e := server.Write([]byte{1, 0, 0, 1, code}); e != nil {
+						done <- e
+						return
+					}
+				}
+				done <- nil
+			}()
+			for i, request := range requests {
+				if n, e := conn.Write(request); e != nil || n != len(request) {
+					t.Fatal("owned CTAS request not preserved")
+				}
+				var response [5]byte
+				n, e := conn.Read(response[:])
+				if i == 0 && (e != nil || n != len(response) || observed.Load()) || i == 1 && (e != io.EOF || n != 0 || observed.Load() != (reply.code == 0)) {
+					t.Fatal("PREPARE or server error was confused with actual CTAS execution success")
+				}
+			}
+			if e := <-done; e != nil {
+				t.Fatal("owned CTAS response stream incomplete")
 			}
 		})
 	}

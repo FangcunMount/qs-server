@@ -293,8 +293,9 @@ func (d database) updateRuntimeBoundary(ctx context.Context, current runtimeBoun
 }
 
 // This task deliberately does not auto-complete a previously committed intent
-// after a local marker/output failure. Fresh read-only inspection exposes the
-// committed material+intent; a separate completion approval remains required.
+// after a local marker/output failure. The clean102 inspect action exposes the
+// exact record. A clean103 diagnostic and independently approved same-intent
+// completion are separate unfinished work; no restart permit is inferred here.
 func (d database) requireCapturedRuntimeBoundary(ctx context.Context, m material) error {
 	if d.binding != m.Binding || m.Format != 3 {
 		return errors.New("runtime_database_boundary_capture_rejected")

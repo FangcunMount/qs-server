@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(t *testing.T) {
+func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github/workflows/ci.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -78,8 +78,8 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(t *testing.T) {
 	}
 	proof = proof[:end]
 	names := regexp.MustCompile(`(?m)^\s+'(TestM4MaintenanceTablesNative[^']*)',?$`).FindAllStringSubmatch(proof, -1)
-	if len(names) != 53 {
-		t.Fatal("D proof must enumerate all exact 53 names")
+	if len(names) != 65 {
+		t.Fatal("D proof must enumerate the original53 plus all twelve runtime-generation entries")
 	}
 	tops := map[string]bool{}
 	files, err := filepath.Glob(filepath.Join(repoRoot(t), "scripts/oneoff/m4_maintenance_table_protection/native*_test.go"))
@@ -107,12 +107,15 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(t *testing.T) {
 	if !expected["TestM4MaintenanceTablesNativeFirstRuntimeGate"] {
 		t.Fatal("D proof must require the actual first-runtime gate top-level test")
 	}
-	if len(tops) != 16 {
-		t.Fatal("D proof must retain the actual sixteen top-level tests")
+	if !expected["TestM4MaintenanceTablesNativeRuntimeGeneration"] {
+		t.Fatal("D proof must require actual database generation and independent-process tests")
+	}
+	if len(tops) != 17 {
+		t.Fatal("D proof must retain the original sixteen and new runtime-generation top-level tests")
 	}
 
 	source := strings.Repeat("a", 40)
-	events := make([]map[string]any, 0, 94)
+	events := make([]map[string]any, 0, len(names)*2+2)
 	for _, name := range names {
 		events = append(events, map[string]any{"Action": "run", "Test": name[1]}, map[string]any{"Action": "pass", "Test": name[1]})
 	}
