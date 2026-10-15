@@ -271,8 +271,20 @@ func TestMongoPrimaryRoleAndURIOverride(t *testing.T) {
 	if mongoReadOptions("mongodb://localhost/?readPreference=secondary").ReadPreference.Mode().String() != "primary" {
 		t.Fatal("URI still selects secondary")
 	}
-	for _, name := range []string{"primary", "secondary", "mongos", "missing_role", "duplicate_host"} {
+	for _, name := range []string{"primary", "named_primary", "empty_set", "missing_set", "non_string_set", "secondary", "mongos", "missing_role", "duplicate_host"} {
 		rawDoc := bson.D{{Key: "setName", Value: "rs0"}, {Key: "isWritablePrimary", Value: name != "secondary"}, {Key: "hosts", Value: bson.A{"mongo:27017"}}}
+		if name == "named_primary" {
+			rawDoc[0].Value = "production-set"
+		}
+		if name == "empty_set" {
+			rawDoc[0].Value = ""
+		}
+		if name == "missing_set" {
+			rawDoc = rawDoc[1:]
+		}
+		if name == "non_string_set" {
+			rawDoc[0].Value = 1
+		}
 		if name == "mongos" {
 			rawDoc = append(rawDoc, bson.E{Key: "msg", Value: "isdbgrid"})
 		}
@@ -284,11 +296,34 @@ func TestMongoPrimaryRoleAndURIOverride(t *testing.T) {
 		}
 		raw, _ := bson.Marshal(rawDoc)
 		_, e := primaryReplicaHosts(raw)
-		if (e == nil) != (name == "primary") {
+		if (e == nil) != (name == "primary" || name == "named_primary") {
 			t.Fatal(name, e)
 		}
 	}
 }
+func TestMongoSelectedIdentityUsesObservedSetAndSelectedDatabase(t *testing.T) {
+	for _, tc := range []struct {
+		name, set, selected, golden string
+		hosts                       bson.A
+	}{
+		{"rs0", "rs0", "qs_fixture", `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"rs0"},{"Key":"hosts","Value":["mongo-a:27017","mongo-b:27017"]}],"qs_fixture"]`, bson.A{"mongo-b:27017", "mongo-a:27017"}},
+		{"named", "production-set", "qs_fixture", `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"production-set"},{"Key":"hosts","Value":["mongo-a:27017","mongo-b:27017"]}],"qs_fixture"]`, bson.A{"mongo-b:27017", "mongo-a:27017"}},
+		{"ordered_hosts", "production-set", "qs_fixture", `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"production-set"},{"Key":"hosts","Value":["mongo-a:27017","mongo-b:27017"]}],"qs_fixture"]`, bson.A{"mongo-a:27017", "mongo-b:27017"}},
+		{"selected_database", "production-set", "qs_other", `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"production-set"},{"Key":"hosts","Value":["mongo-a:27017","mongo-b:27017"]}],"qs_other"]`, bson.A{"mongo-b:27017", "mongo-a:27017"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, e := bson.Marshal(bson.D{{Key: "setName", Value: tc.set}, {Key: "isWritablePrimary", Value: true}, {Key: "hosts", Value: tc.hosts}})
+			if e != nil {
+				t.Fatal(e)
+			}
+			got, e := mongoSelectedIdentity(raw, tc.selected)
+			if e != nil || got != fingerprint([]byte(tc.golden)) {
+				t.Fatal("observed replica/host/database encoding changed", e, got)
+			}
+		})
+	}
+}
+
 func TestAllPageValuesAreServerBinaryAndCanonicalBoundaries(t *testing.T) {
 	for i, s := range scope {
 		query := pageSQL(i, true)

@@ -284,10 +284,11 @@ func (h *maintenanceNative) independentBinding() binding {
 	b := binding{SQLName: h.name, MongoName: h.name, SQLIdentity: fingerprint(raw)}
 	hello, e := h.client.Database("admin").RunCommand(h.t.Context(), bson.D{{Key: "hello", Value: 1}}).Raw()
 	hosts, e2 := primaryReplicaHosts(hello)
-	if e != nil || e2 != nil {
-		h.t.Fatal("independent rs0 primary identity unavailable")
+	set, setOK := hello.Lookup("setName").StringValueOK()
+	if e != nil || e2 != nil || !setOK || set == "" {
+		h.t.Fatal("independent replica primary identity unavailable")
 	}
-	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: hosts}}, h.name})
+	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: set}, {Key: "hosts", Value: hosts}}, h.name})
 	b.MongoIdentity = fingerprint(raw)
 	cur, e := h.client.Database(h.name).ListCollections(h.t.Context(), bson.D{{Key: "name", Value: "schema_migrations"}})
 	if e != nil {
