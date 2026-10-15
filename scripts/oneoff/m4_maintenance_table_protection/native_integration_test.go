@@ -98,6 +98,7 @@ func newMaintenanceNative(t *testing.T) *maintenanceNative {
 	if os.Getenv("QS_M4_D_OBJECT_NATIVE_REQUIRED") != "1" || os.Getenv("QS_M4_D_OBJECT_NATIVE_DISPOSABLE_ACK") != "owned_synthetic_dependencies_only" || !sourceRE.MatchString(version.GitCommit) {
 		t.Fatal("required owned native dependencies and actual compiled source must be explicit")
 	}
+	t.Logf("actual compiled D fixture tool=%s phase=before_dependency_binding", version.GitCommit)
 	dsn, uri := os.Getenv("QS_M4_D_OBJECT_NATIVE_MYSQL_DSN"), os.Getenv("QS_M4_D_OBJECT_NATIVE_MONGO_URI")
 	cfg, e := mysql.ParseDSN(dsn)
 	if e != nil || cfg.Net != "tcp" || cfg.DBName != "" {
@@ -385,7 +386,7 @@ func (h *maintenanceNative) seed() {
 		query string
 		args  []any
 	}{
-		{"INSERT INTO operators(id,org_id,user_id,roles,name) VALUES(1,1,1,JSON_ARRAY('manager'),'owned operator'),(7,1,107,JSON_ARRAY('qs:admin'),'owned historical'),(9,1,109,JSON_ARRAY('qs:result_reviewer'),'owned pending')", nil},
+		{"INSERT INTO operators(id,org_id,user_id,roles,name,is_active) VALUES(1,1,1,JSON_ARRAY('manager'),'owned operator',TRUE),(7,1,107,JSON_ARRAY('qs:admin'),'owned historical',TRUE),(9,1,109,JSON_ARRAY('qs:result_reviewer'),'owned pending',TRUE),(18446744073709551615,1,199,JSON_ARRAY('qs:admin'),'owned administrator',TRUE)", nil},
 		{"INSERT INTO testee(id,org_id,name,gender,profile_id,birthday,store_id) VALUES(1,1,'owned testee',0,NULL,NULL,NULL),(18446744073709551615,1,'owned max',1,NULL,'2020-01-02',0)", nil},
 		{"INSERT INTO clinician(id,org_id,name,clinician_type,store_id) VALUES(1,1,'owned clinician','therapist',NULL)", nil},
 		{"INSERT INTO actor_stores(id,org_id,code,name,address,is_active,version,created_at,updated_at,created_by,updated_by) VALUES(0,1,'owned-zero','owned store','😀',1,1,'2026-10-15 01:02:03.123456','2026-10-15 01:02:04.654321',10001,10001)", nil},
@@ -437,8 +438,20 @@ func (h *maintenanceNative) seedModernRecords() {
 			h.t.Fatal("normal owned retirement completion failed")
 		}
 		recovery, e := retirementDomain.NewRecovery(task, 199, version+2, policy, request, "owned valid archive construction", at)
-		if e != nil || h.repo.WithOperatorLock(h.t.Context(), 1, 7, func(ctx context.Context) error { return h.repo.Recover(ctx, recovery) }) != nil {
-			h.t.Fatal("normal owned recovery archive construction failed")
+		if e != nil {
+			h.t.Fatalf("owned_fixture_error=%s", fixtureErrorJSON("new_recovery", e))
+		}
+		var recoverError error
+		e = h.repo.WithOperatorLock(h.t.Context(), 1, 7, func(ctx context.Context) error {
+			recoverError = h.repo.Recover(ctx, recovery)
+			return recoverError
+		})
+		if e != nil {
+			stage := "operator_lock"
+			if recoverError != nil {
+				stage = "repo_recover"
+			}
+			h.t.Fatalf("owned_fixture_error=%s", fixtureErrorJSON(stage, e))
 		}
 		h.recoveries[request] = recovery
 		version += 3
