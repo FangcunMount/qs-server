@@ -35,7 +35,7 @@ m4-mongo-historical-protection --action=restore --mysql-database=qs --mongo-data
   --approval-file=/private/approved-protection/b-independent-approval.json --approval-sha256=<independent-approval-raw-sha256>
 ```
 
-这些是未执行的调用示例。默认 inspect、capture 和 verify-target 都只读；只有显式 restore 写四个固定索引和原账本。捕获材料与批准使用绝对路径、0600、单硬链接、当前 UID 或 root、无符号链接。首次 capture 以 O_EXCL 创建、文件及目录 fsync、按原始 SHA 回读，不覆盖旧材料。材料原始 SHA 来自外部冻结；批准以另一个 O_EXCL `.consumed` 文件消费一次。
+这些是未执行的调用示例。默认 inspect、capture 和 verify-target 都只读；只有显式 restore 写四个固定索引和原账本。捕获材料与批准使用绝对路径、0600、单硬链接、当前 UID 或 root、无符号链接。首次 capture 以 O_EXCL 创建、文件及目录 fsync、按原始 SHA 回读，不覆盖旧材料。材料原始 SHA 来自外部冻结；材料内部同时绑定首次 capture 的真实规范绝对路径，后续不能将同字节材料复制到别处后作为新恢复根使用。缺少该路径的旧材料明确拒绝。
 
 capture 在 SQL RR 只读事务读取严格单行 clean101，rollback 后再核对。Mongo 账本原 BSON和两集合精确 `$count` 在同一 snapshot session 读取，集合目录及索引在该快照前后独立读取并完整比较。游标须实际 EOF、ID0 和 Close 成功；不存在或失败的集合不能算作零。原 clean39 文档保留 `_id`、字段顺序及 BSON 整数宽度，账本只接受空 options、一个标准 `_id_` 索引及严格单行 typed version/dirty。业务集合保留 UUID、完整 options、全部完整索引及精确计数；材料没有业务正文或全量业务 hash。
 
@@ -47,9 +47,9 @@ MySQL 身份绑定实际 server UUID 和选中数据库；Mongo 稳定身份绑�
 
 执行控制方负责 API1、Collection2、Worker3 六实例及其他相关写入者持续冻结，在首个新 runtime 启动命令发出前，以 O_EXCL 持久写入批准绑定的 first-runtime marker。工具不生成或删除该 marker。marker 缺失本身不证明停写；计数相同也不证明业务字段没有被更新。首个新启动命令已发出或有新持久事实之后，禁止回放旧材料，只能使用目标 schema 兼容版本向前恢复。
 
-restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须是原 DROP 前缀0、1、2、3、4，SQL始终须 clean101。逆序补回缺失索引，使每个实际成功ACK后仍是更短的缺失前缀；clean40 也接受这种已恢复后缀。每次继续须使用新的独立批准并保持原 first-capture、持续冻结和绝对恢复截止，已消费批准不能复用。原索引、业务 UUID/options、精确计数和无关索引均须匹配；非前缀缺失、已存在规格变化、额外索引或其他 head 拒绝自动推进。verify-target 仍只接受 clean40 且四索引全部缺失，不把部分或全部恢复的状态当作B安装成功。
+restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须是原 DROP 前缀0、1、2、3、4，SQL始终须 clean101。逆序补回缺失索引，使每个实际成功ACK后仍是更短的缺失前缀；clean40 也接受这种已恢复后缀。每次继续须使用新的独立批准并保持原 first-capture、持续冻结和绝对恢复截止。首次批准在原材料的固定 parent 中，以材料 SHA 命名的 O_EXCL 文件持久冻结完整恢复边界；续跑只允许更换 operation，其他字段必须与首份结构完全相同，包括原 marker、决策、截止、expiry、停写与责任。批准消费文件由同一固定根和 operation 摘要定位，不依赖批准文件名或 JSON 空白，因此复制批准或重编码同一 operation 不能重复使用。边界缺失、损坏、未知、写入或 fsync 未证实时停止，既有边界只读核验并重新确认落盘，不覆盖或自动重建。原索引、业务 UUID/options、精确计数和无关索引均须匹配；非前缀缺失、已存在规格变化、额外索引或其他 head 拒绝自动推进。verify-target 仍只接受 clean40 且四索引全部缺失，不把部分或全部恢复的状态当作B安装成功。
 
-批准再次核读并单次消费后，只按四个固定位置执行原始完整 createIndexes spec，随后完整核对索引、集合、计数、SQL身份和原40账本。全部通过后，在同一个显式 RS 事务内 DELETE 当前唯一账本文档、INSERT 捕获的原39 BSON，最后 COMMIT；不 Drop/Create 集合、不 Force、不构造 clean 文档、不直接清 dirty。成功后新快照须证明原39 BSON逐字相同，账本 UUID 仍是 provider40 已产生的当前 UUID。
+批准再次核读并单次消费后，只按四个固定位置执行原始完整 createIndexes spec，随后完整核对索引、集合、计数、SQL身份和原40账本。全部通过后，在同一个显式 RS 事务内 DELETE 当前唯一账本文档、INSERT 捕获的原39 BSON，最后 COMMIT；不 Drop/Create 集合、不 Force、不构造 clean 文档、不直接清 dirty。成功后新快照须证明原39 BSON逐字相同，账本 UUID 仍是 provider40 已产生的当前 UUID。 每次新的索引写入、账本事务、DELETE、INSERT和最终 COMMIT 前都重新核对原 marker、首次边界和绝对期限；最后 SQL 身份/账本回读完成后，紧邻 COMMIT 发令再次核对，不能沿用该有界 RPC 等待前的检查。
 
 只读请求、连接和选择服务器预算为5秒，总时限默认15分钟、最高20分钟。createIndexes 单独使用总 deadline、恢复绝对 deadline 和批准 expiry 三者最早边界的有限剩余预算，并设置 server maxTimeMS/writeConcern 等待；不被 URI 中的 client/socket 5秒超时隐性截断。DDL或最终提交结果未知时停止，不自动猜测完成或重跑。
 
@@ -61,7 +61,7 @@ restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须
 
 协议 source `ed97ae9a20aa369982c58d0a99cf18385f03fe8d` 的42项单测通过，只证明当时协议；当时 DB 入口尚未实现。只读 capture source `f7a23591e34c862bc745748e1a0315055b8d389a` 完成57项单测；恢复 source `857e9b5ca4f3eb6e09c8474579fb8bfc473486eb` 完成69项单测。Mongo 事务释放语义修正 source `3d0d3f4645740536f83cdafba9f83044567fb437` 的69项单测、race、vet、目标 lint 均通过；不可变私有 `qs-m4-b-object-tool-release-3d0d3f46/receipt.json` SHA为 `17b16c51bab54b2e3eace4c10da2448711c316dbbbe887433fe9fa9774af457f`。这些不是 native、生产权限或数据库操作验收。
 
-native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。当前七个顶层、恢复矩阵六个 child、批准边界五个 child 与续跑八个 child，合计26项必须全部实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败：
+native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。该历史26项清单由七个顶层、恢复矩阵六个 child、批准边界五个 child 与续跑八个 child 构成。当前源码新增首次恢复边界八个 child 及最后 SQL 回读 marker 顶层，共九个顶层和27个 child、36个必需事件；全部须实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败。此前26项证明不能覆盖新反例：
 
 - 捕获、真实 provider40 完整升级及 clean10140 核对。
 - dirty40 的0–4 DROP前缀及 clean40 全部退出后的对象恢复、真实原账本最后事务回放、当前40 UUID保留和 fresh10139 只读核对。
@@ -69,6 +69,8 @@ native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e
 - 账本事务写入中断、服务端 COMMIT 已成功但全部响应被丢失，以及同一事务重发摘要。
 - first-runtime marker、外冻材料变化、过期批准、实际消费后再次使用、真实 SQL102 未来 head 拒绝。
 - dirty40/clean40 各在第1–4个真实 createIndexes ACK后中断，旧批准复用无DDL拒绝，同一原材料和原绝对截止的新批准继续；四索引全恢复但账本尚未回放的中断也须通过。
+- 实际ACK1中断后，复制批准路径、同operation重编码、延期、变更决策、更换已经存在的原marker、复制材料、删除或损坏首次边界，全部须具名拒绝且无新增DDL或账本写入。
+- 账本INSERT实际ACK后，以自有SQL表锁阻挡正式最后回读，独立确认该SELECT正在等待时写原marker，再释放锁；必须无COMMIT、真实abort ACK、原40 BSON/UUID保持，公开事务释放仍为unproven。
 
 原生测试独立读取全部合成 BSON、全部业务集合 UUID/options、无关索引及 SQL 账本进行比较；这些正文不进入工具材料。测试代理仅使用 owned loopback，记录成功回包和事务身份摘要，不写生产或更改真实请求。编译或内存 wire helper 测试不代替这些 native 用例。
 
@@ -89,3 +91,5 @@ native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e
 原head `da1f162735e7077c5e2cc06b814d48f86b2b4b87` 的审查发现恢复续跑缺口：按正序补回索引后中断会留下非前缀；clean40补回一部分或全部后、账本回放前中断也被旧校验拒绝。先前17项没有覆盖这些恢复中断，不作为该能力证明。source `5588d8ddd` 改为逆序重建并只在restore扩展clean40合法前缀；source `fe45c321f10cdebb8462e05b81f14e895b79523b` 加入八个真实ACK中断child和26项显式CI清单。新普通/race87项、内存helper/race2项、integration编译、tagged vet/lint0及configcontract通过，私有 `qs-m4-b-resume-source-fe45c321/receipt.json` SHA为 `fd215f8c9ec6fe1637887ec7a2f2c6ace13082a7c824302acc4a377ce7d413a6`。该source检查时26项真实native尚未执行；旧17项证明保留原来源，后续native与新headCI/审查分别登记。
 
 修复后 clean checkout `0827df92685971aceb1fc5257f53bff7aa1e5af5`（Go/CI与fe45逐字相同）实际完成26 RUN/PASS、0 FAIL/SKIP、exit0，MySQL8.0.36/MongoRS7.0.31。不可变 `qs-m4-b-object-tool-native-v3/receipt.json` SHA为 `17382b370630cea9b14a1e32bd7515e915e34d3f3132fc737e871fddef3b56ec`，原始JSONL SHA为 `1877b7911e178efc8a92a5c45204a75b264892adbefbe2fa0242606d6fed91fc`，runner SHA为 `98bcbdc0b53920e2800e6eb53949c257bf81af28661bbc7130ce3cdcb8369435`。八个 dirty/clean ACK1–4中断均实际到达，独立核对实际40 BSON/UUID和原spec后缀，旧批准无DDL拒绝，新批准不改变原材料、恢复决策或绝对截止并完成账本最后回放；全部原17场景也再次实际通过。两自有容器和网络释放，原CID/images/volumes保留，动态运行元数据变化如实保留。113.907秒仅是这轮小型矩阵总耗时；生产、规模、30/60分钟和RPO仍未签。新PR head必须fresh CI并结清原P1审查，不能仅凭本地26项转签。
+
+新批准边界 source `a872ac5a96476dcd71d70d8b9ebf759dfd99e6b7` 已完成精确101项普通/race RUN/PASS、0FAIL/SKIP、integration仅编译、tagged vet/lint0；私有 `qs-m4-b-boundary-source-a872/receipt.json` SHA为 `9254d13af5e3a253edc6d5547ba9294976e043a3518c18428ce4c073be719cb1`。独立 `fe03d8cc8` 关闭最后SQL回读的检查过时窗口；source `64f25149e6c0c0734ff7ca95a8d217eff62b2c6d` 加入新的真实反例、修正旧消费文件断言，并使CI从实际完整JSONL输出matched RUN/PASS names、FAIL/SKIP计数和实际编译工具source与checkout核对的紧凑摘要。本轮非DB QA在fe03的待提交fixture上执行，文件逐字等于64f提交：101普通/race通过，integration编译、tagged vet/lint0、actionlint带shellcheck和configcontract通过，receipt `qs-m4-b-boundary-fixture-source-64f25149/receipt.json` SHA为 `066b0659f5c0b6f393f29c8beb2e179d1f6b84876bb530a25d2501373fae71ec`。新增36项真实native、新head CI及两条批准P1审查尚未执行/结清；原26证明保持原来源，生产状态不提升。
