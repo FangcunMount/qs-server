@@ -269,7 +269,7 @@ func (d *database) commitValueBatch(ctx context.Context, m material, rows []rowP
 	for _, row := range rows {
 		args = append(args, row.Key, row.Retained)
 	}
-	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+	if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 		return e
 	}
 	tx, e := d.conn.BeginTx(ctx, nil)
@@ -282,7 +282,7 @@ func (d *database) commitValueBatch(ctx context.Context, m material, rows []rowP
 			recordRollback(&resultErr, tx)
 		}
 	}()
-	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+	if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 		return e
 	}
 	q, cancel := context.WithTimeout(ctx, queryLimit)
@@ -295,7 +295,7 @@ func (d *database) commitValueBatch(ctx context.Context, m material, rows []rowP
 	if e != nil || affected != int64(len(rows)) {
 		return errors.New("original_value_cas_count_rejected")
 	}
-	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+	if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 		return e
 	}
 	if tx.Commit() != nil {
@@ -333,6 +333,9 @@ func rereadApprovedInputs(m material, a approval, path, hash, approvalPath, appr
 }
 
 func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash, tool string, consumed *bool) error {
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
 	prior, e := readRecoveryBoundary(m, a, materialHash)
 	if e != nil {
 		return e
@@ -357,13 +360,19 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if ctx.Err() != nil {
 		return errors.New("total_budget_exceeded")
 	}
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("total_budget_exceeded")
+	}
 	if e := consumeApproval(m, a, approvalHash); e != nil {
 		return e
 	}
 	*consumed = true
 	for _, i := range []int{1, 0} {
 		if current.Columns[i] == columnAbsent {
-			if e := validateMutableBoundary(m, a, materialHash, tool); e != nil {
+			if e := d.requireRecoveryAuthority(ctx, m, a, materialHash, tool); e != nil {
 				return e
 			}
 			if _, e := d.conn.ExecContext(ctx, statements[i]); e != nil {
@@ -381,7 +390,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 			return e
 		}
 		if i == 1 && current.Columns[i] == columnTemporaryNullable {
-			if e := validateMutableBoundary(m, a, materialHash, tool); e != nil {
+			if e := d.requireRecoveryAuthority(ctx, m, a, materialHash, tool); e != nil {
 				return e
 			}
 			if _, e := d.conn.ExecContext(ctx, statements[2]); e != nil {
@@ -403,7 +412,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 		return e
 	}
 	final, e := d.snapshot(ctx, tool, 101, true)
-	if e != nil || !reflect.DeepEqual(final.Tables, m.Tables) || !reflect.DeepEqual(final.Ledger, m.Ledger) || final.LedgerDDL != m.LedgerDDL || !bytes.Equal(final.MongoHead, m.MongoHead) {
+	if e != nil || verifyRestored(m, final) != nil {
 		return errors.New("final_original_values_ledger_or_binding_unproven")
 	}
 	return nil
@@ -421,7 +430,7 @@ func (d *database) replayLedgerLast(ctx context.Context, m material, expected le
 	if e != nil || observed.Ledger != expected || !bytes.Equal(observed.Mongo, m.MongoHead) {
 		return errors.New("binding_or_ledger_changed_before_last_transaction")
 	}
-	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+	if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 		return e
 	}
 	tx, e := d.conn.BeginTx(ctx, nil)
@@ -438,7 +447,7 @@ func (d *database) replayLedgerLast(ctx context.Context, m material, expected le
 	if e != nil || rows[0] != expected {
 		return errors.New("original102_ledger_changed_before_replay")
 	}
-	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+	if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 		return e
 	}
 	deleted, e := tx.ExecContext(ctx, "DELETE FROM schema_migrations")
@@ -449,7 +458,7 @@ func (d *database) replayLedgerLast(ctx context.Context, m material, expected le
 		return errors.New("ledger_transaction_delete_count_rejected")
 	}
 	for _, row := range m.Ledger {
-		if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+		if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 			return e
 		}
 		if _, e := tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", row.Version, row.Dirty); e != nil {
@@ -460,7 +469,7 @@ func (d *database) replayLedgerLast(ctx context.Context, m material, expected le
 	if e != nil || final.Ledger != m.Ledger[0] || !bytes.Equal(final.Mongo, m.MongoHead) {
 		return errors.New("binding_or_original_ledger_changed_before_commit")
 	}
-	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+	if e := d.requireRecoveryAuthority(ctx, m, a, hash, tool); e != nil {
 		return e
 	}
 	if tx.Commit() != nil {
@@ -477,4 +486,11 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 		deadline = expiry
 	}
 	return context.WithDeadline(ctx, deadline)
+}
+
+func (d *database) requireRecoveryAuthority(ctx context.Context, m material, a approval, hash, tool string) error {
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	return validateMutableBoundary(m, a, hash, tool)
 }
