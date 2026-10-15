@@ -505,6 +505,13 @@ jobs:
               'TestM4MaintenanceTablesNativeUnboundMaterialRejected/hash',
               'TestM4MaintenanceTablesNativeUnboundMaterialRejected/identity',
               'TestM4MaintenanceTablesNativeUnboundMaterialRejected/source',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/Target103Admission',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/Original102Admission',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/CreateMDLWaitBlocksMarker',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/MarkerBlocksRestoreBeforeConsume',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/ConnectionLossKeepsServerGate',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/ReleaseUnknownNeverAuthorizesStart',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
           counts = {action: collections.Counter(event['Test'] for event in events if event.get('Action') == action and event.get('Test')) for action in ('run', 'pass')}
@@ -523,7 +530,7 @@ jobs:
               raise SystemExit('D object native requires actual checkout/dependency sentinels and zero FAIL/SKIP')
           for action in ('run', 'pass'):
               if counts[action] != collections.Counter({name: 1 for name in expected}):
-                  raise SystemExit('D object native requires all exact 46 selectors once RUN/PASS')
+                  raise SystemExit('D object native requires all exact 53 selectors once RUN/PASS')
           PY_D_OBJECT_PROOF
           cleanup_owned_fixture
 
