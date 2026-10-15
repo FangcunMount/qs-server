@@ -157,3 +157,20 @@ CI任务 `a168bc3aec9970524abc99b5cee88863315dd6f7` 及健康门禁 `059821e6696
 Fresh ef15审查4284410220发现固定数组解码会忽略原stdout中多余的集合计数。独立source `7de60377a59c6c4ac2e6e783b0d3f9699499071e` 在原strict typed解码前要求原数组恰好两项；不改材料/批准解码、37项native、资源/迁移或原命令截止。真实定向red保留7RUN/1PASS/5个child失败，修复后306普通/306race RUN/PASS、0FAIL/SKIP，tagged仅编译/vet/lint0通过；QA `qs-m4-b-capture-count-shape-fix-v1/source-qa-receipt.json` SHA为 `9415bbeae266ffcc399a044ca5fa48f9a0ccf485fe062444cbd28d0346a99fad`。此前e9 native37及ef15审查各保留原归属，不能替新finalhead签CI/native37/AI；生产及完整窗口资格仍未提升。
 
 Fresh8bf审查4284625167发现显式空release_error_category仍可通过，但真实成功stdout会省略该字段。独立source `2143511ee6eec13da5afb96f3c91c5dfba023ed9` 仅接受成功输出实际必需字段，release_error_category/restored_verification任何presence均拒，并删除两解码调用均不再使用的optional分支。真实red11RUN/9PASS/2FAIL（父及empty_release）保留，修复后target18、ordinary317/race317全oncePASS、0FAIL/SKIP，tag仅编译/vet/pinned lint通过；QA `qs-m4-b-success-capture-schema-fix-v1/source-qa.json` SHA为 `b208fbe6ace23bf6ca2c62e55758394662e4738339b59a0d823bf2e0ee3b1a9a`。所有native/CI/material/approval/count/预算原字节保持。旧8bf有12项CI在镜像拉取/元信息读取阶段被DockerHub限流，不能替新head签native37、CI或AI；生产及窗口资格不提升。
+
+
+原 `a01ba6e55feea03af0df087310d0bbf6231b3a5c` 的后端终态已独立核实为24 success、1设计skip；B范围37 RUN/PASS、0FAIL/SKIP，实际编译 `8533a4fe7ec43effe434f56fc7525fdc2bbe6c97` 与a01全tree相同。原件 `qs-m4-b-a01-native-tree-proof-v1.json` SHA为 `9061c76782257fc544b5093e36ed3a56c1ee13efd91878e10fe0bd0ddb522fb0`；后端tail被截断，只签可见完整B37范围。同head fresh AI评论4285164481仍发现原stdout可被重编码后接受，因此旧绿色结果没有关闭该问题，也不转签后续修复。
+
+独立 source `d937a0e5542d662c55db03d4d9f2bc5315afa9ad` 在原严格字段及语义检查后，要求原stdout与真实 `deliverReceipt` 编码器输出逐字相同，包含末尾换行；只比较，不改写独立冻结的任何原件。语义等价的重排、缩进、转义、数值改写或前后空白均不能作为原stdout。原六字段执行记录、材料和批准schema、native37名单/顺序/原断言、工作流、迁移和期限保持原字节。
+
+修前真实red为37 RUN、4 PASS、33 FAIL；修后首次普通354 RUN、352 PASS、2 FAIL来自旧计数正例重新编码stdout，原失败日志保留。该夹具改为真实 `deliverReceipt` 输出及原raw上的局部计数修改，原断言保留。最终target44、ordinary354/race354均逐项一次PASS、0FAIL/SKIP、exit0；integration仅编译、tagged vet、固定版本lint和diff通过。`qs-m4-b-canonical-capture-stdout-fix-v1/final-source-qa.json` SHA为 `def7af84e6af398fb320be700faac5126a050dc5304a8dfb664d5d93a74b7b9f`，独立 `commit-bridge.json` SHA为 `0aed1aa80a3d7adf2dd5a73afb93a1286cccb602f712f37a1bfcd79dd05cb774`；25个Go输入与d937 Git对象及QA逐字匹配。以下是该QA实际argv，`GOMAXPROCS=2`、`GOMEMLIMIT=1GiB` 由进程环境提供，未执行 `-p=2`：
+
+```sh
+go test -json -count=1 -run '^TestCaptureEvidenceRejectsReencodedOriginalStdout$|^TestCaptureReceiptRequiresExactlyTwoOriginalCollectionCounts$' ./scripts/oneoff/m4_mongo_historical_protection
+go test -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection
+go test -race -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection
+go test -tags=integration -run '^$' -count=1 ./scripts/oneoff/m4_mongo_historical_protection
+go vet -tags=integration ./scripts/oneoff/m4_mongo_historical_protection
+```
+
+固定lint的绝对可执行路径、全部实际argv、原日志和输入SHA保存在同一QA原件。新d937及后续文档head的实际native37、fresh CI和AI尚待执行；旧a01、e9及其他来源保持原绑定。本轮未调用数据库、Docker、SSH或生产；生产停写、恢复/启动、RPO、30/60分钟及业务验收资格不变。

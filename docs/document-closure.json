@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
-    "verified_on": "2026-10-15"
+    "sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+    "verified_on": "2026-10-16"
   },
   "status_policy": {
     "doc_status": [
@@ -14376,8 +14376,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
-        "verified_on": "2026-10-15"
+        "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -14709,6 +14709,28 @@
           "result": "passed",
           "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/capture_evidence.go",
+          "selector": "!bytes.Equal(raw, original.Bytes())",
+          "result": "matched",
+          "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -14760,7 +14782,7 @@
           "id": "M4-B-OBJECT-TOOL-REVIEW",
           "kind": "verification",
           "severity": "high",
-          "summary": "Known surplus-count and successful-stdout optional-field findings fixed by7de/214 with317ordinary/race PASS. New finalhead native37/CI/AI remain pending; old8bf12registry-limit CI failures do not qualify target behavior.",
+          "summary": "Historical status retained: Known surplus-count and successful-stdout optional-field findings fixed by7de/214 with317ordinary/race PASS. New finalhead native37/CI/AI remain pending; old8bf12registry-limit CI failures do not qualify target behavior. Update on d937: Previous verified binding retained: {\"source_sha\": \"2143511ee6eec13da5afb96f3c91c5dfba023ed9\", \"verified_on\": \"2026-10-15\"}. Historical a01 actually passed all37 native RUN/PASS (compiled8533 tree-equal) and terminal24success/1designskip, but fresh AI4285164481 found reencoded stdout accepted. Source d937 requires exact original deliverReceipt encoder bytes including newline: red37RUN4PASS33FAIL retained; target44,ordinary354/race354 oncePASS0FAIL/SKIP,tagcompile-only/vet/pinnedlint/diff passed. QAdef7af84e6af398fb320be700faac5126a050dc5304a8dfb664d5d93a74b7b9f and commitbridge0aed1aa80a3d7adf2dd5a73afb93a1286cccb602f712f37a1bfcd79dd05cb774 bind all25 Go inputs and actual argv. The first354RUN352PASS2FAIL counts-fixture QA remains retained; positive fixture now uses actualdeliverReceipt/raw count-only mutation without weakened assertions. External envelope/material/approval/native37/workflow/deadline bytes unchanged. Exact argv ran with GOMAXPROCS=2/GOMEMLIMIT=1GiB in process environment, no invented -p flag. Fresh d937/finaldocshead native37/CI/AI remain pending; historical proofs are not relabelled, production evidence is unchanged.",
           "exit_criteria": "Fresh finalhead must actually RUN/PASS all37 B native events with original serve stdout/actual exit evidence, exact source/tree and healthy owned lifecycle/cleanup, plus fresh AI review of strict external proof, held-FD capture and durable journal. Retain old QA/native/CI source attribution and separate production approval/window/business evidence."
         },
         {
