@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+    "sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
     "verified_on": "2026-10-16"
   },
   "status_policy": {
@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
-        "verified_on": "2026-10-15"
+        "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -425,6 +425,34 @@
         {
           "kind": "source",
           "path": "scripts/dbops/test-mysql-metadata-profile-ssh.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/run.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/prepare.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/approve.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/test_source.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/fixture_test.go.txt"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/remote-maintenance.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-a-formal-carrier/original-api-binding.json"
         }
       ],
       "verification": [
@@ -733,6 +761,48 @@
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/m4-a-formal-carrier/test_source.py",
+          "result": "passed",
+          "source_sha": "a96db6726fcc84861801a81c8fcb97eb62fe0d8a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "a96db6726fcc84861801a81c8fcb97eb62fe0d8a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "a96db6726fcc84861801a81c8fcb97eb62fe0d8a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/m4-a-formal-carrier/test_source.py",
+          "result": "passed",
+          "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -762,7 +832,23 @@
           "severity": "medium",
           "summary": "R4 candidate removes the registered one-time tools and rewrites the remaining entry boundaries. The rewritten document still awaits independent source review. Original proof identities remain in the fixed B Git snapshot; runtime and production acceptance remain unknown.",
           "exit_criteria": "Review the rewritten document against retained permanent source and bind the actual five production exit receipts; obtain fresh document signoff without changing the historical proof identities."
+        },
+        {
+          "id": "M4-A-FORMAL-CARRIER-ACTUAL",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "The optional source is prepared and locally checked only. No actual Ubuntu root0/512MiB/native bind run or current registry availability has been observed by this task; CI artifact is not Mac custody.",
+          "exit_criteria": "After independent root review,dispatch the exact stable source and require its full actual predicate,original Tool/hash/image configuration/ELF/50MB material/actions/physical releases/owned cleanup. Preserve negative originals. Keep Mac original-three-file custody and production approval/fresh preflight independent; do not rerun or relabel A14 six-instance proof."
         }
+      ],
+      "notes": [
+        "Prior verified marker retained unchanged before the optional M4-A carrier CI source review: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}",
+        "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
+        "Actual source-only QA for a96db6726fcc84861801a81c8fcb97eb62fe0d8a:14 pure qualifier/producer/phase/cleanup cases and131 configcontract RUN/PASS each once with0FAIL/SKIP; all86 full bash blocks,5 embedded Python blocks and5 fixture Python files parse,actionlint passes,fixture Go formatting is clean. Exact602 source actually rebuilt LinuxAMD64 Tool2c314; updated fixture78ce36529bc9132e837e216dfad2a9d40cca1bd6739e8878fbfafc75a09327b6 compiled against immutableA511 as ELF156c2112398c867bec29a1069af0dda11ca6b75d9da60eb7f9d043176981e8e3,with tagged vet passed. The exact build used Go1.25.12 darwin/arm64 with GOOS=linux/GOARCH=amd64/CGO_ENABLED=0; no ELF/DB/Docker/SSH/registry/CI execution took place. Initial local Python3.9 unsupported archive-filter failure and prior snapshots remain retained; fixed source validates regular-only Git archive members and succeeds without replacing immutable bytes. Raw QA and build receipts remain in qs-m4-a-formal-carrier-ci-source-v1; no source-only compiler result is a Linux runtime qualification. Configcontract used GOMAXPROCS=2/GOMEMLIMIT=1GiB in its process environment; those are not argv entries. Docs87 unit/211 hygiene/165 facts passed before this evidence-only addition.",
+        "Actual actionlint result retained as full original record because the existing command verifier does not accept this executable; its allowlist is unchanged: {\"kind\":\"command\",\"command\":\"actionlint -color .github/workflows/ci.yml\",\"result\":\"passed\",\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}",
+        "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification.",
+        "Actual final source-only checks for 5c2fc6bda8de53bfb5a9930931bbd885e09920fb:14 pure tests passed;131 configcontract cases RUN/PASS each once,0FAIL/SKIP;actionlint passed;86 full bash scripts and all6 actual embedded Python blocks parse,including the ordinary-test wrapper PY that the prior5-block summary omitted;5 fixture Python files parse and fixture Go formatting is unchanged. Prior5-block summary is retained as the original limited result,not rewritten. Strict set-Eeuo-pipefail guards the final commands. Original Tool602 byte-equal2c314 and A511 fixture build/vet remain the earlier actual build,with all six implementation/binding fixture-file bytes unchanged and only the pure budget predicate changed. No Docker/DB/SSH/registry/CI execution or Mac original-three-file custody occurred in this task.",
+        "Final docs-check at source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb actually passed87 documentation unit tests,211 hygiene files and165 active facts. The subsequent evidence-only closure addition retains the same source attribution; a final repeat is required before commit. The manual dispatch also runs all existing normal jobs; only the optional qualification is default-OFF. Registry login reuses existingALIYUN_ACR_* and optionalDOCKERHUB_USERNAME/TOKEN inputs without reading or printing secrets."
       ]
     },
     {
@@ -11583,7 +11669,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+        "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -12538,7 +12624,10 @@
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
         "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending.",
+        "Prior verified marker retained unchanged before the optional M4-A carrier CI source review: {\"source_sha\":\"9fbe9d04f0f688df30758d0eef3a224ce4fee589\",\"verified_on\":\"2026-10-16\"}",
+        "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
+        "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification."
       ]
     },
     {
@@ -13901,7 +13990,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+        "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -14548,7 +14637,10 @@
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
+        "Prior verified marker retained unchanged before the optional M4-A carrier CI source review: {\"source_sha\":\"6597ce303cb70485ea8c49578347f6f7396ea663\",\"verified_on\":\"2026-10-16\"}",
+        "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
+        "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification."
       ]
     },
     {
@@ -14665,7 +14757,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+        "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -15131,7 +15223,10 @@
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
+        "Prior verified marker retained unchanged before the optional M4-A carrier CI source review: {\"source_sha\":\"6597ce303cb70485ea8c49578347f6f7396ea663\",\"verified_on\":\"2026-10-16\"}",
+        "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
+        "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification."
       ]
     },
     {
@@ -15140,7 +15235,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+        "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -15515,7 +15610,10 @@
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"1bea1a6013bc3a59c0bb0228e516381aeac7478e\",\"verified_on\":\"2026-10-15\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
+        "Prior verified marker retained unchanged before the optional M4-A carrier CI source review: {\"source_sha\":\"6597ce303cb70485ea8c49578347f6f7396ea663\",\"verified_on\":\"2026-10-16\"}",
+        "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
+        "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification."
       ]
     },
     {
@@ -15524,7 +15622,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+        "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -15985,7 +16083,10 @@
         "Historical gap object retained unchanged before incoming main source alignment: {\"id\":\"M4-B-OBJECT-TOOL-REVIEW\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Capture-only held-parent FD source0fa passed128ordinary/race and localFS swap regression; fresh finalhead CI37/AI pending. Exact948 CI37 remains historical and its transient-parent P2 is not pre-resolved.\",\"exit_criteria\":\"Fresh finalhead must actually RUN/PASS all37 B native events with source/tree and healthy phase-specific cleanup evidence,plus fresh AI review of held-FD capture and durable journal; do not borrow948CI37 or872b local37 or promote production evidence.\"}",
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"3961a948e1d1e465e1b1bd48e9d83b45a6b982da\",\"verified_on\":\"2026-10-16\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
+        "Prior verified marker retained unchanged before the optional M4-A carrier CI source review: {\"source_sha\":\"6597ce303cb70485ea8c49578347f6f7396ea663\",\"verified_on\":\"2026-10-16\"}",
+        "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
+        "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification."
       ]
     }
   ],

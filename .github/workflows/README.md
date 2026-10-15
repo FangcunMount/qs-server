@@ -68,6 +68,20 @@ MySQL未知typed服务端错误使用 `query_mysql_error` 并保留可选uint16�
 
 CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 rs0。必须设置 required 标记，精确 selector 的 JSON 事件必须实际 RUN/PASS；任意 SKIP、缺失 selector 或依赖未就绪均失败。Mongo fixture 使用固定官方 digest、owned network/container label 和唯一 127.0.0.1 随机端口，不复用业务 runtime fixture。
 
+### 3.1. 可选 M4-A 正式载体隔离验证
+
+`ci.yml` 的 `m4_a_formal_carrier` 输入默认为 false；仅在本仓库手工派发且明确开启时，独立 `m4-a-formal-carrier` job 才运行。同次手工派发仍会运行既有 CI jobs；普通 push／PR 的原门禁不借用此结果。固定夹具位于 [m4-a-formal-carrier](../../scripts/testing/m4-a-formal-carrier/run.py)，不接收数据库地址、主机、SQL、镜像替代值或生产批准。
+
+该任务从固定 `602710eb…` 源码以 Go 1.25.12 重建工具，产物必须与原 `2c314163…` SHA 完全一致。原 M2 API 仅从既有 ACR 的固定 manifest 读取，另核原始配置摘要、18 个层摘要和 ELF；取不到或不一致时失败，不回退 tag、最新镜像或近似构建。Registry Secret 仅通过原 `ALIYUN_ACR_*` 登录输入及可选 `DOCKERHUB_USERNAME`／`DOCKERHUB_TOKEN` 只读拉取登录使用，不进入固定夹具和证据包。
+
+夹具只构造原 V10 Receiver 的隔离上下文，明确绕过生产主机、SSH、Nginx 和配置装配构造入口；`native`、`run_native_carrier`、Engine 创建、guard 和释放方法保持原字节。真实 Linux 原生 Docker 上使用 root、512MiB、同一 canonical 私有路径的 host bind、原 API 网络命名空间，以及独占合成 `qs` 双库；每张目标表为 247,463 行，材料约 50MB。原始 capture stdout 与同 CID 实际 exit0 才能生成执行证明。固定独立批准进程核原三件和局部 dirty101 事实，再执行原 restore／verify-restored，最后验证 clean101/39；不启动六个业务进程，也不重复六实例演练。
+
+任务的 CI 外层上限为 85 分钟：checkout／Go 准备／纯校验／源码依赖／固定构建／两次只读登录／拉取／隔离执行／归档／上传的步骤上限依次为 1／2／1／2／22／1／1／4／42／1／3 分钟，合计 80 分钟，另留 5 分钟 Action 收尾。固定构建内两次编译各最多 600 秒；隔离程序自身仍受 240 秒准备、180 秒数据准备、原 1800 秒 native 窗口、120 秒证明及 120 秒清理约束。不会扩大 512MiB、原查询／IO／内核期限或 300 秒启动预留。任何失败、OOM、未知 ACK 或释放失败均不签合格；限定 nonce 资源清理成功不能把原载体的未知释放改成成功。首次失败材料保留，不自动重试或生成成功证明。
+
+CI artifact 的 30 天保留只是隔离证据保留策略，不证明 Mac mini 已托管原三件。原始材料、stdout 和 envelope 的 Mac 私有目录复制、原 V10 mirror／逐字读回属于后续单独的非生产托管步骤。此 job 成功也不证明生产 SSH、供给、维护 30 分钟／恢复 60 分钟、RPO=0 或真实业务验收，更不授予生产停写、迁移或启动权限。
+
+该可选夹具属于 M4-A 临时验收设施；对应验收与恢复责任结清后，由 M7 单独退役，历史原件按已有保留责任处理。
+
 ## 4. 本地非缓存验证
 
 ```bash
@@ -80,6 +94,7 @@ python3 -B scripts/dbops/test-mysql-metadata-readiness.py
 python3 -B scripts/dbops/test-mysql-retirement-inventory.py
 python3 -B scripts/dbops/test-mongodb-metadata-profile.py
 python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
+python3 -B scripts/testing/m4-a-formal-carrier/test_source.py
 # 仅在各自独占 fixture 和 required 身份变量已绑定后执行：
 make test-metadata-readiness-mysql-native
 make test-metadata-readiness-mongodb-native
