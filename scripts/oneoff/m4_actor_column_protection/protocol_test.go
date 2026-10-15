@@ -18,7 +18,7 @@ func fixtureBinding() binding {
 }
 func fixtureMaterial(t *testing.T) material {
 	t.Helper()
-	raw, e := bson.Marshal(bson.D{{Key: "version", Value: int64(40)}, {Key: "dirty", Value: false}})
+	raw, e := bson.Marshal(bson.D{{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: int64(40)}, {Key: "dirty", Value: false}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -83,17 +83,20 @@ func TestOriginalJSONFraming(t *testing.T) {
 
 func TestMongo40RequiresPresentTypedUniqueCleanFields(t *testing.T) {
 	for _, version := range []any{int32(40), int64(40)} {
-		raw, _ := bson.Marshal(bson.D{{Key: "version", Value: version}, {Key: "dirty", Value: false}})
+		raw, _ := bson.Marshal(bson.D{{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: version}, {Key: "dirty", Value: false}})
 		if !cleanMongo40(raw) {
 			t.Fatal("clean typed version40 rejected")
 		}
 	}
 	for name, doc := range map[string]bson.D{
-		"missing_dirty": {{Key: "version", Value: int64(40)}},
-		"null_dirty":    {{Key: "version", Value: int64(40)}, {Key: "dirty", Value: nil}},
-		"dirty":         {{Key: "version", Value: int64(40)}, {Key: "dirty", Value: true}},
-		"wrong_type":    {{Key: "version", Value: float64(40)}, {Key: "dirty", Value: false}},
-		"wrong_version": {{Key: "version", Value: int64(39)}, {Key: "dirty", Value: false}},
+		"missing_id":    {{Key: "version", Value: int64(40)}, {Key: "dirty", Value: false}},
+		"null_id":       {{Key: "_id", Value: nil}, {Key: "version", Value: int64(40)}, {Key: "dirty", Value: false}},
+		"unknown_field": {{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: int64(40)}, {Key: "dirty", Value: false}, {Key: "extra", Value: false}},
+		"missing_dirty": {{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: int64(40)}},
+		"null_dirty":    {{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: int64(40)}, {Key: "dirty", Value: nil}},
+		"dirty":         {{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: int64(40)}, {Key: "dirty", Value: true}},
+		"wrong_type":    {{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: float64(40)}, {Key: "dirty", Value: false}},
+		"wrong_version": {{Key: "_id", Value: "fixture-head"}, {Key: "version", Value: int64(39)}, {Key: "dirty", Value: false}},
 		"duplicate":     {{Key: "version", Value: int64(40)}, {Key: "dirty", Value: true}, {Key: "dirty", Value: false}},
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -128,15 +128,19 @@ func keyLess(a, b string, binary bool) bool {
 }
 func cleanMongo40(raw bson.Raw) bool {
 	elements, e := raw.Elements()
-	if e != nil {
+	if e != nil || len(elements) != 3 {
 		return false
 	}
 	seen := map[string]bool{}
 	for _, element := range elements {
-		if seen[element.Key()] {
+		if seen[element.Key()] || (element.Key() != "_id" && element.Key() != "version" && element.Key() != "dirty") {
 			return false
 		}
 		seen[element.Key()] = true
+	}
+	id := raw.Lookup("_id")
+	if id.Type == 0 || id.Type == bson.TypeNull || id.Type == bson.TypeUndefined {
+		return false
 	}
 	v, ok := raw.Lookup("version").Int64OK()
 	if !ok {
