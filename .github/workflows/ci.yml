@@ -42,7 +42,10 @@ jobs:
           cache: true
       - name: Test fixed qualification and default isolation
         timeout-minutes: 1
-        run: python3 -B scripts/testing/m4-a-formal-carrier/test_source.py
+        run: |
+          set -Eeuo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 -B scripts/testing/m4-a-formal-carrier/test_source.py
       - name: Resolve the fixed source dependencies
         timeout-minutes: 2
         run: |
