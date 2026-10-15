@@ -76,3 +76,10 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 非零差异、非法字段、孤儿关系及 `unknown` 状态仍是完整观测中的 finding，不自动得出 eligible 或删除许可。生产盘点须独立绑定 source/run/target 回执；本源码批次的隔离验收不包含生产连接或派发，实际生产观测由另行授权任务登记。盘点不证明持续停写、定向值备份、失败恢复、旧新服务启动或30/60分钟与RPO=0。这个一次性工具随 M7 退出，清理完成后不得扩成永久通用查询入口。
 
 源码 `80f422101ccfd83b4c4eb5bd165272145afe7afd` 在自有 MySQL8.0.36 上实际执行同一 required race proof：三个 top 及子场景共24项 RUN/PASS、0 FAIL/SKIP。新 inventory 的8项包括非零/unknown计数、重复期望关系、非法actor和字节差异、真实列权限1143、缺对象与非InnoDB、dirty/其它head、RR并发actor/AI变化及 rollback 后实时版本、全空对象；原 profile 和 readiness 回归保留。原 JSONL SHA256 `54a68e1c8a491e11d6f4ab7923c9eefa63e3971b2101cd28b9c710dc56b4fb6f`，回执 SHA256 `ff72274b13056b70066880e636fa825b0d504eb50b4a90db5b7e8d3481076f38`。自有容器/网络已释放，旧CID/images/volumes保持，所有组件源码前后相同；该 fixture 是限定 reader 结构/计量证明，不冒称生产迁移初始化或实际生产权限。
+
+
+**PR381 原失败与测试观察边界。** head `49864e8f02ea69d82a5e919cc2bb4b12999ef9a4` 的 MySQL Native Metadata job `116625591832` 完整后端日志记录 `dirty_or_other_head_is_rejected` 报 `owned_inventory_server_connection_not_released`，随后因 helper 持父测试对象而触发 parent FailNow。原日志 SHA `9e2165f99fef38ae528a64fe7fcc4251916ef6e5ff14bbf649af7a93c0f0fb4f` 保留；没有保留该时点的实际剩余数/客户端释放字段，不能倒签为已证连接泄漏、服务端延迟或 flaky。本机同498原8项一次通过，另64次固定 dirty early-return/关闭采样均即时与终态为server0，没有复现原失败。
+
+独立源码 `abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e` 只改 integration 测试夹具：先断言原Conn/DB/pool释放为true，再在原40秒测试context内、最多原5秒queryLimit只读观察该自有用户的server线程归零。查询错误或到期仍失败，不重跑inventory、不KILL连接、不延长任何生产5/45秒预算；read/open/exec helper显式接收当前子测试。驱动v1.9.3的Close发送COM_QUIT并关闭本地socket，不读取server线程结束ACK，因此即时count不应作为唯一同步假设；这说明修正理由，不证明原CI失败原因。
+
+该冻结文件字节在498工作区实际执行原完整 required race proof，三个top及原子场景24项各一次RUN/PASS、0FAIL/SKIP；本包普通/race各153项通过，tag仅编译、vet及pinned2.5普通/taglint通过。私有 `qs-m4-inventory-close-fixture-v1` 保留原失败、旧8/64与新24分开证据；源码交付 SHA `5fa1491719293fdf98b96001cb091675213a276b661b228b779c7e16207439ba`、实际资源回执 SHA `a1c6710ec44b4693e1239ec96aaf234378c311532ec9bed28e738a4a7ec3b738`。唯一自有MySQL容器/卷/网络均精确ID、删除ACK与缺失核验；旧CID/image/mount保留，nsqd3540→3542及三个Health采样变化不签运行恒定。生产Go、15+3读取/控制界限、工作流和迁移资源逐字保持；原CI仍为失败，新head CI/AI、生产及业务资格继续独立，不重签80f历史24项。
