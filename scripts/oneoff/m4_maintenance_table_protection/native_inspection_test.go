@@ -22,7 +22,7 @@ import (
 
 // This diagnostic has its own strict selector. The historical 53 and runtime
 // generation 12 remain separate gates, with their source and names unchanged.
-func TestM4MaintenanceTablesNativeReadOnlyInspect(t *testing.T) {
+func TestM4MaintenanceTablesReadOnlyInspectNative(t *testing.T) {
 	for _, name := range []string{"Clean102", "Clean103", "Committed102", "Committed103", "Dirty103", "Unknown104", "ForeignBoundary", "HiddenBoundary"} {
 		t.Run(name, func(t *testing.T) {
 			h := newMaintenanceNative(t)
