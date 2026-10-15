@@ -168,6 +168,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		defer c()
 	}
 	if a.action == "capture" {
+		if e := recoveryParent(a.capture); e != nil {
+			r.Error = e.Error()
+			return r
+		}
 		if s, e := privatePath(a.capture, false); e != nil || s != nil {
 			r.Error = "first_capture_exists_or_path_rejected"
 			return r

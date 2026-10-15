@@ -23,13 +23,31 @@ func recoveryPaths(m material, materialHash, operation string) (boundary, consum
 	if !absolutePath(m.CapturePath) || !nonzeroHash(materialHash) || !operationRE.MatchString(operation) {
 		return "", "", errors.New("recovery_anchor_rejected")
 	}
-	parent := filepath.Dir(m.CapturePath)
-	s, e := privatePath(parent, true)
-	if e != nil || !s.IsDir() || s.Mode().Perm()&022 != 0 || (s.Sys().(*syscall.Stat_t).Uid != 0 && s.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid())) {
-		return "", "", errors.New("recovery_private_parent_rejected")
+	if e := recoveryParent(m.CapturePath); e != nil {
+		return "", "", e
 	}
+	parent := filepath.Dir(m.CapturePath)
 	prefix := filepath.Join(parent, ".m4-b-"+materialHash)
 	return prefix + ".boundary.json", prefix + ".operation-" + fingerprint([]byte(operation)) + ".consumed", nil
+}
+
+func recoveryParent(path string) error {
+	if !absolutePath(path) {
+		return errors.New("recovery_private_parent_rejected")
+	}
+	s, e := privatePath(filepath.Dir(path), true)
+	if e != nil || !recoveryParentAllowed(s, uint32(os.Getuid())) {
+		return errors.New("recovery_private_parent_rejected")
+	}
+	return nil
+}
+
+func recoveryParentAllowed(s os.FileInfo, uid uint32) bool {
+	if s == nil || !s.IsDir() || s.Mode().Perm()&022 != 0 {
+		return false
+	}
+	stat, ok := s.Sys().(*syscall.Stat_t)
+	return ok && (stat.Uid == 0 || stat.Uid == uid)
 }
 
 func readRecoveryBoundary(m material, a approval, materialHash string) (bool, error) {
