@@ -311,7 +311,7 @@ class Fixture:
         need(self.result["mysql_image_binding"]["container_image_id"]
              == self.result["mysql_image_binding"]["image"]["Id"], "fixed_MySQL_container_image_mismatch")
         self.docker("start", self.mysql)
-        self.ready(self.mysql, ["mysqladmin", "ping", "-uroot", "--silent"])
+        self.ready(self.mysql, ["mysqladmin", "ping", "--protocol=TCP", "--host=127.0.0.1", "-uroot", "--silent"])
         actual = self.docker("exec", self.mysql, "mysql", "-uroot", "-N", "-e", "SELECT VERSION()")
         need(actual.strip() == b"8.0.36", "actual_MySQL8.0.36_required")
         self.result["mysql_image_binding"]["actual_server_version"] = actual.strip().decode("ascii")
