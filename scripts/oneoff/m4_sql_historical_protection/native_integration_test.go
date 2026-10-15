@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -288,13 +289,7 @@ func TestM4SQLObjectNativeExistingEncodingMismatchRefusedBeforeClaim(t *testing.
 		t.Fatal("early mismatch refusal changed an object")
 	}
 	h.assertHead(101, true)
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--approval-file=") {
-			if _, e := os.Stat(strings.TrimPrefix(arg, "--approval-file=") + ".consumed"); !os.IsNotExist(e) {
-				t.Fatal("early mismatch refusal consumed authorization")
-			}
-		}
-	}
+	assertOwnedRecoveryUnclaimed(t, h, args)
 }
 func (h *nativeFixture) migrateSQL(source fs.FS, target uint) {
 	h.t.Helper()
@@ -370,7 +365,7 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 			return h.uri
 		}
 		return ""
-	}, h.tool)
+	}, h.tool, nil)
 }
 func (h *nativeFixture) capture() {
 	h.t.Helper()
@@ -534,13 +529,7 @@ func TestM4SQLObjectNativeOriginalDefinitionDriftRefused(t *testing.T) {
 				t.Fatal("early refusal changed the drifted original structure", e)
 			}
 			h.assertHead(101, true)
-			for _, arg := range args {
-				if strings.HasPrefix(arg, "--approval-file=") {
-					if _, e := os.Stat(strings.TrimPrefix(arg, "--approval-file=") + ".consumed"); !os.IsNotExist(e) {
-						t.Fatal("early definition refusal consumed authorization")
-					}
-				}
-			}
+			assertOwnedRecoveryUnclaimed(t, h, args)
 		})
 	}
 }
@@ -701,6 +690,7 @@ func TestM4SQLObjectNativeCommitResponseLossRemainsUnknown(t *testing.T) {
 	h.capture()
 	h.upgrade(2, false)
 	args, _ := h.restoreInput()
+	directDSN := h.dsn
 	cfg, _ := mysql.ParseDSN(h.dsn)
 	actualAck := false
 	network := h.name
@@ -719,7 +709,49 @@ func TestM4SQLObjectNativeCommitResponseLossRemainsUnknown(t *testing.T) {
 		t.Fatal("actual committed reply loss was not safely refused", r, actualAck)
 	}
 	h.assertHead(100, false)
-	t.Log("actual MySQL COMMIT OK was dropped; tool reported unknown and did not force/down/retry")
+	// This is a new normal TCP client, not the connection that lost the ACK.
+	h.dsn = directDSN
+	stateBefore := ownedRecoveryStateBytes(t, h.dir)
+	verified := h.action("verify-restored", args...)
+	if !verified.Complete || !verified.ReadOnly || !verified.SQLConnectionClosed || !verified.SQLPoolClosed || !verified.MongoClosed || verified.ReleaseError != "" || verified.TransactionReleaseUnproven {
+		t.Fatal("fresh read-only original-state verification failed", verified)
+	}
+	if !reflect.DeepEqual(stateBefore, ownedRecoveryStateBytes(t, h.dir)) {
+		t.Fatal("read-only verification changed retained recovery files")
+	}
+	// A real retained fact change must make the same full verification fail.
+	if _, e := h.db.Exec("UPDATE assessment SET primary_score_value=primary_score_value+1 WHERE id=4101"); e != nil {
+		t.Fatal("owned retained-fact change unavailable", e)
+	}
+	drifted := h.action("verify-restored", args...)
+	if drifted.Complete || !drifted.ReadOnly || drifted.Error != "retained_structure_or_fact_changed" || !drifted.SQLConnectionClosed || !drifted.SQLPoolClosed || !drifted.MongoClosed || drifted.ReleaseError != "" || drifted.TransactionReleaseUnproven {
+		t.Fatal("fresh verification accepted drift or failed to release", drifted)
+	}
+	h.assertHead(100, false)
+	if !reflect.DeepEqual(stateBefore, ownedRecoveryStateBytes(t, h.dir)) || r.Complete || r.Error != "ledger_commit_outcome_unknown" {
+		t.Fatal("verification changed the original unknown receipt or recovery state")
+	}
+	t.Log("actual MySQL COMMIT OK was dropped; independent fresh full verification proved original state, retained drift then refused; no replay/new claim and unknown receipt unchanged")
+}
+
+func ownedRecoveryStateBytes(t *testing.T, directory string) map[string]string {
+	t.Helper()
+	entries, e := os.ReadDir(directory)
+	if e != nil {
+		t.Fatal("owned recovery directory unavailable")
+	}
+	out := map[string]string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			t.Fatal("unexpected directory in owned recovery state")
+		}
+		raw, e := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if e != nil {
+			t.Fatal("owned recovery state unavailable")
+		}
+		out[entry.Name()] = fingerprint(raw)
+	}
+	return out
 }
 
 func TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF(t *testing.T) {
@@ -833,7 +865,7 @@ func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
 						return h.uri
 					}
 					return ""
-				}, h.tool)
+				}, h.tool, nil)
 			}()
 			pending, early := probeOwnedRestoreDDL(t, h, true, 3*time.Second, response)
 			if early != nil {
@@ -966,5 +998,390 @@ func logOwnedRestoreDDLProbe(t *testing.T, h *nativeFixture) {
 	}
 	if rows.Err() != nil {
 		t.Log("owned DDL probe diagnostics incomplete")
+	}
+}
+
+func TestM4SQLObjectNativeRestoreContinuation(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		clean bool
+		acks  int
+	}{
+		{"dirty_after_first_add_ack", false, 1},
+		{"dirty_after_second_add_ack", false, 2},
+		{"clean_after_first_add_ack", true, 1},
+		{"clean_after_second_add_ack", true, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newNativeOriginalCharset(t, "utf8")
+			h.capture()
+			original := h.fullDDL()
+			h.upgrade(2, tc.clean)
+			ledgerBefore := readOwnedLedger(t, h)
+			args, marker := h.restoreInput()
+			action, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			acks := []int{}
+			r := run(action, append([]string{"--action=restore", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=1m"}, args...), func(key string) string {
+				switch key {
+				case "QS_M4_OBJECT_MYSQL_DSN":
+					return h.dsn
+				case "QS_M4_OBJECT_MONGO_URI":
+					return h.uri
+				}
+				return ""
+			}, h.tool, func(i int) {
+				acks = append(acks, i)
+				if len(acks) == tc.acks {
+					cancel()
+				}
+			})
+			if r.Complete || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.TransactionReleaseUnproven || len(acks) != tc.acks || acks[0] != 1 || (tc.acks == 2 && acks[1] != 0) {
+				t.Fatal("explicit interruption did not follow successful reverse ADD acknowledgments", r.Error, acks)
+			}
+			if !reflect.DeepEqual(readOwnedLedger(t, h), ledgerBefore) {
+				t.Fatal("101 ledger bytes or DDL changed before full object restoration")
+			}
+			h.assertHead(101, !tc.clean)
+			actual := h.fullDDL()
+			for i := range objects {
+				present := strings.Contains(actual[i], "`"+objects[i].column+"` json DEFAULT NULL")
+				wantPresent := i == 1 || tc.acks == 2
+				if present != wantPresent || (present && actual[i] != original[i]) {
+					t.Fatal("acknowledged ADD did not leave an exact admitted DROP prefix", i, present)
+				}
+			}
+			if tc.clean {
+				verified := h.action("verify-target", "--material-file="+h.materialPath, "--material-sha256="+h.materialHash)
+				if verified.Complete || verified.Error != "target_objects_still_present" {
+					t.Fatal("restore admission leaked into verify-target", verified.Error)
+				}
+			}
+			old := h.action("restore", args...)
+			if old.Complete || old.Error != "restore_approval_consumption_failed" || !reflect.DeepEqual(readOwnedLedger(t, h), ledgerBefore) || h.fullDDL() != actual {
+				t.Fatal("consumed approval reused or changed restored facts", old.Error)
+			}
+			next := nextOwnedRestoreApproval(t, h, args, marker)
+			resumed := h.action("restore", next...)
+			if !resumed.Complete || !resumed.SQLConnectionClosed || !resumed.SQLPoolClosed || !resumed.MongoClosed || resumed.TransactionReleaseUnproven || h.fullDDL() != original {
+				t.Fatal("new explicit approval could not finish the admitted prefix", resumed.Error)
+			}
+			h.assertHead(100, false)
+			if !h.action("inspect").Complete {
+				t.Fatal("fresh10039 rejected after explicit continuation")
+			}
+			assertOwnedRetainedCapture(t, h)
+			t.Logf("actual successful ADD acknowledgments=%d; original101 ledger remained unchanged; new approval restored original DDL/facts/ledger and released clients", tc.acks)
+		})
+	}
+}
+
+func nextOwnedRestoreApproval(t *testing.T, h *nativeFixture, original []string, marker string) []string {
+	t.Helper()
+	var path, hash string
+	for _, arg := range original {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			path = strings.TrimPrefix(arg, "--approval-file=")
+		}
+		if strings.HasPrefix(arg, "--approval-sha256=") {
+			hash = strings.TrimPrefix(arg, "--approval-sha256=")
+		}
+	}
+	raw, e := readPrivate(path, hash, 32768)
+	var first approval
+	if e != nil || strictDecode(raw, &first) != nil || first.Marker != marker {
+		t.Fatal("first independently frozen approval unavailable for explicit continuation")
+	}
+	next := first
+	next.Operation = fmt.Sprintf("%d-2", time.Now().UnixNano())
+	if next.Operation == first.Operation {
+		t.Fatal("continuation operation was not independent")
+	}
+	// Keep the original freeze, material, marker, decision and absolute expiry/
+	// deadline unchanged. A new attempt cannot reset its recovery budget.
+	raw, e = json.Marshal(next)
+	path = filepath.Join(h.dir, next.Operation+"-approval.json")
+	if e != nil || writeExclusive(path, raw) != nil {
+		t.Fatal("new explicit continuation approval could not be frozen")
+	}
+	args := append([]string(nil), original...)
+	for i, arg := range args {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			args[i] = "--approval-file=" + path
+		}
+		if strings.HasPrefix(arg, "--approval-sha256=") {
+			args[i] = "--approval-sha256=" + fingerprint(raw)
+		}
+	}
+	return args
+}
+
+type ownedLedger struct {
+	DDL  string
+	Rows []ledgerRow
+}
+
+func readOwnedLedger(t *testing.T, h *nativeFixture) ownedLedger {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), queryLimit)
+	defer cancel()
+	text, e := ddl(ctx, h.db, "schema_migrations")
+	if e != nil {
+		t.Fatal("actual ledger DDL unavailable")
+	}
+	out := ownedLedger{DDL: text}
+	rows, e := h.db.QueryContext(ctx, "SELECT version,dirty FROM schema_migrations ORDER BY version LIMIT 2")
+	if e != nil {
+		t.Fatal("actual ledger rows unavailable")
+	}
+	for rows.Next() {
+		var row ledgerRow
+		if rows.Scan(&row.Version, &row.Dirty) != nil {
+			_ = rows.Close()
+			t.Fatal("actual ledger row invalid")
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	re, ce := rows.Err(), rows.Close()
+	if re != nil || ce != nil || len(out.Rows) != 1 {
+		t.Fatal("complete actual ledger or row release unproved")
+	}
+	return out
+}
+
+func assertOwnedRetainedCapture(t *testing.T, h *nativeFixture) {
+	t.Helper()
+	p := filepath.Join(h.dir, "independent-final-capture.json")
+	r := h.action("capture", "--capture-file="+p)
+	if !r.Complete {
+		t.Fatal("fresh independent complete capture failed", r.Error)
+	}
+	raw, e := readPrivate(p, r.MaterialHash, maxMaterialBytes)
+	var final material
+	if e != nil || strictDecode(raw, &final) != nil || compareRetained(h.material, final) != nil || !reflect.DeepEqual(h.material.Ledger, final.Ledger) || h.material.LedgerDDL != final.LedgerDDL {
+		t.Fatal("fresh capture did not preserve all original facts and full ledger")
+	}
+}
+
+func TestM4SQLObjectNativeCompleteCountBudgets(t *testing.T) {
+	for _, name := range []string{"pending_over_five_seconds_then_complete", "earlier_action_deadline", "actual_count_mismatch"} {
+		t.Run(name, func(t *testing.T) {
+			h := newNativeOriginalCharset(t, "utf8")
+			h.capture()
+			original := h.fullDDL()
+			for _, query := range []string{
+				"UPDATE performance_schema.setup_instruments SET ENABLED='YES',TIMED='YES' WHERE NAME IN ('wait/lock/metadata/sql/mdl','statement/sql/select')",
+				"UPDATE performance_schema.setup_consumers SET ENABLED='YES' WHERE NAME IN ('global_instrumentation','thread_instrumentation','events_statements_current')",
+			} {
+				if _, e := h.root.ExecContext(t.Context(), query); e != nil {
+					t.Fatal("owned COUNT instrumentation unavailable")
+				}
+			}
+			limit := 30 * time.Second
+			if name == "earlier_action_deadline" {
+				limit = 4 * time.Second
+			}
+			action, cancelAction := context.WithTimeout(t.Context(), limit)
+			defer cancelAction()
+			cfg, e := mysql.ParseDSN(h.dsn)
+			if e != nil || !configureMySQLAction(action, cfg) {
+				t.Fatal("actual action connection configuration failed")
+			}
+			pool, e := sql.Open("mysql", cfg.FormatDSN())
+			if e != nil {
+				t.Fatal("owned COUNT pool unavailable")
+			}
+			pool.SetMaxOpenConns(1)
+			pool.SetMaxIdleConns(1)
+			defer func() {
+				if !closeSQLPool(pool) {
+					t.Error("owned COUNT pool release unproved")
+				}
+			}()
+			connect, cancelConnect := context.WithTimeout(action, queryLimit)
+			conn, e := pool.Conn(connect)
+			cancelConnect()
+			if e != nil {
+				t.Fatal("owned COUNT connection unavailable")
+			}
+			defer func() {
+				if e := conn.Close(); e != nil && !errors.Is(e, sql.ErrConnDone) {
+					t.Error("owned COUNT connection release unproved")
+				}
+			}()
+			tx, e := conn.BeginTx(action, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+			if e != nil {
+				t.Fatal("owned COUNT RR snapshot unavailable")
+			}
+			defer func() {
+				if e := tx.Rollback(); e != nil && !errors.Is(e, sql.ErrTxDone) {
+					t.Error("owned COUNT RR release unproved")
+				}
+			}()
+			q, cancel := context.WithTimeout(action, queryLimit)
+			var head uint64
+			e = tx.QueryRowContext(q, "SELECT version FROM schema_migrations").Scan(&head)
+			cancel()
+			if e != nil || head != 100 {
+				t.Fatal("owned COUNT snapshot did not begin on the actual clean100 ledger")
+			}
+			if name == "actual_count_mismatch" {
+				if e := verifyCompleteRangeCount(action, tx, 0, 3); e == nil || e.Error() != "complete_range_count_mismatch" {
+					t.Fatal("actual two-row COUNT did not reject expected three", e)
+				}
+			} else {
+				runOwnedBlockedCount(t, h, action, tx, name == "pending_over_five_seconds_then_complete")
+			}
+			if e := tx.Rollback(); e != nil && !errors.Is(e, sql.ErrTxDone) {
+				t.Fatal("COUNT snapshot release failed")
+			}
+			h.assertHead(100, false)
+			if h.fullDDL() != original {
+				t.Fatal("read-only COUNT changed original objects")
+			}
+			assertOwnedRetainedCapture(t, h)
+		})
+	}
+}
+
+func runOwnedBlockedCount(t *testing.T, h *nativeFixture, action context.Context, tx *sql.Tx, complete bool) {
+	t.Helper()
+	blockerCtx, cancelBlocker := context.WithTimeout(t.Context(), 35*time.Second)
+	defer cancelBlocker()
+	blocker, e := h.db.Conn(blockerCtx)
+	if e != nil {
+		t.Fatal("owned COUNT blocker connection unavailable")
+	}
+	released := false
+	release := func() {
+		if released {
+			return
+		}
+		q, cancel := context.WithTimeout(t.Context(), queryLimit)
+		_, unlockErr := blocker.ExecContext(q, "UNLOCK TABLES")
+		cancel()
+		closeErr := blocker.Close()
+		released = true
+		if unlockErr != nil || closeErr != nil {
+			t.Error("owned COUNT blocker release unproved")
+		}
+	}
+	defer release()
+	q, cancel := context.WithTimeout(blockerCtx, queryLimit)
+	_, e = blocker.ExecContext(q, "LOCK TABLES assessment WRITE")
+	cancel()
+	if e != nil {
+		t.Fatal("owned COUNT MDL blocker not installed")
+	}
+	response := make(chan error, 1)
+	go func() { response <- verifyCompleteRangeCount(action, tx, 0, 2) }()
+	readResponse := false
+	defer func() {
+		release()
+		if !readResponse {
+			select {
+			case <-response:
+			case <-time.After(10 * time.Second):
+				t.Error("owned COUNT client termination unproved")
+			}
+		}
+		if !waitOwnedCountStatement(t, h, false, 10*time.Second) {
+			t.Error("actual COUNT termination remained unknown after unlocking")
+		}
+	}()
+	deadline := time.Now().Add(3 * time.Second)
+	for !waitOwnedCountStatement(t, h, true, 50*time.Millisecond) {
+		select {
+		case e := <-response:
+			readResponse = true
+			t.Fatal("COUNT returned before independent MDL evidence", e)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("independent probe did not observe the actual COUNT pending on MDL")
+		}
+	}
+	pendingAt := time.Now()
+	if complete {
+		timer := time.NewTimer(6 * time.Second)
+		defer timer.Stop()
+		select {
+		case e := <-response:
+			readResponse = true
+			t.Fatal("COUNT did not survive the observed six-second MDL wait", e)
+		case <-timer.C:
+		}
+		release()
+	}
+	select {
+	case e = <-response:
+		readResponse = true
+	case <-time.After(8 * time.Second):
+		t.Fatal("COUNT did not obey its bounded action after the observed MDL wait")
+	}
+	if complete {
+		if e != nil {
+			t.Fatal("bounded COUNT did not complete after unlocking", e)
+		}
+	} else if e == nil || (e.Error() != "complete_range_count_deadline_exceeded" && e.Error() != "complete_range_count_server_timeout") {
+		t.Fatal("earlier action deadline was not a classified COUNT failure", e)
+	}
+	release()
+	h.assertHead(100, false)
+	if !waitOwnedCountStatement(t, h, false, 10*time.Second) {
+		t.Fatal("COUNT still active after releasing the owned MDL blocker")
+	}
+	t.Logf("actual COUNT MDL pending observed; elapsed_after_pending=%.3fs complete=%t; no rollback inferred", time.Since(pendingAt).Seconds(), complete)
+}
+
+func waitOwnedCountStatement(t *testing.T, h *nativeFixture, pending bool, limit time.Duration) bool {
+	t.Helper()
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		q, cancel := context.WithTimeout(t.Context(), time.Second)
+		query := "SELECT COUNT(*) FROM performance_schema.events_statements_current s JOIN performance_schema.threads p ON p.THREAD_ID=s.THREAD_ID WHERE p.PROCESSLIST_DB=? AND s.EVENT_NAME='statement/sql/select' AND s.END_EVENT_ID IS NULL AND LOCATE('COUNT(*) FROM `assessment`',s.SQL_TEXT)>0"
+		args := []any{h.name}
+		if pending {
+			query += " AND EXISTS(SELECT 1 FROM performance_schema.metadata_locks m WHERE m.OWNER_THREAD_ID=s.THREAD_ID AND m.OBJECT_SCHEMA=? AND m.OBJECT_NAME='assessment' AND m.LOCK_STATUS='PENDING')"
+			args = append(args, h.name)
+		}
+		var n int
+		e := h.root.QueryRowContext(q, query, args...).Scan(&n)
+		cancel()
+		if e != nil {
+			return false
+		}
+		if (pending && n == 1) || (!pending && n == 0) {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
+}
+
+func assertOwnedRecoveryUnclaimed(t *testing.T, h *nativeFixture, args []string) {
+	t.Helper()
+	var path, hash string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			path = strings.TrimPrefix(arg, "--approval-file=")
+		}
+		if strings.HasPrefix(arg, "--approval-sha256=") {
+			hash = strings.TrimPrefix(arg, "--approval-sha256=")
+		}
+	}
+	raw, e := readPrivate(path, hash, 32768)
+	var approved approval
+	if e != nil || strictDecode(raw, &approved) != nil {
+		t.Fatal("actual frozen approval unavailable for claim observation")
+	}
+	boundary, claim, e := recoveryPaths(h.material, h.materialHash, approved.Operation)
+	if e != nil {
+		t.Fatal("actual fixed recovery paths unavailable")
+	}
+	for _, ownedPath := range []string{boundary, claim} {
+		if _, e := os.Stat(ownedPath); !os.IsNotExist(e) {
+			t.Fatal("early refusal persisted original boundary or operation claim")
+		}
 	}
 }

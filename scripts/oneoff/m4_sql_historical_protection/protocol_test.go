@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +18,60 @@ import (
 )
 
 const testSource = "1111111111111111111111111111111111111111"
+
+func TestMongoReadsOverrideSecondaryURIPreference(t *testing.T) {
+	for _, query := range []string{"readPreference=secondary", "readPreference=secondaryPreferred&readPreferenceTags=region:fixture&maxStalenessSeconds=120", "readPreference=nearest", "directConnection=true"} {
+		opts := mongoReadOptions("mongodb://localhost:27017/qs_fixture?" + query)
+		if e := opts.Validate(); e != nil || opts.ReadPreference == nil || opts.ReadPreference.Mode() != readpref.PrimaryMode {
+			t.Fatal("URI escaped primary ledger/catalog routing", e)
+		}
+		if opts.MaxPoolSize == nil || *opts.MaxPoolSize != 1 || opts.Timeout == nil || *opts.Timeout != queryLimit || opts.ServerSelectionTimeout == nil || *opts.ServerSelectionTimeout != queryLimit {
+			t.Fatal("primary routing changed the existing bounded pool/read policy")
+		}
+	}
+}
+
+func TestMongoHelloRequiresActualReplicaPrimary(t *testing.T) {
+	base := bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: bson.A{"b:27017", "a:27017"}}, {Key: "isWritablePrimary", Value: true}}
+	raw, _ := bson.Marshal(base)
+	set, hosts, e := primaryReplicaIdentity(raw)
+	identity, _ := json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: set}, {Key: "hosts", Value: hosts}}, "qs_fixture"})
+	const originalIdentity = `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"rs0"},{"Key":"hosts","Value":["a:27017","b:27017"]}],"qs_fixture"]`
+	if e != nil || string(identity) != originalIdentity {
+		t.Fatal("legitimate primary changed the existing cluster identity bytes", e)
+	}
+	for _, name := range []string{"secondary", "missing_role", "null_role", "numeric_role", "string_role", "mongos", "unknown_message", "empty_set", "duplicate_host", "typed_host"} {
+		t.Run(name, func(t *testing.T) {
+			doc := append(bson.D(nil), base...)
+			switch name {
+			case "secondary":
+				doc[2].Value = false
+			case "missing_role":
+				doc = doc[:2]
+			case "null_role":
+				doc[2].Value = nil
+			case "numeric_role":
+				doc[2].Value = int32(1)
+			case "string_role":
+				doc[2].Value = "true"
+			case "mongos":
+				doc = append(doc, bson.E{Key: "msg", Value: "isdbgrid"})
+			case "unknown_message":
+				doc = append(doc, bson.E{Key: "msg", Value: int32(1)})
+			case "empty_set":
+				doc[0].Value = ""
+			case "duplicate_host":
+				doc[1].Value = bson.A{"a:27017", "a:27017"}
+			case "typed_host":
+				doc[1].Value = bson.A{int32(1)}
+			}
+			raw, _ := bson.Marshal(doc)
+			if _, _, e := primaryReplicaIdentity(raw); e == nil {
+				t.Fatal("secondary, mongos or unknown primary identity accepted")
+			}
+		})
+	}
+}
 
 func privateTestDir(t *testing.T) string {
 	t.Helper()
@@ -30,7 +86,7 @@ func testMaterial() material { return testMaterialEncoding(originalUTF8MB4) }
 
 func testMaterialEncoding(encoding originalEncoding) material {
 	now := time.Now().UTC()
-	m := material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: testSource, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: now.Format(time.RFC3339Nano), SQLName: "qs_fixture", MongoName: "qs_fixture", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), MongoUUID: strings.Repeat("c", 64), MongoHead: []byte{1}, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE schema_migrations", Ledger: []ledgerRow{{100, false}}}
+	m := material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: testSource, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: now.Format(time.RFC3339Nano), CapturePath: "/private/approved/first-capture.json", SQLName: "qs_fixture", MongoName: "qs_fixture", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), MongoUUID: strings.Repeat("c", 64), MongoHead: []byte{1}, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE schema_migrations", Ledger: []ledgerRow{{100, false}}}
 	for i, o := range objects {
 		check, e := originalCheckDefinition(i, encoding)
 		if e != nil {
@@ -174,7 +230,9 @@ func TestRestoreIndependentApprovalAndFirstRuntimeBoundary(t *testing.T) {
 }
 func TestFirstCaptureExclusiveExternalHashAndApprovalSingleUse(t *testing.T) {
 	p := filepath.Join(privateTestDir(t), "material.json")
-	raw, _ := json.Marshal(testMaterial())
+	m := testMaterial()
+	m.CapturePath = p
+	raw, _ := json.Marshal(m)
 	if e := writeExclusive(p, raw); e != nil {
 		t.Fatal(e)
 	}
@@ -188,16 +246,16 @@ func TestFirstCaptureExclusiveExternalHashAndApprovalSingleUse(t *testing.T) {
 	if _, e := readPrivate(p, strings.Repeat("e", 64), maxMaterialBytes); e == nil {
 		t.Fatal("restore input self-authorized")
 	}
-	a := testApproval(t, testMaterial(), h)
+	a := testApproval(t, m, h)
 	approvalPath := filepath.Join(privateTestDir(t), "approval.json")
 	araw, _ := json.Marshal(a)
 	if e := writeExclusive(approvalPath, araw); e != nil {
 		t.Fatal(e)
 	}
-	if e := consumeApproval(approvalPath, a, fingerprint(araw)); e != nil {
+	if e := consumeApproval(m, a, fingerprint(araw)); e != nil {
 		t.Fatal(e)
 	}
-	if consumeApproval(approvalPath, a, fingerprint(araw)) == nil {
+	if consumeApproval(m, a, fingerprint(araw)) == nil {
 		t.Fatal("approval reused")
 	}
 	if e := os.Chmod(p, 0644); e != nil {
@@ -254,7 +312,7 @@ func TestDefaultReadOnlyAndCredentialsNeverFlags(t *testing.T) {
 			t.Fatal("unsafe arguments accepted")
 		}
 	}
-	r := run(t.Context(), []string{"--mysql-database=qs", "--mongo-database=qs"}, func(string) string { return "mysql://secret" }, "")
+	r := run(t.Context(), []string{"--mysql-database=qs", "--mongo-database=qs"}, func(string) string { return "mysql://secret" }, "", nil)
 	if r.Complete || strings.Contains(r.Error, "secret") || r.ProductionFreezeCertified {
 		t.Fatal(r)
 	}
@@ -312,11 +370,23 @@ func TestTransactionalTableScopeMustBeCompleteAndInnoDB(t *testing.T) {
 	}
 }
 func TestCaptureFsyncCrossingDeadlineNeverCompletes(t *testing.T) {
+	path := filepath.Join(privateTestDir(t), "material.json")
+	parent, e := captureParent(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = parent.close() })
 	ctx, cancel := context.WithCancel(t.Context())
 	r := receipt{}
-	e := finishCapture(ctx, &r, "private", []byte("captured"), func(string, []byte) error { cancel(); return nil })
-	if e == nil || r.Complete {
-		t.Fatal("late file release was marked complete")
+	e = finishCapture(ctx, &r, path, &parent, []byte("captured"), func(original *captureParentIdentity, p string, raw []byte) error {
+		if e := writeCaptureExclusive(original, p, raw); e != nil {
+			return e
+		}
+		cancel()
+		return nil
+	})
+	if e == nil || r.Complete || r.MaterialHash != "" {
+		t.Fatal("late file release was certified")
 	}
 }
 
@@ -438,12 +508,14 @@ func TestMySQLSocketReadBudgetUsesBoundedActionAndRestoreApproval(t *testing.T) 
 type boundedPageReadProbe struct {
 	db         *sql.DB
 	deadlines  []time.Time
+	queries    []string
 	pageHintOK bool
 }
 
 func (p *boundedPageReadProbe) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	deadline, _ := ctx.Deadline()
 	p.deadlines = append(p.deadlines, deadline)
+	p.queries = append(p.queries, query)
 	return p.db.QueryRowContext(ctx, query, args...)
 }
 
@@ -477,5 +549,100 @@ func TestReadQueriesKeepFiveSecondContextInsideLongAction(t *testing.T) {
 	mock.ExpectClose()
 	if db.Close() != nil || mock.ExpectationsWereMet() != nil {
 		t.Fatal("bounded read probe did not release its SQL fixture")
+	}
+}
+
+func TestConfiguredMySQLActionKeepsShortConnectionAndFiniteReadBudgets(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	cfg := mysql.NewConfig()
+	cfg.Params = map[string]string{"charset": "utf8mb3"}
+	cfg.MultiStatements, cfg.ParseTime = true, true
+	if !configureMySQLAction(ctx, cfg) || cfg.Timeout != queryLimit || cfg.WriteTimeout != queryLimit || cfg.ReadTimeout <= queryLimit || cfg.ReadTimeout > time.Minute || cfg.MultiStatements || cfg.ParseTime || cfg.Params["charset"] != "utf8mb3" {
+		t.Fatal("selected action lost its finite socket budget or changed connection identity inputs")
+	}
+	if configureMySQLAction(context.Background(), mysql.NewConfig()) {
+		t.Fatal("unbounded socket configuration accepted")
+	}
+}
+
+func TestCompleteRangeCountUsesSameSnapshotAndRemainingActionBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		value      any
+		err        error
+	}{
+		{"complete", "", uint64(2), nil},
+		{"real_count_mismatch", "complete_range_count_mismatch", uint64(3), nil},
+		{"scan_failed", "complete_range_count_query_failed", "not-a-count", nil},
+		{"query_failed", "complete_range_count_query_failed", nil, errors.New("unretained SQL body or connection details")},
+		{"deadline", "complete_range_count_deadline_exceeded", nil, context.DeadlineExceeded},
+		{"canceled", "complete_range_count_canceled", nil, context.Canceled},
+		{"server3024_before_context", "complete_range_count_server_timeout", nil, errors.Join(&mysql.MySQLError{Number: 3024, Message: "unretained server text"}, context.DeadlineExceeded)},
+		{"other_server", "complete_range_count_query_failed", nil, &mysql.MySQLError{Number: 1064, Message: "unretained SQL text"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock, e := sqlmock.New()
+			if e != nil {
+				t.Fatal(e)
+			}
+			expected := mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME\\([1-9][0-9]*\\) \\*/ COUNT\\(\\*\\) FROM `assessment`")
+			if tc.err != nil {
+				expected.WillReturnError(tc.err)
+			} else {
+				expected.WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.value))
+			}
+			mock.ExpectClose()
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			deadline, _ := ctx.Deadline()
+			probe := &boundedPageReadProbe{db: db}
+			before := time.Now()
+			e = verifyCompleteRangeCount(ctx, probe, 0, 2)
+			after := time.Now()
+			if (tc.want == "" && e != nil) || (tc.want != "" && (e == nil || e.Error() != tc.want)) || len(probe.deadlines) != 1 || !probe.deadlines[0].Equal(deadline) {
+				t.Fatal("COUNT error category or original action context changed", e)
+			}
+			query := probe.queries[0]
+			start := strings.Index(query, "MAX_EXECUTION_TIME(") + len("MAX_EXECUTION_TIME(")
+			end := strings.Index(query[start:], ")") + start
+			var hint int64
+			if json.Unmarshal([]byte(query[start:end]), &hint) != nil || hint <= queryLimit.Milliseconds() || hint > deadline.Sub(before).Milliseconds() || hint < deadline.Sub(after).Milliseconds() {
+				t.Fatal("server COUNT deadline was absent, zero, lengthened or replaced by the page budget")
+			}
+			if db.Close() != nil || mock.ExpectationsWereMet() != nil {
+				t.Fatal("COUNT fixture or expected reader was not released")
+			}
+		})
+	}
+}
+
+func TestCompleteRangeCountRejectsMissingExpiredOrSubMillisecondBudget(t *testing.T) {
+	for _, which := range []string{"missing", "expired", "sub_millisecond", "canceled", "outside_maximum_action"} {
+		t.Run(which, func(t *testing.T) {
+			ctx := context.Background()
+			want := "complete_range_count_budget_rejected"
+			var cancel context.CancelFunc
+			switch which {
+			case "expired":
+				ctx, cancel = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				want = "complete_range_count_deadline_exceeded"
+			case "sub_millisecond":
+				ctx, cancel = context.WithDeadline(ctx, time.Now().Add(time.Microsecond))
+				want = "complete_range_count_deadline_exceeded"
+			case "canceled":
+				ctx, cancel = context.WithTimeout(ctx, time.Minute)
+				cancel()
+				want = "complete_range_count_canceled"
+			case "outside_maximum_action":
+				ctx, cancel = context.WithTimeout(ctx, time.Hour)
+			}
+			if cancel != nil {
+				defer cancel()
+			}
+			if e := verifyCompleteRangeCount(ctx, nil, 0, 2); e == nil || e.Error() != want {
+				t.Fatal("invalid aggregate budget reached the reader", e)
+			}
+		})
 	}
 }
