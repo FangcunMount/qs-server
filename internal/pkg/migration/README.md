@@ -59,6 +59,10 @@ C后续独立源码准备使用 **format2**，必需 `runtime_database_boundary 
 
 `m4_c_runtime_boundary` 是本C批专属临时控制对象，不复用D表或迁移ledger，不改历史资源或正常业务装配。其生产创建/权限须以后另行明确批准并如实纳入在线对象计数，原恢复责任、旧工具/人工重放/批准入口全部退出后由M7具名退役；当前没有生产DDL授权。当前本包普通/race各300项及本地ACK管道纯测8项通过，tag仅编译、vet/pinned lint通过。新增独立native top及13子项共14个准备事件覆盖跨capture/进程、新T0/CAS、foreign/权限、真实CTAS执行ACK/COMMIT回应丢失、MDL与释放未知；它不落入旧九top selector。旧30名单/断言保留，新44联合实际数据库资格、fresh CI/AI、生产完整窗口/RPO与六实例运行均尚未验证；旧cdac/d3cf证据保持原来源。
 
+**C44 与 D 最终 pending 源码整合。** 正常合并源码 `b4c7c319463a83642b6fdeb5e55d2bda8570329f` 的两父为冻结 C `a325a426d5a3f74b0cd63aa4dca858264eea0aeb` 与待合并 D `ab9bb229cbd57bb7bf951451635326c67ed033ab`；此时 actual main 仍为 `3175474a9fb96e10e33212c4c6cbdb555bd2e9ac`，D 尚非已合并主线。保留八个 fresh 阶段与110分钟外层预算、每段8分钟，原 C30/A47/B37/D74/H13 和新增 I14 证明块不变；只合入 D 固定旧5707 CLI 的 H 准备/终态哈希接线及 metadata 连接释放测试修正。C31、D58、A17、B26、metadata11 个包文件和288份迁移资源各与其冻结来源逐字相等。
+
+本次联合普通/race各 C300、D444、metadata153、配置契约188项一次PASS、0FAIL/SKIP；tag仅编译、vet、pinned2.5 lint、actionlint及15 YAML/184 bash/11 Python语法通过。QA回执 `6dcf2c4339c9c7474678ba523ce872d7625c8ee14c52f89e4a0b0cec0cb0471a` 位于私有 `qs-m4-c44-d-final-source-integration-v1`。原C44数据库与新联合head hosted CI/AI仍待验，D旧native/CI失败及修复来源保持原归属；尚须D真正合并后正常整合实际main。未运行数据库、Docker、SSH或生产，不新增失败capture取消或同intent完成接口，不扩大生产窗口/RPO/业务资格。
+
 **C14 独立CI阶段准备。** 源码 `2520780947fe2ba452cce070b297050db59627e6` 在冻结C8b7基础上正常合入当时待合并的D `0a8ce49ce481b7468d237b69cd701fe66d2c0338`；它不是actual main，后续须再整合D实际合并来源。新增fresh `i` 阶段只选择 `^TestM4ActorColumnsNativeRuntimeGeneration$`，14名各一次RUN/PASS、0FAIL/SKIP、终态package PASS及依赖前compiled entry/真实依赖/当前checkout SHA均须匹配。分片Output按Test重组，缺失、重复、外来phase/package、失败/跳过及源/资源漂移拒绝。旧C30和A47/B37/D74/H13证明块逐字保持；C生产Go等于8b7，仅新14 top增加依赖前entry日志。八阶段按8×8分钟测试、8×3分钟readiness sleep及20分钟准备/证明/清理推导108分钟、取整110分钟，每工具8分钟、资源和cleanup不变，不扩大生产30/60分钟。
 
 联合本地普通/race实际C300、D444、configcontract187各一次PASS、0FAIL/SKIP；一处新增contract风格lint修正后，受影响33项普通/race及pinned lint通过。tag仅编译/vet、actionlint、15份YAML/184段bash/10段Python语法与七个隔离shell模拟通过。原首lint失败和修正QA保留在私有 `qs-m4-c-runtime-ci-d0a8-integration-v1`，回执 SHA `7dac0dc4a3f5844b32e6d447450259e8dc6141bd746d0a170de7160838652d95`。新44项数据库/hosted CI/AI及完整生产窗口仍未验，不移签原300项源码QA或cdac原30；D后续cross-source资格另行整合。
