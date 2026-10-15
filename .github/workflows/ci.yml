@@ -169,8 +169,8 @@ jobs:
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
     runs-on: ubuntu-latest
-    # 7 x 8m tests + 7 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 97m; ceil100.
-    timeout-minutes: 100
+    # 8 x 8m tests + 8 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 108m; ceil110.
+    timeout-minutes: 110
     services:
       mysql:
         image: mysql:8.0.36
@@ -271,7 +271,7 @@ jobs:
           trap cleanup_owned_fixture EXIT
           start_owned_fixture() {
             [[ -z "$fixture_cid" && "$fixture_network_created" == false && -z "$fixture_owner" && -z "$fixture_name" && -z "$fixture_network" ]] || exit 1
-            case "$1" in m|a|b|c|d|g|h) fixture_phase="$1" ;; *) exit 1 ;; esac
+            case "$1" in m|a|b|c|d|g|h|i) fixture_phase="$1" ;; *) exit 1 ;; esac
             fixture_owner="${fixture_run_owner}${fixture_phase}"
             [[ "$fixture_owner" =~ ^[a-z0-9]{8,24}$ ]] || exit 1
             fixture_name="qs-mongo-profile-owned-${fixture_owner}"
@@ -751,6 +751,64 @@ jobs:
           PY_D_RUNTIME_COMPLETION_PROOF
           cleanup_owned_fixture
           unset TMPDIR
+
+          # C generation14 is a separate fresh pair; original C30 and D74/H13 remain separate.
+          start_owned_fixture i
+          export QS_M4_C_OBJECT_NATIVE_REQUIRED=1
+          export QS_M4_C_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only
+          export QS_M4_C_OBJECT_NATIVE_MYSQL_DSN="root:m4-owned-object-fixture@tcp(127.0.0.1:${OBJECT_MYSQL_PORT})/"
+          export QS_M4_C_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^TestM4ActorColumnsNativeRuntimeGeneration$' ./scripts/oneoff/m4_actor_column_protection | tee actor-runtime-generation-native.jsonl
+          python3 - actor-runtime-generation-native.jsonl "$object_source" <<'PY_C_RUNTIME_GENERATION_PROOF'
+          import collections, json, re, sys
+          expected = {
+              'TestM4ActorColumnsNativeRuntimeGeneration',
+              'TestM4ActorColumnsNativeRuntimeGeneration/TwoCapturesAfterIndependentProcessExit',
+              'TestM4ActorColumnsNativeRuntimeGeneration/NewT0After_cancel101',
+              'TestM4ActorColumnsNativeRuntimeGeneration/NewT0After_restored101',
+              'TestM4ActorColumnsNativeRuntimeGeneration/ForeignTable',
+              'TestM4ActorColumnsNativeRuntimeGeneration/ForeignView',
+              'TestM4ActorColumnsNativeRuntimeGeneration/EmptyTable',
+              'TestM4ActorColumnsNativeRuntimeGeneration/MalformedRecord',
+              'TestM4ActorColumnsNativeRuntimeGeneration/ReadOnlyCaptureAbsentAndCurrent',
+              'TestM4ActorColumnsNativeRuntimeGeneration/MissingControlPermission',
+              'TestM4ActorColumnsNativeRuntimeGeneration/CreateExecuteACKUnknown',
+              'TestM4ActorColumnsNativeRuntimeGeneration/CASCommitACKUnknown',
+              'TestM4ActorColumnsNativeRuntimeGeneration/ReleaseACKUnknown',
+              'TestM4ActorColumnsNativeRuntimeGeneration/CreateMDLPendingHoldsGateAndDeadline',
+          }
+          source = sys.argv[2]
+          package = 'github.com/FangcunMount/qs-server/scripts/oneoff/m4_actor_column_protection'
+          if len(expected) != 14 or not re.fullmatch(r'[0-9a-f]{40}', source):
+              raise SystemExit('C generation requires its exact14 selectors and checkout source')
+          events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
+          counts = {action: collections.Counter(event['Test'] for event in events if event.get('Action') == action and event.get('Test')) for action in ('run', 'pass')}
+          failures = sum(event.get('Action') == 'fail' for event in events)
+          skips = sum(event.get('Action') == 'skip' for event in events)
+          packages = collections.Counter(event.get('Package') for event in events if event.get('Action') == 'pass' and not event.get('Test'))
+          streams = collections.defaultdict(str)
+          for event in events:
+              if event.get('Package') != package:
+                  raise SystemExit('C generation log contains a missing or foreign package')
+              if event.get('Test') and event['Test'] not in expected:
+                  raise SystemExit('C generation log contains a foreign test event')
+              if event.get('Test') and 'Output' in event:
+                  streams[event['Test']] += event['Output']
+          entries, sources = set(), set()
+          for output in streams.values():
+              entries.update(re.findall(r'actual compiled C fixture tool=([0-9a-f]{40}) phase=before_dependency_binding', output))
+              sources.update(re.findall(r'actual owned dependencies mysql=8\.0\.36 mongo=7\.0\.31 rs0; Csource=040b122d7dfe77b1119d9ed6969a54abd6a9fbdf resources=fadbb5a33baed5b2fb40a6f1efdf4a20dc5a1525ab2a0090486b7d5832437814 files=284; tool=([0-9a-f]{40})', output))
+          summary = {'proof': 'C runtime generation native', 'compiled_tool_sources': sorted(sources), 'entry_tool_sources': sorted(entries), 'required': len(expected), 'actual': {action: dict(counts[action]) for action in counts}, 'fail_events': failures, 'skip_events': skips, 'package_pass': dict(packages)}
+          print(json.dumps(summary, sort_keys=True))
+          if failures or skips or entries != {source} or sources != {source} or packages != collections.Counter({package: 1}):
+              raise SystemExit('C generation requires actual checkout/dependency/terminal package proof and zero FAIL/SKIP')
+          if any(counts[action] != collections.Counter({name: 1 for name in expected}) for action in counts):
+              raise SystemExit('C generation requires every exact selector once RUN/PASS in its own fresh phase')
+          PY_C_RUNTIME_GENERATION_PROOF
+          cleanup_owned_fixture
+
 
 
   action-audit-mysql:

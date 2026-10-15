@@ -10,7 +10,7 @@ import (
 // A separate observation never changes a failed/unknown restore receipt and
 // never consumes an operation or authorizes the first runtime command.
 func verifyRestored(original, restored material) error {
-	if original.Format != restored.Format || original.Kind != restored.Kind || original.ToolSource != restored.ToolSource || original.CSource != restored.CSource || original.CResources != restored.CResources || original.CResourceFiles != restored.CResourceFiles || original.SessionZone != restored.SessionZone || original.SessionCharset != restored.SessionCharset || original.SessionSQLMode != restored.SessionSQLMode || original.Binding != restored.Binding || !bytes.Equal(original.MongoHead, restored.MongoHead) || original.LedgerDDL != restored.LedgerDDL || !reflect.DeepEqual(original.Ledger, restored.Ledger) {
+	if original.Format != restored.Format || original.RuntimeBoundary != restored.RuntimeBoundary || original.Kind != restored.Kind || original.ToolSource != restored.ToolSource || original.CSource != restored.CSource || original.CResources != restored.CResources || original.CResourceFiles != restored.CResourceFiles || original.SessionZone != restored.SessionZone || original.SessionCharset != restored.SessionCharset || original.SessionSQLMode != restored.SessionSQLMode || original.Binding != restored.Binding || !bytes.Equal(original.MongoHead, restored.MongoHead) || original.LedgerDDL != restored.LedgerDDL || !reflect.DeepEqual(original.Ledger, restored.Ledger) {
 		return errors.New("restored_original_identity_or_ledger_rejected")
 	}
 	if !reflect.DeepEqual(original.Tables, restored.Tables) {
