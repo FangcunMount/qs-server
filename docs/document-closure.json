@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
+    "sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
+        "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4544,6 +4544,14 @@
         {
           "kind": "source",
           "path": "scripts/oneoff/m4_actor_column_protection/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_actor_column_protection/original_actor_schema.sql"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_actor_column_protection/original_role_projection.sql"
         }
       ],
       "verification": [
@@ -4670,14 +4678,6 @@
         },
         {
           "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/main.go",
-          "selector": "restore_not_implemented",
-          "result": "matched",
-          "source_sha": "db7db9b9ac30b86f1d2307e7ca888e369816b293",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
           "path": "scripts/oneoff/m4_actor_column_protection/database.go",
           "selector": "func verifyTarget(original, target material) error",
           "result": "matched",
@@ -4760,6 +4760,67 @@
           "result": "passed",
           "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/recovery.go",
+          "selector": "func (d *database) restore(",
+          "result": "matched",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/recovery_journal.go",
+          "selector": "func verifyRecoveryJournal(",
+          "result": "matched",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
+          "selector": "func verifyCompleteRangeCount(",
+          "result": "matched",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
+          "selector": "func TestM4ActorColumnsNativeRestoreOriginalStates(",
+          "result": "matched",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
+          "selector": "func TestM4ActorColumnsNativeRestoreContinuation(",
+          "result": "matched",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_actor_column_protection",
+          "result": "passed",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4788,7 +4849,11 @@
           "C source5b8cf6f517117dd739226890e899c20335dcb480 overrides URI read preference with Primary for all reads and independently requires actual typed writable rs0 hello, rejecting secondary/mongos/unknown role. The local receipt694a15b4f8e00f74b4e9846e44505c70425b66a58ba53ee61cc31cd6a0a593f0 binds14 tops/66 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and five unchanged source hashes. URI-override and topology tests are pure ordinary tests, not actual database routing. Terminal complete COUNT remains on5s child context and is pending a locally adopted, actually verified A deadline fix; full COUNT/EOF/retained proofs remain present. No C native, restore, production, SSH, Docker, push or PR was executed. Prior source/QA records remain unchanged.",
           "C fixture source db3328fc9ea1d622db286d9740338cf6b1872011 adds only an integration-tag test file; the three production Go files remain byte-identical to5b8cf6f517117dd739226890e899c20335dcb480. Local receipt31dae776993bd9dfad1999b5f11ebde8f59761026813762b2969044ff865b7f7 proves integration compilation, tagged vet/lint and exactly the source-only TestM4ActorColumnsPinnedResources (284 files/fadbb digest). The five database top-level scenarios have NOT run. Historical providers will generate101/40, and original102 resources perform the two actual DROP statements; no force/SetVersion or direct clean-ledger writes are implemented. NULL fixtures respect original tags nullable/effective_roles NOTNULL. Owned loopback/ACK and actual8.0.36/7.0.31 rs0 are mandatory for future execution. No Docker, database, SSH, production, restore, business process, source push or PR occurred; COUNT deadline adoption and real native evidence remain pending. The earlier66 ordinary tests remain separately bound to5b8 rather than relabelled native.",
           "C test-only source af97da6af9a590c0957e3e16540a9e25babbf065 removes forged checksum/direct archive INSERT fixtures and prepares legal domain/repository Begin/Save/Finish/Recover records, case-sensitive A/a request IDs, and real FindTask/FindRecovery pre/post102 assertions. Receipt3a2f1ab6b64cfdd455e0272d275a4d129f1708d3d2192589e2f3af43cdbbd9a2 binds14 top-level/66 total ordinary race RUN/PASS,0FAIL/SKIP, integration compilation with no selected test, tagged vet/lint and diff check; its six source hashes are identical before/after. The three production Go files remain exactly5b8cf6f517117dd739226890e899c20335dcb480. The five database tops have NOT run, no modern fixture row has actually been written/read in this task, and no native, full Recover/IAM, production, backup, runtime or time/RPO signoff is added. Restore still rejects before environment/material access and has no approval input/consumption. Actor2.9 future requirements now admit only proven inverse-prefix/nullable-effective_roles/partial-original-value recovery continuation under the first boundary and a new operation; normal verify-target stays clean102/40 with both columns absent. Immutable archives and original checksums must not be rewritten. Terminal COUNT adoption remains waiting for the independently verified A implementation; no code or historical evidence was changed.",
-          "Human M4-C object responsibility confirmation on2026-10-15: testee.tags and operators.effective_roles have no undeclared consumers or unfinished tasks. Only the external-consumer and old restoration/whole-row-summary outstanding responsibilities for these two columns are closed_by_user; data/recovery owner remains system (10001), and original material/manifests/digests/old-schema interpretation remain retained as isolated recovery material. The confirmation does not extend to assessment_stats, modern archives, five historical tables or any other objects. It is not production migration approval, a101/40 T0 capture, original-value restoration, current C-tool native execution, six-instance freeze/startup, maintenance-window or RPO signoff. Restore remains unsupported with no approval input or consumption; all prior source/verification/production evidence is preserved."
+          "Human M4-C object responsibility confirmation on2026-10-15: testee.tags and operators.effective_roles have no undeclared consumers or unfinished tasks. Only the external-consumer and old restoration/whole-row-summary outstanding responsibilities for these two columns are closed_by_user; data/recovery owner remains system (10001), and original material/manifests/digests/old-schema interpretation remain retained as isolated recovery material. The confirmation does not extend to assessment_stats, modern archives, five historical tables or any other objects. It is not production migration approval, a101/40 T0 capture, original-value restoration, current C-tool native execution, six-instance freeze/startup, maintenance-window or RPO signoff. Restore remains unsupported with no approval input or consumption; all prior source/verification/production evidence is preserved.",
+          "M4-C obsolete current selector retained as a complete historical record, not evidence for the new restore source: {\"kind\":\"source_selector\",\"path\":\"scripts/oneoff/m4_actor_column_protection/main.go\",\"result\":\"matched\",\"selector\":\"restore_not_implemented\",\"source_sha\":\"db7db9b9ac30b86f1d2307e7ca888e369816b293\",\"verified_on\":\"2026-10-15\"}",
+          "C local restore-source commits d3f22c60c0e1fb5aeba1fdbf0a592ff2a623b2f3 and64c15b00b354227daa11dfb67a1517ec78c55e90 replace the earlier unsupported restore action with a real pre-start fixed102/40 entry. Immutable CapturePath/raw SHA and independent approved first deadline/marker bind a durable boundary, append-only bounded operation journal and all consumed claims; missing/partial records are not rebuilt. Initial strict DROP prefixes remain distinct from prior-authorized nullable/partial-value continuation. Reverse fixed001/070 ADD, original raw JSON-only CAS batches of100 rows/1MiB with updated_at preserved, NOTNULL restoration, four-table complete facts and original ledger-last are implemented. Receiptfd36ac03ddb63a8fbcf0587b09229aeba36297c2d1869349262b734caecefb3d binds64c actual29top/134 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and integration compilation only. No native database, production restoration, runtime, freeze or budget acceptance follows; older read-only/unsupported-source evidence remains historical rather than rewritten.",
+          "C COUNT source2844971f700881c44ade1b987c319fd2bd127be5 locally adopts independently verified A8357 aggregate budgeting without a shared framework: terminal COUNT stays on the same RR reader, positive server MAX_EXECUTION_TIME is bounded by the remaining finite action, all action socket reads are finite, and ordinary metadata/page/dial/write limits remain5s. Typed server3024, context deadline/cancel, query failure and count mismatch are separate closed categories. Receipt3de6d72b9c93b1f4c7887daa28e7a275ab0e3c2f8906f29c75f37f166f19cbd9 binds32top/150 total ordinary race RUN/PASS,0FAIL/SKIP, target vet/lint and integration compilation. This is not C native or scale proof and borrows no A database PASS.",
+          "C test-only source6973dff1ba06b013f445280e76c9a06b44c5b7c7 prepares8 database tops with13 children, not15 total events: the6 original unbound-input children remain in addition to4 original102 DROP-prefix recovery and3 actual-OK response-loss continuation children. Original historical providers generate real101/40 and dirty102/clean102 states; no Force/SetVersion or fixture ledger writes. The valued fixtures include SQLNULL/JSONnull/array order/four-byte/0/MAX,205 additional rows for100-row CAS batches, valid immutable modern task/recovery payloads and real FindTask/FindRecovery assertions; first foreign nullable state is refused. Receipt37abe5c19de5cfd59ee6d36dbd2671bfedb40c79ed3977145c606510b202df0e binds actual32top/150 ordinary race RUN/PASS and2 source/in-memory tops+4children=6 RUN/PASS,0FAIL/SKIP, tagged vet/lint and integration compilation. All8 database tops remain unexecuted; no current C-tool capture or recovery database qualification, three-service startup, T0 material, freeze, production approval, window or RPO is supplied. A read-only verify-restored terminal entry is still absent from C. Source/CI/production/signoff history is preserved; no push or PR occurred."
         ]
       },
       "gaps": [
