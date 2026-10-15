@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -105,6 +106,9 @@ func parseArgs(args []string) (arguments, error) {
 			return a, errors.New("inspect_rejects_material_inputs")
 		}
 	case "capture":
+		if filepath.Base(a.capture) == "first-runtime" {
+			return a, errors.New("capture_reserved_runtime_marker_rejected")
+		}
 		if a.capture == "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
 		}

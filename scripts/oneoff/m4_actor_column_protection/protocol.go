@@ -185,7 +185,7 @@ func retainedDDL(ddl string, index int, present bool) (string, error) {
 }
 
 func validateMaterial(m material, tool string, b binding) error {
-	if !absolutePath(m.CapturePath) {
+	if !absolutePath(m.CapturePath) || filepath.Base(m.CapturePath) == "first-runtime" {
 		return errors.New("material_first_capture_path_required")
 	}
 	if m.Format != 2 || !validRuntimeBoundaryState(m.RuntimeBoundary, b) || m.Kind != "m4_c_actor_column_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.Binding != b || !validBinding(b) || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || m.LedgerDDL == "" || len(m.LedgerDDL) > 65536 || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{101, false}) || !cleanMongo40(m.MongoHead) {
