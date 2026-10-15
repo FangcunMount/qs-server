@@ -289,8 +289,9 @@ func TestRestoreAndVerificationRejectUnprovedInputsBeforeEnvironment(t *testing.
 			}
 			args[len(args)-1] = "--approval-sha256=" + fingerprint(raw)
 		}
+		args = append(args, unitCaptureEvidenceArgs(t, m, mh)...)
 		r := run(context.Background(), args, func(string) string { t.Fatal("ENV before input rejection"); return "" }, testTool)
-		if r.Complete || r.ApprovalConsumed || r.SQLPoolClosed || r.MongoClosed {
+		if r.Complete || r.Error != "restore_approval_rejected" || r.ApprovalConsumed || r.SQLPoolClosed || r.MongoClosed {
 			t.Fatal("unproved entrypoint reached resources", r)
 		}
 	}

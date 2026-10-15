@@ -41,17 +41,20 @@ import (
 // non-default loopback pair. Providers create every ledger; no Force, SetVersion
 // or fixture ledger writes manufacture the source or target states.
 type maintenanceNative struct {
-	t                          *testing.T
-	name, dsn, uri, tool, dir  string
-	root, db, repoPool         *sql.DB
-	repo                       *retirementRepo.Repository
-	tasks                      map[uint64]retirementDomain.Task
-	recoveries                 map[string]retirementDomain.Recovery
-	client                     *mongo.Client
-	sqlSource, mongoSource     fstest.MapFS
-	binding                    binding
-	materialPath, materialHash string
-	original                   material
+	t                                        *testing.T
+	name, dsn, uri, tool, dir                string
+	root, db, repoPool                       *sql.DB
+	repo                                     *retirementRepo.Repository
+	tasks                                    map[uint64]retirementDomain.Task
+	recoveries                               map[string]retirementDomain.Recovery
+	client                                   *mongo.Client
+	sqlSource, mongoSource                   fstest.MapFS
+	binding                                  binding
+	materialPath, materialHash               string
+	captureEvidencePath, captureEvidenceHash string
+	captureStdout                            []byte
+	captureExit                              int
+	original                                 material
 }
 
 func pinnedMaintenanceSources(t *testing.T) (fstest.MapFS, fstest.MapFS) {
@@ -316,7 +319,11 @@ func (h *maintenanceNative) actionContext(ctx context.Context, action string, ex
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=2m"}
 	args = append(args, extras...)
-	r := run(ctx, args, func(key string) string {
+	if action != "inspect" && action != "capture" && h.captureEvidencePath != "" {
+		args = append(args, "--capture-evidence-file="+h.captureEvidencePath, "--capture-evidence-sha256="+h.captureEvidenceHash)
+	}
+	var stdout bytes.Buffer
+	exit := serve(ctx, args, func(key string) string {
 		switch key {
 		case "QS_M4_D_OBJECT_MYSQL_DSN":
 			return h.dsn
@@ -324,7 +331,14 @@ func (h *maintenanceNative) actionContext(ctx context.Context, action string, ex
 			return h.uri
 		}
 		return ""
-	}, h.tool)
+	}, h.tool, &stdout)
+	var r receipt
+	if strictDecode(stdout.Bytes(), &r) != nil || (exit == 0) != r.Complete {
+		h.t.Fatal("original CLI output or exit disagrees with completion")
+	}
+	if action == "capture" {
+		h.captureStdout, h.captureExit = append([]byte(nil), stdout.Bytes()...), exit
+	}
 	// The tool's closed receipt contains only scope hashes, counts and fixed
 	// categories. Keep all actual returned flags before any assertion can fail;
 	// never log connection inputs, original cells or the captured material.
@@ -507,6 +521,22 @@ func (h *maintenanceNative) capture() {
 	raw, e := readPrivate(h.materialPath, h.materialHash)
 	if e != nil || strictDecode(raw, &h.original) != nil || validateMaterial(h.original, h.tool, h.binding) != nil {
 		h.t.Fatal("formal original material unavailable")
+	}
+	// Preserve the original serve stdout and its actual return status. No failed
+	// capture can obtain success evidence from this fixture producer.
+	if h.captureExit != 0 || len(h.captureStdout) == 0 {
+		h.t.Fatal("original successful CLI termination unavailable")
+	}
+	receiptPath := filepath.Join(h.dir, "original-capture-receipt.json")
+	if writeExclusive(receiptPath, h.captureStdout) != nil {
+		h.t.Fatal("original capture stdout could not be frozen")
+	}
+	execution := captureExecutionEvidence{Format: 1, Kind: "m4_d_capture_execution", Termination: "exited", ExitCode: &h.captureExit, ReceiptFile: receiptPath, ReceiptHash: fingerprint(h.captureStdout)}
+	evidence, e := json.Marshal(execution)
+	h.captureEvidencePath = filepath.Join(h.dir, "original-capture-execution.json")
+	h.captureEvidenceHash = fingerprint(evidence)
+	if e != nil || writeExclusive(h.captureEvidencePath, evidence) != nil || readCaptureEvidence(h.original, h.materialHash, h.tool, h.captureEvidencePath, h.captureEvidenceHash) != nil {
+		h.t.Fatal("original successful capture execution could not be frozen")
 	}
 }
 func (h *maintenanceNative) verify() receipt {

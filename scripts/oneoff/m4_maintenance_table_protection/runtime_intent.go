@@ -120,6 +120,9 @@ func readRuntimeIntent(path, hash string) (runtimeIntent, error) {
 }
 
 func rereadRuntimeInputs(v runtimeIntent, m material, a arguments, tool string, ap *approval) error {
+	if e := readCaptureEvidence(m, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
+		return e
+	}
 	raw, e := readPrivate(a.material, a.materialHash)
 	var again material
 	if e != nil || strictDecode(raw, &again) != nil || validateMaterial(again, tool, m.Binding) != nil || again.CapturePath != a.material {

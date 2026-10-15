@@ -83,8 +83,9 @@ func TestRuntimeIntentStrictRawSHAAndSizeFailBeforeEnvironment(t *testing.T) {
 				ih = fingerprint([]byte("unrelated bytes"))
 			}
 			args := append(cliArgs("mark-first-runtime"), "--material-file="+m.CapturePath, "--material-sha256="+hash, "--runtime-intent-file="+p, "--runtime-intent-sha256="+ih)
+			args = append(args, unitCaptureEvidenceArgs(t, m, hash)...)
 			r := run(context.Background(), args, func(string) string { t.Fatal("ENV before strict intent rejection"); return "" }, testTool)
-			if r.Complete || r.MarkerWritten || r.SQLConnectionClosed || r.RuntimeGateAcquired {
+			if r.Complete || r.Error != "runtime_independent_intent_rejected" || r.MarkerWritten || r.SQLConnectionClosed || r.RuntimeGateAcquired {
 				t.Fatal("unapproved marker action progressed", r)
 			}
 		})

@@ -374,7 +374,7 @@ func (d database) fillOriginalRows(ctx context.Context, m material, current reco
 	return nil
 }
 
-func (d database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string, consumed *bool) error {
+func (d database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash, tool string, consumed *bool) error {
 	if e := d.gate.require(ctx); e != nil {
 		return e
 	}
@@ -395,6 +395,12 @@ func (d database) restore(ctx context.Context, m material, a approval, materialP
 	}
 	if e := rereadApprovedInputs(m, a, materialPath, materialHash, approvalPath, approvalHash, tool); e != nil {
 		return e
+	}
+	if e := readCaptureEvidence(m, materialHash, tool, evidencePath, evidenceHash); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("total_budget_exceeded")
 	}
 	initial, missing := current.Material.Ledger[0], current.Missing
 	if prior != nil {
