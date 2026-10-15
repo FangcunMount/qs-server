@@ -41,6 +41,21 @@ func readPrivate(path, expected string, limit int64) ([]byte, error) {
 	if !nonzeroHash(expected) {
 		return nil, errors.New("external_fingerprint_required")
 	}
+	raw, e := readOwnedPrivate(path, limit)
+	if e != nil {
+		return nil, e
+	}
+	if fingerprint(raw) != expected {
+		return nil, errors.New("private_file_hash_or_release_failed")
+	}
+	return raw, nil
+}
+
+// Only for tool-owned recovery state in the original material's fixed private
+// parent. External material and approvals must still use readPrivate with an
+// independently supplied raw SHA. Filesystem ownership/identity and release
+// checks are identical; trusted local state has no caller-selected hash.
+func readOwnedPrivate(path string, limit int64) ([]byte, error) {
 	s, e := privatePath(path, true)
 	if e != nil || !s.Mode().IsRegular() || s.Mode().Perm() != 0600 || s.Sys().(*syscall.Stat_t).Nlink != 1 || (s.Sys().(*syscall.Stat_t).Uid != 0 && s.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid())) || s.Size() < 1 || s.Size() > limit {
 		return nil, errors.New("private_file_rejected")
@@ -58,7 +73,7 @@ func readPrivate(path, expected string, limit int64) ([]byte, error) {
 	after, se := f.Stat()
 	ce := f.Close()
 	current, pe := os.Lstat(path)
-	if re != nil || se != nil || ce != nil || pe != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || len(raw) > int(limit) || fingerprint(raw) != expected {
+	if re != nil || se != nil || ce != nil || pe != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || len(raw) > int(limit) {
 		return nil, errors.New("private_file_hash_or_release_failed")
 	}
 	return raw, nil

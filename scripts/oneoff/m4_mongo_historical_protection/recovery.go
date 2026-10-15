@@ -47,10 +47,6 @@ func verifyRestoredObservation(m material, before, after observation) error {
 	}
 	return nil
 }
-func consumeApproval(path string, a approval, hash string) error {
-	raw, _ := json.Marshal([]string{a.Operation, hash, a.MaterialHash})
-	return writeExclusive(path+".consumed", raw)
-}
 func recoveryBudget(ctx context.Context, at time.Time) (time.Duration, error) {
 	deadline, ok := ctx.Deadline()
 	left := deadline.Sub(at)
@@ -69,7 +65,7 @@ func (d *database) verifyTarget(ctx context.Context, m material) (observation, e
 func rereadApproval(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) error {
 	raw, e := readPrivate(materialPath, materialHash, maxMaterialBytes)
 	var again material
-	if e != nil || strictDecode(raw, &again) != nil || validateMaterial(again, tool, m.SQLName, m.MongoName) != nil {
+	if e != nil || strictDecode(raw, &again) != nil || validateMaterial(again, tool, m.SQLName, m.MongoName) != nil || again.CapturePath != materialPath || m.CapturePath != materialPath {
 		return errors.New("frozen_material_changed_before_claim")
 	}
 	raw, e = readPrivate(approvalPath, approvalHash, 32768)
@@ -84,7 +80,10 @@ func rereadApproval(m material, a approval, materialPath, materialHash, approval
 	if !bytes.Equal(before, after) {
 		return errors.New("frozen_approval_changed_before_claim")
 	}
-	return validateApproval(approved, again, materialHash, tool, time.Now())
+	if e := validateApproval(approved, again, materialHash, tool, time.Now()); e != nil {
+		return e
+	}
+	return checkRecoveryBoundary(again, approved, materialHash, false)
 }
 func (d *database) createOriginalIndex(ctx context.Context, m material, position int) error {
 	left, e := recoveryBudget(ctx, time.Now())
@@ -135,7 +134,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if e = rereadApproval(m, a, materialPath, materialHash, approvalPath, approvalHash, tool); e != nil {
 		return before, e
 	}
-	if e = consumeApproval(approvalPath, a, approvalHash); e != nil {
+	if e = consumeApproval(m, a, approvalHash); e != nil {
 		return before, e
 	}
 	// Undo the DROP prefix from its end. Each successful command then leaves
@@ -143,7 +142,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	// ACK but before the original ledger is replayed.
 	for i := len(missing) - 1; i >= 0; i-- {
 		position := missing[i]
-		if e = validateApproval(a, m, materialHash, tool, time.Now()); e != nil {
+		if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 			return before, e
 		}
 		if e = d.createOriginalIndex(ctx, m, position); e != nil {
@@ -157,7 +156,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if !sameBusinessNamespaces(m, restoredIndexes) || !bytes.Equal(before.Ledger.Document, restoredIndexes.Ledger.Document) || !bytes.Equal(before.Ledger.Namespace.UUID, restoredIndexes.Ledger.Namespace.UUID) || !bytes.Equal(before.Ledger.Namespace.Options, restoredIndexes.Ledger.Namespace.Options) || !bytes.Equal(before.Ledger.Namespace.Indexes[0], restoredIndexes.Ledger.Namespace.Indexes[0]) || before.SQLIdentity != restoredIndexes.SQLIdentity || before.MongoIdentity != restoredIndexes.MongoIdentity {
 		return before, errors.New("objects_or_dirty_ledger_changed_before_last_replay")
 	}
-	if e = validateApproval(a, m, materialHash, tool, time.Now()); e != nil {
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 		return before, e
 	}
 	if e = d.replayOriginalLedger(ctx, m, before, a, materialHash, tool); e != nil {
@@ -171,6 +170,9 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 }
 
 func (d *database) replayOriginalLedger(ctx context.Context, m material, before observation, a approval, materialHash, tool string) (err error) {
+	if e := validateMutableBoundary(m, a, materialHash, tool); e != nil {
+		return e
+	}
 	session, e := d.mongo.StartSession(options.Session().SetCausalConsistency(false))
 	if e != nil {
 		return errors.New("ledger_transaction_session_failed")
@@ -210,11 +212,17 @@ func (d *database) replayOriginalLedger(ctx context.Context, m material, before 
 	if !bytes.Equal(raw, before.Ledger.Document) {
 		return errors.New("current_ledger_changed_inside_transaction")
 	}
+	if e := validateMutableBoundary(m, a, materialHash, tool); e != nil {
+		return e
+	}
 	q, c := context.WithTimeout(sc, queryLimit)
 	result, e := d.mongo.Database(d.mongoName).Collection("schema_migrations").DeleteMany(q, bson.D{})
 	c()
 	if e != nil || result.DeletedCount != 1 {
 		return errors.New("ledger_transaction_delete_failed")
+	}
+	if e := validateMutableBoundary(m, a, materialHash, tool); e != nil {
+		return e
 	}
 	q, c = context.WithTimeout(sc, queryLimit)
 	_, e = d.mongo.Database(d.mongoName).Collection("schema_migrations").InsertOne(q, bson.Raw(m.Ledger.Document))
@@ -222,7 +230,7 @@ func (d *database) replayOriginalLedger(ctx context.Context, m material, before 
 	if e != nil {
 		return errors.New("original_ledger_bson_insert_failed")
 	}
-	if e = validateApproval(a, m, materialHash, tool, time.Now()); e != nil {
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 		return e
 	}
 	sqlIdentity, _, _, e := d.sqlState(ctx, d.conn)

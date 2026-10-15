@@ -18,6 +18,7 @@ func currentRestoreApproval(t *testing.T, m *material, dir string) (approval, st
 	now := time.Now().UTC()
 	m.CapturedAt = now.Add(-time.Minute).Format(time.RFC3339Nano)
 	materialPath := filepath.Join(dir, "original.json")
+	m.CapturePath = materialPath
 	raw, _ := json.Marshal(m)
 	if e := writeExclusive(materialPath, raw); e != nil {
 		t.Fatal(e)
@@ -142,10 +143,10 @@ func TestRestorePreclaimRechecksExternalBytesMarkerAndSingleUse(t *testing.T) {
 	if e := rereadApproval(m, a, mp, mh, ap, ah, testSource); e != nil {
 		t.Fatal(e)
 	}
-	if e := consumeApproval(ap, a, ah); e != nil {
+	if e := consumeApproval(m, a, ah); e != nil {
 		t.Fatal(e)
 	}
-	if consumeApproval(ap, a, ah) == nil {
+	if consumeApproval(m, a, ah) == nil {
 		t.Fatal("approval reused")
 	}
 	if e := os.WriteFile(mp, []byte(`{"wrong":true}`), 0600); e != nil {

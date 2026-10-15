@@ -53,6 +53,7 @@ func fixtureMaterial(t *testing.T) material {
 	t.Helper()
 	count, ledgerCount := int64(17), int64(1)
 	m := material{Format: 1, Kind: "m4_b_mongo_index_object_protection", ToolSource: testSource, BSource: bSource, BResources: bResources, BResourceFiles: bResourceFiles, CapturedAt: "2026-10-15T09:50:00Z", SQLName: "qs_owned", MongoName: "qs_owned", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), SQLVersion: 101}
+	m.CapturePath = "/private/original-b-capture.json"
 	for i, name := range []string{"answersheets", "report_generations"} {
 		m.Collections[i] = namespaceProof{Name: name, UUID: bytes.Repeat([]byte{byte(i + 1)}, 16), Options: rawBSON(t, bson.D{}), Indexes: [][]byte{idSpec(t)}, Count: &count}
 		for j, x := range targets {

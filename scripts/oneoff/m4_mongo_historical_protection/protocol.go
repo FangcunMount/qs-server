@@ -55,6 +55,7 @@ type material struct {
 	BResources     string            `json:"b_execution_resources_sha256"`
 	BResourceFiles int               `json:"b_execution_resource_files"`
 	CapturedAt     string            `json:"captured_at"`
+	CapturePath    string            `json:"first_capture_path"`
 	SQLName        string            `json:"mysql_database"`
 	MongoName      string            `json:"mongo_database"`
 	SQLIdentity    string            `json:"mysql_identity_sha256"`
@@ -239,6 +240,15 @@ func markerAbsent(path string) error {
 	return nil
 }
 func validateMaterial(m material, tool, sqlName, mongoName string) error {
+	if !absolutePath(m.CapturePath) {
+		return errors.New("material_first_capture_path_required")
+	}
+	return validateOriginalMetadata(m, tool, sqlName, mongoName)
+}
+
+// Inspect validates original database metadata without fabricating a capture
+// location. A persisted material must additionally bind its real first path.
+func validateOriginalMetadata(m material, tool, sqlName, mongoName string) error {
 	if m.Format != 1 || m.Kind != "m4_b_mongo_index_object_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.BSource != bSource || m.BResources != bResources || m.BResourceFiles != bResourceFiles || !nameRE.MatchString(sqlName) || !nameRE.MatchString(mongoName) || m.SQLName != sqlName || m.MongoName != mongoName || !nonzeroHash(m.SQLIdentity) || !nonzeroHash(m.MongoIdentity) || m.SQLVersion != 101 {
 		return errors.New("material_binding_rejected")
 	}

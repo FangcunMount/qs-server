@@ -138,7 +138,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = e.Error()
 			return r
 		}
-		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil {
+		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil || m.CapturePath != a.material {
 			r.Error = "material_rejected"
 			return r
 		}
@@ -152,6 +152,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		if strictDecode(raw, &ap) != nil || validateApproval(ap, m, a.materialHash, tool, time.Now()) != nil {
 			r.Error = "restore_approval_rejected"
+			return r
+		}
+		if e := checkRecoveryBoundary(m, ap, a.materialHash, false); e != nil {
+			r.Error = e.Error()
 			return r
 		}
 		deadline, _ := time.Parse(time.RFC3339Nano, ap.Deadline)
@@ -281,7 +285,12 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		o, e = d.snapshot(ctx)
 		if e == nil {
 			m = makeMaterial(o, tool, a.sqlName, a.mongoName, at)
-			e = validateMaterial(m, tool, a.sqlName, a.mongoName)
+			m.CapturePath = a.capture
+			if a.action == "capture" {
+				e = validateMaterial(m, tool, a.sqlName, a.mongoName)
+			} else {
+				e = validateOriginalMetadata(m, tool, a.sqlName, a.mongoName)
+			}
 		}
 		if e == nil && a.action == "capture" {
 			rawMaterial, e = json.Marshal(m)
