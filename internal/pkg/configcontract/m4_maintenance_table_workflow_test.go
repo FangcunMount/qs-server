@@ -46,7 +46,7 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 		`export QS_M4_D_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only`,
 		`export QS_M4_D_OBJECT_NATIVE_MYSQL_DSN="root:m4-owned-object-fixture@tcp(127.0.0.1:${OBJECT_MYSQL_PORT})/?multiStatements=true"`,
 		`-ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source"`,
-		`-run='^TestM4SQLObjectNative'`, `-run='^TestM4MongoObjectNative'`, `-run='^TestM4ActorColumnsNative'`,
+		`-run='^TestM4SQLObjectNative'`, `-run='^TestM4MongoObjectNative'`, "-run='" + actorColumnNativeSelector + "'",
 		`make test-metadata-readiness-mongodb-native`,
 	} {
 		if !strings.Contains(runs, required) {

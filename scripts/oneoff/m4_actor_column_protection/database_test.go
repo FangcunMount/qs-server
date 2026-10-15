@@ -35,7 +35,7 @@ func TestHelloRequiresActualReplicaPrimary(t *testing.T) {
 	if e != nil || strings.Join(hosts, ",") != "a:27017,b:27017" {
 		t.Fatal("legitimate primary or stable identity order rejected", e)
 	}
-	for _, name := range []string{"secondary", "missing_role", "null_role", "numeric_role", "mongos", "wrong_set", "duplicate_host", "typed_host"} {
+	for _, name := range []string{"secondary", "missing_role", "null_role", "numeric_role", "mongos", "empty_set", "missing_set", "null_set", "numeric_set", "duplicate_host", "typed_host"} {
 		t.Run(name, func(t *testing.T) {
 			doc := append(bson.D(nil), base...)
 			switch name {
@@ -49,8 +49,14 @@ func TestHelloRequiresActualReplicaPrimary(t *testing.T) {
 				doc[2].Value = int32(1)
 			case "mongos":
 				doc = append(doc, bson.E{Key: "msg", Value: "isdbgrid"})
-			case "wrong_set":
-				doc[0].Value = "other"
+			case "empty_set":
+				doc[0].Value = ""
+			case "missing_set":
+				doc = doc[1:]
+			case "null_set":
+				doc[0].Value = nil
+			case "numeric_set":
+				doc[0].Value = int32(1)
 			case "duplicate_host":
 				doc[1].Value = bson.A{"a:27017", "a:27017"}
 			case "typed_host":
@@ -59,6 +65,53 @@ func TestHelloRequiresActualReplicaPrimary(t *testing.T) {
 			raw, _ := bson.Marshal(doc)
 			if _, e := primaryReplicaHosts(raw); e == nil {
 				t.Fatal("non-primary/unknown topology accepted")
+			}
+		})
+	}
+}
+
+func TestMongoSelectedIdentityUsesActualReplicaSet(t *testing.T) {
+	base := bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: bson.A{"b:27017", "a:27017"}}, {Key: "isWritablePrimary", Value: true}}
+	const originalRS0Encoding = `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"rs0"},{"Key":"hosts","Value":["a:27017","b:27017"]}],"qs_fixture"]`
+	const originalRS0Hash = "01b9bf3364d0c95afdda9b4bfb77dd240128654730d3235b1a4d22f767f6f0ce"
+	for _, name := range []string{"rs0_golden", "named_primary", "selected_database"} {
+		t.Run(name, func(t *testing.T) {
+			doc := append(bson.D(nil), base...)
+			selected := "qs_fixture"
+			if name == "named_primary" {
+				doc[0].Value = "owned-named-replica"
+			}
+			if name == "selected_database" {
+				selected = "qs_other_fixture"
+			}
+			raw, e := bson.Marshal(doc)
+			if e != nil {
+				t.Fatal(e)
+			}
+			actual, e := mongoSelectedIdentity(raw, selected)
+			if e != nil || !hashRE.MatchString(actual) {
+				t.Fatal("legitimate actual replica identity rejected", e)
+			}
+			expectedEncoding := originalRS0Encoding
+			switch name {
+			case "named_primary":
+				expectedEncoding = strings.Replace(originalRS0Encoding, `"rs0"`, `"owned-named-replica"`, 1)
+			case "selected_database":
+				expectedEncoding = strings.Replace(originalRS0Encoding, `"qs_fixture"`, `"qs_other_fixture"`, 1)
+			}
+			if fingerprint([]byte(originalRS0Encoding)) != originalRS0Hash || actual != fingerprint([]byte(expectedEncoding)) || (name == "rs0_golden") != (actual == originalRS0Hash) {
+				t.Fatal("rs0 compatibility or actual set/database identity lost")
+			}
+			// Only the observed hosts' order is canonicalized; actual set/database
+			// values remain part of the original identity encoding.
+			doc[1].Value = bson.A{"a:27017", "b:27017"}
+			raw, e = bson.Marshal(doc)
+			if e != nil {
+				t.Fatal(e)
+			}
+			reordered, e := mongoSelectedIdentity(raw, selected)
+			if e != nil || actual != reordered {
+				t.Fatal("host order changed the selected replica identity", e)
 			}
 		})
 	}

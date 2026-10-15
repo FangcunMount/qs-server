@@ -59,7 +59,7 @@ func decodeCaptureDocument(raw []byte, target any) error {
 }
 
 func validateCaptureReceipt(r receipt, m material, hash, tool string) error {
-	if r.Action != "capture" || !r.Complete || !r.ReadOnly || r.Error != "none" || r.ReleaseError != "" || !nonzeroHash(hash) || r.MaterialHash != hash || r.ToolSource != tool || r.ToolSource != m.ToolSource || r.CSource != cSource || r.CResources != cResources || r.CResourceFiles != cResourceFiles || !r.SQLSnapshot || !r.MandatoryEOF || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.BudgetExceeded || r.TransactionReleaseUnproven || r.ProductionFreezeCertified || r.CrossDatabaseAtomicRR || r.ApprovalConsumed || len(r.TableCounts) != len(m.Tables) {
+	if r.Action != "capture" || !r.Complete || !r.ReadOnly || r.Error != "none" || r.ReleaseError != "" || !nonzeroHash(hash) || r.MaterialHash != hash || r.ToolSource != tool || r.ToolSource != m.ToolSource || r.CSource != cSource || r.CResources != cResources || r.CResourceFiles != cResourceFiles || !r.SQLSnapshot || !r.MandatoryEOF || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.BudgetExceeded || r.TransactionReleaseUnproven || r.ProductionFreezeCertified || r.CrossDatabaseAtomicRR || r.ApprovalConsumed || r.RecoveryGateAcquired || r.RecoveryGateReleased || r.RecoveryGateReleaseUnproven || len(r.TableCounts) != len(m.Tables) {
 		return errors.New("original_capture_receipt_not_successful")
 	}
 	for _, table := range m.Tables {
