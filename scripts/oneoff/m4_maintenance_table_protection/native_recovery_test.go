@@ -134,6 +134,11 @@ func (h *maintenanceNative) assertRestoreReleased(r receipt) {
 func (h *maintenanceNative) restoreAndVerify(before [5][][]sql.NullString, modern [8][][]sql.NullString, head []byte, bindingBefore binding) {
 	h.t.Helper()
 	args, _, _ := h.restoreInput("1001-1")
+	h.restoreUsingArgsAndVerify(args, before, modern, head, bindingBefore)
+}
+
+func (h *maintenanceNative) restoreUsingArgsAndVerify(args []string, before [5][][]sql.NullString, modern [8][][]sql.NullString, head []byte, bindingBefore binding) {
+	h.t.Helper()
 	r := h.action("restore", args...)
 	h.assertRestoreReleased(r)
 	if !r.Complete || r.Error != "none" || r.ReadOnly || !r.ApprovalConsumed || !r.MandatoryEOF || !r.RetainedEOF {

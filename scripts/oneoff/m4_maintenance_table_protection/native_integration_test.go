@@ -308,9 +308,14 @@ func (h *maintenanceNative) independentBinding() binding {
 
 func (h *maintenanceNative) action(action string, extras ...string) receipt {
 	h.t.Helper()
+	return h.actionContext(h.t.Context(), action, extras...)
+}
+
+func (h *maintenanceNative) actionContext(ctx context.Context, action string, extras ...string) receipt {
+	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=2m"}
 	args = append(args, extras...)
-	return run(h.t.Context(), args, func(key string) string {
+	return run(ctx, args, func(key string) string {
 		switch key {
 		case "QS_M4_D_OBJECT_MYSQL_DSN":
 			return h.dsn
