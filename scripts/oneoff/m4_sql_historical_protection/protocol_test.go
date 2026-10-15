@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"io"
 	"os"
@@ -438,12 +439,14 @@ func TestMySQLSocketReadBudgetUsesBoundedActionAndRestoreApproval(t *testing.T) 
 type boundedPageReadProbe struct {
 	db         *sql.DB
 	deadlines  []time.Time
+	queries    []string
 	pageHintOK bool
 }
 
 func (p *boundedPageReadProbe) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	deadline, _ := ctx.Deadline()
 	p.deadlines = append(p.deadlines, deadline)
+	p.queries = append(p.queries, query)
 	return p.db.QueryRowContext(ctx, query, args...)
 }
 
@@ -477,5 +480,100 @@ func TestReadQueriesKeepFiveSecondContextInsideLongAction(t *testing.T) {
 	mock.ExpectClose()
 	if db.Close() != nil || mock.ExpectationsWereMet() != nil {
 		t.Fatal("bounded read probe did not release its SQL fixture")
+	}
+}
+
+func TestConfiguredMySQLActionKeepsShortConnectionAndFiniteReadBudgets(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	cfg := mysql.NewConfig()
+	cfg.Params = map[string]string{"charset": "utf8mb3"}
+	cfg.MultiStatements, cfg.ParseTime = true, true
+	if !configureMySQLAction(ctx, cfg) || cfg.Timeout != queryLimit || cfg.WriteTimeout != queryLimit || cfg.ReadTimeout <= queryLimit || cfg.ReadTimeout > time.Minute || cfg.MultiStatements || cfg.ParseTime || cfg.Params["charset"] != "utf8mb3" {
+		t.Fatal("selected action lost its finite socket budget or changed connection identity inputs")
+	}
+	if configureMySQLAction(context.Background(), mysql.NewConfig()) {
+		t.Fatal("unbounded socket configuration accepted")
+	}
+}
+
+func TestCompleteRangeCountUsesSameSnapshotAndRemainingActionBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		value      any
+		err        error
+	}{
+		{"complete", "", uint64(2), nil},
+		{"real_count_mismatch", "complete_range_count_mismatch", uint64(3), nil},
+		{"scan_failed", "complete_range_count_query_failed", "not-a-count", nil},
+		{"query_failed", "complete_range_count_query_failed", nil, errors.New("unretained SQL body or connection details")},
+		{"deadline", "complete_range_count_deadline_exceeded", nil, context.DeadlineExceeded},
+		{"canceled", "complete_range_count_canceled", nil, context.Canceled},
+		{"server3024_before_context", "complete_range_count_server_timeout", nil, errors.Join(&mysql.MySQLError{Number: 3024, Message: "unretained server text"}, context.DeadlineExceeded)},
+		{"other_server", "complete_range_count_query_failed", nil, &mysql.MySQLError{Number: 1064, Message: "unretained SQL text"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock, e := sqlmock.New()
+			if e != nil {
+				t.Fatal(e)
+			}
+			expected := mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME\\([1-9][0-9]*\\) \\*/ COUNT\\(\\*\\) FROM `assessment`")
+			if tc.err != nil {
+				expected.WillReturnError(tc.err)
+			} else {
+				expected.WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.value))
+			}
+			mock.ExpectClose()
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			deadline, _ := ctx.Deadline()
+			probe := &boundedPageReadProbe{db: db}
+			before := time.Now()
+			e = verifyCompleteRangeCount(ctx, probe, 0, 2)
+			after := time.Now()
+			if (tc.want == "" && e != nil) || (tc.want != "" && (e == nil || e.Error() != tc.want)) || len(probe.deadlines) != 1 || !probe.deadlines[0].Equal(deadline) {
+				t.Fatal("COUNT error category or original action context changed", e)
+			}
+			query := probe.queries[0]
+			start := strings.Index(query, "MAX_EXECUTION_TIME(") + len("MAX_EXECUTION_TIME(")
+			end := strings.Index(query[start:], ")") + start
+			var hint int64
+			if json.Unmarshal([]byte(query[start:end]), &hint) != nil || hint <= queryLimit.Milliseconds() || hint > deadline.Sub(before).Milliseconds() || hint < deadline.Sub(after).Milliseconds() {
+				t.Fatal("server COUNT deadline was absent, zero, lengthened or replaced by the page budget")
+			}
+			if db.Close() != nil || mock.ExpectationsWereMet() != nil {
+				t.Fatal("COUNT fixture or expected reader was not released")
+			}
+		})
+	}
+}
+
+func TestCompleteRangeCountRejectsMissingExpiredOrSubMillisecondBudget(t *testing.T) {
+	for _, which := range []string{"missing", "expired", "sub_millisecond", "canceled", "outside_maximum_action"} {
+		t.Run(which, func(t *testing.T) {
+			ctx := context.Background()
+			want := "complete_range_count_budget_rejected"
+			var cancel context.CancelFunc
+			switch which {
+			case "expired":
+				ctx, cancel = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				want = "complete_range_count_deadline_exceeded"
+			case "sub_millisecond":
+				ctx, cancel = context.WithDeadline(ctx, time.Now().Add(time.Microsecond))
+				want = "complete_range_count_deadline_exceeded"
+			case "canceled":
+				ctx, cancel = context.WithTimeout(ctx, time.Minute)
+				cancel()
+				want = "complete_range_count_canceled"
+			case "outside_maximum_action":
+				ctx, cancel = context.WithTimeout(ctx, time.Hour)
+			}
+			if cancel != nil {
+				defer cancel()
+			}
+			if e := verifyCompleteRangeCount(ctx, nil, 0, 2); e == nil || e.Error() != want {
+				t.Fatal("invalid aggregate budget reached the reader", e)
+			}
+		})
 	}
 }

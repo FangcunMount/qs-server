@@ -86,8 +86,8 @@ func main() {
 
 // The action context already includes the CLI/parent deadline. Restore narrows
 // it again to its independently approved deadline and expiry before connecting.
-// Every individual read keeps its shorter query context; an ALTER response may
-// need longer than one read query, but never an unbounded socket wait.
+// Metadata and page reads keep their shorter query contexts. A complete COUNT
+// or ALTER response may need longer, but never an unbounded socket wait.
 func mysqlActionReadTimeout(ctx context.Context) (time.Duration, bool) {
 	deadline, bounded := ctx.Deadline()
 	if !bounded || ctx.Err() != nil {
@@ -98,6 +98,19 @@ func mysqlActionReadTimeout(ctx context.Context) (time.Duration, bool) {
 		return 0, false
 	}
 	return remaining, true
+}
+
+func configureMySQLAction(ctx context.Context, dsn *mysql.Config) bool {
+	budget, bounded := mysqlActionReadTimeout(ctx)
+	if !bounded {
+		return false
+	}
+	dsn.MultiStatements = false
+	dsn.ParseTime = false
+	dsn.Timeout = queryLimit
+	dsn.ReadTimeout = budget
+	dsn.WriteTimeout = queryLimit
+	return true
 }
 
 func restoreActionContext(ctx context.Context, a approval) (context.Context, context.CancelFunc) {
@@ -161,20 +174,11 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "selected_connection_input_rejected"
 		return r
 	}
-	dsn.MultiStatements = false
-	dsn.ParseTime = false
-	dsn.Timeout = queryLimit
-	dsn.ReadTimeout = queryLimit
-	if a.action == "restore" {
-		var bounded bool
-		dsn.ReadTimeout, bounded = mysqlActionReadTimeout(ctx)
-		if !bounded {
-			r.Error = "mysql_connection_failed"
-			r.BudgetExceeded = ctx.Err() != nil
-			return r
-		}
+	if !configureMySQLAction(ctx, dsn) {
+		r.Error = "mysql_connection_failed"
+		r.BudgetExceeded = ctx.Err() != nil
+		return r
 	}
-	dsn.WriteTimeout = queryLimit
 	if mysql.SetLogger(&mysql.NopLogger{}) != nil {
 		r.Error = "mysql_logging_boundary_failed"
 		return r

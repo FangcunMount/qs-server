@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -398,13 +399,53 @@ func scanTable(ctx context.Context, r sqlReader, i int, cols []column, present b
 			break
 		}
 	}
-	q, cancel = context.WithTimeout(ctx, queryLimit)
-	defer cancel()
-	var count uint64
-	if r.QueryRowContext(q, "SELECT COUNT(*) FROM `"+out.Table+"`").Scan(&count) != nil || count != uint64(len(out.Rows)) {
-		return out, errors.New("complete_range_count_rejected")
+	if e := verifyCompleteRangeCount(ctx, r, i, uint64(len(out.Rows))); e != nil {
+		return out, e
 	}
 	return out, nil
+}
+
+// The independent whole-table count remains in the same read-only RR snapshot.
+// Its aggregate work uses only the existing action's remaining absolute budget;
+// pages, MAX(id), metadata, connection and session setup keep their 5s limits.
+func verifyCompleteRangeCount(ctx context.Context, r sqlReader, i int, expected uint64) error {
+	deadline, bounded := ctx.Deadline()
+	if !bounded {
+		return errors.New("complete_range_count_budget_rejected")
+	}
+	if e := ctx.Err(); e != nil {
+		return classifyCompleteCountError(e)
+	}
+	milliseconds := time.Until(deadline).Milliseconds()
+	if milliseconds <= 0 {
+		return errors.New("complete_range_count_deadline_exceeded")
+	}
+	if milliseconds > (20 * time.Minute).Milliseconds() {
+		return errors.New("complete_range_count_budget_rejected")
+	}
+	var count uint64
+	query := "SELECT /*+ MAX_EXECUTION_TIME(" + strconv.FormatInt(milliseconds, 10) + ") */ COUNT(*) FROM `" + objects[i].table + "`"
+	if e := r.QueryRowContext(ctx, query).Scan(&count); e != nil {
+		return classifyCompleteCountError(e)
+	}
+	if count != expected {
+		return errors.New("complete_range_count_mismatch")
+	}
+	return nil
+}
+
+func classifyCompleteCountError(e error) error {
+	var server *mysql.MySQLError
+	switch {
+	case errors.As(e, &server) && server.Number == 3024:
+		return errors.New("complete_range_count_server_timeout")
+	case errors.Is(e, context.DeadlineExceeded):
+		return errors.New("complete_range_count_deadline_exceeded")
+	case errors.Is(e, context.Canceled):
+		return errors.New("complete_range_count_canceled")
+	default:
+		return errors.New("complete_range_count_query_failed")
+	}
 }
 func (d database) snapshot(ctx context.Context, tool string, original bool) (m material, before observation, resultErr error) {
 	if e := requireTransactionalTables(ctx, d.conn); e != nil {
