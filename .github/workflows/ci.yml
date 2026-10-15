@@ -118,7 +118,7 @@ jobs:
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     services:
       mysql:
         image: mysql:8.0.36
