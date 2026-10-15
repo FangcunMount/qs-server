@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -251,18 +252,21 @@ func TestRestoreApprovalWindowOwnershipAndFirstRuntimeBoundary(t *testing.T) {
 	}
 }
 
-func TestEntryRemainsNonOperationalAndDoesNotEchoRejectedInputs(t *testing.T) {
+func TestEntryRejectsInvalidInputsBeforeConnectionsAndDoesNotEcho(t *testing.T) {
 	base := []string{"--mysql-database=qs_owned", "--mongo-database=qs_owned"}
-	for _, args := range [][]string{base, append(append([]string{}, base...), "--action=capture", "--capture-file=/private/first.json"), append(append([]string{}, base...), "--action=secret-value-that-must-not-leak")} {
+	for _, args := range [][]string{base, append(append([]string{}, base...), "--action=secret-value-that-must-not-leak")} {
 		var out bytes.Buffer
-		if serve(args, testSource, &out) == 0 {
-			t.Fatal("protocol-only review batch must never imply operation completion")
+		// Missing connection input fails before any DB operation. Rejected flags
+		// and invalid connection strings never enter the structured receipt.
+		if serve(context.Background(), args, func(string) string { return "secret-value-that-must-not-leak" }, testSource, &out) == 0 {
+			t.Fatal("invalid input completed")
 		}
 		var r receipt
-		if json.Unmarshal(out.Bytes(), &r) != nil || r.Complete || r.ImplementationReady || r.FreezeCertified || strings.Contains(out.String(), "secret-value") {
-			t.Fatal("entry leaked rejected input or certified unavailable work")
+		if json.Unmarshal(out.Bytes(), &r) != nil || r.Complete || r.FreezeCertified || strings.Contains(out.String(), "secret-value") {
+			t.Fatal("input leaked or freeze certified")
 		}
 	}
+
 	raw, _ := json.Marshal(fixtureMaterial(t))
 	raw = append(raw[:len(raw)-1], []byte(`,"business_document_body":"forbidden"}`)...)
 	var m material

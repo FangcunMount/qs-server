@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
-	"path/filepath"
 	"regexp"
 	"time"
 
@@ -235,19 +233,10 @@ func validateApproval(a approval, m material, materialHash, tool string, now tim
 // Same first-runtime boundary as the approved A tool. Absence is only a local
 // guard; it never independently certifies that the six instances are frozen.
 func markerAbsent(path string) error {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+	if s, e := privatePath(path, false); e != nil || s != nil {
 		return errors.New("first_runtime_already_started_or_marker_unknown")
 	}
-	for p := path; ; p = filepath.Dir(p) {
-		s, e := os.Lstat(p)
-		if p == path && os.IsNotExist(e) {
-		} else if e != nil || s.Mode()&os.ModeSymlink != 0 || p == path || !s.IsDir() || (s.Mode().Perm()&022 != 0 && s.Mode()&os.ModeSticky == 0) {
-			return errors.New("first_runtime_already_started_or_marker_unknown")
-		}
-		if p == filepath.Dir(p) {
-			return nil
-		}
-	}
+	return nil
 }
 func validateMaterial(m material, tool, sqlName, mongoName string) error {
 	if m.Format != 1 || m.Kind != "m4_b_mongo_index_object_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.BSource != bSource || m.BResources != bResources || m.BResourceFiles != bResourceFiles || !nameRE.MatchString(sqlName) || !nameRE.MatchString(mongoName) || m.SQLName != sqlName || m.MongoName != mongoName || !nonzeroHash(m.SQLIdentity) || !nonzeroHash(m.MongoIdentity) || m.SQLVersion != 101 {
