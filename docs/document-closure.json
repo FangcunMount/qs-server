@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5b8cf6f517117dd739226890e899c20335dcb480",
+    "sha": "db3328fc9ea1d622db286d9740338cf6b1872011",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
+        "source_sha": "db3328fc9ea1d622db286d9740338cf6b1872011",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4707,6 +4707,14 @@
           "result": "matched",
           "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_integration_test.go",
+          "selector": "func TestM4ActorColumnsNativeCaptureUpgradeVerify(t *testing.T)",
+          "result": "matched",
+          "source_sha": "db3328fc9ea1d622db286d9740338cf6b1872011",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4732,7 +4740,8 @@
           "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
           "C read-only source db7db9b9ac30b86f1d2307e7ca888e369816b293 is prepared after actual main8f08 merge273b39355. The separately retained local receipt8e461138496f7caecdc958bada28ee9679bc1f946416b1aaa15f4a2832dc9dd2 binds 12 top-level and53 total ordinary/race RUN/PASS,0FAIL/SKIP, target vet/lint/build and five unchanged source hashes. These are SQLmock/pure-protocol tests and compilation, not native database execution. Only inspect/capture clean101/40 and verify-target clean102/40 exist; restore is rejected before connection configuration/material access and no approval input is accepted or consumed. C040b/284 resources remain independent of the tool checkout. No C production material, freeze, restoration, runtime or time/RPO proof is supplied.",
           "Follow-up source744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0 restricts Mongo40 BSON to exactly nonnull _id, integer32/64 version40 and actual bool dirty=false, rejecting extra/duplicate fields. The separate local receipt45bd5852eda5c4fa128c5433dfb11a18ac68e7232149e6dfbbe21e3da2e5303d binds12 top-level/56 total ordinary race RUN/PASS,0FAIL/SKIP and target vet/lint/build. Mongo read scope remains one original document and independently bound ledger UUID before/after the SQL window; options/index are not captured or attested. No native database or production access occurred; old db7 source evidence is retained without relabelling.",
-          "C source5b8cf6f517117dd739226890e899c20335dcb480 overrides URI read preference with Primary for all reads and independently requires actual typed writable rs0 hello, rejecting secondary/mongos/unknown role. The local receipt694a15b4f8e00f74b4e9846e44505c70425b66a58ba53ee61cc31cd6a0a593f0 binds14 tops/66 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and five unchanged source hashes. URI-override and topology tests are pure ordinary tests, not actual database routing. Terminal complete COUNT remains on5s child context and is pending a locally adopted, actually verified A deadline fix; full COUNT/EOF/retained proofs remain present. No C native, restore, production, SSH, Docker, push or PR was executed. Prior source/QA records remain unchanged."
+          "C source5b8cf6f517117dd739226890e899c20335dcb480 overrides URI read preference with Primary for all reads and independently requires actual typed writable rs0 hello, rejecting secondary/mongos/unknown role. The local receipt694a15b4f8e00f74b4e9846e44505c70425b66a58ba53ee61cc31cd6a0a593f0 binds14 tops/66 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and five unchanged source hashes. URI-override and topology tests are pure ordinary tests, not actual database routing. Terminal complete COUNT remains on5s child context and is pending a locally adopted, actually verified A deadline fix; full COUNT/EOF/retained proofs remain present. No C native, restore, production, SSH, Docker, push or PR was executed. Prior source/QA records remain unchanged.",
+          "C fixture source db3328fc9ea1d622db286d9740338cf6b1872011 adds only an integration-tag test file; the three production Go files remain byte-identical to5b8cf6f517117dd739226890e899c20335dcb480. Local receipt31dae776993bd9dfad1999b5f11ebde8f59761026813762b2969044ff865b7f7 proves integration compilation, tagged vet/lint and exactly the source-only TestM4ActorColumnsPinnedResources (284 files/fadbb digest). The five database top-level scenarios have NOT run. Historical providers will generate101/40, and original102 resources perform the two actual DROP statements; no force/SetVersion or direct clean-ledger writes are implemented. NULL fixtures respect original tags nullable/effective_roles NOTNULL. Owned loopback/ACK and actual8.0.36/7.0.31 rs0 are mandatory for future execution. No Docker, database, SSH, production, restore, business process, source push or PR occurred; COUNT deadline adoption and real native evidence remain pending. The earlier66 ordinary tests remain separately bound to5b8 rather than relabelled native."
         ]
       },
       "gaps": [
