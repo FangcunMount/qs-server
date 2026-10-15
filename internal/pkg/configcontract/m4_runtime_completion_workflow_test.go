@@ -275,3 +275,56 @@ func TestCommittedRuntimeCompletionProofRejectsIncompleteOrForeignEvidence(t *te
 		})
 	}
 }
+
+func TestCommittedRuntimeCompletionRequiresFixedActualOldCLI(t *testing.T) {
+	run, _ := completionWorkflow(t)
+	start := strings.Index(run, "start_owned_fixture h\n")
+	if start < 0 {
+		t.Fatal("completion phase missing")
+	}
+	tail := run[start:]
+	for _, required := range []string{
+		`old_completion_source='5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c'`,
+		`git archive --format=tar --output="$d_native_tmp/old-source.tar" "$old_completion_source"`,
+		`timeout 120s env GOMAXPROCS=2 go -C "$d_native_tmp/old-source" build -p=2`,
+		`-ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$old_completion_source"`,
+		`export QS_M4_D_COMPLETION_OLD_CLI_REQUIRED=1`,
+		`export QS_M4_D_COMPLETION_OLD_CLI_FILE="$d_native_tmp/old-d-cli"`,
+		`export QS_M4_D_COMPLETION_OLD_CLI_SHA256`,
+		`timeout 60s git fetch --no-tags --depth=1 origin "$old_completion_source"`,
+		`[[ "$(git rev-parse "${old_completion_source}^{commit}")" == "$old_completion_source" ]]`,
+		`env -i GOMAXPROCS=2 "$QS_M4_D_COMPLETION_OLD_CLI_FILE" --fixed-old-cli-pre-environment-probe-must-be-invalid`,
+		`[[ "$old_probe_status" == 1 ]]`,
+	} {
+		if !strings.Contains(tail, required) {
+			t.Fatal("fixed old CLI build/execution boundary absent", required)
+		}
+	}
+	// A correct hash observed only before execution cannot certify the binary
+	// actually retained by the completed phase. Preserve both source and file
+	// checks around its exact native command, ahead of the existing13 proof.
+	ordered := []string{
+		`[[ "$(git rev-parse HEAD)" == "$object_source" ]]`,
+		`git archive --format=tar`,
+		`timeout 120s env GOMAXPROCS=2 go -C`,
+		`QS_M4_D_COMPLETION_OLD_CLI_SHA256="$(sha256sum`,
+		`env -i GOMAXPROCS=2`,
+		`PY_D_OLD_CLI_PROBE` + "\n",
+		`GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json`,
+		`[[ "$(sha256sum "$QS_M4_D_COMPLETION_OLD_CLI_FILE" | awk '{print $1}')" == "$QS_M4_D_COMPLETION_OLD_CLI_SHA256" ]]`,
+		`[[ "$(git rev-parse HEAD)" == "$object_source" ]]`,
+		`python3 - runtime-completion-native.jsonl`,
+	}
+	remaining := tail
+	for _, boundary := range ordered {
+		_, next, ok := strings.Cut(remaining, boundary)
+		if !ok {
+			t.Fatal("fixed old producer proof/build/native/posthash ordering lost", boundary)
+		}
+		remaining = next
+	}
+	source, e := os.ReadFile(filepath.Join(repoRoot(t), "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go"))
+	if e != nil || !strings.Contains(string(source), `const completionOldCLISource = "5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c"`) || !strings.Contains(string(source), `t.Run("ExistingOriginalMarkerAfterOutputLoss", nativeCompletionAcrossActualOldCLI)`) {
+		t.Fatal("actual old native consumer and fixed CI producer disagree")
+	}
+}
