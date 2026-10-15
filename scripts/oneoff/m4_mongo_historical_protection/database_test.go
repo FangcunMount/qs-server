@@ -77,22 +77,33 @@ func TestFirstMaterialCaptureIsDurablePrivateAndNeverOverwrites(t *testing.T) {
 	}
 }
 func TestCaptureNeverCertifiesExpiredBudgetOrFailedFileRelease(t *testing.T) {
+	path := filepath.Join(privateDir(t), "material.json")
+	parent, e := captureParent(path)
+	if e != nil {
+		t.Fatal(e)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	called := false
 	r := receipt{}
-	e := finishCapture(ctx, &r, "unused", []byte("fixed"), func(string, []byte) error { called = true; return nil })
+	e = finishCapture(ctx, &r, path, parent, []byte("fixed"), func(string, []byte) error { called = true; return nil })
 	if e == nil || called || r.Complete || r.MaterialHash != "" {
 		t.Fatal("expired capture performed a write")
 	}
-	e = finishCapture(context.Background(), &r, "unused", []byte("fixed"), func(string, []byte) error { return errors.New("private_directory_release_failed") })
+	e = finishCapture(context.Background(), &r, path, parent, []byte("fixed"), func(string, []byte) error { return errors.New("private_directory_release_failed") })
 	if e == nil || r.Complete || r.MaterialHash != "" {
 		t.Fatal("failed fsync/release signed material")
 	}
 	ctx, cancel = context.WithCancel(context.Background())
-	e = finishCapture(ctx, &r, "unused", []byte("fixed"), func(string, []byte) error { cancel(); return nil })
-	if e == nil || r.Complete || r.MaterialHash == "" {
-		t.Fatal("after-write cancellation lost the existing material identity or completed")
+	e = finishCapture(ctx, &r, path, parent, []byte("fixed"), func(p string, raw []byte) error {
+		if e := writeExclusive(p, raw); e != nil {
+			return e
+		}
+		cancel()
+		return nil
+	})
+	if e == nil || r.Complete || r.MaterialHash != "" {
+		t.Fatal("after-write cancellation signed material identity or completed")
 	}
 }
 func TestSQLIdentityRequiresObservedSingleClean101Ledger(t *testing.T) {
