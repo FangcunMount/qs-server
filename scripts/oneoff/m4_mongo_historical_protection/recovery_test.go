@@ -24,13 +24,19 @@ func currentRestoreApproval(t *testing.T, m *material, dir string) (approval, st
 		t.Fatal(e)
 	}
 	materialHash := fingerprint(raw)
+	a, approvalPath, approvalHash := freezeRestoreApproval(t, *m, materialHash, dir)
+	return a, materialPath, materialHash, approvalPath, approvalHash
+}
+func freezeRestoreApproval(t *testing.T, m material, materialHash, dir string) (approval, string, string) {
+	t.Helper()
+	now := time.Now().UTC()
 	a := approval{Format: 1, Kind: "m4_b_pre_start_mongo_object_restore", Operation: "123-1", ToolSource: testSource, BSource: bSource, BResources: bResources, BResourceFiles: bResourceFiles, MaterialHash: materialHash, FreezeHash: strings.Repeat("d", 64), ResponsibilityHash: strings.Repeat("e", 64), SQLIdentity: m.SQLIdentity, MongoIdentity: m.MongoIdentity, RuntimeFrozen: true, RuntimeNotStarted: true, Marker: filepath.Join(dir, "first-runtime"), WindowStarted: now.Add(-2 * time.Minute).Format(time.RFC3339Nano), RecoveryDecision: now.Add(-time.Second).Format(time.RFC3339Nano), Deadline: now.Add(30 * time.Minute).Format(time.RFC3339Nano), Expires: now.Add(time.Hour).Format(time.RFC3339Nano), RetentionDays: 30, DataOwner: "system (10001)", RecoveryOwner: "system (10001)"}
 	approvalPath := filepath.Join(dir, "restore-approval.json")
-	raw, _ = json.Marshal(a)
+	raw, _ := json.Marshal(a)
 	if e := writeExclusive(approvalPath, raw); e != nil {
 		t.Fatal(e)
 	}
-	return a, materialPath, materialHash, approvalPath, fingerprint(raw)
+	return a, approvalPath, fingerprint(raw)
 }
 func TestVerifyTargetRequiresClean40AndExactRemainingScope(t *testing.T) {
 	m := fixtureMaterial(t)
@@ -124,13 +130,14 @@ func TestRecoveryDDLUsesOnlyFixedCapturedSpecAndRemainingAbsoluteBudget(t *testi
 func TestRestorePreclaimRechecksExternalBytesMarkerAndSingleUse(t *testing.T) {
 	m := fixtureMaterial(t)
 	a, mp, mh, ap, ah := currentRestoreApproval(t, &m, privateDir(t))
-	if e := rereadApproval(m, a, mp, mh, ap, ah, testSource); e != nil {
+	proof := fixtureCaptureEvidence(t, m, mh)
+	if e := rereadApproval(m, a, mp, mh, ap, ah, testSource, proof); e != nil {
 		t.Fatal(e)
 	}
 	if e := os.WriteFile(a.Marker, []byte("start intent"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	if rereadApproval(m, a, mp, mh, ap, ah, testSource) == nil {
+	if rereadApproval(m, a, mp, mh, ap, ah, testSource, proof) == nil {
 		t.Fatal("late first-runtime marker ignored")
 	}
 	_, claim, e := recoveryPaths(m, mh, a.Operation)
@@ -144,7 +151,8 @@ func TestRestorePreclaimRechecksExternalBytesMarkerAndSingleUse(t *testing.T) {
 	// operation/material/raw approval. No retry can consume it a second time.
 	m = fixtureMaterial(t)
 	a, mp, mh, ap, ah = currentRestoreApproval(t, &m, privateDir(t))
-	if e := rereadApproval(m, a, mp, mh, ap, ah, testSource); e != nil {
+	proof = fixtureCaptureEvidence(t, m, mh)
+	if e := rereadApproval(m, a, mp, mh, ap, ah, testSource, proof); e != nil {
 		t.Fatal(e)
 	}
 	if e := consumeApproval(m, a, ah); e != nil {
@@ -156,7 +164,7 @@ func TestRestorePreclaimRechecksExternalBytesMarkerAndSingleUse(t *testing.T) {
 	if e := os.WriteFile(mp, []byte(`{"wrong":true}`), 0600); e != nil {
 		t.Fatal(e)
 	}
-	if rereadApproval(m, a, mp, mh, ap, ah, testSource) == nil {
+	if rereadApproval(m, a, mp, mh, ap, ah, testSource, proof) == nil {
 		t.Fatal("changed original material accepted")
 	}
 }
