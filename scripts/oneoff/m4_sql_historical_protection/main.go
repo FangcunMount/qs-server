@@ -46,7 +46,7 @@ func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-sql-historical-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored")
 	f.StringVar(&a.sqlName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.mongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.capture, "capture-file", "", "first private capture path")
@@ -67,8 +67,8 @@ func parseArgs(args []string) (arguments, error) {
 		if a.capture == "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
 		}
-	case "verify-target", "restore":
-		if a.capture != "" || a.material == "" || !hashRE.MatchString(a.materialHash) || (a.action == "restore" && (a.approval == "" || !hashRE.MatchString(a.approvalHash))) || (a.action == "verify-target" && (a.approval != "" || a.approvalHash != "")) {
+	case "verify-target", "restore", "verify-restored":
+		if a.capture != "" || a.material == "" || !hashRE.MatchString(a.materialHash) || (a.action != "verify-target" && (a.approval == "" || !hashRE.MatchString(a.approvalHash))) || (a.action == "verify-target" && (a.approval != "" || a.approvalHash != "")) {
 			return a, errors.New("bound_material_and_action_required")
 		}
 	default:
@@ -86,8 +86,8 @@ func main() {
 
 // The action context already includes the CLI/parent deadline. Restore narrows
 // it again to its independently approved deadline and expiry before connecting.
-// Every individual read keeps its shorter query context; an ALTER response may
-// need longer than one read query, but never an unbounded socket wait.
+// Metadata and page reads keep their shorter query contexts. A complete COUNT
+// or ALTER response may need longer, but never an unbounded socket wait.
 func mysqlActionReadTimeout(ctx context.Context) (time.Duration, bool) {
 	deadline, bounded := ctx.Deadline()
 	if !bounded || ctx.Err() != nil {
@@ -100,6 +100,19 @@ func mysqlActionReadTimeout(ctx context.Context) (time.Duration, bool) {
 	return remaining, true
 }
 
+func configureMySQLAction(ctx context.Context, dsn *mysql.Config) bool {
+	budget, bounded := mysqlActionReadTimeout(ctx)
+	if !bounded {
+		return false
+	}
+	dsn.MultiStatements = false
+	dsn.ParseTime = false
+	dsn.Timeout = queryLimit
+	dsn.ReadTimeout = budget
+	dsn.WriteTimeout = queryLimit
+	return true
+}
+
 func restoreActionContext(ctx context.Context, a approval) (context.Context, context.CancelFunc) {
 	deadline, _ := time.Parse(time.RFC3339Nano, a.Deadline)
 	expiry, _ := time.Parse(time.RFC3339Nano, a.Expires)
@@ -108,8 +121,15 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 	}
 	return context.WithDeadline(ctx, deadline)
 }
+
+func mongoReadOptions(uri string) *options.ClientOptions {
+	// Ping's preference applies only to that probe. Ledger/catalog reads must
+	// also override a URI that asks for a secondary or nearest server.
+	return options.Client().ApplyURI(uri).SetReadPreference(readpref.Primary()).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit)
+}
+
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
-	return deliverReceipt(run(ctx, args, getenv, tool), out)
+	return deliverReceipt(run(ctx, args, getenv, tool, nil), out)
 }
 func deliverReceipt(r receipt, out io.Writer) int {
 	if json.NewEncoder(out).Encode(r) != nil || !r.Complete {
@@ -118,7 +138,9 @@ func deliverReceipt(r receipt, out io.Writer) int {
 	return 0
 }
 
-func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
+// The CLI always supplies nil. The observer receives only a fixed object index
+// after ExecContext has received a successful ADD acknowledgment.
+func run(parent context.Context, args []string, getenv func(string) string, tool string, afterRestoreDDL func(int)) (r receipt) {
 	r = receipt{ToolSource: tool, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, Error: "arguments_invalid"}
 	a, e := parseArgs(args)
 	r.Action = a.action
@@ -130,19 +152,20 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	defer cancel()
 	var m material
 	var ap approval
-	if a.action == "verify-target" || a.action == "restore" {
+	var captureDirectory captureParentIdentity
+	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.material, a.materialHash, maxMaterialBytes)
 		if e != nil {
 			r.Error = e.Error()
 			return r
 		}
-		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil {
+		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil || m.CapturePath != a.material {
 			r.Error = "material_rejected"
 			return r
 		}
 		r.MaterialHash = a.materialHash
 	}
-	if a.action == "restore" {
+	if a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.approval, a.approvalHash, 32768)
 		if e != nil {
 			r.Error = e.Error()
@@ -152,29 +175,52 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "restore_approval_rejected"
 			return r
 		}
+		if a.action == "verify-restored" {
+			e = checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+		} else {
+			e = checkRecoveryBoundary(m, ap, a.materialHash, false)
+		}
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
 		var c context.CancelFunc
 		ctx, c = restoreActionContext(ctx, ap)
 		defer c()
+	}
+	if a.action == "capture" {
+		captureDirectory, e = captureParent(a.capture)
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		defer func() {
+			if e := captureDirectory.close(); e != nil {
+				if r.ReleaseError == "" {
+					r.ReleaseError = e.Error()
+				}
+				if r.Complete || r.Error == "none" {
+					r.Error = e.Error()
+				}
+				r.Complete = false
+				r.MaterialHash = ""
+			}
+		}()
+		if s, e := privatePath(a.capture, false); e != nil || s != nil {
+			r.Error = "first_capture_exists_or_path_rejected"
+			return r
+		}
 	}
 	dsn, e := mysql.ParseDSN(getenv("QS_M4_OBJECT_MYSQL_DSN"))
 	if e != nil || dsn.DBName != a.sqlName || getenv("QS_M4_OBJECT_MONGO_URI") == "" {
 		r.Error = "selected_connection_input_rejected"
 		return r
 	}
-	dsn.MultiStatements = false
-	dsn.ParseTime = false
-	dsn.Timeout = queryLimit
-	dsn.ReadTimeout = queryLimit
-	if a.action == "restore" {
-		var bounded bool
-		dsn.ReadTimeout, bounded = mysqlActionReadTimeout(ctx)
-		if !bounded {
-			r.Error = "mysql_connection_failed"
-			r.BudgetExceeded = ctx.Err() != nil
-			return r
-		}
+	if !configureMySQLAction(ctx, dsn) {
+		r.Error = "mysql_connection_failed"
+		r.BudgetExceeded = ctx.Err() != nil
+		return r
 	}
-	dsn.WriteTimeout = queryLimit
 	if mysql.SetLogger(&mysql.NopLogger{}) != nil {
 		r.Error = "mysql_logging_boundary_failed"
 		return r
@@ -186,7 +232,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	d := database{sqlName: a.sqlName, mongoName: a.mongoName}
+	d := database{sqlName: a.sqlName, mongoName: a.mongoName, afterRestoreDDL: afterRestoreDDL}
 	var rawMaterial []byte
 	ok := false
 	defer func() {
@@ -216,13 +262,24 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return
 		}
 		if a.action == "capture" {
-			if e := finishCapture(ctx, &r, a.capture, rawMaterial, writeExclusive); e != nil {
+			if e := finishCapture(ctx, &r, a.capture, &captureDirectory, rawMaterial, writeCaptureExclusive); e != nil {
 				r.BudgetExceeded = ctx.Err() != nil
 				r.Error = e.Error()
 				return
 			}
 		}
 
+		if a.action == "verify-restored" {
+			if e := checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool); e != nil {
+				r.Error = e.Error()
+				return
+			}
+			if ctx.Err() != nil {
+				r.BudgetExceeded = true
+				r.Error = "total_budget_exceeded"
+				return
+			}
+		}
 		r.Complete = true
 		r.Error = "none"
 	}()
@@ -240,7 +297,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "session_binding_failed"
 		return r
 	}
-	d.mongo, e = mongo.Connect(ctx, options.Client().ApplyURI(getenv("QS_M4_OBJECT_MONGO_URI")).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit))
+	d.mongo, e = mongo.Connect(ctx, mongoReadOptions(getenv("QS_M4_OBJECT_MONGO_URI")))
 	if e != nil {
 		r.Error = "mongo_connect_failed"
 		return r
@@ -259,6 +316,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	case "capture":
 		m, _, e = d.snapshot(ctx, tool, true)
 		if e == nil {
+			m.CapturePath = a.capture
 			e = validateMaterial(m, tool, a.sqlName, a.mongoName)
 		}
 		if e == nil {
@@ -266,6 +324,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 	case "verify-target":
 		e = d.verifyTarget(ctx, m, tool)
+	case "verify-restored":
+		e = d.verifyRestored(ctx, m, tool)
 	case "restore":
 		e = d.restore(ctx, m, ap, tool, a.material, a.materialHash, a.approval, a.approvalHash)
 	}
@@ -276,17 +336,6 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	}
 	ok = true
 	return r
-}
-
-func finishCapture(ctx context.Context, r *receipt, path string, raw []byte, write func(string, []byte) error) error {
-	if e := write(path, raw); e != nil {
-		return e
-	}
-	r.MaterialHash = fingerprint(raw)
-	if ctx.Err() != nil {
-		return errors.New("total_budget_exceeded")
-	}
-	return nil
 }
 
 func hasTransactionReleaseFailure(e error) bool {

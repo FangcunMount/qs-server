@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -32,6 +33,8 @@ type database struct {
 	conn               *sql.Conn
 	mongo              *mongo.Client
 	sqlName, mongoName string
+	// nil in the CLI; native tests may stop after a real fixed ADD succeeds.
+	afterRestoreDDL func(int)
 }
 type observation struct {
 	SQLHash, MongoHash, MongoUUID string
@@ -80,20 +83,15 @@ func (d database) observe(ctx context.Context, r sqlReader) (observation, error)
 	if re != nil || ce != nil || count != 1 {
 		return out, errors.New("sql_ledger_or_release_invalid")
 	}
-	var hello struct {
-		Set   string   `bson:"setName"`
-		Hosts []string `bson:"hosts"`
-	}
-	if d.mongo.Database("admin").RunCommand(q, bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil || hello.Set == "" || len(hello.Hosts) == 0 {
+	var hello bson.Raw
+	if d.mongo.Database("admin").RunCommand(q, bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil {
 		return out, errors.New("mongo_identity_unknown")
 	}
-	sort.Strings(hello.Hosts)
-	for i, h := range hello.Hosts {
-		if h == "" || (i > 0 && h == hello.Hosts[i-1]) {
-			return out, errors.New("mongo_identity_invalid")
-		}
+	set, hosts, e := primaryReplicaIdentity(hello)
+	if e != nil {
+		return out, e
 	}
-	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: hello.Set}, {Key: "hosts", Value: hello.Hosts}}, d.mongoName})
+	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: set}, {Key: "hosts", Value: hosts}}, d.mongoName})
 	out.MongoHash = fingerprint(raw)
 	cur, e := d.mongo.Database(d.mongoName).Collection("schema_migrations").Find(q, bson.D{}, options.Find().SetLimit(2))
 	if e != nil {
@@ -132,6 +130,29 @@ func (d database) observe(ctx context.Context, r sqlReader) (observation, error)
 	}
 	return out, nil
 }
+
+func primaryReplicaIdentity(raw bson.Raw) (string, []string, error) {
+	primary, primaryOK := raw.Lookup("isWritablePrimary").BooleanOK()
+	message := raw.Lookup("msg")
+	if !primaryOK || !primary || (message.Type != 0 && (message.Type != bson.TypeString || message.StringValue() != "")) {
+		return "", nil, errors.New("mongo_identity_unknown")
+	}
+	var hello struct {
+		Set   string   `bson:"setName"`
+		Hosts []string `bson:"hosts"`
+	}
+	if bson.Unmarshal(raw, &hello) != nil || hello.Set == "" || len(hello.Hosts) == 0 {
+		return "", nil, errors.New("mongo_identity_unknown")
+	}
+	sort.Strings(hello.Hosts)
+	for i, host := range hello.Hosts {
+		if host == "" || (i > 0 && host == hello.Hosts[i-1]) {
+			return "", nil, errors.New("mongo_identity_invalid")
+		}
+	}
+	return hello.Set, hello.Hosts, nil
+}
+
 func (d database) retiredObjectsMissing(ctx context.Context, r sqlReader) error {
 	q, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()
@@ -398,13 +419,53 @@ func scanTable(ctx context.Context, r sqlReader, i int, cols []column, present b
 			break
 		}
 	}
-	q, cancel = context.WithTimeout(ctx, queryLimit)
-	defer cancel()
-	var count uint64
-	if r.QueryRowContext(q, "SELECT COUNT(*) FROM `"+out.Table+"`").Scan(&count) != nil || count != uint64(len(out.Rows)) {
-		return out, errors.New("complete_range_count_rejected")
+	if e := verifyCompleteRangeCount(ctx, r, i, uint64(len(out.Rows))); e != nil {
+		return out, e
 	}
 	return out, nil
+}
+
+// The independent whole-table count remains in the same read-only RR snapshot.
+// Its aggregate work uses only the existing action's remaining absolute budget;
+// pages, MAX(id), metadata, connection and session setup keep their 5s limits.
+func verifyCompleteRangeCount(ctx context.Context, r sqlReader, i int, expected uint64) error {
+	deadline, bounded := ctx.Deadline()
+	if !bounded {
+		return errors.New("complete_range_count_budget_rejected")
+	}
+	if e := ctx.Err(); e != nil {
+		return classifyCompleteCountError(e)
+	}
+	milliseconds := time.Until(deadline).Milliseconds()
+	if milliseconds <= 0 {
+		return errors.New("complete_range_count_deadline_exceeded")
+	}
+	if milliseconds > (20 * time.Minute).Milliseconds() {
+		return errors.New("complete_range_count_budget_rejected")
+	}
+	var count uint64
+	query := "SELECT /*+ MAX_EXECUTION_TIME(" + strconv.FormatInt(milliseconds, 10) + ") */ COUNT(*) FROM `" + objects[i].table + "`"
+	if e := r.QueryRowContext(ctx, query).Scan(&count); e != nil {
+		return classifyCompleteCountError(e)
+	}
+	if count != expected {
+		return errors.New("complete_range_count_mismatch")
+	}
+	return nil
+}
+
+func classifyCompleteCountError(e error) error {
+	var server *mysql.MySQLError
+	switch {
+	case errors.As(e, &server) && server.Number == 3024:
+		return errors.New("complete_range_count_server_timeout")
+	case errors.Is(e, context.DeadlineExceeded):
+		return errors.New("complete_range_count_deadline_exceeded")
+	case errors.Is(e, context.Canceled):
+		return errors.New("complete_range_count_canceled")
+	default:
+		return errors.New("complete_range_count_query_failed")
+	}
 }
 func (d database) snapshot(ctx context.Context, tool string, original bool) (m material, before observation, resultErr error) {
 	if e := requireTransactionalTables(ctx, d.conn); e != nil {
@@ -543,6 +604,32 @@ func (d database) verifyTarget(ctx context.Context, m material, tool string) err
 	}
 	return nil
 }
+
+// A lost COMMIT response remains unknown. This separate action proves the
+// current original state from fresh reads, without replaying any recovery write.
+func (d database) verifyRestored(ctx context.Context, m material, tool string) error {
+	got, _, e := d.snapshot(ctx, tool, true)
+	if e != nil {
+		return e
+	}
+	return compareRestored(m, got)
+}
+
+func compareRestored(want, got material) error {
+	if e := compareRetained(want, got); e != nil {
+		return e
+	}
+	if !reflect.DeepEqual(want.Ledger, got.Ledger) {
+		return errors.New("restored_original_ledger_rows_changed")
+	}
+	for i, t := range got.Tables {
+		if !t.SQLNullOnly || t.OriginalDDL != want.Tables[i].OriginalDDL {
+			return errors.New("restored_original_objects_or_ddl_changed")
+		}
+	}
+	return nil
+}
+
 func restorationStatements(m material) ([2]string, error) {
 	var out [2]string
 	if fingerprint([]byte(originalDDL)) != originalDDLHash {
@@ -580,6 +667,12 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if e := validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
 	}
+	if m.CapturePath != materialPath {
+		return errors.New("frozen_material_path_changed_before_claim")
+	}
+	if e := checkRecoveryBoundary(m, a, materialHash, false); e != nil {
+		return e
+	}
 	got, o, e := d.snapshot(ctx, tool, false)
 	if e != nil {
 		return e
@@ -592,9 +685,6 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	}
 	if got.Tables[0].SQLNullOnly && !got.Tables[1].SQLNullOnly {
 		return errors.New("unproved_inverse_partial_restore_shape")
-	}
-	if !o.Dirty && (got.Tables[0].SQLNullOnly || got.Tables[1].SQLNullOnly) {
-		return errors.New("clean101_requires_both_objects_absent")
 	}
 	for i, t := range got.Tables {
 		if t.SQLNullOnly {
@@ -629,16 +719,22 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
 	}
-	if e = consumeApproval(approvalPath, a, approvalHash); e != nil {
+	if e = consumeApproval(m, a, approvalHash); e != nil {
 		return errors.New("restore_approval_consumption_failed")
 	}
-	for i, t := range got.Tables {
-		if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
+	// Undo the DROP prefix in reverse order so each acknowledged ADD leaves
+	// another admitted prefix if the explicitly approved attempt is interrupted.
+	for i := len(got.Tables) - 1; i >= 0; i-- {
+		t := got.Tables[i]
+		if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 			return e
 		}
 		if !t.SQLNullOnly {
 			if _, e = d.conn.ExecContext(ctx, statements[i]); e != nil {
 				return errors.New("object_ddl_restore_failed_or_unknown")
+			}
+			if d.afterRestoreDDL != nil {
+				d.afterRestoreDDL(i)
 			}
 		}
 	}
@@ -657,7 +753,7 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 			return errors.New("original_objects_or_ddl_not_restored")
 		}
 	}
-	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 		return e
 	}
 	tx, e := d.conn.BeginTx(ctx, nil)
@@ -670,15 +766,21 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 			recordRollback(&resultErr, tx)
 		}
 	}()
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
+		return e
+	}
 	if _, e = tx.ExecContext(ctx, "DELETE FROM schema_migrations"); e != nil {
 		return errors.New("ledger_transaction_replay_failed")
 	}
 	for _, row := range m.Ledger {
+		if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
+			return e
+		}
 		if _, e = tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", row.Version, row.Dirty); e != nil {
 			return errors.New("ledger_transaction_replay_failed")
 		}
 	}
-	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 		return e
 	}
 	if e = tx.Commit(); e != nil {
