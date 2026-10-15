@@ -301,7 +301,7 @@ func (d database) insertOriginalBatch(ctx context.Context, m material, a approva
 			}
 		}
 	}
-	if used > insertBatchBytes && len(rows) > 1 {
+	if used > insertBatchBytes {
 		return errors.New("original_insert_batch_bytes_rejected")
 	}
 	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
@@ -360,7 +360,10 @@ func (d database) fillOriginalRows(ctx context.Context, m material, current reco
 			for _, v := range pending[n].Values {
 				size += len(v.Bytes)
 			}
-			if n > 0 && used+size > insertBatchBytes {
+			if size > insertBatchBytes {
+				return errors.New("original_insert_batch_bytes_rejected")
+			}
+			if used+size > insertBatchBytes {
 				break
 			}
 			used += size

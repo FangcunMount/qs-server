@@ -308,3 +308,176 @@ func (r markerAfterAck) RowsAffected() (int64, error) {
 	}
 	return 1, nil
 }
+
+func historicalRowAtPayloadBytes(t *testing.T, table, size int, key string) rowProof {
+	t.Helper()
+	row := originalRow(table, []string{key})
+	payload := -1
+	other := 0
+	for i, c := range scope[table].columns {
+		if c.Type == "longtext" {
+			payload = i
+		} else {
+			other += len(row.Values[i].Bytes)
+		}
+	}
+	if payload < 0 || size < other+2 {
+		t.Fatal("historical payload fixture cannot attain requested total size")
+	}
+	row.Values[payload] = cell{Bytes: append(bytes.Repeat([]byte{' '}, size-other-2), []byte("{}")...)}
+	row.Hash = rowHash(scope[table].columns, row.Values)
+	return row
+}
+
+func approvedHistoricalRows(t *testing.T, rows []rowProof) (material, approval, string) {
+	t.Helper()
+	m, a, _, path, _ := recoveryInputs(t)
+	m.Tables[4].Rows = rows
+	m.Tables[4].EncodedRowsBytes = 0
+	for _, row := range rows {
+		raw, e := json.Marshal(row)
+		if e != nil {
+			t.Fatal(e)
+		}
+		m.Tables[4].EncodedRowsBytes += len(raw) + 1
+	}
+	raw, e := json.Marshal(m)
+	if e != nil || os.WriteFile(m.CapturePath, raw, 0600) != nil {
+		t.Fatal("cannot freeze original historical material", e)
+	}
+	hash := fingerprint(raw)
+	a.MaterialHash = hash
+	raw, e = json.Marshal(a)
+	if e != nil || os.WriteFile(path, raw, 0600) != nil {
+		t.Fatal("cannot freeze matching independent approval", e)
+	}
+	if e := validateApproval(a, m, hash, testTool, time.Now()); e != nil {
+		t.Fatal("test must reach size boundary with genuinely valid approval", e)
+	}
+	if e := consumeApproval(m, a, fingerprint(raw), ledgerRow{103, false}, []bool{true, true, true, true, true}); e != nil {
+		t.Fatal(e)
+	}
+	if e := validateMutableBoundary(m, a, hash, testTool); e != nil {
+		t.Fatal("test must not fail at approval/claim before size protection", e)
+	}
+	return m, a, hash
+}
+
+func TestHistoricalRowsCannotExceedOneRecoveryBatchPayload(t *testing.T) {
+	for _, table := range []int{3, 4} {
+		for _, input := range []struct {
+			name string
+			size int
+		}{{"exact_limit", insertBatchBytes}, {"one_over_limit", insertBatchBytes + 1}} {
+			t.Run(scope[table].name+"/"+input.name, func(t *testing.T) {
+				row := historicalRowAtPayloadBytes(t, table, input.size, "41")
+				e := validateRow(scope[table], row)
+				if input.size == insertBatchBytes && e != nil || input.size > insertBatchBytes && (e == nil || e.Error() != "material_row_hash_or_limit_rejected") {
+					t.Error("historical capture row did not enforce its restoration payload bound", e)
+				}
+				m := originalMaterial()
+				m.Tables[table].Rows = []rowProof{row}
+				raw, _ := json.Marshal(row)
+				m.Tables[table].EncodedRowsBytes = len(raw) + 1
+				e = validateMaterial(m, testTool, m.Binding)
+				if input.size == insertBatchBytes && e != nil || input.size > insertBatchBytes && e == nil {
+					t.Error("complete capture material certified an unrestorable original row", e)
+				}
+				db, mock := dbFixture(t)
+				mock.ExpectQuery("owned historical page").WillReturnRows(sqlmock.NewRows(pageColumns(table)).AddRow(pageValues(row)...))
+				observed, e := db.QueryContext(t.Context(), "owned historical page")
+				if e != nil || !observed.Next() {
+					t.Fatal("historical scan fixture", e)
+				}
+				_, e = scanPageRow(observed, scope[table])
+				if closeErr := observed.Close(); closeErr != nil {
+					t.Fatal(closeErr)
+				}
+				if input.size == insertBatchBytes && e != nil || input.size > insertBatchBytes && e == nil {
+					t.Error("capture scanner accepted row outside restoration bound", e)
+				}
+			})
+		}
+	}
+}
+
+func TestOriginalInsertExactPayloadBoundsWithValidConsumedApproval(t *testing.T) {
+	for _, input := range []struct {
+		name  string
+		sizes []int
+		want  string
+	}{
+		{"single_exact", []int{insertBatchBytes}, ""},
+		{"single_one_over", []int{insertBatchBytes + 1}, "original_insert_row_rejected"},
+		{"multiple_exact", []int{insertBatchBytes / 2, insertBatchBytes / 2}, ""},
+		{"multiple_one_over", []int{insertBatchBytes / 2, insertBatchBytes/2 + 1}, "original_insert_batch_bytes_rejected"},
+	} {
+		t.Run(input.name, func(t *testing.T) {
+			var rows []rowProof
+			for i, size := range input.sizes {
+				rows = append(rows, historicalRowAtPayloadBytes(t, 4, size, []string{"41", "42"}[i]))
+			}
+			m, a, hash := approvedHistoricalRows(t, rows)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			if input.want != "" {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						t.Fatal("over-budget historical row reached missing connection despite valid approval", recovered)
+					}
+				}()
+				e := (database{}).insertOriginalBatch(ctx, m, a, hash, testTool, 4, rows)
+				if e == nil || e.Error() != input.want {
+					t.Fatal("over-budget original batch was not rejected before connection", e)
+				}
+				return
+			}
+			if e := validateMaterial(m, testTool, m.Binding); e != nil {
+				t.Fatal("exact-limit original material must remain valid", e)
+			}
+			db, mock := dbFixture(t)
+			conn, e := db.Conn(ctx)
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer func() { _ = conn.Close() }()
+			query, e := insertBatchSQL(4, len(rows))
+			if e != nil {
+				t.Fatal(e)
+			}
+			var args []driver.Value
+			for _, row := range rows {
+				for _, value := range row.Values {
+					if value.SQLNull {
+						args = append(args, nil)
+					} else {
+						args = append(args, value.Bytes)
+					}
+				}
+			}
+			mock.ExpectBegin()
+			mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnResult(sqlmock.NewResult(0, int64(len(rows))))
+			mock.ExpectCommit()
+			if e := (database{conn: conn}).insertOriginalBatch(ctx, m, a, hash, testTool, 4, rows); e != nil {
+				t.Fatal("exact-limit original batch changed bytes or failed transaction", e)
+			}
+		})
+	}
+}
+
+func TestRecoveryGroupingRejectsOversizedFirstRowBeforeConnection(t *testing.T) {
+	row := historicalRowAtPayloadBytes(t, 4, insertBatchBytes+1, "41")
+	m, a, hash := approvedHistoricalRows(t, []rowProof{row})
+	current := recoveryState{Material: cloneMaterial(m)}
+	current.Material.Tables[4].Rows = nil
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatal("oversized first row crossed grouping into a connection", recovered)
+		}
+	}()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	if e := (database{}).fillOriginalRows(ctx, m, current, a, hash, testTool, 4); e == nil || e.Error() != "original_insert_batch_bytes_rejected" {
+		t.Fatal("oversized first row produced an empty batch/loop or reached mutation", e)
+	}
+}
