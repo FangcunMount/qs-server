@@ -47,6 +47,8 @@ Actor原生四主场景及两个范围拒绝子场景在源码 `7f131c9e` 的独
 
 C定向工具当前已提供只读 `verify-restored`，在原材料/成功capture证据、已消费独立批准与首次boundary/journal/marker/绝对期限下核原clean101/40、两列原值及四表保留事实、原账本和身份/释放；不重放未知COMMIT或自动批准旧实例启动。冻结cdac源码的旧21+新9在独占8.0.36/7.0.31实际30项各一次RUN/PASS、0FAIL/SKIP，回执 `f7bc07f4f7a0a1799d7a12a3119e99e378583766fab7b157d4d9a8f2f7100e03`。本次整合保留C25包字节，CI新增九top显式OR及30项严格证明；新整合head的CI/AI仍待独立运行，旧证据不移签。
 
+C后续独立源码 `9fbe9d04f0f688df30758d0eef3a224ce4fee589` 只修两文件的Mongo身份绑定：使用实际非空typed setName及原排序hosts/selected DB编码，保持Primary/mongos/hosts守卫和rs0原身份字节/hash；其余C23包文件、固定资源及CI30名单不变。该源普通/race各248项通过，tag仅编译、vet及pinned lint通过；旧7aff源码准备与cdac真实30项不移签，新head CI30/fresh AI继续待验。
+
 C同库session gate只串行化合作式恢复/验证；没有跨capture持久DB代次，不证明释放锁后旧材料已被首runtime永久禁用。该边界须在正式C执行器上线前独立闭合；本任务未新增生产fence或controller，不能借D的代次或本地30项签C生产窗口/RPO。具体范围与历史证据见[Actor问题清单2.9](../../../docs/02-业务模块/50-actor/90-设计问题与验证清单.md#29-m4-c-定向保护与启动前恢复隔离原生已验生产待验)。
 
 ### M4-D：历史维护表与在线旧工具退出

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+    "sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
     "verified_on": "2026-10-16"
   },
   "status_policy": {
@@ -4524,7 +4524,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+        "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -5238,6 +5238,22 @@
           "result": "matched",
           "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
+          "selector": "func mongoSelectedIdentity(",
+          "result": "matched",
+          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database_test.go",
+          "selector": "func TestMongoSelectedIdentityUsesActualReplicaSet(",
+          "result": "matched",
+          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -5343,7 +5359,8 @@
         "Both source-baseline markers preserved before independent D/main source merge: {\"ours\":{\"sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"},\"incoming\":{\"sha\":\"3961a948e1d1e465e1b1bd48e9d83b45a6b982da\",\"verified_on\":\"2026-10-16\"}}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
         "Previous top source_baseline retained as complete original JSON: {\"sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending."
       ]
     },
     {
@@ -11566,7 +11583,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6597ce303cb70485ea8c49578347f6f7396ea663",
+        "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -12403,6 +12420,22 @@
           "result": "matched",
           "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
+          "selector": "func mongoSelectedIdentity(",
+          "result": "matched",
+          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database_test.go",
+          "selector": "func TestMongoSelectedIdentityUsesActualReplicaSet(",
+          "result": "matched",
+          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -12504,7 +12537,8 @@
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending."
       ]
     },
     {
