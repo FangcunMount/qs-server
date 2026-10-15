@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
+func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github/workflows/ci.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -36,33 +36,47 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 	for _, step := range job.Steps {
 		runs += step.Run
 	}
-	if job.Timeout != 5*8+5*3+20 {
-		t.Fatal("five bounded phases need 40m tests,15m readiness sleeps,20m setup/proof/cleanup")
+	if job.Timeout != ((6*8+6*3+20+9)/10)*10 {
+		t.Fatal("six bounded phases need 48m tests,18m readiness sleeps,20m setup/proof/cleanup rounded to90m")
 	}
 	for _, required := range []string{
-		`case "$1" in m|a|b|d|g)`,
+		`case "$1" in m|a|b|c|d|g)`,
 		`start_owned_fixture d`, `start_owned_fixture g`,
 		`export QS_M4_D_OBJECT_NATIVE_REQUIRED=1`,
 		`export QS_M4_D_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only`,
 		`export QS_M4_D_OBJECT_NATIVE_MYSQL_DSN="root:m4-owned-object-fixture@tcp(127.0.0.1:${OBJECT_MYSQL_PORT})/?multiStatements=true"`,
 		`-ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source"`,
-		`-run='^TestM4SQLObjectNative'`, `-run='^TestM4MongoObjectNative'`,
+		`-run='^TestM4SQLObjectNative'`, `-run='^TestM4MongoObjectNative'`, `-run='^TestM4ActorColumnsNative'`,
 		`make test-metadata-readiness-mongodb-native`,
 	} {
 		if !strings.Contains(runs, required) {
 			t.Fatal("D native phase lost its real selector or owned dependency boundary", required)
 		}
 	}
+	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdg])$`).FindAllStringSubmatch(runs, -1)
+	if len(phases) != 6 {
+		t.Fatal("metadata/A/B/C/D/combined each need exactly one fresh phase")
+	}
+	for i, phase := range []string{"m", "a", "b", "c", "d", "g"} {
+		if phases[i][1] != phase {
+			t.Fatal("fresh-phase order must preserve every existing stage", phase)
+		}
+	}
+	if strings.Count(runs, "-timeout=8m -json") != 5 {
+		t.Fatal("five tool commands plus metadata retain six original8m budgets")
+	}
 	bEnd := strings.LastIndex(runs, "PY_MONGO_OBJECT_PROOF")
+	cStart := strings.Index(runs, "start_owned_fixture c\n")
+	cEnd := strings.LastIndex(runs, "PY_ACTOR_OBJECT_PROOF")
 	dStart := strings.Index(runs, "start_owned_fixture d\n")
 	gStart := strings.Index(runs, "start_owned_fixture g\n")
 	originalProof := strings.Index(runs, `d_native_proof original maintenance-object-native.jsonl "$object_source"`)
 	generationProof := strings.Index(runs, `d_native_proof generation runtime-generation-native.jsonl "$object_source"`)
 	unionProof := strings.Index(runs, `d_native_proof union maintenance-object-native.jsonl runtime-generation-native.jsonl "$object_source"`)
-	if bEnd < 0 || dStart <= bEnd || originalProof <= dStart || gStart <= originalProof || generationProof <= gStart || unionProof <= generationProof {
-		t.Fatal("D requires original53 then generation12 then their same-source union")
+	if bEnd < 0 || cStart <= bEnd || cEnd <= cStart || dStart <= cEnd || originalProof <= dStart || gStart <= originalProof || generationProof <= gStart || unionProof <= generationProof {
+		t.Fatal("D requires original53 then combinedgeneration12/inspection9 then their same-source union")
 	}
-	for _, boundary := range [][2]int{{bEnd, dStart}, {originalProof, gStart}, {generationProof, unionProof}} {
+	for _, boundary := range [][2]int{{bEnd, cStart}, {cEnd, dStart}, {originalProof, gStart}, {generationProof, unionProof}} {
 		if strings.Count(runs[boundary[0]:boundary[1]], "cleanup_owned_fixture\n") != 1 {
 			t.Fatal("fresh phase cannot begin or certify union before prior healthy cleanup/absence")
 		}
@@ -94,7 +108,7 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 		t.Fatal("D proof terminator missing")
 	}
 	proof = proof[:end]
-	namePattern := regexp.MustCompile(`(?m)^\s+'(TestM4MaintenanceTablesNative[^']*)',?$`)
+	namePattern := regexp.MustCompile(`(?m)^\s+'(TestM4MaintenanceTables[^']*)',?$`)
 	phaseNames := func(variable string, want int) []string {
 		t.Helper()
 		_, body, ok := strings.Cut(proof, variable+" = {\n")
@@ -115,7 +129,9 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 		}
 		return names
 	}
-	originalNames, generationNames := phaseNames("original_expected", 53), phaseNames("generation_expected", 12)
+	originalNames, legacyGenerationNames := phaseNames("original_expected", 53), phaseNames("generation_expected", 12)
+	inspectionNames := phaseNames("inspection_expected", 9)
+	generationNames := append(append([]string{}, legacyGenerationNames...), inspectionNames...)
 	names := append(append([]string{}, originalNames...), generationNames...)
 	tops := map[string]bool{}
 	files, err := filepath.Glob(filepath.Join(repoRoot(t), "scripts/oneoff/m4_maintenance_table_protection/native*_test.go"))
@@ -128,7 +144,7 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, declaration := range parsed.Decls {
-			if function, ok := declaration.(*ast.FuncDecl); ok && strings.HasPrefix(function.Name.Name, "TestM4MaintenanceTablesNative") {
+			if function, ok := declaration.(*ast.FuncDecl); ok && (strings.HasPrefix(function.Name.Name, "TestM4MaintenanceTablesNative") || function.Name.Name == "TestM4MaintenanceTablesReadOnlyInspectNative") {
 				tops[function.Name.Name] = true
 			}
 		}
@@ -140,8 +156,8 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 		}
 		expected[name] = true
 	}
-	if !expected["TestM4MaintenanceTablesNativeFirstRuntimeGate"] || !expected["TestM4MaintenanceTablesNativeRuntimeGeneration"] || len(tops) != 17 {
-		t.Fatal("D proof must retain all original sixteen and new generation top-level tests")
+	if !expected["TestM4MaintenanceTablesNativeFirstRuntimeGate"] || !expected["TestM4MaintenanceTablesNativeRuntimeGeneration"] || !expected["TestM4MaintenanceTablesReadOnlyInspectNative"] || len(tops) != 18 || len(expected) != 74 {
+		t.Fatal("D proof must retain original sixteen plus generation and independent inspection tops")
 	}
 	selectors := regexp.MustCompile(`-run='([^']+)' ./scripts/oneoff/m4_maintenance_table_protection`).FindAllStringSubmatch(runs, -1)
 	if len(selectors) != 2 {
@@ -152,11 +168,12 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 		t.Fatal(err)
 	}
 	generationSelector, err := regexp.Compile(selectors[1][1])
-	if err != nil || selectors[1][1] != "^TestM4MaintenanceTablesNativeRuntimeGeneration$" || !strings.HasPrefix(selectors[0][1], "^(") || !strings.HasSuffix(selectors[0][1], ")$") {
+	if err != nil || selectors[1][1] != "^(TestM4MaintenanceTablesNativeRuntimeGeneration|TestM4MaintenanceTablesReadOnlyInspectNative)$" || !strings.HasPrefix(selectors[0][1], "^(") || !strings.HasSuffix(selectors[0][1], ")$") {
 		t.Fatal("D phase selectors must be exactly anchored")
 	}
 	for top := range tops {
-		if originalSelector.MatchString(top) != (top != "TestM4MaintenanceTablesNativeRuntimeGeneration") || generationSelector.MatchString(top) != (top == "TestM4MaintenanceTablesNativeRuntimeGeneration") || originalSelector.MatchString(top+"Unexpected") {
+		second := top == "TestM4MaintenanceTablesNativeRuntimeGeneration" || top == "TestM4MaintenanceTablesReadOnlyInspectNative"
+		if originalSelector.MatchString(top) == second || generationSelector.MatchString(top) != second || originalSelector.MatchString(top+"Unexpected") || generationSelector.MatchString(top+"Unexpected") {
 			t.Fatal("D phase selectors overlap,omit or overmatch an actual top-level test", top)
 		}
 	}
@@ -192,7 +209,7 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 		}
 		return path
 	}
-	for _, name := range []string{"complete", "missing_run", "missing_pass", "duplicate", "unknown", "skip", "fail", "wrong_source", "missing_entry", "original_only", "generation_only", "swapped_logs", "old_full65", "generation_in_original", "wrong_generation_source", "missing_generation_entry", "duplicate_generation", "missing_generation_pass"} {
+	for _, name := range []string{"complete", "missing_run", "missing_pass", "duplicate", "unknown", "skip", "fail", "wrong_source", "missing_entry", "original_only", "generation_only", "swapped_logs", "old_full65", "generation_in_original", "wrong_generation_source", "missing_generation_entry", "duplicate_generation", "missing_generation_pass", "missing_inspection_run", "missing_inspection_pass", "duplicate_inspection", "foreign_inspection", "inspection_in_original", "original_in_second", "inspection_only", "old65_without_inspection", "wrong_inspection_source"} {
 		t.Run(name, func(t *testing.T) {
 			original, generation := append([]map[string]any{}, originalEvents...), append([]map[string]any{}, generationEvents...)
 			mode := "union"
@@ -222,7 +239,7 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 			case "swapped_logs":
 				original, generation = generation, original
 			case "old_full65":
-				original = append(original, generation...)
+				original = append(original, eventsFor(legacyGenerationNames)...)
 			case "generation_in_original":
 				original = append(original, generation[0])
 			case "missing_generation_entry":
@@ -231,6 +248,32 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact65(t *testing.T) {
 				generation = append(generation, generationEvents[0])
 			case "missing_generation_pass":
 				generation = append(generation[:1], generation[2:]...)
+			case "missing_inspection_run", "missing_inspection_pass":
+				wanted := "run"
+				if name == "missing_inspection_pass" {
+					wanted = "pass"
+				}
+				filtered := make([]map[string]any, 0, len(generation))
+				for _, event := range generation {
+					if event["Test"] != inspectionNames[0] || event["Action"] != wanted {
+						filtered = append(filtered, event)
+					}
+				}
+				generation = filtered
+			case "duplicate_inspection":
+				generation = append(generation, map[string]any{"Action": "run", "Test": inspectionNames[0]})
+			case "foreign_inspection":
+				generation = append(generation, map[string]any{"Action": "run", "Test": inspectionNames[0] + "Unexpected"})
+			case "inspection_in_original":
+				original = append(original, map[string]any{"Action": "run", "Test": inspectionNames[0]})
+			case "original_in_second":
+				generation = append(generation, originalEvents[0])
+			case "inspection_only":
+				generation = eventsFor(inspectionNames)
+			case "old65_without_inspection":
+				generation = eventsFor(legacyGenerationNames)
+			case "wrong_inspection_source":
+				generation = append(generation, map[string]any{"Action": "output", "Test": inspectionNames[0], "Output": "actual compiled D fixture tool=" + strings.Repeat("b", 40) + " phase=before_dependency_binding\n"})
 			}
 			originalPath, generationPath := writeEvents(t, original), writeEvents(t, generation)
 			args := []string{"-c", proof, mode, originalPath, generationPath, source}
