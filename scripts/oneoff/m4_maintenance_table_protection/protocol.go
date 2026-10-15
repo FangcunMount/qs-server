@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -433,45 +432,4 @@ func writeExclusive(path string, raw []byte) (resultErr error) {
 	}
 	_, e = readPrivate(path, fingerprint(raw))
 	return e
-}
-
-// Capture binds the real parent identity before ENV/DB and checks it again on
-// both sides of the O_EXCL, fsync and original-byte readback. A changed parent
-// never yields a successful material receipt.
-func sameCaptureParent(path string, initial os.FileInfo, uid uint32) error {
-	p, e := privateParent(path)
-	if e != nil {
-		return errors.New("capture_parent_changed")
-	}
-	current, e := p.Stat()
-	ce := p.Close()
-	if e != nil || ce != nil || initial == nil || !os.SameFile(initial, current) {
-		return errors.New("capture_parent_changed")
-	}
-	st, ok := current.Sys().(*syscall.Stat_t)
-	if !ok || st.Uid != uid {
-		return errors.New("capture_parent_changed")
-	}
-	return nil
-}
-func finishCapture(ctx context.Context, path string, raw []byte, initial os.FileInfo, uid uint32) error {
-	if len(raw) == 0 || len(raw) > maxMaterialBytes {
-		return errors.New("material_encoding_limit")
-	}
-	if e := ctx.Err(); e != nil {
-		return errors.New("total_budget_exceeded")
-	}
-	if e := sameCaptureParent(path, initial, uid); e != nil {
-		return e
-	}
-	if e := writeExclusive(path, raw); e != nil {
-		return e
-	}
-	if e := sameCaptureParent(path, initial, uid); e != nil {
-		return e
-	}
-	if ctx.Err() != nil {
-		return errors.New("total_budget_exceeded")
-	}
-	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -181,46 +180,6 @@ func privateFixture(t *testing.T) string {
 	t.Cleanup(func() { _ = os.RemoveAll(real) })
 	return real
 }
-func TestPrivateCaptureOneTimeAndParentIdentity(t *testing.T) {
-	dir := privateFixture(t)
-	path := filepath.Join(dir, "original.json")
-	parent, e := privateParent(path)
-	if e != nil {
-		t.Fatal(e)
-	}
-	st, _ := parent.Stat()
-	uid := st.Sys().(*syscall.Stat_t).Uid
-	_ = parent.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	raw := []byte(`{"original":"bytes"}`)
-	if finishCapture(ctx, path, raw, st, uid) != nil {
-		t.Fatal("capture failed")
-	}
-	if got, e := readPrivate(path, fingerprint(raw)); e != nil || !bytes.Equal(got, raw) {
-		t.Fatal("readback failed")
-	}
-	if finishCapture(ctx, path, []byte("new"), st, uid) == nil {
-		t.Fatal("overwrote original")
-	}
-	if finishCapture(ctx, filepath.Join(dir, "wrongowner.json"), raw, st, uid+1) == nil {
-		t.Fatal("owner changed accepted")
-	}
-	moved := dir + "-old"
-	if e := os.Rename(dir, moved); e != nil {
-		t.Fatal(e)
-	}
-	defer func() { _ = os.RemoveAll(moved) }()
-	if e := os.Mkdir(dir, 0700); e != nil {
-		t.Fatal(e)
-	}
-	if finishCapture(ctx, filepath.Join(dir, "replaced.json"), raw, st, uid) == nil {
-		t.Fatal("parent replaced accepted")
-	}
-	if _, e := os.Stat(filepath.Join(dir, "replaced.json")); !errors.Is(e, os.ErrNotExist) {
-		t.Fatal("wrote after parent replaced")
-	}
-}
 func TestPrivateMaterialRejectsHashAndSymlink(t *testing.T) {
 	dir := privateFixture(t)
 	path := filepath.Join(dir, "material.json")
@@ -274,16 +233,15 @@ func TestFrozenDInventoryMatchesOriginalEmbeddedFiles(t *testing.T) {
 func TestCaptureDeadlineNeverLeavesSuccessfulFingerprint(t *testing.T) {
 	dir := privateFixture(t)
 	path := filepath.Join(dir, "too-late.json")
-	p, e := privateParent(path)
+	parent, e := captureParent(path)
 	if e != nil {
 		t.Fatal(e)
 	}
-	st, _ := p.Stat()
-	uid := st.Sys().(*syscall.Stat_t).Uid
-	_ = p.Close()
+	defer func() { _ = parent.close() }()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if finishCapture(ctx, path, []byte("original"), st, uid) == nil {
+	r := receipt{}
+	if finishCapture(ctx, &r, path, &parent, []byte("original"), writeCaptureExclusive) == nil || r.MaterialHash != "" {
 		t.Fatal("canceled capture accepted")
 	}
 	if _, e := os.Stat(path); !errors.Is(e, os.ErrNotExist) {
