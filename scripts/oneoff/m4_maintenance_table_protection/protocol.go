@@ -37,6 +37,7 @@ const sessionMode = "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_Z
 
 var nameRE = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+var operationRE = regexp.MustCompile(`^[0-9]{1,20}-[0-9]{1,4}$`)
 var sourceRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
@@ -371,8 +372,8 @@ func readPrivateLimit(path, expected string, limit int64) ([]byte, error) {
 	return raw, nil
 }
 
-// This bounded file read is internal to readPrivate; callers must supply the
-// independently frozen SHA before any material can be accepted.
+// Local boundary/journal state uses the bounded owned read. External material
+// and approval documents must always use the independently frozen SHA reader.
 func readOwnedPrivate(path string, limit int64) (raw []byte, resultErr error) {
 	if !absolutePath(path) || limit <= 0 || limit > maxMaterialBytes {
 		return nil, errors.New("private_path_or_limit_rejected")
