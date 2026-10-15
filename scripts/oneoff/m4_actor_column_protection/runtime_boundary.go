@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -236,5 +237,121 @@ func validateFrozenRuntimeMarker(v runtimeBoundaryRecord) error {
 	if e != nil || !bytes.Equal(expected, v.MarkerRaw) {
 		return errors.New("runtime_database_marker_bytes_rejected")
 	}
+	return nil
+}
+
+func nextRuntimeBoundary(m material, v runtimeIntent, a arguments, tool string) (runtimeBoundaryRecord, []byte, error) {
+	if !validRuntimeBoundaryState(m.RuntimeBoundary, m.Binding) || m.RuntimeBoundary.Generation == math.MaxUint64 || !sourceRE.MatchString(tool) || !nonzeroHash(a.materialHash) || !nonzeroHash(a.runtimeIntentHash) {
+		return runtimeBoundaryRecord{}, nil, errors.New("runtime_database_boundary_generation_rejected")
+	}
+	version := uint64(101)
+	if v.Mode == "target102" {
+		version = 102
+	}
+	record := runtimeBoundaryRecord{Format: 1, Kind: "m4_c_runtime_boundary", SQLIdentity: m.Binding.SQLIdentity, SQLName: m.Binding.SQLName, Generation: m.RuntimeBoundary.Generation + 1, Previous: m.RuntimeBoundary.Fingerprint, ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, MaterialHash: a.materialHash, IntentHash: a.runtimeIntentHash, Mode: v.Mode, SQLVersion: version, Created: v.Decision}
+	record.MarkerRaw, _ = json.Marshal(markerForRecord(record))
+	record.MarkerHash = fingerprint(record.MarkerRaw)
+	raw, e := json.Marshal(record)
+	if e != nil || validateRuntimeBoundaryRecord(record, raw, m.Binding) != nil {
+		return runtimeBoundaryRecord{}, nil, errors.New("runtime_database_boundary_generation_rejected")
+	}
+	return record, raw, nil
+}
+
+// Initial creation is one atomic MySQL8.0.36 InnoDB CTAS, including the only row.
+// Later advances use a transactional compare-and-set on generation, hash and
+// original bytes. Neither path resets, drops, repairs or recreates an old state.
+func (d database) advanceRuntimeBoundary(ctx context.Context, m material, v runtimeIntent, a arguments, tool string, ap *approval, r *receipt) error {
+	if d.binding != m.Binding || m.Format != 2 {
+		return errors.New("runtime_database_boundary_capture_rejected")
+	}
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	current, e := readRuntimeBoundary(ctx, d.conn, m.Binding)
+	if e != nil {
+		return e
+	}
+	if current.State != m.RuntimeBoundary || !validRuntimeBoundaryState(m.RuntimeBoundary, m.Binding) {
+		return errors.New("runtime_database_boundary_changed")
+	}
+	record, raw, e := nextRuntimeBoundary(m, v, a, tool)
+	if e != nil || ctx.Err() != nil {
+		return errors.New("runtime_database_boundary_generation_rejected")
+	}
+	hash, _ := hex.DecodeString(fingerprint(raw))
+	if e := rereadRuntimeInputs(ctx, v, m, a, tool, ap); e != nil {
+		return e
+	}
+	if current.State.Generation == 0 {
+		q, cancel := context.WithTimeout(ctx, queryLimit)
+		r.DatabaseBoundaryAdvanceUnknown = true
+		result, e := d.conn.ExecContext(q, runtimeBoundaryCreate, 1, record.Generation, hash, raw)
+		cancel()
+		if e != nil {
+			return errors.New("runtime_database_boundary_create_outcome_unknown")
+		}
+		if count, e := result.RowsAffected(); e != nil || count != 1 {
+			return errors.New("runtime_database_boundary_create_outcome_unknown")
+		}
+	} else if e := d.updateRuntimeBoundary(ctx, current, record, raw, hash, m, v, a, tool, ap, r); e != nil {
+		return e
+	}
+	got, e := readRuntimeBoundary(ctx, d.conn, m.Binding)
+	if e != nil || got.Record == nil || !bytes.Equal(got.Record.MarkerRaw, record.MarkerRaw) || !bytes.Equal(got.Raw, raw) || ctx.Err() != nil {
+		return errors.New("runtime_database_boundary_advance_readback_unproven")
+	}
+	r.DatabaseBoundary, r.DatabaseBoundaryRecord = &got.State, got.Record
+	r.DatabaseBoundaryAdvanced, r.DatabaseBoundaryAdvanceUnknown = true, false
+	return nil
+}
+
+func (d database) updateRuntimeBoundary(ctx context.Context, current runtimeBoundaryObservation, next runtimeBoundaryRecord, raw, hash []byte, m material, v runtimeIntent, a arguments, tool string, ap *approval, r *receipt) (resultErr error) {
+	tx, e := d.conn.BeginTx(ctx, nil)
+	if e != nil {
+		return errors.New("runtime_database_boundary_begin_failed")
+	}
+	done := false
+	defer func() {
+		if !done {
+			recordRollback(&resultErr, tx)
+		}
+	}()
+	if e := requireRuntimeBoundary(ctx, tx, m.Binding, current.State); e != nil {
+		return e
+	}
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	if e := rereadRuntimeInputs(ctx, v, m, a, tool, ap); e != nil {
+		return e
+	}
+	oldHash, _ := hex.DecodeString(current.State.Fingerprint)
+	q, cancel := context.WithTimeout(ctx, queryLimit)
+	r.DatabaseBoundaryAdvanceUnknown = true
+	result, e := tx.ExecContext(q, runtimeBoundaryUpdate, next.Generation, hash, raw, current.State.Generation, oldHash, current.Raw)
+	cancel()
+	if e != nil {
+		return errors.New("runtime_database_boundary_update_failed_or_unknown")
+	}
+	if count, e := result.RowsAffected(); e != nil || count != 1 {
+		return errors.New("runtime_database_boundary_compare_and_set_rejected")
+	}
+	if e := requireRuntimeBoundary(ctx, tx, m.Binding, runtimeBoundaryState{Generation: next.Generation, Fingerprint: fingerprint(raw)}); e != nil {
+		return e
+	}
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	if e := rereadRuntimeInputs(ctx, v, m, a, tool, ap); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("runtime_database_boundary_deadline_exhausted")
+	}
+	if tx.Commit() != nil {
+		return errors.New("runtime_database_boundary_commit_outcome_unknown")
+	}
+	done = true
 	return nil
 }
