@@ -464,10 +464,14 @@ func TestOriginalInsertExactPayloadBoundsWithValidConsumedApproval(t *testing.T)
 					}
 				}
 			}
+			d := runtimeDatabaseFixture(t, conn, m.Binding)
+			expectCapturedRuntimeBoundary(mock, m.Binding)
 			mock.ExpectBegin()
+			expectCapturedRuntimeBoundary(mock, m.Binding)
 			mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnResult(sqlmock.NewResult(0, int64(len(rows))))
+			expectCapturedRuntimeBoundary(mock, m.Binding)
 			mock.ExpectCommit()
-			if e := (database{conn: conn}).insertOriginalBatch(ctx, m, a, hash, testTool, 4, rows); e != nil {
+			if e := d.insertOriginalBatch(ctx, m, a, hash, testTool, 4, rows); e != nil {
 				t.Fatal("exact-limit original batch changed bytes or failed transaction", e)
 			}
 		})
