@@ -211,7 +211,7 @@ jobs:
           trap cleanup_owned_fixture EXIT
           start_owned_fixture() {
             [[ -z "$fixture_cid" && "$fixture_network_created" == false && -z "$fixture_owner" && -z "$fixture_name" && -z "$fixture_network" ]] || exit 1
-            case "$1" in m|a|b) fixture_phase="$1" ;; *) exit 1 ;; esac
+            case "$1" in m|a|b|c) fixture_phase="$1" ;; *) exit 1 ;; esac
             fixture_owner="${fixture_run_owner}${fixture_phase}"
             [[ "$fixture_owner" =~ ^[a-z0-9]{8,24}$ ]] || exit 1
             fixture_name="qs-mongo-profile-owned-${fixture_owner}"
@@ -390,6 +390,54 @@ jobs:
               if set(matched[action]) != expected:
                   raise SystemExit('B object native selectors did not all RUN/PASS')
           PY_MONGO_OBJECT_PROOF
+          cleanup_owned_fixture
+
+          start_owned_fixture c
+          export QS_M4_C_OBJECT_NATIVE_REQUIRED=1
+          export QS_M4_C_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only
+          export QS_M4_C_OBJECT_NATIVE_MYSQL_DSN="root:m4-owned-object-fixture@tcp(127.0.0.1:${OBJECT_MYSQL_PORT})/"
+          export QS_M4_C_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^TestM4ActorColumnsNative' ./scripts/oneoff/m4_actor_column_protection | tee actor-object-native.jsonl
+          python3 - actor-object-native.jsonl "$object_source" <<'PY_ACTOR_OBJECT_PROOF'
+          import collections, json, re, sys
+          expected = {
+              'TestM4ActorColumnsNativeCaptureUpgradeVerify',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected/hash',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected/source',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected/scope',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected/identity',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected/eof',
+              'TestM4ActorColumnsNativeUnboundMaterialRejected/boundary',
+              'TestM4ActorColumnsNativeRetainedAndBoundaryDrift',
+              'TestM4ActorColumnsNativeOriginalSchemaDrift',
+              'TestM4ActorColumnsNativeIncompletePrivilege',
+              'TestM4ActorColumnsNativeRestoreOriginalStates',
+              'TestM4ActorColumnsNativeRestoreOriginalStates/dirty_before_drop',
+              'TestM4ActorColumnsNativeRestoreOriginalStates/dirty_after_tags_drop',
+              'TestM4ActorColumnsNativeRestoreOriginalStates/dirty_after_both_drops',
+              'TestM4ActorColumnsNativeRestoreOriginalStates/clean_after_both_drops',
+              'TestM4ActorColumnsNativeRestoreContinuation',
+              'TestM4ActorColumnsNativeRestoreContinuation/roles_add_ack',
+              'TestM4ActorColumnsNativeRestoreContinuation/first_roles_batch_commit_ack',
+              'TestM4ActorColumnsNativeRestoreContinuation/tags_add_ack',
+              'TestM4ActorColumnsNativeRestoreRefusesForeignPartialState',
+          }
+          with open(sys.argv[1], encoding='utf-8') as source:
+              events = [json.loads(line) for line in source if line.strip()]
+          counts = {action: collections.Counter(event['Test'] for event in events if event.get('Test') and event.get('Action') == action) for action in ('run', 'pass')}
+          failures = sum(event.get('Action') == 'fail' for event in events)
+          skips = sum(event.get('Action') == 'skip' for event in events)
+          sources = {match.group(1) for event in events for match in [re.search(r'; tool=([0-9a-f]{40})', event.get('Output', ''))] if match}
+          print(json.dumps({'proof': 'C object native', 'compiled_tool_sources': sorted(sources), 'required': len(expected), 'matched': {action: sorted(counts[action]) for action in counts}, 'fail_events': failures, 'skip_events': skips}, sort_keys=True))
+          if failures or skips or sources != {sys.argv[2]}:
+              raise SystemExit('C object native must pass without skips on the actual compiled checkout')
+          for action in ('run', 'pass'):
+              if counts[action] != collections.Counter({name: 1 for name in expected}):
+                  raise SystemExit('C object native selectors must each RUN/PASS exactly once')
+          PY_ACTOR_OBJECT_PROOF
           cleanup_owned_fixture
 
   action-audit-mysql:

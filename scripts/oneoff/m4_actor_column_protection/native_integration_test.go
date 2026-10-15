@@ -172,11 +172,7 @@ func newActorNative(t *testing.T) *actorNative {
 	if _, e := root.ExecContext(t.Context(), "CREATE DATABASE `"+h.name+"` CHARACTER SET utf8mb4"); e != nil {
 		t.Fatal("new owned SQL namespace unavailable")
 	}
-	var e2 error
-	h.dir, e2 = filepath.EvalSymlinks(t.TempDir())
-	if e2 != nil || os.Chmod(h.dir, 0700) != nil {
-		t.Fatal("private owned capture directory unavailable")
-	}
+	h.dir = privateRecoveryDir(t)
 	cfg.DBName = h.name
 	h.dsn = cfg.FormatDSN()
 	h.db, e = sql.Open("mysql", h.dsn)
