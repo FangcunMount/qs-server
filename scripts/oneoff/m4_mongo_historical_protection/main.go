@@ -22,6 +22,7 @@ import (
 
 type arguments struct {
 	action, sqlName, mongoName, capture, material, materialHash, approval, approvalHash string
+	captureEvidence                                                                     captureEvidenceInput
 	timeout                                                                             time.Duration
 }
 type restoredVerification struct {
@@ -74,21 +75,29 @@ func parseArgs(args []string) (arguments, error) {
 	f.StringVar(&a.materialHash, "material-sha256", "", "externally frozen raw bytes hash")
 	f.StringVar(&a.approval, "approval-file", "", "independent pre-start restore approval")
 	f.StringVar(&a.approvalHash, "approval-sha256", "", "independent approval raw bytes hash")
+	f.StringVar(&a.captureEvidence.path, "capture-evidence-file", "", "independently frozen capture executor evidence")
+	f.StringVar(&a.captureEvidence.hash, "capture-evidence-sha256", "", "independent capture executor evidence raw bytes hash")
 	f.DurationVar(&a.timeout, "timeout", 15*time.Minute, "finite total deadline, at most20m")
 	if f.Parse(args) != nil || f.NArg() != 0 || !nameRE.MatchString(a.sqlName) || !nameRE.MatchString(a.mongoName) || a.timeout <= 0 || a.timeout > 20*time.Minute {
 		return a, errors.New("arguments_invalid")
 	}
+	evidenceSupplied := false
+	f.Visit(func(option *flag.Flag) {
+		if option.Name == "capture-evidence-file" || option.Name == "capture-evidence-sha256" {
+			evidenceSupplied = true
+		}
+	})
 	switch a.action {
 	case "inspect":
-		if a.capture != "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
+		if a.capture != "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" || evidenceSupplied {
 			return a, errors.New("inspect_rejects_write_inputs")
 		}
 	case "capture":
-		if !absolutePath(a.capture) || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
+		if !absolutePath(a.capture) || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" || evidenceSupplied {
 			return a, errors.New("capture_arguments_invalid")
 		}
 	case "verify-target", "restore", "verify-restored":
-		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action != "verify-target" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") {
+		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || !absolutePath(a.captureEvidence.path) || !nonzeroHash(a.captureEvidence.hash) || a.action != "verify-target" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") {
 			return a, errors.New("bound_material_and_action_required")
 		}
 	default:
@@ -105,7 +114,9 @@ func main() {
 	}
 }
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
-	r := run(ctx, args, getenv, tool, nil)
+	return deliverReceipt(run(ctx, args, getenv, tool, nil), out)
+}
+func deliverReceipt(r receipt, out io.Writer) int {
 	if json.NewEncoder(out).Encode(r) != nil || !r.Complete {
 		return 1
 	}
@@ -149,6 +160,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "material_rejected"
 			return r
 		}
+		if e := a.captureEvidence.check(m, a.materialHash, tool); e != nil {
+			r.Error = e.Error()
+			return r
+		}
 		r.MaterialHash = a.materialHash
 	}
 	if a.action == "restore" || a.action == "verify-restored" {
@@ -162,7 +177,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 		if a.action == "verify-restored" {
-			e = checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+			e = checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool, a.captureEvidence)
 		} else {
 			e = checkRecoveryBoundary(m, ap, a.materialHash, false)
 		}
@@ -280,8 +295,18 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 				return
 			}
 		}
+		if a.action == "verify-target" || a.action == "restore" {
+			if e := a.captureEvidence.check(m, a.materialHash, tool); e != nil {
+				r.Error = e.Error()
+				return
+			}
+			if ctx.Err() != nil {
+				r.BudgetExceeded, r.Error = true, "total_budget_exceeded"
+				return
+			}
+		}
 		if a.action == "verify-restored" {
-			if e := checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool); e != nil {
+			if e := checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool, a.captureEvidence); e != nil {
 				r.Error = e.Error()
 				return
 			}
@@ -343,7 +368,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	case "verify-target":
 		o, e = d.verifyTarget(ctx, m)
 	case "restore":
-		o, e = d.restore(ctx, m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+		o, e = d.restore(ctx, m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool, a.captureEvidence)
 	case "verify-restored":
 		o, e = d.verifyRestored(ctx, m)
 	}

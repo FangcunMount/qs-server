@@ -43,6 +43,9 @@ type nativeFixture struct {
 	root, db                                              *sql.DB
 	client                                                *mongo.Client
 	original                                              material
+	captureEvidence                                       captureEvidenceInput
+	captureStdout                                         []byte
+	captureExit                                           int
 }
 
 func nativeSources(t *testing.T, backend string, through int) fstest.MapFS {
@@ -312,6 +315,16 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=2m"}
 	args = append(args, extra...)
+	if action == "capture" {
+		var stdout bytes.Buffer
+		h.captureExit = serve(h.t.Context(), args, h.connectionInput, h.tool, &stdout)
+		h.captureStdout = append([]byte(nil), stdout.Bytes()...)
+		var r receipt
+		if strictDecode(h.captureStdout, &r) != nil || (h.captureExit == 0) != r.Complete {
+			h.t.Fatal("original capture CLI stdout or exit disagrees with completion")
+		}
+		return r
+	}
 	start := h.indexEventCount()
 	r := run(h.t.Context(), args, func(key string) string {
 		if key == "QS_M4_OBJECT_MYSQL_DSN" {
@@ -352,9 +365,19 @@ func (h *nativeFixture) capture() {
 	if e != nil || strictDecode(raw, &h.original) != nil || validateMaterial(h.original, h.tool, h.name, h.name) != nil {
 		h.t.Fatal("first genuine material unavailable")
 	}
+	// The fixture acts as the independent executor only after actual serve
+	// succeeds. Freeze its original stdout bytes and returned exit, not a
+	// reconstruction from the parsed receipt.
+	if h.captureExit != 0 || len(h.captureStdout) == 0 {
+		h.t.Fatal("original successful capture CLI execution unavailable")
+	}
+	h.captureEvidence = freezeCaptureProcess(h.t, h.dir, h.captureStdout, "exited", &h.captureExit)
+	if e := h.captureEvidence.check(h.original, h.materialHash, h.tool); e != nil {
+		h.t.Fatal("original successful capture CLI execution rejected", e)
+	}
 }
 func (h *nativeFixture) boundInput() []string {
-	return []string{"--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash}
+	return append([]string{"--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash}, captureEvidenceArgs(h.captureEvidence)...)
 }
 func (h *nativeFixture) approval() ([]string, string, string) {
 	h.t.Helper()

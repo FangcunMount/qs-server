@@ -154,6 +154,7 @@ func TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary(t *testing.T) {
 				t.Fatal("independent negative approval unavailable")
 			}
 			negativeArgs := []string{"--material-file=" + materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + nextPath, "--approval-sha256=" + fingerprint(approvalRaw)}
+			negativeArgs = append(negativeArgs, captureEvidenceArgs(h.captureEvidence)...)
 			beforeEvents := h.indexEventCount()
 			rejected := h.action("restore", negativeArgs...)
 			requireReleasedOrUnopened(t, rejected)

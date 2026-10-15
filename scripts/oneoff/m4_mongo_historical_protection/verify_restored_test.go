@@ -17,6 +17,7 @@ func TestVerifyRestoredRequiresClaimedOriginalApprovalBeforeEnvironment(t *testi
 		t.Run(fault, func(t *testing.T) {
 			m := fixtureMaterial(t)
 			a, mp, mh, ap, ah := currentRestoreApproval(t, &m, privateDir(t))
+			proof := fixtureCaptureEvidence(t, m, mh)
 			if fault != "no_boundary" && consumeApproval(m, a, ah) != nil {
 				t.Fatal("owned original recovery state unavailable")
 			}
@@ -47,7 +48,8 @@ func TestVerifyRestoredRequiresClaimedOriginalApprovalBeforeEnvironment(t *testi
 				}
 			}
 			before, _ := os.ReadFile(journal)
-			r := run(context.Background(), []string{"--action=verify-restored", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + mp, "--material-sha256=" + mh, "--approval-file=" + ap, "--approval-sha256=" + ah}, func(string) string {
+			args := append([]string{"--action=verify-restored", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + mp, "--material-sha256=" + mh, "--approval-file=" + ap, "--approval-sha256=" + ah}, captureEvidenceArgs(proof)...)
+			r := run(context.Background(), args, func(string) string {
 				t.Fatal("connection input read before original consumed recovery state proved")
 				return ""
 			}, testSource, nil)
@@ -78,6 +80,7 @@ func TestVerifyRestoredRequiresClaimedOriginalApprovalBeforeEnvironment(t *testi
 func TestVerifyRestoredAuthorizationBorrowsExactConsumedBytesWithoutMutation(t *testing.T) {
 	m := fixtureMaterial(t)
 	a, mp, mh, ap, ah := currentRestoreApproval(t, &m, privateDir(t))
+	proof := fixtureCaptureEvidence(t, m, mh)
 	if consumeApproval(m, a, ah) != nil {
 		t.Fatal("owned first recovery state unavailable")
 	}
@@ -91,7 +94,7 @@ func TestVerifyRestoredAuthorizationBorrowsExactConsumedBytesWithoutMutation(t *
 		}
 		before[path] = fingerprint(raw)
 	}
-	if e := checkRestoredAuthorization(m, a, mp, mh, ap, ah, testSource); e != nil {
+	if e := checkRestoredAuthorization(m, a, mp, mh, ap, ah, testSource, proof); e != nil {
 		t.Fatal("original consumed approval refused", e)
 	}
 	for path, hash := range before {
@@ -102,7 +105,7 @@ func TestVerifyRestoredAuthorizationBorrowsExactConsumedBytesWithoutMutation(t *
 	}
 	raw, _ := json.MarshalIndent(a, "", "  ")
 	copyPath := filepath.Join(filepath.Dir(ap), "different-encoding.json")
-	if writeExclusive(copyPath, raw) != nil || checkRestoredAuthorization(m, a, mp, mh, copyPath, fingerprint(raw), testSource) == nil {
+	if writeExclusive(copyPath, raw) != nil || checkRestoredAuthorization(m, a, mp, mh, copyPath, fingerprint(raw), testSource, proof) == nil {
 		t.Fatal("new raw approval bytes bypassed consumed hash")
 	}
 }
@@ -168,6 +171,7 @@ func TestVerifyOriginalRestoredSnapshotsRequiresCompleteOriginalFactsAndStableCu
 
 func TestVerifyRestoredArgumentsRequireOriginalApproval(t *testing.T) {
 	base := []string{"--action=verify-restored", "--mysql-database=qs", "--mongo-database=qs", "--material-file=/private/original.json", "--material-sha256=" + strings.Repeat("a", 64)}
+	base = append(base, "--capture-evidence-file=/private/capture-execution.json", "--capture-evidence-sha256="+strings.Repeat("c", 64))
 	if _, e := parseArgs(base); e == nil {
 		t.Fatal("verification accepted no independent approval")
 	}
