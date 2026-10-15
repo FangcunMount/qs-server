@@ -61,7 +61,7 @@ restore 接受实际 provider 产生的 dirty40 原 DROP 前缀0、1、2、3、4
 
 协议 source `ed97ae9a20aa369982c58d0a99cf18385f03fe8d` 的42项单测通过，只证明当时协议；当时 DB 入口尚未实现。只读 capture source `f7a23591e34c862bc745748e1a0315055b8d389a` 完成57项单测；恢复 source `857e9b5ca4f3eb6e09c8474579fb8bfc473486eb` 完成69项单测。Mongo 事务释放语义修正 source `3d0d3f4645740536f83cdafba9f83044567fb437` 的69项单测、race、vet、目标 lint 均通过；不可变私有 `qs-m4-b-object-tool-release-3d0d3f46/receipt.json` SHA为 `17b16c51bab54b2e3eace4c10da2448711c316dbbbe887433fe9fa9774af457f`。这些不是 native、生产权限或数据库操作验收。
 
-新增 native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 仍待真实依赖执行。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。六个必跑顶层、恢复矩阵六个 child 与批准边界五个 child 必须全部实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败：
+native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。六个顶层、恢复矩阵六个 child 与批准边界五个 child 必须全部实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败：
 
 - 捕获、真实 provider40 完整升级及 clean10140 核对。
 - dirty40 的0–4 DROP前缀及 clean40 全部退出后的对象恢复、真实原账本最后事务回放、当前40 UUID保留和 fresh10139 只读核对。
@@ -73,4 +73,10 @@ restore 接受实际 provider 产生的 dirty40 原 DROP 前缀0、1、2、3、4
 
 目前未签生产 capture/持续冻结/权限、索引生产规模恢复时长、业务镜像安装、三服务启动、真实业务、RPO0或生产30/60分钟预算。无需完整业务文档备份的逐对象方案，不能被解释为没有持续冻结和逐对象责任。
 
-当前33511c07的非DB检查实际完成普通69项/race、内存wire helper1项/race、integration编译、tagged vet、tagged lint0及configcontract；私有 `qs-m4-b-object-tool-native-source-33511c07/receipt.json` SHA为 `9a3184f59496454960aea5b97824d40a55c2d6a9f8fa813687a19d138709dba0`，真实native仍未执行。分支当前基于main3112，尚未包含独立的A超时修复PR372；正式发布PR之前必须整合其实际合并main、重新闭包和验收新head。
+历史33511c07的非DB检查实际完成普通69项/race、内存wire helper1项/race、integration编译、tagged vet、tagged lint0及configcontract；私有 `qs-m4-b-object-tool-native-source-33511c07/receipt.json` SHA为 `9a3184f59496454960aea5b97824d40a55c2d6a9f8fa813687a19d138709dba0`。这份检查当时基于main3112，未包含A超时修复，不能转签为后续来源。
+
+首次真实 native 在 clean source `3b5faa8d4df5a4a03104cb3dcb1c22a2af03d32f` 执行：MySQL8.0.36/MongoRS7.0.31，17 RUN、5 PASS、12 FAIL、0 SKIP，exit1。不可变 `qs-m4-b-object-tool-native-v1/receipt.json` SHA为 `28bd0f6ea0e63930a1584982979a181214bad0a41839b07ad91a623e44373491`，原始 JSONL SHA为 `bbc894219f20109ecc6b326c97ab884f2c5ab69bad9ccf7b96c8cf9a7ab07206`。失败包括完整合成BSON比较和索引创建；当时未捕获 typed server code，不能将 generic错误定性为具体服务端原因。旧冲突用例仅证明失败，未证明11000；两项wire故障用例未到达目标事务/commit。两自有容器和网络均已释放，原CID/images/volumes保留；旧运行元数据变化，不签全环境稳定。
+
+修正 source `535849914a3d719a6794889a6435986ecf725dc1` 和 `445815303cb9c659fa9e5d77a9dedb0522722843` 关闭两项已确认的代码问题：URI应用完成后显式清除 ClientOptions.Timeout 为 nil，避免 SetTimeout(0) 仍启用CSOT而与固定 maxTimeMS 冲突；native provider 使用真实当前版本，避免把39误作0准备而重新创建退役命名空间。前者曾有一次namespace常量的编译错误，后者已修正；这些静态因果不冒充首次未捕获的server错误码。source `3447cbded3352301c4378c2c7cd2fd8bedf959da` 增加仅本工具内的nil-default typed observer：CLI不装配，测试仅记录固定操作、数值code、闭集name和OK；BSON差异只记录集合、ID/raw摘要及键名/类型，绝不输出值或原始错误正文。冲突用例现须实际 typed11000，wire用例仍须到达原定故障点。
+
+正常 merge `1356621084e26eaacd82cfd776a583920931a445` 已整合实际main `8f08f28fe395e11c55ac119f0490f539b6b30995` 的A超时修复，A工具文件逐字保持主线。该来源实际77项普通/race、2项内存native helper/race、integration编译、tagged vet、tagged lint0和configcontract通过；私有 `qs-m4-b-object-tool-diagnostic-source-13566210/receipt.json` SHA为 `998d5fb1f21c30884643b731e244d67cd956bd84bc9c04fdd041d0359a8ede97`。这不替代修正后全部17项真实native；下一轮尚待独占fixture批准，未签新native或生产结论。
