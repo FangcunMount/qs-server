@@ -26,6 +26,11 @@ def valid():
                         "sql_pool_closed": True, "mongo_closed": True, "error_category": "none",
                         "transaction_release_unproven": False, "total_budget_exceeded": False})
     row = {"kind": "M4_A_original_native_carrier", "tool_sha256": runner.TOOL_HASH, "tool_exact_build": True,
+           "mysql_image_binding": {"registry_ref": runner.MYSQL,
+                                   "image": {"Id": "sha256:" + "a" * 64, "RepoDigests": [runner.MYSQL],
+                                             "Os": "linux", "Architecture": "amd64"},
+                                   "container_image_id": "sha256:" + "a" * 64,
+                                   "actual_server_version": "8.0.36"},
            "actions": actions, "material_counts": [247463, 247463], "material_bytes": 50_014_038,
            "production": False, "Mac_custody_executed": False, "business_runtime_started": False,
            "carriers": [{"action": a, "image_content_verified": True, "uid": "0:0", "memory": 536870912,
@@ -40,6 +45,44 @@ def valid():
 class QualificationTests(unittest.TestCase):
     def test_full_actual_predicate_accepts_only_complete_fixed_scope(self):
         self.assertTrue(runner.qualify(valid()))
+
+    def test_fixed_mysql_content_and_actual_container_identity_are_mandatory(self):
+        mutations = {
+            "missing_binding": lambda row: row.pop("mysql_image_binding"),
+            "wrong_requested_ref": lambda row: row["mysql_image_binding"].update(registry_ref="mysql:8.0.36"),
+            "missing_digest": lambda row: row["mysql_image_binding"]["image"].pop("RepoDigests"),
+            "empty_digests": lambda row: row["mysql_image_binding"]["image"].update(RepoDigests=[]),
+            "wrong_digest": lambda row: row["mysql_image_binding"]["image"].update(RepoDigests=["mysql@sha256:" + "b" * 64]),
+            "foreign_repo": lambda row: row["mysql_image_binding"]["image"].update(RepoDigests=[runner.MYSQL.replace("library/mysql", "foreign/mysql")]),
+            "wrong_os": lambda row: row["mysql_image_binding"]["image"].update(Os="windows"),
+            "wrong_arch": lambda row: row["mysql_image_binding"]["image"].update(Architecture="arm64"),
+            "missing_engine_id": lambda row: row["mysql_image_binding"]["image"].pop("Id"),
+            "bad_engine_id": lambda row: row["mysql_image_binding"]["image"].update(Id="actual-unknown"),
+            "missing_container_id": lambda row: row["mysql_image_binding"].pop("container_image_id"),
+            "different_container_id": lambda row: row["mysql_image_binding"].update(container_image_id="sha256:" + "b" * 64),
+            "wrong_version": lambda row: row["mysql_image_binding"].update(actual_server_version="8.0.37"),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name):
+                row = valid(); mutate(row)
+                with self.assertRaises(RuntimeError): runner.qualify(row)
+
+    def test_mysql_registry_digest_is_not_an_assumed_engine_config_id(self):
+        row = valid()
+        row["mysql_image_binding"]["image"]["RepoDigests"] = [runner.MYSQL.removeprefix("docker.io/library/")]
+        self.assertTrue(runner.qualify(row))
+        self.assertNotEqual(row["mysql_image_binding"]["image"]["Id"], runner.MYSQL.split("@", 1)[1])
+
+    def test_workflow_pulls_the_same_fixed_amd64_mysql_as_the_fixture(self):
+        import shlex
+        import yaml
+        workflow = yaml.safe_load((HERE.parents[2] / ".github/workflows/ci.yml").read_text())
+        step = next(item for item in workflow["jobs"]["m4-a-formal-carrier"]["steps"]
+                    if item.get("name") == "Read only the fixed images without replacement")
+        pulls = [shlex.split(line) for line in step["run"].splitlines() if line.strip().startswith("docker pull ")]
+        selected = [args for args in pulls if args[-1] == runner.MYSQL]
+        self.assertEqual(len(selected), 1)
+        self.assertIn("--platform=linux/amd64", selected[0])
 
     def test_missing_duplicate_foreign_and_reordered_actual_actions_rejected(self):
         for mutate in (lambda r: r["actions"].pop(), lambda r: r["actions"].append(r["actions"][0]),

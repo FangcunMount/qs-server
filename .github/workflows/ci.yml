@@ -86,7 +86,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           docker pull --platform=linux/amd64 crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-apiserver@sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816
-          docker pull --platform=linux/amd64 mysql:8.0.36
+          docker pull --platform=linux/amd64 docker.io/library/mysql@sha256:a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964
           docker pull --platform=linux/amd64 mongo@sha256:43fddee7e532a920f3dfdee9e8f4834398c155c26bcb92d790cc1cd3c630fc40
       - name: Exercise the unchanged V10 native carrier with owned synthetic data
         timeout-minutes: 42

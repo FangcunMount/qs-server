@@ -24,7 +24,8 @@ TOOL_SOURCE = "602710eb2f6ee383923230890c4bdb4a3bcada3a"
 TOOL_HASH = "2c314163ee6931aa133f3537b418927c97cce9f8fd8f4f3b75f42be142e173fd"
 A_SOURCE = "51163edab7038adcdb6b8f1712d6dc434f361dc6"
 RESOURCE = "77e11d801d270ef7b12f86261a05217a95bd8f8049f20d2e5f14ee0c0a20083b"
-MYSQL = "mysql:8.0.36"  # same fixture release as existing CI; actual version checked
+# This is the digest actually pulled by the qualified original f8f carrier.
+MYSQL = "docker.io/library/mysql@sha256:a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964"
 MONGO = "mongo@sha256:43fddee7e532a920f3dfdee9e8f4834398c155c26bcb92d790cc1cd3c630fc40"
 LABEL = "qs.m4.a.formal-carrier.fixture"
 STEPS = ("capture", "restore", "verify-restored", "verify-target")
@@ -92,12 +93,30 @@ def check_receipt(row, action):
          and row.get("total_budget_exceeded") is False, "native_unknown_or_budget_failure")
 
 
+def require_mysql_image(image):
+    need(type(image) is dict and image.get("Os") == "linux" and image.get("Architecture") == "amd64"
+         and type(image.get("Id")) is str and re.fullmatch(r"sha256:[0-9a-f]{64}", image["Id"]),
+         "fixed_MySQL_image_identity_required")
+    repos = image.get("RepoDigests")
+    # Docker may display its default registry/repository in familiar form.
+    need(type(repos) is list and 1 <= len(repos) <= 32
+         and all(type(item) is str and len(item) <= 256 for item in repos)
+         and any(item in (MYSQL, MYSQL.removeprefix("docker.io/library/")) for item in repos),
+         "fixed_MySQL_RepoDigest_required")
+
+
 def qualify(result):
     """The actual final predicate, also exercised directly by pure tests."""
     need(type(result) is dict and result.get("kind") == "M4_A_original_native_carrier",
          "qualification_kind")
     need(result.get("tool_sha256") == TOOL_HASH and result.get("tool_exact_build") is True,
          "qualification_tool")
+    mysql = result.get("mysql_image_binding")
+    need(type(mysql) is dict and mysql.get("registry_ref") == MYSQL,
+         "qualification_MySQL_binding")
+    require_mysql_image(mysql.get("image"))
+    need(mysql.get("container_image_id") == mysql["image"]["Id"]
+         and mysql.get("actual_server_version") == "8.0.36", "qualification_MySQL_actual_identity")
     actions = result.get("actions")
     need(type(actions) is list and [item.get("action") for item in actions] == list(STEPS),
          "qualification_exact_actions")
@@ -252,6 +271,13 @@ class Fixture:
             need(len(manifest) == 1, "single_original_image_required")
             config = stream.extractfile(manifest[0]["Config"]).read(1 << 20)
             need(digest(config) == self.binding["config_sha256"], "old_M2_raw_config_mismatch")
+        mysql_images = decode(self.docker("image", "inspect", MYSQL))
+        need(type(mysql_images) is list and len(mysql_images) == 1, "single_fixed_MySQL_image_required")
+        require_mysql_image(mysql_images[0])
+        self.result["mysql_image_binding"] = {
+            "registry_ref": MYSQL,
+            "image": {key: mysql_images[0][key] for key in ("Id", "RepoDigests", "Os", "Architecture")},
+        }
         self.network_created = True
         self.network_id = self.docker("network", "create", "--internal", "--label", LABEL + "=" + self.owner,
                                       self.network).decode().strip()
@@ -263,10 +289,14 @@ class Fixture:
                                 "--network-alias=mysql", "--env=MYSQL_ALLOW_EMPTY_PASSWORD=yes", "--env=MYSQL_DATABASE=qs",
                                 "--mount=type=volume,src=" + self.sqlvolume + ",dst=/var/lib/mysql",
                                 "--entrypoint=/usr/local/bin/docker-entrypoint.sh"], ["mysqld", "--innodb-buffer-pool-size=64M"])
+        self.result["mysql_image_binding"]["container_image_id"] = self.inspect(self.mysql)["Image"]
+        need(self.result["mysql_image_binding"]["container_image_id"]
+             == self.result["mysql_image_binding"]["image"]["Id"], "fixed_MySQL_container_image_mismatch")
         self.docker("start", self.mysql)
         self.ready(self.mysql, ["mysqladmin", "ping", "-uroot", "--silent"])
         actual = self.docker("exec", self.mysql, "mysql", "-uroot", "-N", "-e", "SELECT VERSION()")
         need(actual.strip() == b"8.0.36", "actual_MySQL8.0.36_required")
+        self.result["mysql_image_binding"]["actual_server_version"] = actual.strip().decode("ascii")
         self.mongo = self.create_command("mongo", MONGO, ["--memory=2g", "--memory-swap=2g", "--cpus=1",
                               "--network-alias=mongo", "--tmpfs=/data/db:rw,size=1g",
                               "--tmpfs=/data/configdb:rw,size=128m", "--entrypoint=mongod"],
