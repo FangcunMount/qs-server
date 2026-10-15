@@ -788,6 +788,7 @@ func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
 			}
 			now := time.Now().UTC()
 			a := testApproval(t, h.material, h.materialHash)
+			a.ToolSource = h.tool
 			a.Operation = fmt.Sprintf("%d-1", now.UnixNano())
 			a.Deadline, a.Expires = now.Add(30*time.Second).Format(time.RFC3339Nano), now.Add(30*time.Second).Format(time.RFC3339Nano)
 			switch name {
@@ -795,6 +796,10 @@ func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
 				a.Deadline = now.Add(4 * time.Second).Format(time.RFC3339Nano)
 			case "earlier_approval_expiry":
 				a.Expires = now.Add(4 * time.Second).Format(time.RFC3339Nano)
+			}
+			if e := validateApproval(a, h.material, h.materialHash, h.tool, time.Now()); e != nil {
+				release()
+				t.Fatal("owned deadline approval does not bind this actual compiled tool", e.Error())
 			}
 			raw, _ := json.Marshal(a)
 			approvalPath := filepath.Join(h.dir, "ddl-deadline-approval.json")
@@ -830,7 +835,13 @@ func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
 					return ""
 				}, h.tool)
 			}()
-			if !waitOwnedRestoreDDL(t, h, true, 3*time.Second) {
+			pending, early := probeOwnedRestoreDDL(t, h, true, 3*time.Second, response)
+			if early != nil {
+				readResponse = true
+				t.Fatalf("restore returned before an actual MDL wait: category=%s complete=%t connection_closed=%t pool_closed=%t mongo_closed=%t", early.Error, early.Complete, early.SQLConnectionClosed, early.SQLPoolClosed, early.MongoClosed)
+			}
+			if !pending {
+				logOwnedRestoreDDLProbe(t, h)
 				t.Fatal("independent probe did not observe this ALTER actually pending on MDL")
 			}
 			pendingAt := time.Now()
@@ -894,8 +905,19 @@ func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
 
 func waitOwnedRestoreDDL(t *testing.T, h *nativeFixture, pending bool, limit time.Duration) bool {
 	t.Helper()
+	observed, _ := probeOwnedRestoreDDL(t, h, pending, limit, nil)
+	return observed
+}
+
+func probeOwnedRestoreDDL(t *testing.T, h *nativeFixture, pending bool, limit time.Duration, response <-chan receipt) (bool, *receipt) {
+	t.Helper()
 	deadline := time.Now().Add(limit)
 	for time.Now().Before(deadline) {
+		select {
+		case r := <-response:
+			return false, &r
+		default:
+		}
 		q, cancel := context.WithTimeout(t.Context(), time.Second)
 		query := "SELECT COUNT(*) FROM performance_schema.events_statements_current s JOIN performance_schema.threads p ON p.THREAD_ID=s.THREAD_ID WHERE p.PROCESSLIST_DB=? AND s.EVENT_NAME='statement/sql/alter_table' AND s.END_EVENT_ID IS NULL"
 		if pending {
@@ -909,12 +931,40 @@ func waitOwnedRestoreDDL(t *testing.T, h *nativeFixture, pending bool, limit tim
 		e := h.root.QueryRowContext(q, query, args...).Scan(&n)
 		cancel()
 		if e != nil {
-			return false
+			return false, nil
 		}
 		if (pending && n > 0) || (!pending && n == 0) {
-			return true
+			return true, nil
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	return false
+	return false, nil
+}
+
+func logOwnedRestoreDDLProbe(t *testing.T, h *nativeFixture) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	rows, e := h.root.QueryContext(ctx, "SELECT COALESCE(s.EVENT_NAME,'none'),s.END_EVENT_ID IS NULL,p.PROCESSLIST_DB=?,COALESCE(m.LOCK_TYPE,'none'),COALESCE(m.LOCK_STATUS,'none') FROM performance_schema.threads p LEFT JOIN performance_schema.events_statements_current s ON s.THREAD_ID=p.THREAD_ID LEFT JOIN performance_schema.metadata_locks m ON m.OWNER_THREAD_ID=p.THREAD_ID AND m.OBJECT_SCHEMA=? AND m.OBJECT_NAME='assessment' WHERE p.PROCESSLIST_DB=? LIMIT 65", h.name, h.name, h.name)
+	if e != nil {
+		t.Log("owned DDL probe diagnostics unavailable")
+		return
+	}
+	defer func() {
+		if rows.Close() != nil {
+			t.Error("owned DDL probe diagnostic rows release unproved")
+		}
+	}()
+	for n := 0; rows.Next(); n++ {
+		var event, lockType, lockStatus string
+		var unfinished, selectedDatabase bool
+		if n >= 64 || rows.Scan(&event, &unfinished, &selectedDatabase, &lockType, &lockStatus) != nil || len(event) > 128 || len(lockType) > 64 || len(lockStatus) > 64 {
+			t.Log("owned DDL probe diagnostics incomplete")
+			return
+		}
+		t.Logf("owned DDL probe event_name=%s unfinished=%t selected_database=%t lock_type=%s lock_status=%s", event, unfinished, selectedDatabase, lockType, lockStatus)
+	}
+	if rows.Err() != nil {
+		t.Log("owned DDL probe diagnostics incomplete")
+	}
 }
