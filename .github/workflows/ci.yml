@@ -169,7 +169,8 @@ jobs:
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 6 x 8m tests + 6 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 86m; ceil90.
+    timeout-minutes: 90
     services:
       mysql:
         image: mysql:8.0.36
@@ -216,6 +217,7 @@ jobs:
           fixture_phase=''
           fixture_cid=''
           fixture_network_created=false
+          d_native_tmp=''
           fixture_image='mongo@sha256:43fddee7e532a920f3dfdee9e8f4834398c155c26bcb92d790cc1cd3c630fc40'
           cleanup_owned_fixture() {
             fixture_status=$?
@@ -256,13 +258,20 @@ jobs:
             fixture_name=''
             fixture_network=''
             fixture_phase=''
+            if [ -n "$d_native_tmp" ]; then
+              [[ "$d_native_tmp" == "$HOME/qs-m4-d-native-${fixture_run_owner}."* ]] || return 1
+              [[ -d "$d_native_tmp" && ! -L "$d_native_tmp" && "$(stat -c '%u:%a' "$d_native_tmp")" == "$(id -u):700" ]] || return 1
+              rm -rf -- "$d_native_tmp"
+              [[ ! -e "$d_native_tmp" && ! -L "$d_native_tmp" ]] || return 1
+              d_native_tmp=''
+            fi
             [[ "$fixture_state_evidence" == true ]] || return 1
             return "$fixture_status"
           }
           trap cleanup_owned_fixture EXIT
           start_owned_fixture() {
             [[ -z "$fixture_cid" && "$fixture_network_created" == false && -z "$fixture_owner" && -z "$fixture_name" && -z "$fixture_network" ]] || exit 1
-            case "$1" in m|a|b|c) fixture_phase="$1" ;; *) exit 1 ;; esac
+            case "$1" in m|a|b|c|d|g) fixture_phase="$1" ;; *) exit 1 ;; esac
             fixture_owner="${fixture_run_owner}${fixture_phase}"
             [[ "$fixture_owner" =~ ^[a-z0-9]{8,24}$ ]] || exit 1
             fixture_name="qs-mongo-profile-owned-${fixture_owner}"
@@ -442,7 +451,6 @@ jobs:
                   raise SystemExit('B object native selectors did not all RUN/PASS')
           PY_MONGO_OBJECT_PROOF
           cleanup_owned_fixture
-
           start_owned_fixture c
           export QS_M4_C_OBJECT_NATIVE_REQUIRED=1
           export QS_M4_C_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only
@@ -490,6 +498,162 @@ jobs:
                   raise SystemExit('C object native selectors must each RUN/PASS exactly once')
           PY_ACTOR_OBJECT_PROOF
           cleanup_owned_fixture
+
+          # D's original53 and combined generation12/inspection9 use two fresh Mongo processes/tmpfs.
+          # Validate each new log before release; the final union never imports old runs.
+          d_native_proof() {
+            python3 - "$@" <<'PY_D_OBJECT_PROOF'
+          import collections, json, re, sys
+          original_expected = {
+              'TestM4MaintenanceTablesNativeBatchCommitACKLossContinuation',
+              'TestM4MaintenanceTablesNativeBinaryPagesAndRawEOF',
+              'TestM4MaintenanceTablesNativeCaptureUpgradeVerify',
+              'TestM4MaintenanceTablesNativeCreateACKLossContinuation',
+              'TestM4MaintenanceTablesNativeCreateACKLossContinuation/create0',
+              'TestM4MaintenanceTablesNativeCreateACKLossContinuation/create1',
+              'TestM4MaintenanceTablesNativeCreateACKLossContinuation/create2',
+              'TestM4MaintenanceTablesNativeCreateACKLossContinuation/create3',
+              'TestM4MaintenanceTablesNativeCreateACKLossContinuation/create4',
+              'TestM4MaintenanceTablesNativeCreatePermissionFailure',
+              'TestM4MaintenanceTablesNativeFirstBoundaryCannotReset',
+              'TestM4MaintenanceTablesNativeFirstBoundaryCannotReset/deadline',
+              'TestM4MaintenanceTablesNativeFirstBoundaryCannotReset/freeze',
+              'TestM4MaintenanceTablesNativeFirstBoundaryCannotReset/marker',
+              'TestM4MaintenanceTablesNativeForeignPartialRejected',
+              'TestM4MaintenanceTablesNativeForeignPartialRejected/foreign_column',
+              'TestM4MaintenanceTablesNativeForeignPartialRejected/foreign_index',
+              'TestM4MaintenanceTablesNativeForeignPartialRejected/foreign_primary_prefix',
+              'TestM4MaintenanceTablesNativeForeignPartialRejected/foreign_row_key',
+              'TestM4MaintenanceTablesNativeForeignPartialRejected/foreign_value',
+              'TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof',
+              'TestM4MaintenanceTablesNativeLedgerFailureRollsBackAndResumes',
+              'TestM4MaintenanceTablesNativeLockWaitMarkerPreventsCommit',
+              'TestM4MaintenanceTablesNativeOversizeHashRefusesCapture',
+              'TestM4MaintenanceTablesNativeRestoreClosedCollations',
+              'TestM4MaintenanceTablesNativeRestoreClosedCollations/utf8mb4_0900_ai_ci',
+              'TestM4MaintenanceTablesNativeRestoreClosedCollations/utf8mb4_general_ci',
+              'TestM4MaintenanceTablesNativeRestoreClosedCollations/utf8mb4_unicode_ci',
+              'TestM4MaintenanceTablesNativeRestorePrefixes',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/clean5',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/dirty0',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/dirty1',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/dirty2',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/dirty3',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/dirty4',
+              'TestM4MaintenanceTablesNativeRestorePrefixes/dirty5',
+              'TestM4MaintenanceTablesNativeSchemaAndReappearanceRejected',
+              'TestM4MaintenanceTablesNativeSchemaAndReappearanceRejected/nullable',
+              'TestM4MaintenanceTablesNativeSchemaAndReappearanceRejected/primary_prefix',
+              'TestM4MaintenanceTablesNativeSchemaAndReappearanceRejected/reappeared',
+              'TestM4MaintenanceTablesNativeUnboundMaterialRejected',
+              'TestM4MaintenanceTablesNativeUnboundMaterialRejected/eof',
+              'TestM4MaintenanceTablesNativeUnboundMaterialRejected/first_path',
+              'TestM4MaintenanceTablesNativeUnboundMaterialRejected/hash',
+              'TestM4MaintenanceTablesNativeUnboundMaterialRejected/identity',
+              'TestM4MaintenanceTablesNativeUnboundMaterialRejected/source',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/Target103Admission',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/Original102Admission',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/CreateMDLWaitBlocksMarker',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/MarkerBlocksRestoreBeforeConsume',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/ConnectionLossKeepsServerGate',
+              'TestM4MaintenanceTablesNativeFirstRuntimeGate/ReleaseUnknownNeverAuthorizesStart',
+          }
+          generation_expected = {
+              'TestM4MaintenanceTablesNativeRuntimeGeneration',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/TwoCapturesAfterIndependentProcessRelease',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/NewT0After_cancel102',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/NewT0After_restored102',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/ForeignTable',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/ForeignView',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/EmptyTable',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/HiddenBoundaryPermissionRejected',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/CreateExecuteACKUnknown',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/UpdateCommitACKUnknown',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/AdvanceThenLocalFailure',
+              'TestM4MaintenanceTablesNativeRuntimeGeneration/CreateMDLDeadline',
+          }
+          inspection_expected = {
+              'TestM4MaintenanceTablesReadOnlyInspectNative',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/Clean102',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/Clean103',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/Committed102',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/Committed103',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/Dirty103',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/Unknown104',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/ForeignBoundary',
+              'TestM4MaintenanceTablesReadOnlyInspectNative/HiddenBoundary',
+          }
+          if len(original_expected) != 53 or len(generation_expected) != 12 or len(inspection_expected) != 9 or original_expected & generation_expected or original_expected & inspection_expected or generation_expected & inspection_expected:
+              raise SystemExit('D native selectors must preserve disjoint original53, generation12 and inspection9')
+          second_expected = generation_expected | inspection_expected
+          source = sys.argv[-1]
+          if not re.fullmatch(r'[0-9a-f]{40}', source):
+              raise SystemExit('D native requires the exact checkout source')
+          def checked(path, expected, phase):
+              events = [json.loads(line) for line in open(path, encoding='utf-8')]
+              counts = {action: collections.Counter(event['Test'] for event in events if event.get('Action') == action and event.get('Test')) for action in ('run', 'pass')}
+              failures = sum(event.get('Action') == 'fail' for event in events)
+              skips = sum(event.get('Action') == 'skip' for event in events)
+              streams = collections.defaultdict(str)
+              for event in events:
+                  if event.get('Test') and 'Output' in event:
+                      streams[event['Test']] += event['Output']
+              entries, sources = set(), set()
+              for output in streams.values():
+                  entries.update(re.findall(r'actual compiled D fixture tool=([0-9a-f]{40}) phase=before_dependency_binding', output))
+                  sources.update(re.findall(r'actual owned dependencies mysql=8\.0\.36 mongo=7\.0\.31 rs0; Dsource=c335b2a1a34dd69830261e2d8e11b16da3f8befb resources=20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d files=286; tool=([0-9a-f]{40})', output))
+              summary = {'proof': 'D object native', 'phase': phase, 'compiled_tool_sources': sorted(sources), 'entry_tool_sources': sorted(entries), 'required': len(expected), 'actual': {action: dict(counts[action]) for action in counts}, 'fail_events': failures, 'skip_events': skips}
+              if failures or skips or entries != {source} or sources != {source}:
+                  print(json.dumps(summary, sort_keys=True))
+                  raise SystemExit('D object native requires actual checkout/dependency sentinels and zero FAIL/SKIP per fresh phase')
+              for action in ('run', 'pass'):
+                  if counts[action] != collections.Counter({name: 1 for name in expected}):
+                      print(json.dumps(summary, sort_keys=True))
+                      raise SystemExit('D object native requires every exact phase selector once RUN/PASS')
+              return counts, summary
+          mode = sys.argv[1]
+          if mode in ('original', 'generation') and len(sys.argv) == 4:
+              _, summary = checked(sys.argv[2], original_expected if mode == 'original' else second_expected, mode)
+          elif mode == 'union' and len(sys.argv) == 5:
+              original, _ = checked(sys.argv[2], original_expected, 'original')
+              generation, _ = checked(sys.argv[3], second_expected, 'generation')
+              expected = original_expected | second_expected
+              combined = {action: original[action] + generation[action] for action in ('run', 'pass')}
+              if len(expected) != 74 or any(combined[action] != collections.Counter({name: 1 for name in expected}) for action in combined):
+                  raise SystemExit('D native union requires all74 disjoint selectors once from these two new logs')
+              summary = {'proof': 'D object native union', 'compiled_tool_sources': [source], 'required': len(expected), 'phase_required': [53, 21], 'second_phase_components': [12, 9], 'actual': {action: dict(combined[action]) for action in combined}, 'fail_events': 0, 'skip_events': 0}
+          else:
+              raise SystemExit('D native proof requires its fixed phase or two-log union arguments')
+          print(json.dumps(summary, sort_keys=True))
+          PY_D_OBJECT_PROOF
+          }
+          start_owned_fixture d
+          export QS_M4_D_OBJECT_NATIVE_REQUIRED=1
+          export QS_M4_D_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only
+          export QS_M4_D_OBJECT_NATIVE_MYSQL_DSN="root:m4-owned-object-fixture@tcp(127.0.0.1:${OBJECT_MYSQL_PORT})/?multiStatements=true"
+          export QS_M4_D_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"
+          d_native_tmp="$(mktemp -d "$HOME/qs-m4-d-native-${fixture_run_owner}.XXXXXX")"
+          export TMPDIR="$d_native_tmp"
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^(TestM4MaintenanceTablesNativeBatchCommitACKLossContinuation|TestM4MaintenanceTablesNativeBinaryPagesAndRawEOF|TestM4MaintenanceTablesNativeCaptureUpgradeVerify|TestM4MaintenanceTablesNativeCreateACKLossContinuation|TestM4MaintenanceTablesNativeCreatePermissionFailure|TestM4MaintenanceTablesNativeFirstBoundaryCannotReset|TestM4MaintenanceTablesNativeForeignPartialRejected|TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof|TestM4MaintenanceTablesNativeLedgerFailureRollsBackAndResumes|TestM4MaintenanceTablesNativeLockWaitMarkerPreventsCommit|TestM4MaintenanceTablesNativeOversizeHashRefusesCapture|TestM4MaintenanceTablesNativeRestoreClosedCollations|TestM4MaintenanceTablesNativeRestorePrefixes|TestM4MaintenanceTablesNativeSchemaAndReappearanceRejected|TestM4MaintenanceTablesNativeUnboundMaterialRejected|TestM4MaintenanceTablesNativeFirstRuntimeGate)$' ./scripts/oneoff/m4_maintenance_table_protection | tee maintenance-object-native.jsonl
+          d_native_proof original maintenance-object-native.jsonl "$object_source"
+          cleanup_owned_fixture
+          unset TMPDIR
+          # No original-phase process/tmpfs or private material root is reused.
+          start_owned_fixture g
+          export QS_M4_D_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"
+          d_native_tmp="$(mktemp -d "$HOME/qs-m4-d-native-${fixture_run_owner}.XXXXXX")"
+          export TMPDIR="$d_native_tmp"
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^(TestM4MaintenanceTablesNativeRuntimeGeneration|TestM4MaintenanceTablesReadOnlyInspectNative)$' ./scripts/oneoff/m4_maintenance_table_protection | tee runtime-generation-native.jsonl
+          d_native_proof generation runtime-generation-native.jsonl "$object_source"
+          cleanup_owned_fixture
+          unset TMPDIR
+          d_native_proof union maintenance-object-native.jsonl runtime-generation-native.jsonl "$object_source"
+
 
   action-audit-mysql:
     name: Action audit MySQL JSON lifecycle

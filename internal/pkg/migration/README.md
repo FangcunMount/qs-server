@@ -61,7 +61,110 @@ SQL103 只删除 `testee_store_migration_reversions`、`testee_store_migration_i
 
 生产只读盘点 `80f422101ccfd83b4c4eb5bd165272145afe7afd` / run `38628472662-1` 在cleanSQL100、MySQL8.0.36的一致快照中确认：Testee manifests/items/reversions为1/83797/0，Operator manifests/binding archive为1/119；Testee manifest applied=1、item candidate=55577/deferred=28220，Operator applied_unchanged=1，三个历史引用gap均0。私有回执摘要 `73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125` 绑定原目标和所有连接/事务释放，`freeze_verified=false`。用户已确认五表没有遗留任务，原材料按隔离恢复职责保留；这些时点与责任事实不代替D执行时clean102/40的实际全量原值/DDL、完整原账本保护、持续停写和迁移/恢复资格。
 
-定向保护、生产迁移/恢复及30/60分钟/RPO0仍未验收。固定测试seam不提供生产备份/恢复入口；首个新runtime命令后只允许保留新事实的向前恢复，不能回放旧表/账本覆盖新事实。SQL103down只明确拒绝，不用Force、SetVersion或手清dirty替代恢复。
+生产定向材料、迁移/恢复及30/60分钟/RPO0仍未验收。固定测试seam本身不提供生产备份/恢复入口；首个新runtime命令后只允许保留新事实的向前恢复，不能回放旧表/账本覆盖新事实。SQL103down只明确拒绝，不用Force、SetVersion或手清dirty替代恢复。
+
+#### 已保留的只读阶段
+
+D 定向工具 `scripts/oneoff/m4_maintenance_table_protection` 在最初只读阶段的源码与实际编译 `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已通过只读原生验收，状态为 `read_only_native_verified / restore_not_implemented`。固定执行源 `c335b2a1a34dd69830261e2d8e11b16da3f8befb`，原 SQL1..103/Mongo1..40 的286个 up/down 资源按 `[backend,path,rawSHA256]` 顺序编码后的摘要为 `20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d`；这与独立编译的工具 SHA 分别登记，不用后续 main 的资源替换。该阶段工具未调用迁移 provider、DDL、恢复、批准或 journal。当前 format2 恢复协议与实际验证见下节。
+
+默认 `inspect` 只检查 clean102/40、五张原 InnoDB BASE TABLE 的列/主键形状和原 DDL。`capture` 在同一 SQL 只读 RR 中完整保存五表原 DDL、固定列与完整主键、逐行服务端 `CAST AS BINARY` 原值及 SQL NULL 标记、行摘要、完整原 SQL 账本及其 DDL；`ParseTime=false`、固定 UTC/结果字符集/SQL mode，DATETIME(6) 微秒、LONGTEXT 空白/键顺序、已有摘要均不经 Go 时间或 JSON map 重编码、不重签。字符串主键按完整 binary bytes 排序；复合主键再按 uint64 数值排序，边界使用 `DECIMAL(20,0)`，保留空字符串、0 与 Uint64MAX，每表额外读取空 EOF 并在同 RR 执行完整 COUNT 守恒。
+
+保护边界是单值8MiB、单行原值12MiB、每表行 JSON 完整编码128MiB、总材料256MiB、每表250000行/总500000行，分页500，单个 DDL 上限64KiB。超限整次拒绝，不截断、不写成功材料；这些是工具限额，不推断生产实际内容一定能容纳。普通元数据/分页请求各5秒；只有末端完整 COUNT 使用有限 action 剩余绝对期限及正值服务端 MAX_EXECUTION_TIME，action 最长20分钟，不能据此签30分钟窗口/60分钟恢复预算。
+
+`capture` 需要调用方提供独立 SQL/Mongo 选库身份及 Mongo 账本 UUID 摘要，连接仅来自 `QS_M4_D_OBJECT_MYSQL_DSN` / `QS_M4_D_OBJECT_MONGO_URI` 环境；不在 argv、回执或材料保存连接凭据。SQL 同 RR 与 Mongo 原40账本严格三字段 BSON/UUID 的前后独立观测分别记录，不声称双库原子 RR；Mongo options/index 未保存或核验。新材料必须在当前 UID 的0700叶目录以 O_EXCL/0600 写入、fsync、重开核对 SHA；写前后同一个真实目录/UID和总期限通过、所有事务/连接释放后才输出成功摘要。旧文件、未知/重复 schema 成员、身份/原材料 SHA 或首录绝对路径不符均拒绝。
+
+`verify-target` 只接受独立冻结的完整材料及外部 SHA，确认 clean103/40、五表全部缺失、原账本 DDL和双库身份/Mongo 原 BSON 不变；它不保存或证明五表之外的业务行值不变，不把 ready/账本状态替代业务验收。`restore` 在读取环境/连接前明确拒绝，尚无批准消费或恢复入口。原源码 `f571d36d7e755d7ae843d7e02c7c7245acf1e7b2` 的普通/race、编译/vet/lint只保留其本地源码证明；`4a648fe44` 将原值与服务端 SHA2/HEX/CONCAT 放在相同的每值/整行长度 CASE 后，`51513297d` 新增固定原生夹具，`1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 单独收口 capture 持有原目录FD。后者在 pre-ENV 以原 strict privateParent 同UID/0700资格打开并跨数据库快照持有，创建/读回/fsync均相对原FD，最终 canonical目录/UID→Close→总期限通过后才输出材料摘要；真实瞬时 swap-away/write/swap-back 对照、原文件/symlink和Close后预算反例在77项普通/race中通过。原共享writer、材料DTO、database及native夹具字节与对应前源保持，恢复接口仍未实现。原 d253 固定 seam 的15项证明不移签给此工具。
+
+源码与实际编译 SHA `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已在唯一自有 MySQL8.0.36/Mongo7.0.31 rs0 上执行一次：五顶层、八子场景共13项各一次 RUN/PASS、零FAIL/SKIP、exit0，耗时50.325秒。真实历史providers产生原clean102/40和正常103退役，不Force或手写账本；独立原查询逐列比对五表DDL/PK、LONGTEXT原空白/重复JSON键/四字节、已有摘要、微秒与SQL NULL，507项复合键经过两数据页及必空EOF，明确空key、0/MAX与Z/a binary顺序。实际超8MiB合法LONGTEXT的原值和hash均NULL、capture明确拒绝且不落材料；材料hash/source/身份/EOF/首路径、原PK prefix/nullable漂移与103旧表复现均拒绝。Mongo原40 BSON与账本UUID独立前后不变。该轮只证明capture/verify-target，不执行五表恢复或业务runtime。
+
+原始回执 SHA `f14e08c3dc669ee9986f20077d3e799e336f93a20828954e733e742d04862ed2`，实际JSONL `573b5b84fa84b99f8a62be6196114fb5f84549eb552b20e698405b2c532a863f`，私有目录 `qs-m4-d-maintenance-object-native-v1` 保留实际argv/source-binding及17个制品摘要。原目录FD模式、原资源及源文件前后不变，两自有容器/网络/子进程组释放，cleanup错误为空；旧容器ID/镜像/卷保留，本次选定State/RestartCount元数据无差异。该轮没有执行五表恢复；后续恢复原生证明按新源码独立登记，不改签这13项。生产102/40全量材料、持续冻结、正式服务启动、30/60分钟/RPO0与业务验收仍未完成，不由50.325秒的小型合成夹具推定生产预算。
+#### 当前 format2 固定对象恢复
+
+上一轮46项验收的工具源码与实际原生编译为 `e125fff48364e1a0833f8f9f96f62135c3a77310`，状态为 `synthetic_capture_restore_native_verified / production_pending`；后续首 runtime 互斥及53项证明见下节。D 执行源仍为 `c335b2a1`，286原资源摘要仍为 `20e0096f...254c4d`；未发布的 format1 材料不进入恢复。`inspect/capture` 仅接受 clean102/40，`verify-target` 仅接受 clean103/40且五表全缺失；后者还逐项核对材料中八张现代保留表的原DDL、完整逐PK摘要与同RR COUNT/EOF。八表固定为 `operators`、`testee`、`clinician`、`operator_retirement_tasks`、`operator_recovery_archives`、`actor_stores`、`clinician_store_history`、`testee_store_history`，不扩称全库或跨库原子快照。大值原值与摘要均受相同每值/整行CASE限额保护；原始五表正文/NULL与账本保存方式、全部硬上限和有限COUNT预算保持上述边界。
+
+`restore` 需要外部冻结的原始材料SHA和独立批准SHA。首次只接受103dirty的0..5合法DROP前缀，或103clean五表全缺失；仍在的suffix必须逐DDL/PK/原值吻合。首次材料canonical绝对路径、SHA、身份、初始缺表集、操作截止和首runtime marker由持久first-boundary固定，不能换名复制或用新Operation延长期限/扩大范围。64KiB/最多128条的durable operation journal与每操作claim双向闭合，缺损/旧Operation/未知状态拒绝，不重建或自动重试。
+
+恢复按DROP逆序仅CREATE原先缺失表，DDL只从编译内原075/078与已资格的三种collation派生，不执行材料SQL。MySQL8.0.36的独立15形状实测确认：0900保持原字节；general/unicode的固定char/varchar/longtext列显式重复同表COLLATE。未知、混合、缺失列COLLATE或额外charset/CHECK/索引仍拒绝，不能normalize放过漂移。续跑仅允许原初缺表集合中至多一张当前表含原rows子集；只补缺PK、逐原始字节填回，每batch最多100行/1MiB，无覆盖、REPLACE或whole-row改写。每次写与锁等待后的COMMIT前均重核原marker/首次绝对期限；五表、八现代保留事实及身份完整通过后，最后在事务中回放原完整102账本。COMMIT回应丢失维持unknown，不能把本地 `sql.ErrTxDone` 当服务器abort ACK，也不自动重试恢复。
+
+`verify-restored` 是独立只读终态证明：仍绑定同一材料、已消费批准、journal和首次deadline，核原clean102/40、五表原DDL/全原值、八表保留摘要、原SQL账本与Mongo原BSON/UUID。未知COMMIT结果可显式读取证明，不能改成自动回放。首个新runtime启动命令发出后禁止旧材料回放；生产停写、全部写入者与在途责任、marker写入时机及窗口批准由外部执行批次承担，工具不凭marker尚不存在自签已冻结。
+
+该源码在独占 MySQL8.0.36/Mongo7.0.31 rs0 上实际通过46项（15顶层+31子项），每项恰一次RUN/PASS、0FAIL/SKIP、exit0，耗时189.105秒；回执 `cee7384789c2318dbd55a3fe7448c4a6fe5de0cd20dd921edd5b6f1f295ccc50`，原JSONL `dc591f3f2fab012b61e1f59abe67eef6e648adee02852565781986316e02ba91`。包括dirty前缀0..5/clean全缺、三collation完整原值恢复、五个真实CREATE成功ACK丢失、跨100行batch提交丢响应续跑、原账本COMMIT unknown后的新鲜只读证明、实际锁等待中marker阻COMMIT及服务器ROLLBACK ACK、权限/账本失败/外来partial/批准边界拒绝。现代人员样本通过真实domain/repository Begin/Finish/Recover及FindTask/FindRecovery校验和原payload历史字节比对；不代表外部IAM或真实参与者业务验收。
+
+该轮编译source/42输入前后相同，28个原制品摘要可复核；两个owned容器、网络和子进程组精确释放、cleanup为空，旧IDs/images/volumes保留。原NSQ同CID自行Restart2986→2990且仍unhealthy，因此不签全旧runtime稳定。早前v3..v6的失败原件保留；v6未保存实际漂移DDL，不能把后续15形状倒签为其已采集原因。独立 `731af` 形状诊断Go实际1RUN/PASS/exit0，但wrapper解析test2json长Output分片后exit1，原回执 `062fce25...85cc8` 与本地独立重组分析分别保留，不机械重跑改绿。
+
+普通/race各191项与编译/vet/lint通过；整合 actual main `8c24e0199` 后42个D输入逐字桥接该原生来源，不把这轮native改签为后续merge或CI头。现有CI追加独立fresh D Mongo阶段，实际checkout SHA编译并逐46名/真实依赖sentinel验收，A47/B37/metadata门禁保留；新head CI仍待实际运行。生产102/40全量材料与容量、连续冻结、旧/新正式镜像及三服务启动、实际恢复、30/60分钟/RPO0和业务验收继续未完成。未在本轮进行生产停启、DDL、发布或新数据生成。
+
+#### D 首 runtime 与恢复 DDL 的互斥（隔离53项通过，生产待验）
+
+PR #376 原源码的每次 CREATE 前 marker 检查不能排除命令等待 metadata lock 期间首 runtime 边界出现；CREATE 隐式提交后的检查不能撤回该 DDL。上述 `e125` 的46项实际证明按原来源保留，不证明下述新互斥。D 工具新增实际 CLI `--action=mark-first-runtime`，与 `restore` 共用固定 D domain、SQL实例身份及选定数据库组成的完整 SHA256 `GET_LOCK` key；key 不含材料、Operation、路径、截止或工具源码，换材料不能分裂同库互斥。两动作在同一 pinned SQL Conn 上取得并核实所有权；恢复持锁跨 CREATE 的隐式提交及原账本事务，marker 作者持锁至私有文件 O_EXCL、文件与目录 fsync、原字节读回完成。只有实际 `RELEASE_LOCK=1` 回应才签服务端释放，本地连接/池关闭不替代该证明；命令/释放未知保持失败和 unproven，不自动重试。
+
+marker 作者使用原有双库名字及身份/账本UUID参数、`--material-file` / `--material-sha256`，另需 `--runtime-intent-file` / `--runtime-intent-sha256`。独立冻结的 strict intent 最多32KiB，绑定 compiled source、固定D执行源/286资源、原材料canonical路径/raw SHA、双库身份、具名操作、持续停写与责任回执、窗口起点/批准时刻/绝对截止/失效时刻和首启动未发命令声明。其三种模式仅为：`target103` 完整核验 clean103/40 及五表全缺和八表原事实；`restored102` 同时需要原已消费恢复批准的 file/raw SHA、原journal/首次期限及 clean102/40 的全部原事实；`cancel102` 需要独立明确未派发 offline apply，拒绝已有恢复状态，完整核验 clean102/40 原事实。正常目标的截止不超过原窗口30分钟，恢复模式沿原首次恢复截止，取消模式亦受独立有限截止约束；声明不替代实际六实例与其他写入者停写证据。
+
+首 marker 固定为原捕获材料目录内的 `first-runtime`，恢复批准中的 marker 也必须等于此派生路径，不接受旧自选路径。锁内前后重读原材料/原intent及相应恢复批准，只有完整状态证明后才生成固定marker内容；已有、部分写入或写入结果未知的 marker 均不删除或覆盖，保守关闭旧材料回放。D 后续控制器必须调用此作者并取得成功回执后才发首 runtime 命令；旧独立 `touch`、只探锁后释放再写文件或 A 既有 marker 作者不属于本 D 互斥协议。本动作只写首边界文件，不启动容器、业务进程或执行D退役迁移，生产批次批准仍另行完成。
+
+新增原生顶层 `TestM4MaintenanceTablesNativeFirstRuntimeGate` 及六子场景覆盖正常103/原102准入、真实 FTWRL/CREATE 等待阻 marker、marker先到的恢复拒绝、实际服务端会话仍存活时本地取消、RELEASE回应未知。原46顺序保留，合计53项数据库事件。首轮69d12f82仅执行CREATE/create0及顶层2个事件即失败：实际主unknown与gate释放未证明符合预期，新增测试却要求局部Conn关闭成功。2bc85e808仅修正此negative断言，保留原实际bool、完整失败回执和所有正向释放保证；其余46输入含生产Go不变，tag编译/vet/lint与8项wire race通过，当时完整53项仍待新来源实际验证。该 native-v8 失败及精确清理原件保留，不改写为成功。
+
+后续 native-v9 在实际源码/编译 `5910e1b6f57b19310cb44901a5d84fd5d58c453b`、独占 MySQL8.0.36/Mongo7.0.31 rs0 上逐项完成53次 RUN/PASS（16顶层、37子项），0FAIL/SKIP、exit0，273.341秒。原回执 SHA `1c17a97ea95bc7c465fdff7469e63906e8bfb7e85d3dd7077698d90f63225967`、JSONL `ba98ea8dbd68a7acdd4378c8b8402091503b52af985911a8eaba11f415fc8644`，root 独立逐项/30制品复核 `c7dd0b85c703a8da4632a050c41e0d82e8413d83da49e3b5e6f42d0b26568d15` 均保留在私有 `qs-m4-d-maintenance-object-native-v9`。两个owned容器、网络与子进程组均精确释放，旧IDs/images/volumes保留；旧NSQ自主Restart3118→3123，不能签全旧runtime稳定。这是固定合成对象及合作式 marker 作者的互斥/恢复资格，不是生产完整材料、连续冻结、正式六实例窗口、30/60分钟、RPO0或业务验收。
+
+Mac 全仓普通测试的 `-race` / coverage 执行从 `3f296fb304c14c94c42b60704f0574bb65d1454e` 开始、到5910结束，两源仅现有三份文档变化，Go/CI字节相同；实际374包PASS、28包无测试，exit0，完整日志 SHA `8b86e0e6c9728200cbe9c022ffc6584d144713de52c748eaa253aee8f2a071a2`。这不签LinuxCI。5910 CI Run Tests `116423119996` 的完整22KiB失败摘要明确首因是 `capture_parent_test.go` 的 `private_directory_rejected`：测试夹具的默认临时根落在Linux公共 `/tmp`（1777），原生产 `privateParent` 正确拒绝可写ancestor；backend整尾仍截断，完整摘要与源码桥接分别保留。原72f/69 CI首因仍unknown，不倒签为本次原因。
+
+测试专属修复 `6f0245491547bc8bed5849e57707cb27563e93cc` 仅让 `privateFixture` 在 `os.UserHomeDir()` 下创建0700自有leaf，立即登记精确cleanup、canonical后调用原 `privateParent` 并关闭FD；既有测试以局部TMPDIR验证仍选HOME，不修改生产guard、CI全局环境或skip。6f相对5910的生产Go及全部53选中native源码逐字相同，原5910 native编译身份不改签。修复字节在Mac实际普通214/race214 RUN/PASS、0FAIL/SKIP，integration仅编译通过（QA回执 `51ce23e463c930a121e2b0917b32ca0202a99203bbeb55b4c64cc9afd42ac5ef`）；该轮尚未执行Linux carrier，新head CI/AI与生产窗口也未取得资格；后续验证分列如下。
+
+6f 的首次 Linux 普通测试实际202 RUN/158 PASS/44 FAIL、0 SKIP，原回执 `34a09298d26d5294d1f765f006c7cff287c1894df2a02ec7aab729c558e21500` 保持失败。恢复测试另有 `privateRecoveryDir` 使用公共临时根，日志只保留 `original capture unavailable`；源码追溯与同类祖先拒绝一致，不倒签被该 helper 丢弃的原错误。独立测试提交 `a604813588978d9cebb1aae03b74219c23041fe2` 删除这处重复 helper，`recoveryInputs` 复用已校验的 `privateFixture`。该源码的 Mac 普通/race 各214 PASS、tag编译/vet通过；随后独立 Linux/amd64、UID501、无网络/数据库、只读rootfs、私有HOME与公共 `/tmp`1777的单载体实际214 RUN/PASS、0 FAIL/SKIP、exit0，3.066秒。原回执 `0ce3e75d6ce81346025f31f02e938d942d89ca07d364445d2de64d6f1fc23e9d`、root独立逐名/24制品证明 `916db166df569a88d4f7230b6ff2dc06a8ba8eaa921d47ee2e532480a26f7e23` 保留；载体精确释放，编译/挂载输入及旧资源保持。两次修复都只改普通测试文件，生产Go及53选中native源码仍等于5910；不将普通测试改签为race、数据库或生产验收。
+
+5910 的 CI Mongo Native job116423119691 成功，截断尾内保留完整独立53项严格计数摘要，全部各一次RUN/PASS、0 FAIL/SKIP；并非完整53项原JSONL都在尾中。实际编译/entry为merge `3878ba33e263e46ca95a225e010b76f8155d1eda`，Git双父及整tree已核与5910相同；root证明 `0ddd676f504e8b8a10bb39a6ac3689645fa7c4b71b0f14f00fd9b5c950f67d67` 保留。该单job通过不改变5910普通CI失败，也不签后续最终head CI/AI；生产材料、完整窗口与业务验收继续未完成。
+
+#### D 原 capture 成功执行证据（源码验证，当前原生与生产待验）
+
+源码 `ef43851a8b4226245e6d638c407e9833509af08d` 收紧失败捕获材料的消费资格：capture 已写入并 fsync 后，最终目录、期限或释放检查仍可能失败而留下完整诊断文件。文件存在、手工重算材料 SHA 和一份恢复批准不能将失败捕获重新认定为成功。诊断材料保留原字节，不删除、改写或重新签材料；format2、固定286迁移资源、原恢复批准/journal和首 runtime `GET_LOCK` 协议不变。
+
+四个材料消费者 `verify-target`、`restore`、`verify-restored`、`mark-first-runtime` 另外强制提供 `--capture-evidence-file` 与 `--capture-evidence-sha256`。独立可信执行器保存原 capture CLI stdout 原始字节与实际正常退出状态，并独立冻结以下六字段执行回执；保护工具不生成或自动补齐该回执，也不新增 seal 发布动作。
+
+```json
+{
+  "format_version": 1,
+  "kind": "m4_d_capture_execution",
+  "receipt_file": "/private/approved/original-capture-stdout.json",
+  "receipt_sha256": "<原 stdout 原始字节的 SHA256>",
+  "termination": "exited",
+  "exit_code": 0
+}
+```
+
+执行回执最多32KiB，原 stdout最多64KiB，二者与原材料使用三个不同的 canonical 私有绝对路径。现有 nofollow、同UID、0600、单链接、原始 SHA、限额与资源释放检查均保留；执行状态必须明确正常退出且 exit code 存在、非null、为0。原 stdout必须是 capture 的完整成功 typed receipt，action/error/材料hash、编译工具及D资源、SQL快照/EOF/全部释放标志与五历史表/八保留表的精确行数均匹配；capture不产生的审批、gate、marker及冻结声明不能被填真。仅新证明读取器比较原 JSON 与 typed DTO 的成员/值树，拒绝大小写别名、重复/未知成员、遗漏/null风险字段及零行count的null；原始字节与其SHA不经过规范化。外部 SHA 只绑定已独立封存的字节，不是签名，不能证明不可信生成方的陈述真实。
+
+证明在读取ENV前、恢复消费批准前、marker持锁内原输入复查处及成功终态均按同一固定输入回读；新增文件IO后保留原CLI总预算，不能因恢复批准的截止更晚而越过本次命令期限。`inspect/capture` 拒绝附带证明，包括显式空参数。只有success JSON但输出编码失败或原进程未正常exit0也不能通过；失败原材料加手工SHA/合法恢复批准仍在ENV前拒绝。
+
+提交前冻结字节实际通过普通297项、race297项，每项一次RUN/PASS、0FAIL/SKIP；integration仅编译、tagged vet、pinned lint2.5和格式检查通过。私有 `qs-m4-d-capture-evidence-source-v2` 的QA回执 SHA `bb2493e1ba1f731521013ecfec7b4ee71d082dcc33532492025d7fcb71bd97d2`、49输入绑定 `cfbbd3f66818f87847432a02568f8f3c85605fa5b6c82443ff798f05e838479a` 与 ef438 包字节逐项相同；保留实际执行时base/工作区信息，不把旧command的source SHA改写为新提交。原53项名单/顺序保持，但其producer已改为保存真实serve原stdout/返回码，故新源码53项与最终head CI/AI仍须独立验收。
+
+原 `a563428c4a7533aa0127d5c48e50ecd981e77748` CI已终态24 success、1设计skip，其native严格53项摘要通过；实际编译merge `5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2` 的tree与a563相同。该head的fresh复审同时指出上述真实P2（review comment4283352990），因此旧绿色CI不能替代修复后源码验收。生产继续暂停；停写、DDL、发布、完整材料/窗口、30/60分钟、RPO0及业务资格均未因此取得。
+
+后续 `fed27d59b7d01449854681c2f66c7493ff39d91d` 的真实CI原生job `116463170837` 已失败：保留的截断后端日志明确记录 `ConnectionLossKeepsServerGate` 在 `native_runtime_gate_test.go:272` 报 `owned upstream connection not created`。该特例直接调用run以保留真实上游socket，未经过自动附加capture执行证据的actionContext，遗漏两项proof参数。原日志没有保留此raw run的返回回执；独立无数据库red用同一参数构造器实际复现 `original_capture_evidence_required`、ENV读取0次，不能把该独立复现伪记为CI原回执。
+
+测试源码 `5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc` 仅修正这一特例的consumer输入，补齐原capture执行证据，并在等socket时先接收已完成操作的安全错误类别，避免早失败再等待20秒而掩盖首因。新增纯参数回归使用同一构造器，通过材料/proof/恢复批准后实际读取ENV两次，并以空连接配置止于连接边界；不连接数据库。真实pending CREATE、取消关闭、本地关闭不能证明服务端锁释放、unknown-release及保留数据断言不变；生产Go、固定53项名单/顺序和工作流字节均不变，新增参数回归不计入53项。
+
+该提交49包输入逐字匹配本地冻结QA：普通297/race297均一次RUN/PASS、0FAIL/SKIP，纯参数tag普通/race各1项通过，tag仅编译/vet/pinned lint2.5/格式通过。私有 `qs-m4-d-fed27-native-fixture-input-v1` 保留原失败、red/green与QA回执 `baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56`、输入绑定 `10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8`；实际命令在fed27工作区执行，未改写原source归属。fed27失败仍为失败，5aa2后的真实53项及最终head CI/AI仍待独立验收，生产继续暂停；未执行Docker、SSH、数据库、生产操作或全仓Go。
+
+后续旧 push head `3e5a860639d65790026235842f6168b3422714e7` 的真实CI原生job `116475245327` 已成功；保全的截断后端尾包含完整严格摘要，固定53名各一次RUN/PASS、0FAIL/SKIP，实际编译工具仍记为 `313062a1a7e3112234577133f4084b93c06543f0`。原始后端 SHA `8815be6055bb31eafa8248016d749896722fa3cf2c10f0f55834a481dc2a3683` 与具名读取证明 `04ed9e08e24538f4cd441cae1c4e8770b50084f06a65a600e2e7d8783269044e` 保留该来源及截断界限；不是补造全量原生日志，不把旧fed27失败改签，也不移签为下述新合并头。
+
+合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。
+
+#### D 当前代次边界与 clean103 只读检查（新整合 CI 待验）
+
+当前整合 `e447db20b5f85a3a10095d1de29b643f107dab02` 正常合并冻结 D `c459ce1af0cf371b749099dbfaf9c0d0642a34c4` 与实际 main `73fb54c2679710d12f1806eede7550a6509d4961`。A16/B25/C20 个非 Markdown 包文件逐字保留 incoming main，D55 个包文件逐字保留 c459；没有纳入另支 C 新 verify-restored/gate。两父 command、原生、生产、限制对象保持原归属。
+
+D 当前材料为 format3，固定增加同数据库的 `m4_d_runtime_boundary` 代次/指纹，不再仅靠 capture 目录内 marker 排除跨目录旧恢复。capture 只读观察，不创建边界表；真正 mark-first-runtime 在原同库 GET_LOCK 内，以固定 schema 的初始原子建表或 generation/hash/原文 CAS 提交意图，读回后再持久写本地 marker。旧代次材料在 restore、verify-target、verify-restored 与 marker 链拒绝，clean102 可在当前代次重新 capture 新一轮 T0；不得 reset、删除边界或重签旧材料。该临时表归 D 恢复/启动边界职责，待全部责任结清后随专用设施独立退役。DB 已提交而 marker/输出失败仍保守阻断，精确同已提交意图完成入口尚未实现，不自动延长原意图。
+
+另外三个具名修复保持窄范围：Mongo 身份使用实际非空 replica-set 名并保留原 rs0 编码；capture 文件名 `first-runtime` 在 ENV 前拒绝以防与派生 marker 自撞；五张历史表的单行和恢复 batch 均最多1MiB、无单行豁免，八张现代保留表原12MiB哈希读取预算不变。超限历史值阻断 capture，不截断或删除。
+
+只读 inspect 现接受 clean102 或 clean103，并在只读 RR 内与前后完整身份、账本和 DB 边界观察一致后才完成；全部连接/锁释放成功后才输出可选 `inspected_sql_version`。dirty、未知版本、外来/隐藏边界拒绝；capture 和所有材料消费者的原成功 stdout 协议拒绝该字段的任何出现（含 null/0），原 capture 输出字节 golden 保持。没有扩展 capture 或恢复准入，也没有 Mongo 认证只读账号的验证声明。
+
+原生证明分开归属：`506b0565619c8603bdc852fc0ce67ff2f31b92de` 的两个 fresh owned 批次合计原53+代次12各一次 RUN/PASS、0FAIL/SKIP，独立回执 `4037a94dfa351c808006c2a16bcee6052708e448d1809a5a05f040bcb7044345`。只读新9项另在 `c459ce1af0cf371b749099dbfaf9c0d0642a34c4` 实际逐项通过，exit0、51.130秒，receipt `3227106891af3cab8d45e33d43767e1db225b7b288bfc6156f991a356d452c7c`、root独立闭环 `382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be` 核实源、binary、PID/PGID、精确 owned 清理和旧 IDs/images/volumes 保留。新9使用实际 SELECT-only MySQL 账号并验证写权限拒绝；Mongo fixture 无认证。c459本地普通/race各364项、configcontract各91项通过（QA `5fc119cc0d4ae5f65978da02631c01d53526c8f54cded8a8c4e989ec1b40844f`）。这些不同源结果不拼成当前整合头已实际运行完整74，也不改写先前 OOM/失败原件或宣称旧 runtime 元数据恒定。
+
+CI-only `fc40b4a7ea3a02ddfedef763fca905f6345bc36d` 将 metadata/A/B/C/D53/第二D 六个 fresh 阶段完整保留，第二D以同一8分钟命令显式选择代次12和只读9，逐日志53/21及同源 union74严格逐名 RUN/PASS、0FAIL/SKIP；旧65名单与顺序不变。外层90分钟来自6×8分钟测试＋6×3分钟就绪等待＋20分钟准备/证明/清理=86分钟向上取整，不改生产30/60分钟窗口。实际 configcontract普通/race各100项、目标28项、7个真实 shell mock 流程、15YAML/184bash/8嵌入Python语法、actionlint、vet/pinnedlint通过（QA `888aadc183f801ed2ec1db1e40515ecd1e13a394eea3256457ae22e7cd448b41`）；可选 ShellCheck/pyflakes 未运行。当前新head完整74和 hosted CI/AI仍待，生产暂停、材料/冻结/正式六实例/30/60分钟/RPO0/业务验收继续未闭。
+
+D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
+
 
 ## 新空库的批准
 
