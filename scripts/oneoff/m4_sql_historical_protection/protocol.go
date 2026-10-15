@@ -73,6 +73,7 @@ type material struct {
 	AResources     string        `json:"a_execution_resources_sha256"`
 	AResourceFiles int           `json:"a_execution_resource_files"`
 	CapturedAt     string        `json:"captured_at"`
+	CapturePath    string        `json:"first_capture_path"`
 	SQLName        string        `json:"mysql_database"`
 	MongoName      string        `json:"mongo_database"`
 	SQLIdentity    string        `json:"mysql_identity_sha256"`
@@ -121,6 +122,9 @@ func strictDecode(raw []byte, target any) error {
 	return nil
 }
 func validateMaterial(m material, tool, sqlName, mongoName string) error {
+	if !filepath.IsAbs(m.CapturePath) || filepath.Clean(m.CapturePath) != m.CapturePath {
+		return errors.New("material_first_capture_path_required")
+	}
 	if m.Format != 1 || m.Kind != "m4_a_sql_null_object_protection" || m.ToolSource != tool || !sourceRE.MatchString(tool) || m.ASource != aSource || m.AResources != aResources || m.AResourceFiles != aResourceFiles || m.SQLName != sqlName || m.MongoName != mongoName || !hashRE.MatchString(m.SQLIdentity) || !hashRE.MatchString(m.MongoIdentity) || !hashRE.MatchString(m.MongoUUID) || len(m.MongoHead) == 0 || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{100, false}) || m.LedgerDDL == "" {
 		return errors.New("material_binding_rejected")
 	}
@@ -283,6 +287,19 @@ func readPrivate(path, expected string, limit int64) ([]byte, error) {
 	if !hashRE.MatchString(expected) {
 		return nil, errors.New("external_fingerprint_required")
 	}
+	raw, e := readOwnedPrivate(path, limit)
+	if e != nil {
+		return nil, e
+	}
+	if fingerprint(raw) != expected {
+		return nil, errors.New("private_file_hash_or_release_failed")
+	}
+	return raw, nil
+}
+
+// Only tool-owned recovery state in the original capture's fixed private parent
+// has no caller-supplied SHA. Material and approval inputs still use readPrivate.
+func readOwnedPrivate(path string, limit int64) ([]byte, error) {
 	s, e := privatePath(path, true)
 	if e != nil || !s.Mode().IsRegular() || s.Mode().Perm() != 0600 || s.Sys().(*syscall.Stat_t).Nlink != 1 || (s.Sys().(*syscall.Stat_t).Uid != 0 && s.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid())) || s.Size() < 1 || s.Size() > limit {
 		return nil, errors.New("private_file_rejected")
@@ -300,7 +317,7 @@ func readPrivate(path, expected string, limit int64) ([]byte, error) {
 	after, se := f.Stat()
 	ce := f.Close()
 	current, pe := os.Lstat(path)
-	if e != nil || se != nil || ce != nil || pe != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || len(raw) > int(limit) || fingerprint(raw) != expected {
+	if e != nil || se != nil || ce != nil || pe != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || len(raw) > int(limit) {
 		return nil, errors.New("private_file_hash_or_release_failed")
 	}
 	return raw, nil
@@ -345,11 +362,6 @@ func checkMarker(path string) error {
 	}
 	return nil
 }
-func consumeApproval(path string, a approval, hash string) error {
-	raw, _ := json.Marshal([]string{a.Operation, hash, a.MaterialHash})
-	return writeExclusive(path+".consumed", raw)
-}
-
 func nonzeroHash(s string) bool {
 	return hashRE.MatchString(s) && s != "0000000000000000000000000000000000000000000000000000000000000000"
 }
