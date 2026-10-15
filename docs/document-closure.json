@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
+    "sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -14042,7 +14042,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
+        "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14273,6 +14273,38 @@
           "result": "matched",
           "source_sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence.go",
+          "selector": "func readCaptureEvidence(",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence.go",
+          "selector": "func decodeCaptureEvidence(",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence_test.go",
+          "selector": "func TestFailedCaptureMaterialBytesCannotAuthorizeConsumers(",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/main.go",
+          "selector": "f.Visit(func(v *flag.Flag)",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -14316,7 +14348,9 @@
           "Historical8cc source completed owned native47-v4 exact47RUN/PASS0FAIL/SKIP (receipt0e7764b07a72809124bbc330ee7994edd99817e6c35a850164c03f8495fd2517) and one fixed-parent synthetic capacity-v10 run:247463rows/table,498 EOF-inclusive pages,6144B per added Outcome; measured DATA+INDEX2321170432B, capture19.775s/verify-target20.229s/restore108.269s/fresh10039. Actual two ADDs32.505s/11.688s, PFS errno0, full originalDDL/all retained/count/EOF and captured ledger-last passed, owned resources released. Capacity receipt25cd522fde01bfd12a9153c39f0a368606ebeedd346f05561dd3e0feab268845 and compact81b7806d93010d69c9c465d15dcf9ab81fb58afe0ba35fa955968a7e3897af59 retain8cc source, not a production distribution, new-source full local run or30/60min/RPO signoff. OldIDs/images/volumes preserved; nsqd autonomous restart2798->2803 means old runtime stability false. Actual070ba PR CI24success/1designedskip stays bound to that historical head.",
           "Capture-only source31b661ed457b8db307f02004f3a4313d13ecfebf holds its original preENV directory FD through relative Openat OEXCL creation/readback/inode-owner-mode-nlink checks/file+dirsync; final canonical parent/owner check and Close-success precede last context check and MaterialHash. Shared writer/journal/recovery/SQL core and288 resource files remain byte-identical to8cc (bridge5b94e6566d5685a1ed8cd5c7d8fbb043429b8eb429f3f53c08a545ee8d8da11f). Actual ordinary143 and race143 RUN/PASS0FAIL/SKIP include real transient-swap old write/readback reproduction versus held-FD canonical persistence, missing/different byte refusal, Close-context/hash and existing/symlink preservation; tagged race compilation(no native),vet and incremental lint passed, QA04d0cc149398592caacc665b5b9fc268cfe718caa41095710a7648f83bb6f557. Current exact PR-head CI47 is required/pending; no local full47/capacity repeats are claimed for this pure capture I/O task, and historical8cc proof is not relabelled. Production bundle,freeze,RPO/windows remain unsigned.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
-          "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification."
+          "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Source602710eb2f6ee383923230890c4bdb4a3bcada3a adds only externally frozen capture-execution evidence to material consumers:32KiB six-member m4_a_capture_execution envelope binds original private64KiB stdout/rawSHA, termination exited and explicit integer exit0. The typed original capture must complete with matching material/tool/A511/77e/280 identity and all original physical releases; alias/duplicate/missing/null shape, failed/unknown flags and production claims reject. Trusted external executor evidence is not a signature or a tool-issued seal. PreENV,restore preclaim and final after-release reads use the same proof. Failed post-write material remains diagnostic and cannot be revived by a hand-computed hash/approval. Original receipt/material/approval schemas,privatePath sticky rule,journal,recovery guards and historical resource bytes remain unchanged.",
+          "Exact Go/SQL component bytes in602710 match source-only QA workingSHA59b371111aa964fb3166100d77810a2b2e36b0873cc1eae7236d4ce56f63aeaf. Ordinary204 and race204 RUN/PASS0FAIL/SKIP,tagged compile-only(no native run),taggedvet,normal lint and tagged changed-code lint passed with GOMAXPROCS2/GOMEMLIMIT1GiB;source-review receiptb608b55cdc8bf61afa4f6d5705fa6a112da4675fe14cbdd09f2537f4435a28ed and original QA logs remain in private capture-execution-evidence-source-v1/wire-shape-v2. Full tagged lint retains the original unchanged QF1003 and is not signed all-green. Native fixture now freezes actual serve stdout/return status only after successful capture; original13tops/34children47selectors and assertions remain. New-source/final-head native47,freshCI/AI,newformalbinary/controller,production restore/fullwindow/RPO/30/60minute qualification remain pending. Prior190 QA and all historical native/capacity/production/signoff objects retain their original sources."
         ]
       },
       "gaps": [
@@ -14331,8 +14365,8 @@
           "id": "M4-A-CURRENT-TOOL-QUALIFICATION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.",
-          "exit_criteria": "Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff."
+          "summary": "Capture-execution source602710 has actual204 ordinary/race proof and compile-only native fixtures; new exact-head native47, trusted executor/tool/controller binding and final production bundle remain pending.",
+          "exit_criteria": "Require actual exact-head CI47 including real successful capture stdout/exit evidence and existing regressions, final tool/source/executor/controller bindings, and separately approved production prerequisites. Preserve historical31b/8cc native/capacity sources and all failed capture diagnostics; no hand-computed material hash revives failed capture, and no compilation or source bridge signs production RPO/window qualification."
         }
       ]
     },

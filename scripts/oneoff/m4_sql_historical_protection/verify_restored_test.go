@@ -46,7 +46,7 @@ func TestVerifyRestoredRequiresAlreadyClaimedApprovalBeforeEnvironment(t *testin
 				}
 			}
 			before, _ := os.ReadFile(journal)
-			r := run(context.Background(), []string{"--action=verify-restored", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + mp, "--material-sha256=" + mh, "--approval-file=" + ap, "--approval-sha256=" + ah}, func(string) string {
+			r := run(context.Background(), append([]string{"--action=verify-restored", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + mp, "--material-sha256=" + mh, "--approval-file=" + ap, "--approval-sha256=" + ah}, testCaptureEvidence(t, m, mh)...), func(string) string {
 				t.Fatal("connection input read before existing recovery state was proved")
 				return ""
 			}, testSource, nil)
@@ -139,7 +139,7 @@ func TestVerifyRestoredArgumentsRequireOriginalApproval(t *testing.T) {
 	if _, e := parseArgs(base); e == nil {
 		t.Fatal("read-only verification accepted no independent approval")
 	}
-	args := append(base, "--approval-file=/private/original-approval.json", "--approval-sha256="+strings.Repeat("b", 64))
+	args := append(base, "--approval-file=/private/original-approval.json", "--approval-sha256="+strings.Repeat("b", 64), "--capture-evidence-file=/private/original-capture-execution.json", "--capture-evidence-sha256="+strings.Repeat("c", 64))
 	if _, e := parseArgs(args); e != nil {
 		t.Fatal("fixed verification inputs refused", e)
 	}

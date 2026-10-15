@@ -194,7 +194,7 @@ func TestCopiedOrOldMaterialPathRejectedBeforeEnvironment(t *testing.T) {
 			}
 			hash = fingerprint(old)
 		}
-		r := run(context.Background(), []string{"--action=verify-target", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + path, "--material-sha256=" + hash}, func(string) string { t.Fatal("environment read before material path rejection"); return "" }, testSource, nil)
+		r := run(context.Background(), append([]string{"--action=verify-target", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + path, "--material-sha256=" + hash}, testCaptureEvidence(t, m, hash)...), func(string) string { t.Fatal("environment read before material path rejection"); return "" }, testSource, nil)
 		if r.Complete || r.Error != "material_rejected" {
 			t.Fatalf("copied/missing anchor accepted: %+v", r)
 		}
