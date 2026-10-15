@@ -1005,7 +1005,7 @@ func TestM4SQLObjectNativeRestoreContinuation(t *testing.T) {
 					cancel()
 				}
 			})
-			if r.Complete || len(acks) != tc.acks || acks[0] != 1 || (tc.acks == 2 && acks[1] != 0) {
+			if r.Complete || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.TransactionReleaseUnproven || len(acks) != tc.acks || acks[0] != 1 || (tc.acks == 2 && acks[1] != 0) {
 				t.Fatal("explicit interruption did not follow successful reverse ADD acknowledgments", r.Error, acks)
 			}
 			if !reflect.DeepEqual(readOwnedLedger(t, h), ledgerBefore) {
@@ -1030,10 +1030,7 @@ func TestM4SQLObjectNativeRestoreContinuation(t *testing.T) {
 			if old.Complete || old.Error != "restore_approval_consumption_failed" || !reflect.DeepEqual(readOwnedLedger(t, h), ledgerBefore) || h.fullDDL() != actual {
 				t.Fatal("consumed approval reused or changed restored facts", old.Error)
 			}
-			next, sameMarker := h.restoreInput()
-			if sameMarker != marker || reflect.DeepEqual(next, args) {
-				t.Fatal("continuation did not bind a new independent approval to the same first marker")
-			}
+			next := nextOwnedRestoreApproval(t, h, args, marker)
 			resumed := h.action("restore", next...)
 			if !resumed.Complete || !resumed.SQLConnectionClosed || !resumed.SQLPoolClosed || !resumed.MongoClosed || resumed.TransactionReleaseUnproven || h.fullDDL() != original {
 				t.Fatal("new explicit approval could not finish the admitted prefix", resumed.Error)
@@ -1046,6 +1043,46 @@ func TestM4SQLObjectNativeRestoreContinuation(t *testing.T) {
 			t.Logf("actual successful ADD acknowledgments=%d; original101 ledger remained unchanged; new approval restored original DDL/facts/ledger and released clients", tc.acks)
 		})
 	}
+}
+
+func nextOwnedRestoreApproval(t *testing.T, h *nativeFixture, original []string, marker string) []string {
+	t.Helper()
+	var path, hash string
+	for _, arg := range original {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			path = strings.TrimPrefix(arg, "--approval-file=")
+		}
+		if strings.HasPrefix(arg, "--approval-sha256=") {
+			hash = strings.TrimPrefix(arg, "--approval-sha256=")
+		}
+	}
+	raw, e := readPrivate(path, hash, 32768)
+	var first approval
+	if e != nil || strictDecode(raw, &first) != nil || first.Marker != marker {
+		t.Fatal("first independently frozen approval unavailable for explicit continuation")
+	}
+	next := first
+	next.Operation = fmt.Sprintf("%d-2", time.Now().UnixNano())
+	if next.Operation == first.Operation {
+		t.Fatal("continuation operation was not independent")
+	}
+	// Keep the original freeze, material, marker, decision and absolute expiry/
+	// deadline unchanged. A new attempt cannot reset its recovery budget.
+	raw, e = json.Marshal(next)
+	path = filepath.Join(h.dir, next.Operation+"-approval.json")
+	if e != nil || writeExclusive(path, raw) != nil {
+		t.Fatal("new explicit continuation approval could not be frozen")
+	}
+	args := append([]string(nil), original...)
+	for i, arg := range args {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			args[i] = "--approval-file=" + path
+		}
+		if strings.HasPrefix(arg, "--approval-sha256=") {
+			args[i] = "--approval-sha256=" + fingerprint(raw)
+		}
+	}
+	return args
 }
 
 type ownedLedger struct {
