@@ -235,7 +235,17 @@ func (h *nativeFixture) migrateMongo(source fs.FS, target uint, wantFailure bool
 		_ = client.Disconnect(h.t.Context())
 		h.t.Fatal(e)
 	}
-	cleanup, e := qsMigration.NewMongoDriver(client).PrepareRun(h.t.Context(), &qsMigration.Config{Database: h.name}, 0)
+	before, dirty, e := dd.Version()
+	if e != nil || dirty || before < migrate.NilVersion {
+		h.t.Fatal("real provider current version required before normal preparation")
+	}
+	versionBefore := uint(0)
+	if before != migrate.NilVersion {
+		versionBefore = uint(before)
+	}
+	// Initial preparation sees0; installed39 must not recreate namespaces that
+	// historical retirement migrations already dropped.
+	cleanup, e := qsMigration.NewMongoDriver(client).PrepareRun(h.t.Context(), &qsMigration.Config{Database: h.name}, versionBefore)
 	if e != nil {
 		h.t.Fatal(e)
 	}

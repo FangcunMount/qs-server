@@ -112,6 +112,15 @@ func closeSQLPool(db *sql.DB) bool {
 	return e == nil && s.OpenConnections == 0 && s.InUse == 0
 }
 
+func objectClientOptions(uri string) *options.ClientOptions {
+	opts := options.Client().ApplyURI(uri).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetConnectTimeout(queryLimit).SetServerSelectionTimeout(queryLimit).SetSocketTimeout(0).SetRetryReads(false).SetRetryWrites(false)
+	// SetTimeout(0) still enables CSOT in driver1.17.6, which makes RunCommand
+	// with our explicit maxTimeMS undefined (and can append a second maxTimeMS).
+	// Clear the URI timeout entirely; each operation keeps its bounded context.
+	opts.Timeout = nil
+	return opts
+}
+
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
 	r = receipt{BSource: bSource, BResources: bResources, BResourceFiles: bResourceFiles, Error: "arguments_invalid"}
 	a, e := parseArgs(args)
@@ -246,7 +255,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	// Operation contexts, not a client-wide timeout, bound each fixed read.
 	// This prevents a future approved createIndexes wait being silently capped
 	// by a URI timeoutMS/socketTimeoutMS or retried by the driver.
-	d.mongo, e = mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetConnectTimeout(queryLimit).SetServerSelectionTimeout(queryLimit).SetTimeout(0).SetSocketTimeout(0).SetRetryReads(false).SetRetryWrites(false))
+	d.mongo, e = mongo.Connect(ctx, objectClientOptions(uri))
 	if e != nil {
 		r.Error = "mongo_connect_failed"
 		return r

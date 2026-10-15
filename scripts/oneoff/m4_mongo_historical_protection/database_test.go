@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"go.mongodb.org/mongo-driver/bson"
@@ -178,4 +179,11 @@ func TestCanceledEntryReleasesOnlyOwnedPoolAndDoesNotCreateMaterial(t *testing.T
 		t.Fatal("canceled first capture created a file")
 	}
 
+}
+
+func TestClientClearsURICSOTWithoutEnablingZeroTimeout(t *testing.T) {
+	opts := objectClientOptions("mongodb://127.0.0.1:27017/qs_owned?timeoutMS=5000&socketTimeoutMS=5000&connectTimeoutMS=9000&retryReads=true&retryWrites=true")
+	if opts.Validate() != nil || opts.Timeout != nil || opts.SocketTimeout == nil || *opts.SocketTimeout != 0 || opts.ConnectTimeout == nil || *opts.ConnectTimeout != 5*time.Second || opts.ServerSelectionTimeout == nil || *opts.ServerSelectionTimeout != 5*time.Second || opts.RetryReads == nil || *opts.RetryReads || opts.RetryWrites == nil || *opts.RetryWrites {
+		t.Fatal("explicit maxTimeMS command still subject to CSOT/URI timeout or automatic read/write retry")
+	}
 }
