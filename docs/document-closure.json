@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+    "sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4505,7 +4505,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4900,6 +4900,30 @@
           "result": "matched",
           "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/protocol_test.go",
+          "selector": "dir := privateRecoveryDir(t)",
+          "result": "matched",
+          "source_sha": "7d1cd57eece7819f289ade03205b15b7d41810bb",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "anchor_kind = 'hard_failure'",
+          "result": "matched",
+          "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "name: Upload failed ordinary test log",
+          "result": "matched",
+          "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4935,7 +4959,11 @@
           "C test-only source6973dff1ba06b013f445280e76c9a06b44c5b7c7 prepares8 database tops with13 children, not15 total events: the6 original unbound-input children remain in addition to4 original102 DROP-prefix recovery and3 actual-OK response-loss continuation children. Original historical providers generate real101/40 and dirty102/clean102 states; no Force/SetVersion or fixture ledger writes. The valued fixtures include SQLNULL/JSONnull/array order/four-byte/0/MAX,205 additional rows for100-row CAS batches, valid immutable modern task/recovery payloads and real FindTask/FindRecovery assertions; first foreign nullable state is refused. Receipt37abe5c19de5cfd59ee6d36dbd2671bfedb40c79ed3977145c606510b202df0e binds actual32top/150 ordinary race RUN/PASS and2 source/in-memory tops+4children=6 RUN/PASS,0FAIL/SKIP, tagged vet/lint and integration compilation. All8 database tops remain unexecuted; no current C-tool capture or recovery database qualification, three-service startup, T0 material, freeze, production approval, window or RPO is supplied. A read-only verify-restored terminal entry is still absent from C. Source/CI/production/signoff history is preserved; no push or PR occurred.",
           "Actual C-tool native source/compiled716aa7008f4821f78abbff4a8e268e874791163b passed8 required database tops plus13 children,21 unique RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/Mongo7.0.31rs0. The13 children include6 original rejected-material cases,4 genuine dirty102/clean102 original-DROP states and3 actual-server-OK response-loss continuations. Raw JSONLe21cecbde9a925f2496540d057c0186d99d80985d509fd8c0b4c79b9c1aa7c9f/receipt07633956eba5e2c097fd515e623c1c2d6dcc2acec607df6e4318a1eec995305e/independent summary6d3a59b66ba110be019418aa34046e38f87b189d90089502627c7f396fafa3c3 retain exact actual argv, all required names, source/binary/runner bindings and owned cleanup. These prove formal C capture/verify/original raw values and four-table facts, genuine ledger-last restoration, partial100-row/nullable continuation with new operation, valid immutable modern FindTask/FindRecovery reads and foreign-partial refusal. Earlier6973 ordinary/source-only and historical native records remain bound to their own sources. Both owned containers/bridge/child group released, prior IDs/images/volumes retained; old NSQ Restart2777-to2779 means global runtime metadata stability is false.84.170656s is only this small synthetic suite (including209-row-per-target scenarios), not production window/recovery/RPO. No production access/T0 material/freeze/business runtime/full three-service startup/current CI/release is attested; other unexecuted recovery failures and read-only unknown-ledger-commit terminal proof remain open. Equivalent replay is not recorded as an actual passed command.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
-          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution."
+          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
+          "Prior complete verified marker preserved before C Linux ordinary fixture and bounded-failure-wrapper review: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Actual C989702bd8b26f4804f29a6e7ff1b948513ff96c7 RunTests116470356036 failed; backend retains only120k truncated tail, first failure remains unknown. Independent exact989 CGO0linuxamd64 cached-image UID501/read-only-rootfs/network-none/privateHOME/publictmp1777 carrier actually ran192RUN/191PASS/1FAIL/0SKIP,exit1,noOOM; TestPrivateFirstCaptureIsExclusiveAndExternallyBound protocol_test.go212 private_directory_rejected is local reproduction, not the original CI cause. Failed receipt7944ec38a58dbdfc81da5f3f5ee631696b532838bb88bd1eae1f2000896826f4 retains inputs/binary/logs. Owned CID was identity-checked, rm response compared to fullCID in control flow, and original after inventory proves absence; separate raw rm stdout was not preserved. OldCID/image/volume/network and source/binary preserved.2.479seconds is this noDB test/cleanup duration only; lane returned, no furtherDocker/DB/SSH or production run.",
+          "Test-only source7d1cd57eece7819f289ade03205b15b7d41810bb changes only the failing protocol test directory setup from t.TempDir to existing qualified privateRecoveryDir(HOME), retaining original exclusive/hash/symlink/public-file negative assertions and192names. No production guard/globalTMPDIR change. Frozen20package inputs bridge actual Darwin ordinary192/race192 each onceRUN/PASS0FAIL/SKIP,tagcompile-only/vet/pinnedlint2.5 to commit objects; QA57b6f776f7b34fca5dce102fba7acdf15fc229fd993cf32087524cefb6bca764. Corrected Linux runtime/newhead21native/fullCI/AI remain pending. Historical commands/native/prod/signoffs retain original source attribution.",
+          "CI-only sourcead092d50db54caec5b0df1009ebbd95553ab151a imports exact D3e5a860639d65790026235842f6168b3422714e7 RunTests hard-anchor wrapper and strict failure-only14day raw-log artifact step, retaining original Go flags and Go/tee exits. All other C workflow bytes,stage ordering,A47/B37/C21 proofs/names andCI60min are unchanged; no Dnative phase. Original10shell cases and configcontract52top/72total RUN/PASS0FAIL/SKIP passed;80bash scripts,5heredoc+3inline Python compile,actionlint0. OptionalShellCheck/pyflakes unavailable,not claimed. QAfb1a49038ed43dc532ea1a5291ed64a525923a09b6a3f91251c2e70733d06669 retains exact bytes/raw output; no hostedCI success implied. Raw CI artifact14day retention is not production backup retention. Original verification commands,production identity/signoffs and pending T0/freeze/windows/RPO/business remain unchanged."
         ]
       },
       "gaps": [
@@ -11178,7 +11206,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11788,7 +11816,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution."
+          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
+          "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
         ]
       },
       "gaps": [],
@@ -13156,7 +13186,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13769,7 +13799,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution."
+          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
+          "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
         ]
       },
       "gaps": [],
@@ -13891,7 +13923,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14315,7 +14347,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution."
+          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
+          "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
         ]
       },
       "gaps": [
@@ -14337,7 +14371,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14622,7 +14656,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution."
+          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
+          "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
         ]
       },
       "gaps": [
@@ -14651,7 +14687,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14960,7 +14996,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution."
+          "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
+          "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
         ]
       },
       "gaps": [
