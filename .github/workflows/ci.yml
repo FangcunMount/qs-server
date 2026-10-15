@@ -236,31 +236,52 @@ jobs:
           import json, sys
           expected = {
               'TestM4SQLObjectNativeCaptureAndTargetVerification',
-              'TestM4SQLObjectNativeOriginalDefinitionDriftRefused',
-              'TestM4SQLObjectNativeRecoveryMatrix',
-              'TestM4SQLObjectNativePermissionAndLedgerFailure',
-              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused',
-              'TestM4SQLObjectNativeCommitResponseLossRemainsUnknown',
-              'TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF',
               'TestM4SQLObjectNativeCharsetBoundRecovery',
-              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB3DirtyFirstDDLToolMB4',
               'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB3CleanBothDDLToolMB4',
-              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB4DirtyFirstDDLToolMB3',
+              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB3DirtyFirstDDLToolMB4',
               'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB4CleanBothDDLToolMB3',
-              'TestM4SQLObjectNativeExistingEncodingMismatchRefusedBeforeClaim',
-              'TestM4SQLObjectNativeRestoreDDLDeadlines',
-              'TestM4SQLObjectNativeRestoreDDLDeadlines/pending_over_five_seconds_then_complete',
-              'TestM4SQLObjectNativeRestoreDDLDeadlines/earlier_approval_deadline',
-              'TestM4SQLObjectNativeRestoreDDLDeadlines/earlier_approval_expiry',
+              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB4DirtyFirstDDLToolMB3',
+              'TestM4SQLObjectNativeCommitResponseLossRemainsUnknown',
               'TestM4SQLObjectNativeCompleteCountBudgets',
-              'TestM4SQLObjectNativeCompleteCountBudgets/pending_over_five_seconds_then_complete',
-              'TestM4SQLObjectNativeCompleteCountBudgets/earlier_action_deadline',
               'TestM4SQLObjectNativeCompleteCountBudgets/actual_count_mismatch',
+              'TestM4SQLObjectNativeCompleteCountBudgets/earlier_action_deadline',
+              'TestM4SQLObjectNativeCompleteCountBudgets/pending_over_five_seconds_then_complete',
+              'TestM4SQLObjectNativeExistingEncodingMismatchRefusedBeforeClaim',
+              'TestM4SQLObjectNativeOriginalDefinitionDriftRefused',
+              'TestM4SQLObjectNativeOriginalDefinitionDriftRefused/CheckChanged',
+              'TestM4SQLObjectNativeOriginalDefinitionDriftRefused/ColumnMoved',
+              'TestM4SQLObjectNativePermissionAndLedgerFailure',
+              'TestM4SQLObjectNativePermissionAndLedgerFailure/DDLPermissionDenied',
+              'TestM4SQLObjectNativePermissionAndLedgerFailure/LedgerDeleteDeniedAfterObjectsVerified',
+              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused',
+              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused/FirstRuntimeCommandMarker',
+              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused/NewPersistentFact',
+              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused/NonNullCapture',
+              'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused/RetainedFactChanged',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/ChangedDecision',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/ChangedMarkerAfterFirstRuntime',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedMaterialPath',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/CorruptBoundary',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/ExtendedDeadline',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/MissingBoundaryAfterClaim',
+              'TestM4SQLObjectNativeRecoveryBoundaryAttacks/ReencodedSameOperation',
+              'TestM4SQLObjectNativeRecoveryMatrix',
+              'TestM4SQLObjectNativeRecoveryMatrix/Clean101BeforeFirstRuntime',
+              'TestM4SQLObjectNativeRecoveryMatrix/DirtyAfterBothDDL',
+              'TestM4SQLObjectNativeRecoveryMatrix/DirtyAfterFirstDDL',
+              'TestM4SQLObjectNativeRecoveryMatrix/DirtyBeforeAnyDDL',
               'TestM4SQLObjectNativeRestoreContinuation',
-              'TestM4SQLObjectNativeRestoreContinuation/dirty_after_first_add_ack',
-              'TestM4SQLObjectNativeRestoreContinuation/dirty_after_second_add_ack',
               'TestM4SQLObjectNativeRestoreContinuation/clean_after_first_add_ack',
               'TestM4SQLObjectNativeRestoreContinuation/clean_after_second_add_ack',
+              'TestM4SQLObjectNativeRestoreContinuation/dirty_after_first_add_ack',
+              'TestM4SQLObjectNativeRestoreContinuation/dirty_after_second_add_ack',
+              'TestM4SQLObjectNativeRestoreDDLDeadlines',
+              'TestM4SQLObjectNativeRestoreDDLDeadlines/earlier_approval_deadline',
+              'TestM4SQLObjectNativeRestoreDDLDeadlines/earlier_approval_expiry',
+              'TestM4SQLObjectNativeRestoreDDLDeadlines/pending_over_five_seconds_then_complete',
+              'TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
           if any(event.get('Action') in ('skip', 'fail') for event in events):
@@ -269,7 +290,7 @@ jobs:
               actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
               if actual != expected:
                   raise SystemExit('A object native selectors did not all RUN/PASS')
-          print('A object native: twelve top-level, four cross-charset, three DDL deadline, three COUNT budget and four restore-continuation selectors RUN/PASS; zero SKIP')
+          print('A object native: thirteen top-level plus thirty-four child selectors, all 47 RUN/PASS; zero SKIP')
           PY_OBJECT_PROOF
 
   action-audit-mysql:
