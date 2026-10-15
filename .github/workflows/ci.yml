@@ -174,7 +174,12 @@ jobs:
               [[ "$(docker inspect --format '{{index .Config.Labels "qs.mongo-metadata.fixture"}}' "$fixture_cid")" == "$fixture_owner" ]] || return 1
               [[ "$(docker inspect --format '{{.Name}}' "$fixture_cid")" == "/$fixture_name" ]] || return 1
               printf 'B_MONGO_OWNED_PHASE %s\n' "$fixture_phase"
-              if ! docker inspect --type container --format 'B_MONGO_OWNED_STATE {"id":{{json .Id}},"running":{{json .State.Running}},"exit_code":{{json .State.ExitCode}},"oom_killed":{{json .State.OOMKilled}},"error_present":{{ne .State.Error ""}},"memory":{{json .HostConfig.Memory}},"memory_swap":{{json .HostConfig.MemorySwap}}}' "$fixture_cid"; then
+              if fixture_state_json="$(docker inspect --type container --format '{"id":{{json .Id}},"running":{{json .State.Running}},"exit_code":{{json .State.ExitCode}},"oom_killed":{{json .State.OOMKilled}},"error_present":{{ne .State.Error ""}},"memory":{{json .HostConfig.Memory}},"memory_swap":{{json .HostConfig.MemorySwap}}}' "$fixture_cid")"; then
+                printf 'B_MONGO_OWNED_STATE %s\n' "$fixture_state_json"
+                if ! python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(0 if s.get("running") is True and s.get("oom_killed") is False and s.get("error_present") is False else 1)' <<< "$fixture_state_json"; then
+                  fixture_state_evidence=false
+                fi
+              else
                 fixture_state_evidence=false
               fi
               if ! docker exec "$fixture_cid" df -kP /data/db /data/configdb 2>/dev/null | awk '
@@ -194,13 +199,13 @@ jobs:
               fixture_remaining="$(docker network ls --filter "label=qs.mongo-metadata.fixture=$fixture_owner" --format '{{.Name}}')" || return 1
               [[ -z "$fixture_remaining" ]] || return 1
             fi
-            [[ "$fixture_state_evidence" == true ]] || return 1
             fixture_cid=''
             fixture_network_created=false
             fixture_owner=''
             fixture_name=''
             fixture_network=''
             fixture_phase=''
+            [[ "$fixture_state_evidence" == true ]] || return 1
             return "$fixture_status"
           }
           trap cleanup_owned_fixture EXIT
