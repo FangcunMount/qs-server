@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+    "sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
     "verified_on": "2026-10-16"
   },
   "status_policy": {
@@ -4524,7 +4524,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+        "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -5254,6 +5254,54 @@
           "result": "matched",
           "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary.go",
+          "selector": "const runtimeBoundaryTable = \"m4_c_runtime_boundary\"",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary_test.go",
+          "selector": "func TestRuntimeBoundaryAbsenceRequiresTypedMissingAndEmptyCatalog(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent.go",
+          "selector": "func (d database) markFirstRuntime(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent_test.go",
+          "selector": "func TestMarkerIsFrozenBeforeCommitAndNeverReferencesContainingRecordHash(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/capture_marker_name_test.go",
+          "selector": "func TestCaptureCannotOccupyReservedRuntimeMarker(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_runtime_boundary_test.go",
+          "selector": "func TestM4ActorColumnsNativeRuntimeGeneration(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -5348,6 +5396,13 @@
           "severity": "medium",
           "summary": "Operator retirement is reflected in the revised statements; current client compatibility and deployed retirement behavior are not attested.",
           "exit_criteria": "Retain current caller inventory and exact-version retirement/permission evidence, then complete the accountable review."
+        },
+        {
+          "id": "C-RUNTIME-GENERATION-QUALIFICATION",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Current C format2/first-runtime database generation is source-prepared only. Fixed C-only table creation/permission/count needs a later explicit production approval; M7 separately retires it after old recovery/approval/tool responsibilities end. New native14 plus original30 actual44 and CI/AI pending; same-committed-intent completion, failed-capture pre-DDL cancel, formal six-instance controller/actual window/RPO remain unqualified; no automatic startup/retry or history re-signing.",
+          "exit_criteria": "Qualify exact new source with explicit old30+new14 native gates, then separately close same-intent completion/failed-capture cancellation/formal executor and production object permissions, current-window freeze/custody/runtime/30-60/RPO obligations; retain all original proofs and M7 retirement responsibility."
         }
       ],
       "notes": [
@@ -5360,7 +5415,8 @@
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
         "Previous top source_baseline retained as complete original JSON: {\"sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}",
         "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending.",
+        "C-local format2 runtime generation source preparation 93c4dd10cd5a02dd2515545c00adadc2c7fea501: ordinary/race 300 oncePASS each; local selective ACK pipe pure 8PASS, tagged compile only, vet/pinned 2.5 lint passed. New explicit native top+13children (14) and old30 form pending44; no new DB/CI/production proof. Original verification entries remain in order and retain their original source; source QA in qs-m4-c-runtime-boundary-source-v1. Previous top source_baseline retained as original JSON: {\"sha\":\"9fbe9d04f0f688df30758d0eef3a224ce4fee589\",\"verified_on\":\"2026-10-16\"}"
       ]
     },
     {
@@ -11583,7 +11639,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+        "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -12436,6 +12492,54 @@
           "result": "matched",
           "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary.go",
+          "selector": "const runtimeBoundaryTable = \"m4_c_runtime_boundary\"",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary_test.go",
+          "selector": "func TestRuntimeBoundaryAbsenceRequiresTypedMissingAndEmptyCatalog(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent.go",
+          "selector": "func (d database) markFirstRuntime(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent_test.go",
+          "selector": "func TestMarkerIsFrozenBeforeCommitAndNeverReferencesContainingRecordHash(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/capture_marker_name_test.go",
+          "selector": "func TestCaptureCannotOccupyReservedRuntimeMarker(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/native_runtime_boundary_test.go",
+          "selector": "func TestM4ActorColumnsNativeRuntimeGeneration(",
+          "result": "matched",
+          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -12530,7 +12634,15 @@
           "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged."
         ]
       },
-      "gaps": [],
+      "gaps": [
+        {
+          "id": "C-RUNTIME-GENERATION-QUALIFICATION",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Current C format2/first-runtime database generation is source-prepared only. Fixed C-only table creation/permission/count needs a later explicit production approval; M7 separately retires it after old recovery/approval/tool responsibilities end. New native14 plus original30 actual44 and CI/AI pending; same-committed-intent completion, failed-capture pre-DDL cancel, formal six-instance controller/actual window/RPO remain unqualified; no automatic startup/retry or history re-signing.",
+          "exit_criteria": "Qualify exact new source with explicit old30+new14 native gates, then separately close same-intent completion/failed-capture cancellation/formal executor and production object permissions, current-window freeze/custody/runtime/30-60/RPO obligations; retain all original proofs and M7 retirement responsibility."
+        }
+      ],
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
@@ -12538,7 +12650,8 @@
         "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
         "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending.",
+        "C-local format2 runtime generation source preparation 93c4dd10cd5a02dd2515545c00adadc2c7fea501: ordinary/race 300 oncePASS each; local selective ACK pipe pure 8PASS, tagged compile only, vet/pinned 2.5 lint passed. New explicit native top+13children (14) and old30 form pending44; no new DB/CI/production proof. Original verification entries remain in order and retain their original source; source QA in qs-m4-c-runtime-boundary-source-v1. Previous top source_baseline retained as original JSON: {\"sha\":\"9fbe9d04f0f688df30758d0eef3a224ce4fee589\",\"verified_on\":\"2026-10-16\"}"
       ]
     },
     {
