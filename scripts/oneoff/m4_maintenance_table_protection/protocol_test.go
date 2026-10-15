@@ -177,19 +177,41 @@ func TestTargetVerificationDoesNotClaimSurvivingWholeDatabase(t *testing.T) {
 }
 func privateFixture(t *testing.T) string {
 	t.Helper()
-	dir, e := os.MkdirTemp("", "m4-d-private-")
+	home, e := os.UserHomeDir()
 	if e != nil {
 		t.Fatal(e)
 	}
+	dir, e := os.MkdirTemp(home, "m4-d-private-") // MkdirTemp creates this owned leaf with mode0700.
+	if e != nil {
+		t.Fatal(e)
+	}
+	cleanupPath := dir
+	t.Cleanup(func() { _ = os.RemoveAll(cleanupPath) })
 	real, e := filepath.EvalSymlinks(dir)
 	if e != nil {
 		t.Fatal(e)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(real) })
+	cleanupPath = real
+	parent, e := privateParent(filepath.Join(real, "material.json"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := parent.Close(); e != nil {
+		t.Fatal(e)
+	}
 	return real
 }
 func TestPrivateMaterialRejectsHashAndSymlink(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	dir := privateFixture(t)
+	home, e := os.UserHomeDir()
+	if e != nil {
+		t.Fatal(e)
+	}
+	realHome, e := filepath.EvalSymlinks(home)
+	if e != nil || filepath.Dir(dir) != realHome {
+		t.Fatal("private fixture must select the canonical home instead of TMPDIR")
+	}
 	path := filepath.Join(dir, "material.json")
 	raw := []byte("original")
 	if writeExclusive(path, raw) != nil {
