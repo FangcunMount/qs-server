@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5309241f9e79341f7c44ed94c8084fce4864148d",
+    "sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
+        "source_sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4540,6 +4540,10 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_actor_column_protection/*.go"
         }
       ],
       "verification": [
@@ -4663,6 +4667,30 @@
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/main.go",
+          "selector": "restore_not_implemented",
+          "result": "matched",
+          "source_sha": "db7db9b9ac30b86f1d2307e7ca888e369816b293",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
+          "selector": "func verifyTarget(original, target material) error",
+          "result": "matched",
+          "source_sha": "db7db9b9ac30b86f1d2307e7ca888e369816b293",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/protocol.go",
+          "selector": "e != nil || len(elements) != 3",
+          "result": "matched",
+          "source_sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4685,7 +4713,9 @@
           "M4-D actual component native source d25313486c739b1584539e5fbf61e51eb7038848 passed15 retirement/8 modern/13 store required RUN/PASS on owned MySQL8.0.36/MongoRS7.0.31 with0SKIP. Receipt e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866 preserves real raw argv/source hashes/owned cleanup and prior two failed runs. f562abfa057405a34f718ae635ead3c77b8c5153 changes only CI required selectors after that proof; it is not relabelled as this local native checkout. Production D-target scoped protection/authority/freeze, old/new full runtime startup,30/60min andRPO remain unverified; pre-existing NSQ runtime changes preclude global runtime-stability signoff. No historical command/native/production evidence is promoted.",
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
-          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
+          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
+          "C read-only source db7db9b9ac30b86f1d2307e7ca888e369816b293 is prepared after actual main8f08 merge273b39355. The separately retained local receipt8e461138496f7caecdc958bada28ee9679bc1f946416b1aaa15f4a2832dc9dd2 binds 12 top-level and53 total ordinary/race RUN/PASS,0FAIL/SKIP, target vet/lint/build and five unchanged source hashes. These are SQLmock/pure-protocol tests and compilation, not native database execution. Only inspect/capture clean101/40 and verify-target clean102/40 exist; restore is rejected before connection configuration/material access and no approval input is accepted or consumed. C040b/284 resources remain independent of the tool checkout. No C production material, freeze, restoration, runtime or time/RPO proof is supplied.",
+          "Follow-up source744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0 restricts Mongo40 BSON to exactly nonnull _id, integer32/64 version40 and actual bool dirty=false, rejecting extra/duplicate fields. The separate local receipt45bd5852eda5c4fa128c5433dfb11a18ac68e7232149e6dfbbe21e3da2e5303d binds12 top-level/56 total ordinary race RUN/PASS,0FAIL/SKIP and target vet/lint/build. Mongo read scope remains one original document and independently bound ledger UUID before/after the SQL window; options/index are not captured or attested. No native database or production access occurred; old db7 source evidence is retained without relabelling."
         ]
       },
       "gaps": [
