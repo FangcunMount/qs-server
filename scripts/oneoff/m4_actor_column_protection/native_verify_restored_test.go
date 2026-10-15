@@ -21,7 +21,7 @@ import (
 
 // This new selector is separate from the original21; compiling it is not a
 // substitute for its real MySQL/Mongo execution or CI required-selector wiring.
-func TestM4ActorColumnsNativeVerifyRestored(t *testing.T) {
+func TestM4ActorColumnsRestoredVerificationNative(t *testing.T) {
 	t.Run("ExactOriginalReadOnly", func(t *testing.T) {
 		h := newActorNative(t)
 		h.richOriginalValues(0)
