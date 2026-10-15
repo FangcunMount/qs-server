@@ -220,7 +220,7 @@ func TestM4ActorColumnsNativeRestoreContinuation(t *testing.T) {
 			r := h.action("restore", args...)
 			undo()
 			h.dsn = directDSN
-			if r.Complete || !r.ApprovalConsumed || !observed.Load() || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.ReleaseError != "" || r.TransactionReleaseUnproven {
+			if r.Complete || !r.ApprovalConsumed || !observed.Load() || !r.SQLPoolClosed || !r.MongoClosed || r.ReleaseError != "recovery_gate_release_unproven" || !r.RecoveryGateAcquired || r.RecoveryGateReleased || !r.RecoveryGateReleaseUnproven || r.TransactionReleaseUnproven {
 				t.Fatal("actual acknowledged interruption or owned release was not proved", r.Error)
 			}
 			h.assertSQLHead(102, false)

@@ -157,7 +157,16 @@ func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
 			if e != nil || strings.Contains(query, "AS UNSIGNED") || !strings.Contains(query, "`updated_at`=`updated_at`") || !strings.Contains(query, "`tags` IS NULL") {
 				t.Fatal("CAS/identity/timestamp guard missing", e)
 			}
+			key, e := recoveryGateKey(m.Binding)
+			if e != nil {
+				t.Fatal(e)
+			}
+			expectGate := func() {
+				mock.ExpectQuery(regexp.QuoteMeta("SELECT IS_USED_LOCK(?)=CONNECTION_ID()")).WithArgs(key).WillReturnRows(sqlmock.NewRows([]string{"owned"}).AddRow(true))
+			}
+			expectGate()
 			mock.ExpectBegin()
+			expectGate()
 			exec := mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs("0", []byte("[]"), "0", m.Tables[0].Rows[0].Retained)
 			switch kind {
 			case "write_error", "rollback_failed":
@@ -173,6 +182,9 @@ func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
 			default:
 				exec.WillReturnResult(sqlmock.NewResult(0, 1))
 			}
+			if kind == "success" || kind == "commit_unknown" || kind == "marker_before_commit" {
+				expectGate()
+			}
 			switch kind {
 			case "success":
 				mock.ExpectCommit()
@@ -183,7 +195,7 @@ func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
 			default:
 				mock.ExpectRollback()
 			}
-			d := database{conn: conn}
+			d := database{conn: conn, gate: &recoveryGate{conn: conn, key: key, acquired: true}}
 			e = d.commitValueBatch(t.Context(), m, m.Tables[0].Rows, 0, a, hash, fixtureSource)
 			if (e == nil) != (kind == "success") || (e != nil && strings.Contains(e.Error(), "private")) {
 				t.Fatal("CAS failure became success or leaked driver detail", e)

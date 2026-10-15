@@ -27,34 +27,37 @@ type arguments struct {
 	timeout                                                         time.Duration
 }
 type receipt struct {
-	Action                     string         `json:"action"`
-	ToolSource                 string         `json:"compiled_tool_source"`
-	CSource                    string         `json:"c_execution_source"`
-	CResources                 string         `json:"c_execution_resources_sha256"`
-	CResourceFiles             int            `json:"c_execution_resource_files"`
-	Complete                   bool           `json:"complete"`
-	ReadOnly                   bool           `json:"database_read_only"`
-	MaterialHash               string         `json:"material_sha256,omitempty"`
-	TableCounts                map[string]int `json:"table_rows,omitempty"`
-	MandatoryEOF               bool           `json:"mandatory_empty_eof"`
-	SQLSnapshot                bool           `json:"sql_repeatable_read_snapshot"`
-	SQLConnectionClosed        bool           `json:"sql_connection_closed"`
-	SQLPoolClosed              bool           `json:"sql_pool_closed"`
-	MongoClosed                bool           `json:"mongo_closed"`
-	Error                      string         `json:"error_category"`
-	ReleaseError               string         `json:"release_error_category,omitempty"`
-	ProductionFreezeCertified  bool           `json:"production_freeze_certified"`
-	CrossDatabaseAtomicRR      bool           `json:"cross_database_atomic_snapshot"`
-	BudgetExceeded             bool           `json:"total_budget_exceeded"`
-	TransactionReleaseUnproven bool           `json:"transaction_release_unproven"`
-	ApprovalConsumed           bool           `json:"approval_consumed"`
+	Action                      string         `json:"action"`
+	ToolSource                  string         `json:"compiled_tool_source"`
+	CSource                     string         `json:"c_execution_source"`
+	CResources                  string         `json:"c_execution_resources_sha256"`
+	CResourceFiles              int            `json:"c_execution_resource_files"`
+	Complete                    bool           `json:"complete"`
+	ReadOnly                    bool           `json:"database_read_only"`
+	MaterialHash                string         `json:"material_sha256,omitempty"`
+	TableCounts                 map[string]int `json:"table_rows,omitempty"`
+	MandatoryEOF                bool           `json:"mandatory_empty_eof"`
+	SQLSnapshot                 bool           `json:"sql_repeatable_read_snapshot"`
+	SQLConnectionClosed         bool           `json:"sql_connection_closed"`
+	SQLPoolClosed               bool           `json:"sql_pool_closed"`
+	MongoClosed                 bool           `json:"mongo_closed"`
+	Error                       string         `json:"error_category"`
+	ReleaseError                string         `json:"release_error_category,omitempty"`
+	ProductionFreezeCertified   bool           `json:"production_freeze_certified"`
+	CrossDatabaseAtomicRR       bool           `json:"cross_database_atomic_snapshot"`
+	BudgetExceeded              bool           `json:"total_budget_exceeded"`
+	TransactionReleaseUnproven  bool           `json:"transaction_release_unproven"`
+	RecoveryGateAcquired        bool           `json:"recovery_gate_acquired,omitempty"`
+	RecoveryGateReleased        bool           `json:"recovery_gate_released,omitempty"`
+	RecoveryGateReleaseUnproven bool           `json:"recovery_gate_release_unproven,omitempty"`
+	ApprovalConsumed            bool           `json:"approval_consumed"`
 }
 
 func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-actor-column-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored")
 	f.StringVar(&a.binding.SQLName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.binding.MongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.binding.SQLIdentity, "mysql-identity-sha256", "", "independent target identity")
@@ -89,8 +92,8 @@ func parseArgs(args []string) (arguments, error) {
 		if a.capture == "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
 		}
-	case "verify-target", "restore":
-		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") || a.action == "restore" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
+	case "verify-target", "restore", "verify-restored":
+		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") || (a.action == "restore" || a.action == "verify-restored") && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
 			return a, errors.New("independently_bound_material_required")
 		}
 	default:
@@ -159,7 +162,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	defer cancel()
 	var original material
 	var ap approval
-	if a.action == "verify-target" || a.action == "restore" {
+	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.material, a.materialHash)
 		if e != nil {
 			r.Error = strings.Split(e.Error(), "\n")[0]
@@ -175,7 +178,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 	}
-	if a.action == "restore" {
+	if a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivateLimit(a.approval, a.approvalHash, 32768)
 		if e != nil || len(raw) > 32768 || strictDecode(raw, &ap) != nil || validateApproval(ap, original, a.materialHash, tool, time.Now()) != nil {
 			r.Error = "restore_approval_rejected"
@@ -188,6 +191,12 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		var c context.CancelFunc
 		ctx, c = restoreActionContext(ctx, ap)
 		defer c()
+		if a.action == "verify-restored" {
+			if e := verifyConsumedRecoveryInputs(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool); e != nil {
+				r.Error = e.Error()
+				return r
+			}
+		}
 	}
 	var captureDirectory captureParentIdentity
 	if a.action == "capture" {
@@ -250,6 +259,23 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	var rawMaterial []byte
 	defer func() {
 		released := true
+		if d.gate != nil {
+			if ok {
+				if e := d.gate.require(ctx); e != nil {
+					r.Error, ok = e.Error(), false
+				} else if e := verifyConsumedRecoveryInputs(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool); e != nil {
+					r.Error, ok = e.Error(), false
+				}
+			}
+			if e := d.gate.release(); e != nil {
+				r.ReleaseError = e.Error()
+				if ok {
+					r.Error = e.Error()
+				}
+				released = false
+			}
+			r.RecoveryGateAcquired, r.RecoveryGateReleased, r.RecoveryGateReleaseUnproven = d.gate.acquired, d.gate.released, d.gate.releaseUnproven
+		}
 		if d.conn != nil {
 			r.SQLConnectionClosed = d.conn.Close() == nil
 			released = released && r.SQLConnectionClosed
@@ -266,7 +292,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		released = released && !r.TransactionReleaseUnproven
 		if !released {
-			r.ReleaseError = "owned_connection_release_unproven"
+			if r.ReleaseError == "" {
+				r.ReleaseError = "owned_connection_release_unproven"
+			}
 			if ok {
 				r.Error = r.ReleaseError
 			}
@@ -282,13 +310,19 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		if !ok {
 			return
 		}
-		if a.action == "verify-target" || a.action == "restore" {
+		if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
 			if e := readCaptureEvidence(original, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
 				r.Error = e.Error()
 				return
 			}
 			if ctx.Err() != nil {
 				r.Error, r.BudgetExceeded = "total_budget_exceeded", true
+				return
+			}
+		}
+		if a.action == "verify-restored" {
+			if e := verifyConsumedRecoveryInputs(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool); e != nil {
+				r.Error = e.Error()
 				return
 			}
 		}
@@ -330,6 +364,19 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "mongo_primary_unavailable"
 		return r
 	}
+	if a.action == "restore" || a.action == "verify-restored" {
+		d.gate, e = acquireRecoveryGate(ctx, d.conn, a.binding)
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		if a.action == "verify-restored" {
+			if e := verifyConsumedRecoveryInputs(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool); e != nil {
+				r.Error = e.Error()
+				return r
+			}
+		}
+	}
 	if a.action == "restore" {
 		e = d.restore(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool, &r.ApprovalConsumed)
 		if e != nil {
@@ -369,6 +416,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "material_encoding_limit"
 			return r
 		}
+	}
+	if a.action == "verify-restored" && verifyRestored(original, m) != nil {
+		r.Error = "restored_original_facts_rejected"
+		return r
 	}
 	if a.action == "verify-target" && verifyTarget(original, m) != nil {
 		r.Error = "target_retained_facts_rejected"
