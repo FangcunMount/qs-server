@@ -149,6 +149,20 @@ Mac 全仓普通测试的 `-race` / coverage 执行从 `3f296fb304c14c94c42b6070
 
 合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。
 
+#### D 当前代次边界与 clean103 只读检查（新整合 CI 待验）
+
+当前整合 `e447db20b5f85a3a10095d1de29b643f107dab02` 正常合并冻结 D `c459ce1af0cf371b749099dbfaf9c0d0642a34c4` 与实际 main `73fb54c2679710d12f1806eede7550a6509d4961`。A16/B25/C20 个非 Markdown 包文件逐字保留 incoming main，D55 个包文件逐字保留 c459；没有纳入另支 C 新 verify-restored/gate。两父 command、原生、生产、限制对象保持原归属。
+
+D 当前材料为 format3，固定增加同数据库的 `m4_d_runtime_boundary` 代次/指纹，不再仅靠 capture 目录内 marker 排除跨目录旧恢复。capture 只读观察，不创建边界表；真正 mark-first-runtime 在原同库 GET_LOCK 内，以固定 schema 的初始原子建表或 generation/hash/原文 CAS 提交意图，读回后再持久写本地 marker。旧代次材料在 restore、verify-target、verify-restored 与 marker 链拒绝，clean102 可在当前代次重新 capture 新一轮 T0；不得 reset、删除边界或重签旧材料。该临时表归 D 恢复/启动边界职责，待全部责任结清后随专用设施独立退役。DB 已提交而 marker/输出失败仍保守阻断，精确同已提交意图完成入口尚未实现，不自动延长原意图。
+
+另外三个具名修复保持窄范围：Mongo 身份使用实际非空 replica-set 名并保留原 rs0 编码；capture 文件名 `first-runtime` 在 ENV 前拒绝以防与派生 marker 自撞；五张历史表的单行和恢复 batch 均最多1MiB、无单行豁免，八张现代保留表原12MiB哈希读取预算不变。超限历史值阻断 capture，不截断或删除。
+
+只读 inspect 现接受 clean102 或 clean103，并在只读 RR 内与前后完整身份、账本和 DB 边界观察一致后才完成；全部连接/锁释放成功后才输出可选 `inspected_sql_version`。dirty、未知版本、外来/隐藏边界拒绝；capture 和所有材料消费者的原成功 stdout 协议拒绝该字段的任何出现（含 null/0），原 capture 输出字节 golden 保持。没有扩展 capture 或恢复准入，也没有 Mongo 认证只读账号的验证声明。
+
+原生证明分开归属：`506b0565619c8603bdc852fc0ce67ff2f31b92de` 的两个 fresh owned 批次合计原53+代次12各一次 RUN/PASS、0FAIL/SKIP，独立回执 `4037a94dfa351c808006c2a16bcee6052708e448d1809a5a05f040bcb7044345`。只读新9项另在 `c459ce1af0cf371b749099dbfaf9c0d0642a34c4` 实际逐项通过，exit0、51.130秒，receipt `3227106891af3cab8d45e33d43767e1db225b7b288bfc6156f991a356d452c7c`、root独立闭环 `382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be` 核实源、binary、PID/PGID、精确 owned 清理和旧 IDs/images/volumes 保留。新9使用实际 SELECT-only MySQL 账号并验证写权限拒绝；Mongo fixture 无认证。c459本地普通/race各364项、configcontract各91项通过（QA `5fc119cc0d4ae5f65978da02631c01d53526c8f54cded8a8c4e989ec1b40844f`）。这些不同源结果不拼成当前整合头已实际运行完整74，也不改写先前 OOM/失败原件或宣称旧 runtime 元数据恒定。
+
+CI-only `fc40b4a7ea3a02ddfedef763fca905f6345bc36d` 将 metadata/A/B/C/D53/第二D 六个 fresh 阶段完整保留，第二D以同一8分钟命令显式选择代次12和只读9，逐日志53/21及同源 union74严格逐名 RUN/PASS、0FAIL/SKIP；旧65名单与顺序不变。外层90分钟来自6×8分钟测试＋6×3分钟就绪等待＋20分钟准备/证明/清理=86分钟向上取整，不改生产30/60分钟窗口。实际 configcontract普通/race各100项、目标28项、7个真实 shell mock 流程、15YAML/184bash/8嵌入Python语法、actionlint、vet/pinnedlint通过（QA `888aadc183f801ed2ec1db1e40515ecd1e13a394eea3256457ae22e7cd448b41`）；可选 ShellCheck/pyflakes 未运行。当前新head完整74和 hosted CI/AI仍待，生产暂停、材料/冻结/正式六实例/30/60分钟/RPO0/业务验收继续未闭。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 
