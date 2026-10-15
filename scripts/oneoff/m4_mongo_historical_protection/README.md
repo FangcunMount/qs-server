@@ -47,7 +47,7 @@ MySQL 身份绑定实际 server UUID 和选中数据库；Mongo 稳定身份绑�
 
 执行控制方负责 API1、Collection2、Worker3 六实例及其他相关写入者持续冻结，在首个新 runtime 启动命令发出前，以 O_EXCL 持久写入批准绑定的 first-runtime marker。工具不生成或删除该 marker。marker 缺失本身不证明停写；计数相同也不证明业务字段没有被更新。首个新启动命令已发出或有新持久事实之后，禁止回放旧材料，只能使用目标 schema 兼容版本向前恢复。
 
-restore 接受实际 provider 产生的 dirty40 原 DROP 前缀0、1、2、3、4，或 clean40 且四个目标均缺失，SQL始终须 clean101。原索引、业务 UUID/options、精确计数和无关索引均须匹配；反向部分重建形状、已存在规格变化、额外索引或其他 head 拒绝自动推进。
+restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须是原 DROP 前缀0、1、2、3、4，SQL始终须 clean101。逆序补回缺失索引，使每个实际成功ACK后仍是更短的缺失前缀；clean40 也接受这种已恢复后缀。每次继续须使用新的独立批准并保持原 first-capture、持续冻结和绝对恢复截止，已消费批准不能复用。原索引、业务 UUID/options、精确计数和无关索引均须匹配；非前缀缺失、已存在规格变化、额外索引或其他 head 拒绝自动推进。verify-target 仍只接受 clean40 且四索引全部缺失，不把部分或全部恢复的状态当作B安装成功。
 
 批准再次核读并单次消费后，只按四个固定位置执行原始完整 createIndexes spec，随后完整核对索引、集合、计数、SQL身份和原40账本。全部通过后，在同一个显式 RS 事务内 DELETE 当前唯一账本文档、INSERT 捕获的原39 BSON，最后 COMMIT；不 Drop/Create 集合、不 Force、不构造 clean 文档、不直接清 dirty。成功后新快照须证明原39 BSON逐字相同，账本 UUID 仍是 provider40 已产生的当前 UUID。
 
@@ -61,13 +61,14 @@ restore 接受实际 provider 产生的 dirty40 原 DROP 前缀0、1、2、3、4
 
 协议 source `ed97ae9a20aa369982c58d0a99cf18385f03fe8d` 的42项单测通过，只证明当时协议；当时 DB 入口尚未实现。只读 capture source `f7a23591e34c862bc745748e1a0315055b8d389a` 完成57项单测；恢复 source `857e9b5ca4f3eb6e09c8474579fb8bfc473486eb` 完成69项单测。Mongo 事务释放语义修正 source `3d0d3f4645740536f83cdafba9f83044567fb437` 的69项单测、race、vet、目标 lint 均通过；不可变私有 `qs-m4-b-object-tool-release-3d0d3f46/receipt.json` SHA为 `17b16c51bab54b2e3eace4c10da2448711c316dbbbe887433fe9fa9774af457f`。这些不是 native、生产权限或数据库操作验收。
 
-native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。六个顶层、恢复矩阵六个 child 与批准边界五个 child 必须全部实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败：
+native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。当前七个顶层、恢复矩阵六个 child、批准边界五个 child 与续跑八个 child，合计26项必须全部实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败：
 
 - 捕获、真实 provider40 完整升级及 clean10140 核对。
 - dirty40 的0–4 DROP前缀及 clean40 全部退出后的对象恢复、真实原账本最后事务回放、当前40 UUID保留和 fresh10139 只读核对。
 - 同计数的业务值冲突导致真实 unique index 重建失败，保留 dirty40，不能删业务文档解冲突。
 - 账本事务写入中断、服务端 COMMIT 已成功但全部响应被丢失，以及同一事务重发摘要。
 - first-runtime marker、外冻材料变化、过期批准、实际消费后再次使用、真实 SQL102 未来 head 拒绝。
+- dirty40/clean40 各在第1–4个真实 createIndexes ACK后中断，旧批准复用无DDL拒绝，同一原材料和原绝对截止的新批准继续；四索引全恢复但账本尚未回放的中断也须通过。
 
 原生测试独立读取全部合成 BSON、全部业务集合 UUID/options、无关索引及 SQL 账本进行比较；这些正文不进入工具材料。测试代理仅使用 owned loopback，记录成功回包和事务身份摘要，不写生产或更改真实请求。编译或内存 wire helper 测试不代替这些 native 用例。
 
@@ -84,3 +85,5 @@ native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e
 实际修正后 source `8eeaef32cafa9f17dacee7767d41ccd99f90683c` 已完成唯一第二轮 owned native：MySQL8.0.36/MongoRS7.0.31，六个顶层与十一个 child 全部17 RUN/PASS、0 FAIL/SKIP、exit0。不可变 `qs-m4-b-object-tool-native-v2/receipt.json` SHA为 `6faac785f89fa4a8e8b6ec9951e5add00c4489c0fe67642b1f4e37a477832de8`，原始 JSONL SHA为 `ef4b65fc8a92c4a049267676e3c368924093e08829a39a8560a8ecf45c502b60`，runner SHA为 `22ac7909475f4d315b2ae6b498a71093edda213833468664320759caa2e907ee`。这些文件保留实际完整argv、15个工具文件指纹和全事件，不能把未执行的规范化命令登记为通过。
 
 全部 dirty0–4/clean4 恢复均逐字核对原合成业务BSON、UUID/options、无关索引和SQL账本，原39 BSON在显式事务最后回放，provider40账本UUID保留。冲突实际获得 typed11000/DuplicateKey及ok=false；事务写中断实际到达；服务端COMMIT两次成功响应均被丢弃，同一lsid/txnNumber摘要相同，应用仍unknown/不重跑。真实消费后重复使用和其余批准反例均通过。此轮81.608秒仅是小型合成矩阵总耗时，不能作为生产索引恢复或30/60分钟预算。两自有容器和网络精确释放，既有CID/images/volumes保留；动态运行元数据变化，不签全环境稳定。首次失败保持独立来源，当前只有组件证明；最终PR head还需fresh CI，生产与完整业务镜像安装未验收。
+
+原head `da1f162735e7077c5e2cc06b814d48f86b2b4b87` 的审查发现恢复续跑缺口：按正序补回索引后中断会留下非前缀；clean40补回一部分或全部后、账本回放前中断也被旧校验拒绝。先前17项没有覆盖这些恢复中断，不作为该能力证明。source `5588d8ddd` 改为逆序重建并只在restore扩展clean40合法前缀；source `fe45c321f10cdebb8462e05b81f14e895b79523b` 加入八个真实ACK中断child和26项显式CI清单。新普通/race87项、内存helper/race2项、integration编译、tagged vet/lint0及configcontract通过，私有 `qs-m4-b-resume-source-fe45c321/receipt.json` SHA为 `fd215f8c9ec6fe1637887ec7a2f2c6ace13082a7c824302acc4a377ce7d413a6`。修正后26项真实native及新headCI/审查仍待完成；旧17项证明保留原来源，审查线程尚未结清。
