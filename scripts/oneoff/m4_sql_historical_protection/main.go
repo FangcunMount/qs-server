@@ -158,7 +158,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = e.Error()
 			return r
 		}
-		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil {
+		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil || m.CapturePath != a.material {
 			r.Error = "material_rejected"
 			return r
 		}
@@ -172,6 +172,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		if strictDecode(raw, &ap) != nil || validateApproval(ap, m, a.materialHash, tool, time.Now()) != nil {
 			r.Error = "restore_approval_rejected"
+			return r
+		}
+		if e := checkRecoveryBoundary(m, ap, a.materialHash, false); e != nil {
+			r.Error = e.Error()
 			return r
 		}
 		var c context.CancelFunc
@@ -272,6 +276,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	case "capture":
 		m, _, e = d.snapshot(ctx, tool, true)
 		if e == nil {
+			m.CapturePath = a.capture
 			e = validateMaterial(m, tool, a.sqlName, a.mongoName)
 		}
 		if e == nil {

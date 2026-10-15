@@ -86,7 +86,7 @@ func testMaterial() material { return testMaterialEncoding(originalUTF8MB4) }
 
 func testMaterialEncoding(encoding originalEncoding) material {
 	now := time.Now().UTC()
-	m := material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: testSource, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: now.Format(time.RFC3339Nano), SQLName: "qs_fixture", MongoName: "qs_fixture", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), MongoUUID: strings.Repeat("c", 64), MongoHead: []byte{1}, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE schema_migrations", Ledger: []ledgerRow{{100, false}}}
+	m := material{Format: 1, Kind: "m4_a_sql_null_object_protection", ToolSource: testSource, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, CapturedAt: now.Format(time.RFC3339Nano), CapturePath: "/private/approved/first-capture.json", SQLName: "qs_fixture", MongoName: "qs_fixture", SQLIdentity: strings.Repeat("a", 64), MongoIdentity: strings.Repeat("b", 64), MongoUUID: strings.Repeat("c", 64), MongoHead: []byte{1}, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE schema_migrations", Ledger: []ledgerRow{{100, false}}}
 	for i, o := range objects {
 		check, e := originalCheckDefinition(i, encoding)
 		if e != nil {
@@ -230,7 +230,9 @@ func TestRestoreIndependentApprovalAndFirstRuntimeBoundary(t *testing.T) {
 }
 func TestFirstCaptureExclusiveExternalHashAndApprovalSingleUse(t *testing.T) {
 	p := filepath.Join(privateTestDir(t), "material.json")
-	raw, _ := json.Marshal(testMaterial())
+	m := testMaterial()
+	m.CapturePath = p
+	raw, _ := json.Marshal(m)
 	if e := writeExclusive(p, raw); e != nil {
 		t.Fatal(e)
 	}
@@ -244,16 +246,16 @@ func TestFirstCaptureExclusiveExternalHashAndApprovalSingleUse(t *testing.T) {
 	if _, e := readPrivate(p, strings.Repeat("e", 64), maxMaterialBytes); e == nil {
 		t.Fatal("restore input self-authorized")
 	}
-	a := testApproval(t, testMaterial(), h)
+	a := testApproval(t, m, h)
 	approvalPath := filepath.Join(privateTestDir(t), "approval.json")
 	araw, _ := json.Marshal(a)
 	if e := writeExclusive(approvalPath, araw); e != nil {
 		t.Fatal(e)
 	}
-	if e := consumeApproval(approvalPath, a, fingerprint(araw)); e != nil {
+	if e := consumeApproval(m, a, fingerprint(araw)); e != nil {
 		t.Fatal(e)
 	}
-	if consumeApproval(approvalPath, a, fingerprint(araw)) == nil {
+	if consumeApproval(m, a, fingerprint(araw)) == nil {
 		t.Fatal("approval reused")
 	}
 	if e := os.Chmod(p, 0644); e != nil {

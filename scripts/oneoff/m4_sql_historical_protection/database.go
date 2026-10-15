@@ -641,6 +641,12 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if e := validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
 	}
+	if m.CapturePath != materialPath {
+		return errors.New("frozen_material_path_changed_before_claim")
+	}
+	if e := checkRecoveryBoundary(m, a, materialHash, false); e != nil {
+		return e
+	}
 	got, o, e := d.snapshot(ctx, tool, false)
 	if e != nil {
 		return e
@@ -687,14 +693,14 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
 	}
-	if e = consumeApproval(approvalPath, a, approvalHash); e != nil {
+	if e = consumeApproval(m, a, approvalHash); e != nil {
 		return errors.New("restore_approval_consumption_failed")
 	}
 	// Undo the DROP prefix in reverse order so each acknowledged ADD leaves
 	// another admitted prefix if the explicitly approved attempt is interrupted.
 	for i := len(got.Tables) - 1; i >= 0; i-- {
 		t := got.Tables[i]
-		if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
+		if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 			return e
 		}
 		if !t.SQLNullOnly {
@@ -721,7 +727,7 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 			return errors.New("original_objects_or_ddl_not_restored")
 		}
 	}
-	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 		return e
 	}
 	tx, e := d.conn.BeginTx(ctx, nil)
@@ -734,15 +740,21 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 			recordRollback(&resultErr, tx)
 		}
 	}()
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
+		return e
+	}
 	if _, e = tx.ExecContext(ctx, "DELETE FROM schema_migrations"); e != nil {
 		return errors.New("ledger_transaction_replay_failed")
 	}
 	for _, row := range m.Ledger {
+		if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
+			return e
+		}
 		if _, e = tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", row.Version, row.Dirty); e != nil {
 			return errors.New("ledger_transaction_replay_failed")
 		}
 	}
-	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
 		return e
 	}
 	if e = tx.Commit(); e != nil {
