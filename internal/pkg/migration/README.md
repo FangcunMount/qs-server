@@ -185,6 +185,10 @@ CI-only `fc40b4a7ea3a02ddfedef763fca905f6345bc36d` 将 metadata/A/B/C/D53/第二
 
 冻结工作字节的联合普通/race实际C248、D444、config154各一次RUN/PASS、0FAIL/SKIP，integration仅编译、普通/tagged vet与pinned2.5 lint、actionlint通过；7个新h-tail实际纯shell模拟与15YAML/184bash/9Python语法通过。QA `0a957eadadaf989567541bcc2f8cd54a7c75c0467eb7bdafdf935b8dc16e2c68` 保留source_base=e5及原argv/environment，字节桥接CI1b586不改签；CI纯证明 `f2ca3b6e566cd53a5033d04c95be8eb224d8033e848a8f891f88c19219816103` 仅证明源码/反例流，不是数据库或正式实例。原24份D测试/74名单/286资源逐字保留；新13、此head原74真实DB、hosted CI/AI、真实旧工具与新binary跨source及正式controller去重均待独立验收。生产暂停、完整材料/持续冻结/正式六实例/30/60分钟/RPO0与业务验收不因源码准备关闭。
 
+源码 `57d19d8f784746208c48a68af9983b4b24f202b8` 将原13项中的 `ExistingOriginalMarkerAfterOutputLoss` 改为固定历史 `5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c` 的真实独立CLI：原进程capture的原stdout及正常exit0才可形成原执行证明；原进程mark使用已关闭读端的stdout pipe，保留实际非零退出或signal，再由当前入口以新same_existing批准核实同一旧record/source/marker原字节。未手改material.ToolSource或构造假的成功capture回执。仅测试夹具需要显式required/file/SHA输入；CI h从固定Git archive构建、校验实际compiled source与前后binary SHA，缺失/错误均FAIL。原13名、旧74完整proof、100分钟/8分钟与资源不变，没有新增生产CLI旧source便捷参数。
+
+本地仅实际构建/探测该旧CLI：binary SHA `54e1aeceedb45544a450671e2aa73b678766bc197c282885b1c9f0d1b89d2ca8`，invalid-args在不传任何数据库ENV时正常exit1，真实关闭stdout pipe为SIGPIPE13；新增15项普通/race各一次RUN/PASS。冻结工作字节D普通/race各444、config各155，0FAIL/SKIP，tag仅编译/vet/pinned2.5 lint/actionlint通过；9个h-tail控制流中固定旧archive/build/probe为真实本地进程，native输出明确为模拟，另15YAML/184bash/10Python语法通过。QA `7b4993092d005481295b3f289af8fcd31178088a5328f21d393a70e701608ea6` 保留原working source_base=0a8及原argv/environment，提交后只桥接冻结字节；CI纯证据 `c04e47bc3879590d87080882e1153da13f446965b4733f168847097e64923ca1` 不能代替数据库。新head完整13（含真实旧capture/mark跨source）、原74真实依赖、hosted CI/AI及正式dispatcher持久去重仍待，旧5707实际74与既有普通证据均保持原归属；生产暂停与原窗口/RPO0/业务限制保持。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 
