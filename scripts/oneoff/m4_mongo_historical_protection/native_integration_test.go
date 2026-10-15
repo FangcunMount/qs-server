@@ -25,6 +25,7 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/version"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
+	migratedb "github.com/golang-migrate/migrate/v4/database"
 	migratemongo "github.com/golang-migrate/migrate/v4/database/mongodb"
 	migratemysql "github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -236,11 +237,11 @@ func (h *nativeFixture) migrateMongo(source fs.FS, target uint, wantFailure bool
 		h.t.Fatal(e)
 	}
 	before, dirty, e := dd.Version()
-	if e != nil || dirty || before < migrate.NilVersion {
+	if e != nil || dirty || before < migratedb.NilVersion {
 		h.t.Fatal("real provider current version required before normal preparation")
 	}
 	versionBefore := uint(0)
-	if before != migrate.NilVersion {
+	if before != migratedb.NilVersion {
 		versionBefore = uint(before)
 	}
 	// Initial preparation sees0; installed39 must not recreate namespaces that
