@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
+    "sha": "a604813588978d9cebb1aae03b74219c23041fe2",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
+        "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4800,6 +4800,22 @@
           "result": "passed",
           "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/protocol_test.go",
+          "selector": "os.MkdirTemp(home, \"m4-d-private-\")",
+          "result": "matched",
+          "source_sha": "6f0245491547bc8bed5849e57707cb27563e93cc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/recovery_boundary_test.go",
+          "selector": "dir := privateFixture(t)",
+          "result": "matched",
+          "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4834,7 +4850,14 @@
           "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted.",
           "D first full53 attempt at 69d12f82 ran only CREATE/create0 and its parent:2RUN/0PASS/2FAIL, then failfast. Actual original CREATE ACK loss correctly returned Complete=false, original_table_create_failed_or_unknown and runtime_gate_release_unproven; sql_connection_closed=false caused the newly overstrict negative fixture assertion. Original failed receipt0c3d8a1eee0d567e38ca7d1880b2e81ab1a1de951f260af34cdbb489c49d4d13/JSONL43913304eaa8546c15de462b89080b9b7d40af308ec505c2d3bea4d051ddd871 retained. Both owned databases/network and child PGID were actually released in26.475s with original IDs/images/volumes/runtime preserved. Test-only 2bc85e80858d6a907192f267cd0e547258e06e7f retains the actual local-close bool and all server-gate unknown/negative proof conditions; remaining46 inputs including all production Go unchanged. Tag compile/vet/lint and8 wire race cases passed; full53 retry has not run. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"2bc85e80858d6a907192f267cd0e547258e06e7f\",\"verified_on\":\"2026-10-15\"}",
-          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending."
+          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending.",
+          "Prior verified marker preserved before D native-v9/test-fixture source review: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}",
+          "D native-v9 actual compiled/source5910e1b6f57b19310cb44901a5d84fd5d58c453b passed every required53 RUN/PASS once (16tops/37children),0FAIL/SKIP,exit0,273.341s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt1c17a97ea95bc7c465fdff7469e63906e8bfb7e85d3dd7077698d90f63225967 and JSONLba98ea8dbd68a7acdd4378c8b8402091503b52af985911a8eaba11f415fc8644 were independently checked with30 artifacts by root reviewc7dd0b85c703a8da4632a050c41e0d82e8413d83da49e3b5e6f42d0b26568d15. All original46 plus FirstRuntimeGate top/six children actually ran. Owned2CID/network/process group released,old IDs/images/volumes preserved; existing nsqd autonomous Restart3118->3123 precludes global runtime stability. This qualifies fixed synthetic restoration and cooperative marker serialization only, not production materials/freeze/formal instances/windows/RPO/business. The earlier native-v8 failure and all prior proofs remain unchanged.",
+          "Mac full ordinary-race/coverage execution started at3f296fb304c14c94c42b60704f0574bb65d1454e and completed at5910 with only three existing documentation files changed; Go/workflow bytes are equal. Actual exit0,374 package PASS/28 no-test packages, no failure anchors; full log8b86e0e6c9728200cbe9c022ffc6584d144713de52c748eaa253aee8f2a071a2 and independent receipt2599847cf183c8881349bd5c8f03fa8a5f08d687112da361790ab45bd4e0d2b6 retain the Darwin platform and original command. This is not Linux CI or post-fix full-repository execution.",
+          "Exact5910 CI RunTests116423119996 failed: backend whole tail120k is truncated, while embedded go_test_failure_context is complete22174B (64 hard anchors,4windows,truncated=false). It identifies capture_parent_test.go private_directory_rejected: test privateFixture selected public Linux /tmp1777, correctly rejected by unchanged production privateParent ancestor guard. Root proof f54a5ce121309b766f4798fa4c15bac37e7d75481e88c1ca8ccb3787a2dc2f89 preserves raw backend/source bridge. Prior72f/69 CI causes remain unknown; this cause is not retroassigned.",
+          "Test-only6f0245491547bc8bed5849e57707cb27563e93cc changes only protocol_test.go: UserHomeDir/MkdirTemp(home) owned0700 leaf, immediate exact-leaf Cleanup, canonical original privateParent qualification and FD Close. One existing regression uses only local TMPDIR trap to require the canonical HOME parent; no production guard, global CI environment or skip changes. All production Go and53 selected native test bytes remain equal5910; the native compiled source remains5910. The same fixed test bytes actually passed Darwin ordinary214/race214 RUN/PASS0FAIL/SKIP and integration compile only, QA51ce23e463c930a121e2b0917b32ca0202a99203bbeb55b4c64cc9afd42ac5ef. True Linux carrier and fresh final-head CI/AI remain pending, as do production window/RPO and all existing gaps/signoffs.",
+          "Linux ordinary-v1 at6f actually202RUN/158PASS/44FAIL exposed the remaining privateRecoveryDir public TMPDIR helper; receipt34a09298d26d5294d1f765f006c7cff287c1894df2a02ec7aab729c558e21500 stays failed. Test-onlya604813588978d9cebb1aae03b74219c23041fe2 removes that duplicate helper and reuses privateFixture. Mac ordinary/race214 each PASS plus tagcompile/vet; separate fixed LinuxAMD64 UID501 network-none readonly-root carrier with private HOME and explicit public /tmp1777 actually214RUN/PASS0FAIL/SKIP,exit0,3.066s. Receipt0ce3e75d6ce81346025f31f02e938d942d89ca07d364445d2de64d6f1fc23e9d and root exact-name/24-artifact review916db166df569a88d4f7230b6ff2dc06a8ba8eaa921d47ee2e532480a26f7e23 verify exact carrier release and input/old-resource preservation. Only two ordinary-test files differ from5910, all production and53 selected native bytes remain equal. This does not qualify Linux race, final-head hosted CI/AI, database or production acceptance.",
+          "CI5910 native job116423119691 is successful. Truncated backend tail retains its complete independent exact53 counter summary with eachRUN/PASS once,0FAIL/SKIP; not all original53 JSONL events are visible. Actual compiled/entry merge3878ba33e263e46ca95a225e010b76f8155d1eda has parents8c24/5910 and its whole tree equals5910, root proof0ddd676f504e8b8a10bb39a6ac3689645fa7c4b71b0f14f00fd9b5c950f67d67. This single-job result does not change5910 ordinary CI failure or sign later-head CI/AI, production windows, RPO or business."
         ]
       },
       "gaps": [
@@ -11074,7 +11097,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
+        "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11747,6 +11770,22 @@
           "result": "passed",
           "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/protocol_test.go",
+          "selector": "os.MkdirTemp(home, \"m4-d-private-\")",
+          "result": "matched",
+          "source_sha": "6f0245491547bc8bed5849e57707cb27563e93cc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/recovery_boundary_test.go",
+          "selector": "dir := privateFixture(t)",
+          "result": "matched",
+          "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11811,7 +11850,14 @@
           "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted.",
           "D first full53 attempt at 69d12f82 ran only CREATE/create0 and its parent:2RUN/0PASS/2FAIL, then failfast. Actual original CREATE ACK loss correctly returned Complete=false, original_table_create_failed_or_unknown and runtime_gate_release_unproven; sql_connection_closed=false caused the newly overstrict negative fixture assertion. Original failed receipt0c3d8a1eee0d567e38ca7d1880b2e81ab1a1de951f260af34cdbb489c49d4d13/JSONL43913304eaa8546c15de462b89080b9b7d40af308ec505c2d3bea4d051ddd871 retained. Both owned databases/network and child PGID were actually released in26.475s with original IDs/images/volumes/runtime preserved. Test-only 2bc85e80858d6a907192f267cd0e547258e06e7f retains the actual local-close bool and all server-gate unknown/negative proof conditions; remaining46 inputs including all production Go unchanged. Tag compile/vet/lint and8 wire race cases passed; full53 retry has not run. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"2bc85e80858d6a907192f267cd0e547258e06e7f\",\"verified_on\":\"2026-10-15\"}",
-          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending."
+          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending.",
+          "Prior verified marker preserved before D native-v9/test-fixture source review: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}",
+          "D native-v9 actual compiled/source5910e1b6f57b19310cb44901a5d84fd5d58c453b passed every required53 RUN/PASS once (16tops/37children),0FAIL/SKIP,exit0,273.341s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt1c17a97ea95bc7c465fdff7469e63906e8bfb7e85d3dd7077698d90f63225967 and JSONLba98ea8dbd68a7acdd4378c8b8402091503b52af985911a8eaba11f415fc8644 were independently checked with30 artifacts by root reviewc7dd0b85c703a8da4632a050c41e0d82e8413d83da49e3b5e6f42d0b26568d15. All original46 plus FirstRuntimeGate top/six children actually ran. Owned2CID/network/process group released,old IDs/images/volumes preserved; existing nsqd autonomous Restart3118->3123 precludes global runtime stability. This qualifies fixed synthetic restoration and cooperative marker serialization only, not production materials/freeze/formal instances/windows/RPO/business. The earlier native-v8 failure and all prior proofs remain unchanged.",
+          "Mac full ordinary-race/coverage execution started at3f296fb304c14c94c42b60704f0574bb65d1454e and completed at5910 with only three existing documentation files changed; Go/workflow bytes are equal. Actual exit0,374 package PASS/28 no-test packages, no failure anchors; full log8b86e0e6c9728200cbe9c022ffc6584d144713de52c748eaa253aee8f2a071a2 and independent receipt2599847cf183c8881349bd5c8f03fa8a5f08d687112da361790ab45bd4e0d2b6 retain the Darwin platform and original command. This is not Linux CI or post-fix full-repository execution.",
+          "Exact5910 CI RunTests116423119996 failed: backend whole tail120k is truncated, while embedded go_test_failure_context is complete22174B (64 hard anchors,4windows,truncated=false). It identifies capture_parent_test.go private_directory_rejected: test privateFixture selected public Linux /tmp1777, correctly rejected by unchanged production privateParent ancestor guard. Root proof f54a5ce121309b766f4798fa4c15bac37e7d75481e88c1ca8ccb3787a2dc2f89 preserves raw backend/source bridge. Prior72f/69 CI causes remain unknown; this cause is not retroassigned.",
+          "Test-only6f0245491547bc8bed5849e57707cb27563e93cc changes only protocol_test.go: UserHomeDir/MkdirTemp(home) owned0700 leaf, immediate exact-leaf Cleanup, canonical original privateParent qualification and FD Close. One existing regression uses only local TMPDIR trap to require the canonical HOME parent; no production guard, global CI environment or skip changes. All production Go and53 selected native test bytes remain equal5910; the native compiled source remains5910. The same fixed test bytes actually passed Darwin ordinary214/race214 RUN/PASS0FAIL/SKIP and integration compile only, QA51ce23e463c930a121e2b0917b32ca0202a99203bbeb55b4c64cc9afd42ac5ef. True Linux carrier and fresh final-head CI/AI remain pending, as do production window/RPO and all existing gaps/signoffs.",
+          "Linux ordinary-v1 at6f actually202RUN/158PASS/44FAIL exposed the remaining privateRecoveryDir public TMPDIR helper; receipt34a09298d26d5294d1f765f006c7cff287c1894df2a02ec7aab729c558e21500 stays failed. Test-onlya604813588978d9cebb1aae03b74219c23041fe2 removes that duplicate helper and reuses privateFixture. Mac ordinary/race214 each PASS plus tagcompile/vet; separate fixed LinuxAMD64 UID501 network-none readonly-root carrier with private HOME and explicit public /tmp1777 actually214RUN/PASS0FAIL/SKIP,exit0,3.066s. Receipt0ce3e75d6ce81346025f31f02e938d942d89ca07d364445d2de64d6f1fc23e9d and root exact-name/24-artifact review916db166df569a88d4f7230b6ff2dc06a8ba8eaa921d47ee2e532480a26f7e23 verify exact carrier release and input/old-resource preservation. Only two ordinary-test files differ from5910, all production and53 selected native bytes remain equal. This does not qualify Linux race, final-head hosted CI/AI, database or production acceptance.",
+          "CI5910 native job116423119691 is successful. Truncated backend tail retains its complete independent exact53 counter summary with eachRUN/PASS once,0FAIL/SKIP; not all original53 JSONL events are visible. Actual compiled/entry merge3878ba33e263e46ca95a225e010b76f8155d1eda has parents8c24/5910 and its whole tree equals5910, root proof0ddd676f504e8b8a10bb39a6ac3689645fa7c4b71b0f14f00fd9b5c950f67d67. This single-job result does not change5910 ordinary CI failure or sign later-head CI/AI, production windows, RPO or business."
         ]
       },
       "gaps": []
