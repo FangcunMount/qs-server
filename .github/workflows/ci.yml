@@ -1,7 +1,13 @@
 name: CI
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      m4_a_formal_carrier:
+        description: 'Also run the optional owned A Linux/root/512MiB carrier qualification; no production action'
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
   pull_request:
@@ -17,6 +23,101 @@ env:
   CI_DOCKERHUB_LOGIN: ${{ secrets.DOCKERHUB_USERNAME != '' || secrets.DOCKERHUB_TOKEN != '' }}
 
 jobs:
+  m4-a-formal-carrier:
+    name: Optional A Original Linux Carrier
+    if: github.event_name == 'workflow_dispatch' && inputs.m4_a_formal_carrier == true && github.repository == 'FangcunMount/qs-server'
+    runs-on: ubuntu-latest
+    # Step caps sum80m:1+2+1+2+22+1+1+4+42+1+3;5m action-post reserve.
+    # actual runtime remains2340s +120s cleanup; original carrier limits unchanged.
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v6
+        timeout-minutes: 1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        timeout-minutes: 2
+        with:
+          go-version: '1.25.12'
+          cache: true
+      - name: Test fixed qualification and default isolation
+        timeout-minutes: 1
+        run: |
+          set -Eeuo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 -B scripts/testing/m4-a-formal-carrier/test_source.py
+      - name: Resolve the fixed source dependencies
+        timeout-minutes: 2
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          for source in 602710eb2f6ee383923230890c4bdb4a3bcada3a 51163edab7038adcdb6b8f1712d6dc434f361dc6; do
+            [[ "$(git rev-parse "$source^{commit}")" == "$source" ]]
+            source_root="${RUNNER_TEMP}/a-carrier-deps-${source}"
+            mkdir -m 700 "$source_root"
+            git archive "$source" | tar -x -C "$source_root"
+            (cd "$source_root" && GOTOOLCHAIN=local GOMAXPROCS=2 go mod download)
+          done
+      - name: Reproduce the exact immutable Tool and build the fixed fixture
+        timeout-minutes: 22
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          python3 -B scripts/testing/m4-a-formal-carrier/prepare.py "${RUNNER_TEMP}/a-carrier-build"
+      - name: Read the original M2 API from the existing ACR
+        timeout-minutes: 1
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          username: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+          logout: true
+      - name: Read fixture images with the existing Docker Hub credential contract
+        timeout-minutes: 1
+        if: env.CI_DOCKERHUB_LOGIN == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: true
+      - name: Read only the fixed images without replacement
+        timeout-minutes: 4
+        run: |
+          set -Eeuo pipefail
+          docker pull --platform=linux/amd64 crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-apiserver@sha256:1de02c4a3f7a12c7bc9c656b0be3eefeda15f8bd4674444e3aac1df7f407b816
+          docker pull --platform=linux/amd64 docker.io/library/mysql@sha256:a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964
+          docker pull --platform=linux/amd64 mongo@sha256:43fddee7e532a920f3dfdee9e8f4834398c155c26bcb92d790cc1cd3c630fc40
+      - name: Exercise the unchanged V10 native carrier with owned synthetic data
+        timeout-minutes: 42
+        env:
+          QS_M4_A_CARRIER_ACK: isolated_original_V10_carrier_only
+        run: |
+          set -Eeuo pipefail
+          sudo --preserve-env=GITHUB_ACTIONS,GITHUB_REPOSITORY,QS_M4_A_CARRIER_ACK \
+            python3 -B scripts/testing/m4-a-formal-carrier/run.py \
+            --run --build "${RUNNER_TEMP}/a-carrier-build" --output "${RUNNER_TEMP}/a-carrier-actual"
+      - name: Preserve synthetic original evidence without changing its Linux ownership
+        timeout-minutes: 1
+        if: always()
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          if sudo test -d "${RUNNER_TEMP}/a-carrier-actual"; then
+            sudo tar -C "${RUNNER_TEMP}/a-carrier-actual" -cf - . | tee -- "${RUNNER_TEMP}/a-carrier-actual.tar" > /dev/null
+          fi
+      - name: Upload isolated carrier evidence; Mac custody remains separate
+        timeout-minutes: 3
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: m4-a-formal-carrier-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/a-carrier-actual.tar
+            ${{ runner.temp }}/a-carrier-build/build.json
+          if-no-files-found: warn
+          retention-days: 30
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
