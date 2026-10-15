@@ -40,7 +40,7 @@ capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/�
 
 restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 下原 101 的 0、1、2 个 DROP 前缀，或 clean101 且两个对象均已退出。只执行原 099 的固定 ADD 补齐缺失对象，不替换整表、不写历史列值。ADD 对唯一 schema literal 显式使用材料绑定的原 `_utf8mb3` 或 `_utf8mb4`，不依赖恢复连接字符集，也不执行材料中的DDL；已存在对象若是另一合法编码，在消费批准和执行DDL之前拒绝。恢复后两个完整原 SHOW CREATE 字符串须逐字相同。对象、保留结构、全 NULL、全部保留事实与双库身份核对成功后，才在一个真实 SQL 事务中回放**捕获的完整原账本**，账本为最后一步。中途失败、提交结果未知或连接释放未证实时保留失败，禁止 Force、down、指定版本或直接清 dirty。恢复中出现反向部分形状（assessment 已恢复、outcome 缺失）继续拒绝自动推进，不能猜测先前失败结果。
 
-默认总时限 15 分钟，可显式缩短、最高 20 分钟；单请求/连接 I/O 5 秒，恢复另受批准 deadline/expiry 约束。捕获文件 fsync 后仍检查总 deadline。生产窗口 30 分钟须预留迁移、启动和回读时间；生产规模只读预演不等于 T0 冻结，实际预算仍须独立证明。回执仅在操作成功、SQL connection/pool（含 OpenConnections/InUse 均0）、Mongo 关闭及 deadline 都通过后 complete；事务 rollback 未证实单列，主错误不被覆盖。stdout 回执交付失败以非0退出，不声称成功。
+默认总时限 15 分钟，可显式缩短、最高 20 分钟。连接（含握手）、固定会话初始化、只读请求及 socket 写入保持 5 秒；分页同时保持 MAX_EXECUTION_TIME(5000)。inspect/capture/verify-target 的 socket 读取仍为 5 秒；只有 restore 的 socket 读取使用当前 action 剩余有限时长，DDL 的 context 继续受原有总期限、父 context、批准 deadline 和 expiry 的最早值约束，不提供无期限等待或重试。RR 事务的生命周期保留总 context，不能因给 BEGIN 绑定 5 秒子 context 而在完整分页结束前自动回滚；事务内两条 ledger SELECT 另有显式 5 秒读取 context。客户端超时或连接关闭不证明服务端 DDL 已回滚，失败后须独立观察实际结构和语句终态。捕获文件 fsync 后仍检查总 deadline。生产窗口 30 分钟须预留迁移、启动和回读时间；生产规模只读预演不等于 T0 冻结，实际预算仍须独立证明。回执仅在操作成功、SQL connection/pool（含 OpenConnections/InUse 均0）、Mongo 关闭及 deadline 都通过后 complete；事务 rollback 未证实单列，主错误不被覆盖。stdout 回执交付失败以非0退出，不声称成功。
 
 ## 已执行的隔离证明与 CI
 
@@ -48,7 +48,7 @@ restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 下原 101 的 
 
 实际 argv、独立源 hash 与完整结果保存在不可变私有 `qs-m4-a-null-object-native-v6`：harness `bd42eb7bbeeba9ccf7eb52c25087f449c7385f91f10be3b1ea23a9257daec857`，JSONL `48cc28446a4cbbec5b94eb53106c0de2aaef352aa8fe15e3bbc04e6d90d4c3d9`，receipt `aa3c364d8ee727017e48f07a4ad87bb83380f4982551cd42d8cb6db8d7930ae5`。两个自有容器及 bridge 已释放；原容器 IDs/images/volumes 保留，但既有 NSQ 等动态 runtime 元数据发生变化，未声称全部旧服务 runtime 不变。先前夹具失败及真实测试失败均保留，不借用其结果。
 
-CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job 独占 MySQL8.0.36 服务运行实际 A native，注入实际 checkout SHA，必须九个顶层及四个跨编码 child selector 全部 RUN/PASS 且任何 SKIP/FAIL 均失败。普通测试、编译或 `-run='^$'` 不代替 native。新 merged head 必须独立 CI，以上 component 证明不换签新 head。
+CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job 独占 MySQL8.0.36 服务运行实际 A native，注入实际 checkout SHA，必须十个顶层、四个跨编码及三个 DDL deadline child selector 全部 RUN/PASS 且任何 SKIP/FAIL 均失败。新增 deadline 场景由独立 performance_schema 探针确认 ALTER 实际处于 MDL PENDING 后才持锁六秒并放行；另分别验证更早批准 deadline/expiry，失败时释放自有锁、有限等待实际语句结束并核对原 ledger 未提前回放，不根据超时推断对象回滚。原25项场景保留；新增场景尚须本 head 的真实 native 证明，编译不作为通过。普通测试、编译或 `-run='^$'` 不代替 native。新 merged head 必须独立 CI，以上 component 证明不换签新 head。
 
 该证明只限合成、隔离、小规模对象保护与失败边界；未签生产 capture/权限/冻结/恢复、最终镜像、三服务启动、业务验收、RPO0 或生产30/60分钟预算。
 

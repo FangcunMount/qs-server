@@ -750,3 +750,221 @@ func TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF(t *testing.T) {
 		t.Fatal("highest unsigned key omitted or no independent empty EOF", m.Tables[0].Pages, len(rows))
 	}
 }
+
+func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
+	for _, name := range []string{"pending_over_five_seconds_then_complete", "earlier_approval_deadline", "earlier_approval_expiry"} {
+		t.Run(name, func(t *testing.T) {
+			h := newNativeOriginalCharset(t, "utf8")
+			h.capture()
+			original := h.fullDDL()
+			h.upgrade(2, true)
+			for _, query := range []string{
+				"UPDATE performance_schema.setup_instruments SET ENABLED='YES',TIMED='YES' WHERE NAME IN ('wait/lock/metadata/sql/mdl','statement/sql/alter_table')",
+				"UPDATE performance_schema.setup_consumers SET ENABLED='YES' WHERE NAME IN ('global_instrumentation','thread_instrumentation','events_statements_current')",
+			} {
+				if _, e := h.root.ExecContext(t.Context(), query); e != nil {
+					t.Fatal("owned metadata-lock instrumentation unavailable")
+				}
+			}
+			blockerContext, stopBlocker := context.WithTimeout(t.Context(), 45*time.Second)
+			defer stopBlocker()
+			blocker, e := h.db.BeginTx(blockerContext, &sql.TxOptions{ReadOnly: true})
+			if e != nil {
+				t.Fatal("owned metadata-lock blocker begin failed")
+			}
+			var count int
+			if blocker.QueryRowContext(blockerContext, "SELECT COUNT(*) FROM assessment").Scan(&count) != nil || count != 2 {
+				_ = blocker.Rollback()
+				t.Fatal("owned metadata-lock blocker read failed")
+			}
+			released := false
+			release := func() {
+				if !released {
+					if e := blocker.Rollback(); e != nil {
+						t.Error("owned metadata-lock blocker release failed")
+					}
+					released = true
+				}
+			}
+			now := time.Now().UTC()
+			a := testApproval(t, h.material, h.materialHash)
+			a.ToolSource = h.tool
+			a.Operation = fmt.Sprintf("%d-1", now.UnixNano())
+			a.Deadline, a.Expires = now.Add(30*time.Second).Format(time.RFC3339Nano), now.Add(30*time.Second).Format(time.RFC3339Nano)
+			switch name {
+			case "earlier_approval_deadline":
+				a.Deadline = now.Add(4 * time.Second).Format(time.RFC3339Nano)
+			case "earlier_approval_expiry":
+				a.Expires = now.Add(4 * time.Second).Format(time.RFC3339Nano)
+			}
+			if e := validateApproval(a, h.material, h.materialHash, h.tool, time.Now()); e != nil {
+				release()
+				t.Fatal("owned deadline approval does not bind this actual compiled tool", e.Error())
+			}
+			raw, _ := json.Marshal(a)
+			approvalPath := filepath.Join(h.dir, "ddl-deadline-approval.json")
+			if writeExclusive(approvalPath, raw) != nil {
+				release()
+				t.Fatal("owned deadline approval could not be frozen")
+			}
+			action, cancelAction := context.WithCancel(t.Context())
+			response := make(chan receipt, 1)
+			readResponse := false
+			defer func() {
+				release()
+				cancelAction()
+				if !readResponse {
+					select {
+					case <-response:
+					case <-time.After(10 * time.Second):
+						t.Error("owned restore client did not finish during cleanup")
+					}
+				}
+				if !waitOwnedRestoreDDL(t, h, false, 10*time.Second) {
+					t.Error("owned ALTER termination remained unknown after releasing the blocker")
+				}
+			}()
+			go func() {
+				response <- run(action, []string{"--action=restore", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=30s", "--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + approvalPath, "--approval-sha256=" + fingerprint(raw)}, func(key string) string {
+					switch key {
+					case "QS_M4_OBJECT_MYSQL_DSN":
+						return h.dsn
+					case "QS_M4_OBJECT_MONGO_URI":
+						return h.uri
+					}
+					return ""
+				}, h.tool)
+			}()
+			pending, early := probeOwnedRestoreDDL(t, h, true, 3*time.Second, response)
+			if early != nil {
+				readResponse = true
+				t.Fatalf("restore returned before an actual MDL wait: category=%s complete=%t connection_closed=%t pool_closed=%t mongo_closed=%t", early.Error, early.Complete, early.SQLConnectionClosed, early.SQLPoolClosed, early.MongoClosed)
+			}
+			if !pending {
+				logOwnedRestoreDDLProbe(t, h)
+				t.Fatal("independent probe did not observe this ALTER actually pending on MDL")
+			}
+			pendingAt := time.Now()
+			var r receipt
+			if name == "pending_over_five_seconds_then_complete" {
+				timer := time.NewTimer(6 * time.Second)
+				defer timer.Stop()
+				select {
+				case r = <-response:
+					readResponse = true
+					t.Fatal("restore returned before the observed six-second MDL wait was released", r.Error)
+				case <-timer.C:
+				}
+				release()
+				select {
+				case r = <-response:
+					readResponse = true
+				case <-time.After(10 * time.Second):
+					t.Fatal("restore did not finish after releasing its observed MDL wait")
+				}
+				if !r.Complete || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.TransactionReleaseUnproven || h.fullDDL() != original {
+					t.Fatal("long pending ALTER did not preserve complete original objects and release", r.Error)
+				}
+				h.assertHead(100, false)
+				if !h.action("inspect").Complete {
+					t.Fatal("fresh10039 after the long ALTER was not accepted")
+				}
+			} else {
+				select {
+				case r = <-response:
+					readResponse = true
+				case <-time.After(6 * time.Second):
+					t.Fatal("restore ignored the independently approved earlier context bound")
+				}
+				if r.Complete || !r.BudgetExceeded || r.Error != "object_ddl_restore_failed_or_unknown" {
+					t.Fatal("approved deadline did not stop this actually pending ALTER", r.Error)
+				}
+				var version uint64
+				var dirty bool
+				q, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+				e = h.root.QueryRowContext(q, "SELECT version,dirty FROM `"+h.name+"`.schema_migrations").Scan(&version, &dirty)
+				cancel()
+				if e != nil || version != 101 || dirty {
+					t.Fatal("cancelled ALTER replayed the original ledger before the objects were proved")
+				}
+				release()
+				if !waitOwnedRestoreDDL(t, h, false, 10*time.Second) {
+					t.Fatal("actual statement termination unknown after releasing the owned lock")
+				}
+				h.assertHead(101, false)
+				var actualColumns int
+				if h.root.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND ((TABLE_NAME='assessment' AND COLUMN_NAME='historical_lifecycle_evidence') OR (TABLE_NAME='evaluation_outcome' AND COLUMN_NAME='historical_committed_evidence'))", h.name).Scan(&actualColumns) != nil {
+					t.Fatal("independent post-failure object observation unavailable")
+				}
+				t.Logf("post-timeout actual historical-column count=%d; no rollback inferred; ledger remains101clean", actualColumns)
+			}
+			t.Logf("actual MDL pending observed; elapsed_after_pending=%.3fs complete=%t category=%s connection_closed=%t pool_closed=%t mongo_closed=%t", time.Since(pendingAt).Seconds(), r.Complete, r.Error, r.SQLConnectionClosed, r.SQLPoolClosed, r.MongoClosed)
+		})
+	}
+}
+
+func waitOwnedRestoreDDL(t *testing.T, h *nativeFixture, pending bool, limit time.Duration) bool {
+	t.Helper()
+	observed, _ := probeOwnedRestoreDDL(t, h, pending, limit, nil)
+	return observed
+}
+
+func probeOwnedRestoreDDL(t *testing.T, h *nativeFixture, pending bool, limit time.Duration, response <-chan receipt) (bool, *receipt) {
+	t.Helper()
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		select {
+		case r := <-response:
+			return false, &r
+		default:
+		}
+		q, cancel := context.WithTimeout(t.Context(), time.Second)
+		query := "SELECT COUNT(*) FROM performance_schema.events_statements_current s JOIN performance_schema.threads p ON p.THREAD_ID=s.THREAD_ID WHERE p.PROCESSLIST_DB=? AND s.EVENT_NAME='statement/sql/alter_table' AND s.END_EVENT_ID IS NULL"
+		if pending {
+			query += " AND EXISTS(SELECT 1 FROM performance_schema.metadata_locks m WHERE m.OWNER_THREAD_ID=s.THREAD_ID AND m.OBJECT_SCHEMA=? AND m.OBJECT_NAME='assessment' AND m.LOCK_STATUS='PENDING')"
+		}
+		args := []any{h.name}
+		if pending {
+			args = append(args, h.name)
+		}
+		var n int
+		e := h.root.QueryRowContext(q, query, args...).Scan(&n)
+		cancel()
+		if e != nil {
+			return false, nil
+		}
+		if (pending && n > 0) || (!pending && n == 0) {
+			return true, nil
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return false, nil
+}
+
+func logOwnedRestoreDDLProbe(t *testing.T, h *nativeFixture) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	rows, e := h.root.QueryContext(ctx, "SELECT COALESCE(s.EVENT_NAME,'none'),s.END_EVENT_ID IS NULL,p.PROCESSLIST_DB=?,COALESCE(m.LOCK_TYPE,'none'),COALESCE(m.LOCK_STATUS,'none') FROM performance_schema.threads p LEFT JOIN performance_schema.events_statements_current s ON s.THREAD_ID=p.THREAD_ID LEFT JOIN performance_schema.metadata_locks m ON m.OWNER_THREAD_ID=p.THREAD_ID AND m.OBJECT_SCHEMA=? AND m.OBJECT_NAME='assessment' WHERE p.PROCESSLIST_DB=? LIMIT 65", h.name, h.name, h.name)
+	if e != nil {
+		t.Log("owned DDL probe diagnostics unavailable")
+		return
+	}
+	defer func() {
+		if rows.Close() != nil {
+			t.Error("owned DDL probe diagnostic rows release unproved")
+		}
+	}()
+	for n := 0; rows.Next(); n++ {
+		var event, lockType, lockStatus string
+		var unfinished, selectedDatabase bool
+		if n >= 64 || rows.Scan(&event, &unfinished, &selectedDatabase, &lockType, &lockStatus) != nil || len(event) > 128 || len(lockType) > 64 || len(lockStatus) > 64 {
+			t.Log("owned DDL probe diagnostics incomplete")
+			return
+		}
+		t.Logf("owned DDL probe event_name=%s unfinished=%t selected_database=%t lock_type=%s lock_status=%s", event, unfinished, selectedDatabase, lockType, lockStatus)
+	}
+	if rows.Err() != nil {
+		t.Log("owned DDL probe diagnostics incomplete")
+	}
+}

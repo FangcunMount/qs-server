@@ -380,3 +380,102 @@ func TestPoolCloseMustProveNoBorrowedConnectionsRemain(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestMySQLSocketReadBudgetUsesBoundedActionAndRestoreApproval(t *testing.T) {
+	now := time.Now()
+	for _, tc := range []struct {
+		name                        string
+		parent, action, end, expiry time.Duration
+		want                        time.Duration
+	}{
+		{"action_can_wait_longer_than_one_read", time.Hour, 10 * time.Minute, 20 * time.Minute, 30 * time.Minute, 10 * time.Minute},
+		{"earlier_parent", time.Second, 10 * time.Minute, 20 * time.Minute, 30 * time.Minute, time.Second},
+		{"earlier_restore_deadline", time.Hour, 10 * time.Minute, 2 * time.Second, 30 * time.Minute, 2 * time.Second},
+		{"earlier_approval_expiry", time.Hour, 10 * time.Minute, 20 * time.Minute, 3 * time.Second, 3 * time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parent, stopParent := context.WithDeadline(t.Context(), now.Add(tc.parent))
+			defer stopParent()
+			action, stopAction := context.WithDeadline(parent, now.Add(tc.action))
+			defer stopAction()
+			ctx, stopRestore := restoreActionContext(action, approval{Deadline: now.Add(tc.end).Format(time.RFC3339Nano), Expires: now.Add(tc.expiry).Format(time.RFC3339Nano)})
+			defer stopRestore()
+			deadline, ok := ctx.Deadline()
+			if !ok || !deadline.Equal(now.Add(tc.want)) {
+				t.Fatal("the action or independently approved earlier deadline was lost")
+			}
+			before := time.Now()
+			got, bounded := mysqlActionReadTimeout(ctx)
+			after := time.Now()
+			if !bounded || got <= 0 || got > deadline.Sub(before) || got < deadline.Sub(after) {
+				t.Fatal("socket read budget is not the finite remaining approved action")
+			}
+			if tc.want > queryLimit && got <= queryLimit {
+				t.Fatal("one-query limit still truncates the allowed DDL response wait")
+			}
+		})
+	}
+	for _, which := range []string{"unbounded", "already_expired", "cancelled"} {
+		t.Run(which, func(t *testing.T) {
+			ctx := context.Background()
+			switch which {
+			case "already_expired":
+				var stop context.CancelFunc
+				ctx, stop = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				defer stop()
+			case "cancelled":
+				var stop context.CancelFunc
+				ctx, stop = context.WithTimeout(ctx, time.Minute)
+				stop()
+			}
+			if budget, ok := mysqlActionReadTimeout(ctx); ok || budget != 0 {
+				t.Fatal("missing, expired or cancelled deadline produced a usable socket budget")
+			}
+		})
+	}
+}
+
+type boundedPageReadProbe struct {
+	db         *sql.DB
+	deadlines  []time.Time
+	pageHintOK bool
+}
+
+func (p *boundedPageReadProbe) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	deadline, _ := ctx.Deadline()
+	p.deadlines = append(p.deadlines, deadline)
+	return p.db.QueryRowContext(ctx, query, args...)
+}
+
+func (p *boundedPageReadProbe) QueryContext(ctx context.Context, query string, _ ...any) (*sql.Rows, error) {
+	deadline, _ := ctx.Deadline()
+	p.deadlines = append(p.deadlines, deadline)
+	p.pageHintOK = strings.Contains(query, "MAX_EXECUTION_TIME(5000)")
+	return nil, errors.New("owned fast page cancellation probe")
+}
+
+func TestReadQueriesKeepFiveSecondContextInsideLongAction(t *testing.T) {
+	db, mock, e := sqlmock.New()
+	if e != nil {
+		t.Fatal(e)
+	}
+	mock.ExpectQuery("SELECT MAX\\(id\\)").WillReturnRows(sqlmock.NewRows([]string{"max"}).AddRow("1"))
+	probe := &boundedPageReadProbe{db: db}
+	ctx, stop := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer stop()
+	before := time.Now()
+	_, e = scanTable(ctx, probe, 0, []column{{"id", "bigint unsigned"}}, true)
+	after := time.Now()
+	if e == nil || e.Error() != "bounded_page_read_failed" || !probe.pageHintOK || len(probe.deadlines) != 2 || ctx.Err() != nil {
+		t.Fatal("bounded read query or its independent parent action changed")
+	}
+	for _, deadline := range probe.deadlines {
+		if deadline.Before(before) || deadline.After(after.Add(queryLimit)) {
+			t.Fatal("a read inherited the long socket/action budget")
+		}
+	}
+	mock.ExpectClose()
+	if db.Close() != nil || mock.ExpectationsWereMet() != nil {
+		t.Fatal("bounded read probe did not release its SQL fixture")
+	}
+}
