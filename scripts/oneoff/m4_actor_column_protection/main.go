@@ -166,21 +166,32 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		ctx, c = restoreActionContext(ctx, ap)
 		defer c()
 	}
+	var captureDirectory captureParentIdentity
 	if a.action == "capture" {
 		if !absolutePath(a.capture) {
 			r.Error = "capture_private_path_rejected"
 			return r
 		}
-		parent, e := privateParent(a.capture)
+		captureDirectory, e = captureParent(a.capture)
 		if e != nil {
 			r.Error = "capture_private_parent_rejected"
 			return r
 		}
-		if parent.Close() != nil {
-			r.Error = "capture_private_parent_release_unproven"
-			return r
-		}
+		defer func() {
+			if e := captureDirectory.close(); e != nil {
+				if r.ReleaseError == "" {
+					r.ReleaseError = e.Error()
+				}
+				if r.Complete || r.Error == "none" {
+					r.Error = e.Error()
+				}
+				r.Complete = false
+				r.MaterialHash = ""
+				r.TableCounts = nil
+			}
+		}()
 	}
+
 	dsn, e := mysql.ParseDSN(getenv("QS_M4_C_OBJECT_MYSQL_DSN"))
 	uri := getenv("QS_M4_C_OBJECT_MONGO_URI")
 	if e != nil || dsn.DBName != a.binding.SQLName || uri == "" {
@@ -249,7 +260,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return
 		}
 		if a.action == "capture" {
-			if e := writeExclusive(a.capture, rawMaterial); e != nil {
+			if e := finishCapture(ctx, &r, a.capture, &captureDirectory, rawMaterial, writeCaptureExclusive); e != nil {
 				r.Error = strings.Split(e.Error(), "\n")[0]
 				return
 			}
@@ -257,7 +268,6 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 				r.Error, r.BudgetExceeded = "total_budget_exceeded", true
 				return
 			}
-			r.MaterialHash = fingerprint(rawMaterial)
 		}
 		r.Complete, r.Error = true, "none"
 	}()
