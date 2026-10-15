@@ -375,10 +375,11 @@ func TestCaptureFsyncCrossingDeadlineNeverCompletes(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = parent.close() })
 	ctx, cancel := context.WithCancel(t.Context())
 	r := receipt{}
-	e = finishCapture(ctx, &r, path, parent, []byte("captured"), func(p string, raw []byte) error {
-		if e := writeExclusive(p, raw); e != nil {
+	e = finishCapture(ctx, &r, path, &parent, []byte("captured"), func(original *captureParentIdentity, p string, raw []byte) error {
+		if e := writeCaptureExclusive(original, p, raw); e != nil {
 			return e
 		}
 		cancel()
