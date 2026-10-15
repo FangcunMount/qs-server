@@ -19,6 +19,8 @@ import (
 	"testing/fstest"
 	"time"
 
+	retirementDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
+	retirementRepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/operatorretirement"
 	qsMigration "github.com/FangcunMount/qs-server/internal/pkg/migration"
 	"github.com/FangcunMount/qs-server/pkg/version"
 	"github.com/go-sql-driver/mysql"
@@ -30,6 +32,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // These are test-only owned namespaces. No force/SetVersion or direct writes to
@@ -37,8 +42,11 @@ import (
 type actorNative struct {
 	t                          *testing.T
 	name, dsn, uri, tool, dir  string
-	root, db                   *sql.DB
+	root, db, repoPool         *sql.DB
 	client                     *mongo.Client
+	repo                       *retirementRepo.Repository
+	tasks                      map[uint64]retirementDomain.Task
+	recoveries                 map[string]retirementDomain.Recovery
 	sqlSource, mongoSource     fstest.MapFS
 	binding                    binding
 	materialPath, materialHash string
@@ -127,6 +135,9 @@ func newActorNative(t *testing.T) *actorNative {
 	root.SetMaxOpenConns(1)
 	h := &actorNative{t: t, name: "qs_m4_c_native_" + strconv.FormatInt(time.Now().UnixNano(), 10), root: root, uri: uri, tool: version.GitCommit}
 	t.Cleanup(func() {
+		if h.repoPool != nil && h.repoPool.Close() != nil {
+			t.Error("owned modern repository pool not released")
+		}
 		if h.db != nil && h.db.Close() != nil {
 			t.Error("owned SQL pool not released")
 		}
@@ -184,6 +195,7 @@ func newActorNative(t *testing.T) *actorNative {
 	}
 	h.migrateMongo()
 	h.seed()
+	h.seedModernRecords()
 	h.binding = h.independentBinding()
 	t.Logf("actual owned dependencies mysql=%s mongo=%s rs0; Csource=%s resources=%s files=%d; tool=%s", sqlVersion, build.Version, cSource, cResources, cResourceFiles, h.tool)
 	return h
@@ -270,12 +282,81 @@ func (h *actorNative) seed() {
 	for _, query := range []string{
 		"SET SESSION sql_mode=CONCAT(@@session.sql_mode,',NO_AUTO_VALUE_ON_ZERO')",
 		`INSERT INTO testee(id,org_id,name,gender,tags) VALUES(0,1,'owned-null',0,NULL),(7,1,'owned-array',0,JSON_ARRAY()),(9,1,'owned-json-null',0,'null'),(18446744073709551615,1,'owned-max',0,JSON_ARRAY('retained-original'))`,
-		`INSERT INTO operators(id,org_id,user_id,roles,effective_roles,name,is_active) VALUES(0,1,100,JSON_ARRAY('qs:admin'),'null','owned-json-null',TRUE),(7,1,107,JSON_ARRAY('qs:admin'),JSON_ARRAY(),'owned-empty',TRUE),(18446744073709551615,1,199,JSON_ARRAY('qs:admin'),JSON_ARRAY('qs:result_reviewer'),'owned-max',TRUE)`,
-		`INSERT INTO operator_retirement_tasks(operator_id,org_id,user_id,stage,payload,before_state,updated_at) VALUES(0,1,100,'prepared','{"source":"owned"}','{"effective_roles":["legacy-original"]}','2026-10-15 00:00:00.123'),(18446744073709551615,1,199,'completed','{"source":"owned-max"}','{"tags":[]}','2026-10-15 00:00:00.456')`,
-		`INSERT INTO operator_recovery_archives(request_id,operator_id,org_id,user_id,retirement_request_id,recovery_payload,retirement_payload,retirement_before_state,operator_before_state,checksum,created_at) VALUES('A',0,1,100,'exit-A','{ "spacing" : "original" }','{"exit":"A"}','{"effective_roles":["raw"]}','{"roles":[]}','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','2026-10-15 00:00:00.123'),('a',18446744073709551615,1,199,'exit-a','{"source":"owned"}','{"exit":"a"}','{"tags":null}','{"roles":["qs:admin"]}','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2026-10-15 00:00:00.456')`,
+		`INSERT INTO operators(id,org_id,user_id,roles,effective_roles,name,is_active) VALUES(0,1,100,JSON_ARRAY('qs:admin'),'null','owned-json-null',TRUE),(7,1,107,JSON_ARRAY('qs:admin'),JSON_ARRAY('owned-original-effective-role'),'owned-historical',TRUE),(9,1,109,JSON_ARRAY('qs:result_reviewer'),JSON_ARRAY(),'owned-empty',TRUE),(18446744073709551615,1,199,JSON_ARRAY('qs:admin'),JSON_ARRAY('qs:result_reviewer'),'owned-max',TRUE)`,
 	} {
 		if _, e := conn.ExecContext(h.t.Context(), query); e != nil {
 			h.t.Fatal("owned synthetic actor seed failed")
+		}
+	}
+}
+
+// Normal repository writes construct valid local facts solely for these owned
+// fixtures. Later assertions cover archive/task reads and immutable bytes, not
+// application authorization, IAM convergence or the complete recovery journey.
+func (h *actorNative) seedModernRecords() {
+	h.t.Helper()
+	cfg, e := mysql.ParseDSN(h.dsn)
+	if e != nil {
+		h.t.Fatal("owned modern repository DSN unavailable")
+	}
+	cfg.ParseTime, cfg.Loc = true, time.UTC
+	h.repoPool, e = sql.Open("mysql", cfg.FormatDSN())
+	if e != nil {
+		h.t.Fatal("owned modern repository pool unavailable")
+	}
+	h.repoPool.SetMaxOpenConns(1)
+	db, e := gorm.Open(gormmysql.New(gormmysql.Config{Conn: h.repoPool, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true, Logger: logger.Default.LogMode(logger.Silent)})
+	if e != nil {
+		h.t.Fatal("owned modern repository unavailable")
+	}
+	h.repo = retirementRepo.NewRepository(db)
+	h.recoveries = map[string]retirementDomain.Recovery{}
+	now := time.Date(2026, 10, 15, 0, 0, 0, 123000000, time.UTC)
+	version := uint32(1)
+	for i, request := range []string{"A", "a"} {
+		at := now.Add(time.Duration(i) * time.Second)
+		task, e := retirementDomain.New(7, 1, 107, 199, version, "exit-"+request, "owned valid historical exit", at)
+		if e != nil || h.repo.Begin(h.t.Context(), task) != nil {
+			h.t.Fatal("normal owned retirement begin failed")
+		}
+		policy := int64(10 + i)
+		if task.MarkRevoked(policy, at) != nil || h.repo.Save(h.t.Context(), task) != nil || task.Complete(policy, false, at) != nil || h.repo.Finish(h.t.Context(), task) != nil {
+			h.t.Fatal("normal owned retirement completion failed")
+		}
+		recovery, e := retirementDomain.NewRecovery(task, 199, version+2, policy, request, "owned valid archive construction", at)
+		if e != nil || h.repo.WithOperatorLock(h.t.Context(), 1, 7, func(ctx context.Context) error { return h.repo.Recover(ctx, recovery) }) != nil {
+			h.t.Fatal("normal owned recovery archive construction failed")
+		}
+		h.recoveries[request] = recovery
+		version += 3
+	}
+	h.tasks = map[uint64]retirementDomain.Task{}
+	for _, target := range []struct {
+		id      uint64
+		user    int64
+		version uint32
+	}{{7, 107, version}, {9, 109, 1}} {
+		task, e := retirementDomain.New(target.id, 1, target.user, 199, target.version, "pending-"+strconv.FormatUint(target.id, 10), "owned valid pending exit", now.Add(3*time.Second))
+		if e != nil || h.repo.Begin(h.t.Context(), task) != nil {
+			h.t.Fatal("normal owned pending retirement construction failed")
+		}
+		h.tasks[target.id] = task
+	}
+	h.assertModernReads()
+}
+
+func (h *actorNative) assertModernReads() {
+	h.t.Helper()
+	for id, want := range h.tasks {
+		got, e := h.repo.FindTask(h.t.Context(), 1, id)
+		if e != nil || got == nil || *got != want {
+			h.t.Fatal("modern task payload or row identity changed")
+		}
+	}
+	for request, want := range h.recoveries {
+		got, e := h.repo.FindRecovery(h.t.Context(), request)
+		if e != nil || got == nil || *got != want {
+			h.t.Fatal("modern recovery checksum, payload or row identity changed")
 		}
 	}
 }
@@ -420,6 +501,7 @@ func (h *actorNative) mongoHead() []byte {
 
 func TestM4ActorColumnsNativeCaptureUpgradeVerify(t *testing.T) {
 	h := newActorNative(t)
+	h.assertModernReads()
 	before, mongoHead := h.retainedRaw(), h.mongoHead()
 	h.capture()
 	values := h.query("SELECT id,CAST(tags AS BINARY) FROM testee ORDER BY id")
@@ -440,7 +522,14 @@ func TestM4ActorColumnsNativeCaptureUpgradeVerify(t *testing.T) {
 			}
 		}
 	}
+	for _, request := range []string{"A", "a"} {
+		rows := h.query("SELECT retirement_before_state,operator_before_state FROM operator_recovery_archives WHERE request_id='" + request + "'")
+		if len(rows) != 1 || !strings.Contains(rows[0][0].String, `"effective_roles"`) || !strings.Contains(rows[0][1].String, `"effective_roles"`) {
+			t.Fatal("normal archive did not retain the actual old-schema facts")
+		}
+	}
 	h.migrateSQL(102)
+	h.assertModernReads()
 	r := h.verify()
 	if !r.Complete || r.Error != "none" || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || !r.MandatoryEOF {
 		t.Fatal("formal target verification failed", r.Error)
@@ -502,18 +591,40 @@ func TestM4ActorColumnsNativeRetainedAndBoundaryDrift(t *testing.T) {
 	h := newActorNative(t)
 	h.capture()
 	h.migrateSQL(102)
+	h.assertModernReads()
+	original := h.query("SELECT recovery_payload FROM operator_recovery_archives WHERE request_id='A'")
+	if len(original) != 1 || !original[0][0].Valid {
+		t.Fatal("normal original recovery payload unavailable")
+	}
 	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_recovery_archives SET recovery_payload='changed-original' WHERE request_id='A'"); e != nil {
 		t.Fatal("owned archive drift not installed")
+	}
+	if _, e := h.repo.FindRecovery(t.Context(), "A"); e == nil {
+		t.Fatal("actual archive checksum reader accepted changed payload")
 	}
 	if r := h.verify(); r.Complete || r.Error != "target_retained_facts_rejected" {
 		t.Fatal("archive drift accepted", r.Error)
 	}
-	if _, e := h.db.ExecContext(t.Context(), `UPDATE operator_recovery_archives SET recovery_payload='{ "spacing" : "original" }' WHERE request_id='A'`); e != nil {
+	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_recovery_archives SET recovery_payload=? WHERE request_id='A'", original[0][0].String); e != nil {
 		t.Fatal("owned archive reset failed")
 	}
 	if r := h.verify(); !r.Complete {
 		t.Fatal("independent original archive bytes no longer match", r.Error)
 	}
+	h.assertModernReads()
+	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_recovery_archives SET user_id=user_id+1 WHERE request_id='a'"); e != nil {
+		t.Fatal("owned row identity drift unavailable")
+	}
+	if _, e := h.repo.FindRecovery(t.Context(), "a"); e == nil {
+		t.Fatal("actual archive reader accepted changed row identity")
+	}
+	if r := h.verify(); r.Complete || r.Error != "target_retained_facts_rejected" {
+		t.Fatal("archive row identity drift accepted", r.Error)
+	}
+	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_recovery_archives SET user_id=? WHERE request_id='a'", h.recoveries["a"].UserID); e != nil {
+		t.Fatal("owned row identity reset failed")
+	}
+	h.assertModernReads()
 	if _, e := h.db.ExecContext(t.Context(), "INSERT INTO testee(id,org_id,name,gender) VALUES(10,1,'owned-new-fact',0)"); e != nil {
 		t.Fatal("owned new boundary fact unavailable")
 	}
