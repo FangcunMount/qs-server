@@ -483,7 +483,7 @@ func (d database) snapshot(ctx context.Context, tool string, original bool) (m m
 			return m, before, e
 		}
 		if present {
-			if e = validateOriginalObjectDefinition(t.OriginalDDL, i); e != nil {
+			if _, e = validateOriginalObjectDefinition(t.OriginalDDL, i); e != nil {
 				return m, before, e
 			}
 		}
@@ -537,7 +537,7 @@ func (d database) verifyTarget(ctx context.Context, m material, tool string) err
 	}
 	return nil
 }
-func restorationStatements() ([2]string, error) {
+func restorationStatements(m material) ([2]string, error) {
 	var out [2]string
 	if fingerprint([]byte(originalDDL)) != originalDDLHash {
 		return out, errors.New("compiled_original_ddl_changed")
@@ -549,6 +549,25 @@ func restorationStatements() ([2]string, error) {
 	}
 	out[0] = originalDDL[a:b]
 	out[1] = originalDDL[b:]
+	for i := range out {
+		encoding, e := validateOriginalObjectDefinition(m.Tables[i].OriginalDDL, i)
+		if e != nil {
+			return [2]string{}, e
+		}
+		var literal string
+		switch encoding {
+		case originalUTF8MB3:
+			literal = "JSON_SCHEMA_VALID(_utf8mb3'"
+		case originalUTF8MB4:
+			literal = "JSON_SCHEMA_VALID(_utf8mb4'"
+		default:
+			return [2]string{}, errors.New("original_check_resource_invalid")
+		}
+		if strings.Count(out[i], "JSON_SCHEMA_VALID('") != 1 {
+			return [2]string{}, errors.New("original_check_resource_invalid")
+		}
+		out[i] = strings.Replace(out[i], "JSON_SCHEMA_VALID('", literal, 1)
+	}
 	return out, nil
 }
 func (d database) restore(ctx context.Context, m material, a approval, tool, materialPath, materialHash, approvalPath, approvalHash string) (resultErr error) {
@@ -571,6 +590,21 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if !o.Dirty && (got.Tables[0].SQLNullOnly || got.Tables[1].SQLNullOnly) {
 		return errors.New("clean101_requires_both_objects_absent")
 	}
+	for i, t := range got.Tables {
+		if t.SQLNullOnly {
+			want, e := validateOriginalObjectDefinition(m.Tables[i].OriginalDDL, i)
+			if e != nil {
+				return e
+			}
+			current, e := validateOriginalObjectDefinition(t.OriginalDDL, i)
+			if e != nil {
+				return e
+			}
+			if current != want {
+				return errors.New("existing_original_check_encoding_changed")
+			}
+		}
+	}
 	if _, e = readPrivate(materialPath, materialHash, maxMaterialBytes); e != nil {
 		return e
 	}
@@ -582,7 +616,7 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if strictDecode(raw, &again) != nil || !reflect.DeepEqual(a, again) {
 		return errors.New("restore_approval_changed_before_claim")
 	}
-	statements, e := restorationStatements()
+	statements, e := restorationStatements(m)
 	if e != nil {
 		return e
 	}
@@ -613,7 +647,7 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 		return e
 	}
 	for i, t := range restored.Tables {
-		if !t.SQLNullOnly || normalizeFullDDL(t.OriginalDDL) != normalizeFullDDL(m.Tables[i].OriginalDDL) {
+		if !t.SQLNullOnly || t.OriginalDDL != m.Tables[i].OriginalDDL {
 			return errors.New("original_objects_or_ddl_not_restored")
 		}
 	}
@@ -651,7 +685,6 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	}
 	return compareRetained(m, final)
 }
-func normalizeFullDDL(s string) string { return autoIncrementRE.ReplaceAllString(s, "") }
 
 type transactionReleaseFailure struct{ operation error }
 

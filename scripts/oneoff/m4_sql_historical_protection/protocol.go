@@ -131,7 +131,7 @@ func validateMaterial(m material, tool, sqlName, mongoName string) error {
 		if t.Table != objects[i].table || !t.EOF || !t.SQLNullOnly || len(t.Rows) > maxRows || t.Pages < 1 || t.OriginalDDL == "" || t.RetainedDDL != normalizeDDL(t.OriginalDDL, i) || len(t.Columns) < 1 || len(t.Columns) > 128 {
 			return errors.New("material_table_rejected")
 		}
-		if validateOriginalObjectDefinition(t.OriginalDDL, i) != nil {
+		if _, e := validateOriginalObjectDefinition(t.OriginalDDL, i); e != nil {
 			return errors.New("material_original_099_definition_rejected")
 		}
 		seen := map[string]bool{}
@@ -154,9 +154,16 @@ func validateMaterial(m material, tool, sqlName, mongoName string) error {
 }
 
 // MySQL8.0.36 SHOW CREATE renders the original OCTET_LENGTH alias as length.
-// Accept only this fixed server encoding of the immutable 099 expression;
+// Accept only the two fixed ASCII literal encodings of the immutable 099;
 // no generic SQL normalization or material-supplied DDL is executed.
-func originalCheckDefinition(i int) (string, error) {
+type originalEncoding uint8
+
+const (
+	originalUTF8MB3 originalEncoding = 3
+	originalUTF8MB4 originalEncoding = 4
+)
+
+func originalCheckDefinition(i int, encoding originalEncoding) (string, error) {
 	if i < 0 || i >= len(objects) || fingerprint([]byte(originalDDL)) != originalDDLHash {
 		return "", errors.New("compiled_original_ddl_changed")
 	}
@@ -172,43 +179,67 @@ func originalCheckDefinition(i int) (string, error) {
 	if len(parts) != 2 || !json.Valid([]byte(parts[0])) || strings.ContainsAny(parts[0], "'\\") {
 		return "", errors.New("original_check_resource_invalid")
 	}
+	for _, b := range []byte(parts[0]) {
+		if b >= 128 {
+			return "", errors.New("original_check_resource_invalid")
+		}
+	}
+	var intro string
+	switch encoding {
+	case originalUTF8MB3:
+		intro = "_utf8mb3"
+	case originalUTF8MB4:
+		intro = "_utf8mb4"
+	default:
+		return "", errors.New("original_check_resource_invalid")
+	}
 	c := objects[i].column
-	return fmt.Sprintf("CONSTRAINT `%s` CHECK (((`%s` is null) or (json_schema_valid(_utf8mb4'%s',`%s`) and (length(cast(`%s` as char charset utf8mb4)) <= 524288))))", objects[i].check, c, parts[0], c, c), nil
+	return fmt.Sprintf("CONSTRAINT `%s` CHECK (((`%s` is null) or (json_schema_valid(%s'%s',`%s`) and (length(cast(`%s` as char charset utf8mb4)) <= 524288))))", objects[i].check, c, intro, parts[0], c, c), nil
 }
 
-func validateOriginalObjectDefinition(text string, i int) error {
-	want, e := originalCheckDefinition(i)
+func validateOriginalObjectDefinition(text string, i int) (originalEncoding, error) {
+	want3, e := originalCheckDefinition(i, originalUTF8MB3)
 	if e != nil {
-		return e
+		return 0, e
+	}
+	want4, e := originalCheckDefinition(i, originalUTF8MB4)
+	if e != nil {
+		return 0, e
 	}
 	columnCount, checkCount := 0, 0
 	lastColumn := ""
+	var encoding originalEncoding
 	for _, raw := range strings.Split(text, "\n") {
 		line := strings.TrimSuffix(strings.TrimSpace(raw), ",")
 		if strings.HasPrefix(line, "`") {
 			parts := strings.SplitN(line, "`", 3)
 			if len(parts) != 3 {
-				return errors.New("original_099_object_definition_rejected")
+				return 0, errors.New("original_099_object_definition_rejected")
 			}
 			lastColumn = parts[1]
 			if lastColumn == objects[i].column {
 				columnCount++
 				if line != "`"+objects[i].column+"` json DEFAULT NULL" {
-					return errors.New("original_099_object_definition_rejected")
+					return 0, errors.New("original_099_object_definition_rejected")
 				}
 			}
 		}
 		if strings.HasPrefix(line, "CONSTRAINT `"+objects[i].check+"`") {
 			checkCount++
-			if line != want {
-				return errors.New("original_099_object_definition_rejected")
+			switch line {
+			case want3:
+				encoding = originalUTF8MB3
+			case want4:
+				encoding = originalUTF8MB4
+			default:
+				return 0, errors.New("original_099_object_definition_rejected")
 			}
 		}
 	}
 	if columnCount != 1 || checkCount != 1 || lastColumn != objects[i].column {
-		return errors.New("original_099_object_definition_rejected")
+		return 0, errors.New("original_099_object_definition_rejected")
 	}
-	return nil
+	return encoding, nil
 }
 func validateApproval(a approval, m material, expected, tool string, now time.Time) error {
 	if a.Format != 1 || a.Kind != "m4_a_pre_start_sql_object_restore" || !operationRE.MatchString(a.Operation) || a.ToolSource != tool || a.ASource != aSource || a.AResources != aResources || a.AResourceFiles != aResourceFiles || a.MaterialHash != expected || !hashRE.MatchString(expected) || !nonzeroHash(a.FreezeHash) || !nonzeroHash(a.ResponsibilityHash) || a.SQLIdentity != m.SQLIdentity || a.MongoIdentity != m.MongoIdentity || !a.RuntimeFrozen || !a.RuntimeNotStarted || a.RetentionDays < 30 || a.DataOwner != "system (10001)" || a.RecoveryOwner != "system (10001)" {

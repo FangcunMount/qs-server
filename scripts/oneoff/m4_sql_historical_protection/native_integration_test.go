@@ -92,9 +92,20 @@ func nativeSource(t *testing.T, backend string, through int) fstest.MapFS {
 	return out
 }
 func newNative(t *testing.T) *nativeFixture {
+	return newNativeOriginalCharset(t, "utf8mb4")
+}
+
+func newNativeOriginalCharset(t *testing.T, charset string) *nativeFixture {
 	t.Helper()
+	if charset != "utf8" && charset != "utf8mb4" {
+		t.Fatal("fixed original fixture charset required")
+	}
 	dsn, uri, tool := requireNative(t)
 	cfg, _ := mysql.ParseDSN(dsn)
+	if cfg.Params == nil {
+		cfg.Params = map[string]string{}
+	}
+	cfg.Params["charset"] = charset
 	cfg.MultiStatements = true
 	cfg.ParseTime = false
 	root, e := sql.Open("mysql", cfg.FormatDSN())
@@ -164,6 +175,126 @@ func newNative(t *testing.T) *nativeFixture {
 	}
 	t.Logf("actual dependencies MySQL=%s Mongo=%s rs0; owned namespace=%s; compiled source=%s", actual, build.Version, name, tool)
 	return h
+}
+
+func (h *nativeFixture) toolCharset(charset string) {
+	h.t.Helper()
+	if charset != "utf8mb3" && charset != "utf8mb4" {
+		h.t.Fatal("fixed opposite fixture charset required")
+	}
+	cfg, e := mysql.ParseDSN(h.dsn)
+	if e != nil {
+		h.t.Fatal(e)
+	}
+	if cfg.Params == nil {
+		cfg.Params = map[string]string{}
+	}
+	cfg.Params["charset"] = charset
+	h.dsn = cfg.FormatDSN()
+	pool, e := sql.Open("mysql", h.dsn)
+	if e != nil {
+		h.t.Fatal(e)
+	}
+	defer func() {
+		if e := pool.Close(); e != nil {
+			h.t.Error("opposite charset witness release", e)
+		}
+	}()
+	var client, connection string
+	if e = pool.QueryRowContext(h.t.Context(), "SELECT @@character_set_client,@@character_set_connection").Scan(&client, &connection); e != nil || client != charset || connection != charset {
+		h.t.Fatal("actual opposite connection charset not installed", e)
+	}
+	h.t.Logf("actual tool DSN connection charset client=%s connection=%s", client, connection)
+}
+
+func (h *nativeFixture) fullDDL() [2]string {
+	h.t.Helper()
+	var out [2]string
+	for i, object := range objects {
+		var e error
+		out[i], e = ddl(h.t.Context(), h.db, object.table)
+		if e != nil {
+			h.t.Fatal(e)
+		}
+	}
+	return out
+}
+
+func TestM4SQLObjectNativeCharsetBoundRecovery(t *testing.T) {
+	for _, tc := range []struct {
+		name, original, opposite string
+		encoding                 originalEncoding
+		drops                    int
+		clean                    bool
+	}{
+		{"UTF8MB3DirtyFirstDDLToolMB4", "utf8", "utf8mb4", originalUTF8MB3, 1, false},
+		{"UTF8MB3CleanBothDDLToolMB4", "utf8", "utf8mb4", originalUTF8MB3, 2, true},
+		{"UTF8MB4DirtyFirstDDLToolMB3", "utf8mb4", "utf8mb3", originalUTF8MB4, 1, false},
+		{"UTF8MB4CleanBothDDLToolMB3", "utf8mb4", "utf8mb3", originalUTF8MB4, 2, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newNativeOriginalCharset(t, tc.original)
+			original := h.fullDDL()
+			for i := range objects {
+				encoding, e := validateOriginalObjectDefinition(original[i], i)
+				if e != nil || encoding != tc.encoding {
+					t.Fatal("real original 099 encoding did not match creation connection", e)
+				}
+			}
+			h.toolCharset(tc.opposite)
+			h.capture()
+			for i := range objects {
+				if h.material.Tables[i].OriginalDDL != original[i] {
+					t.Fatal("opposite capture connection changed original SHOW CREATE")
+				}
+			}
+			h.upgrade(tc.drops, tc.clean)
+			args, _ := h.restoreInput()
+			r := h.action("restore", args...)
+			if !r.Complete || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.TransactionReleaseUnproven {
+				t.Fatal("cross-charset restore not complete/released", r)
+			}
+			if h.fullDDL() != original {
+				t.Fatal("full original SHOW CREATE not byte-identical after restoration")
+			}
+			h.assertHead(100, false)
+			r = h.action("inspect")
+			if !r.Complete {
+				t.Fatal("fresh clean10039 inspect failed", r)
+			}
+		})
+	}
+}
+
+func TestM4SQLObjectNativeExistingEncodingMismatchRefusedBeforeClaim(t *testing.T) {
+	h := newNativeOriginalCharset(t, "utf8")
+	h.toolCharset("utf8mb4")
+	h.capture()
+	h.upgrade(1, false)
+	other, e := originalCheckDefinition(1, originalUTF8MB4)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = h.db.Exec("ALTER TABLE evaluation_outcome DROP CHECK chk_outcome_historical_committed, ADD " + other); e != nil {
+		t.Fatal("owned known-alternate CHECK setup failed", e)
+	}
+	before := h.fullDDL()
+	args, _ := h.restoreInput()
+	r := h.action("restore", args...)
+	if r.Complete || r.Error != "existing_original_check_encoding_changed" || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed {
+		t.Fatal("known alternate encoding was not rejected before claim", r)
+	}
+	if h.fullDDL() != before {
+		t.Fatal("early mismatch refusal changed an object")
+	}
+	h.assertHead(101, true)
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			if _, e := os.Stat(strings.TrimPrefix(arg, "--approval-file=") + ".consumed"); !os.IsNotExist(e) {
+				t.Fatal("early mismatch refusal consumed authorization")
+			}
+		}
+	}
 }
 func (h *nativeFixture) migrateSQL(source fs.FS, target uint) {
 	h.t.Helper()

@@ -242,6 +242,12 @@ jobs:
               'TestM4SQLObjectNativePostStartNewFactsAndNonNullRefused',
               'TestM4SQLObjectNativeCommitResponseLossRemainsUnknown',
               'TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF',
+              'TestM4SQLObjectNativeCharsetBoundRecovery',
+              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB3DirtyFirstDDLToolMB4',
+              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB3CleanBothDDLToolMB4',
+              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB4DirtyFirstDDLToolMB3',
+              'TestM4SQLObjectNativeCharsetBoundRecovery/UTF8MB4CleanBothDDLToolMB3',
+              'TestM4SQLObjectNativeExistingEncodingMismatchRefusedBeforeClaim',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
           if any(event.get('Action') in ('skip', 'fail') for event in events):
@@ -250,7 +256,7 @@ jobs:
               actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
               if actual != expected:
                   raise SystemExit('A object native selectors did not all RUN/PASS')
-          print('A object native: seven required top-level selectors RUN/PASS; zero SKIP')
+          print('A object native: nine top-level and four cross-charset selectors RUN/PASS; zero SKIP')
           PY_OBJECT_PROOF
 
   action-audit-mysql:

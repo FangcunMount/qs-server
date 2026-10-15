@@ -2,7 +2,7 @@
 
 本工具只保护 `assessment.historical_lifecycle_evidence`、`evaluation_outcome.historical_committed_evidence` 和原有两个 CHECK。只接受原 clean `100/39` 下两列全为 **SQL NULL** 的情形；任一非 NULL、未知结构、身份变化、保留事实变化、超时或释放未证实都会拒绝完成。它不保存业务字段正文，不提供通用数据库恢复、迁移或维护模式。
 
-工具自身编译 SHA 与 A 执行器分别绑定。A 固定为 `51163edab7038adcdb6b8f1712d6dc434f361dc6`，嵌入迁移摘要 `77e11d801d270ef7b12f86261a05217a95bd8f8049f20d2e5f14ee0c0a20083b`、280 个资源。当前主线的后续迁移不会被自动当作 A 执行器。恢复 ADD 来自不可变原 099 资源的逐字节副本，其 SHA-256 为 `575fa26f588e4fb87ee7bbcdc61fc11eeb8fe8ed0234518209e7e3e13b7b0d7a`。
+工具自身编译 SHA 与 A 执行器分别绑定。A 固定为 `51163edab7038adcdb6b8f1712d6dc434f361dc6`，嵌入迁移摘要 `77e11d801d270ef7b12f86261a05217a95bd8f8049f20d2e5f14ee0c0a20083b`、280 个资源。当前主线的后续迁移不会被自动当作 A 执行器。恢复 ADD 的固定来源仍是不可变原 099 资源的逐字节副本，其 SHA-256 为 `575fa26f588e4fb87ee7bbcdc61fc11eeb8fe8ed0234518209e7e3e13b7b0d7a`。
 
 ## 调用与材料
 
@@ -30,7 +30,7 @@ m4-sql-historical-protection --action=restore --mysql-database=qs --mongo-databa
 
 以上是调用示例，未作为生产命令执行。连接、工具 binary/source、A 执行器、输入材料和批准均须由执行控制方独立绑定。材料与批准须为绝对路径的私有 0600 普通文件，单硬链接、无符号链接、属当前 UID 或 root；原始 SHA 固定在独立批准中。首次 capture 用 O_EXCL 写入并 fsync，不覆盖旧材料。批准另以 O_EXCL `.consumed` 文件消费一次，恢复输入不能给自己重新授权。
 
-capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/保留列/类型/主键以及全部主键与保留行 SHA；不保存行正文。三个固定对象必须是 InnoDB BASE TABLE；目标列必须为原099的最后一列且 json DEFAULT NULL，CHECK必须与不可变099在实际MySQL8.0.36上的完整canonical表达式相同（OCTET_LENGTH按服务器编码为length）。捕获、材料验证及恢复snapshot均在任何DDL前拒绝位置/default/谓词/schema漂移。会话时区 `+00:00`、字符集 utf8mb4 与固定 sql_mode 一致；数据库按类型、NULL 标记、字节长度及 HEX 进行散列，不经过 Go 时间重编码。uint64 主键以 DECIMAL(20,0) 参数比较，包含 id0 和最大值；每表 COUNT 守恒且必须实际读取独立空 EOF 页，不用抽样或以短页代替 EOF。上限每表 500,000 行、材料 128MiB，超限拒绝而不签部分完成。只归一化 AUTO_INCREMENT 动态值与明确目标列/CHECK；其他结构须相同。
+capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/保留列/类型/主键以及全部主键与保留行 SHA；不保存行正文。三个固定对象必须是 InnoDB BASE TABLE；目标列必须为原099的最后一列且 json DEFAULT NULL，CHECK仅接受不可变099在实际MySQL8.0.36上的两个完整表达式：原 JSON schema ASCII literal 的 introducer 为 `_utf8mb3` 或 `_utf8mb4`（OCTET_LENGTH按服务器编码为length），其余字节、CAST及谓词必须完全相同。材料中的完整原DDL绑定每个对象的原编码，不增加通用DDL归一化或任意SQL输入。捕获、材料验证及恢复snapshot均在任何DDL前拒绝位置/default/谓词/schema漂移。会话时区 `+00:00`、结果字符集 utf8mb4 与固定 sql_mode 一致；数据库按类型、NULL 标记、字节长度及 HEX 进行散列，不经过 Go 时间重编码。uint64 主键以 DECIMAL(20,0) 参数比较，包含 id0 和最大值；每表 COUNT 守恒且必须实际读取独立空 EOF 页，不用抽样或以短页代替 EOF。上限每表 500,000 行、材料 128MiB，超限拒绝而不签部分完成。只归一化 AUTO_INCREMENT 动态值与明确目标列/CHECK；其他结构须相同。
 
 ## 恢复边界
 
@@ -38,7 +38,7 @@ capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/�
 
 执行控制方负责停止入口及全部 **API1、Collection2、Worker3** 六实例和其他写入者、记录在途责任并持续冻结。它必须在发出首个新 runtime 启动命令**之前**，以 O_EXCL 写入批准绑定的 first-runtime marker。工具不删除或修改 marker；marker 缺失本身不能证明六实例已停写。任何首启动已发出或新持久事实出现后，禁止本工具回放旧材料，改走目标 schema 兼容版本向前恢复。
 
-restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 下原 101 的 0、1、2 个 DROP 前缀，或 clean101 且两个对象均已退出。只执行原 099 的固定 ADD 补齐缺失对象，不替换整表、不写历史列值。对象、保留结构、全 NULL、全部保留事实与双库身份核对成功后，才在一个真实 SQL 事务中回放**捕获的完整原账本**，账本为最后一步。中途失败、提交结果未知或连接释放未证实时保留失败，禁止 Force、down、指定版本或直接清 dirty。恢复中出现反向部分形状（assessment 已恢复、outcome 缺失）继续拒绝自动推进，不能猜测先前失败结果。
+restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 下原 101 的 0、1、2 个 DROP 前缀，或 clean101 且两个对象均已退出。只执行原 099 的固定 ADD 补齐缺失对象，不替换整表、不写历史列值。ADD 对唯一 schema literal 显式使用材料绑定的原 `_utf8mb3` 或 `_utf8mb4`，不依赖恢复连接字符集，也不执行材料中的DDL；已存在对象若是另一合法编码，在消费批准和执行DDL之前拒绝。恢复后两个完整原 SHOW CREATE 字符串须逐字相同。对象、保留结构、全 NULL、全部保留事实与双库身份核对成功后，才在一个真实 SQL 事务中回放**捕获的完整原账本**，账本为最后一步。中途失败、提交结果未知或连接释放未证实时保留失败，禁止 Force、down、指定版本或直接清 dirty。恢复中出现反向部分形状（assessment 已恢复、outcome 缺失）继续拒绝自动推进，不能猜测先前失败结果。
 
 默认总时限 15 分钟，可显式缩短、最高 20 分钟；单请求/连接 I/O 5 秒，恢复另受批准 deadline/expiry 约束。捕获文件 fsync 后仍检查总 deadline。生产窗口 30 分钟须预留迁移、启动和回读时间；生产规模只读预演不等于 T0 冻结，实际预算仍须独立证明。回执仅在操作成功、SQL connection/pool（含 OpenConnections/InUse 均0）、Mongo 关闭及 deadline 都通过后 complete；事务 rollback 未证实单列，主错误不被覆盖。stdout 回执交付失败以非0退出，不声称成功。
 
@@ -48,7 +48,7 @@ restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 下原 101 的 
 
 实际 argv、独立源 hash 与完整结果保存在不可变私有 `qs-m4-a-null-object-native-v6`：harness `bd42eb7bbeeba9ccf7eb52c25087f449c7385f91f10be3b1ea23a9257daec857`，JSONL `48cc28446a4cbbec5b94eb53106c0de2aaef352aa8fe15e3bbc04e6d90d4c3d9`，receipt `aa3c364d8ee727017e48f07a4ad87bb83380f4982551cd42d8cb6db8d7930ae5`。两个自有容器及 bridge 已释放；原容器 IDs/images/volumes 保留，但既有 NSQ 等动态 runtime 元数据发生变化，未声称全部旧服务 runtime 不变。先前夹具失败及真实测试失败均保留，不借用其结果。
 
-CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job 独占 MySQL8.0.36 服务运行实际 A native，注入实际 checkout SHA，必须七 selector 全部 RUN/PASS 且任何 SKIP/FAIL 均失败。普通测试、编译或 `-run='^$'` 不代替 native。新 merged head 必须独立 CI，以上 component 证明不换签新 head。
+CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job 独占 MySQL8.0.36 服务运行实际 A native，注入实际 checkout SHA，必须九个顶层及四个跨编码 child selector 全部 RUN/PASS 且任何 SKIP/FAIL 均失败。普通测试、编译或 `-run='^$'` 不代替 native。新 merged head 必须独立 CI，以上 component 证明不换签新 head。
 
 该证明只限合成、隔离、小规模对象保护与失败边界；未签生产 capture/权限/冻结/恢复、最终镜像、三服务启动、业务验收、RPO0 或生产30/60分钟预算。
 
@@ -59,3 +59,14 @@ CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job
 实际 argv 与源文件摘要保存在新不可变私有 `qs-m4-a-null-object-native-v8`：harness `6851c25107a19ed7b55235e598e715b62016572ebf5c75a7589c6b6f251c4d39`，JSONL `e50d9506bc04729c39d91ad82891e0eac5dafed4a8576babeb9198fd97a29a7e`，receipt `6ba23dff77f0e56cb829e7dfc0bad97fc7a49b1c477ba463d47e82446f299d9a`。79.090秒仅是本次小规模隔离夹具总耗时。两个自有容器及 bridge 已释放、cleanup errors为空，原 IDs/images/volumes 保留；既有 runtime 动态元数据仍发生变化，未签全部旧服务稳定。旧成功及失败材料均保留。
 
 独立 Linux/amd64 正式 tool 以实际 `56c598337578537aa75319f7612dd9690948ef3c` 编译，六个源文件与上述 native 前后摘要相同；binary SHA-256 为 `07a964a6b47ac24b76cd5abb3e2af38e0229ae974ea5d897d37c097030cb0afa`。私有 `qs-m4-a-null-object-tool-amd64-56c598` 构建 receipt 为 `28a46e6d6c8e687a95688cdb473542dccd73a70defbde71e14d6549dd60fd1a9`，保存实际 argv 和 `go version -m`。这只证明该 binary 的构建，未证明其 amd64 实际运行或生产调用；工具编译 SHA 不替代 A 执行器511。后续文档 head仍须独立CI，不换签56c的真实native。
+
+
+## 原 CHECK 编码修复的独立证明
+
+先前工具只接受 `_utf8mb4` schema literal，不能捕获经原 `charset=utf8` 连接执行099后保存的 `_utf8mb3` 表达式。修复只枚举上述两种完整原表达式：历史099资源及其摘要不改，CAST仍为utf8mb4；注释、谓词、范围、schema或其他 introducer 变化继续拒绝。原材料版本及字段不变，原编码由已经严格校验的 `OriginalDDL` 绑定。
+
+实际 source `94ab3a7cf090839da5283c7f09e9b7653f92b0e0` 在 owned MySQL8.0.36/MongoRS7.0.31 上完成 `-race` native：九个顶层、十六个 child，**25 RUN/PASS、0 FAIL/SKIP、exit0**。新增四项分别以原 utf8（mb3）或 utf8mb4 连接创建完整历史schema，再用相反字符集连接捕获和恢复；覆盖真正迁移101在首个DROP后dirty和两个DROP后clean的状态。两表完整原SHOW CREATE、全部保留事实和原账本最后回放均通过；另一合法但不匹配的现存编码在批准消费前被实际拒绝。
+
+不可变私有 `qs-m4-a-null-object-native-charset-v2` 保存实际 argv、完整JSONL和源摘要：harness `bc67a8831f9133526fcda9a51bae6ca9c5d6558c6a35759a20e38fb3a3af0514`，JSONL `5ba064d92b73301f08efaae70276b51ca4cbaadca77d3e88d0c8d489c7e3b541`，receipt `13a12fe449f25a9a2bf1725b8462ff9067d63f032acf6f6ae60d44bda2a17167`。100.021秒是本次合成隔离夹具总耗时。owned双库容器及bridge均精确释放、原IDs/images/volumes保留；既有动态runtime元数据变化，仍不签全部服务稳定。首轮新增测试helper的nil map失败和原完整证据保留在 `qs-m4-a-null-object-native-charset-v1`，未作为通过证明。
+
+独立Linux/amd64新tool实际从上述clean source94ab编译；六个Go/SQL文件逐字匹配该25项native来源。binary SHA-256为 `7df1c9d6da4b6cbe1425c1867c7d5916562818d7dc9881266b17fc542d9ae1f2`（9,728,184字节），私有 `qs-m4-a-null-object-tool-amd64-94ab3a/receipt.json` SHA为 `9e87ed4ee54ac3f4447cf1d0390d2725cc647d38657a28c699be1ecc98e52fe9`，保留实际编译参数、Go构建元数据和源文件摘要。旧56c/07a工具及保管材料保持原样；新binary尚未证明amd64实际运行或生产调用。后续文档head通过逐字源闭包继承component证明，最终PR head仍须fresh CI，不能更换native或compiled ToolSource。
