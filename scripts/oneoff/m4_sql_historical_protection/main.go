@@ -132,6 +132,12 @@ func deliverReceipt(r receipt, out io.Writer) int {
 }
 
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
+	return runWithRestoreDDLObserver(parent, args, getenv, tool, nil)
+}
+
+// The CLI always supplies nil. The observer receives only a fixed object index
+// after ExecContext has received a successful ADD acknowledgment.
+func runWithRestoreDDLObserver(parent context.Context, args []string, getenv func(string) string, tool string, afterRestoreDDL func(int)) (r receipt) {
 	r = receipt{ToolSource: tool, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, Error: "arguments_invalid"}
 	a, e := parseArgs(args)
 	r.Action = a.action
@@ -190,7 +196,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	d := database{sqlName: a.sqlName, mongoName: a.mongoName}
+	d := database{sqlName: a.sqlName, mongoName: a.mongoName, afterRestoreDDL: afterRestoreDDL}
 	var rawMaterial []byte
 	ok := false
 	defer func() {

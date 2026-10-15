@@ -33,6 +33,8 @@ type database struct {
 	conn               *sql.Conn
 	mongo              *mongo.Client
 	sqlName, mongoName string
+	// nil in the CLI; native tests may stop after a real fixed ADD succeeds.
+	afterRestoreDDL func(int)
 }
 type observation struct {
 	SQLHash, MongoHash, MongoUUID string
@@ -634,9 +636,6 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if got.Tables[0].SQLNullOnly && !got.Tables[1].SQLNullOnly {
 		return errors.New("unproved_inverse_partial_restore_shape")
 	}
-	if !o.Dirty && (got.Tables[0].SQLNullOnly || got.Tables[1].SQLNullOnly) {
-		return errors.New("clean101_requires_both_objects_absent")
-	}
 	for i, t := range got.Tables {
 		if t.SQLNullOnly {
 			want, e := validateOriginalObjectDefinition(m.Tables[i].OriginalDDL, i)
@@ -673,13 +672,19 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	if e = consumeApproval(approvalPath, a, approvalHash); e != nil {
 		return errors.New("restore_approval_consumption_failed")
 	}
-	for i, t := range got.Tables {
+	// Undo the DROP prefix in reverse order so each acknowledged ADD leaves
+	// another admitted prefix if the explicitly approved attempt is interrupted.
+	for i := len(got.Tables) - 1; i >= 0; i-- {
+		t := got.Tables[i]
 		if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 			return e
 		}
 		if !t.SQLNullOnly {
 			if _, e = d.conn.ExecContext(ctx, statements[i]); e != nil {
 				return errors.New("object_ddl_restore_failed_or_unknown")
+			}
+			if d.afterRestoreDDL != nil {
+				d.afterRestoreDDL(i)
 			}
 		}
 	}
