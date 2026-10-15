@@ -36,11 +36,11 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 	for _, step := range job.Steps {
 		runs += step.Run
 	}
-	if job.Timeout != ((7*8+7*3+20+9)/10)*10 {
-		t.Fatal("seven bounded phases need56m tests,21m readiness sleeps,20m setup/proof/cleanup rounded to100m")
+	if job.Timeout != ((8*8+8*3+20+9)/10)*10 {
+		t.Fatal("eight bounded phases need64m tests,24m readiness sleeps,20m setup/proof/cleanup rounded to110m")
 	}
 	for _, required := range []string{
-		`case "$1" in m|a|b|c|d|g|h)`,
+		`case "$1" in m|a|b|c|d|g|h|i)`,
 		`start_owned_fixture d`, `start_owned_fixture g`,
 		`export QS_M4_D_OBJECT_NATIVE_REQUIRED=1`,
 		`export QS_M4_D_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only`,
@@ -53,17 +53,17 @@ func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(t *testing.T) {
 			t.Fatal("D native phase lost its real selector or owned dependency boundary", required)
 		}
 	}
-	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdgh])$`).FindAllStringSubmatch(runs, -1)
-	if len(phases) != 7 {
-		t.Fatal("metadata/A/B/C/D/combined/completion each need exactly one fresh phase")
+	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdghi])$`).FindAllStringSubmatch(runs, -1)
+	if len(phases) != 8 {
+		t.Fatal("metadata/A/B/C/D/combined/completion/C-generation each need exactly one fresh phase")
 	}
-	for i, phase := range []string{"m", "a", "b", "c", "d", "g", "h"} {
+	for i, phase := range []string{"m", "a", "b", "c", "d", "g", "h", "i"} {
 		if phases[i][1] != phase {
 			t.Fatal("fresh-phase order must preserve every existing stage", phase)
 		}
 	}
-	if strings.Count(runs, "-timeout=8m -json") != 6 {
-		t.Fatal("six tool commands plus metadata retain seven original8m budgets")
+	if strings.Count(runs, "-timeout=8m -json") != 7 {
+		t.Fatal("seven tool commands plus metadata retain eight8m budgets")
 	}
 	bEnd := strings.LastIndex(runs, "PY_MONGO_OBJECT_PROOF")
 	cStart := strings.Index(runs, "start_owned_fixture c\n")

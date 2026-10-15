@@ -78,28 +78,37 @@ func completionProof(t *testing.T) (string, []string) {
 
 func TestCommittedRuntimeCompletionNativeWorkflowHasSeparateFreshPhase(t *testing.T) {
 	run, timeout := completionWorkflow(t)
-	if timeout != ((7*8+7*3+20+9)/10)*10 {
-		t.Fatal("seven bounded phases require56m tests+21m readiness+20m setup/proof/cleanup; ceil100")
+	if timeout != ((8*8+8*3+20+9)/10)*10 {
+		t.Fatal("eight bounded phases require64m tests+24m readiness+20m setup/proof/cleanup; ceil110")
 	}
-	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdgh])$`).FindAllStringSubmatch(run, -1)
-	if len(phases) != 7 {
-		t.Fatal("metadata,A47,B37,C30,D53,D21,completion13 need seven fresh phases")
+	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdghi])$`).FindAllStringSubmatch(run, -1)
+	if len(phases) != 8 {
+		t.Fatal("metadata,A47,B37,C30,D53,D21,completion13,C-generation14 need eight fresh phases")
 	}
-	for i, phase := range []string{"m", "a", "b", "c", "d", "g", "h"} {
+	for i, phase := range []string{"m", "a", "b", "c", "d", "g", "h", "i"} {
 		if phases[i][1] != phase {
 			t.Fatal("existing phases lost or reordered")
 		}
 	}
-	if strings.Count(run, "-timeout=8m -json") != 6 {
-		t.Fatal("six object commands plus metadata keep seven original8m budgets")
+	if strings.Count(run, "-timeout=8m -json") != 7 {
+		t.Fatal("seven object commands plus metadata keep eight8m budgets")
 	}
 	union := strings.Index(run, `d_native_proof union maintenance-object-native.jsonl runtime-generation-native.jsonl "$object_source"`)
 	start := strings.Index(run, "start_owned_fixture h\n")
 	if union < 0 || start <= union {
 		t.Fatal("completion must follow the unchanged standalone74 union")
 	}
-	tail := run[start:]
-	for _, required := range []string{`case "$1" in m|a|b|c|d|g|h)`, `export QS_M4_D_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"`, `d_native_tmp="$(mktemp -d "$HOME/qs-m4-d-native-${fixture_run_owner}.XXXXXX")"`, `export TMPDIR="$d_native_tmp"`, `-ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source"`, `-run='` + committedRuntimeCompletionSelector + `' ./scripts/oneoff/m4_maintenance_table_protection | tee runtime-completion-native.jsonl`, `python3 - runtime-completion-native.jsonl "$object_source" <<'PY_D_RUNTIME_COMPLETION_PROOF'`} {
+	next := strings.Index(run, "start_owned_fixture i\n")
+	if next <= start {
+		t.Fatal("C runtime generation must follow the completion phase")
+	}
+	tail := run[start:next]
+	reset := strings.Index(tail, "\nunset TMPDIR\n")
+	if reset < 0 {
+		t.Fatal("completion phase must reset its own TMPDIR before the next fresh phase")
+	}
+	tail = tail[:reset+len("\nunset TMPDIR\n")]
+	for _, required := range []string{`case "$1" in m|a|b|c|d|g|h|i)`, `export QS_M4_D_OBJECT_NATIVE_MONGO_URI="$QS_M4_OBJECT_NATIVE_MONGO_URI"`, `d_native_tmp="$(mktemp -d "$HOME/qs-m4-d-native-${fixture_run_owner}.XXXXXX")"`, `export TMPDIR="$d_native_tmp"`, `-ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source"`, `-run='` + committedRuntimeCompletionSelector + `' ./scripts/oneoff/m4_maintenance_table_protection | tee runtime-completion-native.jsonl`, `python3 - runtime-completion-native.jsonl "$object_source" <<'PY_D_RUNTIME_COMPLETION_PROOF'`} {
 		scope := tail
 		if strings.HasPrefix(required, "case ") {
 			scope = run

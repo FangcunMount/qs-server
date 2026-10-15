@@ -49,7 +49,23 @@ C定向工具当前已提供只读 `verify-restored`，在原材料/成功captur
 
 C后续独立源码 `9fbe9d04f0f688df30758d0eef3a224ce4fee589` 只修两文件的Mongo身份绑定：使用实际非空typed setName及原排序hosts/selected DB编码，保持Primary/mongos/hosts守卫和rs0原身份字节/hash；其余C23包文件、固定资源及CI30名单不变。该源普通/race各248项通过，tag仅编译、vet及pinned lint通过；旧7aff源码准备与cdac真实30项不移签，新head CI30/fresh AI继续待验。
 
-C同库session gate只串行化合作式恢复/验证；没有跨capture持久DB代次，不证明释放锁后旧材料已被首runtime永久禁用。该边界须在正式C执行器上线前独立闭合；本任务未新增生产fence或controller，不能借D的代次或本地30项签C生产窗口/RPO。具体范围与历史证据见[Actor问题清单2.9](../../../docs/02-业务模块/50-actor/90-设计问题与验证清单.md#29-m4-c-定向保护与启动前恢复隔离原生已验生产待验)。
+PR380合并时的历史边界（以下原文保留）：C同库session gate只串行化合作式恢复/验证；没有跨capture持久DB代次，不证明释放锁后旧材料已被首runtime永久禁用。该边界须在正式C执行器上线前独立闭合；本任务未新增生产fence或controller，不能借D的代次或本地30项签C生产窗口/RPO。具体范围与历史证据见[Actor问题清单2.9](../../../docs/02-业务模块/50-actor/90-设计问题与验证清单.md#29-m4-c-定向保护与启动前恢复隔离原生已验生产待验)。
+
+C后续独立源码准备使用 **format2**，必需 `runtime_database_boundary {generation,state_sha256}`；format1、缺失或不明确代次在ENV前拒绝，不给旧材料补签。`capture` 仅只读确认固定 `m4_c_runtime_boundary` 缺失的初态N0或当前严格单行G，前/RR/后必须相同；不会初始化控制表。`restore` 在同SQL身份/库的gate下于消费批准前、每次列DDL/值batch/账本写入与COMMIT前、终态再次比较捕获代次；新旧runtime推进后所有较早capture均失效。原四表全量原值/保留摘要、COUNT/EOF、原账本最后事务、双库身份与绝对期限保持。
+
+新 `mark-first-runtime` 另需独立冻结 `--runtime-intent-file` / `--runtime-intent-sha256`，并沿原material与capture-evidence两对flags。intent绑定原材料/成功capture执行证明SHA、C040b/284资源、实际DB身份、derived同目录 `first-runtime`、持续停写/责任和当前截止。`target102` 只在clean102/40两列缺失且四表保留事实完整后标记；`restored101` 另绑定原已消费恢复批准SHA/boundary/journal及原绝对恢复期限，完整原101/40事实均相等；`cancel101` 仅成功capture之后、未派发DDL且无恢复state时，在完整原101/40下取消。失败capture残留不能用作此取消材料；此前失败的具名pre-DDL取消及正式C六实例执行器仍是独立前置阻断。
+
+工具在提交前从原intent固定时间与编码生成确定marker原bytes/SHA；单行DB记录保存这些原字节及intent SHA，marker不引用包含自身的record SHA。首次仅固定InnoDB CTAS一并建表/插入原行，后续同gate内事务按旧G/hash/raw做CAS、要求RowsAffected=1、回读并提交后独立回读；再O_EXCL/fsync写完全相同的marker字节，真实gate/SQL/Mongo释放通过后才可Complete。控制表异物、view、空表、权限/ACK/回读/释放未知、partial marker均保留并拒绝；不drop/reset/Force或自动重试。该动作不启动业务；DB已提交但marker或响应失败时旧材料保持stale，同intent完成入口尚未实现，不能以第二次advance或新capture补过未知回执。capture与材料校验均拒绝占用保留basename `first-runtime`。
+
+`m4_c_runtime_boundary` 是本C批专属临时控制对象，不复用D表或迁移ledger，不改历史资源或正常业务装配。其生产创建/权限须以后另行明确批准并如实纳入在线对象计数，原恢复责任、旧工具/人工重放/批准入口全部退出后由M7具名退役；当前没有生产DDL授权。当前本包普通/race各300项及本地ACK管道纯测8项通过，tag仅编译、vet/pinned lint通过。新增独立native top及13子项共14个准备事件覆盖跨capture/进程、新T0/CAS、foreign/权限、真实CTAS执行ACK/COMMIT回应丢失、MDL与释放未知；它不落入旧九top selector。旧30名单/断言保留，新44联合实际数据库资格、fresh CI/AI、生产完整窗口/RPO与六实例运行均尚未验证；旧cdac/d3cf证据保持原来源。
+
+**C44 与 D 最终 pending 源码整合。** 正常合并源码 `b4c7c319463a83642b6fdeb5e55d2bda8570329f` 的两父为冻结 C `a325a426d5a3f74b0cd63aa4dca858264eea0aeb` 与待合并 D `ab9bb229cbd57bb7bf951451635326c67ed033ab`；此时 actual main 仍为 `3175474a9fb96e10e33212c4c6cbdb555bd2e9ac`，D 尚非已合并主线。保留八个 fresh 阶段与110分钟外层预算、每段8分钟，原 C30/A47/B37/D74/H13 和新增 I14 证明块不变；只合入 D 固定旧5707 CLI 的 H 准备/终态哈希接线及 metadata 连接释放测试修正。C31、D58、A17、B26、metadata11 个包文件和288份迁移资源各与其冻结来源逐字相等。
+
+本次联合普通/race各 C300、D444、metadata153、配置契约188项一次PASS、0FAIL/SKIP；tag仅编译、vet、pinned2.5 lint、actionlint及15 YAML/184 bash/11 Python语法通过。QA回执 `6dcf2c4339c9c7474678ba523ce872d7625c8ee14c52f89e4a0b0cec0cb0471a` 位于私有 `qs-m4-c44-d-final-source-integration-v1`。原C44数据库与新联合head hosted CI/AI仍待验，D旧native/CI失败及修复来源保持原归属；尚须D真正合并后正常整合实际main。未运行数据库、Docker、SSH或生产，不新增失败capture取消或同intent完成接口，不扩大生产窗口/RPO/业务资格。
+
+**C14 独立CI阶段准备。** 源码 `2520780947fe2ba452cce070b297050db59627e6` 在冻结C8b7基础上正常合入当时待合并的D `0a8ce49ce481b7468d237b69cd701fe66d2c0338`；它不是actual main，后续须再整合D实际合并来源。新增fresh `i` 阶段只选择 `^TestM4ActorColumnsNativeRuntimeGeneration$`，14名各一次RUN/PASS、0FAIL/SKIP、终态package PASS及依赖前compiled entry/真实依赖/当前checkout SHA均须匹配。分片Output按Test重组，缺失、重复、外来phase/package、失败/跳过及源/资源漂移拒绝。旧C30和A47/B37/D74/H13证明块逐字保持；C生产Go等于8b7，仅新14 top增加依赖前entry日志。八阶段按8×8分钟测试、8×3分钟readiness sleep及20分钟准备/证明/清理推导108分钟、取整110分钟，每工具8分钟、资源和cleanup不变，不扩大生产30/60分钟。
+
+联合本地普通/race实际C300、D444、configcontract187各一次PASS、0FAIL/SKIP；一处新增contract风格lint修正后，受影响33项普通/race及pinned lint通过。tag仅编译/vet、actionlint、15份YAML/184段bash/10段Python语法与七个隔离shell模拟通过。原首lint失败和修正QA保留在私有 `qs-m4-c-runtime-ci-d0a8-integration-v1`，回执 SHA `7dac0dc4a3f5844b32e6d447450259e8dc6141bd746d0a170de7160838652d95`。新44项数据库/hosted CI/AI及完整生产窗口仍未验，不移签原300项源码QA或cdac原30；D后续cross-source资格另行整合。
 
 ### M4-D：历史维护表与在线旧工具退出
 

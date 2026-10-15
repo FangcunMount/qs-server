@@ -137,7 +137,7 @@ func (r markerResult) LastInsertId() (int64, error) { return 0, nil }
 func (r markerResult) RowsAffected() (int64, error) { r.write(); return r.n, nil }
 
 func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
-	for _, kind := range []string{"success", "cas_miss", "write_error", "marker_before_commit", "commit_unknown", "rollback_failed"} {
+	for _, kind := range []string{"success", "cas_miss", "write_error", "marker_before_commit", "boundary_before_commit", "commit_unknown", "rollback_failed"} {
 		t.Run(kind, func(t *testing.T) {
 			m, a, hash, _, ah := recoveryInputs(t)
 			if consumeApproval(m, a, ah) != nil {
@@ -163,6 +163,7 @@ func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
 			}
 			expectGate := func() {
 				mock.ExpectQuery(regexp.QuoteMeta("SELECT IS_USED_LOCK(?)=CONNECTION_ID()")).WithArgs(key).WillReturnRows(sqlmock.NewRows([]string{"owned"}).AddRow(true))
+				expectInitialRuntimeBoundary(mock)
 			}
 			expectGate()
 			mock.ExpectBegin()
@@ -182,8 +183,14 @@ func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
 			default:
 				exec.WillReturnResult(sqlmock.NewResult(0, 1))
 			}
-			if kind == "success" || kind == "commit_unknown" || kind == "marker_before_commit" {
-				expectGate()
+			if kind == "success" || kind == "commit_unknown" || kind == "marker_before_commit" || kind == "boundary_before_commit" {
+				if kind == "boundary_before_commit" {
+					mock.ExpectQuery(regexp.QuoteMeta("SELECT IS_USED_LOCK(?)=CONNECTION_ID()")).WithArgs(key).WillReturnRows(sqlmock.NewRows([]string{"owned"}).AddRow(true))
+					record, raw := boundaryRecordFixture(t, m)
+					expectStoredRuntimeBoundary(mock, record, raw)
+				} else {
+					expectGate()
+				}
 			}
 			switch kind {
 			case "success":
@@ -195,7 +202,7 @@ func TestOriginalValueBatchCASCommitAndFailureBoundaries(t *testing.T) {
 			default:
 				mock.ExpectRollback()
 			}
-			d := database{conn: conn, gate: &recoveryGate{conn: conn, key: key, acquired: true}}
+			d := database{conn: conn, binding: m.Binding, gate: &recoveryGate{conn: conn, key: key, acquired: true}}
 			e = d.commitValueBatch(t.Context(), m, m.Tables[0].Rows, 0, a, hash, fixtureSource)
 			if (e == nil) != (kind == "success") || (e != nil && strings.Contains(e.Error(), "private")) {
 				t.Fatal("CAS failure became success or leaked driver detail", e)

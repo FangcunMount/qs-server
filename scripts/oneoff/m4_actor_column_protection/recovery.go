@@ -96,7 +96,7 @@ func sameValue(a, b *originalValue) bool {
 // nullable column or partial row population on its own.
 func validateRecoveryState(original material, current recoveryState, allowContinuation bool) error {
 	m := current.Material
-	if m.Format != original.Format || m.Kind != original.Kind || m.Binding != original.Binding || m.ToolSource != original.ToolSource || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.SessionZone != original.SessionZone || m.SessionCharset != original.SessionCharset || m.SessionSQLMode != original.SessionSQLMode || m.LedgerDDL != original.LedgerDDL || len(m.Ledger) != 1 || m.Ledger[0].Version != 102 || !bytes.Equal(m.MongoHead, original.MongoHead) {
+	if m.Format != original.Format || m.RuntimeBoundary != original.RuntimeBoundary || m.Kind != original.Kind || m.Binding != original.Binding || m.ToolSource != original.ToolSource || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.SessionZone != original.SessionZone || m.SessionCharset != original.SessionCharset || m.SessionSQLMode != original.SessionSQLMode || m.LedgerDDL != original.LedgerDDL || len(m.Ledger) != 1 || m.Ledger[0].Version != 102 || !bytes.Equal(m.MongoHead, original.MongoHead) {
 		return errors.New("restore_identity_or_original_ledger_rejected")
 	}
 	tags, roles := current.Columns[0], current.Columns[1]
@@ -165,13 +165,16 @@ func (d database) recoverySnapshot(ctx context.Context, tool string) (out recove
 			recordRollback(&resultErr, tx)
 		}
 	}()
-	m := material{Format: 1, Kind: "m4_c_actor_column_protection", ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
+	m := material{Format: 2, RuntimeBoundary: before.RuntimeBoundary, Kind: "m4_c_actor_column_protection", ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
 	if e := requireLedgerShape(ctx, tx); e != nil {
 		return out, e
 	}
 	m.Ledger, e = readLedger(ctx, tx)
 	if e != nil || m.Ledger[0] != before.Ledger {
 		return out, errors.New("restore_snapshot_ledger_changed")
+	}
+	if e := requireRuntimeBoundary(ctx, tx, before.Binding, before.RuntimeBoundary); e != nil {
+		return out, e
 	}
 	m.LedgerDDL, e = ddl(ctx, tx, "schema_migrations")
 	if e != nil {
@@ -333,7 +336,7 @@ func rereadApprovedInputs(m material, a approval, path, hash, approvalPath, appr
 }
 
 func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash, tool string, consumed *bool) error {
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	prior, e := readRecoveryBoundary(m, a, materialHash)
@@ -360,7 +363,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if ctx.Err() != nil {
 		return errors.New("total_budget_exceeded")
 	}
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	if ctx.Err() != nil {
@@ -489,8 +492,16 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 }
 
 func (d *database) requireRecoveryAuthority(ctx context.Context, m material, a approval, hash, tool string) error {
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
-	return validateMutableBoundary(m, a, hash, tool)
+	// The mutable local marker/approval check is deliberately last, after the
+	// server reads. No explicit external RPC is inserted between it and a write.
+	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("total_budget_exceeded")
+	}
+	return nil
 }
