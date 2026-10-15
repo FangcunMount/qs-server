@@ -67,7 +67,7 @@ Start、Change、参与者 Retry、评测 Start/Cancel 在同一条 `MessagingCo
 
 当前 component-base 宿主池协商 `utf8`（MySQL 8 对应 utf8mb3），而合法结果含四字节 Unicode。原 JSON 参数写入会报转换错误，普通 JSON 查询还会把这类字符转换成问号；只用驱动默认 utf8mb4 的测试连接不能覆盖该风险。
 
-消息外围对已有请求、历史命令和结果投影的 JSON 参数显式使用 `CONVERT(CAST(? AS BINARY) USING utf8mb4)`，对 JSON 查询、历史移交与索引回填使用二进制结果读取。原 JSON 的 UTF-8 字节在进入数据库 JSON 解释前不经过连接字符集转换，读取仍由原业务解码器处理。首次业务 hash、protobuf body、签名和 wire 不重建；JSON 数据库自身的表示规范化规则不改变。没有 SET NAMES、额外池、连接配置或 schema 修改。
+消息外围对已有请求、历史命令和结果投影的 JSON 参数显式使用 `CONVERT(CAST(? AS BINARY) USING utf8mb4)`，对现用 JSON 查询使用二进制结果读取。原 JSON 的 UTF-8 字节在进入数据库 JSON 解释前不经过连接字符集转换，读取仍由原业务解码器处理。首次业务 hash、protobuf body、签名和 wire 不重建；JSON 数据库自身的表示规范化规则不改变。没有 SET NAMES、额外池、连接配置或 schema 修改。
 
 必要存储回归必须显式协商宿主的三字节字符集并检查未被适配器更改，覆盖含 emoji/补充平面字符的原接单与历史回答、合法128KiB结果、原hash、重复复用ACK、ACK失败时投影与Inbox共同回滚。正常镜像中失败到技术挂起的旧隔离样本保留原身份、wire与预算；修复验证使用独立合成样本，不重置挂起样本或授予新模型调用。
 
@@ -83,7 +83,9 @@ MQ运行Start成功时在原Prometheus注册器登记pull collector，完成Stop
 
 ## 隔离 CLI 与正式入口
 
-`qs-ai-bridge` 仅保留原历史投影读取与 runtime-index-backfill 维护，不提供用户认证。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。现用消息审计与门禁由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control` 执行，默认服务入口不改变。
+`qs-ai-bridge` 仅保留原历史投影读取，不提供用户认证。`runtime-index-backfill` 已退役，在借用数据库前明确拒绝；现代 runtime projection、原子关联、分页与 UTC 行为保持。stage-start、stage-change、relay、receive 在借用数据库或传输资源前永久拒绝；隔离消息故障夹具由独立 testing 工具承载。正常消息生命周期由 qs-apiserver 宿主装配；迁移完成后不能把旧 CLI relay 当作生产降级写路径。原业务契约继续来自 `api/grpc/proto/aiworkflow/workflow.proto`，新增消息契约来自 `messaging.proto`。现用消息审计与门禁由同镜像中的 `qs-ai-messaging-audit`、`qs-ai-messaging-control` 执行，默认服务入口不改变。
+
+本 E 独立 release 以 C 的 `040b122d7dfe77b1119d9ed6969a54abd6a9fbdf` 为基线，仅复用已审 E 四文件源码，迁移资源末端为 SQL102/Mongo40，不夹带 D SQL103。发布顺序为 A→B→C→E→D；历史 E 合并头包含 D103，不能作为本次102/40候选。源码测试、构建与真实 MySQL8.0.36 存储回归分别保留来源；MySQL8.4、新 head CI、生产完整服务/窗口/RPO及业务尚未验收。本文修正不授权生产操作。
 
 ## MQ 发布绑定与离线预检
 
