@@ -43,6 +43,10 @@ type receipt struct {
 	SQLPoolClosed              *bool     `json:"sql_pool_closed"`
 	MongoClosed                *bool     `json:"mongo_closed"`
 	MongoCursorsClosed         *bool     `json:"mongo_cursors_exhausted_and_closed"`
+	LedgerCommitIssued         bool      `json:"ledger_commit_issued"`
+	LedgerCommitAcknowledged   bool      `json:"ledger_commit_acknowledged"`
+	LedgerCommitOutcomeUnknown bool      `json:"ledger_commit_outcome_unknown"`
+	LedgerAbortCalled          bool      `json:"application_ledger_abort_called"`
 	SessionEndCalled           bool      `json:"mongo_snapshot_session_end_called"`
 	TransactionReleaseUnproven bool      `json:"sql_transaction_release_unproven"`
 	Error                      string    `json:"error_category"`
@@ -114,10 +118,40 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		return r
 	}
 	r.Action, r.ToolSource, r.ReadOnly = a.action, tool, a.action != "restore"
-	// The next independently reviewed task supplies these write/target paths.
-	if a.action != "inspect" && a.action != "capture" {
-		r.Error = "action_not_available_in_read_only_batch"
-		return r
+	ctx, cancel := context.WithTimeout(parent, a.timeout)
+	defer cancel()
+	var m material
+	var ap approval
+	if a.action == "verify-target" || a.action == "restore" {
+		raw, e := readPrivate(a.material, a.materialHash, maxMaterialBytes)
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		if strictDecode(raw, &m) != nil || validateMaterial(m, tool, a.sqlName, a.mongoName) != nil {
+			r.Error = "material_rejected"
+			return r
+		}
+		r.MaterialHash = a.materialHash
+	}
+	if a.action == "restore" {
+		raw, e := readPrivate(a.approval, a.approvalHash, 32768)
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		if strictDecode(raw, &ap) != nil || validateApproval(ap, m, a.materialHash, tool, time.Now()) != nil {
+			r.Error = "restore_approval_rejected"
+			return r
+		}
+		deadline, _ := time.Parse(time.RFC3339Nano, ap.Deadline)
+		expiry, _ := time.Parse(time.RFC3339Nano, ap.Expires)
+		if expiry.Before(deadline) {
+			deadline = expiry
+		}
+		var c context.CancelFunc
+		ctx, c = context.WithDeadline(ctx, deadline)
+		defer c()
 	}
 	if a.action == "capture" {
 		if s, e := privatePath(a.capture, false); e != nil || s != nil {
@@ -125,8 +159,6 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 	}
-	ctx, cancel := context.WithTimeout(parent, a.timeout)
-	defer cancel()
 	dsn, e := mysql.ParseDSN(getenv("QS_M4_OBJECT_MYSQL_DSN"))
 	uri := getenv("QS_M4_OBJECT_MONGO_URI")
 	if e != nil || dsn.DBName != a.sqlName || uri == "" {
@@ -170,8 +202,13 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		if d.cursorCount > 0 {
 			r.MongoCursorsClosed = boolean(!d.cursorReleaseUnproven)
 		}
+		r.LedgerCommitIssued = d.ledgerCommitIssued
+		r.LedgerCommitAcknowledged = d.ledgerCommitAcknowledged
+		r.LedgerCommitOutcomeUnknown = d.ledgerCommitUnknown
+		r.LedgerAbortCalled = d.ledgerAbortCalled
 		r.SessionEndCalled = d.sessionEndCalled
 		r.TransactionReleaseUnproven = d.sqlRollbackUnproven
+		r.BudgetExceeded = ctx.Err() != nil
 		released := (r.SQLConnectionClosed == nil || *r.SQLConnectionClosed) && *r.SQLPoolClosed && (r.MongoClosed == nil || *r.MongoClosed) && !d.cursorReleaseUnproven && !d.sqlRollbackUnproven
 		if !released {
 			r.ReleaseError = "owned_resource_release_unproven"
@@ -207,7 +244,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	// Operation contexts, not a client-wide timeout, bound each fixed read.
 	// This prevents a future approved createIndexes wait being silently capped
 	// by a URI timeoutMS/socketTimeoutMS or retried by the driver.
-	d.mongo, e = mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMaxPoolSize(1).SetConnectTimeout(queryLimit).SetServerSelectionTimeout(queryLimit).SetTimeout(0).SetSocketTimeout(0).SetRetryReads(false).SetRetryWrites(false))
+	d.mongo, e = mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMaxPoolSize(1).SetReadPreference(readpref.Primary()).SetConnectTimeout(queryLimit).SetServerSelectionTimeout(queryLimit).SetTimeout(0).SetSocketTimeout(0).SetRetryReads(false).SetRetryWrites(false))
 	if e != nil {
 		r.Error = "mongo_connect_failed"
 		return r
@@ -219,23 +256,32 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "mongo_primary_unavailable"
 		return r
 	}
-	at := time.Now()
-	o, e := d.snapshot(ctx)
+	var o observation
+	switch a.action {
+	case "inspect", "capture":
+		at := time.Now()
+		o, e = d.snapshot(ctx)
+		if e == nil {
+			m = makeMaterial(o, tool, a.sqlName, a.mongoName, at)
+			e = validateMaterial(m, tool, a.sqlName, a.mongoName)
+		}
+		if e == nil && a.action == "capture" {
+			rawMaterial, e = json.Marshal(m)
+			if e != nil || len(rawMaterial) > maxMaterialBytes {
+				e = errors.New("material_encoding_or_size_failed")
+			}
+		}
+	case "verify-target":
+		o, e = d.verifyTarget(ctx, m)
+	case "restore":
+		o, e = d.restore(ctx, m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+	}
 	if e != nil {
 		r.Error = e.Error()
 		return r
 	}
-	m := makeMaterial(o, tool, a.sqlName, a.mongoName, at)
-	if e = validateMaterial(m, tool, a.sqlName, a.mongoName); e != nil {
-		r.Error = e.Error()
-		return r
-	}
-	rawMaterial, e = json.Marshal(m)
-	if e != nil || len(rawMaterial) > maxMaterialBytes {
-		r.Error = "material_encoding_or_size_failed"
-		return r
-	}
-	r.SQLIdentity, r.MongoIdentity, r.SQLVersion, r.MongoVersion = o.SQLIdentity, o.MongoIdentity, o.SQLVersion, 39
+	r.SQLIdentity, r.MongoIdentity, r.SQLVersion = o.SQLIdentity, o.MongoIdentity, o.SQLVersion
+	r.MongoVersion, _, _ = ledgerVersion(o.Ledger.Document)
 	r.Counts = [2]*int64{o.Collections[0].Count, o.Collections[1].Count}
 	ok = true
 	return r
