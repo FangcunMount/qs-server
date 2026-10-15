@@ -418,11 +418,12 @@ func TestMySQLSocketReadBudgetUsesBoundedActionAndRestoreApproval(t *testing.T) 
 	for _, which := range []string{"unbounded", "already_expired", "cancelled"} {
 		t.Run(which, func(t *testing.T) {
 			ctx := context.Background()
-			if which == "already_expired" {
+			switch which {
+			case "already_expired":
 				var stop context.CancelFunc
 				ctx, stop = context.WithDeadline(ctx, time.Now().Add(-time.Second))
 				defer stop()
-			} else if which == "cancelled" {
+			case "cancelled":
 				var stop context.CancelFunc
 				ctx, stop = context.WithTimeout(ctx, time.Minute)
 				stop()
