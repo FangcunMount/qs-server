@@ -74,6 +74,8 @@ CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 
 
 该任务从固定 `602710eb…` 源码以 Go 1.25.12 重建工具，产物必须与原 `2c314163…` SHA 完全一致。原 M2 API 仅从既有 ACR 的固定 manifest 读取，另核原始配置摘要、18 个层摘要和 ELF；取不到或不一致时失败，不回退 tag、最新镜像或近似构建。Registry Secret 仅通过原 `ALIYUN_ACR_*` 登录输入及可选 `DOCKERHUB_USERNAME`／`DOCKERHUB_TOKEN` 只读拉取登录使用，不进入固定夹具和证据包。
 
+固定 M2 镜像内容为 230,144,789 字节，加上 tar 元数据后超过通用命令的 150MiB 输出上限；只有读取该镜像原始 archive 的调用使用 256MiB 上限，其余命令仍为 150MiB。这是隔离夹具进程的读取上限，原载体 512MiB、工具、查询／IO 和步骤／窗口期限保持不变。
+
 夹具只构造原 V10 Receiver 的隔离上下文，明确绕过生产主机、SSH、Nginx 和配置装配构造入口；`native`、`run_native_carrier`、Engine 创建、guard 和释放方法保持原字节。真实 Linux 原生 Docker 上使用 root、512MiB、同一 canonical 私有路径的 host bind、原 API 网络命名空间，以及独占合成 `qs` 双库；每张目标表为 247,463 行，材料约 50MB。原始 capture stdout 与同 CID 实际 exit0 才能生成执行证明。固定独立批准进程核原三件和局部 dirty101 事实，再执行原 restore／verify-restored，最后验证 clean101/39；不启动六个业务进程，也不重复六实例演练。
 
 固定纯校验步骤先由同一 `python3` 显式安装 `pyyaml`，再运行 JSON／workflow 解析测试；两者共同受原 1 分钟上限约束，安装或测试失败即停止。
