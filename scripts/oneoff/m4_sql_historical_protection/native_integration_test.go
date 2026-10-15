@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -35,13 +36,16 @@ import (
 )
 
 type nativeFixture struct {
-	t                          *testing.T
-	name, dsn, uri, tool       string
-	root, db                   *sql.DB
-	client                     *mongo.Client
-	dir                        string
-	materialPath, materialHash string
-	material                   material
+	t                                        *testing.T
+	name, dsn, uri, tool                     string
+	root, db                                 *sql.DB
+	client                                   *mongo.Client
+	dir                                      string
+	materialPath, materialHash               string
+	material                                 material
+	captureStdout                            []byte
+	captureExit                              int
+	captureEvidencePath, captureEvidenceHash string
 }
 
 func requireNative(t *testing.T) (string, string, string) {
@@ -357,7 +361,17 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=2m"}
 	args = append(args, extra...)
-	return run(h.t.Context(), args, func(key string) string {
+	if action == "verify-target" || action == "restore" || action == "verify-restored" {
+		found := false
+		for _, arg := range extra {
+			found = found || strings.HasPrefix(arg, "--capture-evidence-file=")
+		}
+		if !found {
+			args = append(args, h.captureEvidenceArgs()...)
+		}
+	}
+	var stdout bytes.Buffer
+	exit := serve(h.t.Context(), args, func(key string) string {
 		if key == "QS_M4_OBJECT_MYSQL_DSN" {
 			return h.dsn
 		}
@@ -365,7 +379,20 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 			return h.uri
 		}
 		return ""
-	}, h.tool, nil)
+	}, h.tool, &stdout)
+	var r receipt
+	if strictDecode(stdout.Bytes(), &r) != nil {
+		h.t.Fatal("actual CLI receipt encoding failed")
+	}
+	if action == "capture" {
+		h.captureStdout, h.captureExit = append([]byte(nil), stdout.Bytes()...), exit
+	}
+	return r
+}
+
+func (h *nativeFixture) captureEvidenceArgs() []string {
+	h.t.Helper()
+	return []string{"--capture-evidence-file=" + h.captureEvidencePath, "--capture-evidence-sha256=" + h.captureEvidenceHash}
 }
 func (h *nativeFixture) capture() {
 	h.t.Helper()
@@ -383,6 +410,19 @@ func (h *nativeFixture) capture() {
 		if len(table.Rows) != 2 || !table.EOF || !table.SQLNullOnly {
 			h.t.Fatal("incomplete real capture")
 		}
+	}
+	if h.captureExit != 0 || len(h.captureStdout) == 0 {
+		h.t.Fatal("capture executor did not observe successful actual CLI exit")
+	}
+	rp := filepath.Join(h.dir, "original-capture-stdout.json")
+	if writeExclusive(rp, h.captureStdout) != nil {
+		h.t.Fatal("actual capture stdout could not be retained")
+	}
+	h.captureEvidencePath = filepath.Join(h.dir, "original-capture-execution.json")
+	raw, e = json.Marshal(captureExecutionEvidence{Format: 1, Kind: "m4_a_capture_execution", ReceiptFile: rp, ReceiptHash: fingerprint(h.captureStdout), Termination: "exited", ExitCode: &h.captureExit})
+	h.captureEvidenceHash = fingerprint(raw)
+	if e != nil || writeExclusive(h.captureEvidencePath, raw) != nil || readCaptureEvidence(h.material, h.materialHash, h.tool, h.captureEvidencePath, h.captureEvidenceHash) != nil {
+		h.t.Fatal("actual successful capture execution could not be independently frozen")
 	}
 }
 func (h *nativeFixture) upgrade(drops int, clean bool) {
@@ -450,7 +490,7 @@ func (h *nativeFixture) restoreInput() ([]string, string) {
 	if e := writeExclusive(p, raw); e != nil {
 		h.t.Fatal(e)
 	}
-	return []string{"--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + p, "--approval-sha256=" + fingerprint(raw)}, a.Marker
+	return append([]string{"--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + p, "--approval-sha256=" + fingerprint(raw)}, h.captureEvidenceArgs()...), a.Marker
 }
 func (h *nativeFixture) limited(withoutAlter bool) func() {
 	h.t.Helper()
@@ -857,7 +897,7 @@ func TestM4SQLObjectNativeRestoreDDLDeadlines(t *testing.T) {
 				}
 			}()
 			go func() {
-				response <- run(action, []string{"--action=restore", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=30s", "--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + approvalPath, "--approval-sha256=" + fingerprint(raw)}, func(key string) string {
+				response <- run(action, append([]string{"--action=restore", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=30s", "--material-file=" + h.materialPath, "--material-sha256=" + h.materialHash, "--approval-file=" + approvalPath, "--approval-sha256=" + fingerprint(raw)}, h.captureEvidenceArgs()...), func(key string) string {
 					switch key {
 					case "QS_M4_OBJECT_MYSQL_DSN":
 						return h.dsn

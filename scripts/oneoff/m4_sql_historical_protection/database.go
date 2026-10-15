@@ -663,7 +663,7 @@ func restorationStatements(m material) ([2]string, error) {
 	}
 	return out, nil
 }
-func (d database) restore(ctx context.Context, m material, a approval, tool, materialPath, materialHash, approvalPath, approvalHash string) (resultErr error) {
+func (d database) restore(ctx context.Context, m material, a approval, tool, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash string) (resultErr error) {
 	if e := validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
 	}
@@ -718,6 +718,12 @@ func (d database) restore(ctx context.Context, m material, a approval, tool, mat
 	}
 	if e = validateApproval(a, m, a.MaterialHash, tool, time.Now()); e != nil {
 		return e
+	}
+	if e = readCaptureEvidence(m, materialHash, tool, evidencePath, evidenceHash); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("total_budget_exceeded")
 	}
 	if e = consumeApproval(m, a, approvalHash); e != nil {
 		return errors.New("restore_approval_consumption_failed")
