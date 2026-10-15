@@ -124,8 +124,11 @@ func TestM4SQLObjectNativeRecoveryBoundaryAttacks(t *testing.T) {
 				t.Fatal("independently frozen attack fixture unavailable")
 			}
 			r = h.action("restore", "--material-file="+materialPath, "--material-sha256="+h.materialHash, "--approval-file="+attackPath, "--approval-sha256="+fingerprint(raw))
-			if r.Complete || r.Error != expected || h.fullDDL() != beforeDDL || !reflect.DeepEqual(readOwnedLedger(t, h), ledger) {
+			if r.Complete || r.Error != expected || r.ReleaseError != "" || r.TransactionReleaseUnproven || h.fullDDL() != beforeDDL || !reflect.DeepEqual(readOwnedLedger(t, h), ledger) {
 				t.Fatal("attack changed original recovery boundary or persisted schema/ledger", r.Error)
+			}
+			if (name == "CopiedApprovalPath" || name == "ReencodedSameOperation") && (!r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed) {
+				t.Fatal("opened negative-path clients were not released", r.ReleaseError)
 			}
 			claim, e := readOwnedPrivate(consumed, 32768)
 			if e != nil || !bytes.Equal(firstClaim, claim) {
