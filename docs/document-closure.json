@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
+    "sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -14342,7 +14342,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
+        "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14560,6 +14560,46 @@
           "selector": "timeout-minutes: 45",
           "result": "matched",
           "source_sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/main.go",
+          "selector": "case \"verify-target\", \"restore\", \"verify-restored\":",
+          "result": "matched",
+          "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/native_wire_test.go",
+          "selector": "verified := h.action(\"verify-restored\", args...)",
+          "result": "matched",
+          "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/recovery.go",
+          "selector": "func verifyOriginalRestoredSnapshots(",
+          "result": "matched",
+          "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/recovery_journal.go",
+          "selector": "func checkRestoredAuthorization(",
+          "result": "matched",
+          "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/verify_restored_test.go",
+          "selector": "func TestVerifyOriginalRestoredSnapshotsRequiresCompleteOriginalFactsAndStableCurrentUUID(",
+          "result": "matched",
+          "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
           "verified_on": "2026-10-15"
         }
       ],
