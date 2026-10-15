@@ -432,7 +432,9 @@ func (d database) snapshot(ctx context.Context, tool string, original bool) (m m
 	if e != nil {
 		return m, before, e
 	}
-	ledgerRows, e := tx.QueryContext(ctx, "SELECT version,dirty FROM schema_migrations ORDER BY version LIMIT 2")
+	ledgerRead, cancelLedgerRead := context.WithTimeout(ctx, queryLimit)
+	defer cancelLedgerRead()
+	ledgerRows, e := tx.QueryContext(ledgerRead, "SELECT version,dirty FROM schema_migrations ORDER BY version LIMIT 2")
 	if e != nil {
 		return m, before, errors.New("complete_ledger_snapshot_failed")
 	}
@@ -445,10 +447,13 @@ func (d database) snapshot(ctx context.Context, tool string, original bool) (m m
 		m.Ledger = append(m.Ledger, item)
 	}
 	re, ce := ledgerRows.Err(), ledgerRows.Close()
+	cancelLedgerRead()
 	if re != nil || ce != nil || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{before.Version, before.Dirty}) {
 		return m, before, errors.New("complete_ledger_changed_or_release_failed")
 	}
-	ledgerColumns, e := tx.QueryContext(ctx, "SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='schema_migrations' ORDER BY ORDINAL_POSITION")
+	ledgerSchemaRead, cancelLedgerSchemaRead := context.WithTimeout(ctx, queryLimit)
+	defer cancelLedgerSchemaRead()
+	ledgerColumns, e := tx.QueryContext(ledgerSchemaRead, "SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='schema_migrations' ORDER BY ORDINAL_POSITION")
 	if e != nil {
 		return m, before, errors.New("ledger_schema_read_failed")
 	}
@@ -462,6 +467,7 @@ func (d database) snapshot(ctx context.Context, tool string, original bool) (m m
 		names = append(names, name)
 	}
 	re, ce = ledgerColumns.Err(), ledgerColumns.Close()
+	cancelLedgerSchemaRead()
 	if re != nil || ce != nil || !reflect.DeepEqual(names, []string{"version", "dirty"}) {
 		return m, before, errors.New("unknown_ledger_schema_or_release_failed")
 	}
