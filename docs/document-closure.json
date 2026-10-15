@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+    "sha": "8cc222f45fa5cca986925efbf4eca3b7c901a625",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+        "source_sha": "8cc222f45fa5cca986925efbf4eca3b7c901a625",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -12805,7 +12805,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+        "source_sha": "8cc222f45fa5cca986925efbf4eca3b7c901a625",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13442,7 +13442,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+        "source_sha": "8cc222f45fa5cca986925efbf4eca3b7c901a625",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13790,7 +13790,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+        "source_sha": "8cc222f45fa5cca986925efbf4eca3b7c901a625",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13920,6 +13920,13 @@
           "result": "matched",
           "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_sql_historical_protection",
+          "result": "passed",
+          "source_sha": "8cc222f45fa5cca986925efbf4eca3b7c901a625",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13948,7 +13955,8 @@
           "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal.",
           "Historical source94e1b7d1856de57665c96bbe807c13bcc725e8ab completed the actual owned MySQL8.0.36/MongoRS7.0.31 47RUN/PASS0FAIL/SKIP matrix (13tops/34children), native292.549s and313.652s including cleanup. Private native47-v2 receipt a255facd4e257009b3b27b458799f04f49170cb46851ddabb7b366249e85063b and JSONL8acb8e2f5dd1be4b64f3e218e8cfd84c6bb493680129576f7f54812b07caf18e retain exact source/input/binary binding. All owned resources/processes released, oldCID/image/volume identities preserved; existing nsqd restarted2710->2715, so whole prior runtime stability is false. This is historical small-fixture proof, not qualification of subsequent journal/verify-restored code, capacity, production, RPO0 or30/60minute budget.",
           "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied.",
-          "Actual documentation checkouta325392fe8cae327220b935cc2bbdbd0ae0aad72 (Go/SQL/CI byte-identical to runtime sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c) independently completed all47 required RUN/PASS0FAIL/SKIP,13tops/34children, on owned MySQL8.0.36/MongoRS7.0.31. Native47-v3 binding8187fe4171adc629b013aa3f1f369a321fb5cce6128227222bd862619a13919b, binary279da827a2ddf237070ef8b30c14ac3c9fa871d7893cb6822309cdb286d8332e, JSONLee75fb0241715ff3f70d2e9fc124d4a6d9ed72610bdab67e07a4e22213770949 and receipte8bdb4f7bcdf6a86173846e62556cb746452a0364d4a3b46fb5248998949a492 preserve305 inputs/actual argv. Expanded COMMIT-loss verification and retained-drift refusal passed without changing original unknown/recovery files. Native295.484s,315.869s including cleanup;548 artifact hashes verified. All owned containers/network/volume/processes absent; oldCID/image/volume preserved, existing nsqd restart2745->2751 means prior runtime stability false. This closes only the earlier pending current-source47 small-fixture qualification. Representative capacity, fresh exact PR-head CI/AI, production freeze/restore, RPO0 and30/60minute budget remain unproved; prior limitations and source proofs remain historical and unchanged."
+          "Actual documentation checkouta325392fe8cae327220b935cc2bbdbd0ae0aad72 (Go/SQL/CI byte-identical to runtime sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c) independently completed all47 required RUN/PASS0FAIL/SKIP,13tops/34children, on owned MySQL8.0.36/MongoRS7.0.31. Native47-v3 binding8187fe4171adc629b013aa3f1f369a321fb5cce6128227222bd862619a13919b, binary279da827a2ddf237070ef8b30c14ac3c9fa871d7893cb6822309cdb286d8332e, JSONLee75fb0241715ff3f70d2e9fc124d4a6d9ed72610bdab67e07a4e22213770949 and receipte8bdb4f7bcdf6a86173846e62556cb746452a0364d4a3b46fb5248998949a492 preserve305 inputs/actual argv. Expanded COMMIT-loss verification and retained-drift refusal passed without changing original unknown/recovery files. Native295.484s,315.869s including cleanup;548 artifact hashes verified. All owned containers/network/volume/processes absent; oldCID/image/volume preserved, existing nsqd restart2745->2751 means prior runtime stability false. This closes only the earlier pending current-source47 small-fixture qualification. Representative capacity, fresh exact PR-head CI/AI, production freeze/restore, RPO0 and30/60minute budget remain unproved; prior limitations and source proofs remain historical and unchanged.",
+          "Capture-only source8cc222f45fa5cca986925efbf4eca3b7c901a625 freezes the original qualified parent FileInfo/UID before ENV access, rechecks SameFile/originalowner/current eligibility before persistence and after capture-local original-byte readback, then checks context before certifying MaterialHash. Shared writer, journal, recovery protocol and receipt schema remain byte-identical. Exact-package ordinary-race135RUN/PASS0FAIL/SKIP, tagged race compilation(no native execution), taggedvet and incremental taggedlint passed; private QA27e79a0544e267a4494c480f957ef6fc538f46a1b6f480a50b11377e4b037f65 records immutable source bytes. Current-source native47-v4 is prepared only and remains unexecuted; a325 actual47 and06afe fresh24success/1designedskip CI stay historical. Capacity-v9 is prepared/unexecuted on a325, not current8cc. No production mutation, RPO or window qualification follows."
         ]
       },
       "gaps": [
@@ -13963,8 +13971,8 @@
           "id": "M4-A-CURRENT-TOOL-QUALIFICATION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Current a01 source has complete actual a325-checkout47 small-fixture native proof; representative capacity recovery and final PR-head CI remain unproved.",
-          "exit_criteria": "Preserve the exact a325 native47/input/binary proof and all prior failures; independently qualify representative capacity restoration, fresh exact PR-head CI/AI and the production execution bundle. Do not reuse old530/94 binary qualification or treat the small native fixture as production RPO/window proof."
+          "summary": "Current capture-parent source8cc has actual135 ordinary race proof; its complete real47 native and representative capacity recovery remain pending.",
+          "exit_criteria": "Qualify final capture-parent source with the exact47 required native set and releases, bind representative capacity to that same qualified source, then independently accept final PR-head CI/AI and the production execution bundle. Preserve actual a325/06afe historical proofs and all failed attempts; no small native fixture signs production RPO/window budgets."
         }
       ]
     }
