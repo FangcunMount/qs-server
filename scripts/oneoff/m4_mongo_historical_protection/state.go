@@ -41,7 +41,7 @@ func planRestore(m material, current observation) ([]int, error) {
 	if e := validateLedger(current.Ledger.Namespace); e != nil {
 		return nil, e
 	}
-	head, dirty, e := ledgerVersion(current.Ledger.Document)
+	head, _, e := ledgerVersion(current.Ledger.Document)
 	if e != nil || head != 40 || bytes.Equal(current.Ledger.Namespace.UUID, m.Ledger.Namespace.UUID) || !bytes.Equal(current.Ledger.Namespace.Options, m.Ledger.Namespace.Options) || !bytes.Equal(current.Ledger.Namespace.Indexes[0], m.Ledger.Namespace.Indexes[0]) {
 		return nil, errors.New("provider40_ledger_state_rejected")
 	}
@@ -74,7 +74,7 @@ func planRestore(m material, current observation) ([]int, error) {
 	presentSeen := false
 	for i, absent := range missing {
 		if absent && presentSeen {
-			return nil, errors.New("non_prefix_or_interrupted_restore_shape")
+			return nil, errors.New("non_prefix_index_state_rejected")
 		}
 		if absent {
 			result = append(result, i)
@@ -82,8 +82,9 @@ func planRestore(m material, current observation) ([]int, error) {
 			presentSeen = true
 		}
 	}
-	if !dirty && len(result) != len(targets) {
-		return nil, errors.New("clean40_requires_all_four_indexes_retired")
-	}
+	// A reverse-order restore leaves this same missing-prefix shape after
+	// every acknowledged createIndexes command. Both dirty40 and clean40 can
+	// therefore resume with a new independent approval before ledger replay.
+	// verify-target separately requires clean40 with all four still absent.
 	return result, nil
 }

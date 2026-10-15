@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -177,9 +179,9 @@ func TestRestorePlanOnlyAcceptsActualBPrefixAndProviderUUID(t *testing.T) {
 				t.Fatal("plan left fixed compiled target order")
 			}
 		}
-		_, e = planRestore(m, currentState(t, m, n, false))
-		if (n == 4) != (e == nil) {
-			t.Fatal("clean40 must mean all four targets exited", n, e)
+		cleanPlan, e := planRestore(m, currentState(t, m, n, false))
+		if e != nil || !reflect.DeepEqual(plan, cleanPlan) {
+			t.Fatal("clean40 reverse-restore prefix refused", n, e)
 		}
 	}
 	mutations := map[string]func(*observation){
@@ -202,14 +204,16 @@ func TestRestorePlanOnlyAcceptsActualBPrefixAndProviderUUID(t *testing.T) {
 			o.Collections[0].Indexes = append(o.Collections[0].Indexes, m.Collections[0].Indexes[1])
 		},
 	}
-	for name, mutate := range mutations {
-		t.Run(name, func(t *testing.T) {
-			o := currentState(t, m, 2, true)
-			mutate(&o)
-			if _, e := planRestore(m, o); e == nil {
-				t.Fatal("unknown recovery shape accepted")
-			}
-		})
+	for _, dirty := range []bool{true, false} {
+		for name, mutate := range mutations {
+			t.Run(fmt.Sprintf("dirty_%t/%s", dirty, name), func(t *testing.T) {
+				o := currentState(t, m, 2, dirty)
+				mutate(&o)
+				if _, e := planRestore(m, o); e == nil {
+					t.Fatal("unknown recovery shape accepted")
+				}
+			})
+		}
 	}
 }
 

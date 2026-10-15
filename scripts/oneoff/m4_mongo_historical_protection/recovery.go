@@ -138,7 +138,11 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if e = consumeApproval(approvalPath, a, approvalHash); e != nil {
 		return before, e
 	}
-	for _, position := range missing {
+	// Undo the DROP prefix from its end. Each successful command then leaves
+	// a shorter missing prefix, including interruption after the final index
+	// ACK but before the original ledger is replayed.
+	for i := len(missing) - 1; i >= 0; i-- {
+		position := missing[i]
 		if e = validateApproval(a, m, materialHash, tool, time.Now()); e != nil {
 			return before, e
 		}

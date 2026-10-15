@@ -37,6 +37,11 @@ func TestVerifyTargetRequiresClean40AndExactRemainingScope(t *testing.T) {
 	if e := verifyTargetObservation(m, o); e != nil {
 		t.Fatal(e)
 	}
+	for missing := 0; missing < len(targets); missing++ {
+		if verifyTargetObservation(m, currentState(t, m, missing, false)) == nil {
+			t.Fatal("clean40 partial/full index restoration accepted as B installation", missing)
+		}
+	}
 	for name, mutate := range map[string]func(*observation){
 		"dirty40":           func(o *observation) { o.Ledger.Document = changeSpec(t, o.Ledger.Document, "dirty", true) },
 		"one_index_present": func(o *observation) { o.Collections[0].Indexes = append(o.Collections[0].Indexes, targetSpec(t, 0)) },
