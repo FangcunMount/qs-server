@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -245,5 +246,50 @@ func TestCaptureHeldParentNeverOverwritesExistingOrSymlinkEntry(t *testing.T) {
 				t.Fatal("unrelated retained bytes changed")
 			}
 		})
+	}
+}
+
+func TestCaptureRuntimeMarkerNameIsRejectedBeforeEnvironmentOrPersistence(t *testing.T) {
+	dir := privateFixture(t)
+	path := filepath.Join(dir, "first-runtime")
+	args := append(cliArgs("capture"), "--capture-file="+path)
+	if _, e := parseArgs(args); e == nil || e.Error() != "capture_runtime_marker_path_conflict" {
+		t.Fatal("capture accepted its derived runtime marker as original material", e)
+	}
+	reads := 0
+	r := run(context.Background(), args, func(string) string { reads++; return "" }, testTool)
+	if reads != 0 || r.Complete || r.MaterialHash != "" || r.Error != "capture_runtime_marker_path_conflict" {
+		t.Fatal("conflicting capture crossed the pre-environment boundary", reads, r)
+	}
+	if entries, e := os.ReadDir(dir); e != nil || len(entries) != 0 {
+		t.Fatal("rejected capture created material or marker", entries, e)
+	}
+}
+
+func TestOrdinaryCaptureNameRemainsWritableAndDistinctFromRuntimeMarker(t *testing.T) {
+	path := filepath.Join(privateFixture(t), "material.json")
+	if _, e := parseArgs(append(cliArgs("capture"), "--capture-file="+path)); e != nil {
+		t.Fatal("ordinary capture name rejected", e)
+	}
+	m := originalMaterial()
+	m.CapturePath = path
+	if e := validateMaterial(m, testTool, m.Binding); e != nil {
+		t.Fatal(e)
+	}
+	raw, e := json.Marshal(m)
+	if e != nil {
+		t.Fatal(e)
+	}
+	parent, e := captureParent(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = parent.close() })
+	r := receipt{}
+	if e := finishCapture(context.Background(), &r, path, &parent, raw, writeCaptureExclusive); e != nil || r.MaterialHash != fingerprint(raw) {
+		t.Fatal("ordinary material lost capture persistence", e, r)
+	}
+	if path == derivedRuntimeMarker(m) || markerAbsent(derivedRuntimeMarker(m)) != nil {
+		t.Fatal("ordinary capture created or collided with runtime marker")
 	}
 }
