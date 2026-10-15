@@ -14,11 +14,11 @@ func cliArgs(action string) []string {
 	b := testBinding()
 	return []string{"--action", action, "--mysql-database", b.SQLName, "--mongo-database", b.MongoName, "--mysql-identity-sha256", b.SQLIdentity, "--mongo-identity-sha256", b.MongoIdentity, "--mongo-ledger-uuid-sha256", b.MongoUUID}
 }
-func TestReadOnlyEntrypointsRejectRestoreBeforeEnvironment(t *testing.T) {
+func TestEntrypointsRejectUnapprovedRestoreBeforeEnvironment(t *testing.T) {
 	cases := [][]string{cliArgs("restore"), append(cliArgs("inspect"), "--approval-file", "/private/approval.json"), append(cliArgs("verify-target"), "--material-file", "/private/original.json"), append(cliArgs("capture"), "--capture-file", "relative.json"), append(cliArgs("inspect"), "--timeout", "21m")}
 	for i, args := range cases {
 		r := run(context.Background(), args, func(string) string { t.Fatal("read ENV before rejection"); return "" }, testTool)
-		if r.Complete || !r.ReadOnly || r.MaterialHash != "" || r.SQLConnectionClosed || r.MongoClosed {
+		if r.Complete || r.ReadOnly != (i != 0) || r.MaterialHash != "" || r.SQLConnectionClosed || r.MongoClosed {
 			t.Fatalf("case%d %+v", i, r)
 		}
 	}
@@ -52,7 +52,7 @@ func TestReceiptDeliveryFailureIsNotSuccess(t *testing.T) {
 		t.Fatal("missing receipt success")
 	}
 	var out strings.Builder
-	if serve(context.Background(), cliArgs("restore"), func(string) string { return "" }, testTool, &out) != 1 || !strings.Contains(out.String(), "restore_not_implemented") {
+	if serve(context.Background(), cliArgs("restore"), func(string) string { return "" }, testTool, &out) != 1 || !strings.Contains(out.String(), "independently_bound_material_required") {
 		t.Fatal(out.String())
 	}
 	if serve(context.Background(), nil, func(string) string { return "" }, testTool, io.Discard) != 1 {

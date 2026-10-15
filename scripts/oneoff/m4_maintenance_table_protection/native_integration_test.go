@@ -551,8 +551,8 @@ func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(t *testing.T) {
 	if got := h.query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('testee_store_migration_reversions','testee_store_migration_items','testee_store_migration_manifests','clinician_operator_binding_archive','operator_retirement_manifests')"); len(got) != 0 {
 		t.Fatal("not all five original tables were dropped")
 	}
-	if r := h.action("restore"); r.Complete || r.Error != "restore_not_implemented" || r.SQLPoolClosed || r.MongoClosed {
-		t.Fatal("unsupported restore crossed ENV/DB boundary")
+	if r := h.action("restore"); r.Complete || r.Error != "independently_bound_material_required" || r.SQLPoolClosed || r.MongoClosed {
+		t.Fatal("restore without independent material/approval crossed ENV/DB boundary")
 	}
 }
 func TestM4MaintenanceTablesNativeBinaryPagesAndRawEOF(t *testing.T) {

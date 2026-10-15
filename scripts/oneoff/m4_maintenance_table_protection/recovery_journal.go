@@ -199,3 +199,26 @@ func syncRecoveryParent(path string) error {
 	}
 	return nil
 }
+
+// Terminal verification only reads an already consumed independent approval.
+// It cannot create a journal, change the first budget or authorize retry.
+func checkRestoredAuthorization(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) error {
+	if e := rereadApprovedInputs(m, a, materialPath, materialHash, approvalPath, approvalHash, tool); e != nil {
+		return e
+	}
+	path, e := recoveryJournalPath(m, materialHash)
+	if e != nil {
+		return e
+	}
+	raw, e := readOwnedPrivate(path, maxRecoveryJournalBytes)
+	ops, pe := parseRecoveryOperations(raw, materialHash)
+	if e != nil || pe != nil {
+		return errors.New("recovery_operation_journal_invalid_or_lost")
+	}
+	for _, op := range ops {
+		if op.Operation == a.Operation && op.ApprovalHash == approvalHash {
+			return validateMutableBoundary(m, a, materialHash, tool)
+		}
+	}
+	return errors.New("restored_verification_operation_not_claimed")
+}

@@ -180,10 +180,12 @@ func (d database) observe(ctx context.Context, r sqlReader) (out observation, er
 	return out, nil
 }
 
+const fixedTablesQuery = "SELECT TABLE_NAME,TABLE_TYPE,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('testee_store_migration_reversions','testee_store_migration_items','testee_store_migration_manifests','clinician_operator_binding_archive','operator_retirement_manifests','schema_migrations','operators','testee','clinician','operator_retirement_tasks','operator_recovery_archives','actor_stores','clinician_store_history','testee_store_history') ORDER BY TABLE_NAME"
+
 func requireTables(ctx context.Context, r sqlReader, original bool) error {
 	q, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()
-	rows, e := r.QueryContext(q, "SELECT TABLE_NAME,TABLE_TYPE,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('testee_store_migration_reversions','testee_store_migration_items','testee_store_migration_manifests','clinician_operator_binding_archive','operator_retirement_manifests','schema_migrations','operators','testee','clinician','operator_retirement_tasks','operator_recovery_archives','actor_stores','clinician_store_history','testee_store_history') ORDER BY TABLE_NAME")
+	rows, e := r.QueryContext(q, fixedTablesQuery)
 	if e != nil {
 		return errors.New("fixed_table_metadata_unavailable")
 	}
