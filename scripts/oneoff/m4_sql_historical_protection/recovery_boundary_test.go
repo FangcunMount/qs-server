@@ -5,9 +5,49 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
+
+type parentWithOwner struct {
+	os.FileInfo
+	owner uint32
+}
+
+func (s parentWithOwner) Sys() any { return &syscall.Stat_t{Uid: s.owner} }
+
+func TestCaptureAndRecoveryRequireTheSameParent(t *testing.T) {
+	dir := privateTestDir(t)
+	info, e := os.Stat(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, tc := range []struct {
+		owner, caller uint32
+		allowed       bool
+	}{{501, 0, false}, {0, 0, true}, {501, 501, true}, {0, 501, true}, {502, 501, false}} {
+		if recoveryParentAllowed(parentWithOwner{info, tc.owner}, tc.caller) != tc.allowed {
+			t.Fatal("capture/recovery parent ownership differs", tc)
+		}
+	}
+	// The general file writer accepts sticky ancestors. The retained recovery
+	// root must be private before connection inputs are read or capture begins.
+	if os.Chmod(dir, os.ModeSticky|0777) != nil {
+		t.Fatal("owned parent permission fault unavailable")
+	}
+	path := filepath.Join(dir, "must-not-capture.json")
+	r := run(context.Background(), []string{"--action=capture", "--mysql-database=qs", "--mongo-database=qs", "--capture-file=" + path}, func(string) string {
+		t.Fatal("connection input read before parent rejection")
+		return ""
+	}, testSource, nil)
+	if r.Complete || r.Error != "recovery_private_parent_rejected" {
+		t.Fatal("capture accepted a parent restoration must reject", r)
+	}
+	if _, e := os.Stat(path); !os.IsNotExist(e) {
+		t.Fatal("rejected parent persisted canonical material")
+	}
+}
 
 func TestFirstRecoveryBoundaryAndOperationCannotBeMovedOrReencoded(t *testing.T) {
 	m := testMaterial()

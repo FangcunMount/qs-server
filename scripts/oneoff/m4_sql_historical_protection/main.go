@@ -182,6 +182,12 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		ctx, c = restoreActionContext(ctx, ap)
 		defer c()
 	}
+	if a.action == "capture" {
+		if e := recoveryParent(a.capture); e != nil {
+			r.Error = e.Error()
+			return r
+		}
+	}
 	dsn, e := mysql.ParseDSN(getenv("QS_M4_OBJECT_MYSQL_DSN"))
 	if e != nil || dsn.DBName != a.sqlName || getenv("QS_M4_OBJECT_MONGO_URI") == "" {
 		r.Error = "selected_connection_input_rejected"
