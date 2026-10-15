@@ -200,13 +200,7 @@ func TestUnboundRestoreRejectedBeforeConfigurationOrMaterialAccess(t *testing.T)
 }
 
 func TestPrivateFirstCaptureIsExclusiveAndExternallyBound(t *testing.T) {
-	dir, e := filepath.EvalSymlinks(t.TempDir())
-	if e != nil {
-		t.Fatal(e)
-	}
-	if e := os.Chmod(dir, 0700); e != nil {
-		t.Fatal(e)
-	}
+	dir := privateRecoveryDir(t)
 	path, raw := filepath.Join(dir, "capture.json"), []byte(`{"fixed":"bytes"}`)
 	if e := writeExclusive(path, raw); e != nil {
 		t.Fatal(e)
