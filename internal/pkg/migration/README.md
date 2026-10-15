@@ -102,7 +102,7 @@ marker 作者使用原有双库名字及身份/账本UUID参数、`--material-fi
 
 首 marker 固定为原捕获材料目录内的 `first-runtime`，恢复批准中的 marker 也必须等于此派生路径，不接受旧自选路径。锁内前后重读原材料/原intent及相应恢复批准，只有完整状态证明后才生成固定marker内容；已有、部分写入或写入结果未知的 marker 均不删除或覆盖，保守关闭旧材料回放。D 后续控制器必须调用此作者并取得成功回执后才发首 runtime 命令；旧独立 `touch`、只探锁后释放再写文件或 A 既有 marker 作者不属于本 D 互斥协议。本动作只写首边界文件，不启动容器、业务进程或执行D退役迁移，生产批次批准仍另行完成。
 
-新增原生顶层 `TestM4MaintenanceTablesNativeFirstRuntimeGate` 及六子场景准备正常103/原102准入、真实 FTWRL/CREATE 等待阻 marker、marker先到的恢复拒绝、实际服务端会话仍存活时本地取消、RELEASE回应未知。原46顺序保留，合计53项数据库事件；当前只完成源码与编译准备，未执行这些新增数据库断言，不宣称已取得生产恢复、并发或窗口资格。
+新增原生顶层 `TestM4MaintenanceTablesNativeFirstRuntimeGate` 及六子场景准备正常103/原102准入、真实 FTWRL/CREATE 等待阻 marker、marker先到的恢复拒绝、实际服务端会话仍存活时本地取消、RELEASE回应未知。原46顺序保留，合计53项数据库事件。首轮69d12f82仅执行CREATE/create0及顶层2个事件即失败：实际主unknown与gate释放未证明符合预期，新增测试却要求局部Conn关闭成功。2bc85e808仅修正此negative断言，保留原实际bool、完整失败回执和所有正向释放保证；其余46输入含生产Go不变，tag编译/vet/lint与8项wire race通过，完整53项仍待新来源实际验证。隔离依赖已精确释放，不宣称取得生产恢复、并发或窗口资格。
 
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 

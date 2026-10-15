@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+    "sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4831,7 +4831,10 @@
           "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}",
           "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
           "Historical selector retained after exact53 replacement; complete original verification: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
-          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted."
+          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted.",
+          "D first full53 attempt at 69d12f82 ran only CREATE/create0 and its parent:2RUN/0PASS/2FAIL, then failfast. Actual original CREATE ACK loss correctly returned Complete=false, original_table_create_failed_or_unknown and runtime_gate_release_unproven; sql_connection_closed=false caused the newly overstrict negative fixture assertion. Original failed receipt0c3d8a1eee0d567e38ca7d1880b2e81ab1a1de951f260af34cdbb489c49d4d13/JSONL43913304eaa8546c15de462b89080b9b7d40af308ec505c2d3bea4d051ddd871 retained. Both owned databases/network and child PGID were actually released in26.475s with original IDs/images/volumes/runtime preserved. Test-only 2bc85e80858d6a907192f267cd0e547258e06e7f retains the actual local-close bool and all server-gate unknown/negative proof conditions; remaining46 inputs including all production Go unchanged. Tag compile/vet/lint and8 wire race cases passed; full53 retry has not run. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"2bc85e80858d6a907192f267cd0e547258e06e7f\",\"verified_on\":\"2026-10-15\"}",
+          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending."
         ]
       },
       "gaps": [
@@ -11071,7 +11074,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11805,7 +11808,10 @@
           "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
           "Historical selector retained after exact53 replacement; complete original verification: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
-          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted."
+          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted.",
+          "D first full53 attempt at 69d12f82 ran only CREATE/create0 and its parent:2RUN/0PASS/2FAIL, then failfast. Actual original CREATE ACK loss correctly returned Complete=false, original_table_create_failed_or_unknown and runtime_gate_release_unproven; sql_connection_closed=false caused the newly overstrict negative fixture assertion. Original failed receipt0c3d8a1eee0d567e38ca7d1880b2e81ab1a1de951f260af34cdbb489c49d4d13/JSONL43913304eaa8546c15de462b89080b9b7d40af308ec505c2d3bea4d051ddd871 retained. Both owned databases/network and child PGID were actually released in26.475s with original IDs/images/volumes/runtime preserved. Test-only 2bc85e80858d6a907192f267cd0e547258e06e7f retains the actual local-close bool and all server-gate unknown/negative proof conditions; remaining46 inputs including all production Go unchanged. Tag compile/vet/lint and8 wire race cases passed; full53 retry has not run. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"2bc85e80858d6a907192f267cd0e547258e06e7f\",\"verified_on\":\"2026-10-15\"}",
+          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending."
         ]
       },
       "gaps": []
@@ -13170,7 +13176,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13776,7 +13782,8 @@
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
           "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
-          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": []
@@ -13895,7 +13902,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14312,7 +14319,8 @@
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
           "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
-          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -14331,7 +14339,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14609,7 +14617,8 @@
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
           "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
-          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -14635,7 +14644,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+        "source_sha": "3f296fb304c14c94c42b60704f0574bb65d1454e",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14937,7 +14946,8 @@
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"6186df273482c5c3fd3e802fd0659d867c639c3f\",\"verified_on\":\"2026-10-15\"}",
           "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
           "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
-          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
