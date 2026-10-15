@@ -222,6 +222,28 @@ func (c *nativeHeldSQLSocket) Close() error {
 	return nil // test transport keeps the upstream server session genuinely alive
 }
 
+// This fixture bypasses actionContext to retain the actual upstream socket.
+// Keep its complete consumer input independently testable without a database.
+func (h *maintenanceNative) connectionLossRestoreArgs(extras []string) []string {
+	base := []string{"--action=restore", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=20s", "--capture-evidence-file=" + h.captureEvidencePath, "--capture-evidence-sha256=" + h.captureEvidenceHash}
+	return append(base, extras...)
+}
+
+func TestRuntimeConnectionLossFixtureInputReachesEnvironment(t *testing.T) {
+	m, _, hash, approvalPath, approvalHash := recoveryInputs(t)
+	proofPath, proofHash, _ := unitCaptureEvidence(t, unitCaptureReceipt(m, hash), 0)
+	h := maintenanceNative{t: t, name: m.Binding.SQLName, binding: m.Binding, captureEvidencePath: proofPath, captureEvidenceHash: proofHash}
+	extras := []string{"--material-file=" + m.CapturePath, "--material-sha256=" + hash, "--approval-file=" + approvalPath, "--approval-sha256=" + approvalHash}
+	reads := 0
+	r := run(t.Context(), h.connectionLossRestoreArgs(extras), func(string) string {
+		reads++
+		return "" // stop at the ENV boundary; never open a database connection
+	}, testTool)
+	if reads != 2 || r.Complete || r.Error != "selected_connection_input_rejected" || r.ApprovalConsumed || r.RuntimeGateAcquired {
+		t.Fatal("socket-loss fixture did not reach its intended connection boundary", reads, r)
+	}
+}
+
 func nativeRuntimeConnectionLoss(t *testing.T) {
 	h := newMaintenanceNative(t)
 	h.capture()
@@ -254,8 +276,7 @@ func nativeRuntimeConnectionLoss(t *testing.T) {
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
-		base := []string{"--action=restore", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=20s"}
-		done <- run(ctx, append(base, args...), func(key string) string {
+		done <- run(ctx, h.connectionLossRestoreArgs(args), func(key string) string {
 			if key == "QS_M4_D_OBJECT_MYSQL_DSN" {
 				return dsn
 			}
@@ -268,8 +289,15 @@ func nativeRuntimeConnectionLoss(t *testing.T) {
 	var wire *nativeHeldSQLSocket
 	select {
 	case wire = <-physical:
+	case r := <-done:
+		t.Fatal("owned restore exited before its upstream connection", r.Error)
 	case <-ctx.Done():
-		t.Fatal("owned upstream connection not created")
+		select {
+		case r := <-done:
+			t.Fatal("owned restore exited before its upstream connection", r.Error)
+		default:
+			t.Fatal("owned upstream connection not created")
+		}
 	}
 	defer func() { _ = wire.Conn.Close() }()
 	defer func() {
