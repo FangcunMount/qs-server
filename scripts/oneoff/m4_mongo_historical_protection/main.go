@@ -25,33 +25,34 @@ type arguments struct {
 	timeout                                                                             time.Duration
 }
 type receipt struct {
-	Action                     string    `json:"action,omitempty"`
-	ToolSource                 string    `json:"compiled_tool_source,omitempty"`
-	BSource                    string    `json:"b_execution_source"`
-	BResources                 string    `json:"b_execution_resources_sha256"`
-	BResourceFiles             int       `json:"b_execution_resource_files"`
-	Complete                   bool      `json:"complete"`
-	ReadOnly                   bool      `json:"database_read_only"`
-	FreezeCertified            bool      `json:"production_freeze_certified"`
-	MaterialHash               string    `json:"material_sha256,omitempty"`
-	SQLIdentity                string    `json:"mysql_identity_sha256,omitempty"`
-	MongoIdentity              string    `json:"mongo_identity_sha256,omitempty"`
-	SQLVersion                 uint64    `json:"mysql_clean_version,omitempty"`
-	MongoVersion               int64     `json:"mongo_clean_version,omitempty"`
-	Counts                     [2]*int64 `json:"exact_fixed_collection_counts"`
-	SQLConnectionClosed        *bool     `json:"sql_connection_closed"`
-	SQLPoolClosed              *bool     `json:"sql_pool_closed"`
-	MongoClosed                *bool     `json:"mongo_closed"`
-	MongoCursorsClosed         *bool     `json:"mongo_cursors_exhausted_and_closed"`
-	LedgerCommitIssued         bool      `json:"ledger_commit_issued"`
-	LedgerCommitAcknowledged   bool      `json:"ledger_commit_acknowledged"`
-	LedgerCommitOutcomeUnknown bool      `json:"ledger_commit_outcome_unknown"`
-	LedgerAbortCalled          bool      `json:"application_ledger_abort_called"`
-	SessionEndCalled           bool      `json:"mongo_snapshot_session_end_called"`
-	TransactionReleaseUnproven bool      `json:"sql_transaction_release_unproven"`
-	Error                      string    `json:"error_category"`
-	ReleaseError               string    `json:"release_error_category,omitempty"`
-	BudgetExceeded             bool      `json:"total_budget_exceeded"`
+	Action                          string    `json:"action,omitempty"`
+	ToolSource                      string    `json:"compiled_tool_source,omitempty"`
+	BSource                         string    `json:"b_execution_source"`
+	BResources                      string    `json:"b_execution_resources_sha256"`
+	BResourceFiles                  int       `json:"b_execution_resource_files"`
+	Complete                        bool      `json:"complete"`
+	ReadOnly                        bool      `json:"database_read_only"`
+	FreezeCertified                 bool      `json:"production_freeze_certified"`
+	MaterialHash                    string    `json:"material_sha256,omitempty"`
+	SQLIdentity                     string    `json:"mysql_identity_sha256,omitempty"`
+	MongoIdentity                   string    `json:"mongo_identity_sha256,omitempty"`
+	SQLVersion                      uint64    `json:"mysql_clean_version,omitempty"`
+	MongoVersion                    int64     `json:"mongo_clean_version,omitempty"`
+	Counts                          [2]*int64 `json:"exact_fixed_collection_counts"`
+	SQLConnectionClosed             *bool     `json:"sql_connection_closed"`
+	SQLPoolClosed                   *bool     `json:"sql_pool_closed"`
+	MongoClosed                     *bool     `json:"mongo_closed"`
+	MongoCursorsClosed              *bool     `json:"mongo_cursors_exhausted_and_closed"`
+	LedgerCommitIssued              bool      `json:"ledger_commit_issued"`
+	LedgerCommitAcknowledged        bool      `json:"ledger_commit_acknowledged"`
+	LedgerCommitOutcomeUnknown      bool      `json:"ledger_commit_outcome_unknown"`
+	LedgerAbortCalled               bool      `json:"application_ledger_abort_called"`
+	SessionEndCalled                bool      `json:"mongo_snapshot_session_end_called"`
+	MongoTransactionReleaseUnproven bool      `json:"mongo_transaction_release_unproven"`
+	TransactionReleaseUnproven      bool      `json:"sql_transaction_release_unproven"`
+	Error                           string    `json:"error_category"`
+	ReleaseError                    string    `json:"release_error_category,omitempty"`
+	BudgetExceeded                  bool      `json:"total_budget_exceeded"`
 }
 
 func absolutePath(s string) bool { return filepath.IsAbs(s) && filepath.Clean(s) == s }
@@ -208,8 +209,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.LedgerAbortCalled = d.ledgerAbortCalled
 		r.SessionEndCalled = d.sessionEndCalled
 		r.TransactionReleaseUnproven = d.sqlRollbackUnproven
+		r.MongoTransactionReleaseUnproven = d.mongoTransactionReleaseUnproven
 		r.BudgetExceeded = ctx.Err() != nil
-		released := (r.SQLConnectionClosed == nil || *r.SQLConnectionClosed) && *r.SQLPoolClosed && (r.MongoClosed == nil || *r.MongoClosed) && !d.cursorReleaseUnproven && !d.sqlRollbackUnproven
+		released := (r.SQLConnectionClosed == nil || *r.SQLConnectionClosed) && *r.SQLPoolClosed && (r.MongoClosed == nil || *r.MongoClosed) && !d.cursorReleaseUnproven && !d.sqlRollbackUnproven && !d.mongoTransactionReleaseUnproven
 		if !released {
 			r.ReleaseError = "owned_resource_release_unproven"
 			if ok {

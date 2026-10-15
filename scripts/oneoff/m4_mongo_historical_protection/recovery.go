@@ -180,13 +180,15 @@ func (d *database) replayOriginalLedger(ctx context.Context, m material, before 
 	if session.StartTransaction(options.Transaction().SetReadConcern(readconcern.Snapshot()).SetReadPreference(readpref.Primary()).SetWriteConcern(writeconcern.Majority()).SetMaxCommitTime(&left)) != nil {
 		return errors.New("ledger_transaction_start_failed")
 	}
+	d.mongoTransactionReleaseUnproven = true
 	commitIssued := false
 	defer func() {
 		if !commitIssued {
 			q, c := context.WithTimeout(context.Background(), queryLimit)
 			sc := mongo.NewSessionContext(q, session)
-			// AbortTransaction ignores its wire error in the pinned SDK. Confirm the
-			// retained 40 BSON afterwards; a nil SDK abort is not a positive restore.
+			// AbortTransaction ignores its wire error in the pinned SDK. A call
+			// or an outside read of ledger40 cannot certify server transaction release;
+			// keep mongoTransactionReleaseUnproven true on every precommit failure.
 			d.ledgerAbortCalled = true
 			_ = session.AbortTransaction(sc)
 			c()
@@ -233,6 +235,7 @@ func (d *database) replayOriginalLedger(ctx context.Context, m material, before 
 		d.ledgerCommitUnknown = true
 		return errors.New("ledger_commit_failed_or_unknown")
 	}
+	d.mongoTransactionReleaseUnproven = false
 	d.ledgerCommitAcknowledged = true
 	return nil
 }

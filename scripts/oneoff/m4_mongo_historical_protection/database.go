@@ -25,17 +25,18 @@ type sqlReader interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 type database struct {
-	conn                     *sql.Conn
-	mongo                    *mongo.Client
-	sqlName, mongoName       string
-	cursorCount              int
-	cursorReleaseUnproven    bool
-	sqlRollbackUnproven      bool
-	sessionEndCalled         bool
-	ledgerCommitIssued       bool
-	ledgerCommitAcknowledged bool
-	ledgerCommitUnknown      bool
-	ledgerAbortCalled        bool
+	conn                            *sql.Conn
+	mongo                           *mongo.Client
+	sqlName, mongoName              string
+	cursorCount                     int
+	cursorReleaseUnproven           bool
+	sqlRollbackUnproven             bool
+	sessionEndCalled                bool
+	ledgerCommitIssued              bool
+	ledgerCommitAcknowledged        bool
+	ledgerCommitUnknown             bool
+	mongoTransactionReleaseUnproven bool
+	ledgerAbortCalled               bool
 }
 
 func (d *database) sqlState(ctx context.Context, r sqlReader) (string, uint64, bool, error) {
