@@ -33,9 +33,14 @@ m4-mongo-historical-protection --action=verify-target --mysql-database=qs --mong
 m4-mongo-historical-protection --action=restore --mysql-database=qs --mongo-database=qs \
   --material-file=/private/approved-protection/b-first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
   --approval-file=/private/approved-protection/b-independent-approval.json --approval-sha256=<independent-approval-raw-sha256>
+m4-mongo-historical-protection --action=verify-restored --mysql-database=qs --mongo-database=qs \
+  --material-file=/private/approved-protection/b-first-capture.json --material-sha256=<same-original-material-raw-sha256> \
+  --approval-file=/private/approved-protection/b-independent-approval.json --approval-sha256=<same-already-consumed-approval-raw-sha256>
 ```
 
 这些是未执行的调用示例。默认 inspect、capture 和 verify-target 都只读；只有显式 restore 写四个固定索引和原账本。捕获材料与批准使用绝对路径、0600、单硬链接、当前 UID 或 root、无符号链接。首次 capture 以 O_EXCL 创建、文件及目录 fsync、按原始 SHA 回读，不覆盖旧材料。capture在读取连接输入前与restore使用同一个父目录owner/permission守卫：必须root或当前UID拥有且不可group/world写；因此root不能先捕获到另一个UID拥有的目录后才在恢复时失败。 首次预检在读取连接输入前打开并持续持有实际父目录FD，同时冻结FileInfo和UID。仅capture使用该原FD下的Openat O_EXCL/NOFOLLOW创建、完整原字节回读和文件/目录fsync，不在写入期间重新按绝对路径选择父目录；共享恢复writer与journal不变。写前与回读后仍核对规范路径的目录资格、os.SameFile身份及原UID；原FD成功关闭后再次检查总预算，最后才赋MaterialHash。中途路径被换走再换回时，材料仍写入最初目录；最终身份、释放或预算未通过时保留未认证材料并停止。材料原始 SHA 来自外部冻结；材料内部同时绑定首次 capture 的真实规范绝对路径，后续不能将同字节材料复制到别处后作为新恢复根使用。缺少该路径的旧材料明确拒绝。
+
+`verify-restored` 是独立的新连接只读核验，供恢复提交回应未知时显式检查当前原状态。它要求首次规范材料与外冻SHA、原批准原字节，以及已存在且完整闭合的首次boundary、journal和该operation的已消费claim；不创建授权状态、不消费新批准、不重放账本。连接前和全部连接释放后都重核原marker、责任、决策、expiry与绝对deadline，不能重新开启恢复预算。两次完整快照均须证明SQL clean101/身份、四索引完整原spec、两业务集合原UUID/options/全部索引/精确计数、原39账本BSON/options/_id索引；该动作不提供业务正文hash。provider40会合法重建账本集合，因此当前账本UUID必须不同于capture39 UUID且在两次快照中相同，不能回造旧UUID。成功回执的`restored_verification`仅记录本次当前UUID摘要及两次稳定；`earlier_restore_ledger_uuid_bound=false`明确首次材料没有保存此后生成的40具体UUID，不宣称与此前restore的具体UUID独立绑定。失败或释放未证实不输出该证明。原unknown恢复回执保持unknown，核验成功也不直接授权启动旧实例，控制方仍需另具名批准。普通inspect不替代此动作，verify-target仍只接受clean101/40和四索引全部缺失。
 
 capture 在 SQL RR 只读事务读取严格单行 clean101，rollback 后再核对。Mongo 账本原 BSON和两集合精确 `$count` 在同一 snapshot session 读取，集合目录及索引在该快照前后独立读取并完整比较。游标须实际 EOF、ID0 和 Close 成功；不存在或失败的集合不能算作零。原 clean39 文档保留 `_id`、字段顺序及 BSON 整数宽度，账本只接受空 options、一个标准 `_id_` 索引及严格单行 typed version/dirty。业务集合保留 UUID、完整 options、全部完整索引及精确计数；材料没有业务正文或全量业务 hash。
 
@@ -67,6 +72,7 @@ native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e
 - dirty40 的0–4 DROP前缀及 clean40 全部退出后的对象恢复、真实原账本最后事务回放、当前40 UUID保留和 fresh10139 只读核对。
 - 同计数的业务值冲突导致真实 unique index 重建失败，保留 dirty40，不能删业务文档解冲突。
 - 账本事务写入中断、服务端 COMMIT 已成功但全部响应被丢失，以及同一事务重发摘要。
+- 原COMMIT回应丢失顶层现追加新连接verify-restored成功与真实保留计数漂移拒绝的源码断言；37项selector不变。该增量目前仅准备普通测试和integration编译，尚未实际运行新native，旧37证明不转签本增量。
 - first-runtime marker、外冻材料变化、过期批准、实际消费后再次使用、真实 SQL102 未来 head 拒绝。
 - dirty40/clean40 各在第1–4个真实 createIndexes ACK后中断，旧批准复用无DDL拒绝，同一原材料和原绝对截止的新批准继续；四索引全恢复但账本尚未回放的中断也须通过。
 - 实际ACK1中断后，复制批准路径、同operation重编码、延期、变更决策、更换已经存在的原marker、复制材料、删除或损坏首次边界，全部须具名拒绝且无新增DDL或账本写入。新增删除已消费claim后，同operation与新operation都须在日志闭合检查处拒绝。

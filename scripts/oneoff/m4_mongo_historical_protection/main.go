@@ -24,35 +24,41 @@ type arguments struct {
 	action, sqlName, mongoName, capture, material, materialHash, approval, approvalHash string
 	timeout                                                                             time.Duration
 }
+type restoredVerification struct {
+	CurrentLedgerUUIDSHA256       string `json:"current_ledger_uuid_sha256"`
+	UUIDStableAcrossTwoSnapshots  bool   `json:"uuid_stable_across_two_snapshots"`
+	EarlierRestoreLedgerUUIDBound bool   `json:"earlier_restore_ledger_uuid_bound"`
+}
 type receipt struct {
-	Action                          string    `json:"action,omitempty"`
-	ToolSource                      string    `json:"compiled_tool_source,omitempty"`
-	BSource                         string    `json:"b_execution_source"`
-	BResources                      string    `json:"b_execution_resources_sha256"`
-	BResourceFiles                  int       `json:"b_execution_resource_files"`
-	Complete                        bool      `json:"complete"`
-	ReadOnly                        bool      `json:"database_read_only"`
-	FreezeCertified                 bool      `json:"production_freeze_certified"`
-	MaterialHash                    string    `json:"material_sha256,omitempty"`
-	SQLIdentity                     string    `json:"mysql_identity_sha256,omitempty"`
-	MongoIdentity                   string    `json:"mongo_identity_sha256,omitempty"`
-	SQLVersion                      uint64    `json:"mysql_clean_version,omitempty"`
-	MongoVersion                    int64     `json:"mongo_clean_version,omitempty"`
-	Counts                          [2]*int64 `json:"exact_fixed_collection_counts"`
-	SQLConnectionClosed             *bool     `json:"sql_connection_closed"`
-	SQLPoolClosed                   *bool     `json:"sql_pool_closed"`
-	MongoClosed                     *bool     `json:"mongo_closed"`
-	MongoCursorsClosed              *bool     `json:"mongo_cursors_exhausted_and_closed"`
-	LedgerCommitIssued              bool      `json:"ledger_commit_issued"`
-	LedgerCommitAcknowledged        bool      `json:"ledger_commit_acknowledged"`
-	LedgerCommitOutcomeUnknown      bool      `json:"ledger_commit_outcome_unknown"`
-	LedgerAbortCalled               bool      `json:"application_ledger_abort_called"`
-	SessionEndCalled                bool      `json:"mongo_snapshot_session_end_called"`
-	MongoTransactionReleaseUnproven bool      `json:"mongo_transaction_release_unproven"`
-	TransactionReleaseUnproven      bool      `json:"sql_transaction_release_unproven"`
-	Error                           string    `json:"error_category"`
-	ReleaseError                    string    `json:"release_error_category,omitempty"`
-	BudgetExceeded                  bool      `json:"total_budget_exceeded"`
+	Action                          string                `json:"action,omitempty"`
+	ToolSource                      string                `json:"compiled_tool_source,omitempty"`
+	BSource                         string                `json:"b_execution_source"`
+	BResources                      string                `json:"b_execution_resources_sha256"`
+	BResourceFiles                  int                   `json:"b_execution_resource_files"`
+	Complete                        bool                  `json:"complete"`
+	ReadOnly                        bool                  `json:"database_read_only"`
+	FreezeCertified                 bool                  `json:"production_freeze_certified"`
+	MaterialHash                    string                `json:"material_sha256,omitempty"`
+	SQLIdentity                     string                `json:"mysql_identity_sha256,omitempty"`
+	MongoIdentity                   string                `json:"mongo_identity_sha256,omitempty"`
+	SQLVersion                      uint64                `json:"mysql_clean_version,omitempty"`
+	MongoVersion                    int64                 `json:"mongo_clean_version,omitempty"`
+	Counts                          [2]*int64             `json:"exact_fixed_collection_counts"`
+	SQLConnectionClosed             *bool                 `json:"sql_connection_closed"`
+	SQLPoolClosed                   *bool                 `json:"sql_pool_closed"`
+	MongoClosed                     *bool                 `json:"mongo_closed"`
+	MongoCursorsClosed              *bool                 `json:"mongo_cursors_exhausted_and_closed"`
+	LedgerCommitIssued              bool                  `json:"ledger_commit_issued"`
+	LedgerCommitAcknowledged        bool                  `json:"ledger_commit_acknowledged"`
+	LedgerCommitOutcomeUnknown      bool                  `json:"ledger_commit_outcome_unknown"`
+	LedgerAbortCalled               bool                  `json:"application_ledger_abort_called"`
+	SessionEndCalled                bool                  `json:"mongo_snapshot_session_end_called"`
+	MongoTransactionReleaseUnproven bool                  `json:"mongo_transaction_release_unproven"`
+	TransactionReleaseUnproven      bool                  `json:"sql_transaction_release_unproven"`
+	Error                           string                `json:"error_category"`
+	ReleaseError                    string                `json:"release_error_category,omitempty"`
+	BudgetExceeded                  bool                  `json:"total_budget_exceeded"`
+	RestoredVerification            *restoredVerification `json:"restored_verification,omitempty"`
 }
 
 func absolutePath(s string) bool { return filepath.IsAbs(s) && filepath.Clean(s) == s }
@@ -60,7 +66,7 @@ func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-mongo-historical-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored")
 	f.StringVar(&a.sqlName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.mongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.capture, "capture-file", "", "first private capture path")
@@ -81,8 +87,8 @@ func parseArgs(args []string) (arguments, error) {
 		if !absolutePath(a.capture) || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
 		}
-	case "verify-target", "restore":
-		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "restore" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") {
+	case "verify-target", "restore", "verify-restored":
+		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action != "verify-target" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") {
 			return a, errors.New("bound_material_and_action_required")
 		}
 	default:
@@ -133,7 +139,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	var m material
 	var ap approval
 	var captureDirectory captureParentIdentity
-	if a.action == "verify-target" || a.action == "restore" {
+	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.material, a.materialHash, maxMaterialBytes)
 		if e != nil {
 			r.Error = e.Error()
@@ -145,7 +151,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		r.MaterialHash = a.materialHash
 	}
-	if a.action == "restore" {
+	if a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.approval, a.approvalHash, 32768)
 		if e != nil {
 			r.Error = e.Error()
@@ -155,7 +161,12 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "restore_approval_rejected"
 			return r
 		}
-		if e := checkRecoveryBoundary(m, ap, a.materialHash, false); e != nil {
+		if a.action == "verify-restored" {
+			e = checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+		} else {
+			e = checkRecoveryBoundary(m, ap, a.materialHash, false)
+		}
+		if e != nil {
 			r.Error = e.Error()
 			return r
 		}
@@ -224,6 +235,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		defer func() {
 			if !r.Complete {
 				r.Counts = [2]*int64{}
+				r.RestoredVerification = nil
 			}
 		}()
 		if d.conn != nil {
@@ -265,6 +277,17 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			if e := finishCapture(ctx, &r, a.capture, &captureDirectory, rawMaterial, writeCaptureExclusive); e != nil {
 				r.BudgetExceeded = ctx.Err() != nil
 				r.Error = e.Error()
+				return
+			}
+		}
+		if a.action == "verify-restored" {
+			if e := checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool); e != nil {
+				r.Error = e.Error()
+				return
+			}
+			if ctx.Err() != nil {
+				r.BudgetExceeded = true
+				r.Error = "total_budget_exceeded"
 				return
 			}
 		}
@@ -321,6 +344,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		o, e = d.verifyTarget(ctx, m)
 	case "restore":
 		o, e = d.restore(ctx, m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+	case "verify-restored":
+		o, e = d.verifyRestored(ctx, m)
 	}
 	if e != nil {
 		r.Error = e.Error()
@@ -329,6 +354,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	r.SQLIdentity, r.MongoIdentity, r.SQLVersion = o.SQLIdentity, o.MongoIdentity, o.SQLVersion
 	r.MongoVersion, _, _ = ledgerVersion(o.Ledger.Document)
 	r.Counts = [2]*int64{o.Collections[0].Count, o.Collections[1].Count}
+	if a.action == "verify-restored" {
+		r.RestoredVerification = &restoredVerification{CurrentLedgerUUIDSHA256: fingerprint(o.Ledger.Namespace.UUID), UUIDStableAcrossTwoSnapshots: true}
+	}
 	ok = true
 	return r
 }
