@@ -83,6 +83,31 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+// The action context already includes the CLI/parent deadline. Restore narrows
+// it again to its independently approved deadline and expiry before connecting.
+// Every individual read keeps its shorter query context; an ALTER response may
+// need longer than one read query, but never an unbounded socket wait.
+func mysqlActionReadTimeout(ctx context.Context) (time.Duration, bool) {
+	deadline, bounded := ctx.Deadline()
+	if !bounded || ctx.Err() != nil {
+		return 0, false
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0, false
+	}
+	return remaining, true
+}
+
+func restoreActionContext(ctx context.Context, a approval) (context.Context, context.CancelFunc) {
+	deadline, _ := time.Parse(time.RFC3339Nano, a.Deadline)
+	expiry, _ := time.Parse(time.RFC3339Nano, a.Expires)
+	if expiry.Before(deadline) {
+		deadline = expiry
+	}
+	return context.WithDeadline(ctx, deadline)
+}
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
 	return deliverReceipt(run(ctx, args, getenv, tool), out)
 }
@@ -127,13 +152,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "restore_approval_rejected"
 			return r
 		}
-		deadline, _ := time.Parse(time.RFC3339Nano, ap.Deadline)
-		expiry, _ := time.Parse(time.RFC3339Nano, ap.Expires)
-		if expiry.Before(deadline) {
-			deadline = expiry
-		}
 		var c context.CancelFunc
-		ctx, c = context.WithDeadline(ctx, deadline)
+		ctx, c = restoreActionContext(ctx, ap)
 		defer c()
 	}
 	dsn, e := mysql.ParseDSN(getenv("QS_M4_OBJECT_MYSQL_DSN"))
@@ -145,6 +165,15 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	dsn.ParseTime = false
 	dsn.Timeout = queryLimit
 	dsn.ReadTimeout = queryLimit
+	if a.action == "restore" {
+		var bounded bool
+		dsn.ReadTimeout, bounded = mysqlActionReadTimeout(ctx)
+		if !bounded {
+			r.Error = "mysql_connection_failed"
+			r.BudgetExceeded = ctx.Err() != nil
+			return r
+		}
+	}
 	dsn.WriteTimeout = queryLimit
 	if mysql.SetLogger(&mysql.NopLogger{}) != nil {
 		r.Error = "mysql_logging_boundary_failed"
@@ -197,12 +226,17 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Complete = true
 		r.Error = "none"
 	}()
-	d.conn, e = db.Conn(ctx)
+	connectContext, cancelConnect := context.WithTimeout(ctx, queryLimit)
+	d.conn, e = db.Conn(connectContext)
+	cancelConnect()
 	if e != nil {
 		r.Error = "mysql_connection_failed"
 		return r
 	}
-	if _, e = d.conn.ExecContext(ctx, "SET SESSION time_zone='+00:00', character_set_results='utf8mb4',sql_mode='"+sessionMode+"'"); e != nil {
+	sessionContext, cancelSession := context.WithTimeout(ctx, queryLimit)
+	_, e = d.conn.ExecContext(sessionContext, "SET SESSION time_zone='+00:00', character_set_results='utf8mb4',sql_mode='"+sessionMode+"'")
+	cancelSession()
+	if e != nil {
 		r.Error = "session_binding_failed"
 		return r
 	}
