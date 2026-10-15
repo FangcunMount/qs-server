@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+    "sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
     "verified_on": "2026-10-16"
   },
   "status_policy": {
@@ -1185,8 +1185,8 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
-        "verified_on": "2026-10-15"
+        "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -1247,6 +1247,20 @@
           "result": "passed",
           "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -1269,7 +1283,9 @@
         }
       ],
       "notes": [
-        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"5d313332a28b76149ff76258db68f1ac4336617f\",\"verified_on\":\"2026-10-15\"}"
+        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"5d313332a28b76149ff76258db68f1ac4336617f\",\"verified_on\":\"2026-10-15\"}",
+        "Prior verified binding retained unchanged as complete JSON: {\"source_sha\": \"716aa7008f4821f78abbff4a8e268e874791163b\", \"verified_on\": \"2026-10-15\"}. Current actual mainbeeee integration3961 has A204/B354/C192/config72 ordinary/race oncePASS,tagcompile-only/vet/ordinary lint/tagged changed-line lint and syntax checks. Historical b2fab24success/1designskip is not current merged-head CI/native/AI; production evidence is unchanged. Exact argv/GOMAXPROCS2/GOMEMLIMIT1GiB and per-package source inputs remain in sourceQA72d04d5bbdcb7eff7d04d81cec19190a08576bf50226fab784224629e0134881.",
+        "Review4283979852 current GraphQL comment.commit and REST commit_id bind b2fab27295a23e3beb766803ee88be9b78e95c86; REST original_commit_id separately records e8618b8929228ce12eccc03a0344253e3518fd7f. Thread remains unresolved pending current-head/sourceQA/freshCI verification. Completion or no newly added comments in automated review is not a substitute for disposition of that actual linked warning. No prior history is rewritten."
       ]
     },
     {
@@ -4508,8 +4524,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "1bea1a6013bc3a59c0bb0228e516381aeac7478e",
-        "verified_on": "2026-10-15"
+        "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -4927,6 +4943,20 @@
           "result": "matched",
           "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -4991,7 +5021,9 @@
       ],
       "notes": [
         "M4-C capture proof source d0052672a477dc6fed1b446c00462dea8843be6d has exact-byte-bound local192 ordinary/192race RUN/PASS,0FAIL/SKIP; QA5449c998424510bda916483749e615e20fbfd817c80ab041859903f3557c5052 and root81310fd791367014277866284d86784c885a0b848b27f8470f98c2f45319d3a0 preserve actual uncommitted checkout and source hashes. Trusted executor original stdout and exit0 are required before ENV, restore claim and terminal success; strict literal shape rejects aliases/nulls. Source3cbe9a26 adds a fresh owned C phase and21 exact Counter/compiledSHA CI gate plus private HOME native fixture, retaining original A47/B37 proof bodies. Syntax/compile/vet/lint are not new native execution; historical716 native21 remains its own source. Production/window/RPO/T0 remain unverified.",
-        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}"
+        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}",
+        "Prior verified binding retained unchanged as complete JSON: {\"source_sha\": \"1bea1a6013bc3a59c0bb0228e516381aeac7478e\", \"verified_on\": \"2026-10-15\"}. Current actual mainbeeee integration3961 has A204/B354/C192/config72 ordinary/race oncePASS,tagcompile-only/vet/ordinary lint/tagged changed-line lint and syntax checks. Historical b2fab24success/1designskip is not current merged-head CI/native/AI; production evidence is unchanged. Exact argv/GOMAXPROCS2/GOMEMLIMIT1GiB and per-package source inputs remain in sourceQA72d04d5bbdcb7eff7d04d81cec19190a08576bf50226fab784224629e0134881.",
+        "Review4283979852 current GraphQL comment.commit and REST commit_id bind b2fab27295a23e3beb766803ee88be9b78e95c86; REST original_commit_id separately records e8618b8929228ce12eccc03a0344253e3518fd7f. Thread remains unresolved pending current-head/sourceQA/freshCI verification. Completion or no newly added comments in automated review is not a substitute for disposition of that actual linked warning. No prior history is rewritten."
       ]
     },
     {
@@ -14744,7 +14776,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+        "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -15013,14 +15045,6 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 45",
-          "result": "matched",
-          "source_sha": "3fa468655a5d2a1a0a705d21055da46976b925bc",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "command",
           "command": "go test -count=1 -json ./scripts/oneoff/m4_mongo_historical_protection",
           "result": "passed",
@@ -15185,7 +15209,9 @@
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "C parent b2fab historical gap retained as complete original JSON, not relabelled as current verification: {\"exit_criteria\":\"Fresh finalhead must actually RUN/PASS all37 B native events with source/tree and healthy phase-specific cleanup evidence,plus fresh AI review of held-FD capture and durable journal; do not borrow948CI37 or872b local37 or promote production evidence.\",\"id\":\"M4-B-OBJECT-TOOL-REVIEW\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Capture-only held-parent FD source0fa passed128ordinary/race and localFS swap regression; fresh finalhead CI37/AI pending. Exact948 CI37 remains historical and its transient-parent P2 is not pre-resolved.\"}",
-        "C parent b2fab verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}"
+        "C parent b2fab verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
+        "C actual mainbeeee integration preserves incoming B verified binding unchanged: {\"source_sha\": \"d937a0e5542d662c55db03d4d9f2bc5315afa9ad\", \"verified_on\": \"2026-10-16\"}. Current verified3961 is a source-only recheck against the unchanged C60-minute CI with fresh C phase; A47/B37 proof bytes remain C-parent exact. Historical B native/CI/commands and production evidence retain original source. It does not qualify current merged-head native37/CI/AI.",
+        "Retired original B45-minute CI selector retained as complete original JSON, not a current C60-minute matched assertion: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}"
       ]
     }
   ],
