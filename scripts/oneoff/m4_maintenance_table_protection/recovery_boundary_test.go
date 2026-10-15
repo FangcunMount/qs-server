@@ -8,21 +8,12 @@ import (
 	"time"
 )
 
-func privateRecoveryDir(t *testing.T) string {
-	t.Helper()
-	p, e := filepath.EvalSymlinks(t.TempDir())
-	if e != nil || os.Chmod(p, 0700) != nil {
-		t.Fatal("owned private fixture directory unavailable")
-	}
-	return p
-}
-
 func recoveryInputs(t *testing.T) (material, approval, string, string, string) {
 	t.Helper()
 	m := originalMaterial()
 	now := time.Now().UTC()
 	m.CapturedAt = now.Add(-time.Minute).Format(time.RFC3339Nano)
-	dir := privateRecoveryDir(t)
+	dir := privateFixture(t)
 	m.CapturePath = filepath.Join(dir, "capture.json")
 	raw, _ := json.Marshal(m)
 	if writeExclusive(m.CapturePath, raw) != nil {
