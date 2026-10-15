@@ -82,21 +82,24 @@ func TestCaptureNeverCertifiesExpiredBudgetOrFailedFileRelease(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = parent.close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	called := false
 	r := receipt{}
-	e = finishCapture(ctx, &r, path, parent, []byte("fixed"), func(string, []byte) error { called = true; return nil })
+	e = finishCapture(ctx, &r, path, &parent, []byte("fixed"), func(*captureParentIdentity, string, []byte) error { called = true; return nil })
 	if e == nil || called || r.Complete || r.MaterialHash != "" {
 		t.Fatal("expired capture performed a write")
 	}
-	e = finishCapture(context.Background(), &r, path, parent, []byte("fixed"), func(string, []byte) error { return errors.New("private_directory_release_failed") })
+	e = finishCapture(context.Background(), &r, path, &parent, []byte("fixed"), func(*captureParentIdentity, string, []byte) error {
+		return errors.New("private_directory_release_failed")
+	})
 	if e == nil || r.Complete || r.MaterialHash != "" {
 		t.Fatal("failed fsync/release signed material")
 	}
 	ctx, cancel = context.WithCancel(context.Background())
-	e = finishCapture(ctx, &r, path, parent, []byte("fixed"), func(p string, raw []byte) error {
-		if e := writeExclusive(p, raw); e != nil {
+	e = finishCapture(ctx, &r, path, &parent, []byte("fixed"), func(original *captureParentIdentity, p string, raw []byte) error {
+		if e := writeCaptureExclusive(original, p, raw); e != nil {
 			return e
 		}
 		cancel()

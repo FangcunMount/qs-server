@@ -174,6 +174,19 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = e.Error()
 			return r
 		}
+		defer func() {
+			if e := captureDirectory.close(); e != nil {
+				if r.ReleaseError == "" {
+					r.ReleaseError = e.Error()
+				}
+				if r.Complete || r.Error == "none" {
+					r.Error = e.Error()
+				}
+				r.Complete = false
+				r.MaterialHash = ""
+				r.Counts = [2]*int64{}
+			}
+		}()
 		if s, e := privatePath(a.capture, false); e != nil || s != nil {
 			r.Error = "first_capture_exists_or_path_rejected"
 			return r
@@ -249,7 +262,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return
 		}
 		if a.action == "capture" {
-			if e := finishCapture(ctx, &r, a.capture, captureDirectory, rawMaterial, writeExclusive); e != nil {
+			if e := finishCapture(ctx, &r, a.capture, &captureDirectory, rawMaterial, writeCaptureExclusive); e != nil {
 				r.BudgetExceeded = ctx.Err() != nil
 				r.Error = e.Error()
 				return
@@ -318,53 +331,4 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	r.Counts = [2]*int64{o.Collections[0].Count, o.Collections[1].Count}
 	ok = true
 	return r
-}
-
-type captureParentIdentity struct {
-	info  os.FileInfo
-	owner uint32
-}
-
-func captureParent(path string) (captureParentIdentity, error) {
-	if e := recoveryParent(path); e != nil {
-		return captureParentIdentity{}, e
-	}
-	info, e := os.Lstat(filepath.Dir(path))
-	if e != nil || !recoveryParentAllowed(info, uint32(os.Getuid())) {
-		return captureParentIdentity{}, errors.New("recovery_private_parent_rejected")
-	}
-	return captureParentIdentity{info: info, owner: info.Sys().(*syscall.Stat_t).Uid}, nil
-}
-
-func checkCaptureParent(path string, original captureParentIdentity) error {
-	current, e := captureParent(path)
-	if e != nil {
-		return e
-	}
-	if original.info == nil || original.owner != current.owner || !os.SameFile(original.info, current.info) {
-		return errors.New("capture_parent_changed")
-	}
-	return nil
-}
-
-func finishCapture(ctx context.Context, r *receipt, path string, originalParent captureParentIdentity, raw []byte, write func(string, []byte) error) error {
-	if ctx.Err() != nil {
-		return errors.New("total_budget_exceeded")
-	}
-	if e := checkCaptureParent(path, originalParent); e != nil {
-		return e
-	}
-	if e := write(path, raw); e != nil {
-		return e
-	}
-	// The exclusive writer has fsynced and read back the original bytes. Check
-	// the same eligible parent again before certifying their material identity.
-	if e := checkCaptureParent(path, originalParent); e != nil {
-		return e
-	}
-	if ctx.Err() != nil {
-		return errors.New("total_budget_exceeded")
-	}
-	r.MaterialHash = fingerprint(raw)
-	return nil
 }
