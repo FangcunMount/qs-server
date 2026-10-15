@@ -261,7 +261,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		released := true
 		if d.gate != nil {
 			if ok {
-				if e := d.gate.require(ctx); e != nil {
+				if e := d.requireCapturedRuntimeBoundary(ctx, original); e != nil {
 					r.Error, ok = e.Error(), false
 				} else if e := verifyConsumedRecoveryInputs(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool); e != nil {
 					r.Error, ok = e.Error(), false

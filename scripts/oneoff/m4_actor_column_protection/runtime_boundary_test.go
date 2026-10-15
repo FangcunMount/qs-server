@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
 	"regexp"
 	"testing"
 
@@ -185,5 +186,36 @@ func TestAllFactsComparisonsRejectAnotherRuntimeGeneration(t *testing.T) {
 	state.Material.RuntimeBoundary.Generation++
 	if validateRecoveryState(original, state, false) == nil {
 		t.Fatal("partial restore crossed runtime generation")
+	}
+}
+
+func TestAnotherCaptureCannotConsumeAfterDatabaseRuntimeAdvance(t *testing.T) {
+	first, _, _, _, _ := recoveryInputs(t)
+	second, a, hash, path, approvalHash := recoveryInputs(t)
+	if first.CapturePath == second.CapturePath || first.Binding != second.Binding || first.RuntimeBoundary != second.RuntimeBoundary {
+		t.Fatal("two legal captures did not share a database generation")
+	}
+	db, mock := recoveryGateSQLMock(t)
+	conn, e := db.Conn(t.Context())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { _ = conn.Close() }()
+	key, _ := recoveryGateKey(second.Binding)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT IS_USED_LOCK(?)=CONNECTION_ID()")).WithArgs(key).WillReturnRows(sqlmock.NewRows([]string{"owned"}).AddRow(1))
+	record, raw := boundaryRecordFixture(t, first)
+	expectStoredRuntimeBoundary(mock, record, raw)
+	d := database{conn: conn, binding: second.Binding, gate: &recoveryGate{conn: conn, key: key, acquired: true}}
+	consumed := false
+	e = d.restore(t.Context(), second, a, second.CapturePath, hash, path, approvalHash, "", "", fixtureSource, &consumed)
+	if e == nil || e.Error() != "runtime_database_boundary_changed" || consumed {
+		t.Fatal("different capture crossed the persistent runtime boundary", e, consumed)
+	}
+	_, claim, e := recoveryPaths(second, hash, a.Operation)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e := os.Stat(claim); !os.IsNotExist(e) {
+		t.Fatal("stale capture consumed an operation")
 	}
 }

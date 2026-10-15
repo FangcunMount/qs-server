@@ -194,6 +194,16 @@ func requireRuntimeBoundary(ctx context.Context, r sqlReader, b binding, expecte
 	return nil
 }
 
+func (d database) requireCapturedRuntimeBoundary(ctx context.Context, m material) error {
+	if d.binding != m.Binding || m.Format != 2 {
+		return errors.New("runtime_database_boundary_capture_rejected")
+	}
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	return requireRuntimeBoundary(ctx, d.conn, m.Binding, m.RuntimeBoundary)
+}
+
 // A marker is encoded before any database advance, from the independently
 // frozen intent. It intentionally does not include the containing record hash.
 type runtimeMarker struct {

@@ -336,7 +336,7 @@ func rereadApprovedInputs(m material, a approval, path, hash, approvalPath, appr
 }
 
 func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash, tool string, consumed *bool) error {
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	prior, e := readRecoveryBoundary(m, a, materialHash)
@@ -363,7 +363,7 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if ctx.Err() != nil {
 		return errors.New("total_budget_exceeded")
 	}
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	if ctx.Err() != nil {
@@ -492,8 +492,16 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 }
 
 func (d *database) requireRecoveryAuthority(ctx context.Context, m material, a approval, hash, tool string) error {
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
-	return validateMutableBoundary(m, a, hash, tool)
+	// The mutable local marker/approval check is deliberately last, after the
+	// server reads. No explicit external RPC is inserted between it and a write.
+	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("total_budget_exceeded")
+	}
+	return nil
 }
