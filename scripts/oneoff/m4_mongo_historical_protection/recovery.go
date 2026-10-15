@@ -241,6 +241,11 @@ func (d *database) replayOriginalLedger(ctx context.Context, m material, before 
 	if e != nil {
 		return e
 	}
+	// The final SQL identity/ledger read can wait for its bounded RPCs. Do not
+	// commit using a marker or approval check made before that wait.
+	if e = validateMutableBoundary(m, a, materialHash, tool); e != nil {
+		return e
+	}
 	commitIssued = true
 	d.ledgerCommitIssued = true
 	// Exactly one application call; no WithTransaction, transaction rerun or
