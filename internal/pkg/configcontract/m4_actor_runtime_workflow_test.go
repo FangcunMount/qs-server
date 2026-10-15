@@ -345,9 +345,10 @@ func TestActorRuntimeGenerationProofRejectsIncompleteOrForeignEvidence(t *testin
 				t.Fatal("proof input release failed")
 			}
 			boundSource := source
-			if name == "invalid_source" {
+			switch name {
+			case "invalid_source":
 				boundSource = "unknown"
-			} else if name == "wrong_source_argument" {
+			case "wrong_source_argument":
 				boundSource = strings.Repeat("b", 40)
 			}
 			output, e := exec.Command("python3", "-c", proof, path, boundSource).CombinedOutput()

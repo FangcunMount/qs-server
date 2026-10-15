@@ -169,7 +169,7 @@ jobs:
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
     runs-on: ubuntu-latest
-    # 7 x 8m tests + 7 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 97m; ceil100.
+    # 8 x 8m tests + 8 x (2 x 45 x 2s) readiness sleeps + 20m setup/proof/cleanup = 108m; ceil110.
     timeout-minutes: 110
     services:
       mysql:
