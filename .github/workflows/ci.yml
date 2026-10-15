@@ -188,13 +188,13 @@ jobs:
           fixture_cid="$(docker run --detach --name "$fixture_name" \
             --label "qs.mongo-metadata.fixture=$fixture_owner" \
             --network "$fixture_network" --network-alias mongo \
-            --publish 127.0.0.1::27017 --memory=1g --cpus=1 \
+            --publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1 \
             --tmpfs /data/db:rw,nosuid,nodev,size=1g \
             --tmpfs /data/configdb:rw,nosuid,nodev,size=128m \
             --env MONGO_INITDB_ROOT_USERNAME=metadata_fixture \
             --env MONGO_INITDB_ROOT_PASSWORD=m4-owned-mongo-fixture \
             --entrypoint bash "$fixture_image" -c \
-            'set -Eeuo pipefail; umask 077; head -c 512 /dev/urandom | base64 > /tmp/metadata-fixture.key; chown 999:999 /tmp/metadata-fixture.key; chmod 0400 /tmp/metadata-fixture.key; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/metadata-fixture.key')"
+            'set -Eeuo pipefail; umask 077; head -c 512 /dev/urandom | base64 > /tmp/metadata-fixture.key; chown 999:999 /tmp/metadata-fixture.key; chmod 0400 /tmp/metadata-fixture.key; exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/metadata-fixture.key --wiredTigerCacheSizeGB 0.25')"
           [[ "$fixture_cid" =~ ^[0-9a-f]{64}$ ]] || exit 1
           fixture_shell='const admin=db.getSiblingDB("admin"); const auth=admin.auth(process.env.MONGO_INITDB_ROOT_USERNAME,process.env.MONGO_INITDB_ROOT_PASSWORD); if(!(auth===1||auth.ok===1))quit(1);'
           fixture_ready=false
