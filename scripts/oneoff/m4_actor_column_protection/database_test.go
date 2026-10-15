@@ -8,7 +8,57 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
+
+func TestURIReadPreferenceCannotSelectSecondary(t *testing.T) {
+	for _, query := range []string{"readPreference=secondary", "readPreference=secondaryPreferred&readPreferenceTags=region:fixture&maxStalenessSeconds=120", "readPreference=nearest", "directConnection=true"} {
+		opts := mongoReadOptions("mongodb://localhost:27017/qs_fixture?" + query)
+		if e := opts.Validate(); e != nil || opts.ReadPreference == nil || opts.ReadPreference.Mode() != readpref.PrimaryMode {
+			t.Fatal("URI escaped fixed Primary read routing", e)
+		}
+		if opts.RetryReads == nil || *opts.RetryReads || opts.RetryWrites == nil || *opts.RetryWrites || opts.Timeout == nil || *opts.Timeout != queryLimit {
+			t.Fatal("routing fix changed existing finite read/retry policy")
+		}
+	}
+}
+
+func TestHelloRequiresActualReplicaPrimary(t *testing.T) {
+	base := bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: bson.A{"b:27017", "a:27017"}}, {Key: "isWritablePrimary", Value: true}}
+	raw, _ := bson.Marshal(base)
+	hosts, e := primaryReplicaHosts(raw)
+	if e != nil || strings.Join(hosts, ",") != "a:27017,b:27017" {
+		t.Fatal("legitimate primary or stable identity order rejected", e)
+	}
+	for _, name := range []string{"secondary", "missing_role", "null_role", "numeric_role", "mongos", "wrong_set", "duplicate_host", "typed_host"} {
+		t.Run(name, func(t *testing.T) {
+			doc := append(bson.D(nil), base...)
+			switch name {
+			case "secondary":
+				doc[2].Value = false
+			case "missing_role":
+				doc = doc[:2]
+			case "null_role":
+				doc[2].Value = nil
+			case "numeric_role":
+				doc[2].Value = int32(1)
+			case "mongos":
+				doc = append(doc, bson.E{Key: "msg", Value: "isdbgrid"})
+			case "wrong_set":
+				doc[0].Value = "other"
+			case "duplicate_host":
+				doc[1].Value = bson.A{"a:27017", "a:27017"}
+			case "typed_host":
+				doc[1].Value = bson.A{int32(1)}
+			}
+			raw, _ := bson.Marshal(doc)
+			if _, e := primaryReplicaHosts(raw); e == nil {
+				t.Fatal("non-primary/unknown topology accepted")
+			}
+		})
+	}
+}
 
 func TestPrimaryKeyOrderingPreservesZeroAndUint64Max(t *testing.T) {
 	const max = "18446744073709551615"

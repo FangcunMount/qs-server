@@ -34,6 +34,38 @@ type observation struct {
 	Mongo   []byte
 }
 
+func primaryReplicaHosts(raw bson.Raw) ([]string, error) {
+	set, setOK := raw.Lookup("setName").StringValueOK()
+	primary, primaryOK := raw.Lookup("isWritablePrimary").BooleanOK()
+	message := raw.Lookup("msg")
+	if set != "rs0" || !setOK || !primaryOK || !primary || (message.Type != 0 && (message.Type != bson.TypeString || message.StringValue() != "")) {
+		return nil, errors.New("mongo_cluster_unknown")
+	}
+	a, ok := raw.Lookup("hosts").ArrayOK()
+	if !ok {
+		return nil, errors.New("mongo_cluster_unknown")
+	}
+	values, e := a.Values()
+	if e != nil || len(values) == 0 || len(values) > 32 {
+		return nil, errors.New("mongo_cluster_unknown")
+	}
+	hosts := make([]string, 0, len(values))
+	for _, value := range values {
+		host, ok := value.StringValueOK()
+		if !ok || host == "" {
+			return nil, errors.New("mongo_cluster_invalid")
+		}
+		hosts = append(hosts, host)
+	}
+	sort.Strings(hosts)
+	for i := 1; i < len(hosts); i++ {
+		if hosts[i] == hosts[i-1] {
+			return nil, errors.New("mongo_cluster_invalid")
+		}
+	}
+	return hosts, nil
+}
+
 func readLedger(ctx context.Context, r sqlReader) ([]ledgerRow, error) {
 	q, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()
@@ -96,22 +128,16 @@ func (d database) observe(ctx context.Context, r sqlReader) (out observation, er
 	}
 	out.Ledger = ledger[0]
 	q, cancel = context.WithTimeout(ctx, queryLimit)
-	var hello struct {
-		Set   string   `bson:"setName"`
-		Hosts []string `bson:"hosts"`
-	}
-	e = d.mongo.Database("admin").RunCommand(q, bson.D{{Key: "hello", Value: 1}}).Decode(&hello)
+	hello, e := d.mongo.Database("admin").RunCommand(q, bson.D{{Key: "hello", Value: 1}}).Raw()
 	cancel()
-	if e != nil || hello.Set != "rs0" || len(hello.Hosts) == 0 || len(hello.Hosts) > 32 {
+	if e != nil {
 		return out, errors.New("mongo_cluster_unknown")
 	}
-	sort.Strings(hello.Hosts)
-	for i, host := range hello.Hosts {
-		if host == "" || (i > 0 && host == hello.Hosts[i-1]) {
-			return out, errors.New("mongo_cluster_invalid")
-		}
+	hosts, e := primaryReplicaHosts(hello)
+	if e != nil {
+		return out, e
 	}
-	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: hello.Set}, {Key: "hosts", Value: hello.Hosts}}, d.binding.MongoName})
+	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: hosts}}, d.binding.MongoName})
 	out.Binding.MongoIdentity = fingerprint(raw)
 	q, cancel = context.WithTimeout(ctx, queryLimit)
 	cur, e := d.mongo.Database(d.binding.MongoName).Collection("schema_migrations").Find(q, bson.D{}, options.Find().SetLimit(2).SetBatchSize(2))

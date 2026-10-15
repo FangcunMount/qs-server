@@ -105,6 +105,13 @@ func serve(ctx context.Context, args []string, getenv func(string) string, tool 
 	}
 	return 0
 }
+
+func mongoReadOptions(uri string) *options.ClientOptions {
+	// Ping's preference is local to that probe. Override the URI for every
+	// subsequent ledger/catalog read as well; hello separately proves the role.
+	return options.Client().ApplyURI(uri).SetReadPreference(readpref.Primary()).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit).SetRetryReads(false).SetRetryWrites(false)
+}
+
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
 	r = receipt{ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Error: "arguments_invalid", ReadOnly: true}
 	a, e := parseArgs(args)
@@ -214,7 +221,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "session_binding_failed"
 		return r
 	}
-	d.mongo, e = mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit).SetRetryReads(false).SetRetryWrites(false))
+	d.mongo, e = mongo.Connect(ctx, mongoReadOptions(uri))
 	if e != nil {
 		r.Error = "mongo_connection_failed"
 		return r
