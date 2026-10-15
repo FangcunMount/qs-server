@@ -114,6 +114,31 @@ Mac 全仓普通测试的 `-race` / coverage 执行从 `3f296fb304c14c94c42b6070
 
 5910 的 CI Mongo Native job116423119691 成功，截断尾内保留完整独立53项严格计数摘要，全部各一次RUN/PASS、0 FAIL/SKIP；并非完整53项原JSONL都在尾中。实际编译/entry为merge `3878ba33e263e46ca95a225e010b76f8155d1eda`，Git双父及整tree已核与5910相同；root证明 `0ddd676f504e8b8a10bb39a6ac3689645fa7c4b71b0f14f00fd9b5c950f67d67` 保留。该单job通过不改变5910普通CI失败，也不签后续最终head CI/AI；生产材料、完整窗口与业务验收继续未完成。
 
+#### D 原 capture 成功执行证据（源码验证，当前原生与生产待验）
+
+源码 `ef43851a8b4226245e6d638c407e9833509af08d` 收紧失败捕获材料的消费资格：capture 已写入并 fsync 后，最终目录、期限或释放检查仍可能失败而留下完整诊断文件。文件存在、手工重算材料 SHA 和一份恢复批准不能将失败捕获重新认定为成功。诊断材料保留原字节，不删除、改写或重新签材料；format2、固定286迁移资源、原恢复批准/journal和首 runtime `GET_LOCK` 协议不变。
+
+四个材料消费者 `verify-target`、`restore`、`verify-restored`、`mark-first-runtime` 另外强制提供 `--capture-evidence-file` 与 `--capture-evidence-sha256`。独立可信执行器保存原 capture CLI stdout 原始字节与实际正常退出状态，并独立冻结以下六字段执行回执；保护工具不生成或自动补齐该回执，也不新增 seal 发布动作。
+
+```json
+{
+  "format_version": 1,
+  "kind": "m4_d_capture_execution",
+  "receipt_file": "/private/approved/original-capture-stdout.json",
+  "receipt_sha256": "<原 stdout 原始字节的 SHA256>",
+  "termination": "exited",
+  "exit_code": 0
+}
+```
+
+执行回执最多32KiB，原 stdout最多64KiB，二者与原材料使用三个不同的 canonical 私有绝对路径。现有 nofollow、同UID、0600、单链接、原始 SHA、限额与资源释放检查均保留；执行状态必须明确正常退出且 exit code 存在、非null、为0。原 stdout必须是 capture 的完整成功 typed receipt，action/error/材料hash、编译工具及D资源、SQL快照/EOF/全部释放标志与五历史表/八保留表的精确行数均匹配；capture不产生的审批、gate、marker及冻结声明不能被填真。仅新证明读取器比较原 JSON 与 typed DTO 的成员/值树，拒绝大小写别名、重复/未知成员、遗漏/null风险字段及零行count的null；原始字节与其SHA不经过规范化。外部 SHA 只绑定已独立封存的字节，不是签名，不能证明不可信生成方的陈述真实。
+
+证明在读取ENV前、恢复消费批准前、marker持锁内原输入复查处及成功终态均按同一固定输入回读；新增文件IO后保留原CLI总预算，不能因恢复批准的截止更晚而越过本次命令期限。`inspect/capture` 拒绝附带证明，包括显式空参数。只有success JSON但输出编码失败或原进程未正常exit0也不能通过；失败原材料加手工SHA/合法恢复批准仍在ENV前拒绝。
+
+提交前冻结字节实际通过普通297项、race297项，每项一次RUN/PASS、0FAIL/SKIP；integration仅编译、tagged vet、pinned lint2.5和格式检查通过。私有 `qs-m4-d-capture-evidence-source-v2` 的QA回执 SHA `bb2493e1ba1f731521013ecfec7b4ee71d082dcc33532492025d7fcb71bd97d2`、49输入绑定 `cfbbd3f66818f87847432a02568f8f3c85605fa5b6c82443ff798f05e838479a` 与 ef438 包字节逐项相同；保留实际执行时base/工作区信息，不把旧command的source SHA改写为新提交。原53项名单/顺序保持，但其producer已改为保存真实serve原stdout/返回码，故新源码53项与最终head CI/AI仍须独立验收。
+
+原 `a563428c4a7533aa0127d5c48e50ecd981e77748` CI已终态24 success、1设计skip，其native严格53项摘要通过；实际编译merge `5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2` 的tree与a563相同。该head的fresh复审同时指出上述真实P2（review comment4283352990），因此旧绿色CI不能替代修复后源码验收。生产继续暂停；停写、DDL、发布、完整材料/窗口、30/60分钟、RPO0及业务资格均未因此取得。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 
