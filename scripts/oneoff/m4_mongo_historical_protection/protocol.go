@@ -3,8 +3,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -20,7 +18,6 @@ const bSource = "c6ad16329863a4aed7b8003d0c351db280be22a0"
 const bResources = "60a0242e235bf696cb1e10d3c7e994f52d3ab81c17df2bc5eab195f60c90c95b"
 const bResourceFiles = 282
 const maxMaterialBytes = 4 << 20
-const queryLimit = 5 * time.Second
 
 var sourceRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -93,7 +90,6 @@ type approval struct {
 	RecoveryOwner      string `json:"recovery_owner"`
 }
 
-func fingerprint(raw []byte) string { v := sha256.Sum256(raw); return hex.EncodeToString(v[:]) }
 func nonzeroHash(s string) bool {
 	return hashRE.MatchString(s) && s != string(bytes.Repeat([]byte{'0'}, 64))
 }
