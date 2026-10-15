@@ -221,7 +221,7 @@ jobs:
           export QS_MONGO_METADATA_NATIVE_PORT
           export QS_MONGO_METADATA_NATIVE_PASSWORD=m4-owned-mongo-fixture
           make test-metadata-readiness-mongodb-native
-          # Reuse this owned replica set and the job-owned MySQL for the A-only tool.
+          # Reuse this owned replica set and the job-owned MySQL for the fixed A/B object tools.
           [[ "$OBJECT_MYSQL_PORT" =~ ^[0-9]+$ && "$OBJECT_MYSQL_PORT" != 3306 ]] || exit 1
           export QS_M4_OBJECT_NATIVE_REQUIRED=1
           export QS_M4_OBJECT_NATIVE_DISPOSABLE_ACK=owned_synthetic_dependencies_only
@@ -258,6 +258,40 @@ jobs:
                   raise SystemExit('A object native selectors did not all RUN/PASS')
           print('A object native: nine top-level and four cross-charset selectors RUN/PASS; zero SKIP')
           PY_OBJECT_PROOF
+          # B reuses the same owned pair only after the A process has exited.
+          GOMAXPROCS=2 go test -p=2 -race -tags=integration -count=1 -timeout=8m -json \
+            -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$object_source" \
+            -run='^TestM4MongoObjectNative' ./scripts/oneoff/m4_mongo_historical_protection | tee mongo-object-native.jsonl
+          python3 - mongo-object-native.jsonl <<'PY_MONGO_OBJECT_PROOF'
+          import json, sys
+          expected = {
+              'TestM4MongoObjectNativeCaptureUpgradeVerify',
+              'TestM4MongoObjectNativeRestoreMatrix',
+              'TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix0',
+              'TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix1',
+              'TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix2',
+              'TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix3',
+              'TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4',
+              'TestM4MongoObjectNativeRestoreMatrix/CleanAll4',
+              'TestM4MongoObjectNativeIndexConflictKeepsDirty',
+              'TestM4MongoObjectNativeInterruptedLedgerTransaction',
+              'TestM4MongoObjectNativeCommitResponseLossUnknown',
+              'TestM4MongoObjectNativePreclaimBoundaries',
+              'TestM4MongoObjectNativePreclaimBoundaries/FirstRuntimeMarker',
+              'TestM4MongoObjectNativePreclaimBoundaries/ChangedExternalMaterial',
+              'TestM4MongoObjectNativePreclaimBoundaries/ExpiredApproval',
+              'TestM4MongoObjectNativePreclaimBoundaries/RepeatedUse',
+              'TestM4MongoObjectNativePreclaimBoundaries/FutureSQL102',
+          }
+          events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
+          if any(event.get('Action') in ('skip', 'fail') for event in events):
+              raise SystemExit('B object native proof cannot skip or fail')
+          for action in ('run', 'pass'):
+              actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
+              if actual != expected:
+                  raise SystemExit('B object native selectors did not all RUN/PASS')
+          print('B object native: six tops and eleven required children RUN/PASS; zero SKIP')
+          PY_MONGO_OBJECT_PROOF
 
   action-audit-mysql:
     name: Action audit MySQL JSON lifecycle
