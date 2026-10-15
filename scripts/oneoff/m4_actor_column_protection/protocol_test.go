@@ -22,7 +22,7 @@ func fixtureMaterial(t *testing.T) material {
 	if e != nil {
 		t.Fatal(e)
 	}
-	m := material{Format: 1, Kind: "m4_c_actor_column_protection", ToolSource: fixtureSource, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, CapturedAt: "2026-10-15T00:00:00Z", Binding: fixtureBinding(), SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE `schema_migrations` (`version` bigint NOT NULL, `dirty` tinyint(1) NOT NULL)", Ledger: []ledgerRow{{101, false}}, MongoHead: raw}
+	m := material{Format: 1, Kind: "m4_c_actor_column_protection", ToolSource: fixtureSource, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, CapturedAt: "2026-10-15T00:00:00Z", CapturePath: "/private/approved/capture.json", Binding: fixtureBinding(), SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE `schema_migrations` (`version` bigint NOT NULL, `dirty` tinyint(1) NOT NULL)", Ledger: []ledgerRow{{101, false}}, MongoHead: raw}
 	for i, s := range scope {
 		ddl := "CREATE TABLE `" + s.table + "` (\n  `" + s.key + "` bigint unsigned NOT NULL,\n"
 		switch i {

@@ -31,6 +31,7 @@ const sessionMode = "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_Z
 
 var nameRE = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+var operationRE = regexp.MustCompile(`^[0-9]{1,20}-[0-9]{1,4}$`)
 var sourceRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
@@ -89,6 +90,7 @@ type material struct {
 	CResources     string        `json:"c_execution_resources_sha256"`
 	CResourceFiles int           `json:"c_execution_resource_files"`
 	CapturedAt     string        `json:"captured_at"`
+	CapturePath    string        `json:"first_capture_path"`
 	Binding        binding       `json:"binding"`
 	SessionZone    string        `json:"session_time_zone"`
 	SessionCharset string        `json:"session_character_set_results"`
@@ -182,6 +184,9 @@ func retainedDDL(ddl string, index int, present bool) (string, error) {
 }
 
 func validateMaterial(m material, tool string, b binding) error {
+	if !absolutePath(m.CapturePath) {
+		return errors.New("material_first_capture_path_required")
+	}
 	if m.Format != 1 || m.Kind != "m4_c_actor_column_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.CSource != cSource || m.CResources != cResources || m.CResourceFiles != cResourceFiles || m.Binding != b || !validBinding(b) || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || m.LedgerDDL == "" || len(m.LedgerDDL) > 65536 || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{101, false}) || !cleanMongo40(m.MongoHead) {
 		return errors.New("material_binding_rejected")
 	}
@@ -286,7 +291,29 @@ func privateParent(path string) (*os.File, error) {
 	}
 	return os.NewFile(uintptr(fd), filepath.Dir(path)), nil
 }
-func readPrivate(path, expected string) (raw []byte, resultErr error) {
+func absolutePath(path string) bool { return filepath.IsAbs(path) && filepath.Clean(path) == path }
+func nonzeroHash(s string) bool     { return hashRE.MatchString(s) && s != strings.Repeat("0", 64) }
+
+func readPrivate(path, expected string) ([]byte, error) {
+	return readPrivateLimit(path, expected, maxMaterialBytes)
+}
+func readPrivateLimit(path, expected string, limit int64) ([]byte, error) {
+	if !nonzeroHash(expected) {
+		return nil, errors.New("external_fingerprint_required")
+	}
+	raw, e := readOwnedPrivate(path, limit)
+	if e != nil || fingerprint(raw) != expected {
+		return nil, errors.New("private_material_fingerprint_or_release_rejected")
+	}
+	return raw, nil
+}
+
+// Only local boundary/claim state uses a bounded read without an external SHA.
+// External original materials and approvals always use readPrivate.
+func readOwnedPrivate(path string, limit int64) (raw []byte, resultErr error) {
+	if !absolutePath(path) || limit <= 0 || limit > maxMaterialBytes {
+		return nil, errors.New("private_path_or_limit_rejected")
+	}
 	parent, e := privateParent(path)
 	if e != nil {
 		return nil, e
@@ -309,16 +336,16 @@ func readPrivate(path, expected string) (raw []byte, resultErr error) {
 		}
 	}()
 	st, e := f.Stat()
-	if e != nil || !st.Mode().IsRegular() || st.Mode().Perm() != 0600 || st.Size() <= 0 || st.Size() > maxMaterialBytes {
+	if e != nil || !st.Mode().IsRegular() || st.Mode().Perm() != 0600 || st.Size() <= 0 || st.Size() > limit {
 		return nil, errors.New("private_material_shape_rejected")
 	}
 	s, ok := st.Sys().(*syscall.Stat_t)
 	if !ok || s.Uid != uint32(os.Getuid()) || s.Nlink != 1 {
 		return nil, errors.New("private_material_owner_rejected")
 	}
-	raw, e = io.ReadAll(io.LimitReader(f, maxMaterialBytes+1))
+	raw, e = io.ReadAll(io.LimitReader(f, limit+1))
 	after, statErr := f.Stat()
-	if e != nil || statErr != nil || st.Size() != after.Size() || st.ModTime() != after.ModTime() || len(raw) != int(st.Size()) || !hashRE.MatchString(expected) || fingerprint(raw) != expected {
+	if e != nil || statErr != nil || st.Size() != after.Size() || st.ModTime() != after.ModTime() || len(raw) != int(st.Size()) {
 		return nil, errors.New("private_material_fingerprint_rejected")
 	}
 	return raw, nil

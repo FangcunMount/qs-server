@@ -133,11 +133,26 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = strings.Split(e.Error(), "\n")[0]
 			return r
 		}
-		if strictDecode(raw, &original) != nil || validateMaterial(original, tool, a.binding) != nil {
+		if strictDecode(raw, &original) != nil || validateMaterial(original, tool, a.binding) != nil || original.CapturePath != a.material {
 			r.Error = "original_material_rejected"
 			return r
 		}
 		r.MaterialHash = a.materialHash
+	}
+	if a.action == "capture" {
+		if !absolutePath(a.capture) {
+			r.Error = "capture_private_path_rejected"
+			return r
+		}
+		parent, e := privateParent(a.capture)
+		if e != nil {
+			r.Error = "capture_private_parent_rejected"
+			return r
+		}
+		if parent.Close() != nil {
+			r.Error = "capture_private_parent_release_unproven"
+			return r
+		}
 	}
 	dsn, e := mysql.ParseDSN(getenv("QS_M4_C_OBJECT_MYSQL_DSN"))
 	uri := getenv("QS_M4_C_OBJECT_MONGO_URI")
@@ -246,6 +261,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		return r
 	}
 	if a.action == "capture" {
+		m.CapturePath = a.capture
 		if validateMaterial(m, tool, a.binding) != nil {
 			r.Error = "captured_material_rejected"
 			return r
