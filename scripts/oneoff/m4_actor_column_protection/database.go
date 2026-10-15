@@ -211,6 +211,10 @@ func ddl(ctx context.Context, r sqlReader, table string) (string, error) {
 	return text, nil
 }
 func columns(ctx context.Context, r sqlReader, i int, original bool) ([]column, error) {
+	return recoveryColumns(ctx, r, i, original, false)
+}
+
+func recoveryColumns(ctx context.Context, r sqlReader, i int, original, temporaryNullable bool) ([]column, error) {
 	q, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()
 	rows, e := r.QueryContext(q, "SELECT COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? ORDER BY ORDINAL_POSITION", scope[i].table)
@@ -228,7 +232,7 @@ func columns(ctx context.Context, r sqlReader, i int, original bool) ([]column, 
 		}
 		c.Nullable = nullable == "YES"
 		if c.Name == scope[i].target {
-			if present || c.Type != "json" || c.Nullable != (i == 0) {
+			if present || c.Type != "json" || c.Nullable != (i == 0 || temporaryNullable) {
 				_ = rows.Close()
 				return nil, errors.New("original_json_column_shape_rejected")
 			}

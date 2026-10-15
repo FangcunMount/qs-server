@@ -21,38 +21,39 @@ import (
 )
 
 type arguments struct {
-	action, capture, material, materialHash string
-	binding                                 binding
-	timeout                                 time.Duration
+	action, capture, material, materialHash, approval, approvalHash string
+	binding                                                         binding
+	timeout                                                         time.Duration
 }
 type receipt struct {
-	Action                    string         `json:"action"`
-	ToolSource                string         `json:"compiled_tool_source"`
-	CSource                   string         `json:"c_execution_source"`
-	CResources                string         `json:"c_execution_resources_sha256"`
-	CResourceFiles            int            `json:"c_execution_resource_files"`
-	Complete                  bool           `json:"complete"`
-	ReadOnly                  bool           `json:"database_read_only"`
-	MaterialHash              string         `json:"material_sha256,omitempty"`
-	TableCounts               map[string]int `json:"table_rows,omitempty"`
-	MandatoryEOF              bool           `json:"mandatory_empty_eof"`
-	SQLSnapshot               bool           `json:"sql_repeatable_read_snapshot"`
-	SQLConnectionClosed       bool           `json:"sql_connection_closed"`
-	SQLPoolClosed             bool           `json:"sql_pool_closed"`
-	MongoClosed               bool           `json:"mongo_closed"`
-	Error                     string         `json:"error_category"`
-	ReleaseError              string         `json:"release_error_category,omitempty"`
-	ProductionFreezeCertified bool           `json:"production_freeze_certified"`
-	CrossDatabaseAtomicRR     bool           `json:"cross_database_atomic_snapshot"`
-	BudgetExceeded            bool           `json:"total_budget_exceeded"`
-	ApprovalConsumed          bool           `json:"approval_consumed"`
+	Action                     string         `json:"action"`
+	ToolSource                 string         `json:"compiled_tool_source"`
+	CSource                    string         `json:"c_execution_source"`
+	CResources                 string         `json:"c_execution_resources_sha256"`
+	CResourceFiles             int            `json:"c_execution_resource_files"`
+	Complete                   bool           `json:"complete"`
+	ReadOnly                   bool           `json:"database_read_only"`
+	MaterialHash               string         `json:"material_sha256,omitempty"`
+	TableCounts                map[string]int `json:"table_rows,omitempty"`
+	MandatoryEOF               bool           `json:"mandatory_empty_eof"`
+	SQLSnapshot                bool           `json:"sql_repeatable_read_snapshot"`
+	SQLConnectionClosed        bool           `json:"sql_connection_closed"`
+	SQLPoolClosed              bool           `json:"sql_pool_closed"`
+	MongoClosed                bool           `json:"mongo_closed"`
+	Error                      string         `json:"error_category"`
+	ReleaseError               string         `json:"release_error_category,omitempty"`
+	ProductionFreezeCertified  bool           `json:"production_freeze_certified"`
+	CrossDatabaseAtomicRR      bool           `json:"cross_database_atomic_snapshot"`
+	BudgetExceeded             bool           `json:"total_budget_exceeded"`
+	TransactionReleaseUnproven bool           `json:"transaction_release_unproven"`
+	ApprovalConsumed           bool           `json:"approval_consumed"`
 }
 
 func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-actor-column-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target; restore unsupported")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore")
 	f.StringVar(&a.binding.SQLName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.binding.MongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.binding.SQLIdentity, "mysql-identity-sha256", "", "independent target identity")
@@ -61,29 +62,26 @@ func parseArgs(args []string) (arguments, error) {
 	f.StringVar(&a.capture, "capture-file", "", "new private first capture")
 	f.StringVar(&a.material, "material-file", "", "private original material")
 	f.StringVar(&a.materialHash, "material-sha256", "", "independently frozen original bytes hash")
+	f.StringVar(&a.approval, "approval-file", "", "independent pre-first-runtime restore approval")
+	f.StringVar(&a.approvalHash, "approval-sha256", "", "independent approval raw SHA")
 	f.DurationVar(&a.timeout, "timeout", 20*time.Minute, "finite total deadline, at most20m")
 	if f.Parse(args) != nil || f.NArg() != 0 {
 		return a, errors.New("arguments_invalid")
-	}
-	// No approval flags are accepted and no input/configuration is read for a
-	// restore request. There is no restore or migration implementation here.
-	if a.action == "restore" {
-		return a, errors.New("restore_not_implemented")
 	}
 	if !validBinding(a.binding) || a.timeout <= 0 || a.timeout > 20*time.Minute {
 		return a, errors.New("external_binding_or_deadline_required")
 	}
 	switch a.action {
 	case "inspect":
-		if a.capture != "" || a.material != "" || a.materialHash != "" {
+		if a.capture != "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("inspect_rejects_material_inputs")
 		}
 	case "capture":
-		if a.capture == "" || a.material != "" || a.materialHash != "" {
+		if a.capture == "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
 		}
-	case "verify-target":
-		if a.capture != "" || a.material == "" || !hashRE.MatchString(a.materialHash) {
+	case "verify-target", "restore":
+		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") || a.action == "restore" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
 			return a, errors.New("independently_bound_material_required")
 		}
 	default:
@@ -115,7 +113,7 @@ func mongoReadOptions(uri string) *options.ClientOptions {
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
 	r = receipt{ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Error: "arguments_invalid", ReadOnly: true}
 	a, e := parseArgs(args)
-	r.Action = a.action
+	r.Action, r.ReadOnly = a.action, a.action != "restore"
 	if e != nil {
 		r.Error = e.Error()
 		return r
@@ -127,7 +125,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	ctx, cancel := context.WithTimeout(parent, a.timeout)
 	defer cancel()
 	var original material
-	if a.action == "verify-target" {
+	var ap approval
+	if a.action == "verify-target" || a.action == "restore" {
 		raw, e := readPrivate(a.material, a.materialHash)
 		if e != nil {
 			r.Error = strings.Split(e.Error(), "\n")[0]
@@ -138,6 +137,20 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 		r.MaterialHash = a.materialHash
+	}
+	if a.action == "restore" {
+		raw, e := readPrivateLimit(a.approval, a.approvalHash, 32768)
+		if e != nil || len(raw) > 32768 || strictDecode(raw, &ap) != nil || validateApproval(ap, original, a.materialHash, tool, time.Now()) != nil {
+			r.Error = "restore_approval_rejected"
+			return r
+		}
+		if e := checkRecoveryBoundary(original, ap, a.materialHash, false); e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		var c context.CancelFunc
+		ctx, c = restoreActionContext(ctx, ap)
+		defer c()
 	}
 	if a.action == "capture" {
 		if !absolutePath(a.capture) {
@@ -162,6 +175,21 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	}
 	dsn.MultiStatements, dsn.ParseTime = false, false
 	dsn.Timeout, dsn.ReadTimeout, dsn.WriteTimeout = queryLimit, queryLimit, queryLimit
+	if a.action == "restore" {
+		left, err := actionReadTimeout(ctx)
+		if err != nil {
+			r.Error = err.Error()
+			return r
+		}
+		dsn.ReadTimeout = left
+		// Original server JSON bytes may contain four-byte UTF-8, independent
+		// of the old application connection charset. Do not parse/reencode them.
+		if dsn.Params == nil {
+			dsn.Params = map[string]string{}
+		}
+		dsn.Params["charset"] = "utf8mb4"
+		dsn.Collation = "utf8mb4_bin"
+	}
 	if mysql.SetLogger(&mysql.NopLogger{}) != nil {
 		r.Error = "mysql_logging_boundary_failed"
 		return r
@@ -192,6 +220,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			closeCancel()
 			released = released && r.MongoClosed
 		}
+		released = released && !r.TransactionReleaseUnproven
 		if !released {
 			r.ReleaseError = "owned_connection_release_unproven"
 			if ok {
@@ -246,6 +275,22 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	stop()
 	if e != nil {
 		r.Error = "mongo_primary_unavailable"
+		return r
+	}
+	if a.action == "restore" {
+		e = d.restore(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool, &r.ApprovalConsumed)
+		if e != nil {
+			r.Error = e.Error()
+			var release *transactionReleaseFailure
+			r.TransactionReleaseUnproven = errors.As(e, &release)
+			return r
+		}
+		r.SQLSnapshot, r.MandatoryEOF = true, true
+		r.TableCounts = map[string]int{}
+		for _, t := range original.Tables {
+			r.TableCounts[t.Table] = len(t.Rows)
+		}
+		ok = true
 		return r
 	}
 	version := uint64(101)

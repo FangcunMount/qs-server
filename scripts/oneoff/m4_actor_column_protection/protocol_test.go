@@ -186,16 +186,16 @@ func TestVerifyTargetPreservesFullRetainedScope(t *testing.T) {
 	}
 }
 
-func TestRestoreRejectedBeforeConfigurationOrMaterialAccess(t *testing.T) {
+func TestUnboundRestoreRejectedBeforeConfigurationOrMaterialAccess(t *testing.T) {
 	r := run(context.Background(), []string{"--action=restore", "--material-file=/unread"}, func(string) string {
 		t.Fatal("restore accessed connection configuration")
 		return ""
 	}, fixtureSource)
-	if r.Error != "restore_not_implemented" || r.Complete || r.ApprovalConsumed || r.SQLConnectionClosed || r.SQLPoolClosed || r.MongoClosed {
-		t.Fatal("unsupported restore upgraded execution or release claims")
+	if r.Error != "external_binding_or_deadline_required" || r.Complete || r.ApprovalConsumed || r.SQLConnectionClosed || r.SQLPoolClosed || r.MongoClosed {
+		t.Fatal("unbound restore upgraded execution or release claims")
 	}
 	if _, e := parseArgs([]string{"--action=restore", "--approval-file=/unread"}); e == nil {
-		t.Fatal("unimplemented approval flag accepted")
+		t.Fatal("unbound approval input accepted")
 	}
 }
 
