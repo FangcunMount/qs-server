@@ -15,6 +15,7 @@ import (
 // capture serve output and return status from the owned database invocation.
 func unitCaptureReceipt(m material, hash string) receipt {
 	r := receipt{Action: "capture", ToolSource: m.ToolSource, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, Complete: true, ReadOnly: true, MaterialHash: hash, Error: "none", SQLSnapshot: true, MandatoryEOF: true, RetainedEOF: true, SQLConnectionClosed: true, SQLPoolClosed: true, MongoClosed: true, TableCounts: map[string]int{}, RetainedCounts: map[string]int{}}
+	r.DatabaseBoundary = &m.RuntimeBoundary
 	for _, table := range m.Tables {
 		r.TableCounts[table.Table] = len(table.Rows)
 	}

@@ -148,7 +148,7 @@ func TestOriginalInsertUsesFixedColumnsAndPreservesRawParameters(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer func() { _ = conn.Close() }()
-	d := database{conn: conn}
+	d := runtimeDatabaseFixture(t, conn, m.Binding)
 	row := m.Tables[1].Rows[0]
 	q, _ := insertBatchSQL(1, 1)
 	values := make([]driver.Value, len(row.Values))
@@ -157,8 +157,11 @@ func TestOriginalInsertUsesFixedColumnsAndPreservesRawParameters(t *testing.T) {
 			values[i] = v.Bytes
 		}
 	}
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectBegin()
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(values...).WillReturnResult(sqlmock.NewResult(0, 1))
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectCommit()
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
@@ -190,10 +193,12 @@ func TestInsertAcknowledgementMarkerRefusesCommitAndRetainsRollbackFailure(t *te
 		t.Fatal(e)
 	}
 	defer func() { _ = conn.Close() }()
-	d := database{conn: conn}
+	d := runtimeDatabaseFixture(t, conn, m.Binding)
 	row := m.Tables[4].Rows[0]
 	q, _ := insertBatchSQL(4, 1)
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectBegin()
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectExec(regexp.QuoteMeta(q)).WillReturnResult(markerAfterAck{path: a.Marker})
 	mock.ExpectRollback().WillReturnError(errors.New("private rollback failure"))
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -218,12 +223,16 @@ func TestInsertCommitUnknownReturnsFailureWithoutRetry(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 	row := m.Tables[0].Rows[0]
 	query, _ := insertBatchSQL(0, 1)
+	d := runtimeDatabaseFixture(t, conn, m.Binding)
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectBegin()
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectExec(regexp.QuoteMeta(query)).WillReturnResult(sqlmock.NewResult(0, 1))
+	expectCapturedRuntimeBoundary(mock, m.Binding)
 	mock.ExpectCommit().WillReturnError(errors.New("private driver commit outcome"))
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
-	e = (database{conn: conn}).insertOriginalBatch(ctx, m, a, hash, testTool, 0, []rowProof{row})
+	e = d.insertOriginalBatch(ctx, m, a, hash, testTool, 0, []rowProof{row})
 	if e == nil || e.Error() != "original_insert_commit_outcome_unknown" || strings.Contains(e.Error(), "private") {
 		t.Fatal("unknown COMMIT was retried/promoted or raw error leaked", e)
 	}

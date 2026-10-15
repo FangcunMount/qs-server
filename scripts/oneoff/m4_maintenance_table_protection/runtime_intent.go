@@ -148,7 +148,7 @@ func rereadRuntimeInputs(v runtimeIntent, m material, a arguments, tool string, 
 // The actual CLI producer and restore contend on one server-session lock. No
 // filesystem writer outside this action is an admitted D runtime-start author.
 func (d database) markFirstRuntime(ctx context.Context, m material, v runtimeIntent, a arguments, tool string, ap *approval, r *receipt) error {
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	if e := rereadRuntimeInputs(v, m, a, tool, ap); e != nil {
@@ -179,6 +179,15 @@ func (d database) markFirstRuntime(ctx context.Context, m material, v runtimeInt
 	if ctx.Err() != nil {
 		return errors.New("runtime_marker_deadline_exhausted")
 	}
+	if e := d.advanceRuntimeBoundary(ctx, m, v, a, tool, r); e != nil {
+		return e
+	}
+	if e := rereadRuntimeInputs(v, m, a, tool, ap); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("runtime_marker_deadline_exhausted")
+	}
 	marker := struct {
 		Kind, ToolSource, DSource, Resources, Material, Intent, Mode, Gate, Created string
 		SQLVersion                                                                  uint64
@@ -195,5 +204,8 @@ func (d database) markFirstRuntime(ctx context.Context, m material, v runtimeInt
 		return errors.New("runtime_marker_readback_or_budget_unproven")
 	}
 	r.MarkerHash, r.MarkerWritten, r.MarkerWriteUnknown = fingerprint(raw), true, false
-	return nil
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
+	return requireRuntimeBoundary(ctx, d.conn, m.Binding, *r.DatabaseBoundary)
 }

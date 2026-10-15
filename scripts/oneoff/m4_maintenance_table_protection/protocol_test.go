@@ -53,7 +53,7 @@ func originalRow(i int, key []string) rowProof {
 }
 func originalMaterial() material {
 	raw, _ := bson.Marshal(bson.D{{Key: "_id", Value: "original"}, {Key: "version", Value: int64(40)}, {Key: "dirty", Value: false}})
-	m := material{Format: 2, Kind: "m4_d_maintenance_table_protection", ToolSource: testTool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), CapturePath: "/private/d/original.json", Binding: testBinding(), SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE `schema_migrations` (version bigint NOT NULL, dirty tinyint(1) NOT NULL)", Ledger: []ledgerRow{{102, false}}, MongoHead: raw}
+	m := material{Format: 3, Kind: "m4_d_maintenance_table_protection", ToolSource: testTool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), CapturePath: "/private/d/original.json", Binding: testBinding(), SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, LedgerDDL: "CREATE TABLE `schema_migrations` (version bigint NOT NULL, dirty tinyint(1) NOT NULL)", Ledger: []ledgerRow{{102, false}}, MongoHead: raw}
 	for i, s := range scope {
 		key := []string{"41"}
 		if len(s.keys) == 2 {
@@ -74,6 +74,7 @@ func originalMaterial() material {
 		raw, _ := json.Marshal(r)
 		m.Retained[i] = retainedTableProof{Table: s.name, DDL: "CREATE TABLE `" + s.name + "` (retained)", Columns: s.columns, Keys: s.keys, Rows: []retainedRowProof{r}, Pages: 2, EOF: true, EncodedRowsBytes: len(raw) + 1}
 	}
+	m.RuntimeBoundary = initialRuntimeBoundary(m.Binding)
 	return m
 }
 func cloneMaterial(m material) material {

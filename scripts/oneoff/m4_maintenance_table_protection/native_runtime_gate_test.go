@@ -45,7 +45,7 @@ func (h *maintenanceNative) runtimeArgs(mode, approvalPath, approvalHash string)
 func (h *maintenanceNative) assertRuntimeMarker(r receipt) {
 	h.t.Helper()
 	h.assertRestoreReleased(r)
-	if !r.Complete || !r.ReadOnly || !r.MarkerWritten || r.MarkerWriteUnknown || !nonzeroHash(r.MarkerHash) || !r.RuntimeGateAcquired || !r.RuntimeGateReleased || r.ApprovalConsumed {
+	if !r.Complete || r.ReadOnly || !r.MarkerWritten || r.MarkerWriteUnknown || !nonzeroHash(r.MarkerHash) || !r.RuntimeGateAcquired || !r.RuntimeGateReleased || r.ApprovalConsumed || !r.DatabaseBoundaryAdvanced || r.DatabaseBoundaryAdvanceUnknown || r.DatabaseBoundary == nil || r.DatabaseBoundary.Generation != h.original.RuntimeBoundary.Generation+1 {
 		h.t.Fatal("actual marker author did not close its held server gate", r)
 	}
 	if _, e := readPrivateLimit(derivedRuntimeMarker(h.original), r.MarkerHash, maxRuntimeIntentBytes); e != nil {

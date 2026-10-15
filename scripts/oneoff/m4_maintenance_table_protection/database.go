@@ -30,9 +30,10 @@ type database struct {
 	gate    *runtimeGate
 }
 type observation struct {
-	Binding binding
-	Ledger  ledgerRow
-	Mongo   []byte
+	Binding         binding
+	Ledger          ledgerRow
+	Mongo           []byte
+	RuntimeBoundary runtimeBoundaryObservation
 }
 
 func primaryReplicaHosts(raw bson.Raw) ([]string, error) {
@@ -133,6 +134,10 @@ func (d database) observe(ctx context.Context, r sqlReader) (out observation, er
 	}
 	raw, _ := json.Marshal([]any{"mysql_server_selected_v1", uuid, name})
 	out.Binding.SQLIdentity = fingerprint(raw)
+	out.RuntimeBoundary, e = readRuntimeBoundary(ctx, r, d.binding)
+	if e != nil {
+		return out, e
+	}
 	ledger, e := readLedger(ctx, r)
 	if e != nil {
 		return out, e
@@ -554,7 +559,7 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 			}
 		}
 	}()
-	m = material{Format: 2, Kind: "m4_d_maintenance_table_protection", ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
+	m = material{Format: 3, Kind: "m4_d_maintenance_table_protection", ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Binding: before.Binding, RuntimeBoundary: before.RuntimeBoundary.State, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
 	if e := requireLedgerShape(ctx, tx); e != nil {
 		return m, e
 	}

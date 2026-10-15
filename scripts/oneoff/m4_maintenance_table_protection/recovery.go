@@ -71,7 +71,7 @@ func (d database) recoverySnapshot(ctx context.Context, tool string) (out recove
 	if e := requireLedgerShape(ctx, tx); e != nil {
 		return out, e
 	}
-	m := material{Format: 2, Kind: "m4_d_maintenance_table_protection", ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
+	m := material{Format: 3, Kind: "m4_d_maintenance_table_protection", ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, Binding: before.Binding, RuntimeBoundary: before.RuntimeBoundary.State, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
 	m.Ledger, e = readLedger(ctx, tx)
 	if e != nil || m.Ledger[0] != before.Ledger {
 		return out, errors.New("restore_snapshot_ledger_changed")
@@ -307,6 +307,9 @@ func (d database) insertOriginalBatch(ctx context.Context, m material, a approva
 	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
 		return e
 	}
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
+		return e
+	}
 	tx, e := d.conn.BeginTx(ctx, nil)
 	if e != nil {
 		return errors.New("original_insert_begin_failed")
@@ -318,6 +321,9 @@ func (d database) insertOriginalBatch(ctx context.Context, m material, a approva
 		}
 	}()
 	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+		return e
+	}
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	q, cancel := context.WithTimeout(ctx, queryLimit)
@@ -333,6 +339,9 @@ func (d database) insertOriginalBatch(ctx context.Context, m material, a approva
 	// Includes time spent waiting for row/index locks; the original absolute
 	// deadline and marker are checked again immediately before COMMIT.
 	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+		return e
+	}
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	if tx.Commit() != nil {
@@ -375,7 +384,7 @@ func (d database) fillOriginalRows(ctx context.Context, m material, current reco
 }
 
 func (d database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash, tool string, consumed *bool) error {
-	if e := d.gate.require(ctx); e != nil {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 		return e
 	}
 	prior, e := readRecoveryBoundary(m, a, materialHash)
@@ -402,6 +411,9 @@ func (d database) restore(ctx context.Context, m material, a approval, materialP
 	if ctx.Err() != nil {
 		return errors.New("total_budget_exceeded")
 	}
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
+		return e
+	}
 	initial, missing := current.Material.Ledger[0], current.Missing
 	if prior != nil {
 		initial, missing = prior.InitialLedger, prior.InitialMissing
@@ -420,6 +432,9 @@ func (d database) restore(ctx context.Context, m material, a approval, materialP
 		}
 		if current.Missing[i] {
 			if e := validateMutableBoundary(m, a, materialHash, tool); e != nil {
+				return e
+			}
+			if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 				return e
 			}
 			if _, e := d.conn.ExecContext(ctx, statements[i]); e != nil {
@@ -454,10 +469,13 @@ func (d database) restore(ctx context.Context, m material, a approval, materialP
 	if e != nil || verifyRestored(m, final) != nil {
 		return errors.New("final_original_tables_or_ledger_unproven")
 	}
-	return nil
+	return d.requireCapturedRuntimeBoundary(ctx, m)
 }
 
 func (d database) replayLedgerLast(ctx context.Context, m material, expected ledgerRow, a approval, hash, tool string) (resultErr error) {
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
+		return e
+	}
 	before, e := d.observe(ctx, d.conn)
 	if e != nil || before.Ledger != expected || !bytes.Equal(before.Mongo, m.MongoHead) {
 		return errors.New("binding_or_ledger_changed_before_last_transaction")
@@ -482,6 +500,9 @@ func (d database) replayLedgerLast(ctx context.Context, m material, expected led
 	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
 		return e
 	}
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
+		return e
+	}
 	r, e := tx.ExecContext(ctx, "DELETE FROM schema_migrations")
 	if e != nil {
 		return errors.New("ledger_transaction_delete_failed")
@@ -491,6 +512,9 @@ func (d database) replayLedgerLast(ctx context.Context, m material, expected led
 	}
 	for _, row := range m.Ledger {
 		if e := validateMutableBoundary(m, a, hash, tool); e != nil {
+			return e
+		}
+		if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
 			return e
 		}
 		if _, e := tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", row.Version, row.Dirty); e != nil {
@@ -504,6 +528,9 @@ func (d database) replayLedgerLast(ctx context.Context, m material, expected led
 	if e := validateMutableBoundary(m, a, hash, tool); e != nil {
 		return e
 	}
+	if e := d.requireCapturedRuntimeBoundary(ctx, m); e != nil {
+		return e
+	}
 	if tx.Commit() != nil {
 		return errors.New("ledger_commit_outcome_unknown")
 	}
@@ -512,7 +539,7 @@ func (d database) replayLedgerLast(ctx context.Context, m material, expected led
 }
 
 func verifyRestored(original, current material) error {
-	if current.Format != original.Format || current.Kind != original.Kind || current.ToolSource != original.ToolSource || current.DSource != original.DSource || current.DResources != original.DResources || current.DResourceFiles != original.DResourceFiles || current.Binding != original.Binding || current.SessionZone != original.SessionZone || current.SessionCharset != original.SessionCharset || current.SessionSQLMode != original.SessionSQLMode || current.LedgerDDL != original.LedgerDDL || !reflect.DeepEqual(current.Ledger, original.Ledger) || !bytes.Equal(current.MongoHead, original.MongoHead) || !reflect.DeepEqual(current.Tables, original.Tables) || !sameRetained(current.Retained, original.Retained) {
+	if current.Format != original.Format || current.Kind != original.Kind || current.ToolSource != original.ToolSource || current.DSource != original.DSource || current.DResources != original.DResources || current.DResourceFiles != original.DResourceFiles || current.Binding != original.Binding || current.RuntimeBoundary != original.RuntimeBoundary || current.SessionZone != original.SessionZone || current.SessionCharset != original.SessionCharset || current.SessionSQLMode != original.SessionSQLMode || current.LedgerDDL != original.LedgerDDL || !reflect.DeepEqual(current.Ledger, original.Ledger) || !bytes.Equal(current.MongoHead, original.MongoHead) || !reflect.DeepEqual(current.Tables, original.Tables) || !sameRetained(current.Retained, original.Retained) {
 		return errors.New("original_restoration_proof_rejected")
 	}
 	return nil

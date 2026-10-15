@@ -28,35 +28,39 @@ type arguments struct {
 	timeout                                                         time.Duration
 }
 type receipt struct {
-	Action                     string         `json:"action"`
-	ToolSource                 string         `json:"compiled_tool_source"`
-	DSource                    string         `json:"d_execution_source"`
-	DResources                 string         `json:"d_execution_resources_sha256"`
-	DResourceFiles             int            `json:"d_execution_resource_files"`
-	Complete                   bool           `json:"complete"`
-	ReadOnly                   bool           `json:"database_read_only"`
-	MaterialHash               string         `json:"material_sha256,omitempty"`
-	TableCounts                map[string]int `json:"table_rows,omitempty"`
-	RetainedCounts             map[string]int `json:"retained_table_rows,omitempty"`
-	RetainedEOF                bool           `json:"retained_mandatory_empty_eof"`
-	MandatoryEOF               bool           `json:"mandatory_empty_eof"`
-	SQLSnapshot                bool           `json:"sql_repeatable_read_snapshot"`
-	SQLConnectionClosed        bool           `json:"sql_connection_closed"`
-	SQLPoolClosed              bool           `json:"sql_pool_closed"`
-	MongoClosed                bool           `json:"mongo_closed"`
-	Error                      string         `json:"error_category"`
-	ReleaseError               string         `json:"release_error_category,omitempty"`
-	ProductionFreezeCertified  bool           `json:"production_freeze_certified"`
-	CrossDatabaseAtomicRR      bool           `json:"cross_database_atomic_snapshot"`
-	BudgetExceeded             bool           `json:"total_budget_exceeded"`
-	TransactionReleaseUnproven bool           `json:"transaction_release_unproven"`
-	ApprovalConsumed           bool           `json:"approval_consumed"`
-	RuntimeGateAcquired        bool           `json:"runtime_gate_acquired"`
-	RuntimeGateReleased        bool           `json:"runtime_gate_released"`
-	RuntimeGateReleaseUnproven bool           `json:"runtime_gate_release_unproven"`
-	MarkerWritten              bool           `json:"runtime_marker_written"`
-	MarkerHash                 string         `json:"runtime_marker_sha256,omitempty"`
-	MarkerWriteUnknown         bool           `json:"runtime_marker_write_unknown"`
+	Action                         string                 `json:"action"`
+	ToolSource                     string                 `json:"compiled_tool_source"`
+	DSource                        string                 `json:"d_execution_source"`
+	DResources                     string                 `json:"d_execution_resources_sha256"`
+	DResourceFiles                 int                    `json:"d_execution_resource_files"`
+	Complete                       bool                   `json:"complete"`
+	ReadOnly                       bool                   `json:"database_read_only"`
+	MaterialHash                   string                 `json:"material_sha256,omitempty"`
+	TableCounts                    map[string]int         `json:"table_rows,omitempty"`
+	RetainedCounts                 map[string]int         `json:"retained_table_rows,omitempty"`
+	RetainedEOF                    bool                   `json:"retained_mandatory_empty_eof"`
+	MandatoryEOF                   bool                   `json:"mandatory_empty_eof"`
+	SQLSnapshot                    bool                   `json:"sql_repeatable_read_snapshot"`
+	SQLConnectionClosed            bool                   `json:"sql_connection_closed"`
+	SQLPoolClosed                  bool                   `json:"sql_pool_closed"`
+	MongoClosed                    bool                   `json:"mongo_closed"`
+	Error                          string                 `json:"error_category"`
+	ReleaseError                   string                 `json:"release_error_category,omitempty"`
+	ProductionFreezeCertified      bool                   `json:"production_freeze_certified"`
+	CrossDatabaseAtomicRR          bool                   `json:"cross_database_atomic_snapshot"`
+	BudgetExceeded                 bool                   `json:"total_budget_exceeded"`
+	TransactionReleaseUnproven     bool                   `json:"transaction_release_unproven"`
+	ApprovalConsumed               bool                   `json:"approval_consumed"`
+	RuntimeGateAcquired            bool                   `json:"runtime_gate_acquired"`
+	RuntimeGateReleased            bool                   `json:"runtime_gate_released"`
+	RuntimeGateReleaseUnproven     bool                   `json:"runtime_gate_release_unproven"`
+	MarkerWritten                  bool                   `json:"runtime_marker_written"`
+	MarkerHash                     string                 `json:"runtime_marker_sha256,omitempty"`
+	MarkerWriteUnknown             bool                   `json:"runtime_marker_write_unknown"`
+	DatabaseBoundary               *runtimeBoundaryState  `json:"runtime_database_boundary,omitempty"`
+	DatabaseBoundaryRecord         *runtimeBoundaryRecord `json:"runtime_database_boundary_record,omitempty"`
+	DatabaseBoundaryAdvanced       bool                   `json:"runtime_database_boundary_advanced"`
+	DatabaseBoundaryAdvanceUnknown bool                   `json:"runtime_database_boundary_advance_unknown"`
 }
 
 func parseArgs(args []string) (arguments, error) {
@@ -163,7 +167,7 @@ func configureMySQLAction(ctx context.Context, dsn *mysql.Config) bool {
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
 	r = receipt{ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, Error: "arguments_invalid", ReadOnly: true}
 	a, e := parseArgs(args)
-	r.Action, r.ReadOnly = a.action, a.action != "restore"
+	r.Action, r.ReadOnly = a.action, a.action != "restore" && a.action != "mark-first-runtime"
 	if e != nil {
 		r.Error = e.Error()
 		return r
@@ -402,6 +406,11 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	if a.action == "mark-first-runtime" {
 		if e := d.markFirstRuntime(ctx, original, intent, a, tool, intentApproval, &r); e != nil {
 			r.Error = strings.Split(e.Error(), "\n")[0]
+			var released *transactionReleaseFailure
+			if errors.As(e, &released) {
+				r.TransactionReleaseUnproven = true
+				r.ReleaseError = "transaction_release_unproven"
+			}
 			return r
 		}
 		r.SQLSnapshot, r.RetainedEOF, r.MandatoryEOF = true, true, intent.Mode != "target103"
@@ -420,6 +429,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 		r.SQLSnapshot = true
+		r.DatabaseBoundary = &original.RuntimeBoundary
 		r.MandatoryEOF, r.RetainedEOF = true, true
 		r.TableCounts, r.RetainedCounts = map[string]int{}, map[string]int{}
 		for _, t := range original.Tables {
@@ -443,6 +453,15 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.TransactionReleaseUnproven = true
 		}
 		return r
+	}
+	r.DatabaseBoundary = &m.RuntimeBoundary
+	if a.action == "inspect" {
+		current, e := readRuntimeBoundary(ctx, d.conn, a.binding)
+		if e != nil || current.State != m.RuntimeBoundary {
+			r.Error = "runtime_database_boundary_changed_during_inspection"
+			return r
+		}
+		r.DatabaseBoundaryRecord = current.Record
 	}
 	if a.action == "capture" {
 		m.CapturePath = a.capture
