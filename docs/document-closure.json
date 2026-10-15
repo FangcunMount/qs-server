@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+    "sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11393,6 +11393,14 @@
           "result": "matched",
           "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
+          "result": "matched",
+          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11430,7 +11438,9 @@
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
           "Source review3e7791b0d0664501a16b09ca5f30ff2bde70a993: only the A-only protection tool and its explicit47 required native selectors changed. This document's offline/migration/metadata modes, resources and execution semantics remain unchanged. This source/selector review does not relabel historical commands, native evidence, production refs or signoffs.",
           "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
-          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal.",
+          "Historical source94e1b7d1856de57665c96bbe807c13bcc725e8ab completed the actual owned MySQL8.0.36/MongoRS7.0.31 47RUN/PASS0FAIL/SKIP matrix (13tops/34children), native292.549s and313.652s including cleanup. Private native47-v2 receipt a255facd4e257009b3b27b458799f04f49170cb46851ddabb7b366249e85063b and JSONL8acb8e2f5dd1be4b64f3e218e8cfd84c6bb493680129576f7f54812b07caf18e retain exact source/input/binary binding. All owned resources/processes released, oldCID/image/volume identities preserved; existing nsqd restarted2710->2715, so whole prior runtime stability is false. This is historical small-fixture proof, not qualification of subsequent journal/verify-restored code, capacity, production, RPO0 or30/60minute budget.",
+          "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied."
         ]
       },
       "gaps": []
@@ -12795,7 +12805,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13289,6 +13299,14 @@
           "result": "matched",
           "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
+          "result": "matched",
+          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13303,7 +13321,9 @@
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
           "Source review3e7791b0d0664501a16b09ca5f30ff2bde70a993: only the A-only protection tool and its explicit47 required native selectors changed. This document's offline/migration/metadata modes, resources and execution semantics remain unchanged. This source/selector review does not relabel historical commands, native evidence, production refs or signoffs.",
           "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
-          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal.",
+          "Historical source94e1b7d1856de57665c96bbe807c13bcc725e8ab completed the actual owned MySQL8.0.36/MongoRS7.0.31 47RUN/PASS0FAIL/SKIP matrix (13tops/34children), native292.549s and313.652s including cleanup. Private native47-v2 receipt a255facd4e257009b3b27b458799f04f49170cb46851ddabb7b366249e85063b and JSONL8acb8e2f5dd1be4b64f3e218e8cfd84c6bb493680129576f7f54812b07caf18e retain exact source/input/binary binding. All owned resources/processes released, oldCID/image/volume identities preserved; existing nsqd restarted2710->2715, so whole prior runtime stability is false. This is historical small-fixture proof, not qualification of subsequent journal/verify-restored code, capacity, production, RPO0 or30/60minute budget.",
+          "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied."
         ]
       },
       "gaps": []
@@ -13422,7 +13442,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13711,6 +13731,14 @@
           "result": "matched",
           "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
+          "result": "matched",
+          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13741,7 +13769,9 @@
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
           "Source review3e7791b0d0664501a16b09ca5f30ff2bde70a993: only the A-only protection tool and its explicit47 required native selectors changed. This document's offline/migration/metadata modes, resources and execution semantics remain unchanged. This source/selector review does not relabel historical commands, native evidence, production refs or signoffs.",
           "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
-          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal.",
+          "Historical source94e1b7d1856de57665c96bbe807c13bcc725e8ab completed the actual owned MySQL8.0.36/MongoRS7.0.31 47RUN/PASS0FAIL/SKIP matrix (13tops/34children), native292.549s and313.652s including cleanup. Private native47-v2 receipt a255facd4e257009b3b27b458799f04f49170cb46851ddabb7b366249e85063b and JSONL8acb8e2f5dd1be4b64f3e218e8cfd84c6bb493680129576f7f54812b07caf18e retain exact source/input/binary binding. All owned resources/processes released, oldCID/image/volume identities preserved; existing nsqd restarted2710->2715, so whole prior runtime stability is false. This is historical small-fixture proof, not qualification of subsequent journal/verify-restored code, capacity, production, RPO0 or30/60minute budget.",
+          "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied."
         ]
       },
       "gaps": [
@@ -13760,7 +13790,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+        "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13867,6 +13897,29 @@
           "result": "matched",
           "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
+          "result": "matched",
+          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_sql_historical_protection",
+          "result": "passed",
+          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/main.go",
+          "selector": "case \"verify-restored\":",
+          "result": "matched",
+          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13892,7 +13945,9 @@
           "The sole owned native38 attempt on source8517c6c9485cb4f888e48f2c7f87cbedc63461f6 failed before the new COUNT/continuation tops ran:27RUN/12PASS/13FAIL/0SKIP; same owned Mongo State actually reported Exit137 and OOMKilled=true. Exact runner termination triggered independent cleanup; two containers/network/volume absent, old IDs/images/volumes preserved but runtime metadata changed. Immutable receipt00e22650917275c83c2e210184b5eedae2acb2a4c58dba7dda566a14b778102b and native JSONL3633d8cb326ba720cc9625266227e18da411f177ec18a651640a6284b64bd5f7 remain failed evidence. No capacity run, new formal tool qualification, production mutation, RPO0 or30/60min signoff follows.",
           "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
           "Fixture-only source509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f additionally requires empty ReleaseError/no transaction-release uncertainty in every negative boundary case and all three actual close flags for the two cases that open clients before rejecting operation reuse. Pre-environment rejections retain unopened semantics. Product Go/SQL and ordinary tests remain byte-identical to3e779; its95-event ordinary proof is historical/component evidence. This is a source/fixture review only; complete final47 native and capacity qualification are still pending.",
-          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal.",
+          "Historical source94e1b7d1856de57665c96bbe807c13bcc725e8ab completed the actual owned MySQL8.0.36/MongoRS7.0.31 47RUN/PASS0FAIL/SKIP matrix (13tops/34children), native292.549s and313.652s including cleanup. Private native47-v2 receipt a255facd4e257009b3b27b458799f04f49170cb46851ddabb7b366249e85063b and JSONL8acb8e2f5dd1be4b64f3e218e8cfd84c6bb493680129576f7f54812b07caf18e retain exact source/input/binary binding. All owned resources/processes released, oldCID/image/volume identities preserved; existing nsqd restarted2710->2715, so whole prior runtime stability is false. This is historical small-fixture proof, not qualification of subsequent journal/verify-restored code, capacity, production, RPO0 or30/60minute budget.",
+          "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied."
         ]
       },
       "gaps": [
