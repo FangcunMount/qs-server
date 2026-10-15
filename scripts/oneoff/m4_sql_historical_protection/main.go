@@ -122,7 +122,7 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 	return context.WithDeadline(ctx, deadline)
 }
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
-	return deliverReceipt(run(ctx, args, getenv, tool), out)
+	return deliverReceipt(run(ctx, args, getenv, tool, nil), out)
 }
 func deliverReceipt(r receipt, out io.Writer) int {
 	if json.NewEncoder(out).Encode(r) != nil || !r.Complete {
@@ -131,13 +131,9 @@ func deliverReceipt(r receipt, out io.Writer) int {
 	return 0
 }
 
-func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
-	return runWithRestoreDDLObserver(parent, args, getenv, tool, nil)
-}
-
 // The CLI always supplies nil. The observer receives only a fixed object index
 // after ExecContext has received a successful ADD acknowledgment.
-func runWithRestoreDDLObserver(parent context.Context, args []string, getenv func(string) string, tool string, afterRestoreDDL func(int)) (r receipt) {
+func run(parent context.Context, args []string, getenv func(string) string, tool string, afterRestoreDDL func(int)) (r receipt) {
 	r = receipt{ToolSource: tool, ASource: aSource, AResources: aResources, AResourceFiles: aResourceFiles, Error: "arguments_invalid"}
 	a, e := parseArgs(args)
 	r.Action = a.action

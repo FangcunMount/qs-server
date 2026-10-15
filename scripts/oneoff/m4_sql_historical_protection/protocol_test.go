@@ -255,7 +255,7 @@ func TestDefaultReadOnlyAndCredentialsNeverFlags(t *testing.T) {
 			t.Fatal("unsafe arguments accepted")
 		}
 	}
-	r := run(t.Context(), []string{"--mysql-database=qs", "--mongo-database=qs"}, func(string) string { return "mysql://secret" }, "")
+	r := run(t.Context(), []string{"--mysql-database=qs", "--mongo-database=qs"}, func(string) string { return "mysql://secret" }, "", nil)
 	if r.Complete || strings.Contains(r.Error, "secret") || r.ProductionFreezeCertified {
 		t.Fatal(r)
 	}

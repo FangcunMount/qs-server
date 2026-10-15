@@ -252,6 +252,15 @@ jobs:
               'TestM4SQLObjectNativeRestoreDDLDeadlines/pending_over_five_seconds_then_complete',
               'TestM4SQLObjectNativeRestoreDDLDeadlines/earlier_approval_deadline',
               'TestM4SQLObjectNativeRestoreDDLDeadlines/earlier_approval_expiry',
+              'TestM4SQLObjectNativeCompleteCountBudgets',
+              'TestM4SQLObjectNativeCompleteCountBudgets/pending_over_five_seconds_then_complete',
+              'TestM4SQLObjectNativeCompleteCountBudgets/earlier_action_deadline',
+              'TestM4SQLObjectNativeCompleteCountBudgets/actual_count_mismatch',
+              'TestM4SQLObjectNativeRestoreContinuation',
+              'TestM4SQLObjectNativeRestoreContinuation/dirty_after_first_add_ack',
+              'TestM4SQLObjectNativeRestoreContinuation/dirty_after_second_add_ack',
+              'TestM4SQLObjectNativeRestoreContinuation/clean_after_first_add_ack',
+              'TestM4SQLObjectNativeRestoreContinuation/clean_after_second_add_ack',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
           if any(event.get('Action') in ('skip', 'fail') for event in events):
@@ -260,7 +269,7 @@ jobs:
               actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
               if actual != expected:
                   raise SystemExit('A object native selectors did not all RUN/PASS')
-          print('A object native: ten top-level, four cross-charset and three deadline selectors RUN/PASS; zero SKIP')
+          print('A object native: twelve top-level, four cross-charset, three DDL deadline, three COUNT budget and four restore-continuation selectors RUN/PASS; zero SKIP')
           PY_OBJECT_PROOF
 
   action-audit-mysql:
