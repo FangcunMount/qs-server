@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+    "sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
     "verified_on": "2026-10-16"
   },
   "status_policy": {
@@ -4524,7 +4524,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+        "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -4587,6 +4587,22 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/testdata/original_shapes/*.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
         },
         {
           "kind": "source",
@@ -4725,6 +4741,195 @@
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "f571d36d7e755d7ae843d7e02c7c7245acf1e7b2",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_integration_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(",
+          "result": "matched",
+          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "start_owned_fixture d",
+          "result": "matched",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_recovery_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeRestorePrefixes(",
+          "result": "matched",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_boundary_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof(",
+          "result": "matched",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_gate.go",
+          "selector": "func acquireRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_intent.go",
+          "selector": "func (d database) markFirstRuntime(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeFirstRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/protocol_test.go",
+          "selector": "os.MkdirTemp(home, \"m4-d-private-\")",
+          "result": "matched",
+          "source_sha": "6f0245491547bc8bed5849e57707cb27563e93cc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/recovery_boundary_test.go",
+          "selector": "dir := privateFixture(t)",
+          "result": "matched",
+          "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
+          "selector": "func readCaptureEvidence(",
+          "result": "matched",
+          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
+          "selector": "func decodeCaptureDocument(",
+          "result": "matched",
+          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence_test.go",
+          "selector": "func TestCaptureDocumentsRequireOriginalLiteralTypedMembers(",
+          "result": "matched",
+          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func (h *maintenanceNative) connectionLossRestoreArgs(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestRuntimeConnectionLossFixtureInputReachesEnvironment(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
           "verified_on": "2026-10-15"
         },
         {
@@ -4914,14 +5119,6 @@
         },
         {
           "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 60",
-          "result": "matched",
-          "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
           "path": "scripts/oneoff/m4_actor_column_protection/protocol_test.go",
           "selector": "dir := privateRecoveryDir(t)",
           "result": "matched",
@@ -4957,6 +5154,38 @@
           "result": "passed",
           "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "timeout-minutes: 90",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
+          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/inspection.go",
+          "selector": "func readInspectionVersion(",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_boundary.go",
+          "selector": "const runtimeBoundaryTable = \"m4_d_runtime_boundary\"",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -4980,6 +5209,36 @@
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
           "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
+          "M4-D read-only tool f571d36 is source-only: inspect/capture require clean102/40 and fixed c335/286-resource scope, target verification clean103/40/all five absent. No DB native, actual production material, restore/approval/journal, global retained-fact proof, freeze, runtime, 30/60min or RPO0 qualification. Prior d253 seam and clean100 inventory remain independently scoped; exact byte/row hard caps reject overflow and are not actual-data capacity proof. Temporary tooling retires under M7 after responsibility closure; original isolated materials remain retained.",
+          "D native capture/verify qualification is independently bound to source and actual compiled1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0:13 exact RUN/PASS/0FAIL/SKIP, exit0,50.325s on owned MySQL8.0.36/Mongo7.0.31rs0, receipt f14e08c3dc669ee9986f20077d3e799e336f93a20828954e733e742d04862ed2 / JSONL573b5b84fa84b99f8a62be6196114fb5f84549eb552b20e698405b2c532a863f. Source fields/scope/shared writer/database/native are byte-bridged separately from capture-only FD changes. Two owned containers/network/process group released; oldIDs/images/volumes and selectedState/RestartCount unchanged this time. Actual rawargv stays in immutable private receipt, not represented by a fabricated normalized command. No D restore/approval/journal, production material/freeze/startup,30/60min/RPO0/business signoff is promoted. Prior verification/production entries remain historical and untouched.",
+          "M4-D final tool source e125fff48364e1a0833f8f9f96f62135c3a77310 (fixed D c335/286 resources) actually passed all46 exact native names once RUN/PASS,0FAIL/SKIP/exit0,189.105s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt cee7384789c2318dbd55a3fe7448c4a6fe5de0cd20dd921edd5b6f1f295ccc50 and JSONL dc591f3f2fab012b61e1f59abe67eef6e648adee02852565781986316e02ba91 preserve actual harness argv and128 safe action receipts. No normalized replay argv is recorded as executed. Two owned containers/network/native process group were exactly released, cleanup empty; old CID/image/volume preserved, pre-existing nsqd Restart2986->2990 means old runtime stability is not signed. Current format2 includes5 raw tables plus8 retained modern table hashes, bounded restore/first-boundary/journal and fresh readonly verify-restored. Production full materials/capacity/freeze/formal images/full runtime/30-60min/RPO/business remain unverified.",
+          "D integration merge2a4d54036af9a99269e3d93bbef26d8c976c2252 preserves actual main8c24e01992749727c1684c73f5eef719a26b4a0b and e125 native-source parents. All42 D package inputs including15 independently observed SHOW CREATE goldens remain byte-identical to actual e125 native. CI taske19d6bba3 adds a fresh D phase with exact46/actual compiled checkout/dependency source proof and a60min total job budget, retaining original A47/B37/metadata gates and8min per suite. Neither historical local native nor existing CI is renamed to this integrated or final head; fresh CI is still required. No production signoff is changed.",
+          "Complete parent verified marker retained from e125fff48364e1a0833f8f9f96f62135c3a77310: {\"source_sha\":\"1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0\",\"verified_on\":\"2026-10-15\"}",
+          "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical selector retained after exact53 replacement; complete original verification: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted.",
+          "D first full53 attempt at 69d12f82 ran only CREATE/create0 and its parent:2RUN/0PASS/2FAIL, then failfast. Actual original CREATE ACK loss correctly returned Complete=false, original_table_create_failed_or_unknown and runtime_gate_release_unproven; sql_connection_closed=false caused the newly overstrict negative fixture assertion. Original failed receipt0c3d8a1eee0d567e38ca7d1880b2e81ab1a1de951f260af34cdbb489c49d4d13/JSONL43913304eaa8546c15de462b89080b9b7d40af308ec505c2d3bea4d051ddd871 retained. Both owned databases/network and child PGID were actually released in26.475s with original IDs/images/volumes/runtime preserved. Test-only 2bc85e80858d6a907192f267cd0e547258e06e7f retains the actual local-close bool and all server-gate unknown/negative proof conditions; remaining46 inputs including all production Go unchanged. Tag compile/vet/lint and8 wire race cases passed; full53 retry has not run. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"2bc85e80858d6a907192f267cd0e547258e06e7f\",\"verified_on\":\"2026-10-15\"}",
+          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending.",
+          "Prior verified marker preserved before D native-v9/test-fixture source review: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}",
+          "D native-v9 actual compiled/source5910e1b6f57b19310cb44901a5d84fd5d58c453b passed every required53 RUN/PASS once (16tops/37children),0FAIL/SKIP,exit0,273.341s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt1c17a97ea95bc7c465fdff7469e63906e8bfb7e85d3dd7077698d90f63225967 and JSONLba98ea8dbd68a7acdd4378c8b8402091503b52af985911a8eaba11f415fc8644 were independently checked with30 artifacts by root reviewc7dd0b85c703a8da4632a050c41e0d82e8413d83da49e3b5e6f42d0b26568d15. All original46 plus FirstRuntimeGate top/six children actually ran. Owned2CID/network/process group released,old IDs/images/volumes preserved; existing nsqd autonomous Restart3118->3123 precludes global runtime stability. This qualifies fixed synthetic restoration and cooperative marker serialization only, not production materials/freeze/formal instances/windows/RPO/business. The earlier native-v8 failure and all prior proofs remain unchanged.",
+          "Mac full ordinary-race/coverage execution started at3f296fb304c14c94c42b60704f0574bb65d1454e and completed at5910 with only three existing documentation files changed; Go/workflow bytes are equal. Actual exit0,374 package PASS/28 no-test packages, no failure anchors; full log8b86e0e6c9728200cbe9c022ffc6584d144713de52c748eaa253aee8f2a071a2 and independent receipt2599847cf183c8881349bd5c8f03fa8a5f08d687112da361790ab45bd4e0d2b6 retain the Darwin platform and original command. This is not Linux CI or post-fix full-repository execution.",
+          "Exact5910 CI RunTests116423119996 failed: backend whole tail120k is truncated, while embedded go_test_failure_context is complete22174B (64 hard anchors,4windows,truncated=false). It identifies capture_parent_test.go private_directory_rejected: test privateFixture selected public Linux /tmp1777, correctly rejected by unchanged production privateParent ancestor guard. Root proof f54a5ce121309b766f4798fa4c15bac37e7d75481e88c1ca8ccb3787a2dc2f89 preserves raw backend/source bridge. Prior72f/69 CI causes remain unknown; this cause is not retroassigned.",
+          "Test-only6f0245491547bc8bed5849e57707cb27563e93cc changes only protocol_test.go: UserHomeDir/MkdirTemp(home) owned0700 leaf, immediate exact-leaf Cleanup, canonical original privateParent qualification and FD Close. One existing regression uses only local TMPDIR trap to require the canonical HOME parent; no production guard, global CI environment or skip changes. All production Go and53 selected native test bytes remain equal5910; the native compiled source remains5910. The same fixed test bytes actually passed Darwin ordinary214/race214 RUN/PASS0FAIL/SKIP and integration compile only, QA51ce23e463c930a121e2b0917b32ca0202a99203bbeb55b4c64cc9afd42ac5ef. True Linux carrier and fresh final-head CI/AI remain pending, as do production window/RPO and all existing gaps/signoffs.",
+          "Linux ordinary-v1 at6f actually202RUN/158PASS/44FAIL exposed the remaining privateRecoveryDir public TMPDIR helper; receipt34a09298d26d5294d1f765f006c7cff287c1894df2a02ec7aab729c558e21500 stays failed. Test-onlya604813588978d9cebb1aae03b74219c23041fe2 removes that duplicate helper and reuses privateFixture. Mac ordinary/race214 each PASS plus tagcompile/vet; separate fixed LinuxAMD64 UID501 network-none readonly-root carrier with private HOME and explicit public /tmp1777 actually214RUN/PASS0FAIL/SKIP,exit0,3.066s. Receipt0ce3e75d6ce81346025f31f02e938d942d89ca07d364445d2de64d6f1fc23e9d and root exact-name/24-artifact review916db166df569a88d4f7230b6ff2dc06a8ba8eaa921d47ee2e532480a26f7e23 verify exact carrier release and input/old-resource preservation. Only two ordinary-test files differ from5910, all production and53 selected native bytes remain equal. This does not qualify Linux race, final-head hosted CI/AI, database or production acceptance.",
+          "CI5910 native job116423119691 is successful. Truncated backend tail retains its complete independent exact53 counter summary with eachRUN/PASS once,0FAIL/SKIP; not all original53 JSONL events are visible. Actual compiled/entry merge3878ba33e263e46ca95a225e010b76f8155d1eda has parents8c24/5910 and its whole tree equals5910, root proof0ddd676f504e8b8a10bb39a6ac3689645fa7c4b71b0f14f00fd9b5c950f67d67. This single-job result does not change5910 ordinary CI failure or sign later-head CI/AI, production windows, RPO or business.",
+          "Prior complete verified marker retained before D original-capture execution-evidence review: {\"source_sha\":\"a604813588978d9cebb1aae03b74219c23041fe2\",\"verified_on\":\"2026-10-15\"}",
+          "D source ef43851a8b4226245e6d638c407e9833509af08d requires capture-evidence-file/raw-SHA for verify-target,restore,verify-restored,mark-first-runtime. Trusted external executor freezes original stdout plus actual normal exit0 in the six-field m4_d_capture_execution envelope; 32KiB envelope/64KiB stdout, distinct private paths, strict literal typed members and exact five/eight counts/releases/source/material binding. Reads occur before ENV,before restore claim,inside original marker locked rereads and before successful terminal receipt; new proof IO does not extend the original CLI budget. Failed material bytes remain diagnostic and cannot be revived by manual SHA plus restore approval. This is independently frozen external evidence,not a signature or a tool-generated seal. Original material2/286 resource bytes,approval/journal and GET_LOCK remain unchanged.",
+          "Actual precommit QA on frozen D bytes passed ordinary297/race297 each exact RUN/PASS once,0FAIL/SKIP,tag compilation only,tagged vet,pinned lint2.5 and format. QA bb2493e1ba1f731521013ecfec7b4ee71d082dcc33532492025d7fcb71bd97d2 and49-input binding cfbbd3f66818f87847432a02568f8f3c85605fa5b6c82443ff798f05e838479a retain actual execution base/worktree; all49 bytes independently equal ef438. Existing command/native/source records are preserved,not relabelled as this commit. Only new source selectors carry the current verified SHA.",
+          "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged.",
+          "Prior complete verified marker preserved before D native socket-loss fixture input review: {\"source_sha\":\"ef43851a8b4226245e6d638c407e9833509af08d\",\"verified_on\":\"2026-10-15\"}",
+          "Actual fed27d59b7d01449854681c2f66c7493ff39d91d native CI job116463170837 FAILED; retained truncated backend log records ConnectionLossKeepsServerGate at native_runtime_gate_test.go:272 owned upstream connection not created. Its direct run bypassed actionContext and omitted both capture evidence flags. Original raw restore receipt is not retained; independent exact-parameter noDB red separately proves original_capture_evidence_required with zero ENV reads, not a reconstructed CI receipt. The historical failure remains failed.",
+          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged.",
+          "M4-D integration retained prior verified marker without relabelling historical commands: {\"source_sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}",
+          "后续旧 push head `3e5a860639d65790026235842f6168b3422714e7` 的真实CI原生job `116475245327` 已成功；保全的截断后端尾包含完整严格摘要，固定53名各一次RUN/PASS、0FAIL/SKIP，实际编译工具仍记为 `313062a1a7e3112234577133f4084b93c06543f0`。原始后端 SHA `8815be6055bb31eafa8248016d749896722fa3cf2c10f0f55834a481dc2a3683` 与具名读取证明 `04ed9e08e24538f4cd441cae1c4e8770b50084f06a65a600e2e7d8783269044e` 保留该来源及截断界限；不是补造全量原生日志，不把旧fed27失败改签，也不移签为下述新合并头。",
+          "合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。",
+          "Previous top source_baseline retained as original JSON: {\"sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}",
           "C read-only source db7db9b9ac30b86f1d2307e7ca888e369816b293 is prepared after actual main8f08 merge273b39355. The separately retained local receipt8e461138496f7caecdc958bada28ee9679bc1f946416b1aaa15f4a2832dc9dd2 binds 12 top-level and53 total ordinary/race RUN/PASS,0FAIL/SKIP, target vet/lint/build and five unchanged source hashes. These are SQLmock/pure-protocol tests and compilation, not native database execution. Only inspect/capture clean101/40 and verify-target clean102/40 exist; restore is rejected before connection configuration/material access and no approval input is accepted or consumed. C040b/284 resources remain independent of the tool checkout. No C production material, freeze, restoration, runtime or time/RPO proof is supplied.",
           "Follow-up source744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0 restricts Mongo40 BSON to exactly nonnull _id, integer32/64 version40 and actual bool dirty=false, rejecting extra/duplicate fields. The separate local receipt45bd5852eda5c4fa128c5433dfb11a18ac68e7232149e6dfbbe21e3da2e5303d binds12 top-level/56 total ordinary race RUN/PASS,0FAIL/SKIP and target vet/lint/build. Mongo read scope remains one original document and independently bound ledger UUID before/after the SQL window; options/index are not captured or attested. No native database or production access occurred; old db7 source evidence is retained without relabelling.",
           "C source5b8cf6f517117dd739226890e899c20335dcb480 overrides URI read preference with Primary for all reads and independently requires actual typed writable rs0 hello, rejecting secondary/mongos/unknown role. The local receipt694a15b4f8e00f74b4e9846e44505c70425b66a58ba53ee61cc31cd6a0a593f0 binds14 tops/66 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and five unchanged source hashes. URI-override and topology tests are pure ordinary tests, not actual database routing. Terminal complete COUNT remains on5s child context and is pending a locally adopted, actually verified A deadline fix; full COUNT/EOF/retained proofs remain present. No C native, restore, production, SSH, Docker, push or PR was executed. Prior source/QA records remain unchanged.",
@@ -5000,7 +5259,11 @@
           "Prior complete verified marker retained before actual-main25028 C integration source review: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
           "Normal merge1bea1a6013bc3a59c0bb0228e516381aeac7478e has actual parentsadd1a979938e8d9504d95a350b98baf6ec6286e5 andmain25028c105b23b5322bdd31f623c356f519336009. All incomingA16GoSQL andwholeApackage equalmain/A602 byte-for-byte; allC20 inputs andCIwrapper/A47/B37/C21 proofs/60min equalCparent. Complete parent verification/limitations/notes retained; the original45minute selector already survives as complete JSON in existingC60 limitation rather than active against60. Latest incoming same-id A602 gap is active,complete old gap/parent verified markers retained as historical JSON. Current verified is source-review only; no historical command/native/production/signoff source changes.",
           "Actual merge-source1bea QA passed ordinary/race eachA204/C192/configcontract72 onceRUN/PASS0FAIL/SKIP,taggedcompile-only/vet,normal fullA/C lint andtaggedchanged-code lint. Private sourceQA46d04d18cdccc0525e0e51b0f5041242523543f24eab168e1fa722c8e59a93bb plus parent/file bridges retain actual source/command. This does not assert fulltagged A lint cleared historical unchanged findings,nor freshnative/hostedCI/AI/production qualification. No newDocker/DB/SSH/fullrepoGo after lane return. Production pause,T0/freeze/formalstartup/windows/RPO/business gaps remain unchanged.",
-          "Historical C989 nativejob116470356129 success retains complete21 original RUN/PASS events and exact required/matched summary in truncated120k backend tail,0FAIL/SKIP. Actual compiled81eef0b71ccaa08fc410cd278d5af1a1e45604ae parents8c24/989 andwhole tree96f89362bdd9852b1cf9d174d109f5b21cd810e3 equal989. Independent proofc28b1e3c7e1e688e125a9bb575dbd4e1169b0f01a69455f07d1c4a5d3d22778f binds only989; ordinaryCI116470356036 remains failed/firstcauseunknown. No native/CI result is reassigned to7d1,merge1bea orlater head."
+          "Historical C989 nativejob116470356129 success retains complete21 original RUN/PASS events and exact required/matched summary in truncated120k backend tail,0FAIL/SKIP. Actual compiled81eef0b71ccaa08fc410cd278d5af1a1e45604ae parents8c24/989 andwhole tree96f89362bdd9852b1cf9d174d109f5b21cd810e3 equal989. Independent proofc28b1e3c7e1e688e125a9bb575dbd4e1169b0f01a69455f07d1c4a5d3d22778f binds only989; ordinaryCI116470356036 remains failed/firstcauseunknown. No native/CI result is reassigned to7d1,merge1bea orlater head.",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(\",\"result\":\"matched\",\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged."
         ]
       },
       "gaps": [
@@ -5023,7 +5286,11 @@
         "M4-C capture proof source d0052672a477dc6fed1b446c00462dea8843be6d has exact-byte-bound local192 ordinary/192race RUN/PASS,0FAIL/SKIP; QA5449c998424510bda916483749e615e20fbfd817c80ab041859903f3557c5052 and root81310fd791367014277866284d86784c885a0b848b27f8470f98c2f45319d3a0 preserve actual uncommitted checkout and source hashes. Trusted executor original stdout and exit0 are required before ENV, restore claim and terminal success; strict literal shape rejects aliases/nulls. Source3cbe9a26 adds a fresh owned C phase and21 exact Counter/compiledSHA CI gate plus private HOME native fixture, retaining original A47/B37 proof bodies. Syntax/compile/vet/lint are not new native execution; historical716 native21 remains its own source. Production/window/RPO/T0 remain unverified.",
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}",
         "Prior verified binding retained unchanged as complete JSON: {\"source_sha\": \"1bea1a6013bc3a59c0bb0228e516381aeac7478e\", \"verified_on\": \"2026-10-15\"}. Current actual mainbeeee integration3961 has A204/B354/C192/config72 ordinary/race oncePASS,tagcompile-only/vet/ordinary lint/tagged changed-line lint and syntax checks. Historical b2fab24success/1designskip is not current merged-head CI/native/AI; production evidence is unchanged. Exact argv/GOMAXPROCS2/GOMEMLIMIT1GiB and per-package source inputs remain in sourceQA72d04d5bbdcb7eff7d04d81cec19190a08576bf50226fab784224629e0134881.",
-        "Review4283979852 current GraphQL comment.commit and REST commit_id bind b2fab27295a23e3beb766803ee88be9b78e95c86; REST original_commit_id separately records e8618b8929228ce12eccc03a0344253e3518fd7f. Thread remains unresolved pending current-head/sourceQA/freshCI verification. Completion or no newly added comments in automated review is not a substitute for disposition of that actual linked warning. No prior history is rewritten."
+        "Review4283979852 current GraphQL comment.commit and REST commit_id bind b2fab27295a23e3beb766803ee88be9b78e95c86; REST original_commit_id separately records e8618b8929228ce12eccc03a0344253e3518fd7f. Thread remains unresolved pending current-head/sourceQA/freshCI verification. Completion or no newly added comments in automated review is not a substitute for disposition of that actual linked warning. No prior history is rewritten.",
+        "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"3961a948e1d1e465e1b1bd48e9d83b45a6b982da\",\"verified_on\":\"2026-10-16\"}",
+        "Both source-baseline markers preserved before independent D/main source merge: {\"ours\":{\"sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"},\"incoming\":{\"sha\":\"3961a948e1d1e465e1b1bd48e9d83b45a6b982da\",\"verified_on\":\"2026-10-16\"}}",
+        "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
+        "Previous top source_baseline retained as complete original JSON: {\"sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}"
       ]
     },
     {
@@ -11246,8 +11513,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
-        "verified_on": "2026-10-15"
+        "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -11305,6 +11572,18 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/testdata/original_shapes/*.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go"
         }
       ],
       "verification": [
@@ -11700,6 +11979,28 @@
           "verified_on": "2026-10-15"
         },
         {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "f571d36d7e755d7ae843d7e02c7c7245acf1e7b2",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_integration_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(",
+          "result": "matched",
+          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
+          "verified_on": "2026-10-15"
+        },
+        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
@@ -11788,6 +12089,173 @@
           "verified_on": "2026-10-15"
         },
         {
+          "kind": "command",
+          "command": "go test -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "start_owned_fixture d",
+          "result": "matched",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_recovery_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeRestorePrefixes(",
+          "result": "matched",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_boundary_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof(",
+          "result": "matched",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_gate.go",
+          "selector": "func acquireRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_intent.go",
+          "selector": "func (d database) markFirstRuntime(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeFirstRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/protocol_test.go",
+          "selector": "os.MkdirTemp(home, \"m4-d-private-\")",
+          "result": "matched",
+          "source_sha": "6f0245491547bc8bed5849e57707cb27563e93cc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/recovery_boundary_test.go",
+          "selector": "dir := privateFixture(t)",
+          "result": "matched",
+          "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
+          "selector": "func readCaptureEvidence(",
+          "result": "matched",
+          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
+          "selector": "func decodeCaptureDocument(",
+          "result": "matched",
+          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence_test.go",
+          "selector": "func TestCaptureDocumentsRequireOriginalLiteralTypedMembers(",
+          "result": "matched",
+          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func (h *maintenanceNative) connectionLossRestoreArgs(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestRuntimeConnectionLossFixtureInputReachesEnvironment(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
+          "verified_on": "2026-10-15"
+        },
+        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "PY_ACTOR_OBJECT_PROOF",
@@ -11798,10 +12266,34 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 60",
+          "selector": "timeout-minutes: 90",
           "result": "matched",
-          "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
-          "verified_on": "2026-10-15"
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
+          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/inspection.go",
+          "selector": "func readInspectionVersion(",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_boundary.go",
+          "selector": "const runtimeBoundaryTable = \"m4_d_runtime_boundary\"",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -11837,6 +12329,8 @@
           "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
           "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
+          "M4-D read-only tool f571d36 is source-only: inspect/capture require clean102/40 and fixed c335/286-resource scope, target verification clean103/40/all five absent. No DB native, actual production material, restore/approval/journal, global retained-fact proof, freeze, runtime, 30/60min or RPO0 qualification. Prior d253 seam and clean100 inventory remain independently scoped; exact byte/row hard caps reject overflow and are not actual-data capacity proof. Temporary tooling retires under M7 after responsibility closure; original isolated materials remain retained.",
+          "D native capture/verify qualification is independently bound to source and actual compiled1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0:13 exact RUN/PASS/0FAIL/SKIP, exit0,50.325s on owned MySQL8.0.36/Mongo7.0.31rs0, receipt f14e08c3dc669ee9986f20077d3e799e336f93a20828954e733e742d04862ed2 / JSONL573b5b84fa84b99f8a62be6196114fb5f84549eb552b20e698405b2c532a863f. Source fields/scope/shared writer/database/native are byte-bridged separately from capture-only FD changes. Two owned containers/network/process group released; oldIDs/images/volumes and selectedState/RestartCount unchanged this time. Actual rawargv stays in immutable private receipt, not represented by a fabricated normalized command. No D restore/approval/journal, production material/freeze/startup,30/60min/RPO0/business signoff is promoted. Prior verification/production entries remain historical and untouched.",
           "Source33511c0751e14d08073e44aa1038f5a50384b011 adds only a sequential B object native gate after the existing A gate in the same owned metadata fixture job; these existing components and native evidence retain their original source/compiled SHA. Current source review rebinds this sidecar without reattributing any old command,production or signoff. B native remains unexecuted; branch base3112 does not include pending A-deadline PR372,which must be integrated after its actual merge before any release PR/fresh CI.",
           "Source review1356621084e26eaacd82cfd776a583920931a445 normally merges actual main8f08f28fe395e11c55ac119f0490f539b6b30995, including the actual A deadline fix. All incoming A tool bytes are identical; existing A/offline/metadata native selectors remain and B adds its sequential17-event gate. This current source/selector review preserves both parents complete historical verification objects and every production/signoff field. The earlier335 limitation remains historical; first B native3b failed17RUN/5PASS/12FAIL/0SKIP with owned cleanup, and corrected B native is pending. No old command/native/production result is relabelled as this merged checkout.",
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
@@ -11854,18 +12348,53 @@
           "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D final tool source e125fff48364e1a0833f8f9f96f62135c3a77310 (fixed D c335/286 resources) actually passed all46 exact native names once RUN/PASS,0FAIL/SKIP/exit0,189.105s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt cee7384789c2318dbd55a3fe7448c4a6fe5de0cd20dd921edd5b6f1f295ccc50 and JSONL dc591f3f2fab012b61e1f59abe67eef6e648adee02852565781986316e02ba91 preserve actual harness argv and128 safe action receipts. No normalized replay argv is recorded as executed. Two owned containers/network/native process group were exactly released, cleanup empty; old CID/image/volume preserved, pre-existing nsqd Restart2986->2990 means old runtime stability is not signed. Current format2 includes5 raw tables plus8 retained modern table hashes, bounded restore/first-boundary/journal and fresh readonly verify-restored. Production full materials/capacity/freeze/formal images/full runtime/30-60min/RPO/business remain unverified.",
+          "D integration merge2a4d54036af9a99269e3d93bbef26d8c976c2252 preserves actual main8c24e01992749727c1684c73f5eef719a26b4a0b and e125 native-source parents. All42 D package inputs including15 independently observed SHOW CREATE goldens remain byte-identical to actual e125 native. CI taske19d6bba3 adds a fresh D phase with exact46/actual compiled checkout/dependency source proof and a60min total job budget, retaining original A47/B37/metadata gates and8min per suite. Neither historical local native nor existing CI is renamed to this integrated or final head; fresh CI is still required. No production signoff is changed.",
+          "Complete parent verified marker retained from e125fff48364e1a0833f8f9f96f62135c3a77310: {\"source_sha\":\"1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0\",\"verified_on\":\"2026-10-15\"}",
+          "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical selector retained after exact53 replacement; complete original verification: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted.",
+          "D first full53 attempt at 69d12f82 ran only CREATE/create0 and its parent:2RUN/0PASS/2FAIL, then failfast. Actual original CREATE ACK loss correctly returned Complete=false, original_table_create_failed_or_unknown and runtime_gate_release_unproven; sql_connection_closed=false caused the newly overstrict negative fixture assertion. Original failed receipt0c3d8a1eee0d567e38ca7d1880b2e81ab1a1de951f260af34cdbb489c49d4d13/JSONL43913304eaa8546c15de462b89080b9b7d40af308ec505c2d3bea4d051ddd871 retained. Both owned databases/network and child PGID were actually released in26.475s with original IDs/images/volumes/runtime preserved. Test-only 2bc85e80858d6a907192f267cd0e547258e06e7f retains the actual local-close bool and all server-gate unknown/negative proof conditions; remaining46 inputs including all production Go unchanged. Tag compile/vet/lint and8 wire race cases passed; full53 retry has not run. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"2bc85e80858d6a907192f267cd0e547258e06e7f\",\"verified_on\":\"2026-10-15\"}",
+          "CodeReview backend CI69 job116394905219 overallFAILED, but its retained truncated tail contains actual FirstRuntimeGate top+6 children each onceRUN/PASS,0FAIL/SKIP. Root independently parsed7 events and Git-proved compiled merge5616f5bbd7eae0a853c7bd280362ef45941316fe tree8b116bbf834e8991d2f5a24c322a80baa22404cd equals69d12f82 head. This separately qualifies those7 Linux scenes at69 only, not full53, the whole job or later source. Original raw/summary are private qs-m4-d-ci69-failure-readback-v1 artifacts; full53 on the negative fixture correction remains pending.",
+          "Prior verified marker preserved before D native-v9/test-fixture source review: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}",
+          "D native-v9 actual compiled/source5910e1b6f57b19310cb44901a5d84fd5d58c453b passed every required53 RUN/PASS once (16tops/37children),0FAIL/SKIP,exit0,273.341s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt1c17a97ea95bc7c465fdff7469e63906e8bfb7e85d3dd7077698d90f63225967 and JSONLba98ea8dbd68a7acdd4378c8b8402091503b52af985911a8eaba11f415fc8644 were independently checked with30 artifacts by root reviewc7dd0b85c703a8da4632a050c41e0d82e8413d83da49e3b5e6f42d0b26568d15. All original46 plus FirstRuntimeGate top/six children actually ran. Owned2CID/network/process group released,old IDs/images/volumes preserved; existing nsqd autonomous Restart3118->3123 precludes global runtime stability. This qualifies fixed synthetic restoration and cooperative marker serialization only, not production materials/freeze/formal instances/windows/RPO/business. The earlier native-v8 failure and all prior proofs remain unchanged.",
+          "Mac full ordinary-race/coverage execution started at3f296fb304c14c94c42b60704f0574bb65d1454e and completed at5910 with only three existing documentation files changed; Go/workflow bytes are equal. Actual exit0,374 package PASS/28 no-test packages, no failure anchors; full log8b86e0e6c9728200cbe9c022ffc6584d144713de52c748eaa253aee8f2a071a2 and independent receipt2599847cf183c8881349bd5c8f03fa8a5f08d687112da361790ab45bd4e0d2b6 retain the Darwin platform and original command. This is not Linux CI or post-fix full-repository execution.",
+          "Exact5910 CI RunTests116423119996 failed: backend whole tail120k is truncated, while embedded go_test_failure_context is complete22174B (64 hard anchors,4windows,truncated=false). It identifies capture_parent_test.go private_directory_rejected: test privateFixture selected public Linux /tmp1777, correctly rejected by unchanged production privateParent ancestor guard. Root proof f54a5ce121309b766f4798fa4c15bac37e7d75481e88c1ca8ccb3787a2dc2f89 preserves raw backend/source bridge. Prior72f/69 CI causes remain unknown; this cause is not retroassigned.",
+          "Test-only6f0245491547bc8bed5849e57707cb27563e93cc changes only protocol_test.go: UserHomeDir/MkdirTemp(home) owned0700 leaf, immediate exact-leaf Cleanup, canonical original privateParent qualification and FD Close. One existing regression uses only local TMPDIR trap to require the canonical HOME parent; no production guard, global CI environment or skip changes. All production Go and53 selected native test bytes remain equal5910; the native compiled source remains5910. The same fixed test bytes actually passed Darwin ordinary214/race214 RUN/PASS0FAIL/SKIP and integration compile only, QA51ce23e463c930a121e2b0917b32ca0202a99203bbeb55b4c64cc9afd42ac5ef. True Linux carrier and fresh final-head CI/AI remain pending, as do production window/RPO and all existing gaps/signoffs.",
+          "Linux ordinary-v1 at6f actually202RUN/158PASS/44FAIL exposed the remaining privateRecoveryDir public TMPDIR helper; receipt34a09298d26d5294d1f765f006c7cff287c1894df2a02ec7aab729c558e21500 stays failed. Test-onlya604813588978d9cebb1aae03b74219c23041fe2 removes that duplicate helper and reuses privateFixture. Mac ordinary/race214 each PASS plus tagcompile/vet; separate fixed LinuxAMD64 UID501 network-none readonly-root carrier with private HOME and explicit public /tmp1777 actually214RUN/PASS0FAIL/SKIP,exit0,3.066s. Receipt0ce3e75d6ce81346025f31f02e938d942d89ca07d364445d2de64d6f1fc23e9d and root exact-name/24-artifact review916db166df569a88d4f7230b6ff2dc06a8ba8eaa921d47ee2e532480a26f7e23 verify exact carrier release and input/old-resource preservation. Only two ordinary-test files differ from5910, all production and53 selected native bytes remain equal. This does not qualify Linux race, final-head hosted CI/AI, database or production acceptance.",
+          "CI5910 native job116423119691 is successful. Truncated backend tail retains its complete independent exact53 counter summary with eachRUN/PASS once,0FAIL/SKIP; not all original53 JSONL events are visible. Actual compiled/entry merge3878ba33e263e46ca95a225e010b76f8155d1eda has parents8c24/5910 and its whole tree equals5910, root proof0ddd676f504e8b8a10bb39a6ac3689645fa7c4b71b0f14f00fd9b5c950f67d67. This single-job result does not change5910 ordinary CI failure or sign later-head CI/AI, production windows, RPO or business.",
+          "Prior complete verified marker retained before D original-capture execution-evidence review: {\"source_sha\":\"a604813588978d9cebb1aae03b74219c23041fe2\",\"verified_on\":\"2026-10-15\"}",
+          "D source ef43851a8b4226245e6d638c407e9833509af08d requires capture-evidence-file/raw-SHA for verify-target,restore,verify-restored,mark-first-runtime. Trusted external executor freezes original stdout plus actual normal exit0 in the six-field m4_d_capture_execution envelope; 32KiB envelope/64KiB stdout, distinct private paths, strict literal typed members and exact five/eight counts/releases/source/material binding. Reads occur before ENV,before restore claim,inside original marker locked rereads and before successful terminal receipt; new proof IO does not extend the original CLI budget. Failed material bytes remain diagnostic and cannot be revived by manual SHA plus restore approval. This is independently frozen external evidence,not a signature or a tool-generated seal. Original material2/286 resource bytes,approval/journal and GET_LOCK remain unchanged.",
+          "Actual precommit QA on frozen D bytes passed ordinary297/race297 each exact RUN/PASS once,0FAIL/SKIP,tag compilation only,tagged vet,pinned lint2.5 and format. QA bb2493e1ba1f731521013ecfec7b4ee71d082dcc33532492025d7fcb71bd97d2 and49-input binding cfbbd3f66818f87847432a02568f8f3c85605fa5b6c82443ff798f05e838479a retain actual execution base/worktree; all49 bytes independently equal ef438. Existing command/native/source records are preserved,not relabelled as this commit. Only new source selectors carry the current verified SHA.",
+          "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged.",
+          "Prior complete verified marker preserved before D native socket-loss fixture input review: {\"source_sha\":\"ef43851a8b4226245e6d638c407e9833509af08d\",\"verified_on\":\"2026-10-15\"}",
+          "Actual fed27d59b7d01449854681c2f66c7493ff39d91d native CI job116463170837 FAILED; retained truncated backend log records ConnectionLossKeepsServerGate at native_runtime_gate_test.go:272 owned upstream connection not created. Its direct run bypassed actionContext and omitted both capture evidence flags. Original raw restore receipt is not retained; independent exact-parameter noDB red separately proves original_capture_evidence_required with zero ENV reads, not a reconstructed CI receipt. The historical failure remains failed.",
+          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged.",
+          "M4-D integration retained prior verified marker without relabelling historical commands: {\"source_sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}",
+          "后续旧 push head `3e5a860639d65790026235842f6168b3422714e7` 的真实CI原生job `116475245327` 已成功；保全的截断后端尾包含完整严格摘要，固定53名各一次RUN/PASS、0FAIL/SKIP，实际编译工具仍记为 `313062a1a7e3112234577133f4084b93c06543f0`。原始后端 SHA `8815be6055bb31eafa8248016d749896722fa3cf2c10f0f55834a481dc2a3683` 与具名读取证明 `04ed9e08e24538f4cd441cae1c4e8770b50084f06a65a600e2e7d8783269044e` 保留该来源及截断界限；不是补造全量原生日志，不把旧fed27失败改签，也不移签为下述新合并头。",
+          "合并源码 `d4b61353b909657d056077716b51a9308d0853f0` 正常整合实际main `25028c105b23b5322bdd31f623c356f519336009`：D49份Go/SQL及固定53项/完整CI字节仍等于3e5，incomingA16份Go/SQL及README逐字等于main。两父验证/限制按原source保留；A的602成功执行证明事实保持，旧45分钟selector以完整原JSON归档，实际D工作流仍为60分钟。该合并头本地普通297/race297 RUN/PASS、0FAIL/SKIP，tag纯参数普通/race各1、integration仅编译、普通/tagged vet及pinned2.5 lint、configcontract82项通过；实际原argv、环境、49/17输入与原始日志保留在私有 `qs-m4-d-integrate-main25028-v1`，源码QA回执 SHA `a62df99a948e844fdb264fe02b858f7993dff0bd44e419ce84ae395577832ca8`。未执行本地DB/Docker/SSH、新头53或生产；新的最终head CI/AI、完整材料/冻结/正式六实例窗口、30/60分钟/RPO0与业务仍待验。",
+          "Previous top source_baseline retained as original JSON: {\"sha\":\"5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
-          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(\",\"result\":\"matched\",\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged."
         ]
       },
       "gaps": [],
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}"
+        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+        "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
+        "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied."
       ]
     },
     {
@@ -13228,8 +13757,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
-        "verified_on": "2026-10-15"
+        "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -13796,6 +14325,13 @@
           "verified_on": "2026-10-15"
         },
         {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "PY_ACTOR_OBJECT_PROOF",
@@ -13806,10 +14342,10 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 60",
+          "selector": "timeout-minutes: 90",
           "result": "matched",
-          "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
-          "verified_on": "2026-10-15"
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -13839,18 +14375,27 @@
           "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
-          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [],
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}"
+        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+        "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
+        "Previous verified marker retained as complete original JSON: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied."
       ]
     },
     {
@@ -13967,8 +14512,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
-        "verified_on": "2026-10-15"
+        "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -14330,6 +14875,13 @@
           "verified_on": "2026-10-15"
         },
         {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "PY_ACTOR_OBJECT_PROOF",
@@ -14340,10 +14892,10 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 60",
+          "selector": "timeout-minutes: 90",
           "result": "matched",
-          "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
-          "verified_on": "2026-10-15"
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -14389,11 +14941,18 @@
           "Current sourcea01d30ede0ee85e5e25b6300ace90a0b1be3690c includes independent parentguardbd468, bounded-journal910ea and read-only verify-restored tasks. Exact-package ordinary-race125RUN/PASS0FAIL/SKIP, tagged race compilation(no tests), taggedvet and changed-code lint passed (private QA581749ae0e4e22d65d5632dab141e8596e5762480859a32eea9f2f75e1456001). Existing COMMIT-loss native top now also requires fresh full original-state verification, retained drift refusal, original unknown receipt/recovery bytes unchanged and releases. Required47 native events and capacity remain pending on current source; no production/controller-start approval is implied.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
-          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -14408,7 +14967,9 @@
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}"
+        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+        "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
+        "Previous verified marker retained as complete original JSON: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied."
       ]
     },
     {
@@ -14417,8 +14978,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1bea1a6013bc3a59c0bb0228e516381aeac7478e",
-        "verified_on": "2026-10-15"
+        "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -14643,22 +15204,6 @@
         },
         {
           "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "PY_ACTOR_OBJECT_PROOF",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 60",
-          "result": "matched",
-          "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
           "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence.go",
           "selector": "func readCaptureEvidence(",
           "result": "matched",
@@ -14688,6 +15233,22 @@
           "result": "matched",
           "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "PY_ACTOR_OBJECT_PROOF",
+          "result": "matched",
+          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "timeout-minutes: 90",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -14732,20 +15293,34 @@
           "Capture-only source31b661ed457b8db307f02004f3a4313d13ecfebf holds its original preENV directory FD through relative Openat OEXCL creation/readback/inode-owner-mode-nlink checks/file+dirsync; final canonical parent/owner check and Close-success precede last context check and MaterialHash. Shared writer/journal/recovery/SQL core and288 resource files remain byte-identical to8cc (bridge5b94e6566d5685a1ed8cd5c7d8fbb043429b8eb429f3f53c08a545ee8d8da11f). Actual ordinary143 and race143 RUN/PASS0FAIL/SKIP include real transient-swap old write/readback reproduction versus held-FD canonical persistence, missing/different byte refusal, Close-context/hash and existing/symlink preservation; tagged race compilation(no native),vet and incremental lint passed, QA04d0cc149398592caacc665b5b9fc268cfe718caa41095710a7648f83bb6f557. Current exact PR-head CI47 is required/pending; no local full47/capacity repeats are claimed for this pure capture I/O task, and historical8cc proof is not relabelled. Production bundle,freeze,RPO/windows remain unsigned.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Source602710eb2f6ee383923230890c4bdb4a3bcada3a adds only externally frozen capture-execution evidence to material consumers:32KiB six-member m4_a_capture_execution envelope binds original private64KiB stdout/rawSHA, termination exited and explicit integer exit0. The typed original capture must complete with matching material/tool/A511/77e/280 identity and all original physical releases; alias/duplicate/missing/null shape, failed/unknown flags and production claims reject. Trusted external executor evidence is not a signature or a tool-issued seal. PreENV,restore preclaim and final after-release reads use the same proof. Failed post-write material remains diagnostic and cannot be revived by a hand-computed hash/approval. Original receipt/material/approval schemas,privatePath sticky rule,journal,recovery guards and historical resource bytes remain unchanged.",
+          "Exact Go/SQL component bytes in602710 match source-only QA workingSHA59b371111aa964fb3166100d77810a2b2e36b0873cc1eae7236d4ce56f63aeaf. Ordinary204 and race204 RUN/PASS0FAIL/SKIP,tagged compile-only(no native run),taggedvet,normal lint and tagged changed-code lint passed with GOMAXPROCS2/GOMEMLIMIT1GiB;source-review receiptb608b55cdc8bf61afa4f6d5705fa6a112da4675fe14cbdd09f2537f4435a28ed and original QA logs remain in private capture-execution-evidence-source-v1/wire-shape-v2. Full tagged lint retains the original unchanged QF1003 and is not signed all-green. Native fixture now freezes actual serve stdout/return status only after successful capture; original13tops/34children47selectors and assertions remain. New-source/final-head native47,freshCI/AI,newformalbinary/controller,production restore/fullwindow/RPO/30/60minute qualification remain pending. Prior190 QA and all historical native/capacity/production/signoff objects retain their original sources.",
+          "M4-D merge retained D parent3e5 verification as complete original JSON (historical, not re-executed): {\"command\":\"make docs-check\",\"kind\":\"command\",\"result\":\"passed\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D merge retained original verified from D parent3e5 (incoming602 qualification remains active): {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D merge retained original gaps from D parent3e5 (incoming602 qualification remains active): [{\"exit_criteria\":\"Bind approved exact A execution/tool/images, original clean10039 identities, T0 allNULL proof and private materials, six-instanceAPI1/Collection2/Worker3 freeze and startup marker, independently rehearsed scoped restore and startup reserve before separately authorized production mutation.\",\"id\":\"M4-A-OBJECT-PROTECTION-PRODUCTION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Actual T0 protection, independently approved six-instance writer freeze and production-scale deadline remain unproved.\"},{\"exit_criteria\":\"Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff.\",\"id\":\"M4-A-CURRENT-TOOL-QUALIFICATION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.\"}]",
+          "M4-D integration retained prior verified marker without relabelling historical commands: {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
+          "M4-D integration preserved incoming A historical timeout selector as complete original JSON; D workflow60min remains active, not reverified45min: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Read-only source review on merged4b61353b909657d056077716b51a9308d0853f0 retains all incoming A602 proof Go/SQL bytes, exact16GoSQL/main25028 source bridge and original204/native/capacity/production records. D49 bytes and entire CI remain original3e5, including native53 and hard-anchor ordinary failure wrapper; incoming timeout45 historical selector is explicitly archived, current60min selector matched. No A or D local native run/production status is promoted; fresh final-head CI/AI remain required.",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
           "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
-          "Source602710eb2f6ee383923230890c4bdb4a3bcada3a adds only externally frozen capture-execution evidence to material consumers:32KiB six-member m4_a_capture_execution envelope binds original private64KiB stdout/rawSHA, termination exited and explicit integer exit0. The typed original capture must complete with matching material/tool/A511/77e/280 identity and all original physical releases; alias/duplicate/missing/null shape, failed/unknown flags and production claims reject. Trusted external executor evidence is not a signature or a tool-issued seal. PreENV,restore preclaim and final after-release reads use the same proof. Failed post-write material remains diagnostic and cannot be revived by a hand-computed hash/approval. Original receipt/material/approval schemas,privatePath sticky rule,journal,recovery guards and historical resource bytes remain unchanged.",
-          "Exact Go/SQL component bytes in602710 match source-only QA workingSHA59b371111aa964fb3166100d77810a2b2e36b0873cc1eae7236d4ce56f63aeaf. Ordinary204 and race204 RUN/PASS0FAIL/SKIP,tagged compile-only(no native run),taggedvet,normal lint and tagged changed-code lint passed with GOMAXPROCS2/GOMEMLIMIT1GiB;source-review receiptb608b55cdc8bf61afa4f6d5705fa6a112da4675fe14cbdd09f2537f4435a28ed and original QA logs remain in private capture-execution-evidence-source-v1/wire-shape-v2. Full tagged lint retains the original unchanged QF1003 and is not signed all-green. Native fixture now freezes actual serve stdout/return status only after successful capture; original13tops/34children47selectors and assertions remain. New-source/final-head native47,freshCI/AI,newformalbinary/controller,production restore/fullwindow/RPO/30/60minute qualification remain pending. Prior190 QA and all historical native/capacity/production/signoff objects retain their original sources.",
           "Historical complete pre-A602 gap retained from C parent; current active same-id gap follows incoming A602 source: {\"id\":\"M4-A-CURRENT-TOOL-QUALIFICATION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.\",\"exit_criteria\":\"Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff.\"}",
           "Complete parent verified marker retained during normal C/main merge (C parent add1a979938e8d9504d95a350b98baf6ec6286e5): {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
           "Complete parent verified marker retained during normal C/main merge (actual main parent 25028c105b23b5322bdd31f623c356f519336009): {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
           "Normal merge preserves incoming A602 exact Go/SQL and its complete source/QA limitations together with C60/native21 and ordinary-wrapper source-review history. All original command/native/production/signoff objects keep their source. Active45-minute selector had already been retained as complete original JSON in the existing C60 limitation; it is not reactivated against current60-minute CI. This merge alone grants no new native,hostedCI,production window,RPO orbusiness qualification; postmerge source-review binding follows separately.",
           "Prior complete verified marker retained before actual-main25028 C integration source review: {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
           "Normal merge1bea1a6013bc3a59c0bb0228e516381aeac7478e has actual parentsadd1a979938e8d9504d95a350b98baf6ec6286e5 andmain25028c105b23b5322bdd31f623c356f519336009. All incomingA16GoSQL andwholeApackage equalmain/A602 byte-for-byte; allC20 inputs andCIwrapper/A47/B37/C21 proofs/60min equalCparent. Complete parent verification/limitations/notes retained; the original45minute selector already survives as complete JSON in existingC60 limitation rather than active against60. Latest incoming same-id A602 gap is active,complete old gap/parent verified markers retained as historical JSON. Current verified is source-review only; no historical command/native/production/signoff source changes.",
-          "Actual merge-source1bea QA passed ordinary/race eachA204/C192/configcontract72 onceRUN/PASS0FAIL/SKIP,taggedcompile-only/vet,normal fullA/C lint andtaggedchanged-code lint. Private sourceQA46d04d18cdccc0525e0e51b0f5041242523543f24eab168e1fa722c8e59a93bb plus parent/file bridges retain actual source/command. This does not assert fulltagged A lint cleared historical unchanged findings,nor freshnative/hostedCI/AI/production qualification. No newDocker/DB/SSH/fullrepoGo after lane return. Production pause,T0/freeze/formalstartup/windows/RPO/business gaps remain unchanged."
+          "Actual merge-source1bea QA passed ordinary/race eachA204/C192/configcontract72 onceRUN/PASS0FAIL/SKIP,taggedcompile-only/vet,normal fullA/C lint andtaggedchanged-code lint. Private sourceQA46d04d18cdccc0525e0e51b0f5041242523543f24eab168e1fa722c8e59a93bb plus parent/file bridges retain actual source/command. This does not assert fulltagged A lint cleared historical unchanged findings,nor freshnative/hostedCI/AI/production qualification. No newDocker/DB/SSH/fullrepoGo after lane return. Production pause,T0/freeze/formalstartup/windows/RPO/business gaps remain unchanged.",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -14767,7 +15342,9 @@
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}"
+        "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
+        "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"1bea1a6013bc3a59c0bb0228e516381aeac7478e\",\"verified_on\":\"2026-10-15\"}",
+        "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied."
       ]
     },
     {
@@ -14776,7 +15353,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
+        "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -15029,19 +15606,18 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "PY_ACTOR_OBJECT_PROOF",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
           "verified_on": "2026-10-15"
         },
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 60",
+          "selector": "PY_ACTOR_OBJECT_PROOF",
           "result": "matched",
-          "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
+          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
           "verified_on": "2026-10-15"
         },
         {
@@ -15139,6 +15715,14 @@
           "result": "matched",
           "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "timeout-minutes: 90",
+          "result": "matched",
+          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -15179,6 +15763,12 @@
           "Capture-only0fa holds original qualified parentFD preENV through Openat/OEXCL/NOFOLLOW,relative originalbyte readback,file+dirfsync,canonicalSameFile/ownerchecks,successfulFDclose and finalctx before MaterialHash. RealFS swap-away/write/swap-back reproduces old absolutewriter misplacedmaterial while newFDwriter retains canonicalbytes; existingfile/symlink,owner/qualification/close/budget negatives pass. Actual128ordinary/128race RUN/PASS0FAIL/SKIP,tagcompile37only,tagvet/lint0 on948 plus pending4files later committed unchanged0fa; QAfb2278f6c4a256923290276b2d63d2fe27f7bbf628dcda496997319fb5ef75bf/deliveryd12a93277d2dcecadf1f430eb01b8d1558086225662ead0bfca50361127fd04e bind fullbytes. Sharedprivate/journal/recovery/database/protocol/CI unchanged. NoDocker/DB/production/newnative37 executed; finalheadCI37/freshAI stillrequired; oldP2thread notpre-resolved.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"6186df273482c5c3fd3e802fd0659d867c639c3f\",\"verified_on\":\"2026-10-15\"}",
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified.",
+          "Ordinary CI69 head failed and the retained bounded summary matched283 passing logger/test .go lines before the actual failure; first cause remains unknown. CI source 3f296fb304c14c94c42b60704f0574bb65d1454e prioritizes real hard-failure anchors and uses only strict line-start compiler diagnostics as fallback; actual10 shell scenarios passed, original command/flags/exits/full failure artifact/native53 remain unchanged. Prior verified marker: {\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker preserved before C native-job scheduling-budget review: {\"source_sha\":\"3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e\",\"verified_on\":\"2026-10-15\"}",
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
@@ -15187,7 +15777,8 @@
           "Source88bcefa7069f4430f0cfcda8a50c6c3e130b0092 requires an independently frozen trusted-executor six-field m4_b_capture_execution envelope (32KiB) and original capture stdout (64KiB), both private raw-SHA-bound files. Explicit exited/exit0 and typed capture completion, material/tool/B scope, SQL101/Mongo39 identity, exact counts, cursor/resource releases and absence of unknown/write/production-freeze claims must match. Strict proof JSON rejects duplicate/unknown/case-alias/missing/null members. Inspect/capture reject proof flags even when explicitly empty; all three material consumers check before ENV and reread at preclaim/terminal original input boundaries, retaining original action/approval deadlines. The tool never creates or repairs evidence; SHA is byte binding under independent executor/approval trust, not a signature. Failed material bytes remain retained and cannot be revived with manual hash or a new otherwise valid approval. Original material/hash/approval/journal/unknown semantics are unchanged.",
           "Final88bcefa7 Go bytes actually passed299 ordinary and299 race RUN/PASS0FAIL/SKIP plus integration compile-only, tagged vet, tagged lint0, format/diff. QA08bc82c5ddda147b7c8e6fabf2eda146f0148ba0512ba5c7bb85f672c05bc6e7 in qs-m4-b-capture-execution-evidence-source-v1/native-original-stdout-qa/receipt.json binds actual argv/logs/all25 Go inputs across source commit. Native capture now freezes original actual serve stdout and its returned exit, while every other action retains the original run/observer. Earlier reencoded native producer qualification was withdrawn; old284/286/299 QA and explicit-empty-flag red logs remain bound to their original bytes. Original37 native names/order/assertions remain; the new actual-serve producer was only compiled, and new-head real37/freshCI/AI are not yet executed or accepted. Historical native/CI evidence retains original source; no production, window/RPO, business or signoff promotion. These exact argv ran with GOMAXPROCS=2 and GOMEMLIMIT=1GiB supplied in the process environment; environment assignments are not executable argv entries. The immutable QA receipt retains exact compile-only/vet/lint argv and results; machine-verifiable sidecar command records list the ordinary/race commands without normalizing or inventing different commands.",
           "Previous B verified binding retained unchanged: {\"source_sha\": \"88bcefa7069f4430f0cfcda8a50c6c3e130b0092\", \"verified_on\": \"2026-10-15\"}. Fresh ef15 review4284410220 found Go fixed-array decoding silently discarding surplus originalstdout counts. Source7de60377a requires original exact_fixed_collection_counts rawJSON array length2 before existing strict typed decoding/validation; original material/approval decoders, all37 native names/producer, resources/DDL and original action deadlines are unchanged. Actual red7RUN/1PASS/5failedchildren(+parentfailure) retained, then306ordinary/306race RUN/PASS0FAIL/SKIP and taggedcompile-only/vet/lint0 passed on the exact bytes committed as7de. QA9415bbeae266ffcc399a044ca5fa48f9a0ccf485fe062444cbd28d0346a99fad retains raw logs/actualargv/environment and25GoSHA. Prior e9/ef15 CI/native and review remain historical; new finalheadCI/native37/freshAI are pending. No production/freeze/window/RPO/business/signoff promotion.",
-          "Previous B verified binding retained unchanged: {\"source_sha\": \"7de60377a59c6c4ac2e6e783b0d3f9699499071e\", \"verified_on\": \"2026-10-15\"}. Fresh8bf review4284625167 found explicit empty release_error_category accepted though original successful receipt omits it. Source2143511ee6eec13da5afb96f3c91c5dfba023ed9 restricts successful capture stdout to existing required fields only: any release_error_category/restored_verification presence rejects; both decoders now need no optional-member parameter/branch. Original10case red11RUN/9PASS/2FAIL(parent+empty_release) retained, then18target/317ordinary/317race oncePASS0FAIL/SKIP,tagcompile-only/vet/pinned2.5lint/diff passed. QAb208fbe6ace23bf6ca2c62e55758394662e4738339b59a0d823bf2e0ee3b1a9a and commiteede06e1b7be91a74ab5cd843081fb2aab50b787946715285a17aee36455c098 bind actualbytes/argv. Native files,workflow,material/approval/count/deadline semantics are byte-identical8bf. Old8bf CI had12 explicit DockerHub rate-limit failures before target tests/builds; full backend12job diagnostics retained privately, no failure called a pass. New finalhead native37/CI/AI remain pending; no production/window/RPO/business promotion. Exact actual argv used GOMAXPROCS=2/GOMEMLIMIT=1GiB in the process environment; no -p=2 flag was executed for source214. Machine command entries match the immutable QA argv."
+          "Previous B verified binding retained unchanged: {\"source_sha\": \"7de60377a59c6c4ac2e6e783b0d3f9699499071e\", \"verified_on\": \"2026-10-15\"}. Fresh8bf review4284625167 found explicit empty release_error_category accepted though original successful receipt omits it. Source2143511ee6eec13da5afb96f3c91c5dfba023ed9 restricts successful capture stdout to existing required fields only: any release_error_category/restored_verification presence rejects; both decoders now need no optional-member parameter/branch. Original10case red11RUN/9PASS/2FAIL(parent+empty_release) retained, then18target/317ordinary/317race oncePASS0FAIL/SKIP,tagcompile-only/vet/pinned2.5lint/diff passed. QAb208fbe6ace23bf6ca2c62e55758394662e4738339b59a0d823bf2e0ee3b1a9a and commiteede06e1b7be91a74ab5cd843081fb2aab50b787946715285a17aee36455c098 bind actualbytes/argv. Native files,workflow,material/approval/count/deadline semantics are byte-identical8bf. Old8bf CI had12 explicit DockerHub rate-limit failures before target tests/builds; full backend12job diagnostics retained privately, no failure called a pass. New finalhead native37/CI/AI remain pending; no production/window/RPO/business promotion. Exact actual argv used GOMAXPROCS=2/GOMEMLIMIT=1GiB in the process environment; no -p=2 flag was executed for source214. Machine command entries match the immutable QA argv.",
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
       "gaps": [
@@ -15211,7 +15802,10 @@
         "C parent b2fab historical gap retained as complete original JSON, not relabelled as current verification: {\"exit_criteria\":\"Fresh finalhead must actually RUN/PASS all37 B native events with source/tree and healthy phase-specific cleanup evidence,plus fresh AI review of held-FD capture and durable journal; do not borrow948CI37 or872b local37 or promote production evidence.\",\"id\":\"M4-B-OBJECT-TOOL-REVIEW\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Capture-only held-parent FD source0fa passed128ordinary/race and localFS swap regression; fresh finalhead CI37/AI pending. Exact948 CI37 remains historical and its transient-parent P2 is not pre-resolved.\"}",
         "C parent b2fab verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
         "C actual mainbeeee integration preserves incoming B verified binding unchanged: {\"source_sha\": \"d937a0e5542d662c55db03d4d9f2bc5315afa9ad\", \"verified_on\": \"2026-10-16\"}. Current verified3961 is a source-only recheck against the unchanged C60-minute CI with fresh C phase; A47/B37 proof bytes remain C-parent exact. Historical B native/CI/commands and production evidence retain original source. It does not qualify current merged-head native37/CI/AI.",
-        "Retired original B45-minute CI selector retained as complete original JSON, not a current C60-minute matched assertion: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}"
+        "Retired original B45-minute CI selector retained as complete original JSON, not a current C60-minute matched assertion: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+        "Historical gap object retained unchanged before incoming main source alignment: {\"id\":\"M4-B-OBJECT-TOOL-REVIEW\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Capture-only held-parent FD source0fa passed128ordinary/race and localFS swap regression; fresh finalhead CI37/AI pending. Exact948 CI37 remains historical and its transient-parent P2 is not pre-resolved.\",\"exit_criteria\":\"Fresh finalhead must actually RUN/PASS all37 B native events with source/tree and healthy phase-specific cleanup evidence,plus fresh AI review of held-FD capture and durable journal; do not borrow948CI37 or872b local37 or promote production evidence.\"}",
+        "Historical incoming verified marker retained unchanged before D/main source merge: {\"source_sha\":\"3961a948e1d1e465e1b1bd48e9d83b45a6b982da\",\"verified_on\":\"2026-10-16\"}",
+        "Previous verified marker retained as complete original JSON: {\"source_sha\":\"3f296fb304c14c94c42b60704f0574bb65d1454e\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied."
       ]
     }
   ],
