@@ -104,7 +104,7 @@ jobs:
           set -Eeuo pipefail
           umask 077
           if sudo test -d "${RUNNER_TEMP}/a-carrier-actual"; then
-            sudo tar -C "${RUNNER_TEMP}/a-carrier-actual" -cf - . > "${RUNNER_TEMP}/a-carrier-actual.tar"
+            sudo tar -C "${RUNNER_TEMP}/a-carrier-actual" -cf - . | tee -- "${RUNNER_TEMP}/a-carrier-actual.tar" > /dev/null
           fi
       - name: Upload isolated carrier evidence; Mac custody remains separate
         timeout-minutes: 3
