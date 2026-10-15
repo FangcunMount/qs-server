@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+    "sha": "abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e",
     "verified_on": "2026-10-16"
   },
   "status_policy": {
@@ -14157,7 +14157,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+        "source_sha": "abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e",
         "verified_on": "2026-10-16"
       },
       "fact_sources": [
@@ -14754,6 +14754,14 @@
           "result": "matched",
           "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_native_test.go",
+          "selector": "func inventoryServerConnectionReleased(",
+          "result": "matched",
+          "source_sha": "abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -14807,7 +14815,8 @@
         "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
         "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
         "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
-        "Fixed5707 CLI h-only preparation changes the CI file, so current document source review is rebound to57d; all prior source selectors/commands/native/production objects are retained unchanged. Complete previous verified object: {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}. Removing only the h fixed-old prepare and terminal hash blocks reconstructs exact0a8 CI bytes; original metadata/A47/B37/C30/D74/13 proof and100m/8m/resource budgets are unchanged. This source review is not execution of current-head hosted or database gates."
+        "Fixed5707 CLI h-only preparation changes the CI file, so current document source review is rebound to57d; all prior source selectors/commands/native/production objects are retained unchanged. Complete previous verified object: {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}. Removing only the h fixed-old prepare and terminal hash blocks reconstructs exact0a8 CI bytes; original metadata/A47/B37/C30/D74/13 proof and100m/8m/resource budgets are unchanged. This source review is not execution of current-head hosted or database gates.",
+        "Prior current verified object retained as complete original JSON: {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}. Previous top source_baseline retained as complete original JSON: {\"sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}. PR381498 MySQL job116625591832 actual complete backend failure9e2165f9 remains failed; no original count/client flags were retained. Same498 local original8 PASS plus64 separate dirty-close samples all immediate/final server0 did not reproduce a leak/delay. Native-test-only abea adds <=5s independent read-only processlist convergence under original40s context after original three client release flags, and explicit childT for local helpers. It does not retry inventory/KILL or change production15+3/query5/whole45 limits. Exact frozen file bytes ran full native24 oncePASS and package ordinary/race153 each oncePASS, compile-only/vet/pinned lint; actual execution working base498 is preserved in receipt/source diff. Delivery5fa1491719293fdf98b96001cb091675213a276b661b228b779c7e16207439ba; runtimea1c6710ec44b4693e1239ec96aaf234378c311532ec9bed28e738a4a7ec3b738. Exact ownCID/volume/network removalACK+absence complete; old IDs/images/mounts preserved, NSQ3540->3542/Health changed. Driver Close sends COM_QUIT/local close without a server-thread termination ACK; this is the justification for bounded observation, not a proven original-CI race cause. No production/workflow/migration bytes or old command/native/signoff attribution changes. New-head CI/AI pending."
       ]
     },
     {
