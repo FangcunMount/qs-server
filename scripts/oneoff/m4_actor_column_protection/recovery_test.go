@@ -211,12 +211,9 @@ func TestRestoreUsesBoundedAbsoluteDeadlineAndOriginalValueEncoding(t *testing.T
 	}
 	ctx, c := restoreActionContext(context.Background(), a)
 	defer c()
-	left, e := actionReadTimeout(ctx)
-	if e != nil || left <= 0 || left > 30*time.Minute {
+	deadline, bounded := ctx.Deadline()
+	if !bounded || time.Until(deadline) <= 0 || time.Until(deadline) > 30*time.Minute {
 		t.Fatal("absolute recovery budget lost")
-	}
-	if _, e := actionReadTimeout(context.Background()); e == nil {
-		t.Fatal("unbounded restore socket wait accepted")
 	}
 	q, e := valueBatchSQL(1, 2, m.Tables[1].Columns)
 	if e != nil || strings.Count(q, "CAST(? AS JSON)") != 2 || strings.Count(q, "AS DECIMAL(20,0)") != 4 || strings.Contains(q, "`roles`=") {

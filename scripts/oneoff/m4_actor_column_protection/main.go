@@ -110,6 +110,20 @@ func mongoReadOptions(uri string) *options.ClientOptions {
 	return options.Client().ApplyURI(uri).SetReadPreference(readpref.Primary()).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit).SetRetryReads(false).SetRetryWrites(false)
 }
 
+// The action already includes the CLI deadline and, for restore, its earlier
+// independent approval deadline. Only aggregate reads/DDL may use this finite
+// socket budget; metadata and page reads retain their 5s child contexts.
+func configureMySQLAction(ctx context.Context, dsn *mysql.Config) bool {
+	deadline, bounded := ctx.Deadline()
+	remaining := time.Until(deadline)
+	if !bounded || ctx.Err() != nil || remaining <= 0 {
+		return false
+	}
+	dsn.MultiStatements, dsn.ParseTime = false, false
+	dsn.Timeout, dsn.ReadTimeout, dsn.WriteTimeout = queryLimit, remaining, queryLimit
+	return true
+}
+
 func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
 	r = receipt{ToolSource: tool, CSource: cSource, CResources: cResources, CResourceFiles: cResourceFiles, Error: "arguments_invalid", ReadOnly: true}
 	a, e := parseArgs(args)
@@ -173,15 +187,11 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "selected_connection_input_rejected"
 		return r
 	}
-	dsn.MultiStatements, dsn.ParseTime = false, false
-	dsn.Timeout, dsn.ReadTimeout, dsn.WriteTimeout = queryLimit, queryLimit, queryLimit
+	if !configureMySQLAction(ctx, dsn) {
+		r.Error = "mysql_action_deadline_required"
+		return r
+	}
 	if a.action == "restore" {
-		left, err := actionReadTimeout(ctx)
-		if err != nil {
-			r.Error = err.Error()
-			return r
-		}
-		dsn.ReadTimeout = left
 		// Original server JSON bytes may contain four-byte UTF-8, independent
 		// of the old application connection charset. Do not parse/reencode them.
 		if dsn.Params == nil {

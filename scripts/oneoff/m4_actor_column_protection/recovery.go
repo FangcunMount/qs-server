@@ -472,12 +472,3 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 	}
 	return context.WithDeadline(ctx, deadline)
 }
-
-func actionReadTimeout(ctx context.Context) (time.Duration, error) {
-	deadline, ok := ctx.Deadline()
-	left := time.Until(deadline)
-	if !ok || ctx.Err() != nil || left <= 0 {
-		return 0, errors.New("restore_action_deadline_required")
-	}
-	return left, nil
-}
