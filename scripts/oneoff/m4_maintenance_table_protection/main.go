@@ -25,51 +25,53 @@ type arguments struct {
 	action, capture, material, materialHash, approval, approvalHash string
 	runtimeIntent, runtimeIntentHash                                string
 	captureEvidence, captureEvidenceHash                            string
+	completionApproval, completionApprovalHash                      string
 	binding                                                         binding
 	timeout                                                         time.Duration
 }
 type receipt struct {
-	Action                         string                 `json:"action"`
-	ToolSource                     string                 `json:"compiled_tool_source"`
-	DSource                        string                 `json:"d_execution_source"`
-	DResources                     string                 `json:"d_execution_resources_sha256"`
-	DResourceFiles                 int                    `json:"d_execution_resource_files"`
-	Complete                       bool                   `json:"complete"`
-	ReadOnly                       bool                   `json:"database_read_only"`
-	MaterialHash                   string                 `json:"material_sha256,omitempty"`
-	TableCounts                    map[string]int         `json:"table_rows,omitempty"`
-	RetainedCounts                 map[string]int         `json:"retained_table_rows,omitempty"`
-	RetainedEOF                    bool                   `json:"retained_mandatory_empty_eof"`
-	MandatoryEOF                   bool                   `json:"mandatory_empty_eof"`
-	SQLSnapshot                    bool                   `json:"sql_repeatable_read_snapshot"`
-	SQLConnectionClosed            bool                   `json:"sql_connection_closed"`
-	SQLPoolClosed                  bool                   `json:"sql_pool_closed"`
-	MongoClosed                    bool                   `json:"mongo_closed"`
-	Error                          string                 `json:"error_category"`
-	ReleaseError                   string                 `json:"release_error_category,omitempty"`
-	ProductionFreezeCertified      bool                   `json:"production_freeze_certified"`
-	CrossDatabaseAtomicRR          bool                   `json:"cross_database_atomic_snapshot"`
-	BudgetExceeded                 bool                   `json:"total_budget_exceeded"`
-	TransactionReleaseUnproven     bool                   `json:"transaction_release_unproven"`
-	ApprovalConsumed               bool                   `json:"approval_consumed"`
-	RuntimeGateAcquired            bool                   `json:"runtime_gate_acquired"`
-	RuntimeGateReleased            bool                   `json:"runtime_gate_released"`
-	RuntimeGateReleaseUnproven     bool                   `json:"runtime_gate_release_unproven"`
-	MarkerWritten                  bool                   `json:"runtime_marker_written"`
-	MarkerHash                     string                 `json:"runtime_marker_sha256,omitempty"`
-	MarkerWriteUnknown             bool                   `json:"runtime_marker_write_unknown"`
-	DatabaseBoundary               *runtimeBoundaryState  `json:"runtime_database_boundary,omitempty"`
-	DatabaseBoundaryRecord         *runtimeBoundaryRecord `json:"runtime_database_boundary_record,omitempty"`
-	DatabaseBoundaryAdvanced       bool                   `json:"runtime_database_boundary_advanced"`
-	DatabaseBoundaryAdvanceUnknown bool                   `json:"runtime_database_boundary_advance_unknown"`
-	InspectedSQLVersion            *uint64                `json:"inspected_sql_version,omitempty"`
+	Action                         string                    `json:"action"`
+	ToolSource                     string                    `json:"compiled_tool_source"`
+	DSource                        string                    `json:"d_execution_source"`
+	DResources                     string                    `json:"d_execution_resources_sha256"`
+	DResourceFiles                 int                       `json:"d_execution_resource_files"`
+	Complete                       bool                      `json:"complete"`
+	ReadOnly                       bool                      `json:"database_read_only"`
+	MaterialHash                   string                    `json:"material_sha256,omitempty"`
+	TableCounts                    map[string]int            `json:"table_rows,omitempty"`
+	RetainedCounts                 map[string]int            `json:"retained_table_rows,omitempty"`
+	RetainedEOF                    bool                      `json:"retained_mandatory_empty_eof"`
+	MandatoryEOF                   bool                      `json:"mandatory_empty_eof"`
+	SQLSnapshot                    bool                      `json:"sql_repeatable_read_snapshot"`
+	SQLConnectionClosed            bool                      `json:"sql_connection_closed"`
+	SQLPoolClosed                  bool                      `json:"sql_pool_closed"`
+	MongoClosed                    bool                      `json:"mongo_closed"`
+	Error                          string                    `json:"error_category"`
+	ReleaseError                   string                    `json:"release_error_category,omitempty"`
+	ProductionFreezeCertified      bool                      `json:"production_freeze_certified"`
+	CrossDatabaseAtomicRR          bool                      `json:"cross_database_atomic_snapshot"`
+	BudgetExceeded                 bool                      `json:"total_budget_exceeded"`
+	TransactionReleaseUnproven     bool                      `json:"transaction_release_unproven"`
+	ApprovalConsumed               bool                      `json:"approval_consumed"`
+	RuntimeGateAcquired            bool                      `json:"runtime_gate_acquired"`
+	RuntimeGateReleased            bool                      `json:"runtime_gate_released"`
+	RuntimeGateReleaseUnproven     bool                      `json:"runtime_gate_release_unproven"`
+	MarkerWritten                  bool                      `json:"runtime_marker_written"`
+	MarkerHash                     string                    `json:"runtime_marker_sha256,omitempty"`
+	MarkerWriteUnknown             bool                      `json:"runtime_marker_write_unknown"`
+	DatabaseBoundary               *runtimeBoundaryState     `json:"runtime_database_boundary,omitempty"`
+	DatabaseBoundaryRecord         *runtimeBoundaryRecord    `json:"runtime_database_boundary_record,omitempty"`
+	DatabaseBoundaryAdvanced       bool                      `json:"runtime_database_boundary_advanced"`
+	DatabaseBoundaryAdvanceUnknown bool                      `json:"runtime_database_boundary_advance_unknown"`
+	InspectedSQLVersion            *uint64                   `json:"inspected_sql_version,omitempty"`
+	RuntimeCompletion              *runtimeCompletionReceipt `json:"runtime_completion,omitempty"`
 }
 
 func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-maintenance-table-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored, mark-first-runtime")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored, mark-first-runtime, complete-first-runtime")
 	f.StringVar(&a.binding.SQLName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.binding.MongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.binding.SQLIdentity, "mysql-identity-sha256", "", "independent target identity")
@@ -84,21 +86,30 @@ func parseArgs(args []string) (arguments, error) {
 	f.StringVar(&a.approvalHash, "approval-sha256", "", "independent approval raw SHA")
 	f.StringVar(&a.runtimeIntent, "runtime-intent-file", "", "independent private first-runtime intent")
 	f.StringVar(&a.runtimeIntentHash, "runtime-intent-sha256", "", "independent first-runtime intent raw SHA")
+	f.StringVar(&a.completionApproval, "completion-approval-file", "", "current independent same-committed-intent confirmation approval")
+	f.StringVar(&a.completionApprovalHash, "completion-approval-sha256", "", "independently frozen current confirmation approval raw SHA")
 	f.DurationVar(&a.timeout, "timeout", maxAction, "finite total deadline, at most20m")
 	if f.Parse(args) != nil || f.NArg() != 0 {
 		return a, errors.New("arguments_invalid")
 	}
 	evidenceSupplied := false
+	completionSupplied := false
 	f.Visit(func(f *flag.Flag) {
 		if f.Name == "capture-evidence-file" || f.Name == "capture-evidence-sha256" {
 			evidenceSupplied = true
+		}
+		if f.Name == "completion-approval-file" || f.Name == "completion-approval-sha256" {
+			completionSupplied = true
 		}
 	})
 	if !validBinding(a.binding) || a.timeout <= 0 || a.timeout > maxAction {
 		return a, errors.New("external_binding_or_deadline_required")
 	}
-	if a.action != "mark-first-runtime" && (a.runtimeIntent != "" || a.runtimeIntentHash != "") {
+	if a.action != "mark-first-runtime" && a.action != "complete-first-runtime" && (a.runtimeIntent != "" || a.runtimeIntentHash != "") {
 		return a, errors.New("runtime_intent_action_mismatch")
+	}
+	if a.action != "complete-first-runtime" && completionSupplied {
+		return a, errors.New("runtime_completion_approval_action_mismatch")
 	}
 	switch a.action {
 	case "inspect":
@@ -116,9 +127,21 @@ func parseArgs(args []string) (arguments, error) {
 		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") || a.action != "verify-target" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
 			return a, errors.New("independently_bound_material_required")
 		}
-	case "mark-first-runtime":
+	case "mark-first-runtime", "complete-first-runtime":
 		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || !absolutePath(a.runtimeIntent) || !nonzeroHash(a.runtimeIntentHash) || (a.approval == "") != (a.approvalHash == "") || a.approval != "" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
 			return a, errors.New("runtime_independent_inputs_required")
+		}
+		if a.action == "complete-first-runtime" {
+			if !absolutePath(a.completionApproval) || !nonzeroHash(a.completionApprovalHash) {
+				return a, errors.New("runtime_completion_independent_approval_required")
+			}
+			seen := map[string]bool{}
+			for _, path := range []string{a.material, a.captureEvidence, a.runtimeIntent, a.approval, a.completionApproval} {
+				if path != "" && seen[path] {
+					return a, errors.New("runtime_completion_distinct_inputs_required")
+				}
+				seen[path] = true
+			}
 		}
 	default:
 		return a, errors.New("action_invalid")
@@ -186,6 +209,19 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	var original material
 	var ap approval
 	var intent runtimeIntent
+	var completion runtimeCompletionInputs
+	if a.action == "complete-first-runtime" {
+		completion, e = readRuntimeCompletionInputs(a, tool, time.Now())
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		original, intent = completion.original, completion.intent
+		r.MaterialHash = a.materialHash
+		var stop context.CancelFunc
+		ctx, stop = context.WithDeadline(ctx, mustTime(completion.approval.Expires))
+		defer stop()
+	}
 	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" || a.action == "mark-first-runtime" {
 		raw, e := readPrivate(a.material, a.materialHash)
 		if e != nil {
@@ -240,6 +276,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		var c context.CancelFunc
 		ctx, c = runtimeIntentContext(ctx, intent)
 		defer c()
+	}
+	if a.action == "complete-first-runtime" && ctx.Err() != nil {
+		r.Error, r.BudgetExceeded = "total_budget_exceeded", true
+		return r
 	}
 	var captureDirectory captureParentIdentity
 	if a.action == "capture" {
@@ -301,6 +341,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	ok := false
 	var rawMaterial []byte
 	var inspectedSQLVersion uint64
+	var confirmedCompletion *runtimeCompletionReceipt
 	defer func() {
 		released := true
 		if d.gate != nil {
@@ -347,8 +388,14 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		if !ok {
 			return
 		}
-		if a.action != "inspect" && a.action != "capture" {
+		if a.action != "inspect" && a.action != "capture" && a.action != "complete-first-runtime" {
 			if e := readCaptureEvidence(original, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
+				r.Error = e.Error()
+				return
+			}
+		}
+		if a.action == "complete-first-runtime" {
+			if e := completion.verifyTerminal(a, tool, confirmedCompletion, r.DatabaseBoundaryRecord); e != nil {
 				r.Error = e.Error()
 				return
 			}
@@ -376,6 +423,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		if a.action == "inspect" {
 			r.InspectedSQLVersion = &inspectedSQLVersion
+		}
+		if a.action == "complete-first-runtime" {
+			r.RuntimeCompletion = confirmedCompletion
 		}
 		r.Complete, r.Error = true, "none"
 	}()
@@ -405,12 +455,26 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "mongo_primary_unavailable"
 		return r
 	}
-	if a.action == "restore" || a.action == "mark-first-runtime" {
+	if a.action == "restore" || a.action == "mark-first-runtime" || a.action == "complete-first-runtime" {
 		d.gate, e = acquireRuntimeGate(ctx, d.conn, a.binding)
 		if e != nil {
 			r.Error = e.Error()
 			return r
 		}
+	}
+	if a.action == "complete-first-runtime" {
+		confirmedCompletion, e = d.completeFirstRuntime(ctx, completion, a, tool, &r)
+		if e != nil {
+			r.Error = strings.Split(e.Error(), "\n")[0]
+			if strings.Contains(e.Error(), "readonly_transaction_release_unproven") {
+				r.TransactionReleaseUnproven = true
+				r.ReleaseError = "readonly_transaction_release_unproven"
+			}
+			return r
+		}
+		r.SQLSnapshot, r.RetainedEOF, r.MandatoryEOF = true, true, intent.Mode != "target103"
+		ok = true
+		return r
 	}
 	if a.action == "mark-first-runtime" {
 		if e := d.markFirstRuntime(ctx, original, intent, a, tool, intentApproval, &r); e != nil {

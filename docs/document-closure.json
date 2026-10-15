@@ -881,7 +881,8 @@
         "Actual 46ad7c801acd0c4f12cd8d165189566218f1b3b9 local source-only checks repeated the exact python3 dependency-install and14 pure-test commands successfully,131 configcontract RUN/PASS each once with0FAIL/SKIP,actionlint,86 full bash blocks,6 embedded Python blocks,5 fixture Python parsers and unchanged Go formatting. Local dependency success is distinct from pending fresh Ubuntu CI and actual carrier/database/registry/Mac custody. Raw new checks are in the dependency-fix-v1 child of the original private QA directory;old logs and failed sources are untouched.",
         "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled.",
         "Actual 1618f7de2f293a42c5d169ea228d8c178cc83c71 source-only revalidation:14 existing pure cases passed;131 configcontract RUN/PASS each once,0FAIL/SKIP;actionlint and86bash/6embeddedPython/5fixturePython syntax passed;fixture Go formatting is unchanged. AST scope check confirms only the fixed image-save call passes256MiB while cmd default stays150MiB. These checks execute no Docker/DB/SSH/registry/CI or Mac custody;original Go tool/helper build inputs are unchanged and their old build is not rerun or renamed. Raw checks and exact-source bridge remain in image-save-bound-v1 under the existing private QA directory.",
-        "Existing current_source_baseline policy excludes scripts/testing-only commits,so global source_baseline correctly remains46ad7c801acd0c4f12cd8d165189566218f1b3b9 while this fixture evidence and per-document verified source bind1618f7de2f293a42c5d169ea228d8c178cc83c71. The first1618 docs-check rejected a mistakenly advanced global marker;its raw failure remains in image-save-bound-v1/docs.stdout and docs.stderr. The checker and baseline policy are unchanged;the final repeat must pass before documentation commit."
+        "Existing current_source_baseline policy excludes scripts/testing-only commits,so global source_baseline correctly remains46ad7c801acd0c4f12cd8d165189566218f1b3b9 while this fixture evidence and per-document verified source bind1618f7de2f293a42c5d169ea228d8c178cc83c71. The first1618 docs-check rejected a mistakenly advanced global marker;its raw failure remains in image-save-bound-v1/docs.stdout and docs.stderr. The checker and baseline policy are unchanged;the final repeat must pass before documentation commit.",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\", \"verified_on\": \"2026-10-15\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     },
     {
@@ -4742,6 +4743,22 @@
         {
           "kind": "source",
           "path": "internal/pkg/configcontract/m4_actor_column_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go"
         }
       ],
       "verification": [
@@ -5280,14 +5297,6 @@
         },
         {
           "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 90",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
           "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
           "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(",
           "result": "matched",
@@ -5372,6 +5381,122 @@
           "selector": "func TestMongoSelectedIdentityUsesActualReplicaSet(",
           "result": "matched",
           "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "timeout-minutes: 100",
+          "result": "matched",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
+          "selector": "const completionAuthorizationMode = \"idempotent_current_fact_confirmation\"",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
+          "selector": "func (d database) completeFirstRuntime(",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
+          "selector": "func (v runtimeCompletionInputs) checkConsumedHistory(",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
+          "selector": "func TestM4MaintenanceTablesCommittedRuntimeCompletionNative(",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
+          "selector": "func TestCommittedRuntimeCompletionProofRejectsIncompleteOrForeignEvidence(",
+          "result": "matched",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "-run='^TestM4MaintenanceTablesCommittedRuntimeCompletionNative$'",
+          "result": "matched",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
+          "selector": "const completionOldCLISource = \"5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c\"",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
+          "selector": "func nativeCompletionAcrossActualOldCLI(",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
+          "selector": "func TestCommittedRuntimeCompletionRequiresFixedActualOldCLI(",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "export QS_M4_D_COMPLETION_OLD_CLI_REQUIRED=1",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
           "verified_on": "2026-10-16"
         }
       ],
@@ -5479,7 +5604,13 @@
         "Previous verified marker retained as complete original JSON: {\"source_sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}. Current fc40b4a7ea3a02ddfedef763fca905f6345bc36d review covers the actual six fresh phases,90m scheduling cap and strict D53/21 union74; source comparison retains incoming main A/B/C package bytes and frozen D55 bytes. Existing command/native/production objects remain unchanged; no new merged-head hosted CI or production qualification is implied.",
         "Previous top source_baseline retained as complete original JSON: {\"sha\":\"d4b61353b909657d056077716b51a9308d0853f0\",\"verified_on\":\"2026-10-15\"}",
         "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. C30 CI-only task review retains every old verification/production record; actual main965 is normally merged and tree-identical for these source inputs, without repeating or relabelling native proof.",
-        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending."
+        "Prior verified binding preserved as complete original JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Independent9fbe actual-setName task changes only C database.go/database_test.go; its248 ordinary/race QA has its own raw source-input receipt, and neither7aff source preparation nor cdac native30 is relabelled. New-head CI30/fresh AI remain pending.",
+        "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"9fbe9d04f0f688df30758d0eef3a224ce4fee589\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
+        "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
+        "Prior top source baseline retained as complete JSON: {\"sha\": \"9fbe9d04f0f688df30758d0eef3a224ce4fee589\", \"verified_on\": \"2026-10-16\"}. Source6ed introduces only explicitly current-approved idempotent fact confirmation of one exact committed D intent, no completion claim/journal/DBwrite/advance/restore or business start. Normal mergee5 retains own7 bytes and4012 incoming317 Git blobs. The original24 D test files/74 names/286 resources and original D74 CI proof remain byte-identical. Current sourceCI1b adds a separate fresh h completion13 proof, never mixing new13 into union74. Current sourceQA0a957eadadaf989567541bcc2f8cd54a7c75c0467eb7bdafdf935b8dc16e2c68 records actual working-basee5 argv withGOMAXPROCS2/GOMEMLIMIT1GiB: ordinary/race C248/D444/config154 each once0FAIL/SKIP, compile-only/vet/pinned2.5lint/actionlint. Its frozen Go/CI bytes equal1b, but no old command source field is rewritten. Seven h-tail shell simulations/15YAML184bash9PY syntax are source-only. New13 and current-head original74 real dependencies/hosted CI/freshAI/actual oldtool-newbinary cross-source and formal dispatcher persistent dedupe DBidentity+G/F+original intent remain pending; production paused and no runtime/window/RPO/business evidence is promoted.",
+        "Fixed actual historical CLI source-only followup: prior top baseline and current document binding retained as complete JSON: {\"source_baseline\": {\"sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}}. Source57d replaces only one existing completion13 child with actual fixed5707 OS capture stdout/exit0 and closed-pipe mark, followed by current same_existing confirmation of the old record/source/raw marker. No manually relabelled material or synthetic successful capture evidence is accepted. CI h builds fixed archive, requires explicit test-only file/SHA/required inputs, proves actual compiled source before DB ENV and hashes executable before/after. Original13 names, old74 proof and100m/8m/resources are unchanged. Actual no-DB old-process probes15 ordinary/race passed (invalidargs exited1; real closed stdout SIGPIPE13), D444/config155 ordinary/race passed, tagcompile/vet/pinnedlint/actionlint passed; sourceQA7b4993092d005481295b3f289af8fcd31178088a5328f21d393a70e701608ea6 retains actual working base0a8 argv/environment with an explicit postcommit byte bridge. Nine h-tail flows use real archive/build/preENV probe but simulated native output; CIpurec04e47bc3879590d87080882e1153da13f446965b4733f168847097e64923ca1 is not DB evidence. Newhead complete13 actual dependencies, actual old capture/mark across source, old74 current-head regression, hostedCI/freshAI and formal dispatcher persistent dedupe remain pending. No old unknown/source/command/native/production/window/RPO/business attribution is upgraded; production stays paused.",
+        "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"9fbe9d04f0f688df30758d0eef3a224ce4fee589\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     },
     {
@@ -11781,6 +11912,22 @@
         {
           "kind": "source",
           "path": "internal/pkg/configcontract/m4_actor_column_workflow_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go"
         }
       ],
       "verification": [
@@ -12462,14 +12609,6 @@
         },
         {
           "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 90",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
           "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
           "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(",
           "result": "matched",
@@ -12554,6 +12693,122 @@
           "selector": "func TestMongoSelectedIdentityUsesActualReplicaSet(",
           "result": "matched",
           "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "timeout-minutes: 100",
+          "result": "matched",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
+          "selector": "const completionAuthorizationMode = \"idempotent_current_fact_confirmation\"",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
+          "selector": "func (d database) completeFirstRuntime(",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
+          "selector": "func (v runtimeCompletionInputs) checkConsumedHistory(",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
+          "selector": "func TestM4MaintenanceTablesCommittedRuntimeCompletionNative(",
+          "result": "matched",
+          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
+          "selector": "func TestCommittedRuntimeCompletionProofRejectsIncompleteOrForeignEvidence(",
+          "result": "matched",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "-run='^TestM4MaintenanceTablesCommittedRuntimeCompletionNative$'",
+          "result": "matched",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
+          "selector": "const completionOldCLISource = \"5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c\"",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
+          "selector": "func nativeCompletionAcrossActualOldCLI(",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
+          "selector": "func TestCommittedRuntimeCompletionRequiresFixedActualOldCLI(",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "export QS_M4_D_COMPLETION_OLD_CLI_REQUIRED=1",
+          "result": "matched",
+          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
           "verified_on": "2026-10-16"
         }
       ],
@@ -12662,7 +12917,13 @@
         "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
         "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification.",
         "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"5c2fc6bda8de53bfb5a9930931bbd885e09920fb\",\"verified_on\":\"2026-10-16\"}. Source 46ad7c801acd0c4f12cd8d165189566218f1b3b9 declares python3 -m pip install --quiet pyyaml immediately before the existing parser test in its original1m step. No step or budget is added;85m=80m step caps+5m post reserve. All fixed fixture files and every old CI job byte remain unchanged. Source0b78480aa73a361a1d0665257e760936e5190e36 and its original QA receipt remain preserved:local PyYAML availability did not prove the prior CI job declared that dependency,so they do not close this dependency issue or prove actual Ubuntu qualification. This narrow fix is source-only;old Tool/build/native/production evidence is not relabelled.",
-        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled."
+        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled.",
+        "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"9fbe9d04f0f688df30758d0eef3a224ce4fee589\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
+        "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
+        "Prior top source baseline retained as complete JSON: {\"sha\": \"9fbe9d04f0f688df30758d0eef3a224ce4fee589\", \"verified_on\": \"2026-10-16\"}. Source6ed introduces only explicitly current-approved idempotent fact confirmation of one exact committed D intent, no completion claim/journal/DBwrite/advance/restore or business start. Normal mergee5 retains own7 bytes and4012 incoming317 Git blobs. The original24 D test files/74 names/286 resources and original D74 CI proof remain byte-identical. Current sourceCI1b adds a separate fresh h completion13 proof, never mixing new13 into union74. Current sourceQA0a957eadadaf989567541bcc2f8cd54a7c75c0467eb7bdafdf935b8dc16e2c68 records actual working-basee5 argv withGOMAXPROCS2/GOMEMLIMIT1GiB: ordinary/race C248/D444/config154 each once0FAIL/SKIP, compile-only/vet/pinned2.5lint/actionlint. Its frozen Go/CI bytes equal1b, but no old command source field is rewritten. Seven h-tail shell simulations/15YAML184bash9PY syntax are source-only. New13 and current-head original74 real dependencies/hosted CI/freshAI/actual oldtool-newbinary cross-source and formal dispatcher persistent dedupe DBidentity+G/F+original intent remain pending; production paused and no runtime/window/RPO/business evidence is promoted.",
+        "Fixed actual historical CLI source-only followup: prior top baseline and current document binding retained as complete JSON: {\"source_baseline\": {\"sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}}. Source57d replaces only one existing completion13 child with actual fixed5707 OS capture stdout/exit0 and closed-pipe mark, followed by current same_existing confirmation of the old record/source/raw marker. No manually relabelled material or synthetic successful capture evidence is accepted. CI h builds fixed archive, requires explicit test-only file/SHA/required inputs, proves actual compiled source before DB ENV and hashes executable before/after. Original13 names, old74 proof and100m/8m/resources are unchanged. Actual no-DB old-process probes15 ordinary/race passed (invalidargs exited1; real closed stdout SIGPIPE13), D444/config155 ordinary/race passed, tagcompile/vet/pinnedlint/actionlint passed; sourceQA7b4993092d005481295b3f289af8fcd31178088a5328f21d393a70e701608ea6 retains actual working base0a8 argv/environment with an explicit postcommit byte bridge. Nine h-tail flows use real archive/build/preENV probe but simulated native output; CIpurec04e47bc3879590d87080882e1153da13f446965b4733f168847097e64923ca1 is not DB evidence. Newhead complete13 actual dependencies, actual old capture/mark across source, old74 current-head regression, hostedCI/freshAI and formal dispatcher persistent dedupe remain pending. No old unknown/source/command/native/production/window/RPO/business attribution is upgraded; production stays paused.",
+        "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     },
     {
@@ -14610,17 +14871,25 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 90",
+          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
           "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
           "verified_on": "2026-10-16"
         },
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
+          "selector": "timeout-minutes: 100",
           "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/mysql_metadata_profile/inventory_native_test.go",
+          "selector": "func inventoryServerConnectionReleased(",
+          "result": "matched",
+          "source_sha": "abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e",
           "verified_on": "2026-10-16"
         }
       ],
@@ -14677,7 +14946,13 @@
         "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
         "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification.",
         "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"5c2fc6bda8de53bfb5a9930931bbd885e09920fb\",\"verified_on\":\"2026-10-16\"}. Source 46ad7c801acd0c4f12cd8d165189566218f1b3b9 declares python3 -m pip install --quiet pyyaml immediately before the existing parser test in its original1m step. No step or budget is added;85m=80m step caps+5m post reserve. All fixed fixture files and every old CI job byte remain unchanged. Source0b78480aa73a361a1d0665257e760936e5190e36 and its original QA receipt remain preserved:local PyYAML availability did not prove the prior CI job declared that dependency,so they do not close this dependency issue or prove actual Ubuntu qualification. This narrow fix is source-only;old Tool/build/native/production evidence is not relabelled.",
-        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled."
+        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled.",
+        "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
+        "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
+        "Fixed5707 CLI h-only preparation changes the CI file, so current document source review is rebound to57d; all prior source selectors/commands/native/production objects are retained unchanged. Complete previous verified object: {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}. Removing only the h fixed-old prepare and terminal hash blocks reconstructs exact0a8 CI bytes; original metadata/A47/B37/C30/D74/13 proof and100m/8m/resource budgets are unchanged. This source review is not execution of current-head hosted or database gates.",
+        "Prior current verified object retained as complete original JSON: {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}. Previous top source_baseline retained as complete original JSON: {\"sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}. PR381498 MySQL job116625591832 actual complete backend failure9e2165f9 remains failed; no original count/client flags were retained. Same498 local original8 PASS plus64 separate dirty-close samples all immediate/final server0 did not reproduce a leak/delay. Native-test-only abea adds <=5s independent read-only processlist convergence under original40s context after original three client release flags, and explicit childT for local helpers. It does not retry inventory/KILL or change production15+3/query5/whole45 limits. Exact frozen file bytes ran full native24 oncePASS and package ordinary/race153 each oncePASS, compile-only/vet/pinned lint; actual execution working base498 is preserved in receipt/source diff. Delivery5fa1491719293fdf98b96001cb091675213a276b661b228b779c7e16207439ba; runtimea1c6710ec44b4693e1239ec96aaf234378c311532ec9bed28e738a4a7ec3b738. Exact ownCID/volume/network removalACK+absence complete; old IDs/images/mounts preserved, NSQ3540->3542/Health changed. Driver Close sends COM_QUIT/local close without a server-thread termination ACK; this is the justification for bounded observation, not a proven original-CI race cause. No production/workflow/migration bytes or old command/native/signoff attribution changes. New-head CI/AI pending.",
+        "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     },
     {
@@ -15174,17 +15449,17 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 90",
+          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
           "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
           "verified_on": "2026-10-16"
         },
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
+          "selector": "timeout-minutes: 100",
           "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
           "verified_on": "2026-10-16"
         }
       ],
@@ -15265,7 +15540,12 @@
         "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
         "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification.",
         "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"5c2fc6bda8de53bfb5a9930931bbd885e09920fb\",\"verified_on\":\"2026-10-16\"}. Source 46ad7c801acd0c4f12cd8d165189566218f1b3b9 declares python3 -m pip install --quiet pyyaml immediately before the existing parser test in its original1m step. No step or budget is added;85m=80m step caps+5m post reserve. All fixed fixture files and every old CI job byte remain unchanged. Source0b78480aa73a361a1d0665257e760936e5190e36 and its original QA receipt remain preserved:local PyYAML availability did not prove the prior CI job declared that dependency,so they do not close this dependency issue or prove actual Ubuntu qualification. This narrow fix is source-only;old Tool/build/native/production evidence is not relabelled.",
-        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled."
+        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled.",
+        "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
+        "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
+        "Fixed5707 CLI h-only preparation changes the CI file, so current document source review is rebound to57d; all prior source selectors/commands/native/production objects are retained unchanged. Complete previous verified object: {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}. Removing only the h fixed-old prepare and terminal hash blocks reconstructs exact0a8 CI bytes; original metadata/A47/B37/C30/D74/13 proof and100m/8m/resource budgets are unchanged. This source review is not execution of current-head hosted or database gates.",
+        "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     },
     {
@@ -15541,17 +15821,17 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 90",
+          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
           "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
           "verified_on": "2026-10-16"
         },
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
+          "selector": "timeout-minutes: 100",
           "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
           "verified_on": "2026-10-16"
         }
       ],
@@ -15654,7 +15934,12 @@
         "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
         "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification.",
         "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"5c2fc6bda8de53bfb5a9930931bbd885e09920fb\",\"verified_on\":\"2026-10-16\"}. Source 46ad7c801acd0c4f12cd8d165189566218f1b3b9 declares python3 -m pip install --quiet pyyaml immediately before the existing parser test in its original1m step. No step or budget is added;85m=80m step caps+5m post reserve. All fixed fixture files and every old CI job byte remain unchanged. Source0b78480aa73a361a1d0665257e760936e5190e36 and its original QA receipt remain preserved:local PyYAML availability did not prove the prior CI job declared that dependency,so they do not close this dependency issue or prove actual Ubuntu qualification. This narrow fix is source-only;old Tool/build/native/production evidence is not relabelled.",
-        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled."
+        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled.",
+        "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
+        "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
+        "Fixed5707 CLI h-only preparation changes the CI file, so current document source review is rebound to57d; all prior source selectors/commands/native/production objects are retained unchanged. Complete previous verified object: {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}. Removing only the h fixed-old prepare and terminal hash blocks reconstructs exact0a8 CI bytes; original metadata/A47/B37/C30/D74/13 proof and100m/8m/resource budgets are unchanged. This source review is not execution of current-head hosted or database gates.",
+        "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     },
     {
@@ -16029,17 +16314,17 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 90",
+          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
           "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
+          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
           "verified_on": "2026-10-16"
         },
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
+          "selector": "timeout-minutes: 100",
           "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
+          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
           "verified_on": "2026-10-16"
         }
       ],
@@ -16129,7 +16414,12 @@
         "Source a96db6726fcc84861801a81c8fcb97eb62fe0d8a adds only a default-false workflow_dispatch input and isolated optional Ubuntu carrier job plus fixed source fixtures. Every pre-existing CI job byte is identical to actual main3175474a9fb96e10e33212c4c6cbdb555bd2e9ac (tailSHA9e6d759621f77e52610524af25ee94c24fac6ec640ef151523c121c653851d93). Original tool/migration/normal native selectors and production facts are unchanged. The new job uses immutable602 Tool byte-equal2c314, original M2 API config/layers/ELF and unchanged V10 Receiver methods with a transparent synthetic constructor seam; local pure/build/vet results are distinct from unexecuted Linux/registry/DB carrier qualification. Root0/512MiB/same-path bind and approximately50MB capture/restore/verify are mandatory future checks. CI artifact retention does not prove Mac original-file custody, production30/60/RPO or business acceptance; no approval or runtime dispatch is granted. Historical verification/production/signoff attribution is retained.",
         "Prior optional-carrier verified marker retained as full original JSON: {\"source_sha\":\"a96db6726fcc84861801a81c8fcb97eb62fe0d8a\",\"verified_on\":\"2026-10-16\"}. Source 5c2fc6bda8de53bfb5a9930931bbd885e09920fb keeps the six implementation/binding fixture files byte-identical to a96db6726fcc84861801a81c8fcb97eb62fe0d8a;test_source.py changes only the85m outer-cap and80m step-sum predicates and all original CI jobs byte-identical to main317; only the optional job receives existing read-only DockerHub credentials and explicit per-step limits. Actual step caps sum80m plus5m Action-post reserve equals85m outer cap. Original setup240s/seed180s/native1800s/proof120s/cleanup120s and root0/512MiB/query/IO/kernel limits do not increase. Intermediate b4c32c7f89821373597bd5c5be6199c9ef7855a8 has a retained real pure-test failure (expected82,actual80) and is not signed green; this source corrects that arithmetic without changing any step limit or deleting failure evidence. Old peer and build receipts remain bound to their actual old hashes; neither is relabelled as actual Linux/registry/Mac/production qualification.",
         "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"5c2fc6bda8de53bfb5a9930931bbd885e09920fb\",\"verified_on\":\"2026-10-16\"}. Source 46ad7c801acd0c4f12cd8d165189566218f1b3b9 declares python3 -m pip install --quiet pyyaml immediately before the existing parser test in its original1m step. No step or budget is added;85m=80m step caps+5m post reserve. All fixed fixture files and every old CI job byte remain unchanged. Source0b78480aa73a361a1d0665257e760936e5190e36 and its original QA receipt remain preserved:local PyYAML availability did not prove the prior CI job declared that dependency,so they do not close this dependency issue or prove actual Ubuntu qualification. This narrow fix is source-only;old Tool/build/native/production evidence is not relabelled.",
-        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled."
+        "Prior optional-carrier source marker retained as full original JSON: {\"source_sha\":\"46ad7c801acd0c4f12cd8d165189566218f1b3b9\",\"verified_on\":\"2026-10-16\"}. Source 1618f7de2f293a42c5d169ea228d8c178cc83c71 changes only the fixed fixture run.py image-save output bound:default cmd output remains150MiB,only the immutable original M2 archive read permits256MiB for known230144789B image contents plus tar metadata. Tool602/V10/helper/bindings,all other command output limits,CI steps85m=80m+5m,and original512MiB/query/IO/native windows remain unchanged. Frozen29473901a5f449fe798acbe4e38df7ba6e6d4c3c and its source-only QA are retained;the root-detected deterministic image archive rejection was not an actual Docker/registry execution or a qualification success. Historical evidence is not relabelled.",
+        "D completion13 separate CI task: prior current verified binding retained as complete JSON: {\"source_sha\": \"6597ce303cb70485ea8c49578347f6f7396ea663\", \"verified_on\": \"2026-10-16\"}. Only the current metadata job budget selector is rebound; old command/native/production objects are unchanged.",
+        "Prior90m source selector retained as complete historical JSON: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}. The current seven-phase model is97m rounded100m, without changing production30/60m or original per-command/operation limits.",
+        "Fixed5707 CLI h-only preparation changes the CI file, so current document source review is rebound to57d; all prior source selectors/commands/native/production objects are retained unchanged. Complete previous verified object: {\"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}. Removing only the h fixed-old prepare and terminal hash blocks reconstructs exact0a8 CI bytes; original metadata/A47/B37/C30/D74/13 proof and100m/8m/resource budgets are unchanged. This source review is not execution of current-head hosted or database gates.",
+        "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 90\", \"source_sha\": \"fc40b4a7ea3a02ddfedef763fca905f6345bc36d\", \"verified_on\": \"2026-10-16\"}",
+        "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"57d19d8f784746208c48a68af9983b4b24f202b8\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit."
       ]
     }
   ],
