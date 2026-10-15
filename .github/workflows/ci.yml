@@ -286,6 +286,15 @@ jobs:
               'TestM4MongoObjectNativePreclaimBoundaries/ExpiredApproval',
               'TestM4MongoObjectNativePreclaimBoundaries/RepeatedUse',
               'TestM4MongoObjectNativePreclaimBoundaries/FutureSQL102',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/DirtyAfterACK1',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/DirtyAfterACK2',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/DirtyAfterACK3',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/DirtyAfterACK4',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK1',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK2',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK3',
+              'TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK4',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]
           if any(event.get('Action') in ('skip', 'fail') for event in events):
@@ -294,7 +303,7 @@ jobs:
               actual = {event.get('Test') for event in events if event.get('Action') == action and event.get('Test') in expected}
               if actual != expected:
                   raise SystemExit('B object native selectors did not all RUN/PASS')
-          print('B object native: six tops and eleven required children RUN/PASS; zero SKIP')
+          print('B object native: seven tops and nineteen required children RUN/PASS; zero SKIP')
           PY_MONGO_OBJECT_PROOF
 
   action-audit-mysql:
