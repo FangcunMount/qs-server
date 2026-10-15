@@ -256,9 +256,10 @@ func checkActorColumnNativeProof(t *testing.T, proof string) {
 			case "skip_required", "fail_required", "skip_foreign", "fail_foreign", "skip_package", "fail_package":
 				action, target, _ := strings.Cut(name, "_")
 				event := map[string]any{"Action": action}
-				if target == "required" {
+				switch target {
+				case "required":
 					event["Test"] = actorColumnNativeNames[0]
-				} else if target == "foreign" {
+				case "foreign":
 					event["Test"] = "TestOutsideTheRequiredSelector"
 				}
 				events = append(events, event)
