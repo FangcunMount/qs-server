@@ -606,7 +606,7 @@ def main():
         signal.alarm(0)
     summary = {key: fixture.result.get(key) for key in (
         "kind", "qualified", "production", "Mac_custody_executed", "business_runtime_started",
-        "tool_sha256", "tool_exact_build", "material_counts", "material_bytes", "material_sha256",
+        "tool_sha256", "tool_exact_build", "mysql_image_binding", "material_counts", "material_bytes", "material_sha256",
         "capture_evidence_sha256", "actions", "carriers", "partial_dirty101_proven", "restored10039_witness",
         "target10139_witness", "original_three_files_verified", "all_native_carriers_released",
         "owned_cleanup_proven", "source_unchanged", "primary_failure", "cleanup_failure", "cleanup_errors",
