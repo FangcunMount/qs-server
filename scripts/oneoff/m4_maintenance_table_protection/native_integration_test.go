@@ -578,6 +578,19 @@ func (h *maintenanceNative) assertRetained(raw [8][][]sql.NullString) {
 }
 func (h *maintenanceNative) assertCaptureRaw(raw [5][][]sql.NullString) {
 	h.t.Helper()
+	h.assertOriginalTablesRaw(raw)
+	ledger := h.query("SELECT version,dirty FROM schema_migrations ORDER BY version")
+	if !reflect.DeepEqual(ledger, [][]sql.NullString{{{String: "102", Valid: true}, {String: "0", Valid: true}}}) || len(h.original.Ledger) != 1 || h.original.Ledger[0] != (ledgerRow{102, false}) {
+		h.t.Fatal("original real provider ledger missing")
+	}
+	ld := h.query("SHOW CREATE TABLE schema_migrations")
+	if len(ld) != 1 || ld[0][1].String != h.original.LedgerDDL {
+		h.t.Fatal("original full ledger DDL missing")
+	}
+}
+
+func (h *maintenanceNative) assertOriginalTablesRaw(raw [5][][]sql.NullString) {
+	h.t.Helper()
 	for i, rows := range raw {
 		table := h.original.Tables[i]
 		ddlRows := h.query("SHOW CREATE TABLE `" + scope[i].name + "`")
@@ -604,14 +617,6 @@ func (h *maintenanceNative) assertCaptureRaw(raw [5][][]sql.NullString) {
 				}
 			}
 		}
-	}
-	ledger := h.query("SELECT version,dirty FROM schema_migrations ORDER BY version")
-	if !reflect.DeepEqual(ledger, [][]sql.NullString{{{String: "102", Valid: true}, {String: "0", Valid: true}}}) || len(h.original.Ledger) != 1 || h.original.Ledger[0] != (ledgerRow{102, false}) {
-		h.t.Fatal("original real provider ledger missing")
-	}
-	ld := h.query("SHOW CREATE TABLE schema_migrations")
-	if len(ld) != 1 || ld[0][1].String != h.original.LedgerDDL {
-		h.t.Fatal("original full ledger DDL missing")
 	}
 }
 func (h *maintenanceNative) assertReadOnlyReleased(r receipt) {

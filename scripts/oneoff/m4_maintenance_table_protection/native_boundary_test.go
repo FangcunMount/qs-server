@@ -297,7 +297,7 @@ func TestM4MaintenanceTablesNativeLedgerFailureRollsBackAndResumes(t *testing.T)
 	// Independent server state, rather than local Rollback's return value,
 	// proves the original103 row survived the failed final transaction.
 	h.assertSQLHead(103, false)
-	h.assertCaptureRaw(before)
+	h.assertOriginalTablesRaw(before)
 	h.assertRetained(modern)
 	if !reflect.DeepEqual(before, h.originalRaw()) || !reflect.DeepEqual(modern, h.retainedRaw()) {
 		t.Fatal("failed ledger transaction changed original or retained raw facts")
