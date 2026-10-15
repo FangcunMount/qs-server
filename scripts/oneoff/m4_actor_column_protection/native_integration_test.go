@@ -37,8 +37,8 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// These are test-only owned namespaces. No force/SetVersion or direct writes to
-// either migration ledger are used, and this file implements no restoration.
+// These are test-only owned namespaces. Normal historical providers create the
+// ledgers; no force/SetVersion or direct fixture ledger writes are used.
 type actorNative struct {
 	t                          *testing.T
 	name, dsn, uri, tool, dir  string
@@ -542,8 +542,8 @@ func TestM4ActorColumnsNativeCaptureUpgradeVerify(t *testing.T) {
 			t.Fatal("target changed more than its fixed column")
 		}
 	}
-	if r := h.action("restore"); r.Complete || r.ApprovalConsumed || r.Error != "restore_not_implemented" {
-		t.Fatal("native fixture activated restoration")
+	if r := h.action("restore"); r.Complete || r.ApprovalConsumed || r.SQLPoolClosed || r.MongoClosed || r.Error != "independently_bound_material_required" {
+		t.Fatal("restore without independent material/approval crossed its input boundary")
 	}
 }
 
@@ -566,8 +566,11 @@ func TestM4ActorColumnsNativeUnboundMaterialRejected(t *testing.T) {
 			case "boundary":
 				m.Tables[0].Rows[0].Key = "00"
 			}
-			raw, _ := json.Marshal(m)
 			path := filepath.Join(h.dir, name+".json")
+			// Each negative is located at its own canonical first path so a
+			// copied-path error cannot mask the intended field/hash refusal.
+			m.CapturePath = path
+			raw, _ := json.Marshal(m)
 			if writeExclusive(path, raw) != nil {
 				t.Fatal("private negative material unavailable")
 			}
