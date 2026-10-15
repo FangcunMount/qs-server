@@ -27,7 +27,7 @@ jobs:
     name: Optional A Original Linux Carrier
     if: github.event_name == 'workflow_dispatch' && inputs.m4_a_formal_carrier == true && github.repository == 'FangcunMount/qs-server'
     runs-on: ubuntu-latest
-    # Step caps sum82m:1+2+1+2+22+1+1+4+42+1+3;3m action-post reserve.
+    # Step caps sum80m:1+2+1+2+22+1+1+4+42+1+3;5m action-post reserve.
     # actual runtime remains2340s +120s cleanup; original carrier limits unchanged.
     timeout-minutes: 85
     steps:

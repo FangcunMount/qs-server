@@ -168,7 +168,7 @@ class QualificationTests(unittest.TestCase):
         job = workflow["jobs"]["m4-a-formal-carrier"]
         self.assertEqual(job["if"], "github.event_name == 'workflow_dispatch' && inputs.m4_a_formal_carrier == true && github.repository == 'FangcunMount/qs-server'")
         self.assertEqual(job["timeout-minutes"], "85")
-        self.assertEqual(sum(int(step["timeout-minutes"]) for step in job["steps"]), 82)
+        self.assertEqual(sum(int(step["timeout-minutes"]) for step in job["steps"]), 80)
         self.assertEqual(job["runs-on"], "ubuntu-latest")
         self.assertNotIn("m4-a-formal-carrier", json.dumps(workflow["jobs"]["test"]))
         self.assertEqual(workflow["permissions"], {"contents": "read"})
