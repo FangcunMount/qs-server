@@ -90,14 +90,14 @@ func TestActorColumnNativeWorkflowRequiresFreshExact30(t *testing.T) {
 	if workflow.Defaults.Run.WorkingDirectory != "" || job.Defaults.Run.WorkingDirectory != "" || regexp.MustCompile(`(?m)^\s*(cd|pushd|popd)\s`).MatchString(runs) {
 		t.Fatal("C native relative package and source paths require the checkout root")
 	}
-	if job.Timeout != 90 || strings.Count(runs, "-timeout=8m -json") != 5 {
-		t.Fatal("six fresh phases retain the 90-minute job and their original eight-minute test budgets")
+	if job.Timeout != 100 || strings.Count(runs, "-timeout=8m -json") != 6 {
+		t.Fatal("seven fresh phases retain the100-minute job and their original eight-minute test budgets")
 	}
-	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdg])$`).FindAllStringSubmatch(runs, -1)
-	if len(phases) != 6 {
-		t.Fatal("metadata/A/B/C/D/combined require six fresh phases")
+	phases := regexp.MustCompile(`(?m)^start_owned_fixture ([mabcdgh])$`).FindAllStringSubmatch(runs, -1)
+	if len(phases) != 7 {
+		t.Fatal("metadata/A/B/C/D/combined/completion require seven fresh phases")
 	}
-	for i, phase := range []string{"m", "a", "b", "c", "d", "g"} {
+	for i, phase := range []string{"m", "a", "b", "c", "d", "g", "h"} {
 		if phases[i][1] != phase {
 			t.Fatal("C wiring changed the original fresh-phase order")
 		}
@@ -131,7 +131,7 @@ func TestActorColumnNativeWorkflowRequiresFreshExact30(t *testing.T) {
 	for _, required := range []string{
 		`[[ "$OBJECT_MYSQL_PORT" =~ ^[0-9]+$ && "$OBJECT_MYSQL_PORT" != 3306 ]]`,
 		`object_source="$(git rev-parse HEAD)"`,
-		`case "$1" in m|a|b|c|d|g)`,
+		`case "$1" in m|a|b|c|d|g|h)`,
 		`--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1`,
 		`--tmpfs /data/db:rw,nosuid,nodev,size=1g`,
 		`--tmpfs /data/configdb:rw,nosuid,nodev,size=128m`,
