@@ -83,20 +83,15 @@ func (d database) observe(ctx context.Context, r sqlReader) (observation, error)
 	if re != nil || ce != nil || count != 1 {
 		return out, errors.New("sql_ledger_or_release_invalid")
 	}
-	var hello struct {
-		Set   string   `bson:"setName"`
-		Hosts []string `bson:"hosts"`
-	}
-	if d.mongo.Database("admin").RunCommand(q, bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil || hello.Set == "" || len(hello.Hosts) == 0 {
+	var hello bson.Raw
+	if d.mongo.Database("admin").RunCommand(q, bson.D{{Key: "hello", Value: 1}}).Decode(&hello) != nil {
 		return out, errors.New("mongo_identity_unknown")
 	}
-	sort.Strings(hello.Hosts)
-	for i, h := range hello.Hosts {
-		if h == "" || (i > 0 && h == hello.Hosts[i-1]) {
-			return out, errors.New("mongo_identity_invalid")
-		}
+	set, hosts, e := primaryReplicaIdentity(hello)
+	if e != nil {
+		return out, e
 	}
-	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: hello.Set}, {Key: "hosts", Value: hello.Hosts}}, d.mongoName})
+	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: set}, {Key: "hosts", Value: hosts}}, d.mongoName})
 	out.MongoHash = fingerprint(raw)
 	cur, e := d.mongo.Database(d.mongoName).Collection("schema_migrations").Find(q, bson.D{}, options.Find().SetLimit(2))
 	if e != nil {
@@ -135,6 +130,29 @@ func (d database) observe(ctx context.Context, r sqlReader) (observation, error)
 	}
 	return out, nil
 }
+
+func primaryReplicaIdentity(raw bson.Raw) (string, []string, error) {
+	primary, primaryOK := raw.Lookup("isWritablePrimary").BooleanOK()
+	message := raw.Lookup("msg")
+	if !primaryOK || !primary || (message.Type != 0 && (message.Type != bson.TypeString || message.StringValue() != "")) {
+		return "", nil, errors.New("mongo_identity_unknown")
+	}
+	var hello struct {
+		Set   string   `bson:"setName"`
+		Hosts []string `bson:"hosts"`
+	}
+	if bson.Unmarshal(raw, &hello) != nil || hello.Set == "" || len(hello.Hosts) == 0 {
+		return "", nil, errors.New("mongo_identity_unknown")
+	}
+	sort.Strings(hello.Hosts)
+	for i, host := range hello.Hosts {
+		if host == "" || (i > 0 && host == hello.Hosts[i-1]) {
+			return "", nil, errors.New("mongo_identity_invalid")
+		}
+	}
+	return hello.Set, hello.Hosts, nil
+}
+
 func (d database) retiredObjectsMissing(ctx context.Context, r sqlReader) error {
 	q, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()

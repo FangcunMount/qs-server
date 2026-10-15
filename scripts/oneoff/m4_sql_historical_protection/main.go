@@ -121,6 +121,13 @@ func restoreActionContext(ctx context.Context, a approval) (context.Context, con
 	}
 	return context.WithDeadline(ctx, deadline)
 }
+
+func mongoReadOptions(uri string) *options.ClientOptions {
+	// Ping's preference applies only to that probe. Ledger/catalog reads must
+	// also override a URI that asks for a secondary or nearest server.
+	return options.Client().ApplyURI(uri).SetReadPreference(readpref.Primary()).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit)
+}
+
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
 	return deliverReceipt(run(ctx, args, getenv, tool, nil), out)
 }
@@ -246,7 +253,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		r.Error = "session_binding_failed"
 		return r
 	}
-	d.mongo, e = mongo.Connect(ctx, options.Client().ApplyURI(getenv("QS_M4_OBJECT_MONGO_URI")).SetMaxPoolSize(1).SetServerSelectionTimeout(queryLimit).SetTimeout(queryLimit))
+	d.mongo, e = mongo.Connect(ctx, mongoReadOptions(getenv("QS_M4_OBJECT_MONGO_URI")))
 	if e != nil {
 		r.Error = "mongo_connect_failed"
 		return r

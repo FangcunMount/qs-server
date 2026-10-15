@@ -8,6 +8,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,6 +18,60 @@ import (
 )
 
 const testSource = "1111111111111111111111111111111111111111"
+
+func TestMongoReadsOverrideSecondaryURIPreference(t *testing.T) {
+	for _, query := range []string{"readPreference=secondary", "readPreference=secondaryPreferred&readPreferenceTags=region:fixture&maxStalenessSeconds=120", "readPreference=nearest", "directConnection=true"} {
+		opts := mongoReadOptions("mongodb://localhost:27017/qs_fixture?" + query)
+		if e := opts.Validate(); e != nil || opts.ReadPreference == nil || opts.ReadPreference.Mode() != readpref.PrimaryMode {
+			t.Fatal("URI escaped primary ledger/catalog routing", e)
+		}
+		if opts.MaxPoolSize == nil || *opts.MaxPoolSize != 1 || opts.Timeout == nil || *opts.Timeout != queryLimit || opts.ServerSelectionTimeout == nil || *opts.ServerSelectionTimeout != queryLimit {
+			t.Fatal("primary routing changed the existing bounded pool/read policy")
+		}
+	}
+}
+
+func TestMongoHelloRequiresActualReplicaPrimary(t *testing.T) {
+	base := bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: bson.A{"b:27017", "a:27017"}}, {Key: "isWritablePrimary", Value: true}}
+	raw, _ := bson.Marshal(base)
+	set, hosts, e := primaryReplicaIdentity(raw)
+	identity, _ := json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: set}, {Key: "hosts", Value: hosts}}, "qs_fixture"})
+	const originalIdentity = `["mongodb_cluster_selected_v1",[{"Key":"setName","Value":"rs0"},{"Key":"hosts","Value":["a:27017","b:27017"]}],"qs_fixture"]`
+	if e != nil || string(identity) != originalIdentity {
+		t.Fatal("legitimate primary changed the existing cluster identity bytes", e)
+	}
+	for _, name := range []string{"secondary", "missing_role", "null_role", "numeric_role", "string_role", "mongos", "unknown_message", "empty_set", "duplicate_host", "typed_host"} {
+		t.Run(name, func(t *testing.T) {
+			doc := append(bson.D(nil), base...)
+			switch name {
+			case "secondary":
+				doc[2].Value = false
+			case "missing_role":
+				doc = doc[:2]
+			case "null_role":
+				doc[2].Value = nil
+			case "numeric_role":
+				doc[2].Value = int32(1)
+			case "string_role":
+				doc[2].Value = "true"
+			case "mongos":
+				doc = append(doc, bson.E{Key: "msg", Value: "isdbgrid"})
+			case "unknown_message":
+				doc = append(doc, bson.E{Key: "msg", Value: int32(1)})
+			case "empty_set":
+				doc[0].Value = ""
+			case "duplicate_host":
+				doc[1].Value = bson.A{"a:27017", "a:27017"}
+			case "typed_host":
+				doc[1].Value = bson.A{int32(1)}
+			}
+			raw, _ := bson.Marshal(doc)
+			if _, _, e := primaryReplicaIdentity(raw); e == nil {
+				t.Fatal("secondary, mongos or unknown primary identity accepted")
+			}
+		})
+	}
+}
 
 func privateTestDir(t *testing.T) string {
 	t.Helper()
