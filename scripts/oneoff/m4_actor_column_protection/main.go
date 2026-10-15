@@ -22,6 +22,7 @@ import (
 
 type arguments struct {
 	action, capture, material, materialHash, approval, approvalHash string
+	captureEvidence, captureEvidenceHash                            string
 	binding                                                         binding
 	timeout                                                         time.Duration
 }
@@ -62,12 +63,20 @@ func parseArgs(args []string) (arguments, error) {
 	f.StringVar(&a.capture, "capture-file", "", "new private first capture")
 	f.StringVar(&a.material, "material-file", "", "private original material")
 	f.StringVar(&a.materialHash, "material-sha256", "", "independently frozen original bytes hash")
+	f.StringVar(&a.captureEvidence, "capture-evidence-file", "", "independently frozen original capture execution evidence")
+	f.StringVar(&a.captureEvidenceHash, "capture-evidence-sha256", "", "independent capture execution evidence raw SHA")
 	f.StringVar(&a.approval, "approval-file", "", "independent pre-first-runtime restore approval")
 	f.StringVar(&a.approvalHash, "approval-sha256", "", "independent approval raw SHA")
 	f.DurationVar(&a.timeout, "timeout", 20*time.Minute, "finite total deadline, at most20m")
 	if f.Parse(args) != nil || f.NArg() != 0 {
 		return a, errors.New("arguments_invalid")
 	}
+	captureEvidenceProvided := false
+	f.Visit(func(option *flag.Flag) {
+		if option.Name == "capture-evidence-file" || option.Name == "capture-evidence-sha256" {
+			captureEvidenceProvided = true
+		}
+	})
 	if !validBinding(a.binding) || a.timeout <= 0 || a.timeout > 20*time.Minute {
 		return a, errors.New("external_binding_or_deadline_required")
 	}
@@ -87,6 +96,13 @@ func parseArgs(args []string) (arguments, error) {
 	default:
 		return a, errors.New("action_invalid")
 	}
+	if a.action == "inspect" || a.action == "capture" {
+		if captureEvidenceProvided {
+			return a, errors.New("capture_evidence_action_mismatch")
+		}
+	} else if !absolutePath(a.captureEvidence) || !nonzeroHash(a.captureEvidenceHash) || a.captureEvidence == a.material {
+		return a, errors.New("original_capture_evidence_required")
+	}
 	return a, nil
 }
 func main() {
@@ -97,7 +113,10 @@ func main() {
 	}
 }
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
-	r := run(ctx, args, getenv, tool)
+	return emitReceipt(run(ctx, args, getenv, tool), out)
+}
+
+func emitReceipt(r receipt, out io.Writer) int {
 	if json.NewEncoder(out).Encode(r) != nil || !r.Complete {
 		return 1
 	}
@@ -151,6 +170,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 		r.MaterialHash = a.materialHash
+		if e := readCaptureEvidence(original, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
+			r.Error = e.Error()
+			return r
+		}
 	}
 	if a.action == "restore" {
 		raw, e := readPrivateLimit(a.approval, a.approvalHash, 32768)
@@ -259,6 +282,16 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		if !ok {
 			return
 		}
+		if a.action == "verify-target" || a.action == "restore" {
+			if e := readCaptureEvidence(original, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
+				r.Error = e.Error()
+				return
+			}
+			if ctx.Err() != nil {
+				r.Error, r.BudgetExceeded = "total_budget_exceeded", true
+				return
+			}
+		}
 		if a.action == "capture" {
 			if e := finishCapture(ctx, &r, a.capture, &captureDirectory, rawMaterial, writeCaptureExclusive); e != nil {
 				r.Error = strings.Split(e.Error(), "\n")[0]
@@ -298,7 +331,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		return r
 	}
 	if a.action == "restore" {
-		e = d.restore(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool, &r.ApprovalConsumed)
+		e = d.restore(ctx, original, ap, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash, tool, &r.ApprovalConsumed)
 		if e != nil {
 			r.Error = e.Error()
 			var release *transactionReleaseFailure

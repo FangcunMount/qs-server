@@ -332,7 +332,7 @@ func rereadApprovedInputs(m material, a approval, path, hash, approvalPath, appr
 	return validateApproval(approved, again, hash, tool, time.Now())
 }
 
-func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string, consumed *bool) error {
+func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, evidencePath, evidenceHash, tool string, consumed *bool) error {
 	prior, e := readRecoveryBoundary(m, a, materialHash)
 	if e != nil {
 		return e
@@ -350,6 +350,12 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	}
 	if e := rereadApprovedInputs(m, a, materialPath, materialHash, approvalPath, approvalHash, tool); e != nil {
 		return e
+	}
+	if e := readCaptureEvidence(m, materialHash, tool, evidencePath, evidenceHash); e != nil {
+		return e
+	}
+	if ctx.Err() != nil {
+		return errors.New("total_budget_exceeded")
 	}
 	if e := consumeApproval(m, a, approvalHash); e != nil {
 		return e

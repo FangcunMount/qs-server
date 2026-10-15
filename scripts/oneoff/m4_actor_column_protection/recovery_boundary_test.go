@@ -10,9 +10,25 @@ import (
 
 func privateRecoveryDir(t *testing.T) string {
 	t.Helper()
-	p, e := filepath.EvalSymlinks(t.TempDir())
-	if e != nil || os.Chmod(p, 0700) != nil {
-		t.Fatal("owned private fixture directory unavailable")
+	home, e := os.UserHomeDir()
+	if e != nil {
+		t.Fatal(e)
+	}
+	dir, e := os.MkdirTemp(home, "m4-c-private-")
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	p, e := filepath.EvalSymlinks(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
+	parent, e := privateParent(filepath.Join(p, "material.json"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := parent.Close(); e != nil {
+		t.Fatal(e)
 	}
 	return p
 }

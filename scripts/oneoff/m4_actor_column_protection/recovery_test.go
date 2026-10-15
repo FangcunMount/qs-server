@@ -296,9 +296,14 @@ func TestCopiedMaterialAndInvalidApprovalRejectedBeforeEnvironment(t *testing.T)
 				}
 			}
 			args = append(args, "--material-file="+materialPath, "--material-sha256="+hash, "--approval-file="+path, "--approval-sha256="+ah)
+			args = append(args, unitCaptureEvidence(t, m, hash, "qualifying")...)
 			r := run(t.Context(), args, func(string) string { t.Fatal("invalid frozen input accessed connection configuration"); return "" }, fixtureSource)
 			if r.Complete || r.ApprovalConsumed || r.ReleaseError != "" || r.TransactionReleaseUnproven || r.SQLPoolClosed || r.MongoClosed {
 				t.Fatal("pre-environment refusal fabricated execution or release", r)
+			}
+			want := map[string]string{"copy": "original_material_rejected", "expired": "restore_approval_rejected", "late_material_change": "private_material_fingerprint_or_release_rejected", "late_approval_change": "restore_approval_rejected"}[kind]
+			if r.Error != want {
+				t.Fatal("capture proof masked the original frozen input refusal", kind, r.Error)
 			}
 		})
 	}

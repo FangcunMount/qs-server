@@ -40,17 +40,20 @@ import (
 // These are test-only owned namespaces. Normal historical providers create the
 // ledgers; no force/SetVersion or direct fixture ledger writes are used.
 type actorNative struct {
-	t                          *testing.T
-	name, dsn, uri, tool, dir  string
-	root, db, repoPool         *sql.DB
-	client                     *mongo.Client
-	repo                       *retirementRepo.Repository
-	tasks                      map[uint64]retirementDomain.Task
-	recoveries                 map[string]retirementDomain.Recovery
-	sqlSource, mongoSource     fstest.MapFS
-	binding                    binding
-	materialPath, materialHash string
-	original                   material
+	t                                    *testing.T
+	name, dsn, uri, tool, dir            string
+	root, db, repoPool                   *sql.DB
+	client                               *mongo.Client
+	repo                                 *retirementRepo.Repository
+	tasks                                map[uint64]retirementDomain.Task
+	recoveries                           map[string]retirementDomain.Recovery
+	sqlSource, mongoSource               fstest.MapFS
+	binding                              binding
+	materialPath, materialHash           string
+	captureEvidence, captureEvidenceHash string
+	lastStdout                           []byte
+	lastExit                             int
+	original                             material
 }
 
 func pinnedActorSources(t *testing.T) (fstest.MapFS, fstest.MapFS) {
@@ -401,7 +404,11 @@ func (h *actorNative) action(action string, extras ...string) receipt {
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=2m"}
 	args = append(args, extras...)
-	return run(h.t.Context(), args, func(key string) string {
+	if action == "restore" || action == "verify-target" {
+		args = append(args, "--capture-evidence-file="+h.captureEvidence, "--capture-evidence-sha256="+h.captureEvidenceHash)
+	}
+	var stdout bytes.Buffer
+	h.lastExit = serve(h.t.Context(), args, func(key string) string {
 		switch key {
 		case "QS_M4_C_OBJECT_MYSQL_DSN":
 			return h.dsn
@@ -409,7 +416,13 @@ func (h *actorNative) action(action string, extras ...string) receipt {
 			return h.uri
 		}
 		return ""
-	}, h.tool)
+	}, h.tool, &stdout)
+	h.lastStdout = append([]byte(nil), stdout.Bytes()...)
+	var result receipt
+	if strictDecode(h.lastStdout, &result) != nil || (h.lastExit == 0) != result.Complete {
+		h.t.Fatal("original CLI receipt or exit status inconsistent")
+	}
+	return result
 }
 
 func (h *actorNative) capture() {
@@ -419,10 +432,14 @@ func (h *actorNative) capture() {
 	if !r.Complete || !r.ReadOnly || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || !r.MandatoryEOF || !r.SQLSnapshot || r.ApprovalConsumed {
 		h.t.Fatal("formal capture failed", r.Error, r.ReleaseError)
 	}
+	h.captureEvidence, h.captureEvidenceHash = freezeCaptureExecution(h.t, h.dir, "first-capture", h.lastStdout, h.lastExit)
 	h.materialHash = r.MaterialHash
 	raw, e := readPrivate(h.materialPath, h.materialHash)
 	if e != nil || strictDecode(raw, &h.original) != nil || validateMaterial(h.original, h.tool, h.binding) != nil {
 		h.t.Fatal("captured original material unavailable")
+	}
+	if e := readCaptureEvidence(h.original, h.materialHash, h.tool, h.captureEvidence, h.captureEvidenceHash); e != nil {
+		h.t.Fatal("successful original CLI execution proof unavailable", e)
 	}
 	if r := h.action("capture", "--capture-file="+h.materialPath); r.Complete || r.Error != "new_private_capture_required" {
 		h.t.Fatal("first capture was overwritten", r.Error)
@@ -579,9 +596,17 @@ func TestM4ActorColumnsNativeUnboundMaterialRejected(t *testing.T) {
 				hash = strings.Repeat("0", 64)
 			}
 			args := []string{"--action=verify-target", "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--material-file=" + path, "--material-sha256=" + hash}
+			args = append(args, "--capture-evidence-file="+h.captureEvidence, "--capture-evidence-sha256="+h.captureEvidenceHash)
 			r := run(t.Context(), args, func(string) string { t.Fatal("unbound input accessed connection configuration"); return "" }, h.tool)
 			if r.Complete || r.SQLPoolClosed || r.MongoClosed || r.ApprovalConsumed {
 				t.Fatal("unbound material crossed the pre-connection boundary")
+			}
+			want := "original_material_rejected"
+			if name == "hash" {
+				want = "independently_bound_material_required"
+			}
+			if r.Error != want {
+				t.Fatal("capture proof masked the original material rejection", name, r.Error)
 			}
 		})
 	}
