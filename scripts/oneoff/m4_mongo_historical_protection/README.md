@@ -29,16 +29,36 @@ m4-mongo-historical-protection --mysql-database=qs --mongo-database=qs
 m4-mongo-historical-protection --action=capture --mysql-database=qs --mongo-database=qs \
   --capture-file=/private/approved-protection/b-first-capture.json
 m4-mongo-historical-protection --action=verify-target --mysql-database=qs --mongo-database=qs \
-  --material-file=/private/approved-protection/b-first-capture.json --material-sha256=<externally-frozen-raw-sha256>
+  --material-file=/private/approved-protection/b-first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
+  --capture-evidence-file=/private/approved-protection/b-capture-execution.json --capture-evidence-sha256=<independent-execution-raw-sha256>
 m4-mongo-historical-protection --action=restore --mysql-database=qs --mongo-database=qs \
   --material-file=/private/approved-protection/b-first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
+  --capture-evidence-file=/private/approved-protection/b-capture-execution.json --capture-evidence-sha256=<independent-execution-raw-sha256> \
   --approval-file=/private/approved-protection/b-independent-approval.json --approval-sha256=<independent-approval-raw-sha256>
 m4-mongo-historical-protection --action=verify-restored --mysql-database=qs --mongo-database=qs \
   --material-file=/private/approved-protection/b-first-capture.json --material-sha256=<same-original-material-raw-sha256> \
+  --capture-evidence-file=/private/approved-protection/b-capture-execution.json --capture-evidence-sha256=<same-independent-execution-raw-sha256> \
   --approval-file=/private/approved-protection/b-independent-approval.json --approval-sha256=<same-already-consumed-approval-raw-sha256>
 ```
 
 这些是未执行的调用示例。默认 inspect、capture 和 verify-target 都只读；只有显式 restore 写四个固定索引和原账本。捕获材料与批准使用绝对路径、0600、单硬链接、当前 UID 或 root、无符号链接。首次 capture 以 O_EXCL 创建、文件及目录 fsync、按原始 SHA 回读，不覆盖旧材料。capture在读取连接输入前与restore使用同一个父目录owner/permission守卫：必须root或当前UID拥有且不可group/world写；因此root不能先捕获到另一个UID拥有的目录后才在恢复时失败。 首次预检在读取连接输入前打开并持续持有实际父目录FD，同时冻结FileInfo和UID。仅capture使用该原FD下的Openat O_EXCL/NOFOLLOW创建、完整原字节回读和文件/目录fsync，不在写入期间重新按绝对路径选择父目录；共享恢复writer与journal不变。写前与回读后仍核对规范路径的目录资格、os.SameFile身份及原UID；原FD成功关闭后再次检查总预算，最后才赋MaterialHash。中途路径被换走再换回时，材料仍写入最初目录；最终身份、释放或预算未通过时保留未认证材料并停止。材料原始 SHA 来自外部冻结；材料内部同时绑定首次 capture 的真实规范绝对路径，后续不能将同字节材料复制到别处后作为新恢复根使用。缺少该路径的旧材料明确拒绝。
+
+材料文件完整、可读及其 SHA 相符，不能证明 capture 最后的目录、释放、预算和 stdout 交付已经成功。独立可信执行器须保存 capture 的完整原 stdout 原字节，并在观察原进程实际终止后，封存以下六字段执行记录；不能从解析后的 receipt 重新编码出“原 stdout”。工具不生成或补写此证明，也不为失败材料补认成功：
+
+```json
+{
+  "format_version": 1,
+  "kind": "m4_b_capture_execution",
+  "receipt_file": "/private/approved-protection/b-capture-stdout.json",
+  "receipt_sha256": "<original-stdout-raw-sha256>",
+  "termination": "exited",
+  "exit_code": 0
+}
+```
+
+三种材料消费者都必须显式提供 `--capture-evidence-file` 和 `--capture-evidence-sha256`。执行记录上限32KiB，所指原 stdout 上限64KiB，两文件沿用现有绝对路径、0600、owner、单硬链接、无符号链接及独立原字节 SHA 检查；SHA 只绑定可信执行器独立冻结的字节，不是密码学签名。只接受明确的 `termination=exited`、必填整数 `exit_code=0`，以及原 typed receipt 的 capture、complete、error=none、只读、材料 SHA、工具/B source/resource、SQL101/Mongo39身份与两集合精确计数全部匹配。SQL Conn/pool、Mongo连接和实际游标释放均须为 true，snapshot session 的 EndSession 调用须已记录；失败、预算超限、unknown事务、账本写入或生产停写夸称均拒绝。证明 JSON 拒绝重复或未知成员、大小写别名、缺少必填成员与 null（包括可选成员）。原材料 schema/hash、恢复批准和 journal 不变。
+
+证明在读取连接环境变量前验证，恢复操作消费前以及数据库资源释放后的终态再次回读同一固定证明；`verify-restored` 的原外部授权回读也包含此检查。新增文件读取之后仍检查原 action context，不延长原批准或 CLI 截止时间。`inspect/capture` 拒绝附带证明参数，显式空参数也拒绝。失败 capture 留下的原材料和失败回执保留供核查，但手工计算 SHA、另给合法恢复批准或只提交 complete JSON 都不能使其重新成为可消费材料；原 stdout、实际退出状态和成功语义必须同时成立。
 
 `verify-restored` 是独立的新连接只读核验，供恢复提交回应未知时显式检查当前原状态。它要求首次规范材料与外冻SHA、原批准原字节，以及已存在且完整闭合的首次boundary、journal和该operation的已消费claim；不创建授权状态、不消费新批准、不重放账本。连接前和全部连接释放后都重核原marker、责任、决策、expiry与绝对deadline，不能重新开启恢复预算。两次完整快照均须证明SQL clean101/身份、四索引完整原spec、两业务集合原UUID/options/全部索引/精确计数、原39账本BSON/options/_id索引；该动作不提供业务正文hash。provider40会合法重建账本集合，因此当前账本UUID必须不同于capture39 UUID且在两次快照中相同，不能回造旧UUID。成功回执的`restored_verification`仅记录本次当前UUID摘要及两次稳定；`earlier_restore_ledger_uuid_bound=false`明确首次材料没有保存此后生成的40具体UUID，不宣称与此前restore的具体UUID独立绑定。失败或释放未证实不输出该证明。原unknown恢复回执保持unknown，核验成功也不直接授权启动旧实例，控制方仍需另具名批准。普通inspect不替代此动作，verify-target仍只接受clean101/40和四索引全部缺失。
 
@@ -129,3 +149,28 @@ CI任务 `a168bc3aec9970524abc99b5cee88863315dd6f7` 及健康门禁 `059821e6696
 后续 exact head `94833dc01ca89d5fb6e70e4ffe788c3fa9fad395` 的后端终态为25 checks：24 success、1 Docs & API Generated Sync设计skip，statuses为空且无分页。CI `38692602554` 的Mongo job `116281747508` 实际B范围37 RUN/PASS、0FAIL/SKIP，编译source `b246b23a8d41d829262442ace4d42723696c33ce` 的tree与948相同。不可变 `qs-m4-b-ci-mongo-lifecycle-state-guard-v2/ci-948-native37-actual-proof.json` SHA为 `b37947b530bd88b66157c3708bce741f6bf3a716dd784005a90e7a688bbb19e7`；后端tail SHA为 `e492af9a2be3ea86e60bcc69f0ddd727322639f4808f0ee4d6f135df93a3591a`。完整job日志被截断，只签可见完整B37范围；tail中A/B两个独立phase状态实际健康，metadata phase状态不在该tail内，不虚构第三份可见状态。948新AI仍发现瞬时目录替换P2：原目录写前被换走，绝对路径writer向替代目录写入，再于最后检查前换回，前后身份检查无法覆盖中途路径选择。该问题未被旧37证明消除，原评论继续保留。
 
 独立capture-only修复 source `0fa0b9fcbe9d4aa1233780d2fd8f570b4340f18e` 持有原parent FD直至持久化、回读与释放；没有更改恢复writer、journal、数据库代码、迁移或CI。真实private目录swap-away/write/swap-back对照实际复现旧绝对路径writer丢失规范材料，而新FD writer在原目录保留完整字节；既有文件/符号链接拒绝、目录资格/原UID变化、关闭FD及Close后预算反例均通过。128普通与128 race各RUN/PASS、0FAIL/SKIP，integration只编译原37，tagged vet/lint0；不可变 `qs-m4-b-capture-held-parent-source-v2/source-qa-receipt.json` SHA为 `fb2278f6c4a256923290276b2d63d2fe27f7bbf628dcda496997319fb5ef75bf`，source交付回执SHA为 `d12a93277d2dcecadf1f430eb01b8d1558086225662ead0bfca50361127fd04e`。这些命令实际在948待提交修复字节上执行，随后四文件逐字提交为0fa；新head的真实CI37与fresh AI尚待独立完成，不能由948绿或本地128单位测试代替。未调用Docker、数据库或生产，原P2评论不预先resolve。
+
+当前独立 source `88bcefa7069f4430f0cfcda8a50c6c3e130b0092` 补齐首次 capture 的独立执行证据。真实 finishCapture 写后失败所留完整材料，即使手工取 SHA 并给出合法恢复批准，三个消费者仍在 ENV 前拒绝；非0退出、失败/unknown receipt、字段别名/缺失/null、计数/身份/释放变化、私有文件与原字节变更均受回归保护。显式空证明参数修前的真实失败日志原样保留。native fixture 仅 capture 分支调用实际 serve 并冻结其原 stdout 和实际返回码，其他 action 保留原 run/observer 和全部37项名称、顺序及错误断言；早期中间态从 run 回执重新编码的 producer 已修正，其旧 QA 不作为原 stdout 能力证明。
+
+最终冻结字节实际完成普通及 race 各 **299 RUN/PASS、0 FAIL/SKIP、exit0**，integration仅编译、tagged vet、tagged lint0、gofmt与diff检查通过；提交前后的25个Go输入摘要相同。私有 `qs-m4-b-capture-execution-evidence-source-v1/native-original-stdout-qa/receipt.json` SHA为 `08bc82c5ddda147b7c8e6fabf2eda146f0148ba0512ba5c7bb85f672c05bc6e7`，保留实际argv、原日志及完整输入指纹。此前284/286/299项中间态QA、显式空flag修前失败和历史真实native/CI证据各保留原source归属，不转签。新producer目前只通过编译；新head完整真实37项、fresh CI/AI、生产T0冻结/部署、恢复窗口与业务验收尚未完成，继续分别登记。
+
+Fresh ef15审查4284410220发现固定数组解码会忽略原stdout中多余的集合计数。独立source `7de60377a59c6c4ac2e6e783b0d3f9699499071e` 在原strict typed解码前要求原数组恰好两项；不改材料/批准解码、37项native、资源/迁移或原命令截止。真实定向red保留7RUN/1PASS/5个child失败，修复后306普通/306race RUN/PASS、0FAIL/SKIP，tagged仅编译/vet/lint0通过；QA `qs-m4-b-capture-count-shape-fix-v1/source-qa-receipt.json` SHA为 `9415bbeae266ffcc399a044ca5fa48f9a0ccf485fe062444cbd28d0346a99fad`。此前e9 native37及ef15审查各保留原归属，不能替新finalhead签CI/native37/AI；生产及完整窗口资格仍未提升。
+
+Fresh8bf审查4284625167发现显式空release_error_category仍可通过，但真实成功stdout会省略该字段。独立source `2143511ee6eec13da5afb96f3c91c5dfba023ed9` 仅接受成功输出实际必需字段，release_error_category/restored_verification任何presence均拒，并删除两解码调用均不再使用的optional分支。真实red11RUN/9PASS/2FAIL（父及empty_release）保留，修复后target18、ordinary317/race317全oncePASS、0FAIL/SKIP，tag仅编译/vet/pinned lint通过；QA `qs-m4-b-success-capture-schema-fix-v1/source-qa.json` SHA为 `b208fbe6ace23bf6ca2c62e55758394662e4738339b59a0d823bf2e0ee3b1a9a`。所有native/CI/material/approval/count/预算原字节保持。旧8bf有12项CI在镜像拉取/元信息读取阶段被DockerHub限流，不能替新head签native37、CI或AI；生产及窗口资格不提升。
+
+
+原 `a01ba6e55feea03af0df087310d0bbf6231b3a5c` 的后端终态已独立核实为24 success、1设计skip；B范围37 RUN/PASS、0FAIL/SKIP，实际编译 `8533a4fe7ec43effe434f56fc7525fdc2bbe6c97` 与a01全tree相同。原件 `qs-m4-b-a01-native-tree-proof-v1.json` SHA为 `9061c76782257fc544b5093e36ed3a56c1ee13efd91878e10fe0bd0ddb522fb0`；后端tail被截断，只签可见完整B37范围。同head fresh AI评论4285164481仍发现原stdout可被重编码后接受，因此旧绿色结果没有关闭该问题，也不转签后续修复。
+
+独立 source `d937a0e5542d662c55db03d4d9f2bc5315afa9ad` 在原严格字段及语义检查后，要求原stdout与真实 `deliverReceipt` 编码器输出逐字相同，包含末尾换行；只比较，不改写独立冻结的任何原件。语义等价的重排、缩进、转义、数值改写或前后空白均不能作为原stdout。原六字段执行记录、材料和批准schema、native37名单/顺序/原断言、工作流、迁移和期限保持原字节。
+
+修前真实red为37 RUN、4 PASS、33 FAIL；修后首次普通354 RUN、352 PASS、2 FAIL来自旧计数正例重新编码stdout，原失败日志保留。该夹具改为真实 `deliverReceipt` 输出及原raw上的局部计数修改，原断言保留。最终target44、ordinary354/race354均逐项一次PASS、0FAIL/SKIP、exit0；integration仅编译、tagged vet、固定版本lint和diff通过。`qs-m4-b-canonical-capture-stdout-fix-v1/final-source-qa.json` SHA为 `def7af84e6af398fb320be700faac5126a050dc5304a8dfb664d5d93a74b7b9f`，独立 `commit-bridge.json` SHA为 `0aed1aa80a3d7adf2dd5a73afb93a1286cccb602f712f37a1bfcd79dd05cb774`；25个Go输入与d937 Git对象及QA逐字匹配。以下是该QA实际argv，`GOMAXPROCS=2`、`GOMEMLIMIT=1GiB` 由进程环境提供，未执行 `-p=2`：
+
+```sh
+go test -json -count=1 -run '^TestCaptureEvidenceRejectsReencodedOriginalStdout$|^TestCaptureReceiptRequiresExactlyTwoOriginalCollectionCounts$' ./scripts/oneoff/m4_mongo_historical_protection
+go test -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection
+go test -race -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection
+go test -tags=integration -run '^$' -count=1 ./scripts/oneoff/m4_mongo_historical_protection
+go vet -tags=integration ./scripts/oneoff/m4_mongo_historical_protection
+```
+
+固定lint的绝对可执行路径、全部实际argv、原日志和输入SHA保存在同一QA原件。新d937及后续文档head的实际native37、fresh CI和AI尚待执行；旧a01、e9及其他来源保持原绑定。本轮未调用数据库、Docker、SSH或生产；生产停写、恢复/启动、RPO、30/60分钟及业务验收资格不变。
