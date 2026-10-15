@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7de60377a59c6c4ac2e6e783b0d3f9699499071e",
+    "sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -14376,7 +14376,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "7de60377a59c6c4ac2e6e783b0d3f9699499071e",
+        "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14695,6 +14695,20 @@
           "result": "matched",
           "source_sha": "7de60377a59c6c4ac2e6e783b0d3f9699499071e",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -14737,7 +14751,8 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Source88bcefa7069f4430f0cfcda8a50c6c3e130b0092 requires an independently frozen trusted-executor six-field m4_b_capture_execution envelope (32KiB) and original capture stdout (64KiB), both private raw-SHA-bound files. Explicit exited/exit0 and typed capture completion, material/tool/B scope, SQL101/Mongo39 identity, exact counts, cursor/resource releases and absence of unknown/write/production-freeze claims must match. Strict proof JSON rejects duplicate/unknown/case-alias/missing/null members. Inspect/capture reject proof flags even when explicitly empty; all three material consumers check before ENV and reread at preclaim/terminal original input boundaries, retaining original action/approval deadlines. The tool never creates or repairs evidence; SHA is byte binding under independent executor/approval trust, not a signature. Failed material bytes remain retained and cannot be revived with manual hash or a new otherwise valid approval. Original material/hash/approval/journal/unknown semantics are unchanged.",
           "Final88bcefa7 Go bytes actually passed299 ordinary and299 race RUN/PASS0FAIL/SKIP plus integration compile-only, tagged vet, tagged lint0, format/diff. QA08bc82c5ddda147b7c8e6fabf2eda146f0148ba0512ba5c7bb85f672c05bc6e7 in qs-m4-b-capture-execution-evidence-source-v1/native-original-stdout-qa/receipt.json binds actual argv/logs/all25 Go inputs across source commit. Native capture now freezes original actual serve stdout and its returned exit, while every other action retains the original run/observer. Earlier reencoded native producer qualification was withdrawn; old284/286/299 QA and explicit-empty-flag red logs remain bound to their original bytes. Original37 native names/order/assertions remain; the new actual-serve producer was only compiled, and new-head real37/freshCI/AI are not yet executed or accepted. Historical native/CI evidence retains original source; no production, window/RPO, business or signoff promotion. These exact argv ran with GOMAXPROCS=2 and GOMEMLIMIT=1GiB supplied in the process environment; environment assignments are not executable argv entries. The immutable QA receipt retains exact compile-only/vet/lint argv and results; machine-verifiable sidecar command records list the ordinary/race commands without normalizing or inventing different commands.",
-          "Previous B verified binding retained unchanged: {\"source_sha\": \"88bcefa7069f4430f0cfcda8a50c6c3e130b0092\", \"verified_on\": \"2026-10-15\"}. Fresh ef15 review4284410220 found Go fixed-array decoding silently discarding surplus originalstdout counts. Source7de60377a requires original exact_fixed_collection_counts rawJSON array length2 before existing strict typed decoding/validation; original material/approval decoders, all37 native names/producer, resources/DDL and original action deadlines are unchanged. Actual red7RUN/1PASS/5failedchildren(+parentfailure) retained, then306ordinary/306race RUN/PASS0FAIL/SKIP and taggedcompile-only/vet/lint0 passed on the exact bytes committed as7de. QA9415bbeae266ffcc399a044ca5fa48f9a0ccf485fe062444cbd28d0346a99fad retains raw logs/actualargv/environment and25GoSHA. Prior e9/ef15 CI/native and review remain historical; new finalheadCI/native37/freshAI are pending. No production/freeze/window/RPO/business/signoff promotion."
+          "Previous B verified binding retained unchanged: {\"source_sha\": \"88bcefa7069f4430f0cfcda8a50c6c3e130b0092\", \"verified_on\": \"2026-10-15\"}. Fresh ef15 review4284410220 found Go fixed-array decoding silently discarding surplus originalstdout counts. Source7de60377a requires original exact_fixed_collection_counts rawJSON array length2 before existing strict typed decoding/validation; original material/approval decoders, all37 native names/producer, resources/DDL and original action deadlines are unchanged. Actual red7RUN/1PASS/5failedchildren(+parentfailure) retained, then306ordinary/306race RUN/PASS0FAIL/SKIP and taggedcompile-only/vet/lint0 passed on the exact bytes committed as7de. QA9415bbeae266ffcc399a044ca5fa48f9a0ccf485fe062444cbd28d0346a99fad retains raw logs/actualargv/environment and25GoSHA. Prior e9/ef15 CI/native and review remain historical; new finalheadCI/native37/freshAI are pending. No production/freeze/window/RPO/business/signoff promotion.",
+          "Previous B verified binding retained unchanged: {\"source_sha\": \"7de60377a59c6c4ac2e6e783b0d3f9699499071e\", \"verified_on\": \"2026-10-15\"}. Fresh8bf review4284625167 found explicit empty release_error_category accepted though original successful receipt omits it. Source2143511ee6eec13da5afb96f3c91c5dfba023ed9 restricts successful capture stdout to existing required fields only: any release_error_category/restored_verification presence rejects; both decoders now need no optional-member parameter/branch. Original10case red11RUN/9PASS/2FAIL(parent+empty_release) retained, then18target/317ordinary/317race oncePASS0FAIL/SKIP,tagcompile-only/vet/pinned2.5lint/diff passed. QAb208fbe6ace23bf6ca2c62e55758394662e4738339b59a0d823bf2e0ee3b1a9a and commiteede06e1b7be91a74ab5cd843081fb2aab50b787946715285a17aee36455c098 bind actualbytes/argv. Native files,workflow,material/approval/count/deadline semantics are byte-identical8bf. Old8bf CI had12 explicit DockerHub rate-limit failures before target tests/builds; full backend12job diagnostics retained privately, no failure called a pass. New finalhead native37/CI/AI remain pending; no production/window/RPO/business promotion. Exact actual argv used GOMAXPROCS=2/GOMEMLIMIT=1GiB in the process environment; no -p=2 flag was executed for source214. Machine command entries match the immutable QA argv."
         ]
       },
       "gaps": [
@@ -14745,7 +14760,7 @@
           "id": "M4-B-OBJECT-TOOL-REVIEW",
           "kind": "verification",
           "severity": "high",
-          "summary": "Fresh ef15 review4284410220 identified surplus count entries accepted by Go fixed-array decoding; source7de rejects raw array length other than2. Actual red retained and306ordinary/race passed; new finalhead native37/CI/AI remain pending, without reattributing prior source results.",
+          "summary": "Known surplus-count and successful-stdout optional-field findings fixed by7de/214 with317ordinary/race PASS. New finalhead native37/CI/AI remain pending; old8bf12registry-limit CI failures do not qualify target behavior.",
           "exit_criteria": "Fresh finalhead must actually RUN/PASS all37 B native events with original serve stdout/actual exit evidence, exact source/tree and healthy owned lifecycle/cleanup, plus fresh AI review of strict external proof, held-FD capture and durable journal. Retain old QA/native/CI source attribution and separate production approval/window/business evidence."
         },
         {
