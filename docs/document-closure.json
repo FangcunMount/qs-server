@@ -14371,7 +14371,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
+        "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14610,6 +14610,38 @@
           "result": "matched",
           "source_sha": "51a2d95343c9463a72352d129a633a1acad5dfde",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence.go",
+          "selector": "func readCaptureEvidence(",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence.go",
+          "selector": "func decodeCaptureEvidence(",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/capture_evidence_test.go",
+          "selector": "func TestFailedCaptureMaterialBytesCannotAuthorizeConsumers(",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/main.go",
+          "selector": "f.Visit(func(v *flag.Flag)",
+          "result": "matched",
+          "source_sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -14658,7 +14690,13 @@
           "Historical45-minute selector preserved as complete original JSON; current native-job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 45\",\"result\":\"matched\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
-          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent."
+          "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
+          "Source602710eb2f6ee383923230890c4bdb4a3bcada3a adds only externally frozen capture-execution evidence to material consumers:32KiB six-member m4_a_capture_execution envelope binds original private64KiB stdout/rawSHA, termination exited and explicit integer exit0. The typed original capture must complete with matching material/tool/A511/77e/280 identity and all original physical releases; alias/duplicate/missing/null shape, failed/unknown flags and production claims reject. Trusted external executor evidence is not a signature or a tool-issued seal. PreENV,restore preclaim and final after-release reads use the same proof. Failed post-write material remains diagnostic and cannot be revived by a hand-computed hash/approval. Original receipt/material/approval schemas,privatePath sticky rule,journal,recovery guards and historical resource bytes remain unchanged.",
+          "Exact Go/SQL component bytes in602710 match source-only QA workingSHA59b371111aa964fb3166100d77810a2b2e36b0873cc1eae7236d4ce56f63aeaf. Ordinary204 and race204 RUN/PASS0FAIL/SKIP,tagged compile-only(no native run),taggedvet,normal lint and tagged changed-code lint passed with GOMAXPROCS2/GOMEMLIMIT1GiB;source-review receiptb608b55cdc8bf61afa4f6d5705fa6a112da4675fe14cbdd09f2537f4435a28ed and original QA logs remain in private capture-execution-evidence-source-v1/wire-shape-v2. Full tagged lint retains the original unchanged QF1003 and is not signed all-green. Native fixture now freezes actual serve stdout/return status only after successful capture; original13tops/34children47selectors and assertions remain. New-source/final-head native47,freshCI/AI,newformalbinary/controller,production restore/fullwindow/RPO/30/60minute qualification remain pending. Prior190 QA and all historical native/capacity/production/signoff objects retain their original sources.",
+          "Historical complete pre-A602 gap retained from C parent; current active same-id gap follows incoming A602 source: {\"id\":\"M4-A-CURRENT-TOOL-QUALIFICATION\",\"kind\":\"verification\",\"severity\":\"high\",\"summary\":\"Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.\",\"exit_criteria\":\"Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff.\"}",
+          "Complete parent verified marker retained during normal C/main merge (C parent add1a979938e8d9504d95a350b98baf6ec6286e5): {\"source_sha\":\"ad092d50db54caec5b0df1009ebbd95553ab151a\",\"verified_on\":\"2026-10-15\"}",
+          "Complete parent verified marker retained during normal C/main merge (actual main parent 25028c105b23b5322bdd31f623c356f519336009): {\"source_sha\":\"602710eb2f6ee383923230890c4bdb4a3bcada3a\",\"verified_on\":\"2026-10-15\"}",
+          "Normal merge preserves incoming A602 exact Go/SQL and its complete source/QA limitations together with C60/native21 and ordinary-wrapper source-review history. All original command/native/production/signoff objects keep their source. Active45-minute selector had already been retained as complete original JSON in the existing C60 limitation; it is not reactivated against current60-minute CI. This merge alone grants no new native,hostedCI,production window,RPO orbusiness qualification; postmerge source-review binding follows separately."
         ]
       },
       "gaps": [
@@ -14673,8 +14711,8 @@
           "id": "M4-A-CURRENT-TOOL-QUALIFICATION",
           "kind": "verification",
           "severity": "high",
-          "summary": "Held-FD capture source31b has actual143 ordinary/race FS proof and an exact8cc SQL/capacity byte bridge; new exact PR-head CI47 and final production bundle remain pending.",
-          "exit_criteria": "Require actual exact-head CI47 normal capture/regressions, final tool/source and controller bindings, and separately approved production prerequisites. Preserve8cc native/capacity source and the unchanged SQL/resource bridge; do not fabricate a new local full47/capacity run or production RPO/window signoff."
+          "summary": "Capture-execution source602710 has actual204 ordinary/race proof and compile-only native fixtures; new exact-head native47, trusted executor/tool/controller binding and final production bundle remain pending.",
+          "exit_criteria": "Require actual exact-head CI47 including real successful capture stdout/exit evidence and existing regressions, final tool/source/executor/controller bindings, and separately approved production prerequisites. Preserve historical31b/8cc native/capacity sources and all failed capture diagnostics; no hand-computed material hash revives failed capture, and no compilation or source bridge signs production RPO/window qualification."
         }
       ],
       "notes": [

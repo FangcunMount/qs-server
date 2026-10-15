@@ -21,6 +21,7 @@ import (
 
 type arguments struct {
 	action, sqlName, mongoName, capture, material, materialHash, approval, approvalHash string
+	captureEvidence, captureEvidenceHash                                                string
 	timeout                                                                             time.Duration
 }
 type receipt struct {
@@ -52,6 +53,8 @@ func parseArgs(args []string) (arguments, error) {
 	f.StringVar(&a.capture, "capture-file", "", "first private capture path")
 	f.StringVar(&a.material, "material-file", "", "independently frozen private material")
 	f.StringVar(&a.materialHash, "material-sha256", "", "externally approved original bytes hash")
+	f.StringVar(&a.captureEvidence, "capture-evidence-file", "", "independently frozen original capture execution evidence")
+	f.StringVar(&a.captureEvidenceHash, "capture-evidence-sha256", "", "independent capture execution evidence raw SHA")
 	f.StringVar(&a.approval, "approval-file", "", "independent pre-start restore authorization")
 	f.StringVar(&a.approvalHash, "approval-sha256", "", "independent authorization bytes hash")
 	f.DurationVar(&a.timeout, "timeout", 15*time.Minute, "finite total deadline, at most20m")
@@ -73,6 +76,17 @@ func parseArgs(args []string) (arguments, error) {
 		}
 	default:
 		return a, errors.New("action_invalid")
+	}
+	if a.action == "inspect" || a.action == "capture" {
+		provided := false
+		f.Visit(func(v *flag.Flag) {
+			provided = provided || v.Name == "capture-evidence-file" || v.Name == "capture-evidence-sha256"
+		})
+		if provided {
+			return a, errors.New("capture_evidence_action_mismatch")
+		}
+	} else if !canonicalPrivatePath(a.captureEvidence) || !nonzeroHash(a.captureEvidenceHash) || a.captureEvidence == a.material {
+		return a, errors.New("original_capture_evidence_required")
 	}
 	return a, nil
 }
@@ -164,6 +178,10 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 		r.MaterialHash = a.materialHash
+		if e := readCaptureEvidence(m, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
+			r.Error = e.Error()
+			return r
+		}
 	}
 	if a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.approval, a.approvalHash, 32768)
@@ -268,6 +286,17 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 				return
 			}
 		}
+		if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
+			if e := readCaptureEvidence(m, a.materialHash, tool, a.captureEvidence, a.captureEvidenceHash); e != nil {
+				r.Error = e.Error()
+				return
+			}
+			if ctx.Err() != nil {
+				r.BudgetExceeded = true
+				r.Error = "total_budget_exceeded"
+				return
+			}
+		}
 
 		if a.action == "verify-restored" {
 			if e := checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool); e != nil {
@@ -327,7 +356,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	case "verify-restored":
 		e = d.verifyRestored(ctx, m, tool)
 	case "restore":
-		e = d.restore(ctx, m, ap, tool, a.material, a.materialHash, a.approval, a.approvalHash)
+		e = d.restore(ctx, m, ap, tool, a.material, a.materialHash, a.approval, a.approvalHash, a.captureEvidence, a.captureEvidenceHash)
 	}
 	if e != nil {
 		r.TransactionReleaseUnproven = hasTransactionReleaseFailure(e)

@@ -22,14 +22,32 @@ m4-sql-historical-protection --mysql-database=qs --mongo-database=qs
 m4-sql-historical-protection --action=capture --mysql-database=qs --mongo-database=qs \
   --capture-file=/private/approved-protection/first-capture.json
 m4-sql-historical-protection --action=verify-target --mysql-database=qs --mongo-database=qs \
-  --material-file=/private/approved-protection/first-capture.json --material-sha256=<externally-frozen-raw-sha256>
+  --material-file=/private/approved-protection/first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
+  --capture-evidence-file=/private/approved-protection/capture-execution.json --capture-evidence-sha256=<independently-frozen-execution-sha256>
 m4-sql-historical-protection --action=restore --mysql-database=qs --mongo-database=qs \
   --material-file=/private/approved-protection/first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
+  --capture-evidence-file=/private/approved-protection/capture-execution.json --capture-evidence-sha256=<independently-frozen-execution-sha256> \
   --approval-file=/private/approved-protection/independent-restore-approval.json --approval-sha256=<independent-approval-raw-sha256>
 m4-sql-historical-protection --action=verify-restored --mysql-database=qs --mongo-database=qs \
   --material-file=/private/approved-protection/first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
+  --capture-evidence-file=/private/approved-protection/capture-execution.json --capture-evidence-sha256=<independently-frozen-execution-sha256> \
   --approval-file=/private/approved-protection/independent-restore-approval.json --approval-sha256=<already-consumed-independent-approval-raw-sha256>
 ```
+
+三个材料 consumer 都必须另提供原成功 capture 的执行证据；`inspect`、`capture` 拒绝这两个 proof flags，显式空值也拒绝。外部可信执行器负责保存原始 stdout、观察进程真实终态及退出码，并独立冻结下列六字段 envelope 的原始 SHA。工具不生成 proof，也不根据现存材料自动补成功凭证：
+
+```json
+{
+  "format_version": 1,
+  "kind": "m4_a_capture_execution",
+  "receipt_file": "/private/approved-protection/capture-stdout.json",
+  "receipt_sha256": "<original-stdout-raw-sha256>",
+  "termination": "exited",
+  "exit_code": 0
+}
+```
+
+envelope 上限32KiB，原 stdout 上限64KiB，两者都使用原严格私有文件/SHA/释放检查。仅接受原 typed capture 成功回执：Complete、原材料 SHA、工具/A来源与资源、只读属性及全部连接释放标志一致，无失败、预算耗尽、事务释放未知或生产冻结宣称。新 proof 文档拒绝未知/重复成员、大小写别名及与 typed 输出形状不符的缺失/null 字段，保留正常字段顺序和空白差异；不重写原 stdout 或 hash。材料仍经原 validateMaterial、canonical CapturePath 及完整范围校验。ENV 前、restore 消费批准前及 consumer 释放后的成功终态均回读同一份固定 proof。SHA 是字节指纹而非签名，不能替代对独立执行器和批准方的信任。capture 写后因父目录、预算、输出交付或释放失败留下的文件只保留为诊断；手工计算材料 SHA、提供合法恢复批准也不能绕过缺失的成功 stdout/真实零退出证据。
 
 以上是调用示例，未作为生产命令执行。连接、工具 binary/source、A 执行器、输入材料和批准均须由执行控制方独立绑定。材料与批准须为绝对路径的私有 0600 普通文件，单硬链接、无符号链接、属当前 UID 或 root；原始 SHA 固定在独立批准中。首次 capture 用 O_EXCL 写入并 fsync，不覆盖旧材料。材料必须包含实际首次 capture 的 canonical 绝对路径；复制到另一文件名的材料及旧版缺失路径字段的材料均拒绝，不建立在线兼容层。首次恢复在该材料的固定私有父目录，以 O_EXCL/fsync 持久保存 `.m4-a-<materialSHA>.boundary.json` 和第一份完整批准。以后批准除 Operation 外的所有字段必须逐项相同；marker、恢复决定、deadline、expiry、冻结及责任不能重置。操作消费固定为同目录下 `.m4-a-<materialSHA>.operation-<operationSHA>.consumed`，内容另绑定批准原始 SHA 与材料 SHA，复制批准文件名或重编码不能重新使用同一操作。缺损 boundary 或已有 claim 后丢失 boundary 都拒绝重建，所有持久恢复状态须与原材料一并保留。外部材料和批准仍须独立原始 SHA；工具仅对自有固定状态使用相同私有文件检查读取。
 
@@ -100,3 +118,9 @@ native 耗时295.484秒、含清理315.869秒，均只属本次小规模合成�
 该 source 本包普通与 race 分别实际 **143 RUN/PASS、0 FAIL/SKIP**，含真实 transient swap 的旧 absolute writer/readback 缺口复现、held-FD 原 canonical 材料保留、Close→ctx→Hash、既有文件/符号链接不覆盖、缺失与同长度错误字节的原读回拒绝；tagged race编译（未运行 native）、tagged vet、增量 lint通过。私有 `qs-m4-a-capture-held-parent-source-qa-v1` QA receipt SHA `04d0cc149398592caacc665b5b9fc268cfe718caa41095710a7648f83bb6f557`，byte-bridge SHA `5b94e6566d5685a1ed8cd5c7d8fbb043429b8eb429f3f53c08a545ee8d8da11f` 保存与 source8cc 的逐字差异边界。新的 exact PR head 必须实际执行 CI47；本地不为纯 capture FS 生命周期变更重复全47或容量，编译和文件差异也不替代新 head CI。
 
 历史 source `8cc222f45fa5cca986925efbf4eca3b7c901a625` 的 owned native47-v4 已真实47 RUN/PASS，receipt SHA `0e7764b07a72809124bbc330ee7994edd99817e6c35a850164c03f8495fd2517`。其独立 `qs-m4-a-restore-capacity-rehearsal-v10` 仅在固定未移动私有目录，以每表247463行、每个新增 Outcome JSON6144字节验证498个含空EOF页：capture19.775秒、真实101两DROP后verify-target20.229秒、pre-start restore108.269秒及fresh10039通过。实际 DATA+INDEX 为2321170432字节（约2.32GB/2.16GiB），不是大于2.3GiB的门槛或生产分布；两次原ADD实际32.505秒和11.688秒，PFS错误码0及General实际Execute/Commit与完整原DDL/全保留事实/原账本最后回放相互核验。容量receipt SHA `25cd522fde01bfd12a9153c39f0a368606ebeedd346f05561dd3e0feab268845`，compact proof SHA `81b7806d93010d69c9c465d15dcf9ab81fb58afe0ba35fa955968a7e3897af59` 保留原来源；SQL/core和288个资源与31b逐字相同，不能把旧容量演练改签为新FS源码的实际完整演练。自有资源已释放、旧IDs/images/volumes保留，旧nsqd动态重启单列。生产T0冻结、最终执行包、实际窗口和RPO仍未签核。
+
+## 当前 capture 执行证据准备
+
+源码 `602710eb2f6ee383923230890c4bdb4a3bcada3a` 加入上述外部执行证据，不更改原 material/approval DTO、私有路径/sticky 规则、恢复 guard、历史 SQL 或 A511/77e/280 绑定。本包 ordinary 与 race 各实际 **204 RUN/PASS、0 FAIL/SKIP**，覆盖写后父目录/预算失败原字节保留而不能凭手工 hash 复活、非零退出即使 stdout complete 仍拒绝、原材料/hash/来源/释放不匹配拒绝、literal JSON alias/missing/null/重复键拒绝，以及合法 proof 进入原连接校验。私有 `qs-m4-a-capture-execution-evidence-source-v1/wire-shape-v2/source-review-receipt.json` SHA `b608b55cdc8bf61afa4f6d5705fa6a112da4675fe14cbdd09f2537f4435a28ed` 保存16项Go/SQL摘要与实际QA日志；普通日志 SHA `474a57bcbea6af27ec34df57d93fc0344895cd0ba71cf862023678a8477b2aab`、race日志 SHA `24f2af1b9b25482b6e839d6f5d4e98d3b3996829def4ad8ab515c8298edbb01d`。
+
+tagged `-run='^$'` 仅编译，tagged vet、普通 lint、tagged 新增差异 lint及格式/diff检查通过；full tagged lint仍有原先未改语句的 QF1003，不称全绿。native fixture现保留真实 serve 编码 stdout及返回退出状态，仅成功 capture 才冻结 proof；原13个 top/34个 child、47项名单和断言保持，**新来源及最终文档head的实际 native47、fresh CI/AI仍待验收**。旧190项准备记录、旧真实native/容量/制品来源均保留，不移签至602710；本段不证明新正式binary、完整窗口、生产恢复、30/60分钟或RPO资格。
