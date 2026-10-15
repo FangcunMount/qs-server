@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+    "sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+        "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11417,6 +11417,14 @@
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
+          "result": "matched",
+          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11457,7 +11465,8 @@
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
           "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
-          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution.",
+          "Source review99e1b9a89a6ebff5e296d51883f0d2be6ca083bc adds only a37th fixed B native child and owned-only CI exit/tmpfs diagnostics. Existing A/offline/metadata paths and required selectors are unchanged. B parentguard383b and boundedjournal58f have exact113ordinary/race PASS plus tagcompile/vet/lint0;receiptb6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b. New37native/finalheadCI/AI remainpending;previous36native still belongs tofe17. All historical verification/native/production/signoff objects retain their original attribution."
         ]
       },
       "gaps": []
@@ -12822,7 +12831,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+        "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13340,6 +13349,14 @@
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
+          "result": "matched",
+          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13357,7 +13374,8 @@
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
           "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
-          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution.",
+          "Source review99e1b9a89a6ebff5e296d51883f0d2be6ca083bc adds only a37th fixed B native child and owned-only CI exit/tmpfs diagnostics. Existing A/offline/metadata paths and required selectors are unchanged. B parentguard383b and boundedjournal58f have exact113ordinary/race PASS plus tagcompile/vet/lint0;receiptb6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b. New37native/finalheadCI/AI remainpending;previous36native still belongs tofe17. All historical verification/native/production/signoff objects retain their original attribution."
         ]
       },
       "gaps": []
@@ -13476,7 +13494,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+        "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13789,6 +13807,14 @@
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
+          "result": "matched",
+          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13822,7 +13848,8 @@
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
           "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
-          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution.",
+          "Source review99e1b9a89a6ebff5e296d51883f0d2be6ca083bc adds only a37th fixed B native child and owned-only CI exit/tmpfs diagnostics. Existing A/offline/metadata paths and required selectors are unchanged. B parentguard383b and boundedjournal58f have exact113ordinary/race PASS plus tagcompile/vet/lint0;receiptb6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b. New37native/finalheadCI/AI remainpending;previous36native still belongs tofe17. All historical verification/native/production/signoff objects retain their original attribution."
         ]
       },
       "gaps": [
@@ -13841,7 +13868,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+        "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13957,6 +13984,14 @@
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
+          "result": "matched",
+          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13983,7 +14018,8 @@
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
           "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
-          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution.",
+          "Source review99e1b9a89a6ebff5e296d51883f0d2be6ca083bc adds only a37th fixed B native child and owned-only CI exit/tmpfs diagnostics. Existing A/offline/metadata paths and required selectors are unchanged. B parentguard383b and boundedjournal58f have exact113ordinary/race PASS plus tagcompile/vet/lint0;receiptb6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b. New37native/finalheadCI/AI remainpending;previous36native still belongs tofe17. All historical verification/native/production/signoff objects retain their original attribution."
         ]
       },
       "gaps": [
@@ -14002,7 +14038,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+        "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14145,6 +14181,21 @@
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
+          "result": "matched",
+          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "58f88395eabf4e8f4c331445b435e690f04177aa",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -14172,7 +14223,10 @@
           "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings. NonDB101ordinary/race plus tagcompile/vet/lint0,actionlint withshellcheck andconfigcontract actually ran onfe03 with pending fixturefiles subsequently committed unchanged in64f; receipt066b0659f5c0b6f393f29c8beb2e179d1f6b84876bb530a25d2501373fae71ec records this bytebridge rather than a fictitious exact64f execution.",
           "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution.",
           "Actual cleanfe17e2e8ca2716a1600664ffae3a2aed3d3a2629 passed9tops+27children=36RUN/PASS,0FAIL/SKIP,exit0 on ownedMySQL8.0.36/MongoRS7.0.31. Native binary27c350e8bc4e6adcec448c5e9941fab31a303620e11dae6fd2ff7dd88816fcaa actually compiledfe17 and19packagehashes were unchanged. Receipt1bf38ab5e32762f753760499ab957c0e7a66d0b7911790eb4531256d9ce83543,fullJSONL870d1c33a542a04df640f8768e424442ad2c916cdf02faa536f571aad46365bd,runner5f3cef95fdc2a864afe5437a34f2a6b1d9afd4c6d876caa02b9bda6de89f8340 and actualdelivery19312e578573f75c7197665ec42299939b90dc3d1387236bc7f52838ada61d5b retain full actualargv/events/witnesses. Eight attacks each followed a realACK1 cancellation/prefix3 and retained actual40 BSON/UUID,fullsyntheticBSON/metadata/SQLledger; copied/reencoded/reset/missing/corrupt authority issued no newDDL or ledger mutation. LastSQLread actually waited on an ownedmetadata lock; originalmarker appeared during that wait;zeroCOMMIT and realabortACK were observed,while publicMongo transactionrelease remainedunproven. Original26scenarios passed again,including typed11000 and2successfulsame-txnCOMMIT replies bothdropped/applicationunknown. Nativeprocessgroupreaped/absent,owned2CID+networkreleased,oldIDs/images/volumespreserved,cleanup[]. One selectedoldruntime metadata difference is retained;148.186s onlysmallsyntheticwallclock,notproductioncapacity/RPO/timebudget. NewheadCI/AI remainpending;production/signoff is not promoted.",
-          "Preceding ownedv5 actually failed2RUN/0PASS/2FAIL/0SKIP because sealedtestlauncher usedrepositorycwd instead of packagecwd: originalresourcepath precheck failed before toolconnections. Receipt4a71bebcb435e9957065a2a439ee2958ea2bffe288eb036c324d7d41599336b3 and JSONLb1bff80d6267b62e8e8dad7263726d1b2766b1e15ada9d048fa27915a62eabde remainunchanged;actualmemory/resourcegatespassed andownerresourcesreleased. V6 changedonlynativePopen cwd and preservedGo/binarybytes;actualpackagecwd resource282/60a024 proof and existingnonDBprotocoltops passed before separatelyauthorizedrun. V4 remainsunexecutedpreparation. No product/memory cause is attributed to thislauncherfailure, and no oldnative or production fact is rewritten."
+          "Preceding ownedv5 actually failed2RUN/0PASS/2FAIL/0SKIP because sealedtestlauncher usedrepositorycwd instead of packagecwd: originalresourcepath precheck failed before toolconnections. Receipt4a71bebcb435e9957065a2a439ee2958ea2bffe288eb036c324d7d41599336b3 and JSONLb1bff80d6267b62e8e8dad7263726d1b2766b1e15ada9d048fa27915a62eabde remainunchanged;actualmemory/resourcegatespassed andownerresourcesreleased. V6 changedonlynativePopen cwd and preservedGo/binarybytes;actualpackagecwd resource282/60a024 proof and existingnonDBprotocoltops passed before separatelyauthorizedrun. V4 remainsunexecutedpreparation. No product/memory cause is attributed to thislauncherfailure, and no oldnative or production fact is rewritten.",
+          "Source review99e1b9a89a6ebff5e296d51883f0d2be6ca083bc adds only a37th fixed B native child and owned-only CI exit/tmpfs diagnostics. Existing A/offline/metadata paths and required selectors are unchanged. B parentguard383b and boundedjournal58f have exact113ordinary/race PASS plus tagcompile/vet/lint0;receiptb6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b. New37native/finalheadCI/AI remainpending;previous36native still belongs tofe17. All historical verification/native/production/signoff objects retain their original attribution.",
+          "Fresh7eb AI identified deletedsingleclaim replay and capture/recovery parent mismatch;bothaccepted. Source383b applies identical parentguard beforecaptureENV;58f adds fixedmaterial-root3field journal128operations/64KiB,firstboundaryimmutable,journal/claim two-way closure,nonblockflock followedbyreread/append/fsync/claim/fullreadback. Missingjournal/boundaryhalfstate,empty/partial/truncatedjournal,deletedclaim orunknownclaim refuseallcontinuation;noautomaticreinitialization. Ordinary113/race113 PASS and tagcompile/vet/lint0 bind actual58f receiptb6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b. No protection against maliciousroot rewritingallstate is asserted. New37native includesrealACKthenclaimdeletion/sameandnewoperationrejection;notyetexecuted.",
+          "Historical7eb CI38684465861 Mongojob116256051973 completedfailure;backendtail120kistruncatedbutcontainsB36RUN/27PASS/9FAIL/0SKIP. FirstDirtyAfterACK3 observedACK2/genericindexfailure,thenprimaryunavailable;noactualownedMongoexit/OOM/diskstatewasretained,socauseisunknown. SharedcleanupctxMongoDrop30sexhaustioncannotproveSQLdown. Twoindependentsetup-goactiondownload404jobsandtheirprecisetest-onlyretrymutationsremainseparate.Nooldlocal36proofisusedtosignCIsuccess;newheadCIandAIremainrequired."
         ]
       },
       "gaps": [
@@ -14180,8 +14234,8 @@
           "id": "M4-B-OBJECT-TOOL-REVIEW",
           "kind": "verification",
           "severity": "high",
-          "summary": "New36 local native passed; fresh documentation-child CI/native and the two approval P1 reviews remain pending.",
-          "exit_criteria": "Bind finalheadGo/CI by exact byte equality to actualfe17native,then require applicable freshCI/native and independent AI review closure,without borrowing old4897checks or promoting production status."
+          "summary": "Parent/journal fixes passed nonDB QA; new37 native and finalhead CI/AI remain pending; old7eb CI Mongo failed with unknown dependency cause.",
+          "exit_criteria": "Actually runall37fixednativeevents,includingACKthenclaimdeletionrefusingbothsameandnewoperation;bindcleanup/sourceandrequirefreshheadCI/AIwithowneddependencyfailuremetadata,withoutpromotingold36orproductionevidence."
         },
         {
           "id": "M4-B-OBJECT-TOOL-PRODUCTION",

@@ -35,7 +35,7 @@ m4-mongo-historical-protection --action=restore --mysql-database=qs --mongo-data
   --approval-file=/private/approved-protection/b-independent-approval.json --approval-sha256=<independent-approval-raw-sha256>
 ```
 
-这些是未执行的调用示例。默认 inspect、capture 和 verify-target 都只读；只有显式 restore 写四个固定索引和原账本。捕获材料与批准使用绝对路径、0600、单硬链接、当前 UID 或 root、无符号链接。首次 capture 以 O_EXCL 创建、文件及目录 fsync、按原始 SHA 回读，不覆盖旧材料。材料原始 SHA 来自外部冻结；材料内部同时绑定首次 capture 的真实规范绝对路径，后续不能将同字节材料复制到别处后作为新恢复根使用。缺少该路径的旧材料明确拒绝。
+这些是未执行的调用示例。默认 inspect、capture 和 verify-target 都只读；只有显式 restore 写四个固定索引和原账本。捕获材料与批准使用绝对路径、0600、单硬链接、当前 UID 或 root、无符号链接。首次 capture 以 O_EXCL 创建、文件及目录 fsync、按原始 SHA 回读，不覆盖旧材料。capture在读取连接输入前与restore使用同一个父目录owner/permission守卫：必须root或当前UID拥有且不可group/world写；因此root不能先捕获到另一个UID拥有的目录后才在恢复时失败。材料原始 SHA 来自外部冻结；材料内部同时绑定首次 capture 的真实规范绝对路径，后续不能将同字节材料复制到别处后作为新恢复根使用。缺少该路径的旧材料明确拒绝。
 
 capture 在 SQL RR 只读事务读取严格单行 clean101，rollback 后再核对。Mongo 账本原 BSON和两集合精确 `$count` 在同一 snapshot session 读取，集合目录及索引在该快照前后独立读取并完整比较。游标须实际 EOF、ID0 和 Close 成功；不存在或失败的集合不能算作零。原 clean39 文档保留 `_id`、字段顺序及 BSON 整数宽度，账本只接受空 options、一个标准 `_id_` 索引及严格单行 typed version/dirty。业务集合保留 UUID、完整 options、全部完整索引及精确计数；材料没有业务正文或全量业务 hash。
 
@@ -47,7 +47,7 @@ MySQL 身份绑定实际 server UUID 和选中数据库；Mongo 稳定身份绑�
 
 执行控制方负责 API1、Collection2、Worker3 六实例及其他相关写入者持续冻结，在首个新 runtime 启动命令发出前，以 O_EXCL 持久写入批准绑定的 first-runtime marker。工具不生成或删除该 marker。marker 缺失本身不证明停写；计数相同也不证明业务字段没有被更新。首个新启动命令已发出或有新持久事实之后，禁止回放旧材料，只能使用目标 schema 兼容版本向前恢复。
 
-restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须是原 DROP 前缀0、1、2、3、4，SQL始终须 clean101。逆序补回缺失索引，使每个实际成功ACK后仍是更短的缺失前缀；clean40 也接受这种已恢复后缀。每次继续须使用新的独立批准并保持原 first-capture、持续冻结和绝对恢复截止。首次批准在原材料的固定 parent 中，以材料 SHA 命名的 O_EXCL 文件持久冻结完整恢复边界；续跑只允许更换 operation，其他字段必须与首份结构完全相同，包括原 marker、决策、截止、expiry、停写与责任。批准消费文件由同一固定根和 operation 摘要定位，不依赖批准文件名或 JSON 空白，因此复制批准或重编码同一 operation 不能重复使用。边界缺失、损坏、未知、写入或 fsync 未证实时停止，既有边界只读核验并重新确认落盘，不覆盖或自动重建。原索引、业务 UUID/options、精确计数和无关索引均须匹配；非前缀缺失、已存在规格变化、额外索引或其他 head 拒绝自动推进。verify-target 仍只接受 clean40 且四索引全部缺失，不把部分或全部恢复的状态当作B安装成功。
+restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须是原 DROP 前缀0、1、2、3、4，SQL始终须 clean101。逆序补回缺失索引，使每个实际成功ACK后仍是更短的缺失前缀；clean40 也接受这种已恢复后缀。每次继续须使用新的独立批准并保持原 first-capture、持续冻结和绝对恢复截止。首次批准在原材料的固定 parent 中，以材料 SHA 命名的 O_EXCL 文件持久冻结完整恢复边界；续跑只允许更换 operation，其他字段必须与首份结构完全相同，包括原 marker、决策、截止、expiry、停写与责任。批准消费文件由同一固定根和 operation 摘要定位，不依赖批准文件名或 JSON 空白，因此复制批准或重编码同一 operation 不能重复使用。边界缺失、损坏、未知、写入或 fsync 未证实时停止，既有边界只读核验并重新确认落盘，不覆盖或自动重建。 同一固定根还保留不可重新初始化的有界追加日志（最多128个operation、64KiB，每条只含operation、批准SHA和材料SHA），与每个claim双向核对。删除任何已用claim、日志缺失/为空/截断、未知claim或首次boundary/journal只保留一半时，同operation和新operation均拒绝；不会根据缺失状态重新初始化。日志追加使用非阻塞排他flock，持锁后再次比对原字节，再单次追加、文件及目录fsync、claim落盘并完整回读闭合后才允许可变阶段。部分写入、并发忙或释放失败保持unknown并保留状态。该机制防止单文件丢失重开授权，不承诺抵御有权恶意重写全部本地状态的root。原索引、业务 UUID/options、精确计数和无关索引均须匹配；非前缀缺失、已存在规格变化、额外索引或其他 head 拒绝自动推进。verify-target 仍只接受 clean40 且四索引全部缺失，不把部分或全部恢复的状态当作B安装成功。
 
 批准再次核读并单次消费后，只按四个固定位置执行原始完整 createIndexes spec，随后完整核对索引、集合、计数、SQL身份和原40账本。全部通过后，在同一个显式 RS 事务内 DELETE 当前唯一账本文档、INSERT 捕获的原39 BSON，最后 COMMIT；不 Drop/Create 集合、不 Force、不构造 clean 文档、不直接清 dirty。成功后新快照须证明原39 BSON逐字相同，账本 UUID 仍是 provider40 已产生的当前 UUID。 每次新的索引写入、账本事务、DELETE、INSERT和最终 COMMIT 前都重新核对原 marker、首次边界和绝对期限；最后 SQL 身份/账本回读完成后，紧邻 COMMIT 发令再次核对，不能沿用该有界 RPC 等待前的检查。
 
@@ -61,7 +61,7 @@ restore 接受实际 provider 产生的 dirty40 或 clean40，缺失索引必须
 
 协议 source `ed97ae9a20aa369982c58d0a99cf18385f03fe8d` 的42项单测通过，只证明当时协议；当时 DB 入口尚未实现。只读 capture source `f7a23591e34c862bc745748e1a0315055b8d389a` 完成57项单测；恢复 source `857e9b5ca4f3eb6e09c8474579fb8bfc473486eb` 完成69项单测。Mongo 事务释放语义修正 source `3d0d3f4645740536f83cdafba9f83044567fb437` 的69项单测、race、vet、目标 lint 均通过；不可变私有 `qs-m4-b-object-tool-release-3d0d3f46/receipt.json` SHA为 `17b16c51bab54b2e3eace4c10da2448711c316dbbbe887433fe9fa9774af457f`。这些不是 native、生产权限或数据库操作验收。
 
-native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。该历史26项清单由七个顶层、恢复矩阵六个 child、批准边界五个 child 与续跑八个 child 构成。当前源码新增首次恢复边界八个 child 及最后 SQL 回读 marker 顶层，共九个顶层和27个 child、36个必需事件；全部须实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败。此前26项证明不能覆盖新反例：
+native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e14d08073e44aa1038f5a50384b011` 定义以下必跑矩阵。CI复用已有 authenticated Mongo7.0.31 rs0 和独占 MySQL8.0.36，在 A 进程结束后串行运行 B。该历史26项清单由七个顶层、恢复矩阵六个 child、批准边界五个 child 与续跑八个 child 构成。当前源码新增首次恢复边界八个 child 及最后 SQL 回读 marker 顶层，共九个顶层和28个 child、37个必需事件；全部须实际 RUN/PASS，任一 SKIP/FAIL 或 selector 缺失均失败。此前26项证明不能覆盖新反例：
 
 - 捕获、真实 provider40 完整升级及 clean10140 核对。
 - dirty40 的0–4 DROP前缀及 clean40 全部退出后的对象恢复、真实原账本最后事务回放、当前40 UUID保留和 fresh10139 只读核对。
@@ -69,7 +69,7 @@ native 源 `68c2615970e56533b015e73ae224ca9d6b7f8a0b` 与 CI 接入 `33511c0751e
 - 账本事务写入中断、服务端 COMMIT 已成功但全部响应被丢失，以及同一事务重发摘要。
 - first-runtime marker、外冻材料变化、过期批准、实际消费后再次使用、真实 SQL102 未来 head 拒绝。
 - dirty40/clean40 各在第1–4个真实 createIndexes ACK后中断，旧批准复用无DDL拒绝，同一原材料和原绝对截止的新批准继续；四索引全恢复但账本尚未回放的中断也须通过。
-- 实际ACK1中断后，复制批准路径、同operation重编码、延期、变更决策、更换已经存在的原marker、复制材料、删除或损坏首次边界，全部须具名拒绝且无新增DDL或账本写入。
+- 实际ACK1中断后，复制批准路径、同operation重编码、延期、变更决策、更换已经存在的原marker、复制材料、删除或损坏首次边界，全部须具名拒绝且无新增DDL或账本写入。新增删除已消费claim后，同operation与新operation都须在日志闭合检查处拒绝。
 - 账本INSERT实际ACK后，以自有SQL表锁阻挡正式最后回读，独立确认该SELECT正在等待时写原marker，再释放锁；必须无COMMIT、真实abort ACK、原40 BSON/UUID保持，公开事务释放仍为unproven。
 
 原生测试独立读取全部合成 BSON、全部业务集合 UUID/options、无关索引及 SQL 账本进行比较；这些正文不进入工具材料。测试代理仅使用 owned loopback，记录成功回包和事务身份摘要，不写生产或更改真实请求。编译或内存 wire helper 测试不代替这些 native 用例。
@@ -103,3 +103,7 @@ CI-only source `727558f29dc0a65cfa6716826bdb4bdf4b13a288` 将既有共享 authen
 本次初始VM total为8,214,851,584字节、available为5,011,025,920字节，SQLready后available为4,494,671,872字节；实际HostConfig核对SQL1GiB与Mongo2GiB的memory/swap、CPU和tmpfs成功。测试进程组已回收且不存在，两自有容器和网络精确释放，旧CID/images/volumes保留，cleanup错误为空；一个旧容器的选定运行元数据变化，因此不签全环境稳定。148.186秒仅是小型合成矩阵总耗时，不能作为生产规模、RPO0或30/60分钟预算证明。
 
 前一次唯一v5实际失败为2 RUN、0 PASS、2 FAIL、0 SKIP：封存测试二进制代替go test后，launcher遗漏包工作目录，原资源相对路径检查在工具连接前失败。v5回执SHA `4a71bebcb435e9957065a2a439ee2958ea2bffe288eb036c324d7d41599336b3` 及JSONL `b1bff80d6267b62e8e8dad7263726d1b2766b1e15ada9d048fa27915a62eabde` 原样保留；资源门槛通过、全部自有物料释放。v6只改启动cwd一行，Go和封存测试二进制未改，先在实际包目录重算282资源/60a024并执行既有不连库协议用例，再独立获准执行。v4仍是未执行准备，不能记为失败或通过。后续文档子提交只以Go/CI逐字等价继承组件证据；新PR head的CI/native和两条批准P1审查仍需独立完成，生产状态不提升。
+
+实际7eb审查后补两项来源独立的保护：`383b45cfc` 将capture父目录守卫前置并与恢复共用；`58f88395eabf4e8f4c331445b435e690f04177aa` 增加固定日志与claim双向闭合。精确58f完成113普通/race RUN/PASS、0FAIL/SKIP、integration仅编译、tagged vet/lint0；不可变 `qs-m4-b-journal-source-58f88395/receipt.json` SHA为 `b6979d06d7605a51d0854e98cb03efcee73eaaaa133a535a4548f8a24664c54b`。其unit实际覆盖单claim删除、首次单边初始化、空/partial/后缀截断日志、非阻塞锁冲突及条数/字节界限。原36项只绑定fe17，不能覆盖这两项新修复。
+
+夹具/CI source `99e1b9a89a6ebff5e296d51883f0d2be6ca083bc` 增加DeletedConsumedClaim真实ACK反例，使必跑总数为37；ACK计数异常时输出已有封闭typed observer字段，并在CI自有Mongo移除前记录固定State/Memory/Swap以及tmpfs安全整数或明确UNAVAILABLE。integration编译、tagged vet/lint0、configcontract和actionlint带shellcheck通过；新37项真实native与新head CI/AI尚未执行。旧7eb CI Mongo范围实际36 RUN、27 PASS、9 FAIL、0 SKIP，首失败为DirtyAfterACK3只观察到两个ACK及generic失败，后续primary不可用；原日志tail120k且truncated=true，尚无退出/OOM/空间证据，保持原因unknown，不由清理共用ctx耗尽推断SQL宕机。两个setup-go下载故障及其独立重试与该Mongo失败分别保留，未借本地36覆盖CI。
