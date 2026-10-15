@@ -59,6 +59,7 @@ func TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval(t *tes
 				cancel()
 				requireReleased(t, r)
 				if acknowledged != afterACK || r.Complete || r.LedgerCommitIssued || !r.BudgetExceeded {
+					h.logIndexEvents(0)
 					t.Fatal("real ACK cancellation did not stop before ledger replay", acknowledged, r)
 				}
 				pausedHead, pausedUUID := h.head()

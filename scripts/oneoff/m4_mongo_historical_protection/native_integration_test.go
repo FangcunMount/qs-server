@@ -322,10 +322,7 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 		}
 		return ""
 	}, h.tool, h.observeIndexes())
-	if rows := h.indexEventsFrom(start); len(rows) > 0 {
-		raw, _ := json.Marshal(rows)
-		h.t.Logf("test-only fixed createIndexes witness: %s", raw)
-	}
+	h.logIndexEvents(start)
 	return r
 }
 func requirePhysicalReleased(t *testing.T, r receipt) {

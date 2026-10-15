@@ -49,7 +49,7 @@ func requireReleasedOrUnopened(t *testing.T, r receipt) {
 }
 
 func TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary(t *testing.T) {
-	for _, kind := range []string{"CopiedApprovalPath", "ReencodedSameOperation", "ExtendedDeadline", "ChangedDecision", "ChangedMarkerAfterFirstRuntime", "CopiedMaterialPath", "MissingBoundaryAfterClaim", "CorruptBoundary"} {
+	for _, kind := range []string{"CopiedApprovalPath", "ReencodedSameOperation", "ExtendedDeadline", "ChangedDecision", "ChangedMarkerAfterFirstRuntime", "CopiedMaterialPath", "MissingBoundaryAfterClaim", "CorruptBoundary", "DeletedConsumedClaim"} {
 		t.Run(kind, func(t *testing.T) {
 			h := newNative(t)
 			docs, metadata, sql := h.frozenDocuments(), h.retainedMetadata(), h.sqlLedger()
@@ -77,6 +77,7 @@ func TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary(t *testing.T) {
 			cancel()
 			requireReleased(t, r)
 			if acknowledged != 1 || r.Complete || r.LedgerCommitIssued || !r.BudgetExceeded {
+				h.logIndexEvents(0)
 				t.Fatal("first real index ACK did not stop before ledger replay", acknowledged, r)
 			}
 			paused, pausedUUID := h.head()
@@ -138,6 +139,12 @@ func TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary(t *testing.T) {
 					t.Fatal("owned boundary fault unavailable")
 				}
 				wantError = "recovery_boundary_invalid"
+			case "DeletedConsumedClaim":
+				if os.Remove(claim) != nil {
+					t.Fatal("owned consumed claim deletion unavailable")
+				}
+				next = first
+				wantError = "recovery_operation_journal_invalid_or_lost"
 			}
 			if kind != "CopiedApprovalPath" && kind != "ReencodedSameOperation" {
 				approvalRaw, _ = json.Marshal(next)
@@ -153,13 +160,37 @@ func TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary(t *testing.T) {
 			if rejected.Complete || rejected.Error != wantError || rejected.LedgerCommitIssued || rejected.LedgerAbortCalled || h.indexEventCount() != beforeEvents {
 				t.Fatal("moved/reset recovery authority issued DDL or reached ledger mutation", rejected)
 			}
+			if kind == "DeletedConsumedClaim" {
+				// Deleting one claim loses recovery state for every operation,
+				// not just the operation whose retained journal entry remains.
+				fresh := first
+				fresh.Operation = fmt.Sprintf("%d-3", time.Now().UnixNano())
+				raw, _ := json.Marshal(fresh)
+				freshPath := filepath.Join(h.dir, "new-operation-after-deletion.json")
+				if writeExclusive(freshPath, raw) != nil {
+					t.Fatal("new negative operation unavailable")
+				}
+				freshArgs := append(h.boundInput(), "--approval-file="+freshPath, "--approval-sha256="+fingerprint(raw))
+				freshRejected := h.action("restore", freshArgs...)
+				requireReleasedOrUnopened(t, freshRejected)
+				if freshRejected.Complete || freshRejected.Error != wantError || freshRejected.LedgerCommitIssued || freshRejected.LedgerAbortCalled || h.indexEventCount() != beforeEvents {
+					t.Fatal("new operation bypassed lost original claim", freshRejected)
+				}
+				if _, e := os.Stat(nativeClaimPath(t, h, fresh)); !os.IsNotExist(e) {
+					t.Fatal("lost journal/claim state consumed a new operation")
+				}
+			}
 			after, afterUUID := h.head()
 			if !bytes.Equal(head, after) || !bytes.Equal(uuid, afterUUID) || !reflect.DeepEqual(indexes, h.independentIndexes(true)) || h.sqlLedger() != sql {
 				t.Fatal("rejected authority changed original40 state")
 			}
 			assertDocuments(t, docs, h.frozenDocuments())
 			assertMetadata(t, metadata, h.retainedMetadata())
-			if fingerprintMustRead(t, claim) != claimHash {
+			if kind == "DeletedConsumedClaim" {
+				if _, e := os.Stat(claim); !os.IsNotExist(e) {
+					t.Fatal("deleted operation claim was recreated")
+				}
+			} else if fingerprintMustRead(t, claim) != claimHash {
 				t.Fatal("rejected authority overwrote original operation claim")
 			}
 			if next.Operation != first.Operation {

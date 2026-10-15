@@ -166,10 +166,20 @@ jobs:
           fixture_image='mongo@sha256:43fddee7e532a920f3dfdee9e8f4834398c155c26bcb92d790cc1cd3c630fc40'
           cleanup_owned_fixture() {
             fixture_status=$?
+            fixture_state_evidence=true
             if [ -n "$fixture_cid" ]; then
               [[ "$fixture_cid" =~ ^[0-9a-f]{64}$ ]] || return 1
               [[ "$(docker inspect --format '{{index .Config.Labels "qs.mongo-metadata.fixture"}}' "$fixture_cid")" == "$fixture_owner" ]] || return 1
               [[ "$(docker inspect --format '{{.Name}}' "$fixture_cid")" == "/$fixture_name" ]] || return 1
+              if ! docker inspect --type container --format 'B_MONGO_OWNED_STATE {"id":{{json .Id}},"running":{{json .State.Running}},"exit_code":{{json .State.ExitCode}},"oom_killed":{{json .State.OOMKilled}},"error_present":{{ne .State.Error ""}},"memory":{{json .HostConfig.Memory}},"memory_swap":{{json .HostConfig.MemorySwap}}}' "$fixture_cid"; then
+                fixture_state_evidence=false
+              fi
+              if ! docker exec "$fixture_cid" df -kP /data/db /data/configdb 2>/dev/null | awk '
+                NR == 1 { next }
+                { if (NF < 6 || $2 !~ /^[0-9]+$/ || $3 !~ /^[0-9]+$/ || $4 !~ /^[0-9]+$/) bad=1; count++; blocks[count]=$2; used[count]=$3; available[count]=$4 }
+                END { if (bad || count != 2) exit 1; for (i=1; i<=2; i++) printf "B_MONGO_OWNED_TMPFS {\"ordinal\":%d,\"blocks_1k\":%.0f,\"used_1k\":%.0f,\"available_1k\":%.0f}\n", i, blocks[i], used[i], available[i] }'; then
+                printf '%s\n' 'B_MONGO_OWNED_TMPFS_UNAVAILABLE'
+              fi
               docker rm -f "$fixture_cid" >/dev/null
               fixture_remaining="$(docker ps --all --no-trunc --filter "id=$fixture_cid" --format '{{.ID}}')" || return 1
               [[ -z "$fixture_remaining" ]] || return 1
@@ -179,6 +189,7 @@ jobs:
               [[ "$(docker network inspect --format '{{len .Containers}}' "$fixture_network")" == 0 ]] || return 1
               docker network rm "$fixture_network" >/dev/null
             fi
+            [[ "$fixture_state_evidence" == true ]] || return 1
             return "$fixture_status"
           }
           trap cleanup_owned_fixture EXIT
@@ -304,6 +315,7 @@ jobs:
               'TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/CopiedMaterialPath',
               'TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/MissingBoundaryAfterClaim',
               'TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/CorruptBoundary',
+              'TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim',
               'TestM4MongoObjectNativeFirstRuntimeDuringFinalSQLRead',
           }
           events = [json.loads(line) for line in open(sys.argv[1], encoding='utf-8')]

@@ -20,6 +20,13 @@ type nativeIndexEvent struct {
 	Observation indexObservation `json:"observation"`
 }
 
+func (h *nativeFixture) logIndexEvents(start int) {
+	if rows := h.indexEventsFrom(start); len(rows) > 0 {
+		raw, _ := json.Marshal(rows)
+		h.t.Logf("test-only fixed createIndexes witness: %s", raw)
+	}
+}
+
 func (h *nativeFixture) recordIndex(kind string, o indexObservation) {
 	h.witnessMu.Lock()
 	defer h.witnessMu.Unlock()
