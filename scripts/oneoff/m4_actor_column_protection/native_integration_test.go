@@ -400,7 +400,7 @@ func (h *actorNative) action(action string, extras ...string) receipt {
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=2m"}
 	args = append(args, extras...)
-	if action == "restore" || action == "verify-target" {
+	if action == "restore" || action == "verify-target" || action == "mark-first-runtime" {
 		args = append(args, "--capture-evidence-file="+h.captureEvidence, "--capture-evidence-sha256="+h.captureEvidenceHash)
 	}
 	var stdout bytes.Buffer

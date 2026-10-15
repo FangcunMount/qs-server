@@ -302,12 +302,18 @@ type actorTerminalLossConn struct {
 
 func (c *actorTerminalLossConn) Write(p []byte) (int, error) {
 	c.mu.Lock()
+	if len(p) > 5 && int(p[0])|int(p[1])<<8|int(p[2])<<16 == len(p)-4 && p[4] == 23 && c.mode == "runtime_create" && c.armed {
+		c.drop = true
+	}
 	if len(p) > 5 && int(p[0])|int(p[1])<<8|int(p[2])<<16 == len(p)-4 && (p[4] == 3 || p[4] == 22) {
 		s := strings.ToUpper(strings.TrimSpace(string(p[5:])))
+		if p[4] == 22 && ((c.mode == "runtime_create" && strings.HasPrefix(s, "CREATE TABLE `M4_C_RUNTIME_BOUNDARY`")) || (c.mode == "runtime_commit" && strings.HasPrefix(s, "UPDATE `M4_C_RUNTIME_BOUNDARY`"))) {
+			c.armed = true
+		}
 		if c.mode == "ledger_commit" && s == "DELETE FROM SCHEMA_MIGRATIONS" {
 			c.armed = true
 		}
-		if c.mode == "ledger_commit" && c.armed && p[4] == 3 && s == "COMMIT" || c.mode == "release_prepare" && p[4] == 22 && s == "SELECT RELEASE_LOCK(?)" {
+		if (c.mode == "ledger_commit" || c.mode == "runtime_commit") && c.armed && p[4] == 3 && s == "COMMIT" || c.mode == "release_prepare" && p[4] == 22 && s == "SELECT RELEASE_LOCK(?)" {
 			c.drop = true
 		}
 	}
