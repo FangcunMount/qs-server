@@ -690,6 +690,7 @@ func TestM4SQLObjectNativeCommitResponseLossRemainsUnknown(t *testing.T) {
 	h.capture()
 	h.upgrade(2, false)
 	args, _ := h.restoreInput()
+	directDSN := h.dsn
 	cfg, _ := mysql.ParseDSN(h.dsn)
 	actualAck := false
 	network := h.name
@@ -708,7 +709,49 @@ func TestM4SQLObjectNativeCommitResponseLossRemainsUnknown(t *testing.T) {
 		t.Fatal("actual committed reply loss was not safely refused", r, actualAck)
 	}
 	h.assertHead(100, false)
-	t.Log("actual MySQL COMMIT OK was dropped; tool reported unknown and did not force/down/retry")
+	// This is a new normal TCP client, not the connection that lost the ACK.
+	h.dsn = directDSN
+	stateBefore := ownedRecoveryStateBytes(t, h.dir)
+	verified := h.action("verify-restored", args...)
+	if !verified.Complete || !verified.ReadOnly || !verified.SQLConnectionClosed || !verified.SQLPoolClosed || !verified.MongoClosed || verified.ReleaseError != "" || verified.TransactionReleaseUnproven {
+		t.Fatal("fresh read-only original-state verification failed", verified)
+	}
+	if !reflect.DeepEqual(stateBefore, ownedRecoveryStateBytes(t, h.dir)) {
+		t.Fatal("read-only verification changed retained recovery files")
+	}
+	// A real retained fact change must make the same full verification fail.
+	if _, e := h.db.Exec("UPDATE assessment SET primary_score_value=primary_score_value+1 WHERE id=4101"); e != nil {
+		t.Fatal("owned retained-fact change unavailable", e)
+	}
+	drifted := h.action("verify-restored", args...)
+	if drifted.Complete || !drifted.ReadOnly || drifted.Error != "retained_structure_or_fact_changed" || !drifted.SQLConnectionClosed || !drifted.SQLPoolClosed || !drifted.MongoClosed || drifted.ReleaseError != "" || drifted.TransactionReleaseUnproven {
+		t.Fatal("fresh verification accepted drift or failed to release", drifted)
+	}
+	h.assertHead(100, false)
+	if !reflect.DeepEqual(stateBefore, ownedRecoveryStateBytes(t, h.dir)) || r.Complete || r.Error != "ledger_commit_outcome_unknown" {
+		t.Fatal("verification changed the original unknown receipt or recovery state")
+	}
+	t.Log("actual MySQL COMMIT OK was dropped; independent fresh full verification proved original state, retained drift then refused; no replay/new claim and unknown receipt unchanged")
+}
+
+func ownedRecoveryStateBytes(t *testing.T, directory string) map[string]string {
+	t.Helper()
+	entries, e := os.ReadDir(directory)
+	if e != nil {
+		t.Fatal("owned recovery directory unavailable")
+	}
+	out := map[string]string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			t.Fatal("unexpected directory in owned recovery state")
+		}
+		raw, e := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if e != nil {
+			t.Fatal("owned recovery state unavailable")
+		}
+		out[entry.Name()] = fingerprint(raw)
+	}
+	return out
 }
 
 func TestM4SQLObjectNativeUnsignedBoundaryAndMandatoryEOF(t *testing.T) {

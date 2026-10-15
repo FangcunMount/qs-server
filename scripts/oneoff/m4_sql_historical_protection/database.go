@@ -604,6 +604,32 @@ func (d database) verifyTarget(ctx context.Context, m material, tool string) err
 	}
 	return nil
 }
+
+// A lost COMMIT response remains unknown. This separate action proves the
+// current original state from fresh reads, without replaying any recovery write.
+func (d database) verifyRestored(ctx context.Context, m material, tool string) error {
+	got, _, e := d.snapshot(ctx, tool, true)
+	if e != nil {
+		return e
+	}
+	return compareRestored(m, got)
+}
+
+func compareRestored(want, got material) error {
+	if e := compareRetained(want, got); e != nil {
+		return e
+	}
+	if !reflect.DeepEqual(want.Ledger, got.Ledger) {
+		return errors.New("restored_original_ledger_rows_changed")
+	}
+	for i, t := range got.Tables {
+		if !t.SQLNullOnly || t.OriginalDDL != want.Tables[i].OriginalDDL {
+			return errors.New("restored_original_objects_or_ddl_changed")
+		}
+	}
+	return nil
+}
+
 func restorationStatements(m material) ([2]string, error) {
 	var out [2]string
 	if fingerprint([]byte(originalDDL)) != originalDDLHash {

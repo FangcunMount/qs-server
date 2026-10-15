@@ -46,7 +46,7 @@ func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-sql-historical-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored")
 	f.StringVar(&a.sqlName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.mongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.capture, "capture-file", "", "first private capture path")
@@ -67,8 +67,8 @@ func parseArgs(args []string) (arguments, error) {
 		if a.capture == "" || a.material != "" || a.materialHash != "" || a.approval != "" || a.approvalHash != "" {
 			return a, errors.New("capture_arguments_invalid")
 		}
-	case "verify-target", "restore":
-		if a.capture != "" || a.material == "" || !hashRE.MatchString(a.materialHash) || (a.action == "restore" && (a.approval == "" || !hashRE.MatchString(a.approvalHash))) || (a.action == "verify-target" && (a.approval != "" || a.approvalHash != "")) {
+	case "verify-target", "restore", "verify-restored":
+		if a.capture != "" || a.material == "" || !hashRE.MatchString(a.materialHash) || (a.action != "verify-target" && (a.approval == "" || !hashRE.MatchString(a.approvalHash))) || (a.action == "verify-target" && (a.approval != "" || a.approvalHash != "")) {
 			return a, errors.New("bound_material_and_action_required")
 		}
 	default:
@@ -152,7 +152,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	defer cancel()
 	var m material
 	var ap approval
-	if a.action == "verify-target" || a.action == "restore" {
+	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.material, a.materialHash, maxMaterialBytes)
 		if e != nil {
 			r.Error = e.Error()
@@ -164,7 +164,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		r.MaterialHash = a.materialHash
 	}
-	if a.action == "restore" {
+	if a.action == "restore" || a.action == "verify-restored" {
 		raw, e := readPrivate(a.approval, a.approvalHash, 32768)
 		if e != nil {
 			r.Error = e.Error()
@@ -174,7 +174,12 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "restore_approval_rejected"
 			return r
 		}
-		if e := checkRecoveryBoundary(m, ap, a.materialHash, false); e != nil {
+		if a.action == "verify-restored" {
+			e = checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool)
+		} else {
+			e = checkRecoveryBoundary(m, ap, a.materialHash, false)
+		}
+		if e != nil {
 			r.Error = e.Error()
 			return r
 		}
@@ -246,6 +251,17 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			}
 		}
 
+		if a.action == "verify-restored" {
+			if e := checkRestoredAuthorization(m, ap, a.material, a.materialHash, a.approval, a.approvalHash, tool); e != nil {
+				r.Error = e.Error()
+				return
+			}
+			if ctx.Err() != nil {
+				r.BudgetExceeded = true
+				r.Error = "total_budget_exceeded"
+				return
+			}
+		}
 		r.Complete = true
 		r.Error = "none"
 	}()
@@ -290,6 +306,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 	case "verify-target":
 		e = d.verifyTarget(ctx, m, tool)
+	case "verify-restored":
+		e = d.verifyRestored(ctx, m, tool)
 	case "restore":
 		e = d.restore(ctx, m, ap, tool, a.material, a.materialHash, a.approval, a.approvalHash)
 	}

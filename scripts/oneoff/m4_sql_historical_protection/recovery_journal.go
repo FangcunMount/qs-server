@@ -176,3 +176,34 @@ func claimRecoveryOperation(m material, a approval, hash string, initialize bool
 	}
 	return nil
 }
+
+// Read-only verification uses an already claimed independent recovery approval.
+// It never creates a boundary, journal record or operation claim.
+func checkRestoredAuthorization(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) error {
+	if m.CapturePath != materialPath {
+		return errors.New("frozen_material_path_changed_before_verification")
+	}
+	if _, e := readPrivate(materialPath, materialHash, maxMaterialBytes); e != nil {
+		return e
+	}
+	raw, e := readPrivate(approvalPath, approvalHash, 32768)
+	var frozen approval
+	if e != nil || strictDecode(raw, &frozen) != nil || frozen != a {
+		return errors.New("restore_approval_changed_before_verification")
+	}
+	path, e := recoveryJournalPath(m, materialHash)
+	if e != nil {
+		return e
+	}
+	raw, e = readOwnedPrivate(path, maxRecoveryJournalBytes)
+	operations, parseError := parseRecoveryOperations(raw, materialHash)
+	if e != nil || parseError != nil {
+		return errors.New("recovery_operation_journal_invalid_or_lost")
+	}
+	for _, op := range operations {
+		if op.Operation == a.Operation && op.ApprovalHash == approvalHash {
+			return validateMutableBoundary(m, a, materialHash, tool)
+		}
+	}
+	return errors.New("restored_verification_operation_not_claimed")
+}

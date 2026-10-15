@@ -15,7 +15,7 @@ go build -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(
 
 调用者通过 `QS_M4_OBJECT_MYSQL_DSN`、`QS_M4_OBJECT_MONGO_URI` 提供已审定连接，DSN 选中的数据库须与 `--mysql-database` 一致。不要把密码放在命令参数、日志或回执中。实际 MySQL 必须为 8.0.36，Mongo 须为 replica set 且原账本恰有一个严格 typed clean39 文档。Mongo client 显式使用 Primary 覆盖 URI 的 secondary/nearest 偏好；每次 hello 必须证明 actual typed isWritablePrimary=true，mongos 或未知角色拒绝，原 cluster identity 摘要字节不变。账户须能证明所选 SQL scope 的直接 SELECT 可见性；角色或撤权范围不明时拒绝，不切换账户或自动授权。
 
-默认 `--action=inspect` 只读核对身份、版本、会话及退役旧对象缺失。`capture` 与 `verify-target` 也不修改数据库；只有显式 `restore` 可以恢复两个对象及最后的原账本。
+默认 `--action=inspect` 只读核对身份、版本、会话及退役旧对象缺失。`capture`、`verify-target` 与 `verify-restored` 也不修改数据库；只有显式 `restore` 可以恢复两个对象及最后的原账本。
 
 ```sh
 m4-sql-historical-protection --mysql-database=qs --mongo-database=qs
@@ -26,9 +26,14 @@ m4-sql-historical-protection --action=verify-target --mysql-database=qs --mongo-
 m4-sql-historical-protection --action=restore --mysql-database=qs --mongo-database=qs \
   --material-file=/private/approved-protection/first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
   --approval-file=/private/approved-protection/independent-restore-approval.json --approval-sha256=<independent-approval-raw-sha256>
+m4-sql-historical-protection --action=verify-restored --mysql-database=qs --mongo-database=qs \
+  --material-file=/private/approved-protection/first-capture.json --material-sha256=<externally-frozen-raw-sha256> \
+  --approval-file=/private/approved-protection/independent-restore-approval.json --approval-sha256=<already-consumed-independent-approval-raw-sha256>
 ```
 
 以上是调用示例，未作为生产命令执行。连接、工具 binary/source、A 执行器、输入材料和批准均须由执行控制方独立绑定。材料与批准须为绝对路径的私有 0600 普通文件，单硬链接、无符号链接、属当前 UID 或 root；原始 SHA 固定在独立批准中。首次 capture 用 O_EXCL 写入并 fsync，不覆盖旧材料。材料必须包含实际首次 capture 的 canonical 绝对路径；复制到另一文件名的材料及旧版缺失路径字段的材料均拒绝，不建立在线兼容层。首次恢复在该材料的固定私有父目录，以 O_EXCL/fsync 持久保存 `.m4-a-<materialSHA>.boundary.json` 和第一份完整批准。以后批准除 Operation 外的所有字段必须逐项相同；marker、恢复决定、deadline、expiry、冻结及责任不能重置。操作消费固定为同目录下 `.m4-a-<materialSHA>.operation-<operationSHA>.consumed`，内容另绑定批准原始 SHA 与材料 SHA，复制批准文件名或重编码不能重新使用同一操作。缺损 boundary 或已有 claim 后丢失 boundary 都拒绝重建，所有持久恢复状态须与原材料一并保留。外部材料和批准仍须独立原始 SHA；工具仅对自有固定状态使用相同私有文件检查读取。
+
+capture 在读取连接环境变量前，使用与恢复相同的 canonical 私有父目录规则：父目录须属当前 UID 或 root 且不可 group/world 写入；root 不接受另一非 root UID 的目录，不能先生成恢复入口本身无法使用的材料。操作消费还写入同目录 `.m4-a-<materialSHA>.operation-journal.jsonl`：最多128个唯一操作、总64KiB，每次追加和独立 claim 均须 fsync/目录同步并相互完整，非阻塞文件锁冲突即拒绝。单个 claim 丢失、journal 丢失/截断/少记录、多余 claim 或首 boundary 丢失均保留原状并拒绝重建，不能靠删除消费标记重用原操作。
 
 capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/保留列/类型/主键以及全部主键与保留行 SHA；不保存行正文。三个固定对象必须是 InnoDB BASE TABLE；目标列必须为原099的最后一列且 json DEFAULT NULL，CHECK仅接受不可变099在实际MySQL8.0.36上的两个完整表达式：原 JSON schema ASCII literal 的 introducer 为 `_utf8mb3` 或 `_utf8mb4`（OCTET_LENGTH按服务器编码为length），其余字节、CAST及谓词必须完全相同。材料中的完整原DDL绑定每个对象的原编码，不增加通用DDL归一化或任意SQL输入。捕获、材料验证及恢复snapshot均在任何DDL前拒绝位置/default/谓词/schema漂移。会话时区 `+00:00`、结果字符集 utf8mb4 与固定 sql_mode 一致；数据库按类型、NULL 标记、字节长度及 HEX 进行散列，不经过 Go 时间重编码。uint64 主键以 DECIMAL(20,0) 参数比较，包含 id0 和最大值；每表 COUNT 守恒且必须实际读取独立空 EOF 页，不用抽样或以短页代替 EOF。上限每表 500,000 行、材料 128MiB，超限拒绝而不签部分完成。只归一化 AUTO_INCREMENT 动态值与明确目标列/CHECK；其他结构须相同。
 
@@ -39,6 +44,8 @@ capture 同一个 RR 只读事务记录完整真实 SQL 账本、两个表 DDL/�
 执行控制方负责停止入口及全部 **API1、Collection2、Worker3** 六实例和其他写入者、记录在途责任并持续冻结。它必须在发出首个新 runtime 启动命令**之前**，以 O_EXCL 写入批准绑定的 first-runtime marker。工具不删除或修改 marker；marker 缺失本身不能证明六实例已停写。任何首启动已发出或新持久事实出现后，禁止本工具回放旧材料，改走目标 schema 兼容版本向前恢复。
 
 restore 只接受 `101/39` 的具名 pre-start 状态：dirty101 或 clean101 下原 101 的 0、1、2 个 DROP 前缀，即两个原对象均存在、仅 outcome 原对象存在、两个对象均缺失。只按 outcome→assessment 的逆序执行原 099 固定 ADD 补齐缺失对象，使每个成功 ADD 后仍是合法前缀；不替换整表、不写历史列值。显式恢复中断后，必须继续绑定同一首次材料及 first-runtime marker，并提供新的独立、未消费批准；旧批准仍拒绝，不自动续跑或重试。verify-target 仍只接受 clean101 且两个对象均缺失，不借用恢复的部分形状许可。ADD 对唯一 schema literal 显式使用材料绑定的原 `_utf8mb3` 或 `_utf8mb4`，不依赖恢复连接字符集，也不执行材料中的DDL；已存在对象若是另一合法编码，在消费批准和执行DDL之前拒绝。恢复后两个完整原 SHOW CREATE 字符串须逐字相同。对象、保留结构、全 NULL、全部保留事实与双库身份核对成功后，才在一个真实 SQL 事务中回放**捕获的完整原账本**，账本为最后一步。每个 ADD、账本 BEGIN、DELETE、每条 INSERT 和 COMMIT 前紧邻复核原始持久 boundary、原 marker 和原绝对期限；不在检查后插入其他外部 RPC 再发出 COMMIT。中途失败、提交结果未知或连接释放未证实时保留失败，禁止 Force、down、指定版本或直接清 dirty。恢复中出现反向部分形状（assessment 已恢复、outcome 缺失）继续拒绝自动推进，不能猜测先前失败结果。
+
+COMMIT 回应丢失时，原恢复回执继续保持 `ledger_commit_outcome_unknown`。若服务器实际已恢复为 clean100/39，可另行执行只读 `verify-restored`：必须提供原 canonical 材料及独立原始 SHA、已实际消费的原恢复批准（Operation 和批准原始 SHA 均在完整 journal 中），沿首次 boundary 的 marker、decision、deadline 和 expiry，不创建 boundary/journal/claim，也不消费新批准。它在同一只读 RR 全量核对原账本 DDL/全部行、两列及 CHECK 的完整原 DDL/编码、全 NULL、保留行散列和独立 EOF、双库身份及实时 clean100/39；连接全部释放后再次复核原输入、boundary 和期限才 complete。`verify-target` 仍严格要求 clean101/39、两对象均缺失。验证结果只说明当前原状态，不给旧 unknown 回执补 ACK，不证明停写或业务验收；控制器必须另获具名启动旧实例批准后才能使用该验证证据，不自动启动服务。
 
 默认总时限 15 分钟，可显式缩短、最高 20 分钟。连接（含握手）、固定会话初始化、metadata、MAX(id)、分页读取及 socket 写入保持 5 秒；分页同时保持 MAX_EXECUTION_TIME(5000)。终端独立完整 COUNT 继续使用原 sqlReader、同一个只读 RR 快照及原 action 的绝对截止时间，server MAX_EXECUTION_TIME 取实时剩余的正整数毫秒；没有有限期限或剩余不足 1ms 时拒绝，不以0回退到无限 server 预算。COUNT 查询/Scan 失败、deadline、server3024 和成功读取后的计数不等分别报告，不删除 COUNT、EOF 或全部行散列。所有 action 的 socket 读取使用当前 action 剩余有限时长，普通短读取仍受各自5秒 child context 限制；恢复 DDL 的 context 继续受原有总期限、父 context、批准 deadline 和 expiry 的最早值约束，不提供无期限等待或重试。RR 事务的生命周期保留总 context，不能因给 BEGIN 绑定 5 秒子 context 而在完整分页结束前自动回滚；事务内两条 ledger SELECT 另有显式 5 秒读取 context。客户端超时或连接关闭不证明服务端 COUNT/DDL 已结束或 DDL 已回滚，失败后须独立观察实际结构和语句终态。捕获文件 fsync 后仍检查总 deadline。生产窗口 30 分钟须预留迁移、启动和回读时间；生产规模只读预演不等于 T0 冻结，实际预算仍须独立证明。回执仅在操作成功、SQL connection/pool（含 OpenConnections/InUse 均0）、Mongo 关闭及 deadline 都通过后 complete；事务 rollback 未证实单列，主错误不被覆盖。stdout 回执交付失败以非0退出，不声称成功。
 
@@ -77,3 +84,5 @@ CI 复用 `metadata-readiness-mongodb-native` 的 authenticated rs0，与该 job
 当前修复保留完整 COUNT、独立空 EOF 和全部保留行散列；终端 COUNT 使用原 RR/action 剩余期限，分页等普通读取仍为5秒。旧 source530 的容量演练在 verify-target 的完整 COUNT 通用错误处失败，未证明失败表、接收计数、底层错误或恢复成功；原失败材料不改写，也不将其归因为已采证超时。
 
 source8517 的一次本机 native38 未完成：owned Mongo 实读 Exit137/OOMKilled=true，后续连接失败；部分27 RUN/12 PASS/13 FAIL/0 SKIP，新增 COUNT/续跑 top 尚未 RUN。自有双库、网络及数据卷已释放，原 IDs/images/volumes 保留，动态旧 runtime 元数据变化另列。该失败不作为当前源码、47项矩阵或生产资格证明。Primary、持久 boundary 与八项攻击的源码/编译/普通检查也不替代最终同源真实 native、容量恢复与生产窗口验收；当前没有新正式 tool binary 的资格签核。
+
+当前 journal 与 verify-restored 源码的普通/编译检查不替代 source94e1 的既有47项原生记录；扩展后的真实 COMMIT 丢回应→新鲜连接只读验证→保留事实漂移拒绝，须在最终新源码上独立执行，当前未运行。
