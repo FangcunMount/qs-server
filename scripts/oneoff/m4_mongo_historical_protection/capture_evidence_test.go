@@ -239,30 +239,29 @@ func TestCaptureReceiptBindsObservedBCountsScopeAndAllReleaseResponsibilities(t 
 func TestCaptureReceiptRequiresExactlyTwoOriginalCollectionCounts(t *testing.T) {
 	m := fixtureMaterial(t)
 	hash := strings.Repeat("c", 64)
-	original, e := json.Marshal(fixtureCaptureReceipt(m, hash))
-	if e != nil {
-		t.Fatal(e)
+	var stdout bytes.Buffer
+	if deliverReceipt(fixtureCaptureReceipt(m, hash), &stdout) != 0 {
+		t.Fatal("actual successful capture encoder failed")
 	}
+	original := stdout.Bytes()
 	counts, e := json.Marshal([2]*int64{m.Collections[0].Count, m.Collections[1].Count})
 	if e != nil {
 		t.Fatal(e)
 	}
 	for _, extra := range []string{"valid", "0", "null", "{}", "[0]", "0,0"} {
 		t.Run(extra, func(t *testing.T) {
-			var fields map[string]json.RawMessage
-			if e := json.Unmarshal(original, &fields); e != nil {
-				t.Fatal(e)
-			}
+			raw := original
 			if extra != "valid" {
-				fields["exact_fixed_collection_counts"] = append(append([]byte(nil), counts[:len(counts)-1]...), []byte(","+extra+"]")...)
-			}
-			raw, e := json.Marshal(fields)
-			if e != nil {
-				t.Fatal(e)
+				field := []byte(`"exact_fixed_collection_counts":`)
+				mutated := append(append([]byte(nil), counts[:len(counts)-1]...), []byte(","+extra+"]")...)
+				raw = bytes.Replace(original, append(append([]byte(nil), field...), counts...), append(field, mutated...), 1)
+				if bytes.Equal(raw, original) {
+					t.Fatal("original count field was not mutated")
+				}
 			}
 			zero := 0
 			proof := freezeCaptureProcess(t, privateDir(t), raw, "exited", &zero)
-			e = proof.check(m, hash, testSource)
+			e := proof.check(m, hash, testSource)
 			if extra == "valid" && e != nil || extra != "valid" && (e == nil || e.Error() != "capture_success_receipt_rejected") {
 				t.Fatal("capture stdout accepted a count array the original tool cannot emit", extra, e)
 			}
@@ -533,6 +532,70 @@ func TestCaptureEvidenceAllowsOriginalSuccessfulReceiptBeforeConnections(t *test
 			r := run(context.Background(), args, func(string) string { reads++; return "" }, testSource, nil)
 			if reads == 0 || r.Error != "selected_connection_input_rejected" || r.Complete {
 				t.Fatal("original successful receipt did not reach the independent connection boundary", r, reads)
+			}
+		})
+	}
+}
+
+func TestCaptureEvidenceRejectsReencodedOriginalStdout(t *testing.T) {
+	m := fixtureMaterial(t)
+	a, mp, mh, ap, ah := currentRestoreApproval(t, &m, privateDir(t))
+	if e := consumeApproval(m, a, ah); e != nil {
+		t.Fatal(e)
+	}
+	var encoded bytes.Buffer
+	if deliverReceipt(fixtureCaptureReceipt(m, mh), &encoded) != 0 {
+		t.Fatal("actual successful receipt encoder failed")
+	}
+	original := encoded.Bytes()
+	var reordered map[string]json.RawMessage
+	if json.Unmarshal(original, &reordered) != nil {
+		t.Fatal("original receipt unavailable")
+	}
+	reorderedRaw, e := json.Marshal(reordered)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var indented bytes.Buffer
+	if json.Indent(&indented, original, "", "  ") != nil {
+		t.Fatal("independent JSON transformation failed")
+	}
+	for _, candidate := range []struct {
+		name string
+		raw  []byte
+	}{
+		{"original", original},
+		{"reordered_members", append(reorderedRaw, '\n')},
+		{"indented", indented.Bytes()},
+		{"escaped_key", bytes.Replace(original, []byte(`"action"`), []byte(`"act\u0069on"`), 1)},
+		{"escaped_value", bytes.Replace(original, []byte(`"capture"`), []byte(`"capt\u0075re"`), 1)},
+		{"leading_whitespace", append([]byte(" "), original...)},
+		{"missing_final_newline", bytes.TrimSuffix(original, []byte("\n"))},
+		{"CRLF", append(append([]byte(nil), original[:len(original)-1]...), '\r', '\n')},
+		{"extra_final_newline", append(append([]byte(nil), original...), '\n')},
+	} {
+		t.Run(candidate.name, func(t *testing.T) {
+			if !json.Valid(candidate.raw) || candidate.name != "original" && bytes.Equal(candidate.raw, original) {
+				t.Fatal("candidate is not the intended distinct valid JSON")
+			}
+			zero := 0
+			proof := freezeCaptureProcess(t, privateDir(t), candidate.raw, "exited", &zero)
+			for _, action := range []string{"verify-target", "restore", "verify-restored"} {
+				t.Run(action, func(t *testing.T) {
+					args := append([]string{"--action=" + action, "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + mp, "--material-sha256=" + mh}, captureEvidenceArgs(proof)...)
+					if action != "verify-target" {
+						args = append(args, "--approval-file="+ap, "--approval-sha256="+ah)
+					}
+					reads := 0
+					r := run(context.Background(), args, func(string) string { reads++; return "" }, testSource, nil)
+					if candidate.name == "original" {
+						if reads == 0 || r.Error != "selected_connection_input_rejected" || r.Complete {
+							t.Fatal("actual encoder output did not reach the connection boundary", reads, r)
+						}
+					} else if reads != 0 || r.Error != "capture_success_receipt_rejected" || r.Complete || r.SQLConnectionClosed != nil || r.SQLPoolClosed != nil || r.MongoClosed != nil {
+						t.Fatal("reencoded output crossed the pre-environment evidence boundary", reads, r)
+					}
+				})
 			}
 		})
 	}

@@ -48,7 +48,16 @@ func decodeCaptureReceipt(raw []byte, captured *receipt) error {
 	}
 	// A successful capture omits both release errors and restored-state proof.
 	// Their presence cannot be part of the original successful CLI stdout.
-	return decodeCaptureDocument(raw, captured, captureReceiptFields)
+	if e := decodeCaptureDocument(raw, captured, captureReceiptFields); e != nil {
+		return e
+	}
+	// deliverReceipt emits this exact encoder output, including its newline.
+	// Compare only; never normalize or replace the independently frozen bytes.
+	var original bytes.Buffer
+	if json.NewEncoder(&original).Encode(captured) != nil || !bytes.Equal(raw, original.Bytes()) {
+		return errors.New("capture_receipt_encoding_rejected")
+	}
+	return nil
 }
 
 var captureReceiptFields = []string{
