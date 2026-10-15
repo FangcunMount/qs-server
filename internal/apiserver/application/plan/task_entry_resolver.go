@@ -44,15 +44,16 @@ type taskEntryResolver struct {
 	enrollments domainplan.EnrollmentRepository
 }
 
-func NewTaskEntryResolver(tasks taskEntryFinder, scales ScaleCatalog, enrollments ...domainplan.EnrollmentRepository) TaskEntryResolver {
-	if tasks == nil || scales == nil {
-		return nil
+func NewTaskEntryResolver(tasks taskEntryFinder, scales ScaleCatalog, enrollments domainplan.EnrollmentRepository) (TaskEntryResolver, error) {
+	switch {
+	case tasks == nil:
+		return nil, missingPlanDependency("task entry", "task repository")
+	case scales == nil:
+		return nil, missingPlanDependency("task entry", "scale catalog")
+	case enrollments == nil:
+		return nil, missingPlanDependency("task entry", "enrollment repository")
 	}
-	r := &taskEntryResolver{tasks: tasks, scales: scales, now: time.Now}
-	if len(enrollments) > 0 {
-		r.enrollments = enrollments[0]
-	}
-	return r
+	return &taskEntryResolver{tasks: tasks, scales: scales, now: time.Now, enrollments: enrollments}, nil
 }
 
 func (r *taskEntryResolver) ResolveTaskEntry(ctx context.Context, taskIDRaw, token string) (*ResolvedTaskEntry, error) {
@@ -80,14 +81,12 @@ func (r *taskEntryResolver) ResolveTaskEntry(ctx context.Context, taskIDRaw, tok
 }
 
 func (r *taskEntryResolver) entry(ctx context.Context, task *domainplan.AssessmentTask) (*ResolvedTaskEntry, error) {
-	if r.enrollments != nil {
-		enrollment, err := r.enrollments.FindByID(ctx, task.GetEnrollmentID())
-		if err != nil {
-			return nil, err
-		}
-		if enrollment == nil || !enrollment.IsActive() || enrollment.OrgID() != task.GetOrgID() || enrollment.TesteeID() != task.GetTesteeID() || enrollment.PlanID() != task.GetPlanID() {
-			return nil, errors.WithCode(code.ErrPageNotFound, "task enrollment unavailable")
-		}
+	enrollment, err := r.enrollments.FindByID(ctx, task.GetEnrollmentID())
+	if err != nil {
+		return nil, err
+	}
+	if enrollment == nil || !enrollment.IsActive() || enrollment.OrgID() != task.GetOrgID() || enrollment.TesteeID() != task.GetTesteeID() || enrollment.PlanID() != task.GetPlanID() {
+		return nil, errors.WithCode(code.ErrPageNotFound, "task enrollment unavailable")
 	}
 	published, err := r.scales.ExistsByCode(ctx, task.GetScaleCode())
 	if err != nil {

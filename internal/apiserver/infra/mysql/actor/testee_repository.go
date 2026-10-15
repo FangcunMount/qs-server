@@ -52,7 +52,7 @@ func (r *testeeRepository) Update(ctx context.Context, t *testee.Testee) error {
 		r.mapper.SyncID(po, t)
 		t.SetCreatedAt(po.CreatedAt)
 		t.SetUpdatedAt(po.UpdatedAt)
-	}, "profile_id", "name", "gender", "birthday", "tags", "source", "is_key_focus", "updated_at")
+	}, "profile_id", "name", "gender", "birthday", "source", "is_key_focus", "updated_at")
 }
 
 // FindByID 根据ID查找受试者

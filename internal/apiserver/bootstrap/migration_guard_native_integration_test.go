@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
@@ -70,10 +71,14 @@ func disabledNativeManager(t *testing.T, installed bool) (*DatabaseManager, *sql
 	t.Cleanup(func() { _ = db.Close() })
 	client, mongoDB := mongodbtest.ReplicaSetDatabase(t)
 	if installed {
-		if _, err := db.ExecContext(t.Context(), "CREATE TABLE schema_migrations (version BIGINT NOT NULL PRIMARY KEY, dirty BOOLEAN NOT NULL); INSERT INTO schema_migrations VALUES(100,FALSE)"); err != nil {
+		sqlHead, mongoHead, _, err := migration.EmbeddedMigrationResources()
+		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := mongoDB.Collection("schema_migrations").InsertOne(t.Context(), bson.M{"version": 39, "dirty": false}); err != nil {
+		if _, err := db.ExecContext(t.Context(), fmt.Sprintf("CREATE TABLE schema_migrations (version BIGINT NOT NULL PRIMARY KEY, dirty BOOLEAN NOT NULL); INSERT INTO schema_migrations VALUES(%d,FALSE)", sqlHead)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := mongoDB.Collection("schema_migrations").InsertOne(t.Context(), bson.M{"version": int64(mongoHead), "dirty": false}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -126,10 +131,18 @@ func TestDisabledDDLNativeValidatesCurrentHeadsAndNeverCreatesMetadata(t *testin
 
 func TestDisabledDDLNativeRejectsDirtyPartialOldAndUnknown(t *testing.T) {
 	dm, db, mongoDB := disabledNativeManager(t, true)
+	sqlHead, _, _, err := migration.EmbeddedMigrationResources()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name            string
 		change, restore func() error
 	}{
+		{"previous_declared_release", func() error { _, e := db.Exec("UPDATE schema_migrations SET version=100"); return e }, func() error {
+			_, e := db.Exec(fmt.Sprintf("UPDATE schema_migrations SET version=%d", sqlHead))
+			return e
+		}},
 		{"sql_dirty", func() error { _, e := db.Exec("UPDATE schema_migrations SET dirty=TRUE"); return e }, func() error { _, e := db.Exec("UPDATE schema_migrations SET dirty=FALSE"); return e }},
 		{"mongo_dirty", func() error {
 			_, e := mongoDB.Collection("schema_migrations").UpdateOne(t.Context(), bson.D{}, bson.M{"$set": bson.M{"dirty": true}})
@@ -138,8 +151,17 @@ func TestDisabledDDLNativeRejectsDirtyPartialOldAndUnknown(t *testing.T) {
 			_, e := mongoDB.Collection("schema_migrations").UpdateOne(t.Context(), bson.D{}, bson.M{"$set": bson.M{"dirty": false}})
 			return e
 		}},
-		{"partial", func() error { _, e := db.Exec("UPDATE schema_migrations SET version=99"); return e }, func() error { _, e := db.Exec("UPDATE schema_migrations SET version=100"); return e }},
-		{"unknown_future", func() error { _, e := db.Exec("UPDATE schema_migrations SET version=101"); return e }, func() error { _, e := db.Exec("UPDATE schema_migrations SET version=100"); return e }},
+		{"partial", func() error { _, e := db.Exec("UPDATE schema_migrations SET version=99"); return e }, func() error {
+			_, e := db.Exec(fmt.Sprintf("UPDATE schema_migrations SET version=%d", sqlHead))
+			return e
+		}},
+		{"unknown_future", func() error {
+			_, e := db.Exec(fmt.Sprintf("UPDATE schema_migrations SET version=%d", sqlHead+1))
+			return e
+		}, func() error {
+			_, e := db.Exec(fmt.Sprintf("UPDATE schema_migrations SET version=%d", sqlHead))
+			return e
+		}},
 		{"retired_sql", func() error { _, e := db.Exec("CREATE VIEW domain_event_outbox AS SELECT 1 AS id"); return e }, func() error { _, e := db.Exec("DROP VIEW domain_event_outbox"); return e }},
 		{"retired_mongo", func() error { return mongoDB.CreateCollection(t.Context(), "domain_event_outbox") }, func() error { return mongoDB.Collection("domain_event_outbox").Drop(t.Context()) }},
 		{"selected_identity", func() error { dm.config.MySQLOptions.Database += "_wrong"; return nil }, func() error {

@@ -25,13 +25,13 @@ func TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange(t *testing.T) {
 		}
 		return string(raw)
 	}
-	exec("CREATE TABLE operators (id BIGINT UNSIGNED PRIMARY KEY, org_id BIGINT, user_id BIGINT, version INT UNSIGNED, is_active BOOLEAN, deleted_at DATETIME(3), updated_at DATETIME(3), updated_by BIGINT, roles JSON, effective_roles JSON, authz_policy_version BIGINT, authz_projected_at DATETIME(3), authz_projection_pending BOOLEAN)")
+	exec("CREATE TABLE operators (id BIGINT UNSIGNED PRIMARY KEY, org_id BIGINT, user_id BIGINT, version INT UNSIGNED, is_active BOOLEAN, deleted_at DATETIME(3), updated_at DATETIME(3), updated_by BIGINT, roles JSON, authz_policy_version BIGINT, authz_projected_at DATETIME(3), authz_projection_pending BOOLEAN)")
 	exec(migration("000074_operator_retirement_tasks.up.sql"))
 	exec(migration("000079_operator_recovery_archives.up.sql"))
 	// Empty archive rollback is executable via the same MySQL multi-statement protocol as migrations.
 	exec(migration("000079_operator_recovery_archives.down.sql"))
 	exec(migration("000079_operator_recovery_archives.up.sql"))
-	exec("INSERT INTO operators(id,org_id,user_id,version,is_active,roles,effective_roles) VALUES(7,1,8,1,TRUE,JSON_ARRAY('qs:result_reviewer'),JSON_ARRAY('qs:result_reviewer')),(9,1,9,1,TRUE,JSON_ARRAY('qs:admin'),JSON_ARRAY('qs:admin'))")
+	exec("INSERT INTO operators(id,org_id,user_id,version,is_active,roles) VALUES(7,1,8,1,TRUE,JSON_ARRAY('qs:result_reviewer')),(9,1,9,1,TRUE,JSON_ARRAY('qs:admin'))")
 	repo := NewRepository(db)
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -87,7 +87,7 @@ func TestMySQLRecoveryArchivesExitAndRollsBackEveryLocalChange(t *testing.T) {
 	if err != nil || restored.Version != 4 {
 		t.Fatal(restored, err)
 	}
-	if err = db.Table("operators").Where("id=7 AND JSON_LENGTH(roles)=0 AND JSON_LENGTH(effective_roles)=0 AND authz_policy_version=10").Count(&count).Error; err != nil || count != 1 {
+	if err = db.Table("operators").Where("id=7 AND JSON_LENGTH(roles)=0 AND authz_policy_version=10").Count(&count).Error; err != nil || count != 1 {
 		t.Fatal("roles restored", count, err)
 	}
 	receipt, err := repo.FindRecovery(ctx, "recover")

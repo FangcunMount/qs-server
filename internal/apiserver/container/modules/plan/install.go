@@ -27,25 +27,27 @@ func InstallFrom(host InstallHost) error {
 	if !binding.Enabled {
 		redisClient = nil
 	}
+	reminderEnabled := host.TaskOpenedReminderEnabled()
 	var openedOutbox appEventing.ProfileBinding
-	if host.TaskOpenedReminderEnabled() {
+	if reminderEnabled {
 		openedOutbox = host.EventProfile(eventcatalog.OutboxProfileAssessmentMySQL)
 		if openedOutbox.Stager == nil {
 			return fmt.Errorf("task opened reminder requires a MySQL outbox profile")
 		}
 	}
 	module, err := Wire(WireInput{
-		MySQLDB:         host.MySQLDB(),
-		EventPublisher:  host.EventPublisher(),
-		PublishedModels: host.PublishedModelLister(),
-		RedisClient:     redisClient,
-		CacheBuilder:    host.CacheBuilder(redisruntime.FamilyObject),
-		CachePolicies:   provider,
-		EntryBaseURL:    host.PlanEntryBaseURL(),
-		Observer:        host.CacheObserver(),
-		MySQLLimiter:    host.MySQLLimiter(),
-		TesteeAccess:    host.ActorPorts().TesteeAccess,
-		OpenedOutbox:    openedOutbox,
+		MySQLDB:                   host.MySQLDB(),
+		EventPublisher:            host.EventPublisher(),
+		PublishedModels:           host.PublishedModelLister(),
+		RedisClient:               redisClient,
+		CacheBuilder:              host.CacheBuilder(redisruntime.FamilyObject),
+		CachePolicies:             provider,
+		EntryBaseURL:              host.PlanEntryBaseURL(),
+		Observer:                  host.CacheObserver(),
+		MySQLLimiter:              host.MySQLLimiter(),
+		TesteeAccess:              host.ActorPorts().TesteeAccess,
+		OpenedOutbox:              openedOutbox,
+		TaskOpenedReminderEnabled: reminderEnabled,
 	})
 	if err != nil {
 		return err

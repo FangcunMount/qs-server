@@ -177,6 +177,13 @@ docs-api-verify: docs-rest ## 生成并对比 api/rest 与 swagger（需要 Go/S
 
 docs-verify: docs-check docs-api-verify ## 运行常驻文档门禁与条件化 API 生成校验
 
+.PHONY: test-metadata-readiness-mysql-native test-metadata-readiness-mongodb-native
+test-metadata-readiness-mysql-native: ## 验证独占 MySQL 8.0.36 的权限诊断及只读 readiness（必需 fixture，无 SKIP）
+	bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql
+
+test-metadata-readiness-mongodb-native: ## 验证独占认证 Mongo 7.0.31 rs0 的元数据 reader（必需 fixture，无 SKIP）
+	bash scripts/testing/m4-metadata-readiness-native-proof.sh mongodb
+
 # ============================================================================
 # K6 混合场景压测（详见 docs/04-接口与运维/11-300QPS混合场景压测SOP.md）
 # ============================================================================

@@ -4,18 +4,17 @@ import (
 	"context"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
 	"testing"
 )
 
-func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t *testing.T) {
-	db, _, facts := fixture(t)
-	if err := db.Exec("RENAME TABLE staff TO operators; UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
+func TestMySQLSelectedExitPreflightResumeVerifyWithoutHistoricalTables(t *testing.T) {
+	db, facts := fixture(t)
+	if err := db.Exec("UPDATE operators SET user_id=800018 WHERE id=7; UPDATE operators SET user_id=900019 WHERE id=9").Error; err != nil {
 		t.Fatal(err)
 	}
-	tool, err := New(db, facts, facts, "final")
-	if err != nil {
-		t.Fatal(err)
-	}
+	installCurrentActorColumns(t, db)
+	tool := New(db, facts, facts)
 	ctx := context.Background()
 	cmd := app.Command{OrgID: 1, ActorID: 900019, OperatorID: 7, ExpectedVersion: 3, RequestID: "selected-exit", Reason: "explicitly reviewed personnel exit"}
 	before, err := tool.SelectedPreflight(ctx, cmd)
@@ -28,6 +27,30 @@ func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t 
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, before.Fingerprint, false); err == nil {
 		t.Fatal("maintenance gate skipped")
+	}
+	oldSQL102 := hash(struct {
+		Schema   string
+		Command  app.Command
+		Operator map[string]interface{}
+		Roles    []authz.AssignmentRoleFact
+		Existing *domain.Task
+	}{"actor_columns_sql102", cmd, before.CurrentOperator, before.Roles, nil})
+	if _, err = tool.SelectedApply(ctx, cmd, oldSQL102, true); err == nil {
+		t.Fatal("SQL102 reviewed preflight crossed maintenance retirement")
+	}
+	oldCurrent := make(map[string]interface{}, len(before.CurrentOperator)+1)
+	for key, value := range before.CurrentOperator {
+		oldCurrent[key] = value
+	}
+	oldCurrent["effective_roles"] = []byte(`["qs:result_reviewer"]`)
+	oldPlan := hash(struct {
+		Command  app.Command
+		Operator map[string]interface{}
+		Roles    []authz.AssignmentRoleFact
+		Existing *domain.Task
+	}{cmd, oldCurrent, before.Roles, nil})
+	if _, err = tool.SelectedApply(ctx, cmd, oldPlan, true); err == nil {
+		t.Fatal("old column-layout preflight accepted")
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, "wrong", true); err == nil {
 		t.Fatal("wrong fingerprint accepted")
@@ -57,9 +80,6 @@ func TestMySQLSelectedExitPreflightResumeVerifyAndHistoricalManifestIsolation(t 
 	}
 	if _, err = tool.SelectedApply(ctx, cmd, resumed.Fingerprint, true); err != nil || facts.writes != 1 {
 		t.Fatal("replay performed revocation", facts.writes, err)
-	}
-	if err = db.Table("operator_retirement_manifests").Count(&count).Error; err != nil || count != 0 {
-		t.Fatal("historical doctor manifest modified", count, err)
 	}
 	facts.facts = append(facts.facts, authz.AssignmentRoleFact{RoleID: "new", RoleName: "qs:result_reviewer", ManagementProtection: "standard"})
 	if _, err = tool.SelectedVerify(ctx, cmd); err == nil {

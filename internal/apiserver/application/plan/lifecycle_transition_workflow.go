@@ -92,7 +92,7 @@ func (w *planTransitionWorkflow) transitionPlanWithTaskCancellation(
 				return errors.WrapC(err, errorCode.ErrDatabase, "保存取消任务失败")
 			}
 		}
-		if w.enrollments != nil {
+		{
 			switch spec.enrollmentAction {
 			case "terminate":
 				_, err = w.enrollments.TerminateActiveByPlan(txCtx, orgID, planAggregate.GetID(), spec.action, time.Now())
@@ -105,11 +105,7 @@ func (w *planTransitionWorkflow) transitionPlanWithTaskCancellation(
 		}
 		return nil
 	}
-	if w.tx != nil {
-		err = w.tx.WithinTransaction(ctx, save)
-	} else {
-		err = save(ctx)
-	}
+	err = w.tx.WithinTransaction(ctx, save)
 	if err != nil {
 		logger.L(ctx).Errorw(spec.planSaveError,
 			"action", spec.action,

@@ -632,7 +632,7 @@ func operatorRowFromPO(po *OperatorPO) actorreadmodel.OperatorRow {
 		OrgID:                  po.OrgID,
 		UserID:                 po.UserID,
 		Roles:                  append([]string(nil), po.Roles...),
-		EffectiveRoles:         append([]string(nil), po.EffectiveRoles...),
+		EffectiveRoles:         append([]string(nil), po.Roles...),
 		AuthzPolicyVersion:     po.AuthzPolicyVersion,
 		AuthzProjectionPending: po.AuthzProjectionPending,
 		Name:                   po.Name,

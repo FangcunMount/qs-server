@@ -33,18 +33,19 @@ func run(output io.Writer) error {
 func runArgs(output io.Writer, args []string) error {
 	flags := flag.NewFlagSet("qs-ai-bridge", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	mode := flags.String("mode", "", "projection or runtime-index-backfill")
+	mode := flags.String("mode", "", "projection")
 	id := flags.String("request-id", "", "business request ID")
-	batch := flags.Int("batch-size", 100, "runtime index backfill transaction size (1-500)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	switch *mode {
 	case "stage-start", "stage-change", "relay", "receive":
 		return errors.New("legacy AI transport retired; use the host MQ operation path")
-	case "projection", "runtime-index-backfill":
+	case "runtime-index-backfill":
+		return errors.New("historical AI runtime index backfill retired")
+	case "projection":
 	default:
-		return errors.New("read or maintenance mode required")
+		return errors.New("projection mode required")
 	}
 	ctx := context.Background()
 	db, err := sql.Open("mysql", os.Getenv("QS_AI_BRIDGE_DSN"))
@@ -54,23 +55,9 @@ func runArgs(output io.Writer, args []string) error {
 	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(5)
 	original := &store.Store{DB: db}
-	if *mode == "projection" {
-		value, err := original.Projection(ctx, *id)
-		if err != nil {
-			return err
-		}
-		return json.NewEncoder(output).Encode(value)
+	value, err := original.Projection(ctx, *id)
+	if err != nil {
+		return err
 	}
-	for {
-		count, err := original.BackfillRuntimeIndexes(ctx, *batch)
-		if err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(output, "indexed=%d\n", count); err != nil {
-			return err
-		}
-		if count == 0 {
-			return nil
-		}
-	}
+	return json.NewEncoder(output).Encode(value)
 }

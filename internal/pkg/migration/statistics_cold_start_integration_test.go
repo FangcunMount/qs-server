@@ -10,7 +10,6 @@ import (
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	actorctx "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"os"
 	"strconv"
 	"testing"
@@ -112,8 +111,10 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 
 	fixture := seedStatisticsColdStartBusinessFacts(t, gormDB, mongoDB, orgID, eventAt)
 	assertStatisticsAnswerSheetSource(t, mongoDB, orgID, fixture.answerSheetID, eventAt.Add(4*time.Minute))
-	operator := operatorDomain.NewOperator(orgID, 9001, "statistics reader")
-	if err := mysqlActor.NewOperatorRepository(gormDB).Save(t.Context(), operator); err != nil {
+	// This Statistics fixture deliberately retains the historical SQL98 schema.
+	// Seed its original non-authoritative identity shape explicitly; current
+	// Actor writes are covered only after the real SQL102 retirement.
+	if err := gormDB.WithContext(t.Context()).Exec("INSERT INTO operators(org_id,user_id,roles,effective_roles,name,is_active) VALUES(?,9001,'[]','[]','statistics reader',TRUE)", orgID).Error; err != nil {
 		t.Fatal(err)
 	}
 	readers := mysqlActor.NewReadModel(gormDB)

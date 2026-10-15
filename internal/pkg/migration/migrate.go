@@ -30,6 +30,7 @@ type Config struct {
 	MigrationsCollection string // MongoDB 迁移记录集合名
 	retirementPair       *PairPreflight
 	runContext           context.Context
+	offline              bool
 }
 
 // Migrator 数据库迁移器

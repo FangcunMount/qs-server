@@ -27,39 +27,27 @@ type taskManagementService struct {
 	persistence    taskPersistence
 }
 
-// NewTaskManagementService 创建任务管理服务
+// NewTaskManagementService requires the complete Plan task persistence and admission boundary.
 func NewTaskManagementService(
-	taskRepo plan.AssessmentTaskRepository,
-	entryGenerator planentryport.Generator,
-	eventPublisher event.EventPublisher,
-) TaskManagementService {
-	taskLifecycle := plan.NewTaskLifecycle()
-	return &taskManagementService{
-		taskRepo:       taskRepo,
-		taskLifecycle:  taskLifecycle,
-		entryGenerator: entryGenerator,
-		eventPublisher: eventPublisher,
-		persistence:    taskPersistence{tasks: taskRepo},
-	}
-}
-
-func NewTaskManagementServiceWithEnrollment(
 	taskRepo plan.AssessmentTaskRepository,
 	planRepo plan.AssessmentPlanRepository,
 	enrollmentRepo plan.EnrollmentRepository,
 	txRunner apptransaction.Runner,
 	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
-	openedOutbox ...eventing.ProfileBinding,
-) TaskManagementService {
-	service := NewTaskManagementService(taskRepo, entryGenerator, eventPublisher).(*taskManagementService)
-	service.planRepo = planRepo
-	service.enrollmentRepo = enrollmentRepo
-	service.persistence = taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner}
-	if len(openedOutbox) > 0 {
-		service.persistence.openedOutbox = openedOutbox[0]
+	openingOptions TaskOpeningOptions,
+) (TaskManagementService, error) {
+	if err := validateTaskServiceDependencies("plan task management", taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, eventPublisher); err != nil {
+		return nil, err
 	}
-	return service
+	if err := openingOptions.validate(); err != nil {
+		return nil, err
+	}
+	return &taskManagementService{
+		taskRepo: taskRepo, planRepo: planRepo, enrollmentRepo: enrollmentRepo,
+		taskLifecycle: plan.NewTaskLifecycle(), entryGenerator: entryGenerator, eventPublisher: eventPublisher,
+		persistence: taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner, openingOptions: openingOptions},
+	}, nil
 }
 
 // OpenTask 开放任务
@@ -136,23 +124,19 @@ func (s *taskManagementService) validateOpenAdmission(ctx context.Context, task 
 	if actionAt.Before(task.GetPlannedAt()) || !actionAt.Before(plan.TaskOpenWindowEndsAt(task.GetPlannedAt())) {
 		return errors.WithCode(errorCode.ErrInvalidArgument, "任务不在开放窗口内")
 	}
-	if s.planRepo != nil {
-		parent, err := s.planRepo.FindByID(ctx, task.GetPlanID())
-		if err != nil {
-			return errors.WrapC(err, errorCode.ErrDatabase, "查询任务计划失败")
-		}
-		if parent == nil || parent.GetOrgID() != task.GetOrgID() || !parent.IsActive() {
-			return errors.WithCode(errorCode.ErrInvalidArgument, "任务计划未处于 active 状态")
-		}
+	parent, err := s.planRepo.FindByID(ctx, task.GetPlanID())
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "查询任务计划失败")
 	}
-	if s.enrollmentRepo != nil {
-		enrollment, err := s.enrollmentRepo.FindByID(ctx, task.GetEnrollmentID())
-		if err != nil {
-			return errors.WrapC(err, errorCode.ErrDatabase, "查询任务参与轮次失败")
-		}
-		if enrollment == nil || enrollment.OrgID() != task.GetOrgID() || !enrollment.IsActive() {
-			return errors.WithCode(errorCode.ErrInvalidArgument, "任务参与轮次未处于 active 状态")
-		}
+	if parent == nil || parent.GetOrgID() != task.GetOrgID() || !parent.IsActive() {
+		return errors.WithCode(errorCode.ErrInvalidArgument, "任务计划未处于 active 状态")
+	}
+	enrollment, err := s.enrollmentRepo.FindByID(ctx, task.GetEnrollmentID())
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "查询任务参与轮次失败")
+	}
+	if enrollment == nil || enrollment.OrgID() != task.GetOrgID() || !enrollment.IsActive() {
+		return errors.WithCode(errorCode.ErrInvalidArgument, "任务参与轮次未处于 active 状态")
 	}
 	return nil
 }

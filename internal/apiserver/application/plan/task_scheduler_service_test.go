@@ -136,7 +136,7 @@ func TestTaskSchedulerServiceCancelsPendingTaskForInactivePlan(t *testing.T) {
 	planRepo := &schedulerPlanRepoByIDStub{plan: p}
 	entryGenerator := &entryGeneratorStub{}
 
-	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	service := newTestTaskSchedulerService(t, taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
 	results, err := service.SchedulePendingTasks(context.Background(), 1, "")
 	if err != nil {
 		t.Fatalf("SchedulePendingTasks returned error: %v", err)
@@ -190,7 +190,7 @@ func TestTaskSchedulerServiceSchedulesScopedTasksWithoutGlobalPendingScan(t *tes
 	planRepo := &schedulerPlanRepoByIDStub{plan: p}
 	entryGenerator := &entryGeneratorStub{}
 
-	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	service := newTestTaskSchedulerService(t, taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
 	ctx := WithTaskSchedulerScope(context.Background(), p.GetID().String(), []string{"3001"})
 	results, err := service.SchedulePendingTasks(ctx, 1, before.Format("2006-01-02 15:04:05"))
 	if err != nil {
@@ -247,7 +247,7 @@ func TestTaskSchedulerServiceSkipsPendingTasksBeforeLowerBound(t *testing.T) {
 	planRepo := &schedulerPlanRepoByIDStub{plan: p}
 	entryGenerator := &entryGeneratorStub{}
 
-	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	service := newTestTaskSchedulerService(t, taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
 	ctx := WithTaskSchedulerPlannedAtLowerBound(context.Background(), before.Add(-24*time.Hour))
 	results, err := service.SchedulePendingTasks(ctx, 1, before.Format("2006-01-02 15:04:05"))
 	if err != nil {
@@ -273,7 +273,7 @@ func TestTaskSchedulerCanDeferMissedExpirationDuringInitialRollout(t *testing.T)
 	before := time.Now().In(planBusinessLocation)
 	stale := domainPlan.NewAssessmentTask(p.GetID(), 1, 1, testee.NewID(4103), "scale-code", before.Add(-48*time.Hour))
 	repo := &schedulerTaskRepoStub{pendingTasks: []*domainPlan.AssessmentTask{stale}}
-	service := NewTaskSchedulerService(repo, &schedulerPlanRepoByIDStub{plan: p}, &entryGeneratorStub{}, event.NewNopEventPublisher())
+	service := newTestTaskSchedulerService(t, repo, &schedulerPlanRepoByIDStub{plan: p}, &entryGeneratorStub{}, event.NewNopEventPublisher())
 	ctx := WithTaskSchedulerMissedExpirationEnabled(context.Background(), false)
 	stats := &TaskScheduleStats{}
 	ctx = WithTaskScheduleStatsCollector(ctx, stats)
@@ -342,7 +342,7 @@ func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
 	planRepo := &schedulerPlanRepoByIDStub{plan: p}
 	entryGenerator := &entryGeneratorStub{}
 
-	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	service := newTestTaskSchedulerService(t, taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
 	_, err = service.SchedulePendingTasks(context.Background(), 1, "")
 	if err != nil {
 		t.Fatalf("SchedulePendingTasks returned error: %v", err)

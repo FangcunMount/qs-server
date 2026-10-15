@@ -13,6 +13,7 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operatorretirement"
 	authz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operatorretirement"
+	actorrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor/operatorretirement"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"gorm.io/gorm"
@@ -44,6 +45,9 @@ func (t *Tool) administrator(ctx context.Context, cmd app.RecoveryCommand) (cont
 	if t.db == nil || t.loader == nil {
 		return ctx, fmt.Errorf("recovery dependencies unavailable")
 	}
+	if err := actorrepo.RequireCurrentOperatorPlanSchema(ctx, t.db); err != nil {
+		return ctx, err
+	}
 	snapshot, err := t.loader.LoadFresh(ctx, strconv.FormatInt(cmd.ActorID, 10))
 	if err != nil {
 		return ctx, err
@@ -68,7 +72,7 @@ func (t *Tool) administrator(ctx context.Context, cmd app.RecoveryCommand) (cont
 }
 func (t *Tool) current(ctx context.Context, cmd app.RecoveryCommand) (map[string]interface{}, error) {
 	var current map[string]interface{}
-	err := t.db.WithContext(ctx).Table("operators").Where("org_id=? AND id=?", cmd.OrgID, cmd.OperatorID).Take(&current).Error
+	err := t.db.WithContext(ctx).Table("operators").Select(actorrepo.CurrentOperatorColumns).Where("org_id=? AND id=?", cmd.OrgID, cmd.OperatorID).Take(&current).Error
 	return current, err
 }
 
@@ -122,9 +126,10 @@ func (t *Tool) Preflight(ctx context.Context, cmd app.RecoveryCommand) (*Report,
 	input := cmd
 	input.WritesStopped = false
 	raw, err := json.Marshal(struct {
+		Schema         string
 		Command        app.RecoveryCommand
 		Operator, Exit map[string]interface{}
-	}{input, report.CurrentOperator, exit})
+	}{actorrepo.OperatorFingerprintSchema, input, report.CurrentOperator, exit})
 	if err != nil {
 		return report, err
 	}

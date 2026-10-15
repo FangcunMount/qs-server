@@ -36,7 +36,7 @@ func TestOrdinaryPairCannotAdoptPartialOrUnknownMigration(t *testing.T) {
 			t.Fatal("ordinary initial pair conflict")
 		}
 	}
-	if !installedPairStepAllowed(99, 38, 99, 38, BackendMySQL, false, resources) || !installedPairStepAllowed(99, 38, 100, 38, BackendMongo, true, resources) || !installedPairStepAllowed(100, 39, 100, 39, BackendMySQL, false, resources) || !installedPairStepAllowed(100, 39, 100, 39, BackendMongo, true, resources) {
+	if !installedPairStepAllowed(99, 38, 99, 38, BackendMySQL, false, resources) || !installedPairStepAllowed(99, 38, resources.sql.head, 38, BackendMongo, true, resources) || !installedPairStepAllowed(100, 39, 100, 39, BackendMySQL, false, resources) || !installedPairStepAllowed(100, 39, resources.sql.head, 39, BackendMongo, true, resources) {
 		t.Fatal("true same-process migration phase rejected")
 	}
 	for _, state := range []struct {
@@ -58,26 +58,28 @@ func TestOrdinaryPairCannotAdoptPartialOrUnknownMigration(t *testing.T) {
 }
 
 func TestFuturePairStagesUseDeclaredStartAndActualTargets(t *testing.T) {
-	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{99, 38}, {100, 39}, {101, 39}, {101, 40}})
+	r, err := readMigrationResources(futureMigrationSource(t), futureMigrationPairs(t))
 	if err != nil {
 		t.Fatal(err)
 	}
+	current := testCurrentResources(t)
+	sqlHead, mongoHead := r.sql.head, r.mongo.head
 	for _, test := range []struct {
 		name                                             string
 		initialSQL, initialMongo, actualSQL, actualMongo uint
 		backend                                          Backend
 		done, want                                       bool
 	}{
-		{"sql_start", 100, 39, 100, 39, BackendMySQL, false, true},
-		{"mongo_after_sql", 100, 39, 101, 39, BackendMongo, true, true},
-		{"declared_independent_restart", 101, 39, 101, 39, BackendMySQL, false, true},
-		{"mongo_no_change_start", 101, 40, 101, 40, BackendMongo, true, true},
-		{"old_boundary_live_phase", 99, 38, 101, 38, BackendMongo, true, true},
-		{"undeclared_start", 100, 40, 101, 40, BackendMongo, true, false},
-		{"sql_not_finished", 100, 39, 101, 39, BackendMongo, false, false},
-		{"mongo_changed_externally", 100, 39, 101, 40, BackendMongo, true, false},
-		{"sql_changed_externally", 100, 39, 101, 39, BackendMySQL, false, false},
-		{"old_partial_restart", 100, 38, 101, 38, BackendMongo, true, false},
+		{"sql_start", current.sql.head, current.mongo.head, current.sql.head, current.mongo.head, BackendMySQL, false, true},
+		{"mongo_after_sql", current.sql.head, current.mongo.head, sqlHead, current.mongo.head, BackendMongo, true, true},
+		{"declared_independent_restart", sqlHead, current.mongo.head, sqlHead, current.mongo.head, BackendMySQL, false, true},
+		{"mongo_no_change_start", sqlHead, mongoHead, sqlHead, mongoHead, BackendMongo, true, true},
+		{"old_boundary_live_phase", 99, 38, sqlHead, 38, BackendMongo, true, true},
+		{"undeclared_start", current.sql.head, mongoHead, sqlHead, mongoHead, BackendMongo, true, false},
+		{"sql_not_finished", current.sql.head, current.mongo.head, sqlHead, current.mongo.head, BackendMongo, false, false},
+		{"mongo_changed_externally", current.sql.head, current.mongo.head, sqlHead, mongoHead, BackendMongo, true, false},
+		{"sql_changed_externally", current.sql.head, current.mongo.head, sqlHead, current.mongo.head, BackendMySQL, false, false},
+		{"old_partial_restart", 100, 38, sqlHead, 38, BackendMongo, true, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if got := installedPairStepAllowed(test.initialSQL, test.initialMongo, test.actualSQL, test.actualMongo, test.backend, test.done, r); got != test.want {
@@ -88,33 +90,34 @@ func TestFuturePairStagesUseDeclaredStartAndActualTargets(t *testing.T) {
 }
 
 func TestBoundaryAndFutureCleanWritesCannotForceSuccess(t *testing.T) {
-	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 40}})
+	r, err := readMigrationResources(futureMigrationSource(t), futureMigrationPairs(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, version := range []int{99, 100, 101, 102} {
-		provider := &retirementFailureProvider{version: 100}
+	current := testCurrentResources(t)
+	for _, version := range []int{99, 100, int(current.sql.head), int(r.sql.head), int(r.sql.head + 1)} {
+		provider := &retirementFailureProvider{version: int(current.sql.head)}
 		driver := &retirementDatabaseDriver{Driver: provider, backend: BackendMySQL, resources: r, sourceValid: true, bodyValid: true, pair: &PairPreflight{resources: r}}
 		if err := driver.SetVersion(version, false); err == nil {
 			t.Fatalf("force to %d accepted", version)
 		}
-		if provider.version != 100 {
+		if provider.version != int(current.sql.head) {
 			t.Fatal("rejected force changed schema metadata")
 		}
 	}
 }
 
 func TestFutureStepRejectsChangedDirtyMetadataBeforeRunAndClean(t *testing.T) {
-	r, err := readMigrationResources(futureMigrationSource(t), []schemaVersionPair{{100, 39}, {101, 40}})
+	r, err := readMigrationResources(futureMigrationSource(t), futureMigrationPairs(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider := &retirementFailureProvider{version: 101, dirty: false}
-	driver := &retirementDatabaseDriver{Driver: provider, backend: BackendMySQL, resources: r, sourceValid: true, bodyValid: true, version: 101, dirty: true, stepSucceeded: true, pair: &PairPreflight{resources: r}}
+	provider := &retirementFailureProvider{version: int(r.sql.head), dirty: false}
+	driver := &retirementDatabaseDriver{Driver: provider, backend: BackendMySQL, resources: r, sourceValid: true, bodyValid: true, version: int(r.sql.head), dirty: true, stepSucceeded: true, pair: &PairPreflight{resources: r}}
 	if err := driver.Run(bytes.NewBufferString("CREATE TABLE migration_future_probe (id BIGINT PRIMARY KEY);\n")); err == nil {
 		t.Fatal("externally cleared pending metadata accepted")
 	}
-	if err := driver.SetVersion(101, false); err == nil {
+	if err := driver.SetVersion(int(r.sql.head), false); err == nil {
 		t.Fatal("externally changed metadata re-certified clean")
 	}
 }

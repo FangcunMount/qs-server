@@ -43,13 +43,6 @@ func (g Gender) DisplayName() string {
 	}
 }
 
-// Tag 标签类型
-type Tag string
-
-func (t Tag) String() string {
-	return string(t)
-}
-
 // Source 数据来源类型。
 type Source string
 

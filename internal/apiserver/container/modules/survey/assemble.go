@@ -222,7 +222,7 @@ func (m *Module) Cleanup() error {
 
 // CheckHealth verifies module health.
 func (m *Module) CheckHealth() error {
-	return nil
+	return m.ValidateReadiness()
 }
 
 // ModuleInfo returns module metadata.

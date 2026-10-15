@@ -26,7 +26,6 @@ func (m *TesteeMapper) ToPO(domain *testee.Testee) *TesteePO {
 		Name:         domain.Name(),
 		Gender:       int8(domain.Gender()),
 		Birthday:     domain.Birthday(),
-		Tags:         domain.TagsAsStrings(),
 		Source:       domain.Source(),
 		IsKeyFocus:   domain.IsKeyFocus(),
 	}
@@ -63,7 +62,6 @@ func (m *TesteeMapper) ToDomain(po *TesteePO) *testee.Testee {
 	// 从仓储恢复状态
 	domain.RestoreFromRepository(
 		po.ProfileID,
-		po.Tags,
 		po.IsKeyFocus,
 	)
 	domain.SetCreatedAt(po.CreatedAt)

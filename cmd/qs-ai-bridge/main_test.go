@@ -19,3 +19,12 @@ func TestMQRetiredBridgeModesRejectBeforeStorageOrTransport(t *testing.T) {
 		})
 	}
 }
+
+func TestHistoricalBackfillRejectsBeforeStorage(t *testing.T) {
+	t.Setenv("QS_AI_BRIDGE_DSN", "invalid database configuration")
+	var output bytes.Buffer
+	err := runArgs(&output, []string{"-mode", "runtime-index-backfill"})
+	if err == nil || err.Error() != "historical AI runtime index backfill retired" || output.Len() != 0 {
+		t.Fatal("retired backfill borrowed storage or produced a result")
+	}
+}

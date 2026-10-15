@@ -68,6 +68,9 @@ func (t *Tool) Preflight(ctx context.Context, cmd Command) (*Report, error) {
 	if t.loader == nil || t.identity == nil || t.gateway == nil || !t.gateway.IsEnabled() {
 		return nil, fmt.Errorf("authoritative IAM dependencies required")
 	}
+	if err := actorrepo.RequireCurrentOperatorPlanSchema(ctx, t.db); err != nil {
+		return nil, err
+	}
 	snapshot, err := t.loader.LoadFresh(ctx, strconv.FormatInt(cmd.ActorID, 10))
 	if err != nil {
 		return nil, err
@@ -76,7 +79,7 @@ func (t *Tool) Preflight(ctx context.Context, cmd Command) (*Report, error) {
 		return nil, fmt.Errorf("headquarters permission required")
 	}
 	var actor actorrepo.OperatorPO
-	if err = t.db.WithContext(ctx).Where("org_id=? AND user_id=? AND is_active=TRUE AND deleted_at IS NULL", cmd.OrgID, cmd.ActorID).Take(&actor).Error; err != nil {
+	if err = t.db.WithContext(ctx).Select(actorrepo.CurrentOperatorColumns).Where("org_id=? AND user_id=? AND is_active=TRUE AND deleted_at IS NULL", cmd.OrgID, cmd.ActorID).Take(&actor).Error; err != nil {
 		return nil, fmt.Errorf("active headquarters identity required")
 	}
 	var retiring int64
@@ -98,7 +101,7 @@ func (t *Tool) Preflight(ctx context.Context, cmd Command) (*Report, error) {
 	}
 	var existing []actorrepo.OperatorPO
 	// Include soft-deleted and other-company rows: preparation cannot recover or move identities.
-	if err = t.db.WithContext(ctx).Where("user_id=?", cmd.UserID).Find(&existing).Error; err != nil {
+	if err = t.db.WithContext(ctx).Select(actorrepo.CurrentOperatorColumns).Where("user_id=?", cmd.UserID).Find(&existing).Error; err != nil {
 		return nil, err
 	}
 	report := &Report{State: "pending", Command: cmd}
@@ -107,7 +110,7 @@ func (t *Tool) Preflight(ctx context.Context, cmd Command) (*Report, error) {
 			return nil, fmt.Errorf("multiple Operator memberships require review")
 		}
 		row := existing[0]
-		if row.OrgID != cmd.OrgID || row.DeletedAt != nil || row.IsActive || row.Name != cmd.Name || int64(row.CreatedBy) != cmd.ActorID || len(row.Roles) != 0 || len(row.EffectiveRoles) != 0 {
+		if row.OrgID != cmd.OrgID || row.DeletedAt != nil || row.IsActive || row.Name != cmd.Name || int64(row.CreatedBy) != cmd.ActorID || len(row.Roles) != 0 {
 			return nil, fmt.Errorf("existing Operator conflicts with inactive preparation")
 		}
 		// This observes current state, not ownership of an earlier request or historical completion.
@@ -115,11 +118,12 @@ func (t *Tool) Preflight(ctx context.Context, cmd Command) (*Report, error) {
 		report.OperatorID = uint64(row.ID)
 	}
 	raw, err := json.Marshal(struct {
+		Schema     string
 		Command    Command
 		Actor      actorrepo.OperatorPO
 		Existing   []actorrepo.OperatorPO
 		Projection iambridge.OperatorRoleProjection
-	}{cmd, actor, existing, projection})
+	}{actorrepo.OperatorFingerprintSchema, cmd, actor, existing, projection})
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +143,12 @@ func (t *Tool) Apply(ctx context.Context, cmd Command, fingerprint string) (*Rep
 		if err != nil {
 			return err
 		}
+		if report.Fingerprint != fingerprint {
+			return fmt.Errorf("preparation facts changed; repeat preflight")
+		}
 		// Never call Register on an existing identity: it is also an update API.
 		if report.State == "existing_inactive" {
 			return nil
-		}
-		if report.Fingerprint != fingerprint {
-			return fmt.Errorf("preparation facts changed; repeat preflight")
 		}
 		audited := context.WithValue(locked, middleware.UserClaimsContextKey{}, &middleware.UserClaims{UserID: strconv.FormatInt(cmd.ActorID, 10), OrgID: strconv.FormatInt(cmd.OrgID, 10)})
 		result, err := t.service.Register(audited, app.RegisterOperatorDTO{OrgID: cmd.OrgID, UserID: cmd.UserID, Name: cmd.Name, IsActive: false})

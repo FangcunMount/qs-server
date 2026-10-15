@@ -17,23 +17,55 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前目录末端版本为 MySQL `100`、MongoDB `39`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
+- 当前目录末端版本为 MySQL `103`、MongoDB `40`；MySQL `86` 为传输死信增加物理投递身份，`87` 新建任务开放提醒逐收件账本，`88` 原子冻结一次开放事件的完整收件身份集合，`89` 在原业务事务内索引 Assessment 与其原始评估请求事件 ID（不回填或重放旧消息），`90` 增加单条缺口恢复的宿主审批结果账本（不自动重投）。`91`～`95` 为 AI MQ 增加持久消息、失败状态、旧命令归属、统一准入门禁和技术观测；原消息及未确认责任须保留。仓库目录版本未代表生产已执行或启用；生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。`87`／`88` 一旦写入真实提醒责任，应用回退时须保留两张表；`89`／`90` 的事件身份与人工恢复证据亦须保留，不执行删除账本或关联的 down 迁移。
 
-MySQL `99`、MongoDB `38` 的历史证据槽和索引仍在已发布的 schema 中。历史回填已取消，额外历史证据的读取和核验器已退出当前源码；历史迁移文件保持原字节，本批不删除这些字段、索引或其他业务结构。后续退出须另行盘点数据、演练、授权和发布；目录升级成功不能代替生产数据盘点或业务验收。
+MySQL `99`、MongoDB `38` 原历史证据槽和索引的创建迁移保持原字节；SQL101和Mongo40分别提供M4-A两列与M4-B四索引的独立退役资源，SQL103不扩大这两批范围。历史回填、额外历史证据读取和核验器已退出源码。目录有退役资源不代表生产已执行；每批仍须独立完成实际对象盘点、保护恢复、授权和发布，目录升级成功不能代替生产数据或业务验收。
 
 ## 固定退役边界与后续版本
 
 MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来迁移的版本上限。对已安装库，启动必须证明 MySQL `domain_event_outbox`、`ai_bridge_commands`、`ai_messaging_legacy_commands` 和 MongoDB `domain_event_outbox` 均已缺失。身份、可见性、权限、网络或 dirty 结果未知均阻断；正常启动不代替受控流程删除现存旧对象。历史迁移字节及退役正文绑定保留。
 
-`resources.go` 从嵌入文件形成实际版本清单和目标 head，并通过 `declaredSchemaPairs` 明确声明可运行的 clean 版本对。当前仍是 `99/38` 的历史升级入口和 `100/39` 的最终状态。新增迁移必须同时声明已审核的完整版本对；不存在于资源清单的版本、未来版本和任意组合不能靠数值大于退役边界获得通过。
+`resources.go` 从嵌入文件形成实际版本清单和目标 head，并通过 `declaredSchemaPairs` 明确声明可运行的 clean 版本对。当前声明 `99/38`、`100/39` 的历史升级入口、独立 SQL 发布的 clean `101/39`、Mongo 发布的 clean `101/40` 、Actor 发布的 `102/40` 和本批完整目标 `103/40`。新增迁移必须同时声明已审核的完整版本对；不存在于资源清单的版本、未来版本和任意组合不能靠数值大于退役边界获得通过。
 
 同一次启动先证明初始版本对，再执行 SQL 到该 release 的目标。只有迁移、cleanup、连接释放和最终 clean 回读成功，才允许 Mongo 从未变化的初始版本继续到自身目标。两个 backend 最终达到目标、身份不变且旧对象缺失后才能完成启动。同一 live pair 任一步失败或响应未知即失效。`100/38` 仅允许在同次已证明 SQL 成功的阶段存在，新进程不接管该部分状态。
 
 专用备份 `Capture`、恢复摘要生成及 B 恢复核验器已退出当前源码。已完成批次的备份、恢复预算和生产回执保留在独立归档，当前通用迁移器不提供该历史恢复工具接口。
 
-后续互相独立的 DDL 可以分别发布，例如明确声明 `101/39`，再发布 `101/40`。该示例没有对应的新业务迁移文件，也不授权数据库动作。只有被源码声明并实际回读为 clean 的完整状态可以重启；dirty、未声明中间状态和未知 DDL 结果必须保留现场，依据该版本独立演练的方案前向修复。
+后续互相独立的 DDL 分别准备：SQL101 声明 `101/39`，Mongo40 声明 `101/40`。发布顺序必须先验收 SQL-only `101/39`，再以该 clean pair 为初始批准执行 Mongo-only `101/40`；资源文件和版本声明不授权生产数据库动作。只有被源码声明并实际回读为 clean 的完整状态可以重启；dirty、未声明中间状态和未知 DDL 结果必须保留现场，依据该版本独立演练的方案前向修复。
+
+### M4-C：Actor 两列
+
+SQL102 仅删除 `testee.tags` 与 `operators.effective_roles`；历史迁移1..101及Mongo1..40保持原字节。使用 `m4_actor_columns` 只授权 `101/40 → 102/40`，不能借历史JSON或索引保护范围；`102/39` 不声明为可重启版本对。
+
+本候选必须先离线完成DDL，再启动新runtime；旧有效角色列无默认值，新PO省略它后不能在旧schema写入。C 发布时现代prepare/exit/recover限定cleanSQL102；当前 D 源码已显式重审到cleanSQL103，旧未执行指纹重做。旧raw archive和checksum不重写；旧镜像对SQL102未来head会拒绝。SQL102down明确拒绝，不提供Force、SetVersion、手清dirty或空列重建替代真实数据恢复。
+
+Actor原生四主场景及两个范围拒绝子场景在源码 `7f131c9e` 的独占 MySQL8.0.36/MongoRS7.0.31 夹具上实际 RUN/PASS；现代工具及原历史隔离 SQL 九场景亦通过，均零 SKIP。该轮 schema/value 恢复的版本表保持 clean101/40，不作为 dirty 恢复证明。
+
+后续源码 `c11faebf3c715f511e8b936f46f28bcc1f757150` 的 `TestActorColumnsNativeDirtyObjectBackupRestore` 在同补丁版本的另一套自有夹具上捕获首次 clean101/40 的原列定义、完整列值、保留事实和真实版本账本，并冻结原材料 SHA。真正第二条 ALTER 失败留下 dirty102 后，先恢复两列及原值、核对完整保留事实，最后显式事务回放完整原版本账本；成功后 fresh101/40 preflight 通过。错误备份、保留事实变化、列值恢复失败和账本重复主键失败均拒绝提前完成，回放失败保留 dirty102。该轮五个顶层、七个子场景共十二项 RUN/PASS、零 SKIP，耗时46.51秒；原生日志摘要 `d122b770ca09fa2fcdc05acf713c296f06efb5a1273c5fd37287e04b6ce194fe`，自有容器、网络和私有连接材料已释放。这是固定测试 seam，没有新增生产恢复入口、启动业务 runtime 或证明候选启动后覆盖旧备份合法。
+
+合并后的源码仍须通过当前完整 CI，旧组件证明不签为新合并头的原生执行。生产值分布、定向备份、原/新完整服务启动、完整冻结与30/60分钟/RPO0仍待具名证明。五张历史维护表不在SQL102范围。
+
+### M4-D：历史维护表与在线旧工具退出
+
+SQL103 只删除 `testee_store_migration_reversions`、`testee_store_migration_items`、`testee_store_migration_manifests`、`clinician_operator_binding_archive` 与 `operator_retirement_manifests`，每张表独立 DROP；历史1..102与Mongo1..40资源保持原字节。`m4_legacy_maintenance_tables` 只允许 `102/40 → 103/40`，其他对象scope、跨阶段、no-op、Mongo变化或未来版本拒绝。已到103或其后已声明版本时，五旧对象复现也拒绝启动。
+
+旧 `testee-store-migrate` CLI、Testee初始归属维护包和专属测试退出；现代 `testeestore` 仓库、事务、`testee_store_history`、门店历史与回答开始职责保留。Operator旧批量 manifest/archive/Report、`NewLegacyRepository` 和 staff装配退出，selected/orphan、prepare/recovery、`operator_retirement_tasks` 和 `operator_recovery_archives` 继续使用。旧四个CLI动作用原早拒入口明确拒绝，不能重新签历史清单。
+
+现代维护工具只接受单行cleanSQL103，固定 `CurrentOperatorColumns` 不变，指纹版本为 `actor_maintenance_sql103`；SQL102或更早的未执行preflight须重做。历史归档正文先核原checksum再解码，原字节不重写。原工具、原manifest和摘要解释仅留在具名历史隔离恢复材料与Git历史中，不增加在线兼容分支。
+
+源码 `d25313486c739b1584539e5fbf61e51eb7038848` 在唯一自有 MySQL8.0.36/MongoRS7.0.31 夹具上实际通过 D 五主场景与十子场景共15项、现代人员及Activity八项、门店六项与受试者归属七项；36项均 RUN/PASS、零SKIP/FAIL。D包括全原迁移102/40、真正第三DROP失败留下103dirty、完整五原表DDL/值与保留事实核对、完整真实原账本最后事务回放、1062冲突/中断/新runtime边界拒旧回放，以及旧头/Force/down/旧对象复现/错误scope拒绝。当前fixture的时间列以server CHAR冻结，保留NULL/微秒并绑定同一SQL会话时区，不把带客户端offset的时间文本重新解释为原值。
+
+该轮原生阶段耗时57.96秒、现代12.98秒、门店归属6.56秒。私有receipt摘要 `e5f522eea776cf976243d7594c8242415dfa44d5e02aed0416fcd08bd48a8866`；D原始JSONL `9dd1c622cdae50aa0666d9e3bf7cbdcf53bfae057fa588f71f82ce6a68dc26ef`，现代 `45cd096b7f4424a5043954017aa174d1a1ae1a3e1e80dad75b889bc5180508a4`，门店归属 `9e8839b9b451255768ca19c899d7753ea31be45542009123548131b431242a22`。28个源文件摘要前后一致，13个删除源仍缺失；两自有容器、网络和连接材料已释放，原IDs/images/volumes保留，既有NSQ runtime变化因此不签全部环境稳定。原75b首轮15RUN/11PASS及5602第二轮D15PASS但现代8RUN/4PASS失败均保留；未发布103down文案长度和测试时间值/当前版本资源库存分别独立修正，不改旧迁移。
+
+实际argv及全量case明细以原harness/JSONL为准；CI源码 `f562abfa057405a34f718ae635ead3c77b8c5153` 新增D15项逐一RUN/PASS且任何SKIP失败的门禁，不代表本地在这个后续head重复运行native。没有三服务启动、生产对象/权限/冻结、30/60分钟或RPO0证明，未用模拟runtime标识冒充实际进程启动。
+
+生产只读盘点 `80f422101ccfd83b4c4eb5bd165272145afe7afd` / run `38628472662-1` 在cleanSQL100、MySQL8.0.36的一致快照中确认：Testee manifests/items/reversions为1/83797/0，Operator manifests/binding archive为1/119；Testee manifest applied=1、item candidate=55577/deferred=28220，Operator applied_unchanged=1，三个历史引用gap均0。私有回执摘要 `73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125` 绑定原目标和所有连接/事务释放，`freeze_verified=false`。用户已确认五表没有遗留任务，原材料按隔离恢复职责保留；这些时点与责任事实不代替D执行时clean102/40的实际全量原值/DDL、完整原账本保护、持续停写和迁移/恢复资格。
+
+定向保护、生产迁移/恢复及30/60分钟/RPO0仍未验收。固定测试seam不提供生产备份/恢复入口；首个新runtime命令后只允许保留新事实的向前恢复，不能回放旧表/账本覆盖新事实。SQL103down只明确拒绝，不用Force、SetVersion或手清dirty替代恢复。
 
 ## 新空库的批准
+
+现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4历史两列、M4四索引、Actor两列或五张历史维护表；四个对象scope分别只允许 `100/39 → 101/39`、`101/39 → 101/40`、`101/40 → 102/40` 和 `102/40 → 103/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
 
 新空双库继续使用 `migration.retirement-bootstrap-authorization-file` 和 `migration.retirement-bootstrap-authorization-sha256`，不新增 CLI。文件须为真实私有绝对路径、`0600` 单链接文件，摘要绑定已批准的原始字节；目录为空不构成批准。
 
@@ -43,7 +75,7 @@ MySQL `100`／MongoDB `39` 是不可逆的兼容链退役边界，不是未来�
 
 批准在 SQL 开始前复核并一次消费；失败或部分冷启动不重新使用该文件。只有批准的新空库才允许完整历史升级后删除新生成的空旧对象。正常恢复不能使用冷启动批准，不能借关闭 DDL、down、force 或直接清除 dirty 绕过保护。
 
-本批真实数据库测试覆盖当前 `100/39`、仅在测试 FS 中的未来 `101/40`、独立阶段重启和部分 DDL 失败。源码和测试不是生产发布证明；本重构的实际发布及后续数据退出须独立验收，四对象此前的执行事实仍见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
+本批真实数据库测试覆盖当前 `101/40`、独立 SQL-only `101/39`、从嵌入头计算且仅在测试 FS 中的未来版本、独立阶段重启和部分 DDL 失败。源码和测试不是生产发布证明；本重构的实际发布及后续数据退出须独立验收，四对象此前的执行事实仍见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
 
 ## 目录与职责
 
@@ -221,7 +253,7 @@ make docs-hygiene
 ```bash
 QS_M3_REQUIRE_DATABASE=1 QS_SERVER_TEST_MONGO_DB_PREFIX=qs_m3_test \
   go test -race -tags=integration -count=1 -timeout=8m \
-  -run '^(TestSchemaPairNative|TestDisabledDDLNative)' \
+  -run '^(TestHistoricalEvidenceNative|TestSchemaPairNative|TestDisabledDDLNative)' -v \
   ./internal/pkg/migration ./internal/apiserver/bootstrap
 ```
 
@@ -246,8 +278,8 @@ QS_M3_REQUIRE_DATABASE=1 QS_SERVER_TEST_MONGO_DB_PREFIX=qs_m3_test \
 
 `cmd/operator-recover` 仅用于经过确认的维护操作，不是后台注册或启用接口。它恢复原 Operator ID，不恢复医生绑定、旧二维码或旧角色。后续角色和 Scope 分配必须独立完成。
 
-- `preflight`：读取当前身份、退出记录和 IAM 权限，输出确定性事实指纹，不写授权或身份数据。允许在干净的 MySQL 78 版、尚无恢复归档表时执行。
-- `apply`：要求已执行 79 版迁移、暂停人员及授权写入，并提交本次预演指纹。事务内保存原退出审计、恢复空角色身份、移除已归档退出的阻断记录。
+- `preflight`：仅在当前cleanSQL103读取身份、退出记录和 IAM 权限，输出确定性事实指纹，不写授权或身份数据。仓库保留的clean78缺归档历史读取边界，不是当前维护工具的执行许可。
+- `apply`：要求当前cleanSQL103、已保留79版恢复归档结构、暂停人员及授权写入，并提交本次预演指纹。事务内保存原退出审计、恢复空角色身份、移除已归档退出的阻断记录。
 - `status`：校验恢复归档并报告 `pending` 或 `historical_completed`，同时输出当前 Operator 事实。历史完成不表示当前事实未变化，也不表示业务验收通过；重复 Apply 不覆盖后续变化。
 
 输入使用 `OPERATOR_RECOVERY_INPUT` 指向受限 JSON 文件，包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`ExpectedPolicyVersion`、`RequestID`、`Reason`。目标版本是退出完成后的版本；策略版本必须来自当次核实。报告路径由 `OPERATOR_RECOVERY_REPORT` 指定，必须是尚不存在的新文件，工具以 `0600` 创建。输入不接受未知字段或多个 JSON 对象。
@@ -256,7 +288,9 @@ Apply 另需 `OPERATOR_RECOVERY_FINGERPRINT` 与 `OPERATOR_RECOVERY_MAINTENANCE=
 
 79 版新增 `operator_recovery_archives`。归档包含恢复记录、原退出任务、退出前身份及恢复前身份的原始值和校验和。归档有数据时向下迁移会拒绝删除，必须先安排保留证据的结构恢复方案；普通回滚不得自动重新授予权限。
 
-对于已明确选择、与历史医生绑定清单无关的退出人员，使用 `operator-retire selected-preflight|selected-apply|selected-verify`。`OPERATOR_RETIRE_LAYOUT=final`，`OPERATOR_RETIRE_INPUT` 指向包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`RequestID`、`Reason` 的受限 JSON；报告仍使用 `OPERATOR_RETIRE_REPORT`。Apply 要求预演指纹及 `OPERATOR_RETIRE_MAINTENANCE=true`，调用统一退出用例，失败保持停用并按原任务恢复。Verify 同时检查当前 IAM 后台角色已清空、本地身份已停用并软删除，不能仅凭任务历史完成判定通过。每人独立保存退出任务及原始事实，不改写此前医生退役清单，也不修改医生、门店、受试者或二维码。
+历史医生批次 `operator-retire preflight|apply|status|verify` 在 Options/App、配置读取、报告创建及 DB/IAM 连接之前明确拒绝；旧library/manifest/archive消费者已随M4-D退出。旧工具对assessment/testee等整行算摘要，旧schema、原manifest/AfterHash及解释源码仍按具名隔离恢复材料保留，不能在新schema重新签发旧摘要。五表实际退役及定向数据保护仍待独立生产批准，不以本次源码删除代替责任结清。现代任务、恢复归档、门店和受试者历史继续保留。
+
+对于已明确选择、与历史医生绑定清单无关的退出人员，使用 `operator-retire selected-preflight|selected-apply|selected-verify`。`OPERATOR_RETIRE_INPUT` 指向包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`RequestID`、`Reason` 的受限 JSON；报告仍使用 `OPERATOR_RETIRE_REPORT`。Apply 要求预演指纹及 `OPERATOR_RETIRE_MAINTENANCE=true`，调用统一退出用例，失败保持停用并按原任务恢复。Verify 同时检查当前 IAM 后台角色已清空、本地身份已停用并软删除，不能仅凭任务历史完成判定通过。每人独立保存退出任务及原始事实，不改写此前医生退役清单，也不修改医生、门店、受试者或二维码。
 
 对于任何公司都没有 Operator 记录、但仍有后台授权的用户，使用 `operator-retire orphan-preflight|orphan-apply|orphan-verify`。输入改为 `OrgID`、`ActorID`、`UserID`、`RequestID`、`Reason`，文件须为私有权限；公司用于校验总部操作人，目标用户必须在所有公司都没有 Operator，包括软删除历史。工具仅允许已确认的运营员、结果评估员和计划管理员标准角色，保留 `user` 自服务角色；发现其他权限或人员关联即停止。
 
@@ -275,3 +309,45 @@ MySQL 80 保存 Survey 不可变开始记录，81 为 Assessment 增加开展上
 MySQL `96` 在既有 `evaluation_outcome` 增加原提交事件引用、JSON 证据及唯一约束；`97` 在既有 `ai_messaging_operations` 增加退休 ID 事实、证据、时间、现用统计索引与约束；`98` 在既有审计检查点增加真实 BSON Outbox cursor/upper-bound。MongoDB `37` 为 Generation 和 Run 的非空原事件引用增加部分唯一索引。迁移不回填旧行、不产生业务命令、不删除四个旧对象。
 
 发布 B 的 MySQL `100`／MongoDB `39` 收尾迁移与联合缺失保护已实现，并随 PR #346 上线。当前源码退出额外历史证据集合的读取和核验器，以及无调用的维护窗口接口；标准事件证据、当前 MQ 和退休 ID 防护继续保留。已发布的历史迁移及其 nullable 字段和索引保留原状，本轮没有数据库结构变更。正常启动仍校验两库身份、完整 clean head 和四个旧对象缺失。
+
+## M4-01 历史 JSON 对象退役（源码准备，生产待验收）
+
+新增 MySQL `101` 只删除 `assessment.historical_lifecycle_evidence`、`evaluation_outcome.historical_committed_evidence` 及对应的两个 CHECK，声明完整版本对 `101/39`。SQL-only 发布批次保持 MongoDB `39`；下一批 Mongo40 独立退出四个历史索引，见下节。所有历史迁移字节保留。现用提交事件证据、canonical Outcome、冻结的 schema 3 ReportInput、报告历史以及历史归档/明细表继续保留。
+
+生产部署暂停仍有效。生产配置启用了自动迁移，因此在启动这版二进制前，必须完成以下部署 gate：消费者与历史读取者退出证据、当前事件与命令责任核查、已批准逐对象范围的实际备份与恢复核验、维护窗口及具名恢复责任人。完整双库备份不再作为 M4-A／M4-B 的统一前置；各批备份必须绑定实际源身份、原结构／值、完整原版本账本和资源指纹。只读盘点中两个列全部 NULL，只能支持结构及零值分布证据；不能证明备份或恢复通过。101 的源码和测试通过也不授权执行生产 DDL。
+
+维护与恢复门槛须通过各批实际逐对象恢复及完整启动演练核验：正常窗口 30 分钟，从关闭入口到恢复服务并完成启动核验计时；恢复预算 60 分钟，从作出恢复决定开始计时。所有业务进程、直接写入者及数据库自主写入任务的完整冻结证据缺失时阻断。独立准备的 [离线执行器 PR #360](https://github.com/FangcunMount/qs-server/pull/360) 获批并合并后，先完成 DDL、版本与目标结构只读检查，再明确提交并启动业务 runtime。首个业务 runtime 启动命令发出之前，失败恢复须保持停写、确认 server 侧 DDL／事务／锁已结束，恢复获批对象及原值并核对保留事实后，最后回放实际捕获的完整原版本账本；该命令一旦发出，即使启动失败或尚未 ready，也禁止旧备份覆盖新增事实，只能保留新增事实后前向恢复。当前隔离测试未证明原镜像完整服务启动、生产补丁版本上的恢复或 30／60 分钟及 RPO=0 门槛；不新增生产恢复工具，不以 force 或凭空修改版本元数据代替真实备份恢复。
+
+两条 ALTER 各自提交，不能保证跨表原子性。第二条失败时可能出现第一列已删除、第二列仍存在的 `101 dirty/39 clean`；现有启动保护会拒绝继续，Mongo 不推进。保留失败结构、元数据和日志，由另行审查的向前修复协议处理，或按获批逐对象方案恢复目标结构／原值、核对保留事实，再最后回放完整原版本账本到已声明的 clean pair。禁止 `force`、清 dirty、向下迁移或先 DROP 再 force100 制造成功状态。新增 down 文件以 SQLSTATE `45000` 明确拒绝，不重建空历史列。
+
+`TestHistoricalEvidenceNativeSQLOnlyUpgradeAndRestart` 从真实执行历史资源所得的 clean100/39 升级，核对列/CHECK消失、Mongo元数据不变、业务/冻结报告/现用事件内容不变及无DDL重启。部分DDL测试故障注入第二条ALTER，核对dirty保留、Mongo停止、freshpreflight及force/down拒绝。对象恢复测试在隔离数据库重建原99版对象，恢复合法synthetic非NULL与NULL样本，比较完整SHOW CREATE TABLE、JSON值和CHECK拒绝语义。该演练只证明两个结构对象及synthetic值恢复，未验证生产完整backup pair恢复。
+
+`TestHistoricalEvidenceNativeDirtyObjectBackupRestore` 在真正第二条 ALTER 失败所得的 `101 dirty/39 clean` 上，使用此前捕获的对象结构、完整列值和真实 `schema_migrations` 结构／行备份：对象与保留事实核对通过后，最后在显式事务中回放原账本。错误备份、保留事实变化、真实 CHECK 3819 及账本重复主键 1062 均拒绝提前完成，账本写失败回滚后保留原 dirty 状态；成功后 fresh `100/39` preflight 通过。这是固定测试 seam，未增加生产恢复入口。源码 `e249641f14d48499e211677e6867709a98fbb18b` 在 MySQL 8.0.36／MongoDB 7.0.25 隔离 replica-set 上实际执行四个顶层、五个子场景，共九项 RUN／PASS、零 SKIP；完整证据按 `sql-final-result.json` 摘要 `8c2682c8b8b00a574fca9a9e0b8a1fd477a9239d133c1fa9a34ee5ca6b75e4ae` 登记在既有版本验收台账。该测试没有启动三个业务服务，不能签发生产 7.0.31、完整业务或恢复时间预算验收。
+
+未来版本夹具从嵌入头计算下一个版本，真实101不会与假101相撞。CI要求上述四项 SQL 真实测试和启动保护实际 PASS，禁止 SKIP 或空 selector 通过。SQL-only release 自动 DDL 关闭时必须已经安装其完整101/39。进入本批 Mongo-only release 后完整目标为101/40；声明的旧clean pair只是可升级起点，不能绕过当前完整head校验。
+
+
+## M4-02 四个历史 Mongo 索引退役（源码准备，生产阻断）
+
+新增 MongoDB `40` 只执行以下四个具名 `dropIndexes`。SQL101 资源在本批不变；SQL101 的 PR #358 独立审查和发布，本批 PR 暂以其分支为 base，须在 SQL 合入实际 main 后重新 retarget、整合并验证最终资源/source digest。当前已整合实际 main `ab998bdcae7c5d15ac518872580ff6eddaafed15` 和 SQL-A 精确 head `73dbb045d47a28873ea209c67feb48ce8fca9567`；已发布的 M2 SHA 为 `4a8642b0`，SQL-A 的 `d1fa6ade` 旧批次人员 CLI 入口退役保持；现代 selected/orphan 入口保留，旧四动作在配置和连接创建前明确拒绝。
+
+| 集合 | 精确索引名 |
+| --- | --- |
+| `answersheets` | `uk_answersheet_legacy_submission_event_id` |
+| `answersheets` | `idx_answersheet_legacy_submission_audit` |
+| `report_generations` | `uk_generation_historical_generated_event_id` |
+| `report_generations` | `idx_generation_historical_generated_audit` |
+
+本批没有删除集合、历史 BSON 字段、业务文档、现用 `durable_acceptance`／`generated_event_id` 索引或冻结的 schema 3 ReportInput。历史1～39迁移字节不改，down使用明确不受支持的命令拒绝自动重建。索引删除不替代历史责任归档批准：即使历史字段当前不存在，消费者退出、归档 receipt、业务 writer 与自主 TTL 完整冻结、获批的四个完整 live index spec 和原 `schema_migrations` 文档／options／索引备份，以及逐对象恢复仍需独立证据。证据位置或责任人缺失时保持阻断，生产暂停状态不变。
+
+M4-A 先把 `100/39` 升到 `101/39`，独立只读验证后按已批准的 runtime commit 边界启动。M4-B 另开冻结窗口，批准必须绑定实际 clean `101/39`、实际身份、完整资源与 source digest，SQL migrator 回读101且不执行DDL，Mongo只推进40；完成 `101/40` clean 和结构/内容验收后才可启动新业务 runtime。源码接受100/39的历史入口不授权跳过这两批的独立批准。100/40、任意未知/future版本、dirty和未声明组合均拒绝。旧 SQL-only 101/39 镜像会拒绝40库；当前101/40镜像在DDL关闭时也会拒绝尚处101/39的库。
+
+四条索引DDL逐项提交。第三条失败可留下前两索引已删、后两仍在及 `101 clean/40 dirty`；权限拒绝也可能发生在元数据已写dirty之后。保留实际索引清单、元数据和错误证据，不以force、清dirty、down或重建空字段掩盖中断。首个业务 runtime 启动命令尚未发出且停写事实保持时，按获批逐对象方案恢复四个完整索引 spec，核对业务文档、业务集合 UUID／options 和其他索引后，最后回放真实原版本集合备份；也可执行另行审查的向前修复。首个业务 runtime 启动命令一旦发出，禁止旧备份覆盖新增事实。恢复和30/60分钟门槛见[生产恢复与证据](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md)。独立离线执行器的 PR #360 不混入本批diff；实际执行必须用已合入的执行器和本批资源编译同一批准SHA。
+
+真实隔离测试覆盖 Mongo-only升级/无DDL重启、捕获完整 live index spec 并逐项恢复、unique冲突和partial缺失/非string键约束、第三条失败保留dirty、未知元数据拒绝，以及自有认证replica set中实际Unauthorized13。比较其他索引完整spec、所有business namespace UUID/options、业务BSON与SQL版本元数据；provider自身重建schema_migrations集合的UUID变化通过head/dirty和VerifyComplete另行验证，不冒充业务集合变化。恢复夹具包含 synthetic 非空历史字段和冻结报告，属于对象恢复证明，不是生产完整服务启动或业务验收。新增 `TestHistoricalIndexNativeDirtyObjectBackupRestore` 捕获实际 clean39 的完整原 BSON（含 `_id`、类型及字段顺序）、options／索引与四个 live spec；真正 MongoMigrator40 的固定第三条失败 seam 产生部分 drop 和 dirty40。先核对并恢复索引／保留事实，再在显式 replica-set 事务中替换版本文档；中断或真实重复 `_id` 写失败均保留原 dirty40 BSON，成功后 fresh `101/39` preflight 通过。provider 在39→40过程中已重建版本集合；恢复事务不额外 Drop，保持恢复前后的版本集合 UUID。这不是 force、SetVersion 或凭空清 dirty，也没有新增生产恢复入口。CI要求六项顶层实际 PASS，无 auth 配置、缺依赖或 SKIP 均失败。
+
+2026-10-14 重新整合后的源码 `ffee9817` 在任务独占的 MySQL 8.0.36、MongoDB 7.0.25 plain/auth replica set 上，以 race 执行索引五项、SQL 历史字段三项、版本对四项和关闭 DDL 两项，共十四个顶层用例全部 PASS、无 SKIP；任务自有三容器、网络和认证配置已精确释放。此前已有的本机 NSQ 容器在执行期间继续重启，额外环境稳定性总标志未通过；该观察与迁移用例通过、自有资源释放分别保留，不能声明所有已有容器稳定或 NSQ 验收通过。新版 PR 的 CI、生产逐对象备份恢复、冻结窗口和生产发布继续独立验收。
+
+源码 `94d683c12acca78bc2564c810eae767ed7274674` 的最终事务恢复证明在 MySQL 8.0.36／MongoDB 7.0.25 隔离 replica-set 上实际执行四个顶层及三个恢复子场景，共七项 RUN／PASS、零 SKIP，耗时 32.84 秒；完整原生 JSON 日志摘要为 `735bd63a1aa8775dd6175f7555d2d401f2eb554d2c1ff97a08a48a9212dd7b6e`，结果 `mongo-result-v2.json` 摘要为 `cd7138588ed6be37670b46f8dacba9798e669247f447a67337c90147369a2dc8`，按既有版本验收台账保留。唯一 fixture owner 已精确释放两容器和网络（清理回执摘要 `8c1ee58bd273d1d2d9088697060637727210c1f541b9498950da289382252b89`）；已有容器的一项运行元数据变化原因本轮未诊断，不声明整个旧环境稳定。这轮 7.0.25 证明不单独覆盖 7.0.31；后续同补丁版本证明见下段。原镜像完整启动、生产权限／容量、30／60 分钟或 RPO=0 仍未验收。
+
+随后在 checkout `b7e6e5cff5977abc7c7b85d4269fb428e5d34a91` 上，源码任务仍为 `94d683c12acca78bc2564c810eae767ed7274674`、测试文件前后摘要仍为 `c4c40fac1f276ba0cbef1bdd798e573913ef1fa1574c3f2ad775a94c4e95015f`，使用与生产相同补丁版本的 MongoDB 7.0.31 replica-set 及 MySQL 8.0.36 自有隔离夹具执行同四个顶层／三个子场景：七项 RUN／PASS、零 SKIP、exit0。完整原生日志摘要为 `059bad5d06f4a0773369ea607564e2dca91fddc42372166bcb21186de7511968`，`mongo-result.json` 摘要为 `ed5fac1688f7c23e902190adbd37ab83a51848435e81fa9400743a3ccac2e7d1`，最终 fixture 回执摘要为 `cde6a661a8587ca5354a170099f8ab3c3ea61b8cc63c62b534e9b7f8576657f3`。该回执证明两自有容器／网络已精确释放、原 IDs／images 保留；旧容器运行元数据仍有变化，不签全部旧环境稳定。这补齐了同补丁版本上的 synthetic 对象恢复门禁，不是生产连接、生产规模恢复、原镜像三个业务服务完整启动或 30／60 分钟、RPO=0 验收。

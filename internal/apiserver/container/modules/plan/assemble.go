@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"strings"
 
 	"gorm.io/gorm"
@@ -8,6 +9,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -46,17 +48,18 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the plan module.
 type Deps struct {
-	MySQLDB         *gorm.DB
-	EventPublisher  event.EventPublisher
-	PublishedModels modelcatalogport.PublishedModelLister
-	RedisClient     redis.UniversalClient
-	CacheBuilder    *keyspace.Builder
-	CachePolicies   sharedcache.PolicyProvider
-	EntryBaseURL    string
-	Observer        *observability.ComponentObserver
-	MySQLLimiter    backpressure.Acquirer
-	TesteeAccess    actorAccessApp.TesteeAccessService
-	OpenedOutbox    appEventing.ProfileBinding
+	MySQLDB                   *gorm.DB
+	EventPublisher            event.EventPublisher
+	PublishedModels           modelcatalogport.PublishedModelLister
+	RedisClient               redis.UniversalClient
+	CacheBuilder              *keyspace.Builder
+	CachePolicies             sharedcache.PolicyProvider
+	EntryBaseURL              string
+	Observer                  *observability.ComponentObserver
+	MySQLLimiter              backpressure.Acquirer
+	TesteeAccess              actorAccessApp.TesteeAccessService
+	OpenedOutbox              appEventing.ProfileBinding
+	TaskOpenedReminderEnabled bool
 }
 
 // New assembles the plan module.
@@ -87,12 +90,21 @@ func New(deps Deps) (*Module, error) {
 
 	lifecycleEnrollments, ok := enrollmentRepo.(planDomain.PlanEnrollmentLifecycleRepository)
 	if !ok {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "enrollment repository lacks lifecycle transitions")
+		return nil, missingModuleDependency("enrollment lifecycle transitions")
 	}
-	lifecycleService := planApp.NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
+	lifecycleService, err := planApp.NewLifecycleService(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
+	if err != nil {
+		return nil, err
+	}
 	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
-	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
-	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, normalized.OpenedOutbox)
+	taskSchedulerService, err := planApp.NewTaskSchedulerService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox})
+	if err != nil {
+		return nil, err
+	}
+	taskManagementService, err := planApp.NewTaskManagementService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox})
+	if err != nil {
+		return nil, err
+	}
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,
@@ -107,7 +119,10 @@ func New(deps Deps) (*Module, error) {
 	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog, enrollmentAccess)
 	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog, enrollmentAccess)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
-	module.TaskEntryResolver = planApp.NewTaskEntryResolver(taskRepo, scaleCatalog, enrollmentRepo)
+	module.TaskEntryResolver, err = planApp.NewTaskEntryResolver(taskRepo, scaleCatalog, enrollmentRepo)
+	if err != nil {
+		return nil, err
+	}
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 	module.TaskReminderStateReader = planApp.NewTaskReminderStateReader(taskRepo)
 
@@ -116,7 +131,10 @@ func New(deps Deps) (*Module, error) {
 
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+		return Deps{}, missingModuleDependency("MySQL database")
+	}
+	if deps.PublishedModels == nil {
+		return Deps{}, missingModuleDependency("published model catalog")
 	}
 
 	if deps.EventPublisher == nil {
@@ -128,6 +146,11 @@ func normalizeDeps(deps Deps) (Deps, error) {
 		deps.EntryBaseURL = strings.TrimSpace(deps.EntryBaseURL)
 	}
 	return deps, nil
+}
+
+func missingModuleDependency(dependency string) error {
+	logger.L(context.Background()).Errorw("required Plan module dependency is missing", "dependency", dependency)
+	return errors.WithCode(code.ErrModuleInitializationFailed, "plan module: %s is required", dependency)
 }
 
 // Cleanup releases module resources.

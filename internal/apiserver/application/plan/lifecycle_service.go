@@ -24,14 +24,28 @@ type lifecycleService struct {
 	transitionWorkflow *planTransitionWorkflow
 }
 
-func NewLifecycleServiceWithEnrollment(
+func NewLifecycleService(
 	planRepo plan.AssessmentPlanRepository,
 	taskRepo plan.AssessmentTaskRepository,
 	scaleCatalog ScaleCatalog,
 	enrollments plan.PlanEnrollmentLifecycleRepository,
 	tx apptransaction.Runner,
 	eventPublisher event.EventPublisher,
-) PlanLifecycleService {
+) (PlanLifecycleService, error) {
+	switch {
+	case planRepo == nil:
+		return nil, missingPlanDependency("plan lifecycle", "plan repository")
+	case taskRepo == nil:
+		return nil, missingPlanDependency("plan lifecycle", "task repository")
+	case scaleCatalog == nil:
+		return nil, missingPlanDependency("plan lifecycle", "scale catalog")
+	case enrollments == nil:
+		return nil, missingPlanDependency("plan lifecycle", "enrollment repository")
+	case tx == nil:
+		return nil, missingPlanDependency("plan lifecycle", "transaction runner")
+	case eventPublisher == nil:
+		return nil, missingPlanDependency("plan lifecycle", "event publisher")
+	}
 	taskGenerator := plan.NewTaskGenerator()
 	taskLifecycle := plan.NewTaskLifecycle()
 	lifecycle := plan.NewPlanLifecycle(taskRepo, taskGenerator, taskLifecycle)
@@ -43,7 +57,7 @@ func NewLifecycleServiceWithEnrollment(
 		lifecycle:          lifecycle,
 		createWorkflow:     newPlanCreateWorkflow(planRepo, scaleCatalog, plan.NewPlanValidator()),
 		transitionWorkflow: newPlanTransitionWorkflow(planRepo, taskRepo, enrollments, tx, eventPublisher),
-	}
+	}, nil
 }
 
 // CreatePlan 创建测评计划模板

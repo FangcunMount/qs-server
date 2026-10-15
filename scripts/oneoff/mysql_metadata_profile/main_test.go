@@ -460,3 +460,51 @@ func TestIncompleteRunEmitsNullCurrentFactsAndOnlyReceiptFields(t *testing.T) {
 		t.Fatal("input_value_leaked")
 	}
 }
+
+func TestConnectionReleaseFailureDiscardsAllConclusions(t *testing.T) {
+	db, _ := mockDB(t)
+	c, err := db.Conn(context.Background())
+	if err != nil || c.Close() != nil {
+		t.Fatal("connection_fixture_failed")
+	}
+	v := true
+	r := receipt{Complete: true, CurrentUnrestricted: true, CurrentGlobalSelect: &v, CurrentGlobalShowView: &v,
+		CurrentGlobalTrigger: &v, CurrentGlobalEvent: &v, CurrentPartialRevocations: &v,
+		RDSAvailable: &v, RDSUnrestricted: &v, AssignedRoles: &v, MandatoryRoles: &v}
+	r = releaseConnection(c, r)
+	if r.Complete || r.CurrentUnrestricted || r.ErrorCategory != "connection_release_failed" || r.RDSAvailable != nil || r.RDSUnrestricted != nil || r.AssignedRoles != nil || r.MandatoryRoles != nil {
+		t.Fatal("connection_release_retained_positive")
+	}
+	assertPrivate(t, r)
+}
+
+func TestDatabaseReleaseFailureDiscardsAllConclusions(t *testing.T) {
+	db, mock := mockDB(t)
+	mock.ExpectClose().WillReturnError(errors.New(fixtureSecret))
+	v := true
+	r := releaseDatabase(db, receipt{Complete: true, CurrentUnrestricted: true, CurrentGlobalSelect: &v, RDSAvailable: &v, RDSUnrestricted: &v, AssignedRoles: &v, MandatoryRoles: &v})
+	if r.Complete || r.CurrentUnrestricted || r.ErrorCategory != "database_release_failed" || r.RDSAvailable != nil || r.RDSUnrestricted != nil || r.AssignedRoles != nil || r.MandatoryRoles != nil {
+		t.Fatal("database_release_retained_positive")
+	}
+	assertPrivate(t, r)
+}
+
+func TestOwnedPoolDriverCloseFailureInvalidatesCompletedProbe(t *testing.T) {
+	db, mock := mockDB(t)
+	db.SetMaxIdleConns(1)
+	mock.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+	mock.ExpectQuery(currentSQL).WillReturnRows(grants(positive()))
+	mock.ExpectQuery(mandatorySQL).WillReturnRows(sqlmock.NewRows([]string{"mandatory_roles"}).AddRow(""))
+	mock.ExpectQuery(rdsSQL).WillReturnRows(grants(positive()))
+	mock.ExpectQuery(identitySQL).WillReturnRows(identities(10, "NONE"))
+	mock.ExpectClose().WillReturnError(errors.New(fixtureSecret))
+	r := probe(context.Background(), db, fixtureConnection, fixtureBinding())
+	if !r.Complete || db.Stats().InUse != 0 || db.Stats().OpenConnections != 1 {
+		t.Fatal("owned_pinned_release_failed")
+	}
+	r = releaseDatabase(db, r)
+	if r.Complete || r.CurrentUnrestricted || r.ErrorCategory != "database_release_failed" {
+		t.Fatal("physical_close_failure_reported_complete")
+	}
+	assertPrivate(t, r)
+}
