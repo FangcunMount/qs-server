@@ -236,6 +236,40 @@ func TestCaptureReceiptBindsObservedBCountsScopeAndAllReleaseResponsibilities(t 
 	}
 }
 
+func TestCaptureReceiptRequiresExactlyTwoOriginalCollectionCounts(t *testing.T) {
+	m := fixtureMaterial(t)
+	hash := strings.Repeat("c", 64)
+	original, e := json.Marshal(fixtureCaptureReceipt(m, hash))
+	if e != nil {
+		t.Fatal(e)
+	}
+	counts, e := json.Marshal([2]*int64{m.Collections[0].Count, m.Collections[1].Count})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, extra := range []string{"valid", "0", "null", "{}", "[0]", "0,0"} {
+		t.Run(extra, func(t *testing.T) {
+			var fields map[string]json.RawMessage
+			if e := json.Unmarshal(original, &fields); e != nil {
+				t.Fatal(e)
+			}
+			if extra != "valid" {
+				fields["exact_fixed_collection_counts"] = append(append([]byte(nil), counts[:len(counts)-1]...), []byte(","+extra+"]")...)
+			}
+			raw, e := json.Marshal(fields)
+			if e != nil {
+				t.Fatal(e)
+			}
+			zero := 0
+			proof := freezeCaptureProcess(t, privateDir(t), raw, "exited", &zero)
+			e = proof.check(m, hash, testSource)
+			if extra == "valid" && e != nil || extra != "valid" && (e == nil || e.Error() != "capture_success_receipt_rejected") {
+				t.Fatal("capture stdout accepted a count array the original tool cannot emit", extra, e)
+			}
+		})
+	}
+}
+
 func TestCaptureEvidenceUsesPrivateOriginalFilesAndBothRawHashes(t *testing.T) {
 	m := fixtureMaterial(t)
 	hash := strings.Repeat("c", 64)

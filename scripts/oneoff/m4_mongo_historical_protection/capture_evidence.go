@@ -31,10 +31,22 @@ func (input captureEvidenceInput) check(m material, materialHash, tool string) e
 	}
 	raw, e = readPrivate(execution.ReceiptFile, execution.ReceiptHash, maxCaptureReceiptBytes)
 	var captured receipt
-	if e != nil || decodeCaptureDocument(raw, &captured, captureReceiptFields, []string{"release_error_category", "restored_verification"}) != nil || validateCaptureReceipt(captured, m, materialHash, tool) != nil {
+	if e != nil || decodeCaptureReceipt(raw, &captured) != nil || validateCaptureReceipt(captured, m, materialHash, tool) != nil {
 		return errors.New("capture_success_receipt_rejected")
 	}
 	return nil
+}
+
+func decodeCaptureReceipt(raw []byte, captured *receipt) error {
+	// encoding/json discards surplus elements when decoding a fixed array.
+	// Check the original stdout shape before decoding its two observed counts.
+	var shape struct {
+		Counts []json.RawMessage `json:"exact_fixed_collection_counts"`
+	}
+	if json.Unmarshal(raw, &shape) != nil || len(shape.Counts) != len(captured.Counts) {
+		return errors.New("capture_receipt_count_shape_rejected")
+	}
+	return decodeCaptureDocument(raw, captured, captureReceiptFields, []string{"release_error_category", "restored_verification"})
 }
 
 var captureReceiptFields = []string{
