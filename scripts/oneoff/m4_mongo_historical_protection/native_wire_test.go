@@ -294,6 +294,7 @@ func TestM4MongoObjectNativeCommitResponseLossUnknown(t *testing.T) {
 	_, uuid := h.head()
 	sql := h.sqlLedger()
 	args, _, _ := h.approval()
+	directURI := h.uri
 	p := newNativeWireProxy(t, h, "commit_reply_loss")
 	r := h.action("restore", args...)
 	requirePhysicalReleased(t, r)
@@ -320,6 +321,48 @@ func TestM4MongoObjectNativeCommitResponseLossUnknown(t *testing.T) {
 		}
 	}
 	t.Logf("upstream successful COMMIT replies=%d; every reply dropped; same lsid/txnNumber digest=%s; one application restore/commit call, no transaction rerun", acks, digests[0])
+	if !p.close() {
+		t.Fatal("owned response-loss route not released before independent verification")
+	}
+	h.uri = directURI
+	journalPath, e := recoveryJournalPath(h.original, h.materialHash)
+	if e != nil {
+		t.Fatal(e)
+	}
+	journal, e := readOwnedPrivate(journalPath, maxRecoveryJournalBytes)
+	if e != nil {
+		t.Fatal(e)
+	}
+	indexEvents := h.indexEventCount()
+	verified := h.action("verify-restored", args...)
+	requireReleased(t, verified)
+	if !verified.Complete || !verified.ReadOnly || verified.MaterialHash != h.materialHash || verified.MongoVersion != 39 || verified.SQLVersion != 101 || verified.LedgerCommitIssued || verified.LedgerCommitAcknowledged || verified.LedgerCommitOutcomeUnknown || verified.RestoredVerification == nil || !verified.RestoredVerification.UUIDStableAcrossTwoSnapshots || verified.RestoredVerification.EarlierRestoreLedgerUUIDBound || verified.RestoredVerification.CurrentLedgerUUIDSHA256 != fingerprint(uuid) {
+		t.Fatal("fresh read-only connection did not prove the original restored scope", verified)
+	}
+	assertDocuments(t, docs, h.frozenDocuments())
+	assertMetadata(t, metadata, h.retainedMetadata())
+	current, currentUUID := h.head()
+	if !bytes.Equal(current, after) || !bytes.Equal(currentUUID, uuid) || h.sqlLedger() != sql || h.indexEventCount() != indexEvents {
+		t.Fatal("verification changed original objects, ledger, SQL or index state")
+	}
+	// A real count change is part of the captured business namespace evidence.
+	// Do not hide it by accepting unchanged indexes alone or repairing the row.
+	if _, e := h.client.Database(h.name).Collection("answersheets").InsertOne(t.Context(), bson.D{{Key: "_id", Value: "owned_verify_restored_count_drift"}}); e != nil {
+		t.Fatal("owned retained-count mutation unavailable")
+	}
+	rejected := h.action("verify-restored", args...)
+	requireReleased(t, rejected)
+	if rejected.Complete || !rejected.ReadOnly || rejected.Error != "restored_original_state_or_current_ledger_uuid_unproven" || rejected.RestoredVerification != nil || rejected.Counts != [2]*int64{} || rejected.LedgerCommitIssued || rejected.LedgerCommitOutcomeUnknown {
+		t.Fatal("changed retained facts were certified or verification wrote recovery state", rejected)
+	}
+	finalHead, finalUUID := h.head()
+	finalJournal, e := readOwnedPrivate(journalPath, maxRecoveryJournalBytes)
+	if e != nil || !bytes.Equal(journal, finalJournal) || !bytes.Equal(finalHead, after) || !bytes.Equal(finalUUID, uuid) || h.sqlLedger() != sql || h.indexEventCount() != indexEvents {
+		t.Fatal("verification consumed approval, replayed the ledger or changed indexes")
+	}
+	if !r.LedgerCommitOutcomeUnknown || r.Complete || r.LedgerCommitAcknowledged {
+		t.Fatal("fresh original-state proof rewrote the prior unknown outcome")
+	}
 }
 
 func TestNativeWireMessageBoundsAndTransactionDigest(t *testing.T) {

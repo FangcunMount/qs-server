@@ -62,6 +62,30 @@ func (d *database) verifyTarget(ctx context.Context, m material) (observation, e
 	}
 	return o, verifyTargetObservation(m, o)
 }
+
+func (d *database) verifyRestored(ctx context.Context, m material) (observation, error) {
+	before, e := d.snapshot(ctx)
+	if e != nil {
+		return before, e
+	}
+	after, e := d.snapshot(ctx)
+	if e != nil {
+		return after, e
+	}
+	return after, verifyOriginalRestoredSnapshots(m, before, after)
+}
+
+func verifyOriginalRestoredSnapshots(m material, before, after observation) error {
+	// Provider40 legitimately replaces the captured39 namespace. The retained
+	// material cannot bind a not-yet-created40 UUID: only its distinction from
+	// the original39 UUID and stability across these two fresh reads are proved.
+	// The first check validates the full original state at the first snapshot;
+	// the second additionally compares the two observed current ledger UUIDs.
+	if bytes.Equal(before.Ledger.Namespace.UUID, m.Ledger.Namespace.UUID) || verifyRestoredObservation(m, before, before) != nil || verifyRestoredObservation(m, before, after) != nil {
+		return errors.New("restored_original_state_or_current_ledger_uuid_unproven")
+	}
+	return nil
+}
 func rereadApproval(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) error {
 	raw, e := readPrivate(materialPath, materialHash, maxMaterialBytes)
 	var again material
