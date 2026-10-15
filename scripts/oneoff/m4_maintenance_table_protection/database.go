@@ -314,12 +314,20 @@ func pageSQL(i int, hasLast bool) string {
 		}
 		return a
 	}(), "+") + ")"
-	for n, c := range s.columns {
-		values = append(values, "CASE WHEN "+lengths[n]+"<="+strconv.Itoa(maxValueBytes)+" AND "+rowSize+"<="+strconv.Itoa(maxRowBytes)+" THEN CAST(`"+c.Name+"` AS BINARY) ELSE NULL END")
+	// Test lengths before materializing either the original bytes or the
+	// HEX/CONCAT hash frame. An oversized LONGTEXT never enters that branch.
+	var bounded []string
+	for _, length := range lengths {
+		bounded = append(bounded, "COALESCE("+length+",0)<="+strconv.Itoa(maxValueBytes))
+	}
+	bounded = append(bounded, rowSize+"<="+strconv.Itoa(maxRowBytes))
+	allowed := strings.Join(bounded, " AND ")
+	for _, c := range s.columns {
+		values = append(values, "CASE WHEN "+allowed+" THEN CAST(`"+c.Name+"` AS BINARY) ELSE NULL END")
 	}
 	selectParts = append(selectParts, lengths...)
 	selectParts = append(selectParts, values...)
-	selectParts = append(selectParts, retainedHashSQL(s.columns))
+	selectParts = append(selectParts, "CASE WHEN "+allowed+" THEN "+retainedHashSQL(s.columns)+" ELSE NULL END")
 	return "SELECT /*+ MAX_EXECUTION_TIME(5000) */ " + strings.Join(selectParts, ",") + " FROM `" + s.name + "` FORCE INDEX(PRIMARY) WHERE " + where + " ORDER BY " + strings.Join(order, ",") + " LIMIT " + strconv.Itoa(pageSize)
 }
 func pageArgs(s tableSpec, key []string) []any {
@@ -345,7 +353,8 @@ func scanPageRow(rows *sql.Rows, s tableSpec) (rowProof, error) {
 	for n := range raw {
 		args = append(args, &raw[n])
 	}
-	args = append(args, &out.Hash)
+	var hash sql.NullString
+	args = append(args, &hash)
 	if rows.Scan(args...) != nil {
 		return out, errors.New("bounded_row_scan_failed")
 	}
@@ -364,6 +373,10 @@ func scanPageRow(rows *sql.Rows, s tableSpec) (rowProof, error) {
 	if size > maxRowBytes {
 		return out, errors.New("row_value_limit_rejected")
 	}
+	if !hash.Valid {
+		return out, errors.New("bounded_row_hash_missing")
+	}
+	out.Hash = hash.String
 	if e := validateRow(s, out); e != nil {
 		return out, e
 	}

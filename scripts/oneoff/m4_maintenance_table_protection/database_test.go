@@ -83,7 +83,7 @@ func TestFullKeysetScanRequiresEmptyEOFAndSameSnapshotCount(t *testing.T) {
 	}
 }
 func TestPrimaryPageRejectsOrderOverflowAndReleaseFailure(t *testing.T) {
-	for _, name := range []string{"descending", "oversized", "rows_error", "aggregate_mismatch", "total_limit"} {
+	for _, name := range []string{"descending", "oversized", "oversized_null_hash", "missing_hash", "rows_error", "aggregate_mismatch", "total_limit"} {
 		t.Run(name, func(t *testing.T) {
 			db, m := dbFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -97,6 +97,16 @@ func TestPrimaryPageRejectsOrderOverflowAndReleaseFailure(t *testing.T) {
 				result.AddRow(row...)
 			case "oversized":
 				row[len(scope[i].keys)+4] = int64(maxValueBytes + 1)
+				result = sqlmock.NewRows(pageColumns(i)).AddRow(row...)
+			case "oversized_null_hash":
+				row[len(scope[i].keys)+4] = int64(maxValueBytes + 1)
+				for n := range scope[i].columns {
+					row[len(scope[i].keys)+len(scope[i].columns)+n] = nil
+				}
+				row[len(row)-1] = nil
+				result = sqlmock.NewRows(pageColumns(i)).AddRow(row...)
+			case "missing_hash":
+				row[len(row)-1] = nil
 				result = sqlmock.NewRows(pageColumns(i)).AddRow(row...)
 			case "rows_error":
 				result.RowError(0, errors.New("fixture private error"))
@@ -113,6 +123,12 @@ func TestPrimaryPageRejectsOrderOverflowAndReleaseFailure(t *testing.T) {
 			out, e := scanTable(ctx, db, i, scope[i].columns, &rows, &used)
 			if e == nil || out.EOF && name != "aggregate_mismatch" {
 				t.Fatalf("rejected range was complete: %+v %v", out, e)
+			}
+			if name == "oversized_null_hash" && e.Error() != "cell_value_limit_or_null_rejected" {
+				t.Fatal("lost explicit oversize rejection", e)
+			}
+			if name == "missing_hash" && e.Error() != "bounded_row_hash_missing" {
+				t.Fatal("missing server hash accepted", e)
 			}
 			if strings.Contains(e.Error(), "fixture private") {
 				t.Fatal("raw DB error leaked")
@@ -287,5 +303,33 @@ func TestAllPageValuesAreServerBinaryAndCanonicalBoundaries(t *testing.T) {
 		if !strings.Contains(query, "LIMIT 500") || !strings.Contains(query, "MAX_EXECUTION_TIME(5000)") {
 			t.Fatal(query)
 		}
+	}
+}
+
+// Verify the small semantic guard around the hash, not a complete query golden.
+func TestServerHashOnlyMaterializesWithinAllValueAndRowLimits(t *testing.T) {
+	s := scope[4]
+	query := pageSQL(4, false)
+	hashStart := strings.Index(query, " THEN SHA2(CONCAT(")
+	if hashStart < 0 || strings.Count(query, "SHA2(CONCAT(") != 1 {
+		t.Fatal("missing unique bounded hash branch")
+	}
+	caseStart := strings.LastIndex(query[:hashStart], "CASE WHEN ")
+	if caseStart < 0 {
+		t.Fatal("hash is unconditionally evaluated")
+	}
+	guard := query[caseStart+len("CASE WHEN ") : hashStart]
+	for _, c := range s.columns {
+		length := "COALESCE(OCTET_LENGTH(CAST(`" + c.Name + "` AS BINARY)),0)"
+		if !strings.Contains(guard, length+"<=8388608") {
+			t.Fatalf("hash lacks per-value bound for %s", c.Name)
+		}
+	}
+	if !strings.HasSuffix(guard, ")<=12582912") || !strings.Contains(query[hashStart:], "),256) ELSE NULL END FROM ") {
+		t.Fatal("hash lacks complete row bound or over-limit NULL")
+	}
+	// Every returned original value uses exactly the same predicate.
+	if strings.Count(query, "CASE WHEN "+guard+" THEN ") != len(s.columns)+1 {
+		t.Fatal("hash/value eligibility diverged")
 	}
 }
