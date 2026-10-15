@@ -179,11 +179,14 @@ func claimRecoveryOperation(m material, a approval, hash string, initialize bool
 
 // Verification borrows only an already consumed operation. It never creates a
 // boundary, appends a journal entry or claims a new approval.
-func checkRestoredAuthorization(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) error {
+func checkRestoredAuthorization(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string, captureEvidence captureEvidenceInput) error {
 	if m.CapturePath != materialPath {
 		return errors.New("frozen_material_path_changed_before_verification")
 	}
 	if _, e := readPrivate(materialPath, materialHash, maxMaterialBytes); e != nil {
+		return e
+	}
+	if e := captureEvidence.check(m, materialHash, tool); e != nil {
 		return e
 	}
 	raw, e := readPrivate(approvalPath, approvalHash, 32768)

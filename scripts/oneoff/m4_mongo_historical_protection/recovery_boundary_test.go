@@ -72,7 +72,7 @@ func TestFirstRecoveryBoundaryAndOperationCannotBeMovedOrReencoded(t *testing.T)
 	if e := writeExclusive(copyPath, raw); e != nil {
 		t.Fatal(e)
 	}
-	if e := rereadApproval(m, a, mp, mh, copyPath, ah, testSource); e != nil {
+	if e := rereadApproval(m, a, mp, mh, copyPath, ah, testSource, fixtureCaptureEvidence(t, m, mh)); e != nil {
 		t.Fatal("identical raw approval input unexpectedly invalid", e)
 	}
 	if consumeApproval(m, a, ah) == nil {
@@ -178,6 +178,7 @@ func TestLostOrDamagedRecoveryBoundaryCannotBeRecreated(t *testing.T) {
 func TestCopiedOrOldMaterialPathRejectedBeforeEnvironment(t *testing.T) {
 	m := fixtureMaterial(t)
 	_, mp, mh, _, _ := currentRestoreApproval(t, &m, privateDir(t))
+	proof := fixtureCaptureEvidence(t, m, mh)
 	raw, _ := readPrivate(mp, mh, maxMaterialBytes)
 	copyPath := filepath.Join(filepath.Dir(mp), "copied-material.json")
 	if writeExclusive(copyPath, raw) != nil {
@@ -193,7 +194,8 @@ func TestCopiedOrOldMaterialPathRejectedBeforeEnvironment(t *testing.T) {
 			}
 			hash = fingerprint(old)
 		}
-		r := run(context.Background(), []string{"--action=verify-target", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + path, "--material-sha256=" + hash}, func(string) string { t.Fatal("environment read before material path rejection"); return "" }, testSource, nil)
+		args := append([]string{"--action=verify-target", "--mysql-database=" + m.SQLName, "--mongo-database=" + m.MongoName, "--material-file=" + path, "--material-sha256=" + hash}, captureEvidenceArgs(proof)...)
+		r := run(context.Background(), args, func(string) string { t.Fatal("environment read before material path rejection"); return "" }, testSource, nil)
 		if r.Complete || r.Error != "material_rejected" {
 			t.Fatalf("copied/missing anchor accepted: %+v", r)
 		}

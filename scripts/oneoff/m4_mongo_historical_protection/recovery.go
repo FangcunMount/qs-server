@@ -86,11 +86,14 @@ func verifyOriginalRestoredSnapshots(m material, before, after observation) erro
 	}
 	return nil
 }
-func rereadApproval(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) error {
+func rereadApproval(m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string, captureEvidence captureEvidenceInput) error {
 	raw, e := readPrivate(materialPath, materialHash, maxMaterialBytes)
 	var again material
 	if e != nil || strictDecode(raw, &again) != nil || validateMaterial(again, tool, m.SQLName, m.MongoName) != nil || again.CapturePath != materialPath || m.CapturePath != materialPath {
 		return errors.New("frozen_material_changed_before_claim")
+	}
+	if e := captureEvidence.check(again, materialHash, tool); e != nil {
+		return e
 	}
 	raw, e = readPrivate(approvalPath, approvalHash, 32768)
 	var approved approval
@@ -146,7 +149,7 @@ func originalIndexCommand(m material, position int, left time.Duration) (bson.D,
 	return bson.D{{Key: "createIndexes", Value: target.collection}, {Key: "indexes", Value: bson.A{bson.Raw(spec)}}, {Key: "maxTimeMS", Value: left.Milliseconds()}, {Key: "writeConcern", Value: bson.D{{Key: "w", Value: "majority"}, {Key: "wtimeout", Value: left.Milliseconds()}}}}, nil
 }
 
-func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string) (observation, error) {
+func (d *database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string, captureEvidence captureEvidenceInput) (observation, error) {
 	before, e := d.snapshot(ctx)
 	if e != nil {
 		return before, e
@@ -155,8 +158,11 @@ func (d *database) restore(ctx context.Context, m material, a approval, material
 	if e != nil {
 		return before, e
 	}
-	if e = rereadApproval(m, a, materialPath, materialHash, approvalPath, approvalHash, tool); e != nil {
+	if e = rereadApproval(m, a, materialPath, materialHash, approvalPath, approvalHash, tool, captureEvidence); e != nil {
 		return before, e
+	}
+	if ctx.Err() != nil {
+		return before, errors.New("total_budget_exceeded")
 	}
 	if e = consumeApproval(m, a, approvalHash); e != nil {
 		return before, e

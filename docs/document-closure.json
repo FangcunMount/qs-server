@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "602710eb2f6ee383923230890c4bdb4a3bcada3a",
-    "verified_on": "2026-10-15"
+    "sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+    "verified_on": "2026-10-16"
   },
   "status_policy": {
     "doc_status": [
@@ -14376,8 +14376,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
-        "verified_on": "2026-10-15"
+        "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+        "verified_on": "2026-10-16"
       },
       "fact_sources": [
         {
@@ -14635,6 +14635,102 @@
           "result": "matched",
           "source_sha": "6186df273482c5c3fd3e802fd0659d867c639c3f",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -json ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "88bcefa7069f4430f0cfcda8a50c6c3e130b0092",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race -json ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "88bcefa7069f4430f0cfcda8a50c6c3e130b0092",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/capture_evidence.go",
+          "selector": "func (input captureEvidenceInput) check(",
+          "result": "matched",
+          "source_sha": "88bcefa7069f4430f0cfcda8a50c6c3e130b0092",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/main.go",
+          "selector": "f.Visit(func(option *flag.Flag)",
+          "result": "matched",
+          "source_sha": "88bcefa7069f4430f0cfcda8a50c6c3e130b0092",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/native_integration_test.go",
+          "selector": "h.captureExit = serve(",
+          "result": "matched",
+          "source_sha": "88bcefa7069f4430f0cfcda8a50c6c3e130b0092",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "7de60377a59c6c4ac2e6e783b0d3f9699499071e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -count=1 -json -race ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "7de60377a59c6c4ac2e6e783b0d3f9699499071e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/capture_evidence.go",
+          "selector": "func decodeCaptureReceipt(raw []byte, captured *receipt) error",
+          "result": "matched",
+          "source_sha": "7de60377a59c6c4ac2e6e783b0d3f9699499071e",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "2143511ee6eec13da5afb96f3c91c5dfba023ed9",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+          "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/capture_evidence.go",
+          "selector": "!bytes.Equal(raw, original.Bytes())",
+          "result": "matched",
+          "source_sha": "d937a0e5542d662c55db03d4d9f2bc5315afa9ad",
+          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -14674,7 +14770,11 @@
           "Exact948 CI38692602554/job116281747508 passed all37B RUN/PASS0FAIL/SKIP; compiledb246b23a8d41d829262442ace4d42723696c33ce treeequal948. Backendtail120k/truncatedtrue covers completeBscopeonly; proofb37947b530bd88b66157c3708bce741f6bf3a716dd784005a90e7a688bbb19e7 and taile492af9a2be3ea86e60bcc69f0ddd727322639f4808f0ee4d6f135df93a3591a remain immutable. Terminal25checks24success/1designskip doesnotclose newAI transient-parent-swapP2 or certify0fa capture source. A/BhealthyphaseStateJSON visible; metadataStateJSON not visible in finaltail.",
           "Capture-only0fa holds original qualified parentFD preENV through Openat/OEXCL/NOFOLLOW,relative originalbyte readback,file+dirfsync,canonicalSameFile/ownerchecks,successfulFDclose and finalctx before MaterialHash. RealFS swap-away/write/swap-back reproduces old absolutewriter misplacedmaterial while newFDwriter retains canonicalbytes; existingfile/symlink,owner/qualification/close/budget negatives pass. Actual128ordinary/128race RUN/PASS0FAIL/SKIP,tagcompile37only,tagvet/lint0 on948 plus pending4files later committed unchanged0fa; QAfb2278f6c4a256923290276b2d63d2fe27f7bbf628dcda496997319fb5ef75bf/deliveryd12a93277d2dcecadf1f430eb01b8d1558086225662ead0bfca50361127fd04e bind fullbytes. Sharedprivate/journal/recovery/database/protocol/CI unchanged. NoDocker/DB/production/newnative37 executed; finalheadCI37/freshAI stillrequired; oldP2thread notpre-resolved.",
           "Normal merge75e1f66631cfcb6583bd7381bea64c93858b8543 integrates actual maincd94f462390c2ceb213537acfc0c8fce91cb2187 containing final A held-FD source31b. All23 B tool files remain byte-identical to167e553a8c578a8213b538beb5b0729fa918e079, and all15 imported A tool files equal actual main. CI keeps independent fresh m/a/b Mongo phases, strict State/cleanup and2GiB/WT0.25, exact A47 plus B37 and B compiled-source summary. Both parents retain whole original verification/limitation records without hybrid source/command entries; A current-tool gap and B tool entry remain. This merge actually passed A143/B128 ordinary-race and configcontract72, integration race compilation only, tagged vet, changed-code lint0, selector-byte comparison and actionlint with ShellCheck. No local DB/native was rerun; new exact-head A47/B37 CI and AI, main-push/Sonar, deployment, production window/RPO and business acceptance remain independently unverified.",
-          "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification."
+          "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
+          "Source88bcefa7069f4430f0cfcda8a50c6c3e130b0092 requires an independently frozen trusted-executor six-field m4_b_capture_execution envelope (32KiB) and original capture stdout (64KiB), both private raw-SHA-bound files. Explicit exited/exit0 and typed capture completion, material/tool/B scope, SQL101/Mongo39 identity, exact counts, cursor/resource releases and absence of unknown/write/production-freeze claims must match. Strict proof JSON rejects duplicate/unknown/case-alias/missing/null members. Inspect/capture reject proof flags even when explicitly empty; all three material consumers check before ENV and reread at preclaim/terminal original input boundaries, retaining original action/approval deadlines. The tool never creates or repairs evidence; SHA is byte binding under independent executor/approval trust, not a signature. Failed material bytes remain retained and cannot be revived with manual hash or a new otherwise valid approval. Original material/hash/approval/journal/unknown semantics are unchanged.",
+          "Final88bcefa7 Go bytes actually passed299 ordinary and299 race RUN/PASS0FAIL/SKIP plus integration compile-only, tagged vet, tagged lint0, format/diff. QA08bc82c5ddda147b7c8e6fabf2eda146f0148ba0512ba5c7bb85f672c05bc6e7 in qs-m4-b-capture-execution-evidence-source-v1/native-original-stdout-qa/receipt.json binds actual argv/logs/all25 Go inputs across source commit. Native capture now freezes original actual serve stdout and its returned exit, while every other action retains the original run/observer. Earlier reencoded native producer qualification was withdrawn; old284/286/299 QA and explicit-empty-flag red logs remain bound to their original bytes. Original37 native names/order/assertions remain; the new actual-serve producer was only compiled, and new-head real37/freshCI/AI are not yet executed or accepted. Historical native/CI evidence retains original source; no production, window/RPO, business or signoff promotion. These exact argv ran with GOMAXPROCS=2 and GOMEMLIMIT=1GiB supplied in the process environment; environment assignments are not executable argv entries. The immutable QA receipt retains exact compile-only/vet/lint argv and results; machine-verifiable sidecar command records list the ordinary/race commands without normalizing or inventing different commands.",
+          "Previous B verified binding retained unchanged: {\"source_sha\": \"88bcefa7069f4430f0cfcda8a50c6c3e130b0092\", \"verified_on\": \"2026-10-15\"}. Fresh ef15 review4284410220 found Go fixed-array decoding silently discarding surplus originalstdout counts. Source7de60377a requires original exact_fixed_collection_counts rawJSON array length2 before existing strict typed decoding/validation; original material/approval decoders, all37 native names/producer, resources/DDL and original action deadlines are unchanged. Actual red7RUN/1PASS/5failedchildren(+parentfailure) retained, then306ordinary/306race RUN/PASS0FAIL/SKIP and taggedcompile-only/vet/lint0 passed on the exact bytes committed as7de. QA9415bbeae266ffcc399a044ca5fa48f9a0ccf485fe062444cbd28d0346a99fad retains raw logs/actualargv/environment and25GoSHA. Prior e9/ef15 CI/native and review remain historical; new finalheadCI/native37/freshAI are pending. No production/freeze/window/RPO/business/signoff promotion.",
+          "Previous B verified binding retained unchanged: {\"source_sha\": \"7de60377a59c6c4ac2e6e783b0d3f9699499071e\", \"verified_on\": \"2026-10-15\"}. Fresh8bf review4284625167 found explicit empty release_error_category accepted though original successful receipt omits it. Source2143511ee6eec13da5afb96f3c91c5dfba023ed9 restricts successful capture stdout to existing required fields only: any release_error_category/restored_verification presence rejects; both decoders now need no optional-member parameter/branch. Original10case red11RUN/9PASS/2FAIL(parent+empty_release) retained, then18target/317ordinary/317race oncePASS0FAIL/SKIP,tagcompile-only/vet/pinned2.5lint/diff passed. QAb208fbe6ace23bf6ca2c62e55758394662e4738339b59a0d823bf2e0ee3b1a9a and commiteede06e1b7be91a74ab5cd843081fb2aab50b787946715285a17aee36455c098 bind actualbytes/argv. Native files,workflow,material/approval/count/deadline semantics are byte-identical8bf. Old8bf CI had12 explicit DockerHub rate-limit failures before target tests/builds; full backend12job diagnostics retained privately, no failure called a pass. New finalhead native37/CI/AI remain pending; no production/window/RPO/business promotion. Exact actual argv used GOMAXPROCS=2/GOMEMLIMIT=1GiB in the process environment; no -p=2 flag was executed for source214. Machine command entries match the immutable QA argv."
         ]
       },
       "gaps": [
@@ -14682,8 +14782,8 @@
           "id": "M4-B-OBJECT-TOOL-REVIEW",
           "kind": "verification",
           "severity": "high",
-          "summary": "Capture-only held-parent FD source0fa passed128ordinary/race and localFS swap regression; fresh finalhead CI37/AI pending. Exact948 CI37 remains historical and its transient-parent P2 is not pre-resolved.",
-          "exit_criteria": "Fresh finalhead must actually RUN/PASS all37 B native events with source/tree and healthy phase-specific cleanup evidence,plus fresh AI review of held-FD capture and durable journal; do not borrow948CI37 or872b local37 or promote production evidence."
+          "summary": "Historical status retained: Known surplus-count and successful-stdout optional-field findings fixed by7de/214 with317ordinary/race PASS. New finalhead native37/CI/AI remain pending; old8bf12registry-limit CI failures do not qualify target behavior. Update on d937: Previous verified binding retained: {\"source_sha\": \"2143511ee6eec13da5afb96f3c91c5dfba023ed9\", \"verified_on\": \"2026-10-15\"}. Historical a01 actually passed all37 native RUN/PASS (compiled8533 tree-equal) and terminal24success/1designskip, but fresh AI4285164481 found reencoded stdout accepted. Source d937 requires exact original deliverReceipt encoder bytes including newline: red37RUN4PASS33FAIL retained; target44,ordinary354/race354 oncePASS0FAIL/SKIP,tagcompile-only/vet/pinnedlint/diff passed. QAdef7af84e6af398fb320be700faac5126a050dc5304a8dfb664d5d93a74b7b9f and commitbridge0aed1aa80a3d7adf2dd5a73afb93a1286cccb602f712f37a1bfcd79dd05cb774 bind all25 Go inputs and actual argv. The first354RUN352PASS2FAIL counts-fixture QA remains retained; positive fixture now uses actualdeliverReceipt/raw count-only mutation without weakened assertions. External envelope/material/approval/native37/workflow/deadline bytes unchanged. Exact argv ran with GOMAXPROCS=2/GOMEMLIMIT=1GiB in process environment, no invented -p flag. Fresh d937/finaldocshead native37/CI/AI remain pending; historical proofs are not relabelled, production evidence is unchanged.",
+          "exit_criteria": "Fresh finalhead must actually RUN/PASS all37 B native events with original serve stdout/actual exit evidence, exact source/tree and healthy owned lifecycle/cleanup, plus fresh AI review of strict external proof, held-FD capture and durable journal. Retain old QA/native/CI source attribution and separate production approval/window/business evidence."
         },
         {
           "id": "M4-B-OBJECT-TOOL-PRODUCTION",
