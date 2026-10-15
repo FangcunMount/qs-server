@@ -99,6 +99,9 @@ func readRecoveryBoundary(m material, a approval, materialHash string) (bool, er
 	if _, e := readPrivate(path, fingerprint(raw), 32768); e != nil {
 		return false, errors.New("recovery_boundary_durability_unproven")
 	}
+	if e := verifyRecoveryJournal(m, materialHash, state.First.Operation); e != nil {
+		return false, e
+	}
 	return true, nil
 }
 
@@ -121,7 +124,7 @@ func consumeApproval(m material, a approval, hash string) error {
 	if e != nil {
 		return e
 	}
-	boundary, consumed, e := recoveryPaths(m, a.MaterialHash, a.Operation)
+	boundary, _, e := recoveryPaths(m, a.MaterialHash, a.Operation)
 	if e != nil {
 		return e
 	}
@@ -131,14 +134,10 @@ func consumeApproval(m material, a approval, hash string) error {
 			return errors.New("recovery_boundary_persistence_unproven")
 		}
 	}
-	if e := checkRecoveryBoundary(m, a, a.MaterialHash, true); e != nil {
+	if e := claimRecoveryOperation(m, a, hash, !exists); e != nil {
 		return e
 	}
-	raw, _ := json.Marshal([]string{a.Operation, hash, a.MaterialHash})
-	if writeExclusive(consumed, raw) != nil {
-		return errors.New("recovery_operation_consumed_or_unknown")
-	}
-	return nil
+	return checkRecoveryBoundary(m, a, a.MaterialHash, true)
 }
 
 func validateMutableBoundary(m material, a approval, materialHash, tool string) error {
