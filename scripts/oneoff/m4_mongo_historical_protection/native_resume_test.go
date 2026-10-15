@@ -78,7 +78,7 @@ func TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval(t *tes
 				if h.sqlLedger() != sql || h.action("verify-target", h.boundInput()...).Complete {
 					t.Fatal("partial restoration changed SQL or passed B installation verification")
 				}
-				if _, e := os.Stat(approvalPath + ".consumed"); e != nil {
+				if _, e := os.Stat(nativeClaimPath(t, h, nativeApproval(t, approvalPath))); e != nil {
 					t.Fatal("interrupted attempt did not consume its actual approval")
 				}
 

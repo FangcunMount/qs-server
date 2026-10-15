@@ -114,6 +114,7 @@ func newNative(t *testing.T) *nativeFixture {
 		t.Fatal("owned fixture acknowledgment and actual compiled source required")
 	}
 	checkNativeBResources(t)
+	t.Logf("native compiled tool source: %s", version.GitCommit)
 	cfg.MultiStatements = true
 	cfg.ParseTime = false
 	root, e := sql.Open("mysql", cfg.FormatDSN())
@@ -673,7 +674,7 @@ func TestM4MongoObjectNativePreclaimBoundaries(t *testing.T) {
 				if !r.Complete {
 					t.Fatal("first actual approval use failed", r)
 				}
-				if _, e := os.Stat(path + ".consumed"); e != nil {
+				if _, e := os.Stat(nativeClaimPath(t, h, nativeApproval(t, path))); e != nil {
 					t.Fatal("actual claim missing")
 				}
 			case "FutureSQL102":
@@ -695,7 +696,7 @@ func TestM4MongoObjectNativePreclaimBoundaries(t *testing.T) {
 			assertDocuments(t, docs, h.frozenDocuments())
 			assertMetadata(t, metadata, h.retainedMetadata())
 			if kind != "RepeatedUse" {
-				if _, e := os.Stat(path + ".consumed"); !os.IsNotExist(e) {
+				if _, e := os.Stat(nativeClaimPath(t, h, nativeApproval(t, path))); !os.IsNotExist(e) {
 					t.Fatal("preclaim failure consumed approval")
 				}
 			}

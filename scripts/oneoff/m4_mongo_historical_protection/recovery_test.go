@@ -133,7 +133,11 @@ func TestRestorePreclaimRechecksExternalBytesMarkerAndSingleUse(t *testing.T) {
 	if rereadApproval(m, a, mp, mh, ap, ah, testSource) == nil {
 		t.Fatal("late first-runtime marker ignored")
 	}
-	if _, e := os.Stat(ap + ".consumed"); !os.IsNotExist(e) {
+	_, claim, e := recoveryPaths(m, mh, a.Operation)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e := os.Stat(claim); !os.IsNotExist(e) {
 		t.Fatal("preclaim failure consumed approval")
 	}
 	// Separate, untouched window: consumption is O_EXCL and bound to original
