@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+    "sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+        "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4840,6 +4840,22 @@
           "result": "matched",
           "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func (h *maintenanceNative) connectionLossRestoreArgs(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestRuntimeConnectionLossFixtureInputReachesEnvironment(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4885,7 +4901,10 @@
           "Prior complete verified marker retained before D original-capture execution-evidence review: {\"source_sha\":\"a604813588978d9cebb1aae03b74219c23041fe2\",\"verified_on\":\"2026-10-15\"}",
           "D source ef43851a8b4226245e6d638c407e9833509af08d requires capture-evidence-file/raw-SHA for verify-target,restore,verify-restored,mark-first-runtime. Trusted external executor freezes original stdout plus actual normal exit0 in the six-field m4_d_capture_execution envelope; 32KiB envelope/64KiB stdout, distinct private paths, strict literal typed members and exact five/eight counts/releases/source/material binding. Reads occur before ENV,before restore claim,inside original marker locked rereads and before successful terminal receipt; new proof IO does not extend the original CLI budget. Failed material bytes remain diagnostic and cannot be revived by manual SHA plus restore approval. This is independently frozen external evidence,not a signature or a tool-generated seal. Original material2/286 resource bytes,approval/journal and GET_LOCK remain unchanged.",
           "Actual precommit QA on frozen D bytes passed ordinary297/race297 each exact RUN/PASS once,0FAIL/SKIP,tag compilation only,tagged vet,pinned lint2.5 and format. QA bb2493e1ba1f731521013ecfec7b4ee71d082dcc33532492025d7fcb71bd97d2 and49-input binding cfbbd3f66818f87847432a02568f8f3c85605fa5b6c82443ff798f05e838479a retain actual execution base/worktree; all49 bytes independently equal ef438. Existing command/native/source records are preserved,not relabelled as this commit. Only new source selectors carry the current verified SHA.",
-          "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged."
+          "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged.",
+          "Prior complete verified marker preserved before D native socket-loss fixture input review: {\"source_sha\":\"ef43851a8b4226245e6d638c407e9833509af08d\",\"verified_on\":\"2026-10-15\"}",
+          "Actual fed27d59b7d01449854681c2f66c7493ff39d91d native CI job116463170837 FAILED; retained truncated backend log records ConnectionLossKeepsServerGate at native_runtime_gate_test.go:272 owned upstream connection not created. Its direct run bypassed actionContext and omitted both capture evidence flags. Original raw restore receipt is not retained; independent exact-parameter noDB red separately proves original_capture_evidence_required with zero ENV reads, not a reconstructed CI receipt. The historical failure remains failed.",
+          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged."
         ]
       },
       "gaps": [
@@ -11125,7 +11144,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
+        "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11838,6 +11857,22 @@
           "result": "matched",
           "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func (h *maintenanceNative) connectionLossRestoreArgs(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestRuntimeConnectionLossFixtureInputReachesEnvironment(",
+          "result": "matched",
+          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11913,7 +11948,10 @@
           "Prior complete verified marker retained before D original-capture execution-evidence review: {\"source_sha\":\"a604813588978d9cebb1aae03b74219c23041fe2\",\"verified_on\":\"2026-10-15\"}",
           "D source ef43851a8b4226245e6d638c407e9833509af08d requires capture-evidence-file/raw-SHA for verify-target,restore,verify-restored,mark-first-runtime. Trusted external executor freezes original stdout plus actual normal exit0 in the six-field m4_d_capture_execution envelope; 32KiB envelope/64KiB stdout, distinct private paths, strict literal typed members and exact five/eight counts/releases/source/material binding. Reads occur before ENV,before restore claim,inside original marker locked rereads and before successful terminal receipt; new proof IO does not extend the original CLI budget. Failed material bytes remain diagnostic and cannot be revived by manual SHA plus restore approval. This is independently frozen external evidence,not a signature or a tool-generated seal. Original material2/286 resource bytes,approval/journal and GET_LOCK remain unchanged.",
           "Actual precommit QA on frozen D bytes passed ordinary297/race297 each exact RUN/PASS once,0FAIL/SKIP,tag compilation only,tagged vet,pinned lint2.5 and format. QA bb2493e1ba1f731521013ecfec7b4ee71d082dcc33532492025d7fcb71bd97d2 and49-input binding cfbbd3f66818f87847432a02568f8f3c85605fa5b6c82443ff798f05e838479a retain actual execution base/worktree; all49 bytes independently equal ef438. Existing command/native/source records are preserved,not relabelled as this commit. Only new source selectors carry the current verified SHA.",
-          "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged."
+          "Historical final a563428c4a7533aa0127d5c48e50ecd981e77748 CI completed24success/1designskip. Its complete strict D53 summary is retained in a truncated backend tail and compiled/entry merge5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2 has the same tree as a563. Fresh Codex comment4283352990 nevertheless identifies the real failed-capture P2. ef438 changes the native producer to freeze actual serve stdout/status only after successful capture; new exact53/final-head CI/AI remain unverified. Production stays paused and all original production metadata/signoffs,full scoped materials,continuous freeze,formal six-instance startup/windows,30/60min,RPO0 and business gaps remain unchanged.",
+          "Prior complete verified marker preserved before D native socket-loss fixture input review: {\"source_sha\":\"ef43851a8b4226245e6d638c407e9833509af08d\",\"verified_on\":\"2026-10-15\"}",
+          "Actual fed27d59b7d01449854681c2f66c7493ff39d91d native CI job116463170837 FAILED; retained truncated backend log records ConnectionLossKeepsServerGate at native_runtime_gate_test.go:272 owned upstream connection not created. Its direct run bypassed actionContext and omitted both capture evidence flags. Original raw restore receipt is not retained; independent exact-parameter noDB red separately proves original_capture_evidence_required with zero ENV reads, not a reconstructed CI receipt. The historical failure remains failed.",
+          "Test-only source5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc fixes the special raw consumer argv and reports safe early completion before the bounded socket wait. Same-constructor pure parameter regression reaches two ENV reads then selected_connection_input_rejected without DB. All production Go, original pending CREATE/physical cancellation/server gate/unknown-release/retained assertions, fixed53 native names/order and workflow bytes remain unchanged; new parameter test is outside53. Frozen49 inputs10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8 bridge actual local QA baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56: ordinary297/race297 each onceRUN/PASS0FAIL/SKIP, tagged pure parameter normal/race1 each, tagcompile-only/vet/pinnedlint2.5/format passed. Actual commands retain fed27 worktree context. New exact53/finalhead CI/AI remain pending; no DB,Docker,SSH,push,production or fullrepoGo. All historical command/native/production/signoff attribution and production pause remain unchanged."
         ]
       },
       "gaps": []

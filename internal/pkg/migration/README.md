@@ -139,6 +139,12 @@ Mac 全仓普通测试的 `-race` / coverage 执行从 `3f296fb304c14c94c42b6070
 
 原 `a563428c4a7533aa0127d5c48e50ecd981e77748` CI已终态24 success、1设计skip，其native严格53项摘要通过；实际编译merge `5f31fcc1e97a6cf7c86ba576d150a7a80b24f6d2` 的tree与a563相同。该head的fresh复审同时指出上述真实P2（review comment4283352990），因此旧绿色CI不能替代修复后源码验收。生产继续暂停；停写、DDL、发布、完整材料/窗口、30/60分钟、RPO0及业务资格均未因此取得。
 
+后续 `fed27d59b7d01449854681c2f66c7493ff39d91d` 的真实CI原生job `116463170837` 已失败：保留的截断后端日志明确记录 `ConnectionLossKeepsServerGate` 在 `native_runtime_gate_test.go:272` 报 `owned upstream connection not created`。该特例直接调用run以保留真实上游socket，未经过自动附加capture执行证据的actionContext，遗漏两项proof参数。原日志没有保留此raw run的返回回执；独立无数据库red用同一参数构造器实际复现 `original_capture_evidence_required`、ENV读取0次，不能把该独立复现伪记为CI原回执。
+
+测试源码 `5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc` 仅修正这一特例的consumer输入，补齐原capture执行证据，并在等socket时先接收已完成操作的安全错误类别，避免早失败再等待20秒而掩盖首因。新增纯参数回归使用同一构造器，通过材料/proof/恢复批准后实际读取ENV两次，并以空连接配置止于连接边界；不连接数据库。真实pending CREATE、取消关闭、本地关闭不能证明服务端锁释放、unknown-release及保留数据断言不变；生产Go、固定53项名单/顺序和工作流字节均不变，新增参数回归不计入53项。
+
+该提交49包输入逐字匹配本地冻结QA：普通297/race297均一次RUN/PASS、0FAIL/SKIP，纯参数tag普通/race各1项通过，tag仅编译/vet/pinned lint2.5/格式通过。私有 `qs-m4-d-fed27-native-fixture-input-v1` 保留原失败、red/green与QA回执 `baf2cd34ae42bd293875495d2bd0d6e177c48f6a7192175d21c6145dfd0f1e56`、输入绑定 `10d40967370e43a4843d584fe2a8242c750242e8101ca11767425511da8806f8`；实际命令在fed27工作区执行，未改写原source归属。fed27失败仍为失败，5aa2后的真实53项及最终head CI/AI仍待独立验收，生产继续暂停；未执行Docker、SSH、数据库、生产操作或全仓Go。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 
