@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
+    "sha": "5b8cf6f517117dd739226890e899c20335dcb480",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
+        "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4691,6 +4691,22 @@
           "result": "matched",
           "source_sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/main.go",
+          "selector": "SetReadPreference(readpref.Primary())",
+          "result": "matched",
+          "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
+          "selector": "func primaryReplicaHosts(raw bson.Raw) ([]string, error)",
+          "result": "matched",
+          "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -4715,7 +4731,8 @@
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
           "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
           "C read-only source db7db9b9ac30b86f1d2307e7ca888e369816b293 is prepared after actual main8f08 merge273b39355. The separately retained local receipt8e461138496f7caecdc958bada28ee9679bc1f946416b1aaa15f4a2832dc9dd2 binds 12 top-level and53 total ordinary/race RUN/PASS,0FAIL/SKIP, target vet/lint/build and five unchanged source hashes. These are SQLmock/pure-protocol tests and compilation, not native database execution. Only inspect/capture clean101/40 and verify-target clean102/40 exist; restore is rejected before connection configuration/material access and no approval input is accepted or consumed. C040b/284 resources remain independent of the tool checkout. No C production material, freeze, restoration, runtime or time/RPO proof is supplied.",
-          "Follow-up source744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0 restricts Mongo40 BSON to exactly nonnull _id, integer32/64 version40 and actual bool dirty=false, rejecting extra/duplicate fields. The separate local receipt45bd5852eda5c4fa128c5433dfb11a18ac68e7232149e6dfbbe21e3da2e5303d binds12 top-level/56 total ordinary race RUN/PASS,0FAIL/SKIP and target vet/lint/build. Mongo read scope remains one original document and independently bound ledger UUID before/after the SQL window; options/index are not captured or attested. No native database or production access occurred; old db7 source evidence is retained without relabelling."
+          "Follow-up source744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0 restricts Mongo40 BSON to exactly nonnull _id, integer32/64 version40 and actual bool dirty=false, rejecting extra/duplicate fields. The separate local receipt45bd5852eda5c4fa128c5433dfb11a18ac68e7232149e6dfbbe21e3da2e5303d binds12 top-level/56 total ordinary race RUN/PASS,0FAIL/SKIP and target vet/lint/build. Mongo read scope remains one original document and independently bound ledger UUID before/after the SQL window; options/index are not captured or attested. No native database or production access occurred; old db7 source evidence is retained without relabelling.",
+          "C source5b8cf6f517117dd739226890e899c20335dcb480 overrides URI read preference with Primary for all reads and independently requires actual typed writable rs0 hello, rejecting secondary/mongos/unknown role. The local receipt694a15b4f8e00f74b4e9846e44505c70425b66a58ba53ee61cc31cd6a0a593f0 binds14 tops/66 total ordinary race RUN/PASS,0FAIL/SKIP plus target vet/lint/build and five unchanged source hashes. URI-override and topology tests are pure ordinary tests, not actual database routing. Terminal complete COUNT remains on5s child context and is pending a locally adopted, actually verified A deadline fix; full COUNT/EOF/retained proofs remain present. No C native, restore, production, SSH, Docker, push or PR was executed. Prior source/QA records remain unchanged."
         ]
       },
       "gaps": [
