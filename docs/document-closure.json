@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+    "sha": "33511c0751e14d08073e44aa1038f5a50384b011",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 45,
+      "expected_count": 46,
       "budgeted": false
     }
   },
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+        "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11369,6 +11369,14 @@
           "result": "matched",
           "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
+          "result": "matched",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11402,7 +11410,8 @@
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
           "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
-          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff."
+          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
+          "Source33511c0751e14d08073e44aa1038f5a50384b011 adds only a sequential B object native gate after the existing A gate in the same owned metadata fixture job; these existing components and native evidence retain their original source/compiled SHA. Current source review rebinds this sidecar without reattributing any old command,production or signoff. B native remains unexecuted; branch base3112 does not include pending A-deadline PR372,which must be integrated after its actual merge before any release PR/fresh CI."
         ]
       },
       "gaps": []
@@ -12767,7 +12776,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+        "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13237,6 +13246,14 @@
           "result": "matched",
           "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
+          "result": "matched",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13247,7 +13264,8 @@
         "limitations": [
           "Offline diagnostic and safe receipt contracts do not prove current production permissions, archive validity or cleanup eligibility.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
-          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff."
+          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
+          "Source33511c0751e14d08073e44aa1038f5a50384b011 adds only a sequential B object native gate after the existing A gate in the same owned metadata fixture job; these existing components and native evidence retain their original source/compiled SHA. Current source review rebinds this sidecar without reattributing any old command,production or signoff. B native remains unexecuted; branch base3112 does not include pending A-deadline PR372,which must be integrated after its actual merge before any release PR/fresh CI."
         ]
       },
       "gaps": []
@@ -13366,7 +13384,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+        "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13631,6 +13649,14 @@
           "result": "matched",
           "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
+          "result": "matched",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13657,7 +13683,8 @@
           "A separate production read-only consistent snapshot on source80f422101ccfd83b4c4eb5bd165272145afe7afd/run38628472662-1 observed cleanSQL100/MySQL8.0.36, named five-table counts and state/reference partitions with all transaction/connection/pool release confirmed (receipt73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125). The human confirmed no remaining legacy five-table tasks and retained isolated recovery materials. freeze_verified=false; this is not D-target102/40 capture, DDL approval, scoped backup/restore or release/time/RPO acceptance. Existing production level/deployedSHA/signoffs are not promoted.",
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified.",
           "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted.",
-          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff."
+          "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
+          "Source33511c0751e14d08073e44aa1038f5a50384b011 adds only a sequential B object native gate after the existing A gate in the same owned metadata fixture job; these existing components and native evidence retain their original source/compiled SHA. Current source review rebinds this sidecar without reattributing any old command,production or signoff. B native remains unexecuted; branch base3112 does not include pending A-deadline PR372,which must be integrated after its actual merge before any release PR/fresh CI."
         ]
       },
       "gaps": [
@@ -13676,7 +13703,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
+        "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13744,6 +13771,14 @@
           "result": "matched",
           "source_sha": "94ab3a7cf090839da5283c7f09e9b7653f92b0e0",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
+          "result": "matched",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13763,7 +13798,8 @@
           "Source94ab3a7cf090839da5283c7f09e9b7653f92b0e0 accepts only the two complete immutable099 CHECK goldens with JSON schema literal intro utf8mb3 or utf8mb4. OriginalDDL binds each original encoding; existing alternate valid encoding is rejected before approval consume/DDL; inverse ADD comes only from pinned099 and explicit matching intro; both full original SHOW CREATE strings must equal the material before original ledger replay. Historical099 bytes remain575fa26f588e4fb87ee7bbcdc61fc11eeb8fe8ed0234518209e7e3e13b7b0d7a. No generic DDL normalization or new material schema.",
           "Exact clean source94ab independently passed9tops plus16children:25RUN/PASS,0FAIL/SKIP on owned MySQL8.0.36/MongoRS7.0.31. Cross-charset mb3/mb4 creation versus opposite tool connection covered real dirty-first-DDL and clean-both-DDL; immutable native-charset-v2 harnessbc67a8831f9133526fcda9a51bae6ca9c5d6558c6a35759a20e38fb3a3af0514, JSONL5ba064d92b73301f08efaae70276b51ca4cbaadca77d3e88d0c8d489c7e3b541, receipt13a12fe449f25a9a2bf1725b8462ff9067d63f032acf6f6ae60d44bda2a17167 bind actual argv and all six Go/SQL hashes.100.021s is only this synthetic fixture duration. Two owned containers/network released; old IDs/images/volumes preserved, dynamic runtime metadata not stable. First native fixture nil-map failure remains separately retained, not passed.",
           "Separate LinuxAMD64 tool built from clean94ab has binarySHA7df1c9d6da4b6cbe1425c1867c7d5916562818d7dc9881266b17fc542d9ae1f2 and receipt9e87ed4ee54ac3f4447cf1d0390d2725cc647d38657a28c699be1ecc98e52fe9. Six Go/SQL hashes exactly match actual25-case native; tool/source and fixed A511/77e/280 remain independent. This proves compilation only; AMD64 runtime/production is not signed. Old56c/07a and staged custody remain unchanged. Final documentation/PR head needs fresh CI and must not relabel native or compiled SHA.",
-          "Additional integration-tag full target lint on94ab found pre-existing QF1003 in the unchanged FirstRuntimeCommandMarker conditional, byte-identical to origin/main f294. That additional command failed and is not signed passed; its original log is retained. Normal CI lint and tagged changed-code gate are verified separately without rewriting that historical test."
+          "Additional integration-tag full target lint on94ab found pre-existing QF1003 in the unchanged FirstRuntimeCommandMarker conditional, byte-identical to origin/main f294. That additional command failed and is not signed passed; its original log is retained. Normal CI lint and tagged changed-code gate are verified separately without rewriting that historical test.",
+          "Source33511c0751e14d08073e44aa1038f5a50384b011 adds only a sequential B object native gate after the existing A gate in the same owned metadata fixture job; these existing components and native evidence retain their original source/compiled SHA. Current source review rebinds this sidecar without reattributing any old command,production or signoff. B native remains unexecuted; branch base3112 does not include pending A-deadline PR372,which must be integrated after its actual merge before any release PR/fresh CI."
         ]
       },
       "gaps": [
@@ -13773,6 +13809,100 @@
           "severity": "high",
           "summary": "Actual T0 protection, independently approved six-instance writer freeze and production-scale deadline remain unproved.",
           "exit_criteria": "Bind approved exact A execution/tool/images, original clean10039 identities, T0 allNULL proof and private materials, six-instanceAPI1/Collection2/Worker3 freeze and startup marker, independently rehearsed scoped restore and startup reserve before separately authorized production mutation."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/m4_mongo_historical_protection/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+        "verified_on": "2026-10-15"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/*.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mongodb/000040_retire_historical_event_indexes.up.json"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "3d0d3f4645740536f83cdafba9f83044567fb437",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_mongo_historical_protection/recovery.go",
+          "selector": "func (d *database) replayOriginalLedger(",
+          "result": "matched",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
+          "result": "matched",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 -race -tags=integration -count=1 -json -run=^TestNativeWire ./scripts/oneoff/m4_mongo_historical_protection",
+          "result": "passed",
+          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
+          "verified_on": "2026-10-15"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "New B temporary tool protects exactly four pinned038 index specs and the genuine original39 ledger BSON/options/index. Tool source is independent of frozen Bc6ad/282/60a024; actual SQL101 clean and Mongo7.0.31 replica identity are mandatory. Stable cluster identity excludes the provider-changing ledger UUID.",
+          "Protocol ed97 had42 unit PASS but no operational DB paths. Read-only f7a23591 had57 unit PASS; restore857e9b5 had69 unit PASS. Separate release-precision source3d0d3f46 had69 unit/race PASS,vet and targetlint0; immutable receipt17b16c51bab54b2e3eace4c10da2448711c316dbbbe887433fe9fa9774af457f. These are not native/production claims.",
+          "Native source68c26159 and explicit CI selectors33511c07 are implemented but real DB execution remains pending. Six required tops, all six dirty0..4/clean4 restore children and five preclaim children must actually RUN/PASS with no SKIP. Compilation or in-memory wire helper tests cannot replace that proof.",
+          "Current snapshot stores only exact counts and namespace/index metadata, never business bodies. Continuous scoped writer freeze is independently required; same count does not prove unchanged values. Native-only full synthetic BSON/UUID/options/unrelated-index/SQL-ledger preservation must be verified.",
+          "One explicit application commit call; driver1.17.6 may resend commit for the same transaction. Any returned commit error is unknown; no WithTransaction or application transaction/commit retry. SDK abort nil cannot certify server release, which remains separately unproven on precommit failure and commit error.",
+          "No production permissions,capture,writer-freeze,restore,capacity/elapsed budget,image installation,three-service startup,business,RPO0 or30/60-minute acceptance is signed. First-runtime marker forbids pre-start replay. Owner system10001 and protection retention at least30days remain independent approval conditions.",
+          "Exact335 nonDB QA ordinary69 RUN/PASS/race plus one in-memory wire helper RUN/PASS/race,integration compilation,taggedvet/taggedlint0 and configcontract all passed; immutable receipt9a3184f59496454960aea5b97824d40a55c2d6a9f8fa813687a19d138709dba0. This is not a native pass or production call. Root owns A-deadline PR372 separately; this branch remains based on3112 until its actual merge is incorporated."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "M4-B-OBJECT-TOOL-NATIVE",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Actual required owned MySQL8.0.36/MongoRS7.0.31 execution pending.",
+          "exit_criteria": "Approved exact source on exclusive owned fixture; six tops/eleven children RUN/PASS with no SKIP; real commit-success reply loss/same-txn and dirty0..4/clean4 restoration; exact owned cleanup and immutable source/log receipt."
+        },
+        {
+          "id": "M4-B-OBJECT-TOOL-PRODUCTION",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "No production T0 capture,ongoing freeze,installation or restoration budget proof.",
+          "exit_criteria": "Independently bind fixed B/tool/images,original10139 identity and material,scope/responsibility/retention,start marker and observed restoration before separately approved production mutation."
         }
       ]
     }
