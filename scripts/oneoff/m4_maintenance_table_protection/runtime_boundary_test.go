@@ -49,6 +49,21 @@ func TestFrozenBoundaryRequiresExplicitLiteralGenerationAndHash(t *testing.T) {
 	}
 }
 
+func TestVerifyTargetRejectsRuntimeBoundaryDrift(t *testing.T) {
+	original := originalMaterial()
+	target := cloneMaterial(original)
+	target.Ledger = []ledgerRow{{103, false}}
+	target.Tables = [5]tableProof{}
+	if verifyTarget(original, target) != nil {
+		t.Fatal("unchanged target fixture rejected")
+	}
+	record, raw := boundaryRecordFixture(t, original)
+	target.RuntimeBoundary = runtimeBoundaryState{Generation: record.Generation, Fingerprint: fingerprint(raw)}
+	if verifyTarget(original, target) == nil {
+		t.Fatal("stale material obtained a complete target proof after another runtime intent")
+	}
+}
+
 func expectInitialRuntimeBoundary(mock sqlmock.Sqlmock) {
 	mock.ExpectQuery(regexp.QuoteMeta(runtimeBoundaryShow)).WillReturnError(&mysql.MySQLError{Number: 1146, Message: "private missing-table text"})
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='m4_d_runtime_boundary'")).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))

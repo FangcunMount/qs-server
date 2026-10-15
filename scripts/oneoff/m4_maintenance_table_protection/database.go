@@ -626,7 +626,7 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 	return m, nil
 }
 func verifyTarget(original, target material) error {
-	if original.Format != target.Format || original.Kind != target.Kind || original.ToolSource != target.ToolSource || original.DSource != target.DSource || original.DResources != target.DResources || original.DResourceFiles != target.DResourceFiles || original.SessionZone != target.SessionZone || original.SessionCharset != target.SessionCharset || original.SessionSQLMode != target.SessionSQLMode || original.Binding != target.Binding || !bytes.Equal(original.MongoHead, target.MongoHead) || original.LedgerDDL != target.LedgerDDL || len(target.Ledger) != 1 || target.Ledger[0] != (ledgerRow{103, false}) {
+	if original.Format != target.Format || original.Kind != target.Kind || original.ToolSource != target.ToolSource || original.DSource != target.DSource || original.DResources != target.DResources || original.DResourceFiles != target.DResourceFiles || original.SessionZone != target.SessionZone || original.SessionCharset != target.SessionCharset || original.SessionSQLMode != target.SessionSQLMode || original.Binding != target.Binding || original.RuntimeBoundary != target.RuntimeBoundary || !bytes.Equal(original.MongoHead, target.MongoHead) || original.LedgerDDL != target.LedgerDDL || len(target.Ledger) != 1 || target.Ledger[0] != (ledgerRow{103, false}) {
 		return errors.New("target_identity_or_ledger_rejected")
 	}
 	if !sameRetained(original.Retained, target.Retained) {
