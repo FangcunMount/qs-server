@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
+    "sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
+        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11409,6 +11409,14 @@
           "result": "matched",
           "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
+          "result": "matched",
+          "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11448,7 +11456,8 @@
           "Source review1356621084e26eaacd82cfd776a583920931a445 normally merges actual main8f08f28fe395e11c55ac119f0490f539b6b30995, including the actual A deadline fix. All incoming A tool bytes are identical; existing A/offline/metadata native selectors remain and B adds its sequential17-event gate. This current source/selector review preserves both parents complete historical verification objects and every production/signoff field. The earlier335 limitation remains historical; first B native3b failed17RUN/5PASS/12FAIL/0SKIP with owned cleanup, and corrected B native is pending. No old command/native/production result is relabelled as this merged checkout.",
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
-          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings."
+          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
         ]
       },
       "gaps": []
@@ -12813,7 +12822,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
+        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13323,6 +13332,14 @@
           "result": "matched",
           "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
+          "result": "matched",
+          "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13339,7 +13356,8 @@
           "Source review1356621084e26eaacd82cfd776a583920931a445 normally merges actual main8f08f28fe395e11c55ac119f0490f539b6b30995, including the actual A deadline fix. All incoming A tool bytes are identical; existing A/offline/metadata native selectors remain and B adds its sequential17-event gate. This current source/selector review preserves both parents complete historical verification objects and every production/signoff field. The earlier335 limitation remains historical; first B native3b failed17RUN/5PASS/12FAIL/0SKIP with owned cleanup, and corrected B native is pending. No old command/native/production result is relabelled as this merged checkout.",
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
-          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings."
+          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
         ]
       },
       "gaps": []
@@ -13458,7 +13476,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
+        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13763,6 +13781,14 @@
           "result": "matched",
           "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
+          "result": "matched",
+          "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13795,7 +13821,8 @@
           "Source review1356621084e26eaacd82cfd776a583920931a445 normally merges actual main8f08f28fe395e11c55ac119f0490f539b6b30995, including the actual A deadline fix. All incoming A tool bytes are identical; existing A/offline/metadata native selectors remain and B adds its sequential17-event gate. This current source/selector review preserves both parents complete historical verification objects and every production/signoff field. The earlier335 limitation remains historical; first B native3b failed17RUN/5PASS/12FAIL/0SKIP with owned cleanup, and corrected B native is pending. No old command/native/production result is relabelled as this merged checkout.",
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
-          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings."
+          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
         ]
       },
       "gaps": [
@@ -13814,7 +13841,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
+        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13922,6 +13949,14 @@
           "result": "matched",
           "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
+          "result": "matched",
+          "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13947,7 +13982,8 @@
           "Source review1356621084e26eaacd82cfd776a583920931a445 normally merges actual main8f08f28fe395e11c55ac119f0490f539b6b30995, including the actual A deadline fix. All incoming A tool bytes are identical; existing A/offline/metadata native selectors remain and B adds its sequential17-event gate. This current source/selector review preserves both parents complete historical verification objects and every production/signoff field. The earlier335 limitation remains historical; first B native3b failed17RUN/5PASS/12FAIL/0SKIP with owned cleanup, and corrected B native is pending. No old command/native/production result is relabelled as this merged checkout.",
           "Source review8eeaef32cafa9f17dacee7767d41ccd99f90683c is a documentation child of1356621084e26eaacd82cfd776a583920931a445; tool Go and existing CI selectors remain byte-identical. B native on actual8eea is separately recorded, with no reattribution of any A/offline/metadata native/command or production signoff. Current source rebind is a source/selector review only; all parent historical verification objects remain unchanged.",
           "Current source reviewfe45c321f10cdebb8462e05b81f14e895b79523b only extends the sequential B required native gate to26explicit events after the original A process. Existing A/offline/metadata runtime code and selector semantics are unchanged. B resume fix5588 and its new8children are not covered by prior17native, which retain original source8ee/local andda1/CI. This rebind is source/selector review only; all original command/native/production/signoff objects remain unchanged.",
-          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings."
+          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings.",
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
         ]
       },
       "gaps": [
@@ -13966,7 +14002,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
+        "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14101,6 +14137,14 @@
           "result": "passed",
           "source_sha": "a872ac5a96476dcd71d70d8b9ebf759dfd99e6b7",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
+          "result": "matched",
+          "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -14125,7 +14169,8 @@
           "P1 review on oldhead da1 identified restore interruption leaving a non-prefix and clean40 continuation being rejected. Source5588d8ddd reverses index recreation; restore alone accepts exact clean/dirty40 missing-prefix0..4, while verify-target remains clean40/all4absent. It does not accept unknown/nonprefix/spec or identity drift, bypass consumed approval, change original material or first-runtime boundary. Sourcefe45 adds8real-ACK cancellation children: each old approval must be rejected withoutDDL; fresh independent approval preserves original recoverydecision/deadline/material and resumes ledgerlast.87ordinary/race and2in-memoryhelper/race PASS,tagcompile/vet/lint0/configcontract passed; receiptfd215f8c9ec6fe1637887ec7a2f2c6ace13082a7c824302acc4a377ce7d413a6. New26native/newheadCI/AI remain pending; no old17proof or production signoff is promoted.",
           "Actual clean0827df92685971aceb1fc5257f53bff7aa1e5af5 (all Go/CI bytes equalfe45) passed7tops+19children:26RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/MongoRS7.0.31. Receipt17382b370630cea9b14a1e32bd7515e915e34d3f3132fc737e871fddef3b56ec, JSONL1877b7911e178efc8a92a5c45204a75b264892adbefbe2fa0242606d6fed91fc, runner98bcbdc0b53920e2800e6eb53949c257bf81af28661bbc7130ce3cdcb8369435 bind actualargv/16packagehashes. Eight dirty/clean ACK1..4 interruptions actually reached: genuine40 BSON/currentUUID retained,exact original-spec suffix observed,old consumed approval caused noDDL,new independent approval preserved originalmaterial/recoverydecision/absolute deadline and resumed ledgerlast; original17cases passed again. Owned2CID/network released,old IDs/images/volumes preserved,dynamic runtime metadata changed.113.907s is only fixturewallclock. FinalheadCI and originalP1 review closure remain pending; production/scale/30–60min/RPO/images/business remain unproved.",
           "AI on actual4897 identified two real approval P1s: new recovery windows/markers could replace the first boundary, and pathname-local consumption could be bypassed by copied approval bytes. Sourcea872 anchors real canonical CapturePath, fixed parent/materialSHA first approval and operation identity O_EXCL claims; all fields except Operation remain exact on continuation. Missing/corrupt state is failclosed; every mutablephase checks originalmarker/firstboundary. Precise a872 nonDB101ordinary/race pass and tagcompile/vet/lint0 receipt9254d13af5e3a253edc6d5547ba9294976e043a3518c18428ce4c073be719cb1 does not certify new native or CI. Sourcefe03 adds the final boundary check after the boundedSQLidentity/ledgerread immediately before COMMIT.",
-          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings. NonDB101ordinary/race plus tagcompile/vet/lint0,actionlint withshellcheck andconfigcontract actually ran onfe03 with pending fixturefiles subsequently committed unchanged in64f; receipt066b0659f5c0b6f393f29c8beb2e179d1f6b84876bb530a25d2501373fae71ec records this bytebridge rather than a fictitious exact64f execution."
+          "Current source review64f25149e6c0c0734ff7ca95a8d217eff62b2c6d extends only the sequential B gate to36required actual events and an actual JSONL/source summary. Existing A/offline/metadata code and required selectors remain byte-identical. New B canonical-capture/first-boundary/operation-identity and finalSQL-marker cases are not covered by prior26native; current36native, finalheadCI and the two approval P1 reviews remain pending. All original command/native/production/signoff objects retain their sources and meanings. NonDB101ordinary/race plus tagcompile/vet/lint0,actionlint withshellcheck andconfigcontract actually ran onfe03 with pending fixturefiles subsequently committed unchanged in64f; receipt066b0659f5c0b6f393f29c8beb2e179d1f6b84876bb530a25d2501373fae71ec records this bytebridge rather than a fictitious exact64f execution.",
+          "CI-only source727558f29dc0a65cfa6716826bdb4bdf4b13a288 bounds the existing owned shared Mongo fixture to2GiB memory/swap and0.25GiB WiredTiger cache. Tool Go, all36required B selectors and earlier A/offline/metadata selectors are unchanged. Actionlint withshellcheck andconfigcontract passed. No new database run or production resource change is implied; previous verification/native/prod/signoffs retain their original attribution."
         ]
       },
       "gaps": [
