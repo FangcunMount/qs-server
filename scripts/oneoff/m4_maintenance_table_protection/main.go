@@ -378,7 +378,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.RetainedCounts[t.Table] = len(t.Rows)
 		}
 	}
-	if a.action == "capture" {
+	if a.action == "capture" || a.action == "verify-restored" {
 		r.MandatoryEOF = true
 		r.TableCounts = map[string]int{}
 		for _, t := range m.Tables {

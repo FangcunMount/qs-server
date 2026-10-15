@@ -316,7 +316,7 @@ func (h *maintenanceNative) actionContext(ctx context.Context, action string, ex
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--mysql-identity-sha256=" + h.binding.SQLIdentity, "--mongo-identity-sha256=" + h.binding.MongoIdentity, "--mongo-ledger-uuid-sha256=" + h.binding.MongoUUID, "--timeout=2m"}
 	args = append(args, extras...)
-	return run(ctx, args, func(key string) string {
+	r := run(ctx, args, func(key string) string {
 		switch key {
 		case "QS_M4_D_OBJECT_MYSQL_DSN":
 			return h.dsn
@@ -325,6 +325,15 @@ func (h *maintenanceNative) actionContext(ctx context.Context, action string, ex
 		}
 		return ""
 	}, h.tool)
+	// The tool's closed receipt contains only scope hashes, counts and fixed
+	// categories. Keep all actual returned flags before any assertion can fail;
+	// never log connection inputs, original cells or the captured material.
+	raw, e := json.Marshal(r)
+	if e != nil {
+		h.t.Fatal("safe owned tool receipt encoding failed")
+	}
+	h.t.Logf("owned_tool_receipt=%s", raw)
+	return r
 }
 
 func (h *maintenanceNative) query(query string) [][]sql.NullString {
