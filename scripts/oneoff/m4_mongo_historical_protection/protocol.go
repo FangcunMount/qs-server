@@ -149,7 +149,7 @@ func validateTargetSpec(raw []byte, i int) error {
 	n, nok := d["name"].StringValueOK()
 	wantFields := 3
 	if t.uniquePath != "" {
-		wantFields = 6
+		wantFields = 5
 	}
 	if len(d) != wantFields || !vok || v != 2 || !nok || n != t.name || !orderedDocumentEquals(d["key"], t.key) {
 		return errors.New("original_038_index_spec_rejected")
@@ -157,7 +157,7 @@ func validateTargetSpec(raw []byte, i int) error {
 	if t.uniquePath != "" {
 		unique, ok := d["unique"].BooleanOK()
 		partial := bson.D{{Key: t.uniquePath, Value: bson.D{{Key: "$type", Value: "string"}}}}
-		if !ok || !unique || !orderedDocumentEquals(d["collation"], bson.D{{Key: "locale", Value: "simple"}}) || !orderedDocumentEquals(d["partialFilterExpression"], partial) {
+		if !ok || !unique || !orderedDocumentEquals(d["partialFilterExpression"], partial) {
 			return errors.New("original_038_index_spec_rejected")
 		}
 	}
@@ -167,8 +167,14 @@ func validateNamespace(n namespaceProof, name string) error {
 	if n.Name != name || len(n.UUID) != 16 || bytes.Equal(n.UUID, make([]byte, 16)) || n.Count == nil || *n.Count < 0 || len(n.Indexes) < 1 || len(n.Indexes) > 256 {
 		return errors.New("namespace_proof_invalid")
 	}
-	if _, e := document(n.Options); e != nil {
+	options, e := document(n.Options)
+	if e != nil {
 		return e
+	}
+	// Same-patch ListIndexes omits simple collation. Replaying those exact
+	// captured specs must not inherit a different collection default.
+	if collation, present := options["collation"]; present && !orderedDocumentEquals(collation, bson.D{{Key: "locale", Value: "simple"}}) {
+		return errors.New("non_simple_collection_collation_unsupported")
 	}
 	seen := map[string]bool{}
 	for _, spec := range n.Indexes {

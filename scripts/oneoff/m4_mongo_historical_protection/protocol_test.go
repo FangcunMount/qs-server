@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -26,15 +27,25 @@ func rawBSON(t *testing.T, d bson.D) []byte {
 func idSpec(t *testing.T) []byte {
 	return rawBSON(t, bson.D{{Key: "v", Value: int32(2)}, {Key: "key", Value: bson.D{{Key: "_id", Value: int32(1)}}}, {Key: "name", Value: "_id_"}})
 }
+
+// Exact ListIndexes BSON from the retained Mongo7.0.31 V7 fixture. Only
+// the four index metadata documents are copied; no business BSON is included.
+var original038ServerSpecs = [4]string{
+	"e600000010760002000000036b65790036000000106c65676163795f7375626d697373696f6e5f65766964656e63652e656e74726965732e6576656e745f6964000100000000026e616d65002a000000756b5f616e7377657273686565745f6c65676163795f7375626d697373696f6e5f6576656e745f69640008756e697175650001037061727469616c46696c74657245787072657373696f6e0049000000036c65676163795f7375626d697373696f6e5f65766964656e63652e656e74726965732e6576656e745f696400170000000224747970650007000000737472696e6700000000",
+	"8f00000010760002000000036b6579004c000000106c65676163795f7375626d697373696f6e5f65766964656e63652e76657273696f6e00010000001064656c657465645f6174000100000010646f6d61696e5f6964000100000000026e616d6500280000006964785f616e7377657273686565745f6c65676163795f7375626d697373696f6e5f61756469740000",
+	"ee00000010760002000000036b6579003900000010686973746f726963616c5f67656e6572617465645f65766964656e63652e656e74726965732e6576656e745f6964000100000000026e616d65002c000000756b5f67656e65726174696f6e5f686973746f726963616c5f67656e6572617465645f6576656e745f69640008756e697175650001037061727469616c46696c74657245787072657373696f6e004c00000003686973746f726963616c5f67656e6572617465645f65766964656e63652e656e74726965732e6576656e745f696400170000000224747970650007000000737472696e6700000000",
+	"a000000010760002000000036b6579005b00000010686973746f726963616c5f67656e6572617465645f65766964656e63652e76657273696f6e00010000001064656c657465645f6174000100000010737461747573000100000010646f6d61696e5f6964000100000000026e616d65002a0000006964785f67656e65726174696f6e5f686973746f726963616c5f67656e6572617465645f61756469740000",
+}
+
 func targetSpec(t *testing.T, i int) []byte {
 	t.Helper()
-	x := targets[i]
-	d := bson.D{{Key: "v", Value: int32(2)}, {Key: "key", Value: x.key}, {Key: "name", Value: x.name}}
-	if x.uniquePath != "" {
-		d = append(d, bson.E{Key: "unique", Value: true}, bson.E{Key: "partialFilterExpression", Value: bson.D{{Key: x.uniquePath, Value: bson.D{{Key: "$type", Value: "string"}}}}}, bson.E{Key: "collation", Value: bson.D{{Key: "locale", Value: "simple"}}})
+	raw, e := hex.DecodeString(original038ServerSpecs[i])
+	if e != nil {
+		t.Fatal(e)
 	}
-	return rawBSON(t, d)
+	return raw
 }
+
 func fixtureMaterial(t *testing.T) material {
 	t.Helper()
 	count, ledgerCount := int64(17), int64(1)
@@ -107,6 +118,9 @@ func TestMaterialPreservesCompleteOrderedSpecsAndOriginalLedgerBSON(t *testing.T
 		"missing_target": func(m *material) { m.Collections[0].Indexes = m.Collections[0].Indexes[:2] },
 		"duplicate_index_name": func(m *material) {
 			m.Collections[0].Indexes = append(m.Collections[0].Indexes, m.Collections[0].Indexes[1])
+		},
+		"non_simple_collection_collation": func(m *material) {
+			m.Collections[0].Options = rawBSON(t, bson.D{{Key: "collation", Value: bson.D{{Key: "locale", Value: "en"}}}})
 		},
 		"ledger_options":      func(m *material) { m.Ledger.Namespace.Options = rawBSON(t, bson.D{{Key: "capped", Value: true}}) },
 		"custom_ledger_index": func(m *material) { m.Ledger.Namespace.Indexes = append(m.Ledger.Namespace.Indexes, targetSpec(t, 0)) },
