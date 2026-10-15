@@ -193,6 +193,24 @@ class Fixture:
              "fixture_output_bound")
         row = {"argv": argv, "exit_code": process.returncode,
                "stdout_sha256": digest(process.stdout), "stderr_sha256": digest(process.stderr)}
+        if process.returncode != 0 and "primary_failure" not in self.result:
+            # This opt-in fixture has fixed synthetic inputs only. Publish no
+            # argv/environment; preserve the last failed command before the
+            # primary failure so later cleanup cannot replace its diagnostic.
+            category = "fixed_fixture_command"
+            if argv[:1] == ["docker"] and len(argv) > 1:
+                category = {"info": "docker_info", "ps": "docker_ps", "image": "docker_image",
+                            "network": "docker_network", "volume": "docker_volume", "create": "docker_create",
+                            "start": "docker_start", "exec": "docker_exec", "inspect": "docker_inspect",
+                            "cp": "docker_cp", "rm": "docker_rm"}.get(argv[1], category)
+            if category == "docker_exec" and len(argv) > 3 and argv[3] in ("mysqladmin", "mysql", "mongosh"):
+                category += "_" + argv[3]
+            self.result["last_command_failure"] = {
+                "sequence": self.sequence, "command_category": category, "exit_code": process.returncode,
+                "stdout_bytes": len(process.stdout), "stderr_bytes": len(process.stderr),
+                "stdout_sha256": row["stdout_sha256"], "stderr_sha256": row["stderr_sha256"],
+                "stdout_tail_base64": base64.b64encode(process.stdout[-2048:]).decode("ascii"),
+                "stderr_tail_base64": base64.b64encode(process.stderr[-4096:]).decode("ascii")}
         save(self.output / ("command-%04d.json" % self.sequence), row)
         self.sequence += 1
         need(process.returncode == 0, "fixed_fixture_command_failed")
@@ -609,7 +627,7 @@ def main():
         "tool_sha256", "tool_exact_build", "mysql_image_binding", "material_counts", "material_bytes", "material_sha256",
         "capture_evidence_sha256", "actions", "carriers", "partial_dirty101_proven", "restored10039_witness",
         "target10139_witness", "original_three_files_verified", "all_native_carriers_released",
-        "owned_cleanup_proven", "source_unchanged", "primary_failure", "cleanup_failure", "cleanup_errors",
+        "owned_cleanup_proven", "source_unchanged", "primary_failure", "last_command_failure", "cleanup_failure", "cleanup_errors",
         "qualification_failure", "original_operation_archive_sha256", "elapsed_seconds")}
     summary["observed_native_terminal_states"] = [{"cid": row["Id"], "running": row["State"]["Running"],
         "exit_code": row["State"]["ExitCode"], "oom": row["State"]["OOMKilled"]} for row in fixture.observed][-16:]

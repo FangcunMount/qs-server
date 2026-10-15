@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Pure tests of the actual qualifier, fixed source seam and failed cleanup."""
+import base64
 import datetime as dt
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -43,6 +45,52 @@ def valid():
 
 
 class QualificationTests(unittest.TestCase):
+    def command_fixture(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        fixture = runner.Fixture.__new__(runner.Fixture)
+        fixture.output, fixture.sequence, fixture.result = Path(directory.name), 7, {}
+        fixture.remaining = mock.Mock(return_value=10)
+        return fixture
+
+    def test_failed_fixed_command_publishes_exact_bounded_tails_without_retry(self):
+        fixture = self.command_fixture()
+        argv = ["docker", "exec", "synthetic-owned-cid", "mongosh", "--eval", "fixed-synthetic-input"]
+        stdout, stderr = b"S" * 2300 + b"\xff", b"E" * 4300 + b"\xfe"
+        process = subprocess.CompletedProcess(argv, 23, stdout, stderr)
+        with mock.patch.object(runner.subprocess, "run", return_value=process) as execute:
+            with self.assertRaisesRegex(RuntimeError, "fixed_fixture_command_failed"):
+                fixture.cmd(argv)
+        execute.assert_called_once()
+        diagnostic = fixture.result["last_command_failure"]
+        self.assertEqual((diagnostic["sequence"], diagnostic["command_category"], diagnostic["exit_code"]),
+                         (7, "docker_exec_mongosh", 23))
+        self.assertEqual(base64.b64decode(diagnostic["stdout_tail_base64"]), stdout[-2048:])
+        self.assertEqual(base64.b64decode(diagnostic["stderr_tail_base64"]), stderr[-4096:])
+        self.assertEqual((diagnostic["stdout_bytes"], diagnostic["stderr_bytes"]), (len(stdout), len(stderr)))
+        self.assertEqual(diagnostic["stderr_sha256"], runner.digest(stderr))
+        self.assertNotIn("fixed-synthetic-input", json.dumps(diagnostic))
+        self.assertNotIn("argv", diagnostic)
+        self.assertEqual(json.loads((fixture.output / "command-0007.json").read_bytes())["exit_code"], 23)
+
+    def test_success_and_cleanup_failure_cannot_replace_primary_command_diagnostic(self):
+        fixture = self.command_fixture()
+        with mock.patch.object(runner.subprocess, "run", side_effect=[
+                subprocess.CompletedProcess([], 2, b"", b"initial failure"),
+                subprocess.CompletedProcess([], 3, b"", b"later cleanup failure"),
+                subprocess.CompletedProcess([], 0, b"success", b"")]) as execute:
+            with self.assertRaises(RuntimeError): fixture.cmd(["docker", "start", "owned"])
+            original = dict(fixture.result["last_command_failure"])
+            fixture.result["primary_failure"] = "RuntimeError:fixed_fixture_command_failed"
+            with self.assertRaises(RuntimeError): fixture.cmd(["docker", "rm", "owned"])
+            self.assertEqual(fixture.cmd(["docker", "ps", "-aq"]), b"success")
+        self.assertEqual(execute.call_count, 3)
+        self.assertEqual(fixture.result["last_command_failure"], original)
+        successful = self.command_fixture()
+        with mock.patch.object(runner.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, b"ok", b"")):
+            self.assertEqual(successful.cmd(["docker", "info"]), b"ok")
+        self.assertNotIn("last_command_failure", successful.result)
+
     def test_full_actual_predicate_accepts_only_complete_fixed_scope(self):
         self.assertTrue(runner.qualify(valid()))
 
