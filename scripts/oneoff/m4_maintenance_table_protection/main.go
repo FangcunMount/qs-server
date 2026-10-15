@@ -35,6 +35,8 @@ type receipt struct {
 	ReadOnly                   bool           `json:"database_read_only"`
 	MaterialHash               string         `json:"material_sha256,omitempty"`
 	TableCounts                map[string]int `json:"table_rows,omitempty"`
+	RetainedCounts             map[string]int `json:"retained_table_rows,omitempty"`
+	RetainedEOF                bool           `json:"retained_mandatory_empty_eof"`
 	MandatoryEOF               bool           `json:"mandatory_empty_eof"`
 	SQLSnapshot                bool           `json:"sql_repeatable_read_snapshot"`
 	SQLConnectionClosed        bool           `json:"sql_connection_closed"`
@@ -171,6 +173,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 				r.Complete = false
 				r.MaterialHash = ""
 				r.TableCounts = nil
+				r.RetainedCounts = nil
+				r.RetainedEOF = false
 			}
 		}()
 	}
@@ -301,6 +305,13 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		return r
 	}
 	r.SQLSnapshot = true
+	if a.action != "inspect" {
+		r.RetainedEOF = true
+		r.RetainedCounts = map[string]int{}
+		for _, t := range m.Retained {
+			r.RetainedCounts[t.Table] = len(t.Rows)
+		}
+	}
 	if a.action == "capture" {
 		r.MandatoryEOF = true
 		r.TableCounts = map[string]int{}

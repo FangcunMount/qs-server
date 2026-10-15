@@ -93,22 +93,23 @@ type binding struct {
 	MongoUUID     string `json:"mongo_ledger_uuid_sha256"`
 }
 type material struct {
-	Format         int           `json:"format_version"`
-	Kind           string        `json:"kind"`
-	ToolSource     string        `json:"compiled_tool_source"`
-	DSource        string        `json:"d_execution_source"`
-	DResources     string        `json:"d_execution_resources_sha256"`
-	DResourceFiles int           `json:"d_execution_resource_files"`
-	CapturedAt     string        `json:"captured_at"`
-	CapturePath    string        `json:"first_capture_path"`
-	Binding        binding       `json:"binding"`
-	SessionZone    string        `json:"session_time_zone"`
-	SessionCharset string        `json:"session_character_set_results"`
-	SessionSQLMode string        `json:"session_sql_mode"`
-	LedgerDDL      string        `json:"original_sql_ledger_ddl"`
-	Ledger         []ledgerRow   `json:"original_complete_sql_ledger"`
-	MongoHead      []byte        `json:"independently_observed_mongo40_bson"`
-	Tables         [5]tableProof `json:"tables"`
+	Format         int                   `json:"format_version"`
+	Kind           string                `json:"kind"`
+	ToolSource     string                `json:"compiled_tool_source"`
+	DSource        string                `json:"d_execution_source"`
+	DResources     string                `json:"d_execution_resources_sha256"`
+	DResourceFiles int                   `json:"d_execution_resource_files"`
+	CapturedAt     string                `json:"captured_at"`
+	CapturePath    string                `json:"first_capture_path"`
+	Binding        binding               `json:"binding"`
+	SessionZone    string                `json:"session_time_zone"`
+	SessionCharset string                `json:"session_character_set_results"`
+	SessionSQLMode string                `json:"session_sql_mode"`
+	LedgerDDL      string                `json:"original_sql_ledger_ddl"`
+	Ledger         []ledgerRow           `json:"original_complete_sql_ledger"`
+	MongoHead      []byte                `json:"independently_observed_mongo40_bson"`
+	Tables         [5]tableProof         `json:"tables"`
+	Retained       [8]retainedTableProof `json:"retained_modern_tables"`
 }
 
 func fingerprint(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
@@ -219,7 +220,7 @@ func cleanMongo40(raw bson.Raw) bool {
 	return v == 40 && ok && !dirty
 }
 func validateMaterial(m material, tool string, b binding) error {
-	if m.Format != 1 || m.Kind != "m4_d_maintenance_table_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.DSource != dSource || m.DResources != dResources || m.DResourceFiles != dResourceFiles || m.Binding != b || !validBinding(b) || !absolutePath(m.CapturePath) || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || m.LedgerDDL == "" || len(m.LedgerDDL) > maxDDLBytes || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{102, false}) || !cleanMongo40(m.MongoHead) {
+	if m.Format != 2 || m.Kind != "m4_d_maintenance_table_protection" || !sourceRE.MatchString(tool) || m.ToolSource != tool || m.DSource != dSource || m.DResources != dResources || m.DResourceFiles != dResourceFiles || m.Binding != b || !validBinding(b) || !absolutePath(m.CapturePath) || m.SessionZone != "+00:00" || m.SessionCharset != "utf8mb4" || m.SessionSQLMode != sessionMode || m.LedgerDDL == "" || len(m.LedgerDDL) > maxDDLBytes || len(m.Ledger) != 1 || m.Ledger[0] != (ledgerRow{102, false}) || !cleanMongo40(m.MongoHead) {
 		return errors.New("material_binding_rejected")
 	}
 	if _, e := time.Parse(time.RFC3339Nano, m.CapturedAt); e != nil {
@@ -228,7 +229,7 @@ func validateMaterial(m material, tool string, b binding) error {
 	totalRows, totalBytes := 0, 0
 	for i, t := range m.Tables {
 		s := scope[i]
-		if t.Table != s.name || t.DDL == "" || len(t.DDL) > maxDDLBytes || !sameColumns(t.Columns, s.columns) || !sameStrings(t.Keys, s.keys) || !t.EOF || len(t.Rows) > maxRows || t.Pages != (len(t.Rows)+pageSize-1)/pageSize+1 {
+		if t.Table != s.name || qualifyOriginalDDL(i, t.DDL) != nil || !sameColumns(t.Columns, s.columns) || !sameStrings(t.Keys, s.keys) || !t.EOF || len(t.Rows) > maxRows || t.Pages != (len(t.Rows)+pageSize-1)/pageSize+1 {
 			return errors.New("material_table_shape_or_eof_rejected")
 		}
 		used := 0
@@ -250,6 +251,9 @@ func validateMaterial(m material, tool string, b binding) error {
 		}
 		totalRows += len(t.Rows)
 		totalBytes += used
+	}
+	if e := validateRetained(m.Retained, &totalRows, &totalBytes); e != nil {
+		return e
 	}
 	if totalRows > maxTotalRows || totalBytes > maxMaterialBytes {
 		return errors.New("material_total_limit_rejected")

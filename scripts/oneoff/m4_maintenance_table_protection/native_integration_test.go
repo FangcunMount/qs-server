@@ -366,6 +366,14 @@ func (h *maintenanceNative) seed() {
 		query string
 		args  []any
 	}{
+		{"INSERT INTO operators(id,org_id,user_id,roles,name) VALUES(1,1,1,JSON_ARRAY('manager'),'owned operator')", nil},
+		{"INSERT INTO testee(id,org_id,name,gender,profile_id,birthday,store_id) VALUES(1,1,'owned testee',0,NULL,NULL,NULL),(18446744073709551615,1,'owned max',1,NULL,'2020-01-02',0)", nil},
+		{"INSERT INTO clinician(id,org_id,name,clinician_type,store_id) VALUES(1,1,'owned clinician','therapist',NULL)", nil},
+		{"INSERT INTO operator_retirement_tasks(operator_id,org_id,user_id,stage,payload,before_state,updated_at) VALUES(1,1,1,'prepared',JSON_OBJECT('note','😀'),JSON_OBJECT('roles',JSON_ARRAY()),'2026-10-15 01:02:03.123')", nil},
+		{"INSERT INTO operator_recovery_archives(request_id,operator_id,org_id,user_id,retirement_request_id,recovery_payload,retirement_payload,retirement_before_state,operator_before_state,checksum,created_at) VALUES('Z',1,1,1,'exit-Z',?,?,?,?,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','2026-10-15 01:02:03.123'),('a',1,1,1,'exit-a',?,?,?,?,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2026-10-15 01:02:03.456')", []any{payload, before, payload, before, before, payload, before, payload}},
+		{"INSERT INTO actor_stores(id,org_id,code,name,address,is_active,version,created_at,updated_at,created_by,updated_by) VALUES(0,1,'owned-zero','owned store','😀',1,1,'2026-10-15 01:02:03.123456','2026-10-15 01:02:04.654321',10001,10001)", nil},
+		{"INSERT INTO clinician_store_history(id,org_id,clinician_id,from_store_id,to_store_id,kind,actor_id,created_at,reason,request_id,invalidated_count,version) VALUES(0,1,1,NULL,0,'assigned',10001,'2026-10-15 01:02:03.123456','😀','Z',0,1)", nil},
+		{"INSERT INTO testee_store_history(id,org_id,testee_id,from_store_id,to_store_id,kind,actor_id,entry_id,clinician_id,created_at,reason,request_id,version) VALUES(18446744073709551615,1,1,NULL,0,'assigned',10001,NULL,NULL,'2026-10-15 01:02:03.654321','owned','a',1)", nil},
 		{"INSERT INTO operator_retirement_manifests(migration_id,stage,payload,payload_sha256,created_at,updated_at) VALUES(?,?,?,?,?,?)", []any{"A0", "applied_unchanged", payload, fingerprint(payload), "2026-10-15 01:02:03.123456", "2026-10-15 01:02:04.654321"}},
 		{"INSERT INTO clinician_operator_binding_archive(clinician_id,org_id,operator_id,migration_id,before_record,record_sha256,archived_at) VALUES(0,1,0,'A0',?,?,'2026-10-15 01:02:03.123456'),(18446744073709551615,1,18446744073709551615,'A0',?,?,'2026-10-15 01:02:03.654321')", []any{before, fingerprint(before), before, fingerprint(before)}},
 		{"INSERT INTO testee_store_migration_manifests(migration_id,state,before_hash,after_hash,rollback_hash,items_hash,item_count,actor_id,created_at,completed_at,rolled_back_at) VALUES('','applied',?,'','',?,6,10001,'2026-10-15 01:02:03.123456',NULL,NULL),('A0','applied',?,?,'',?,0,10001,'2026-10-15 01:02:03.123456','2026-10-15 01:02:04.654321',NULL)", []any{fingerprint(payload), fingerprint(before), fingerprint(before), fingerprint(payload), fingerprint(before)}},
@@ -416,6 +424,47 @@ func (h *maintenanceNative) originalRaw() [5][][]sql.NullString {
 	}
 	return out
 }
+
+// These witnesses read full server bytes independently of the hash-only page SQL.
+// Synthetic modern rows prove preservation, not the Recover business workflow.
+func (h *maintenanceNative) retainedRaw() [8][][]sql.NullString {
+	h.t.Helper()
+	var out [8][][]sql.NullString
+	for i, s := range retainedScope {
+		var selected []string
+		for _, c := range s.columns {
+			selected = append(selected, "CAST(`"+c.Name+"` AS BINARY)")
+		}
+		order := "`" + s.keys[0] + "`"
+		if s.binaryFirst {
+			order = "CAST(" + order + " AS BINARY)"
+		}
+		out[i] = h.query("SELECT " + strings.Join(selected, ",") + " FROM `" + s.name + "` ORDER BY " + order)
+	}
+	return out
+}
+func (h *maintenanceNative) assertRetained(raw [8][][]sql.NullString) {
+	h.t.Helper()
+	for i, s := range retainedScope {
+		p := h.original.Retained[i]
+		definition := h.query("SHOW CREATE TABLE `" + s.name + "`")
+		if len(definition) != 1 || definition[0][1].String != p.DDL || len(raw[i]) != len(p.Rows) || !p.EOF || p.Pages != (len(raw[i])+pageSize-1)/pageSize+1 {
+			h.t.Fatal("modern DDL/range/EOF witness mismatch")
+		}
+		for n, row := range raw[i] {
+			values := make([]cell, len(row))
+			for j, v := range row {
+				values[j] = cell{SQLNull: !v.Valid}
+				if v.Valid {
+					values[j].Bytes = []byte(v.String)
+				}
+			}
+			if rowHash(s.columns, values) != p.Rows[n].Hash {
+				h.t.Fatal("modern server byte hash witness mismatch")
+			}
+		}
+	}
+}
 func (h *maintenanceNative) assertCaptureRaw(raw [5][][]sql.NullString) {
 	h.t.Helper()
 	for i, rows := range raw {
@@ -463,11 +512,16 @@ func (h *maintenanceNative) assertReadOnlyReleased(r receipt) {
 func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(t *testing.T) {
 	h := newMaintenanceNative(t)
 	before, mongoBefore, bindingBefore := h.originalRaw(), h.mongoHead(), h.independentBinding()
+	retainedBefore := h.retainedRaw()
 	if r := h.action("inspect"); !r.Complete || r.MandatoryEOF {
 		t.Fatal("metadata-only inspect failed or claimed EOF", r.Error)
 	}
 	h.capture()
 	h.assertCaptureRaw(before)
+	h.assertRetained(retainedBefore)
+	if !reflect.DeepEqual(retainedBefore, h.retainedRaw()) {
+		t.Fatal("capture changed modern retained facts")
+	}
 	if !reflect.DeepEqual(before, h.originalRaw()) || !bytes.Equal(mongoBefore, h.mongoHead()) || bindingBefore != h.independentBinding() {
 		t.Fatal("capture changed original facts or identity")
 	}
@@ -477,8 +531,19 @@ func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(t *testing.T) {
 	}
 	r := h.verify()
 	h.assertReadOnlyReleased(r)
-	if !r.Complete || r.Error != "none" || r.MandatoryEOF || !r.SQLSnapshot {
+	if !r.Complete || r.Error != "none" || r.MandatoryEOF || !r.RetainedEOF || len(r.RetainedCounts) != 8 || !r.SQLSnapshot {
 		t.Fatal("formal target verification failed or claimed nonexistent row scan", r.Error)
+	}
+	if !reflect.DeepEqual(retainedBefore, h.retainedRaw()) {
+		t.Fatal("normal103 changed modern retained facts")
+	}
+	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_recovery_archives SET recovery_payload=CONCAT(recovery_payload,' ') WHERE request_id='Z'"); e != nil {
+		t.Fatal("owned retained raw drift unavailable")
+	}
+	drift := h.verify()
+	h.assertReadOnlyReleased(drift)
+	if drift.Complete || drift.Error != "target_object_or_identity_rejected" {
+		t.Fatal("changed original modern bytes were accepted", drift.Error)
 	}
 	if !bytes.Equal(mongoBefore, h.mongoHead()) || bindingBefore != h.independentBinding() {
 		t.Fatal("unaffected Mongo original BSON/UUID changed")
@@ -563,6 +628,46 @@ func TestM4MaintenanceTablesNativeOversizeHashRefusesCapture(t *testing.T) {
 	}
 	if !reflect.DeepEqual(before, h.query("SELECT OCTET_LENGTH(payload),payload_sha256 FROM operator_retirement_manifests ORDER BY migration_id")) || !bytes.Equal(head, h.mongoHead()) {
 		t.Fatal("oversize rejection changed original data/ledger")
+	}
+	// Independently exercise the hash-only modern LONGTEXT branch after restoring
+	// this synthetic old-table value. No material or restoration is authorized.
+	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_retirement_manifests SET payload='{}'"); e != nil {
+		t.Fatal("owned old-table oversized seed reset failed")
+	}
+	if _, e := h.db.ExecContext(t.Context(), "UPDATE operator_recovery_archives SET recovery_payload=REPEAT('x',?) WHERE request_id='Z'", maxValueBytes+1); e != nil {
+		t.Fatal("owned oversized modern LONGTEXT unavailable")
+	}
+	modernBefore := h.query("SELECT request_id,OCTET_LENGTH(recovery_payload),checksum FROM operator_recovery_archives ORDER BY CAST(request_id AS BINARY)")
+	rows, e = h.db.QueryContext(t.Context(), retainedPageSQL(retainedScope[4], false))
+	if e != nil || !rows.Next() {
+		if rows != nil {
+			_ = rows.Close()
+		}
+		t.Fatal("bounded modern oversized page unavailable")
+	}
+	var key string
+	var boundedHash sql.NullString
+	if rows.Scan(&key, &boundedHash) != nil || key != "5A" || boundedHash.Valid {
+		_ = rows.Close()
+		t.Fatal("oversized modern hash was materialized")
+	}
+	for rows.Next() {
+	}
+	re, ce = rows.Err(), rows.Close()
+	if re != nil || ce != nil {
+		t.Fatal("modern oversized page release unproven")
+	}
+	modernPath := filepath.Join(h.dir, "oversized-modern.json")
+	r = h.action("capture", "--capture-file="+modernPath)
+	h.assertReadOnlyReleased(r)
+	if r.Complete || r.MaterialHash != "" || r.Error != "retained_row_limit_order_or_hash_rejected" {
+		t.Fatal("modern oversized capture not refused", r.Error)
+	}
+	if _, e := os.Stat(modernPath); !os.IsNotExist(e) {
+		t.Fatal("modern oversized material persisted")
+	}
+	if !reflect.DeepEqual(modernBefore, h.query("SELECT request_id,OCTET_LENGTH(recovery_payload),checksum FROM operator_recovery_archives ORDER BY CAST(request_id AS BINARY)")) || !bytes.Equal(head, h.mongoHead()) {
+		t.Fatal("modern oversized refusal mutated facts")
 	}
 }
 func TestM4MaintenanceTablesNativeUnboundMaterialRejected(t *testing.T) {

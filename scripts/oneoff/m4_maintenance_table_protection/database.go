@@ -183,7 +183,7 @@ func (d database) observe(ctx context.Context, r sqlReader) (out observation, er
 func requireTables(ctx context.Context, r sqlReader, original bool) error {
 	q, cancel := context.WithTimeout(ctx, queryLimit)
 	defer cancel()
-	rows, e := r.QueryContext(q, "SELECT TABLE_NAME,TABLE_TYPE,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('testee_store_migration_reversions','testee_store_migration_items','testee_store_migration_manifests','clinician_operator_binding_archive','operator_retirement_manifests','schema_migrations') ORDER BY TABLE_NAME")
+	rows, e := r.QueryContext(q, "SELECT TABLE_NAME,TABLE_TYPE,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('testee_store_migration_reversions','testee_store_migration_items','testee_store_migration_manifests','clinician_operator_binding_archive','operator_retirement_manifests','schema_migrations','operators','testee','clinician','operator_retirement_tasks','operator_recovery_archives','actor_stores','clinician_store_history','testee_store_history') ORDER BY TABLE_NAME")
 	if e != nil {
 		return errors.New("fixed_table_metadata_unavailable")
 	}
@@ -198,12 +198,15 @@ func requireTables(ctx context.Context, r sqlReader, original bool) error {
 	}
 	re, ce := rows.Err(), rows.Close()
 	want := []string{"schema_migrations"}
+	for _, s := range retainedScope {
+		want = append(want, s.name)
+	}
 	if original {
 		for _, s := range scope {
 			want = append(want, s.name)
 		}
-		sort.Strings(want)
 	}
+	sort.Strings(want)
 	if re != nil || ce != nil || !sameStrings(got, want) {
 		return errors.New("fixed_table_presence_or_release_rejected")
 	}
@@ -246,9 +249,17 @@ func columns(ctx context.Context, r sqlReader, i int) ([]column, error) {
 	if re != nil || ce != nil || !sameColumns(got, s.columns) {
 		return nil, errors.New("fixed_columns_or_release_rejected")
 	}
-	rows, e = r.QueryContext(q, "SELECT COLUMN_NAME,NON_UNIQUE,SUB_PART,COLLATION,EXPRESSION,INDEX_TYPE,IS_VISIBLE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME='PRIMARY' ORDER BY SEQ_IN_INDEX", s.name)
+	if e := requirePrimaryKey(ctx, r, s); e != nil {
+		return nil, e
+	}
+	return got, nil
+}
+func requirePrimaryKey(ctx context.Context, r sqlReader, s tableSpec) error {
+	q, cancel := context.WithTimeout(ctx, queryLimit)
+	defer cancel()
+	rows, e := r.QueryContext(q, "SELECT COLUMN_NAME,NON_UNIQUE,SUB_PART,COLLATION,EXPRESSION,INDEX_TYPE,IS_VISIBLE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME='PRIMARY' ORDER BY SEQ_IN_INDEX", s.name)
 	if e != nil {
-		return nil, errors.New("primary_key_metadata_unavailable")
+		return errors.New("primary_key_metadata_unavailable")
 	}
 	var keys []string
 	valid := true
@@ -263,12 +274,13 @@ func columns(ctx context.Context, r sqlReader, i int) ([]column, error) {
 		}
 		keys = append(keys, key)
 	}
-	re, ce = rows.Err(), rows.Close()
+	re, ce := rows.Err(), rows.Close()
 	if re != nil || ce != nil || !valid || !sameStrings(keys, s.keys) {
-		return nil, errors.New("fixed_primary_key_or_release_rejected")
+		return errors.New("fixed_primary_key_or_release_rejected")
 	}
-	return got, nil
+	return nil
 }
+
 func retainedHashSQL(cols []column) string {
 	var encoded []string
 	for _, c := range cols {
@@ -454,6 +466,19 @@ func accountRow(encoded, tableRows int, tableBytes, totalRows, totalBytes *int) 
 // snapshot. Only this terminal aggregate uses the remaining action deadline;
 // ordinary metadata, keyset pages and connection/session setup keep 5s limits.
 func verifyCompleteRangeCount(ctx context.Context, r sqlReader, i int, expected uint64) error {
+	return completeRangeCount(ctx, r, scope[i].name, expected)
+}
+func completeRangeCount(ctx context.Context, r sqlReader, table string, expected uint64) error {
+	fixed := false
+	for _, s := range scope {
+		fixed = fixed || s.name == table
+	}
+	for _, s := range retainedScope {
+		fixed = fixed || s.name == table
+	}
+	if !fixed {
+		return errors.New("complete_range_count_scope_rejected")
+	}
 	deadline, bounded := ctx.Deadline()
 	if !bounded {
 		return errors.New("complete_range_count_budget_rejected")
@@ -469,7 +494,7 @@ func verifyCompleteRangeCount(ctx context.Context, r sqlReader, i int, expected 
 		return errors.New("complete_range_count_budget_rejected")
 	}
 	var count uint64
-	query := "SELECT /*+ MAX_EXECUTION_TIME(" + strconv.FormatInt(milliseconds, 10) + ") */ COUNT(*) FROM `" + scope[i].name + "`"
+	query := "SELECT /*+ MAX_EXECUTION_TIME(" + strconv.FormatInt(milliseconds, 10) + ") */ COUNT(*) FROM `" + table + "`"
 	if e := r.QueryRowContext(ctx, query).Scan(&count); e != nil {
 		return classifyCompleteCountError(e)
 	}
@@ -517,7 +542,7 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 			}
 		}
 	}()
-	m = material{Format: 1, Kind: "m4_d_maintenance_table_protection", ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
+	m = material{Format: 2, Kind: "m4_d_maintenance_table_protection", ToolSource: tool, DSource: dSource, DResources: dResources, DResourceFiles: dResourceFiles, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano), Binding: before.Binding, SessionZone: "+00:00", SessionCharset: "utf8mb4", SessionSQLMode: sessionMode, MongoHead: before.Mongo}
 	if e := requireLedgerShape(ctx, tx); e != nil {
 		return m, e
 	}
@@ -550,7 +575,24 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 			if e != nil {
 				return m, e
 			}
+			if e := qualifyOriginalDDL(i, t.DDL); e != nil {
+				return m, e
+			}
 			m.Tables[i] = t
+		}
+	}
+	for i := range retainedScope {
+		if full {
+			m.Retained[i], e = scanRetained(ctx, tx, i, &totalRows, &totalBytes)
+		} else {
+			s := retainedScope[i]
+			_, e = retainedColumns(ctx, tx, s)
+			if e == nil {
+				_, e = ddl(ctx, tx, s.name)
+			}
+		}
+		if e != nil {
+			return m, e
 		}
 	}
 	if tx.Commit() != nil {
@@ -569,6 +611,9 @@ func (d database) snapshot(ctx context.Context, tool string, version uint64, ful
 func verifyTarget(original, target material) error {
 	if original.Format != target.Format || original.Kind != target.Kind || original.ToolSource != target.ToolSource || original.DSource != target.DSource || original.DResources != target.DResources || original.DResourceFiles != target.DResourceFiles || original.SessionZone != target.SessionZone || original.SessionCharset != target.SessionCharset || original.SessionSQLMode != target.SessionSQLMode || original.Binding != target.Binding || !bytes.Equal(original.MongoHead, target.MongoHead) || original.LedgerDDL != target.LedgerDDL || len(target.Ledger) != 1 || target.Ledger[0] != (ledgerRow{103, false}) {
 		return errors.New("target_identity_or_ledger_rejected")
+	}
+	if !sameRetained(original.Retained, target.Retained) {
+		return errors.New("retained_modern_facts_changed")
 	}
 	for _, t := range target.Tables {
 		if t.Table != "" || len(t.Rows) != 0 {

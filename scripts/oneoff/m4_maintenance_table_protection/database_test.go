@@ -184,6 +184,9 @@ func TestFixedTablesRejectPartialOrNonTransactionalObjects(t *testing.T) {
 			db, m := dbFixture(t)
 			rows := sqlmock.NewRows([]string{"TABLE_NAME", "TABLE_TYPE", "ENGINE"})
 			names := []string{"schema_migrations"}
+			for _, s := range retainedScope {
+				names = append(names, s.name)
+			}
 			original := name != "target" && name != "reappeared"
 			if original {
 				for _, s := range scope {
