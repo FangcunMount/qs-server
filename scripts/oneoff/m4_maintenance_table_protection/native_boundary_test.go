@@ -65,6 +65,13 @@ func (h *maintenanceNative) assertFailedRestore(r receipt, category string, cons
 	}
 }
 
+func (h *maintenanceNative) assertFailedRestoreGateUnknown(r receipt, category string) {
+	h.t.Helper()
+	if r.Complete || r.Error != category || !r.ApprovalConsumed || r.ReadOnly || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || !r.RuntimeGateAcquired || r.RuntimeGateReleased || !r.RuntimeGateReleaseUnproven || r.ReleaseError != "runtime_gate_release_unproven" || r.TransactionReleaseUnproven {
+		h.t.Fatal("wire loss must retain the original error and unproved server gate", r)
+	}
+}
+
 // The proxy consumes a real server OK but leaves the client unaware. A fresh
 // independent connection witnesses the resulting table before any continuation.
 func (h *maintenanceNative) interruptCreate(index int, args []string) {
@@ -72,7 +79,7 @@ func (h *maintenanceNative) interruptCreate(index int, args []string) {
 	observed, _, undo := h.useACKTransport(fmt.Sprintf("create_%d_ack_loss", index), nil)
 	r := h.action("restore", args...)
 	undo()
-	h.assertFailedRestore(r, "original_table_create_failed_or_unknown", true)
+	h.assertFailedRestoreGateUnknown(r, "original_table_create_failed_or_unknown")
 	if !observed.Load() {
 		h.t.Fatal("real CREATE success ACK was not observed")
 	}
@@ -126,7 +133,7 @@ func TestM4MaintenanceTablesNativeBatchCommitACKLossContinuation(t *testing.T) {
 	observed, rollback, undo := h.useACKTransport("items_batch_commit_ack_loss", nil)
 	r := h.action("restore", args...)
 	undo()
-	h.assertFailedRestore(r, "original_insert_commit_outcome_unknown", true)
+	h.assertFailedRestoreGateUnknown(r, "original_insert_commit_outcome_unknown")
 	// ErrTxDone only closes a local Go transaction handle. The positive server
 	// COMMIT ACK and an independent 100-row read prove the committed first batch.
 	if !observed.Load() || rollback.Load() || h.query("SELECT COUNT(*) FROM testee_store_migration_items")[0][0].String != strconv.Itoa(insertBatchRows) {
@@ -149,7 +156,7 @@ func TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof(t *testing.T)
 	observed, rollback, undo := h.useACKTransport("ledger_commit_ack_loss", nil)
 	r := h.action("restore", args...)
 	undo()
-	h.assertFailedRestore(r, "ledger_commit_outcome_unknown", true)
+	h.assertFailedRestoreGateUnknown(r, "ledger_commit_outcome_unknown")
 	if !observed.Load() || rollback.Load() {
 		t.Fatal("actual successful ledger COMMIT ACK missing or confused with abort")
 	}
@@ -218,7 +225,11 @@ func TestM4MaintenanceTablesNativeFirstBoundaryCannotReset(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := h.action("restore", h.continuation(ap, hash, fmt.Sprintf("2005-%d", i+2), tc.change)...)
-			if r.Complete || r.ApprovalConsumed || r.Error != "recovery_boundary_scope_changed" || r.SQLConnectionClosed || r.MongoClosed {
+			want := "recovery_boundary_scope_changed"
+			if tc.name == "marker" {
+				want = "restore_approval_rejected" // derived marker is now checked before ENV
+			}
+			if r.Complete || r.ApprovalConsumed || r.Error != want || r.SQLConnectionClosed || r.MongoClosed {
 				t.Fatal("new operation reset the first boundary or opened DB", r.Error)
 			}
 		})

@@ -63,7 +63,7 @@ func markerAbsent(path string) error {
 }
 
 func validateApproval(a approval, m material, materialHash, tool string, now time.Time) error {
-	if a.Format != 1 || a.Kind != "m4_d_pre_start_maintenance_table_restore" || !operationRE.MatchString(a.Operation) || a.ToolSource != tool || a.DSource != dSource || a.DResources != dResources || a.DResourceFiles != dResourceFiles || a.MaterialHash != materialHash || !nonzeroHash(materialHash) || !nonzeroHash(a.FreezeHash) || !nonzeroHash(a.ResponsibilityHash) || a.Binding != m.Binding || !a.RuntimeFrozen || !a.RuntimeNotStarted || a.RetentionDays < 30 || a.DataOwner != "system (10001)" || a.RecoveryOwner != "system (10001)" {
+	if a.Format != 1 || a.Kind != "m4_d_pre_start_maintenance_table_restore" || !operationRE.MatchString(a.Operation) || a.ToolSource != tool || a.DSource != dSource || a.DResources != dResources || a.DResourceFiles != dResourceFiles || a.MaterialHash != materialHash || !nonzeroHash(materialHash) || !nonzeroHash(a.FreezeHash) || !nonzeroHash(a.ResponsibilityHash) || a.Binding != m.Binding || a.Marker != derivedRuntimeMarker(m) || !a.RuntimeFrozen || !a.RuntimeNotStarted || a.RetentionDays < 30 || a.DataOwner != "system (10001)" || a.RecoveryOwner != "system (10001)" {
 		return errors.New("restore_approval_binding_rejected")
 	}
 	start, e1 := time.Parse(time.RFC3339Nano, a.WindowStarted)

@@ -22,6 +22,7 @@ import (
 
 type arguments struct {
 	action, capture, material, materialHash, approval, approvalHash string
+	runtimeIntent, runtimeIntentHash                                string
 	binding                                                         binding
 	timeout                                                         time.Duration
 }
@@ -49,13 +50,19 @@ type receipt struct {
 	BudgetExceeded             bool           `json:"total_budget_exceeded"`
 	TransactionReleaseUnproven bool           `json:"transaction_release_unproven"`
 	ApprovalConsumed           bool           `json:"approval_consumed"`
+	RuntimeGateAcquired        bool           `json:"runtime_gate_acquired"`
+	RuntimeGateReleased        bool           `json:"runtime_gate_released"`
+	RuntimeGateReleaseUnproven bool           `json:"runtime_gate_release_unproven"`
+	MarkerWritten              bool           `json:"runtime_marker_written"`
+	MarkerHash                 string         `json:"runtime_marker_sha256,omitempty"`
+	MarkerWriteUnknown         bool           `json:"runtime_marker_write_unknown"`
 }
 
 func parseArgs(args []string) (arguments, error) {
 	var a arguments
 	f := flag.NewFlagSet("m4-maintenance-table-protection", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored")
+	f.StringVar(&a.action, "action", "inspect", "inspect, capture, verify-target, restore, verify-restored, mark-first-runtime")
 	f.StringVar(&a.binding.SQLName, "mysql-database", "", "explicit selected database")
 	f.StringVar(&a.binding.MongoName, "mongo-database", "", "explicit selected database")
 	f.StringVar(&a.binding.SQLIdentity, "mysql-identity-sha256", "", "independent target identity")
@@ -66,12 +73,17 @@ func parseArgs(args []string) (arguments, error) {
 	f.StringVar(&a.materialHash, "material-sha256", "", "independently frozen original bytes hash")
 	f.StringVar(&a.approval, "approval-file", "", "independent pre-first-runtime restore approval")
 	f.StringVar(&a.approvalHash, "approval-sha256", "", "independent approval raw SHA")
+	f.StringVar(&a.runtimeIntent, "runtime-intent-file", "", "independent private first-runtime intent")
+	f.StringVar(&a.runtimeIntentHash, "runtime-intent-sha256", "", "independent first-runtime intent raw SHA")
 	f.DurationVar(&a.timeout, "timeout", maxAction, "finite total deadline, at most20m")
 	if f.Parse(args) != nil || f.NArg() != 0 {
 		return a, errors.New("arguments_invalid")
 	}
 	if !validBinding(a.binding) || a.timeout <= 0 || a.timeout > maxAction {
 		return a, errors.New("external_binding_or_deadline_required")
+	}
+	if a.action != "mark-first-runtime" && (a.runtimeIntent != "" || a.runtimeIntentHash != "") {
+		return a, errors.New("runtime_intent_action_mismatch")
 	}
 	switch a.action {
 	case "inspect":
@@ -85,6 +97,10 @@ func parseArgs(args []string) (arguments, error) {
 	case "verify-target", "restore", "verify-restored":
 		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || a.action == "verify-target" && (a.approval != "" || a.approvalHash != "") || a.action != "verify-target" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
 			return a, errors.New("independently_bound_material_required")
+		}
+	case "mark-first-runtime":
+		if a.capture != "" || !absolutePath(a.material) || !nonzeroHash(a.materialHash) || !absolutePath(a.runtimeIntent) || !nonzeroHash(a.runtimeIntentHash) || (a.approval == "") != (a.approvalHash == "") || a.approval != "" && (!absolutePath(a.approval) || !nonzeroHash(a.approvalHash)) {
+			return a, errors.New("runtime_independent_inputs_required")
 		}
 	default:
 		return a, errors.New("action_invalid")
@@ -141,7 +157,8 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	defer cancel()
 	var original material
 	var ap approval
-	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" {
+	var intent runtimeIntent
+	if a.action == "verify-target" || a.action == "restore" || a.action == "verify-restored" || a.action == "mark-first-runtime" {
 		raw, e := readPrivate(a.material, a.materialHash)
 		if e != nil {
 			r.Error = strings.Split(e.Error(), "\n")[0]
@@ -153,7 +170,14 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		r.MaterialHash = a.materialHash
 	}
-	if a.action == "restore" || a.action == "verify-restored" {
+	if a.action == "mark-first-runtime" {
+		intent, e = readRuntimeIntent(a.runtimeIntent, a.runtimeIntentHash)
+		if e != nil || intent.Mode == "restored102" && a.approval == "" || intent.Mode != "restored102" && a.approval != "" {
+			r.Error = "runtime_independent_intent_rejected"
+			return r
+		}
+	}
+	if a.action == "restore" || a.action == "verify-restored" || a.action == "mark-first-runtime" && intent.Mode == "restored102" {
 		raw, e := readPrivateLimit(a.approval, a.approvalHash, 32768)
 		if e != nil || strictDecode(raw, &ap) != nil || validateApproval(ap, original, a.materialHash, tool, time.Now()) != nil {
 			r.Error = "restore_approval_rejected"
@@ -170,6 +194,19 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		var c context.CancelFunc
 		ctx, c = restoreActionContext(ctx, ap)
+		defer c()
+	}
+	var intentApproval *approval
+	if a.action == "mark-first-runtime" {
+		if intent.Mode == "restored102" {
+			intentApproval = &ap
+		}
+		if e := validateRuntimeIntent(intent, original, a.materialHash, tool, intentApproval, time.Now()); e != nil {
+			r.Error = e.Error()
+			return r
+		}
+		var c context.CancelFunc
+		ctx, c = runtimeIntentContext(ctx, intent)
 		defer c()
 	}
 	var captureDirectory captureParentIdentity
@@ -233,6 +270,16 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	var rawMaterial []byte
 	defer func() {
 		released := true
+		if d.gate != nil {
+			if e := d.gate.release(); e != nil {
+				r.ReleaseError = e.Error()
+				if ok {
+					r.Error = e.Error()
+				}
+			}
+			r.RuntimeGateAcquired, r.RuntimeGateReleased, r.RuntimeGateReleaseUnproven = d.gate.acquired, d.gate.released, d.gate.releaseUnproven
+			released = released && !r.RuntimeGateReleaseUnproven
+		}
 		if d.conn != nil {
 			r.SQLConnectionClosed = d.conn.Close() == nil
 			released = released && r.SQLConnectionClosed
@@ -249,7 +296,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 		}
 		released = released && !r.TransactionReleaseUnproven
 		if !released {
-			r.ReleaseError = "owned_connection_release_unproven"
+			if r.ReleaseError == "" {
+				r.ReleaseError = "owned_connection_release_unproven"
+			}
 			if ok {
 				r.Error = r.ReleaseError
 			}
@@ -312,6 +361,22 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	stop()
 	if e != nil {
 		r.Error = "mongo_primary_unavailable"
+		return r
+	}
+	if a.action == "restore" || a.action == "mark-first-runtime" {
+		d.gate, e = acquireRuntimeGate(ctx, d.conn, a.binding)
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+	}
+	if a.action == "mark-first-runtime" {
+		if e := d.markFirstRuntime(ctx, original, intent, a, tool, intentApproval, &r); e != nil {
+			r.Error = strings.Split(e.Error(), "\n")[0]
+			return r
+		}
+		r.SQLSnapshot, r.RetainedEOF, r.MandatoryEOF = true, true, intent.Mode != "target103"
+		ok = true
 		return r
 	}
 	if a.action == "restore" {

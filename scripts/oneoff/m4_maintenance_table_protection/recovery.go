@@ -375,6 +375,9 @@ func (d database) fillOriginalRows(ctx context.Context, m material, current reco
 }
 
 func (d database) restore(ctx context.Context, m material, a approval, materialPath, materialHash, approvalPath, approvalHash, tool string, consumed *bool) error {
+	if e := d.gate.require(ctx); e != nil {
+		return e
+	}
 	prior, e := readRecoveryBoundary(m, a, materialHash)
 	if e != nil {
 		return e

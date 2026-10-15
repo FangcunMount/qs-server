@@ -35,6 +35,9 @@ func nativeACKStep(step, query string, command byte) (arm, drop, lock bool) {
 	if command != 3 && command != 22 {
 		return
 	}
+	if step == "runtime_release_prepare_loss" && command == 22 && strings.HasPrefix(s, "SELECT RELEASE_LOCK(") {
+		drop = true // actual PREPARE OK loss; never claim RELEASE_LOCK executed
+	}
 	for i, spec := range scope {
 		if step == "create_"+string(rune('0'+i))+"_ack_loss" && command == 3 && strings.HasPrefix(s, "CREATE TABLE "+strings.ToUpper(spec.name)+" (") {
 			drop = true
@@ -153,6 +156,7 @@ func TestMaintenanceRestoreWireObservationIsBoundedAndSelective(t *testing.T) {
 		{"ledger", "ledger_commit_ack_loss", "DELETE FROM schema_migrations", 3, true, false, false},
 		{"server_error", "create_4_ack_loss", "CREATE TABLE operator_retirement_manifests (id bigint)", 3, false, true, false},
 		{"actual_rollback_ACK", "items_prepare_lock_marker", "ROLLBACK", 3, false, false, true},
+		{"release_prepare_ACK", "runtime_release_prepare_loss", "SELECT RELEASE_LOCK(?)", 22, false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client, server := net.Pipe()

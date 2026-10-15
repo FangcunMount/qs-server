@@ -27,6 +27,7 @@ type database struct {
 	conn    *sql.Conn
 	mongo   *mongo.Client
 	binding binding
+	gate    *runtimeGate
 }
 type observation struct {
 	Binding binding

@@ -126,7 +126,7 @@ func (h *maintenanceNative) restoreInput(operation string) ([]string, string, st
 
 func (h *maintenanceNative) assertRestoreReleased(r receipt) {
 	h.t.Helper()
-	if !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.ReleaseError != "" || r.TransactionReleaseUnproven || r.ProductionFreezeCertified || r.CrossDatabaseAtomicRR {
+	if !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.ReleaseError != "" || r.TransactionReleaseUnproven || r.RuntimeGateReleaseUnproven || r.RuntimeGateAcquired && !r.RuntimeGateReleased || r.ProductionFreezeCertified || r.CrossDatabaseAtomicRR {
 		h.t.Fatal("owned restore resource release unproven", r.Error, r.ReleaseError)
 	}
 }
