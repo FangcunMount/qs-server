@@ -61,9 +61,11 @@ SQL103 只删除 `testee_store_migration_reversions`、`testee_store_migration_i
 
 生产只读盘点 `80f422101ccfd83b4c4eb5bd165272145afe7afd` / run `38628472662-1` 在cleanSQL100、MySQL8.0.36的一致快照中确认：Testee manifests/items/reversions为1/83797/0，Operator manifests/binding archive为1/119；Testee manifest applied=1、item candidate=55577/deferred=28220，Operator applied_unchanged=1，三个历史引用gap均0。私有回执摘要 `73bdf2677701f454cb7f64cdce950a319328c5fc87e96ea505353fbd55fc0125` 绑定原目标和所有连接/事务释放，`freeze_verified=false`。用户已确认五表没有遗留任务，原材料按隔离恢复职责保留；这些时点与责任事实不代替D执行时clean102/40的实际全量原值/DDL、完整原账本保护、持续停写和迁移/恢复资格。
 
-定向保护、生产迁移/恢复及30/60分钟/RPO0仍未验收。固定测试seam不提供生产备份/恢复入口；首个新runtime命令后只允许保留新事实的向前恢复，不能回放旧表/账本覆盖新事实。SQL103down只明确拒绝，不用Force、SetVersion或手清dirty替代恢复。
+生产定向材料、迁移/恢复及30/60分钟/RPO0仍未验收。固定测试seam本身不提供生产备份/恢复入口；首个新runtime命令后只允许保留新事实的向前恢复，不能回放旧表/账本覆盖新事实。SQL103down只明确拒绝，不用Force、SetVersion或手清dirty替代恢复。
 
-D 定向只读工具 `scripts/oneoff/m4_maintenance_table_protection` 当前源码与实际编译 `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已通过只读原生验收，状态为 `read_only_native_verified / restore_not_implemented`。固定执行源 `c335b2a1a34dd69830261e2d8e11b16da3f8befb`，原 SQL1..103/Mongo1..40 的286个 up/down 资源按 `[backend,path,rawSHA256]` 顺序编码后的摘要为 `20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d`；这与独立编译的工具 SHA 分别登记，不用后续 main 的资源替换。工具未调用迁移 provider、DDL、恢复、批准或 journal。
+#### 已保留的只读阶段
+
+D 定向工具 `scripts/oneoff/m4_maintenance_table_protection` 在最初只读阶段的源码与实际编译 `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已通过只读原生验收，状态为 `read_only_native_verified / restore_not_implemented`。固定执行源 `c335b2a1a34dd69830261e2d8e11b16da3f8befb`，原 SQL1..103/Mongo1..40 的286个 up/down 资源按 `[backend,path,rawSHA256]` 顺序编码后的摘要为 `20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d`；这与独立编译的工具 SHA 分别登记，不用后续 main 的资源替换。该阶段工具未调用迁移 provider、DDL、恢复、批准或 journal。当前 format2 恢复协议与实际验证见下节。
 
 默认 `inspect` 只检查 clean102/40、五张原 InnoDB BASE TABLE 的列/主键形状和原 DDL。`capture` 在同一 SQL 只读 RR 中完整保存五表原 DDL、固定列与完整主键、逐行服务端 `CAST AS BINARY` 原值及 SQL NULL 标记、行摘要、完整原 SQL 账本及其 DDL；`ParseTime=false`、固定 UTC/结果字符集/SQL mode，DATETIME(6) 微秒、LONGTEXT 空白/键顺序、已有摘要均不经 Go 时间或 JSON map 重编码、不重签。字符串主键按完整 binary bytes 排序；复合主键再按 uint64 数值排序，边界使用 `DECIMAL(20,0)`，保留空字符串、0 与 Uint64MAX，每表额外读取空 EOF 并在同 RR 执行完整 COUNT 守恒。
 
@@ -75,7 +77,23 @@ D 定向只读工具 `scripts/oneoff/m4_maintenance_table_protection` 当前源�
 
 源码与实际编译 SHA `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已在唯一自有 MySQL8.0.36/Mongo7.0.31 rs0 上执行一次：五顶层、八子场景共13项各一次 RUN/PASS、零FAIL/SKIP、exit0，耗时50.325秒。真实历史providers产生原clean102/40和正常103退役，不Force或手写账本；独立原查询逐列比对五表DDL/PK、LONGTEXT原空白/重复JSON键/四字节、已有摘要、微秒与SQL NULL，507项复合键经过两数据页及必空EOF，明确空key、0/MAX与Z/a binary顺序。实际超8MiB合法LONGTEXT的原值和hash均NULL、capture明确拒绝且不落材料；材料hash/source/身份/EOF/首路径、原PK prefix/nullable漂移与103旧表复现均拒绝。Mongo原40 BSON与账本UUID独立前后不变。该轮只证明capture/verify-target，不执行五表恢复或业务runtime。
 
-原始回执 SHA `f14e08c3dc669ee9986f20077d3e799e336f93a20828954e733e742d04862ed2`，实际JSONL `573b5b84fa84b99f8a62be6196114fb5f84549eb552b20e698405b2c532a863f`，私有目录 `qs-m4-d-maintenance-object-native-v1` 保留实际argv/source-binding及17个制品摘要。原目录FD模式、原资源及源文件前后不变，两自有容器/网络/子进程组释放，cleanup错误为空；旧容器ID/镜像/卷保留，本次选定State/RestartCount元数据无差异。生产102/40全量材料、持续冻结、五表0..5 DROP前缀恢复及原账本最后回放、正式服务启动、30/60分钟/RPO0与业务验收仍未完成，不由50.325秒的小型合成夹具推定生产预算。
+原始回执 SHA `f14e08c3dc669ee9986f20077d3e799e336f93a20828954e733e742d04862ed2`，实际JSONL `573b5b84fa84b99f8a62be6196114fb5f84549eb552b20e698405b2c532a863f`，私有目录 `qs-m4-d-maintenance-object-native-v1` 保留实际argv/source-binding及17个制品摘要。原目录FD模式、原资源及源文件前后不变，两自有容器/网络/子进程组释放，cleanup错误为空；旧容器ID/镜像/卷保留，本次选定State/RestartCount元数据无差异。该轮没有执行五表恢复；后续恢复原生证明按新源码独立登记，不改签这13项。生产102/40全量材料、持续冻结、正式服务启动、30/60分钟/RPO0与业务验收仍未完成，不由50.325秒的小型合成夹具推定生产预算。
+#### 当前 format2 固定对象恢复
+
+当前工具源码与实际原生编译为 `e125fff48364e1a0833f8f9f96f62135c3a77310`，状态为 `synthetic_capture_restore_native_verified / production_pending`。D 执行源仍为 `c335b2a1`，286原资源摘要仍为 `20e0096f...254c4d`；未发布的 format1 材料不进入恢复。`inspect/capture` 仅接受 clean102/40，`verify-target` 仅接受 clean103/40且五表全缺失；后者还逐项核对材料中八张现代保留表的原DDL、完整逐PK摘要与同RR COUNT/EOF。八表固定为 `operators`、`testee`、`clinician`、`operator_retirement_tasks`、`operator_recovery_archives`、`actor_stores`、`clinician_store_history`、`testee_store_history`，不扩称全库或跨库原子快照。大值原值与摘要均受相同每值/整行CASE限额保护；原始五表正文/NULL与账本保存方式、全部硬上限和有限COUNT预算保持上述边界。
+
+`restore` 需要外部冻结的原始材料SHA和独立批准SHA。首次只接受103dirty的0..5合法DROP前缀，或103clean五表全缺失；仍在的suffix必须逐DDL/PK/原值吻合。首次材料canonical绝对路径、SHA、身份、初始缺表集、操作截止和首runtime marker由持久first-boundary固定，不能换名复制或用新Operation延长期限/扩大范围。64KiB/最多128条的durable operation journal与每操作claim双向闭合，缺损/旧Operation/未知状态拒绝，不重建或自动重试。
+
+恢复按DROP逆序仅CREATE原先缺失表，DDL只从编译内原075/078与已资格的三种collation派生，不执行材料SQL。MySQL8.0.36的独立15形状实测确认：0900保持原字节；general/unicode的固定char/varchar/longtext列显式重复同表COLLATE。未知、混合、缺失列COLLATE或额外charset/CHECK/索引仍拒绝，不能normalize放过漂移。续跑仅允许原初缺表集合中至多一张当前表含原rows子集；只补缺PK、逐原始字节填回，每batch最多100行/1MiB，无覆盖、REPLACE或whole-row改写。每次写与锁等待后的COMMIT前均重核原marker/首次绝对期限；五表、八现代保留事实及身份完整通过后，最后在事务中回放原完整102账本。COMMIT回应丢失维持unknown，不能把本地 `sql.ErrTxDone` 当服务器abort ACK，也不自动重试恢复。
+
+`verify-restored` 是独立只读终态证明：仍绑定同一材料、已消费批准、journal和首次deadline，核原clean102/40、五表原DDL/全原值、八表保留摘要、原SQL账本与Mongo原BSON/UUID。未知COMMIT结果可显式读取证明，不能改成自动回放。首个新runtime启动命令发出后禁止旧材料回放；生产停写、全部写入者与在途责任、marker写入时机及窗口批准由外部执行批次承担，工具不凭marker尚不存在自签已冻结。
+
+该源码在独占 MySQL8.0.36/Mongo7.0.31 rs0 上实际通过46项（15顶层+31子项），每项恰一次RUN/PASS、0FAIL/SKIP、exit0，耗时189.105秒；回执 `cee7384789c2318dbd55a3fe7448c4a6fe5de0cd20dd921edd5b6f1f295ccc50`，原JSONL `dc591f3f2fab012b61e1f59abe67eef6e648adee02852565781986316e02ba91`。包括dirty前缀0..5/clean全缺、三collation完整原值恢复、五个真实CREATE成功ACK丢失、跨100行batch提交丢响应续跑、原账本COMMIT unknown后的新鲜只读证明、实际锁等待中marker阻COMMIT及服务器ROLLBACK ACK、权限/账本失败/外来partial/批准边界拒绝。现代人员样本通过真实domain/repository Begin/Finish/Recover及FindTask/FindRecovery校验和原payload历史字节比对；不代表外部IAM或真实参与者业务验收。
+
+该轮编译source/42输入前后相同，28个原制品摘要可复核；两个owned容器、网络和子进程组精确释放、cleanup为空，旧IDs/images/volumes保留。原NSQ同CID自行Restart2986→2990且仍unhealthy，因此不签全旧runtime稳定。早前v3..v6的失败原件保留；v6未保存实际漂移DDL，不能把后续15形状倒签为其已采集原因。独立 `731af` 形状诊断Go实际1RUN/PASS/exit0，但wrapper解析test2json长Output分片后exit1，原回执 `062fce25...85cc8` 与本地独立重组分析分别保留，不机械重跑改绿。
+
+普通/race各191项与编译/vet/lint通过；整合 actual main `8c24e0199` 后42个D输入逐字桥接该原生来源，不把这轮native改签为后续merge或CI头。现有CI追加独立fresh D Mongo阶段，实际checkout SHA编译并逐46名/真实依赖sentinel验收，A47/B37/metadata门禁保留；新head CI仍待实际运行。生产102/40全量材料与容量、连续冻结、旧/新正式镜像及三服务启动、实际恢复、30/60分钟/RPO0和业务验收继续未完成。未在本轮进行生产停启、DDL、发布或新数据生成。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 
