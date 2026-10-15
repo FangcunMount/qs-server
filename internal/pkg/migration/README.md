@@ -169,6 +169,22 @@ D 当前材料为 format3，固定增加同数据库的 `m4_d_runtime_boundary` 
 
 CI-only `fc40b4a7ea3a02ddfedef763fca905f6345bc36d` 将 metadata/A/B/C/D53/第二D 六个 fresh 阶段完整保留，第二D以同一8分钟命令显式选择代次12和只读9，逐日志53/21及同源 union74严格逐名 RUN/PASS、0FAIL/SKIP；旧65名单与顺序不变。外层90分钟来自6×8分钟测试＋6×3分钟就绪等待＋20分钟准备/证明/清理=86分钟向上取整，不改生产30/60分钟窗口。实际 configcontract普通/race各100项、目标28项、7个真实 shell mock 流程、15YAML/184bash/8嵌入Python语法、actionlint、vet/pinnedlint通过（QA `888aadc183f801ed2ec1db1e40515ecd1e13a394eea3256457ae22e7cd448b41`）；可选 ShellCheck/pyflakes 未运行。当前新head完整74和 hosted CI/AI仍待，生产暂停、材料/冻结/正式六实例/30/60分钟/RPO0/业务验收继续未闭。
 
+#### D 同一已提交意图的幂等核实（源码与独立CI准备）
+
+源码 `6ed3be19efc2a15335c6b374e8855f264ff65e1a` 新增 `--action=complete-first-runtime`，保留原material/capture执行证明/runtime-intent及各rawSHA输入，另需当前独立 `--completion-approval-file` / `--completion-approval-sha256`；其他action连显式空的新参数也拒绝。当前批准format1/kind `m4_d_complete_committed_runtime_intent` 为32KiB以内的私有、literal完整JSON，绑定当前编译SHA、具名原ToolSource、原material/capture执行证明/intent SHA、固定D源/286资源、完整双库binding、实际已提交record kind/G/原rawSHA、mode/clean102或103、完整事实摘要、marker状态/SHA与当前冻结/责任。它最多有效20分钟，不能延长旧intent/恢复批准的deadline。跨source仅在此动作由当前批准明确绑定原source及已知format3，不新增旧source白名单或放宽旧mark/restore。
+
+原恢复批准、boundary/journal/claim只读验证已消费且scope闭合，不新消费或写journal。旧record没有保存恢复批准rawSHA，当前批准必须另绑所提供的原批准，不能声称仅凭DB知道旧进程实际传了哪一份文件。原record.Created仅为原应用构造时间，不是COMMIT观察时间；历史scope合格和当前核实不能把旧unknown/丢输出/旧窗口改签成功。
+
+同一pinned连接GET_LOCK内，先核固定schema/唯一canonical row、G=原捕获N+1、Previous/原material/intent/tool/resource全部精确一致，再复用现有D DTO与reader前后各作完整只读RR事实投影：102核五表原DDL/值、103核五表全缺，均核八保留表完整原摘要/EOF/count、SQL完整账本/会话与Mongo原BSON/UUID/身份。原材料不改成新source/代次来骗过旧verify。无record、dirty、未知/外来schema、N+2、事实漂移或释放未知均失败；不advance、DDL、reset、restore或启动业务。
+
+若批准absent，只能O_EXCL持久写新kind `m4_d_completed_committed_runtime_boundary` 的确定marker；仅编码同已提交record/G/原文指纹、原source/material/intent/身份/固定资源与原record.Created，不编码当前批准、operation、当前source或新时间，不冒充无法重建的旧marker原字节。批准same_existing只读核完整旧/新marker原byte/SHA，不重编码/重签；partial/foreign保持阻断。absent在文件已存在后拒绝，不自动转same_existing；same_existing在当前期限内可重复幂等核实，不承诺当前批准至多一次，不新建completion消费claim/journal/DB状态。旧restore仍被any-existing marker及stale代次关闭。
+
+全部真实gate/事务/Conn/pool/Mongo释放、固定输入和marker终态复读、原总预算通过后才输出可选typed `runtime_completion`：`authorization_mode=idempotent_current_fact_confirmation`、`business_start_authorized=false`。旧ApprovalConsumed、MarkerWritten、DBadvance字段均false，新receipt不改旧unknown。capture原stdout编码不变，并拒新pointer任何出现（含null/0）。正式controller必须另行适配该action/当前批准并按DB身份+G/F+原intent持久去重；当前CLI不是业务启动许可，没有正式dispatcher资格不能标启动闭环完成。
+
+正常merge `e5c019008744591c1f64dbd2cae8842c397f33da` 整合实际main `3175474a9fb96e10e33212c4c6cbdb555bd2e9ac`，own7文件等6ed、其余4012 incoming路径等317。独立CI `1b58651863e03ff319623b9b7c47d27fc8f2cefb` 保留旧A47/B37/C30和D74两fresh阶段/完整proof/union74原字节；新 `^TestM4MaintenanceTablesCommittedRuntimeCompletionNative$` top+12child=13在独立fresh h Mongo/tmpfs、8分钟命令核每名exact RUN/PASS、0FAIL/SKIP、实际依赖/entry编译SHA和终态package PASS，新13不混union74。七阶段外层100分钟按7×8分钟测试+7×3分钟原就绪sleep+20分钟准备/证明/清理=97分钟向上取整，非失败后任意涨时限，原单操作/资源及生产30/60分钟不变。
+
+冻结工作字节的联合普通/race实际C248、D444、config154各一次RUN/PASS、0FAIL/SKIP，integration仅编译、普通/tagged vet与pinned2.5 lint、actionlint通过；7个新h-tail实际纯shell模拟与15YAML/184bash/9Python语法通过。QA `0a957eadadaf989567541bcc2f8cd54a7c75c0467eb7bdafdf935b8dc16e2c68` 保留source_base=e5及原argv/environment，字节桥接CI1b586不改签；CI纯证明 `f2ca3b6e566cd53a5033d04c95be8eb224d8033e848a8f891f88c19219816103` 仅证明源码/反例流，不是数据库或正式实例。原24份D测试/74名单/286资源逐字保留；新13、此head原74真实DB、hosted CI/AI、真实旧工具与新binary跨source及正式controller去重均待独立验收。生产暂停、完整材料/持续冻结/正式六实例/30/60分钟/RPO0与业务验收不因源码准备关闭。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 
