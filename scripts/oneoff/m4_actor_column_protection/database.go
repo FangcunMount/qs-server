@@ -40,7 +40,7 @@ func primaryReplicaHosts(raw bson.Raw) ([]string, error) {
 	set, setOK := raw.Lookup("setName").StringValueOK()
 	primary, primaryOK := raw.Lookup("isWritablePrimary").BooleanOK()
 	message := raw.Lookup("msg")
-	if set != "rs0" || !setOK || !primaryOK || !primary || (message.Type != 0 && (message.Type != bson.TypeString || message.StringValue() != "")) {
+	if !setOK || set == "" || !primaryOK || !primary || (message.Type != 0 && (message.Type != bson.TypeString || message.StringValue() != "")) {
 		return nil, errors.New("mongo_cluster_unknown")
 	}
 	a, ok := raw.Lookup("hosts").ArrayOK()
@@ -66,6 +66,16 @@ func primaryReplicaHosts(raw bson.Raw) ([]string, error) {
 		}
 	}
 	return hosts, nil
+}
+
+func mongoSelectedIdentity(raw bson.Raw, selected string) (string, error) {
+	hosts, e := primaryReplicaHosts(raw)
+	if e != nil {
+		return "", e
+	}
+	set, _ := raw.Lookup("setName").StringValueOK()
+	encoded, _ := json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: set}, {Key: "hosts", Value: hosts}}, selected})
+	return fingerprint(encoded), nil
 }
 
 func readLedger(ctx context.Context, r sqlReader) ([]ledgerRow, error) {
@@ -135,12 +145,10 @@ func (d database) observe(ctx context.Context, r sqlReader) (out observation, er
 	if e != nil {
 		return out, errors.New("mongo_cluster_unknown")
 	}
-	hosts, e := primaryReplicaHosts(hello)
+	out.Binding.MongoIdentity, e = mongoSelectedIdentity(hello, d.binding.MongoName)
 	if e != nil {
 		return out, e
 	}
-	raw, _ = json.Marshal([]any{"mongodb_cluster_selected_v1", bson.D{{Key: "setName", Value: "rs0"}, {Key: "hosts", Value: hosts}}, d.binding.MongoName})
-	out.Binding.MongoIdentity = fingerprint(raw)
 	q, cancel = context.WithTimeout(ctx, queryLimit)
 	cur, e := d.mongo.Database(d.binding.MongoName).Collection("schema_migrations").Find(q, bson.D{}, options.Find().SetLimit(2).SetBatchSize(2))
 	if e != nil {
