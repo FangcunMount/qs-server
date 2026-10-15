@@ -58,7 +58,7 @@ func readCaptureEvidence(m material, materialHash, tool, path, hash string) erro
 }
 
 func validateCaptureReceipt(r receipt, m material, hash, tool string) error {
-	if r.DatabaseBoundary == nil || *r.DatabaseBoundary != m.RuntimeBoundary || r.DatabaseBoundaryRecord != nil || r.DatabaseBoundaryAdvanced || r.DatabaseBoundaryAdvanceUnknown {
+	if r.DatabaseBoundary == nil || *r.DatabaseBoundary != m.RuntimeBoundary || r.DatabaseBoundaryRecord != nil || r.DatabaseBoundaryAdvanced || r.DatabaseBoundaryAdvanceUnknown || r.InspectedSQLVersion != nil {
 		return errors.New("original_capture_receipt_not_successful")
 	}
 	if r.Action != "capture" || !r.Complete || !r.ReadOnly || r.Error != "none" || r.ReleaseError != "" || !nonzeroHash(hash) || r.MaterialHash != hash || r.ToolSource != tool || r.ToolSource != m.ToolSource || r.DSource != dSource || r.DResources != dResources || r.DResourceFiles != dResourceFiles || !r.SQLSnapshot || !r.MandatoryEOF || !r.RetainedEOF || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || r.BudgetExceeded || r.TransactionReleaseUnproven || r.ProductionFreezeCertified || r.CrossDatabaseAtomicRR || r.ApprovalConsumed || r.RuntimeGateAcquired || r.RuntimeGateReleased || r.RuntimeGateReleaseUnproven || r.MarkerWritten || r.MarkerWriteUnknown || r.MarkerHash != "" || len(r.TableCounts) != len(m.Tables) || len(r.RetainedCounts) != len(m.Retained) {

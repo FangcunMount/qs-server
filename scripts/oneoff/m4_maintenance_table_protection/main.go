@@ -62,6 +62,7 @@ type receipt struct {
 	DatabaseBoundaryRecord         *runtimeBoundaryRecord `json:"runtime_database_boundary_record,omitempty"`
 	DatabaseBoundaryAdvanced       bool                   `json:"runtime_database_boundary_advanced"`
 	DatabaseBoundaryAdvanceUnknown bool                   `json:"runtime_database_boundary_advance_unknown"`
+	InspectedSQLVersion            *uint64                `json:"inspected_sql_version,omitempty"`
 }
 
 func parseArgs(args []string) (arguments, error) {
@@ -299,6 +300,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	d := database{binding: a.binding}
 	ok := false
 	var rawMaterial []byte
+	var inspectedSQLVersion uint64
 	defer func() {
 		released := true
 		if d.gate != nil {
@@ -371,6 +373,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			r.Error = "total_budget_exceeded"
 			r.BudgetExceeded = true
 			return
+		}
+		if a.action == "inspect" {
+			r.InspectedSQLVersion = &inspectedSQLVersion
 		}
 		r.Complete, r.Error = true, "none"
 	}()
@@ -449,6 +454,13 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	if a.action == "verify-target" {
 		version = 103
 	}
+	if a.action == "inspect" {
+		version, e = readInspectionVersion(ctx, d.conn)
+		if e != nil {
+			r.Error = e.Error()
+			return r
+		}
+	}
 	m, e := d.snapshot(ctx, tool, version, a.action != "inspect")
 	if e != nil {
 		r.Error = strings.Split(e.Error(), "\n")[0]
@@ -466,6 +478,7 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 			return r
 		}
 		r.DatabaseBoundaryRecord = current.Record
+		inspectedSQLVersion = version
 	}
 	if a.action == "capture" {
 		m.CapturePath = a.capture
