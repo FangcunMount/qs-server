@@ -26,7 +26,7 @@ type captureExecution struct {
 func (input captureEvidenceInput) check(m material, materialHash, tool string) error {
 	raw, e := readPrivate(input.path, input.hash, maxCaptureExecutionBytes)
 	var execution captureExecution
-	if e != nil || decodeCaptureDocument(raw, &execution, []string{"format_version", "kind", "receipt_file", "receipt_sha256", "termination", "exit_code"}, nil) != nil || execution.Format != 1 || execution.Kind != "m4_b_capture_execution" || !absolutePath(execution.ReceiptFile) || !nonzeroHash(execution.ReceiptHash) || execution.Termination != "exited" || execution.ExitCode == nil || *execution.ExitCode != 0 {
+	if e != nil || decodeCaptureDocument(raw, &execution, []string{"format_version", "kind", "receipt_file", "receipt_sha256", "termination", "exit_code"}) != nil || execution.Format != 1 || execution.Kind != "m4_b_capture_execution" || !absolutePath(execution.ReceiptFile) || !nonzeroHash(execution.ReceiptHash) || execution.Termination != "exited" || execution.ExitCode == nil || *execution.ExitCode != 0 {
 		return errors.New("capture_execution_evidence_rejected")
 	}
 	raw, e = readPrivate(execution.ReceiptFile, execution.ReceiptHash, maxCaptureReceiptBytes)
@@ -46,7 +46,9 @@ func decodeCaptureReceipt(raw []byte, captured *receipt) error {
 	if json.Unmarshal(raw, &shape) != nil || len(shape.Counts) != len(captured.Counts) {
 		return errors.New("capture_receipt_count_shape_rejected")
 	}
-	return decodeCaptureDocument(raw, captured, captureReceiptFields, []string{"release_error_category", "restored_verification"})
+	// A successful capture omits both release errors and restored-state proof.
+	// Their presence cannot be part of the original successful CLI stdout.
+	return decodeCaptureDocument(raw, captured, captureReceiptFields)
 }
 
 var captureReceiptFields = []string{
@@ -74,7 +76,7 @@ func validateCaptureReceipt(r receipt, m material, materialHash, tool string) er
 
 // Only the new executor evidence and original stdout require this additional
 // duplicate-member check. The original material/approval encoding is unchanged.
-func decodeCaptureDocument(raw []byte, target any, required, optional []string) error {
+func decodeCaptureDocument(raw []byte, target any, required []string) error {
 	d := json.NewDecoder(bytes.NewReader(raw))
 	var walk func() error
 	walk = func() error {
@@ -108,17 +110,11 @@ func decodeCaptureDocument(raw []byte, target any, required, optional []string) 
 	if json.Unmarshal(raw, &fields) != nil {
 		return errors.New("capture_evidence_document_rejected")
 	}
-	allowed := make(map[string]bool, len(required)+len(optional))
+	allowed := make(map[string]bool, len(required))
 	for _, name := range required {
 		value, present := fields[name]
 		if !present || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			return errors.New("capture_evidence_required_member_missing")
-		}
-		allowed[name] = true
-	}
-	for _, name := range optional {
-		if value, present := fields[name]; present && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return errors.New("capture_evidence_null_member")
 		}
 		allowed[name] = true
 	}

@@ -270,6 +270,53 @@ func TestCaptureReceiptRequiresExactlyTwoOriginalCollectionCounts(t *testing.T) 
 	}
 }
 
+func TestCaptureReceiptRejectsFieldsOmittedFromSuccessfulStdout(t *testing.T) {
+	m := fixtureMaterial(t)
+	hash := strings.Repeat("c", 64)
+	var stdout bytes.Buffer
+	if exit := deliverReceipt(fixtureCaptureReceipt(m, hash), &stdout); exit != 0 {
+		t.Fatal("successful capture fixture did not produce original CLI stdout", exit)
+	}
+	original := append([]byte(nil), stdout.Bytes()...)
+	var fields map[string]json.RawMessage
+	if e := json.Unmarshal(original, &fields); e != nil {
+		t.Fatal(e)
+	}
+	for _, name := range []string{"release_error_category", "restored_verification"} {
+		if _, present := fields[name]; present {
+			t.Fatal("successful capture encoder emitted an inapplicable field", name)
+		}
+	}
+	for _, input := range []struct {
+		name, member string
+	}{
+		{"valid_absence", ""},
+		{"empty_release", `"release_error_category":""`},
+		{"nonempty_release", `"release_error_category":"owned_resource_release_unproven"`},
+		{"null_release", `"release_error_category":null`},
+		{"null_restored", `"restored_verification":null`},
+		{"object_restored", `"restored_verification":{}`},
+		{"array_restored", `"restored_verification":[]`},
+		{"string_restored", `"restored_verification":""`},
+		{"number_restored", `"restored_verification":0`},
+		{"bool_restored", `"restored_verification":false`},
+	} {
+		t.Run(input.name, func(t *testing.T) {
+			raw := append([]byte(nil), original...)
+			if input.member != "" {
+				raw = bytes.TrimSpace(raw)
+				raw = append(raw[:len(raw)-1], []byte(","+input.member+"}")...)
+			}
+			zero := 0
+			proof := freezeCaptureProcess(t, privateDir(t), raw, "exited", &zero)
+			e := proof.check(m, hash, testSource)
+			if input.member == "" && e != nil || input.member != "" && (e == nil || e.Error() != "capture_success_receipt_rejected") {
+				t.Fatal("capture evidence accepted fields its successful CLI encoder omits", input.name, e)
+			}
+		})
+	}
+}
+
 func TestCaptureEvidenceUsesPrivateOriginalFilesAndBothRawHashes(t *testing.T) {
 	m := fixtureMaterial(t)
 	hash := strings.Repeat("c", 64)
