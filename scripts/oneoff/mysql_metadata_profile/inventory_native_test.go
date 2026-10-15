@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"os"
 	"regexp"
 	"strconv"
@@ -61,7 +62,7 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		"ai_bridge_requests":                 "CREATE TABLE ai_bridge_requests(request_id VARCHAR(64) PRIMARY KEY,payload JSON NOT NULL,organization_id BIGINT UNSIGNED NULL,subject_id VARCHAR(128) NULL,testee_id BIGINT UNSIGNED NULL) ENGINE=InnoDB",
 		"ai_bridge_request_assessments":      "CREATE TABLE ai_bridge_request_assessments(request_id VARCHAR(64),assessment_id BIGINT UNSIGNED,PRIMARY KEY(request_id,assessment_id)) ENGINE=InnoDB",
 	}
-	exec := func(statement string, args ...any) {
+	exec := func(t *testing.T, statement string, args ...any) {
 		t.Helper()
 		if _, e := admin.ExecContext(ctx, statement, args...); e != nil {
 			t.Fatal("owned_inventory_fixture_statement_failed")
@@ -81,30 +82,30 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 			}
 		}
 	}()
-	exec("CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN NOT NULL) ENGINE=InnoDB")
-	exec("INSERT INTO schema_migrations VALUES(100,false)")
+	exec(t, "CREATE TABLE schema_migrations(version BIGINT UNSIGNED PRIMARY KEY,dirty BOOLEAN NOT NULL) ENGINE=InnoDB")
+	exec(t, "INSERT INTO schema_migrations VALUES(100,false)")
 	for _, name := range inventoryTables {
-		exec(ddl[name])
+		exec(t, ddl[name])
 	}
 	for _, user := range []string{"inventory_reader", "inventory_columns"} {
-		exec("CREATE USER `" + user + "`@`%` IDENTIFIED BY '" + password + "'")
+		exec(t, "CREATE USER `"+user+"`@`%` IDENTIFIED BY '"+password+"'")
 	}
-	exec("GRANT SELECT ON `" + cfg.Database + "`.* TO `inventory_reader`@`%`")
-	exec("GRANT SELECT ON `" + cfg.Database + "`.schema_migrations TO `inventory_columns`@`%`")
+	exec(t, "GRANT SELECT ON `"+cfg.Database+"`.* TO `inventory_reader`@`%`")
+	exec(t, "GRANT SELECT ON `"+cfg.Database+"`.schema_migrations TO `inventory_columns`@`%`")
 	for _, name := range inventoryTables {
 		columns := ""
 		if name == "testee" {
 			columns = " (id)"
 		}
-		exec("GRANT SELECT" + columns + " ON `" + cfg.Database + "`.`" + name + "` TO `inventory_columns`@`%`")
+		exec(t, "GRANT SELECT"+columns+" ON `"+cfg.Database+"`.`"+name+"` TO `inventory_columns`@`%`")
 	}
-	exec("INSERT INTO testee VALUES(1,NULL),(2,'null'),(3,'[]'),(4,'[\"native-private-tag\"]'),(5,'{\"native-private-body\":1}')")
-	exec("INSERT INTO operators VALUES(1,'[]','[]'),(2,'[\"a\"]','[\"b\"]'),(3,NULL,NULL),(4,'[\"α\",\"β\"]','[ \"α\", \"β\" ]')")
-	exec("INSERT INTO testee_store_migration_manifests VALUES('m1','applied'),('m2','rolled_back'),('m3','APPLIED')")
-	exec("INSERT INTO testee_store_migration_items VALUES('m1',1,'candidate'),('m1',2,'deferred'),('m2',3,'already_assigned'),('missing',4,'UNRECOGNIZED')")
-	exec("INSERT INTO testee_store_migration_reversions VALUES('m1',1),('m1',999)")
-	exec("INSERT INTO operator_retirement_manifests VALUES('o1','pending'),('o2','executing'),('o3','UNRECOGNIZED')")
-	exec("INSERT INTO clinician_operator_binding_archive VALUES(1,'o1'),(2,'missing')")
+	exec(t, "INSERT INTO testee VALUES(1,NULL),(2,'null'),(3,'[]'),(4,'[\"native-private-tag\"]'),(5,'{\"native-private-body\":1}')")
+	exec(t, "INSERT INTO operators VALUES(1,'[]','[]'),(2,'[\"a\"]','[\"b\"]'),(3,NULL,NULL),(4,'[\"α\",\"β\"]','[ \"α\", \"β\" ]')")
+	exec(t, "INSERT INTO testee_store_migration_manifests VALUES('m1','applied'),('m2','rolled_back'),('m3','APPLIED')")
+	exec(t, "INSERT INTO testee_store_migration_items VALUES('m1',1,'candidate'),('m1',2,'deferred'),('m2',3,'already_assigned'),('missing',4,'UNRECOGNIZED')")
+	exec(t, "INSERT INTO testee_store_migration_reversions VALUES('m1',1),('m1',999)")
+	exec(t, "INSERT INTO operator_retirement_manifests VALUES('o1','pending'),('o2','executing'),('o3','UNRECOGNIZED')")
+	exec(t, "INSERT INTO clinician_operator_binding_archive VALUES(1,'o1'),(2,'missing')")
 	max := "18446744073709551615"
 	for _, v := range []struct {
 		request                                   string
@@ -123,10 +124,10 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		if e != nil {
 			t.Fatal("owned_inventory_payload_failed")
 		}
-		exec("INSERT INTO ai_bridge_requests VALUES(?,?,?,?,?)", v.request, raw, v.indexedOrg, v.indexedSubject, v.indexedTestee)
+		exec(t, "INSERT INTO ai_bridge_requests VALUES(?,?,?,?,?)", v.request, raw, v.indexedOrg, v.indexedSubject, v.indexedTestee)
 	}
-	exec("INSERT INTO ai_bridge_request_assessments VALUES('r1',1),('r1',99),('r2',18446744073709551615),('r2',0),('r6',6),('orphan',7)")
-	open := func(user string) *sql.DB {
+	exec(t, "INSERT INTO ai_bridge_request_assessments VALUES('r1',1),('r1',99),('r2',18446744073709551615),('r2',0),('r6',6),('orphan',7)")
+	open := func(t *testing.T, user string) *sql.DB {
 		t.Helper()
 		copy := cfg
 		copy.User, copy.Password = user, password
@@ -140,16 +141,15 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		return db
 	}
 	b := binding{SHA: strings.Repeat("a", 40), RunID: "12345-1", Expected: hashText(cfg.Host, strconv.Itoa(cfg.Port), cfg.Database, uuid)}
-	read := func(user string) inventoryReceipt {
+	read := func(t *testing.T, user string) inventoryReceipt {
 		t.Helper()
-		db := open(user)
+		db := open(t, user)
 		r := releaseInventoryDatabase(db, probeInventory(ctx, db, cfg, b))
-		var remaining int
-		if admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.processlist WHERE USER=?", user).Scan(&remaining) != nil || remaining != 0 {
-			t.Fatal("owned_inventory_server_connection_not_released")
-		}
 		if r.ConnectionReleased == nil || !*r.ConnectionReleased || r.DatabaseReleased == nil || !*r.DatabaseReleased || r.PoolClosedVerified == nil || !*r.PoolClosedVerified {
 			t.Fatal("owned_inventory_release_unverified")
+		}
+		if remaining, observations, e := inventoryServerConnectionReleased(ctx, admin, user); e != nil {
+			t.Fatalf("owned_inventory_server_connection_not_released: remaining=%d observations=%d deadline=%t", remaining, observations, errors.Is(e, context.DeadlineExceeded))
 		}
 		raw, e := json.Marshal(r)
 		if e != nil {
@@ -166,7 +166,7 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		return r
 	}
 	t.Run("closed_nonzero_counts_duplicate_expected_and_complete_relations", func(t *testing.T) {
-		r := read("inventory_reader")
+		r := read(t, "inventory_reader")
 		if !r.Complete || r.QueryCount != 15 || r.ControlStatements != 3 || r.Measurements == nil {
 			t.Fatalf("native_inventory_incomplete:%s/%s", r.ErrorCategory, r.FailureStage)
 		}
@@ -190,40 +190,40 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		}
 	})
 	t.Run("real_column_privilege_denial_is_unknown", func(t *testing.T) {
-		r := read("inventory_columns")
+		r := read(t, "inventory_columns")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_permission_denied" || r.FailureStage != "testee_tags_partition" || r.QueryMySQLNumber == nil || *r.QueryMySQLNumber != 1143 {
 			t.Fatalf("native_inventory_column_denial_misclassified:%s/%s", r.ErrorCategory, r.FailureStage)
 		}
 	})
 	t.Run("missing_owned_object_is_not_zero", func(t *testing.T) {
-		exec("DROP TABLE testee_store_migration_reversions")
-		r := read("inventory_reader")
-		exec(ddl["testee_store_migration_reversions"])
-		exec("INSERT INTO testee_store_migration_reversions VALUES('m1',1),('m1',999)")
+		exec(t, "DROP TABLE testee_store_migration_reversions")
+		r := read(t, "inventory_reader")
+		exec(t, ddl["testee_store_migration_reversions"])
+		exec(t, "INSERT INTO testee_store_migration_reversions VALUES('m1',1),('m1',999)")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "object_shape_rejected" || r.QueryCount != 3 {
 			t.Fatal("native_inventory_missing_table_became_zero")
 		}
 	})
 	t.Run("noninnodb_owned_object_is_rejected", func(t *testing.T) {
-		exec("ALTER TABLE testee_store_migration_reversions ENGINE=MyISAM")
-		r := read("inventory_reader")
-		exec("ALTER TABLE testee_store_migration_reversions ENGINE=InnoDB")
+		exec(t, "ALTER TABLE testee_store_migration_reversions ENGINE=MyISAM")
+		r := read(t, "inventory_reader")
+		exec(t, "ALTER TABLE testee_store_migration_reversions ENGINE=InnoDB")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "object_shape_rejected" {
 			t.Fatal("native_inventory_nonsnapshot_engine_accepted")
 		}
 	})
 	t.Run("dirty_or_other_head_is_rejected", func(t *testing.T) {
 		for _, state := range []struct{ version, dirty int }{{100, 1}, {101, 0}} {
-			exec("UPDATE schema_migrations SET version=?,dirty=?", state.version, state.dirty)
-			r := read("inventory_reader")
+			exec(t, "UPDATE schema_migrations SET version=?,dirty=?", state.version, state.dirty)
+			r := read(t, "inventory_reader")
 			if r.Complete || r.Measurements != nil || r.ErrorCategory != "migration_pair_rejected" || r.QueryCount != 2 || r.TransactionReleased != nil {
 				t.Fatal("native_inventory_old_or_dirty_head_accepted")
 			}
 		}
-		exec("UPDATE schema_migrations SET version=100,dirty=false")
+		exec(t, "UPDATE schema_migrations SET version=100,dirty=false")
 	})
 	t.Run("same_rr_snapshot_with_concurrent_actor_and_ai_changes", func(t *testing.T) {
-		db := open("inventory_reader")
+		db := open(t, "inventory_reader")
 		defer func() {
 			if db.Close() != nil {
 				t.Error("owned_snapshot_database_release_failed")
@@ -256,11 +256,11 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		if _, e = readinessRows(ctx, conn, inventoryTesteeTagsPartitionSQL, 7); e != nil {
 			t.Fatal("owned_snapshot_initial_read_failed")
 		}
-		exec("UPDATE testee SET tags='[]'")
-		exec("UPDATE operators SET effective_roles=roles")
-		exec("DELETE FROM ai_bridge_request_assessments")
-		exec("DELETE FROM ai_bridge_requests")
-		exec("UPDATE schema_migrations SET version=101")
+		exec(t, "UPDATE testee SET tags='[]'")
+		exec(t, "UPDATE operators SET effective_roles=roles")
+		exec(t, "DELETE FROM ai_bridge_request_assessments")
+		exec(t, "DELETE FROM ai_bridge_requests")
+		exec(t, "UPDATE schema_migrations SET version=101")
 		for _, statement := range []struct {
 			query  string
 			fields []string
@@ -291,13 +291,13 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 		if e != nil || readinessClean100(ledger) {
 			t.Fatal("owned_live_ledger_was_hidden_after_rollback")
 		}
-		exec("UPDATE schema_migrations SET version=100")
+		exec(t, "UPDATE schema_migrations SET version=100")
 	})
 	t.Run("empty_all_objects_is_complete_observation", func(t *testing.T) {
 		for _, name := range inventoryTables {
-			exec("DELETE FROM `" + name + "`")
+			exec(t, "DELETE FROM `"+name+"`")
 		}
-		r := read("inventory_reader")
+		r := read(t, "inventory_reader")
 		if !r.Complete || r.Measurements == nil {
 			t.Fatalf("native_inventory_empty_incomplete:%s/%s", r.ErrorCategory, r.FailureStage)
 		}
@@ -309,4 +309,28 @@ func TestRetirementInventoryNativeOwnedMySQL(t *testing.T) {
 			}
 		}
 	})
+}
+
+// The driver sends COM_QUIT and closes the local socket without waiting for the
+// server to remove its thread. Observe that independent fact within the original
+// test deadline and at most queryLimit; never retry the inventory or kill a session.
+func inventoryServerConnectionReleased(parent context.Context, admin *sql.DB, user string) (remaining, observations int, err error) {
+	ctx, cancel := context.WithTimeout(parent, queryLimit)
+	defer cancel()
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		observations++
+		if err = admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.processlist WHERE USER=?", user).Scan(&remaining); err != nil {
+			return remaining, observations, err
+		}
+		if remaining == 0 {
+			return remaining, observations, nil
+		}
+		select {
+		case <-ctx.Done():
+			return remaining, observations, ctx.Err()
+		case <-tick.C:
+		}
+	}
 }
