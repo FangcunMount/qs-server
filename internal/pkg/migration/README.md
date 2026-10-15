@@ -94,6 +94,16 @@ D 定向工具 `scripts/oneoff/m4_maintenance_table_protection` 在最初只读�
 
 普通/race各191项与编译/vet/lint通过；整合 actual main `8c24e0199` 后42个D输入逐字桥接该原生来源，不把这轮native改签为后续merge或CI头。现有CI追加独立fresh D Mongo阶段，实际checkout SHA编译并逐46名/真实依赖sentinel验收，A47/B37/metadata门禁保留；新head CI仍待实际运行。生产102/40全量材料与容量、连续冻结、旧/新正式镜像及三服务启动、实际恢复、30/60分钟/RPO0和业务验收继续未完成。未在本轮进行生产停启、DDL、发布或新数据生成。
 
+#### D 首 runtime 与恢复 DDL 的互斥（源码准备，原生待验）
+
+PR #376 原源码的每次 CREATE 前 marker 检查不能排除命令等待 metadata lock 期间首 runtime 边界出现；CREATE 隐式提交后的检查不能撤回该 DDL。上述 `e125` 的46项实际证明按原来源保留，不证明下述新互斥。D 工具新增实际 CLI `--action=mark-first-runtime`，与 `restore` 共用固定 D domain、SQL实例身份及选定数据库组成的完整 SHA256 `GET_LOCK` key；key 不含材料、Operation、路径、截止或工具源码，换材料不能分裂同库互斥。两动作在同一 pinned SQL Conn 上取得并核实所有权；恢复持锁跨 CREATE 的隐式提交及原账本事务，marker 作者持锁至私有文件 O_EXCL、文件与目录 fsync、原字节读回完成。只有实际 `RELEASE_LOCK=1` 回应才签服务端释放，本地连接/池关闭不替代该证明；命令/释放未知保持失败和 unproven，不自动重试。
+
+marker 作者使用原有双库名字及身份/账本UUID参数、`--material-file` / `--material-sha256`，另需 `--runtime-intent-file` / `--runtime-intent-sha256`。独立冻结的 strict intent 最多32KiB，绑定 compiled source、固定D执行源/286资源、原材料canonical路径/raw SHA、双库身份、具名操作、持续停写与责任回执、窗口起点/批准时刻/绝对截止/失效时刻和首启动未发命令声明。其三种模式仅为：`target103` 完整核验 clean103/40 及五表全缺和八表原事实；`restored102` 同时需要原已消费恢复批准的 file/raw SHA、原journal/首次期限及 clean102/40 的全部原事实；`cancel102` 需要独立明确未派发 offline apply，拒绝已有恢复状态，完整核验 clean102/40 原事实。正常目标的截止不超过原窗口30分钟，恢复模式沿原首次恢复截止，取消模式亦受独立有限截止约束；声明不替代实际六实例与其他写入者停写证据。
+
+首 marker 固定为原捕获材料目录内的 `first-runtime`，恢复批准中的 marker 也必须等于此派生路径，不接受旧自选路径。锁内前后重读原材料/原intent及相应恢复批准，只有完整状态证明后才生成固定marker内容；已有、部分写入或写入结果未知的 marker 均不删除或覆盖，保守关闭旧材料回放。D 后续控制器必须调用此作者并取得成功回执后才发首 runtime 命令；旧独立 `touch`、只探锁后释放再写文件或 A 既有 marker 作者不属于本 D 互斥协议。本动作只写首边界文件，不启动容器、业务进程或执行D退役迁移，生产批次批准仍另行完成。
+
+新增原生顶层 `TestM4MaintenanceTablesNativeFirstRuntimeGate` 及六子场景准备正常103/原102准入、真实 FTWRL/CREATE 等待阻 marker、marker先到的恢复拒绝、实际服务端会话仍存活时本地取消、RELEASE回应未知。原46顺序保留，合计53项数据库事件；当前只完成源码与编译准备，未执行这些新增数据库断言，不宣称已取得生产恢复、并发或窗口资格。
+
 D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按批准保留期与责任保留。
 
 

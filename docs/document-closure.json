@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+    "sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -4477,7 +4477,7 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -4749,18 +4749,56 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
-          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_gate.go",
+          "selector": "func acquireRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_intent.go",
+          "selector": "func (d database) markFirstRuntime(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeFirstRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
+          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
           "verified_on": "2026-10-15"
         }
       ],
@@ -4790,7 +4828,10 @@
           "M4-D final tool source e125fff48364e1a0833f8f9f96f62135c3a77310 (fixed D c335/286 resources) actually passed all46 exact native names once RUN/PASS,0FAIL/SKIP/exit0,189.105s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt cee7384789c2318dbd55a3fe7448c4a6fe5de0cd20dd921edd5b6f1f295ccc50 and JSONL dc591f3f2fab012b61e1f59abe67eef6e648adee02852565781986316e02ba91 preserve actual harness argv and128 safe action receipts. No normalized replay argv is recorded as executed. Two owned containers/network/native process group were exactly released, cleanup empty; old CID/image/volume preserved, pre-existing nsqd Restart2986->2990 means old runtime stability is not signed. Current format2 includes5 raw tables plus8 retained modern table hashes, bounded restore/first-boundary/journal and fresh readonly verify-restored. Production full materials/capacity/freeze/formal images/full runtime/30-60min/RPO/business remain unverified.",
           "D integration merge2a4d54036af9a99269e3d93bbef26d8c976c2252 preserves actual main8c24e01992749727c1684c73f5eef719a26b4a0b and e125 native-source parents. All42 D package inputs including15 independently observed SHOW CREATE goldens remain byte-identical to actual e125 native. CI taske19d6bba3 adds a fresh D phase with exact46/actual compiled checkout/dependency source proof and a60min total job budget, retaining original A47/B37/metadata gates and8min per suite. Neither historical local native nor existing CI is renamed to this integrated or final head; fresh CI is still required. No production signoff is changed.",
           "Complete parent verified marker retained from e125fff48364e1a0833f8f9f96f62135c3a77310: {\"source_sha\":\"1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0\",\"verified_on\":\"2026-10-15\"}",
-          "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}"
+          "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\",\"verified_on\":\"2026-10-15\"}",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical selector retained after exact53 replacement; complete original verification: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted."
         ]
       },
       "gaps": [
@@ -11030,7 +11071,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11652,18 +11693,56 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
-          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_gate.go",
+          "selector": "func acquireRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_intent.go",
+          "selector": "func (d database) markFirstRuntime(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
+          "selector": "func TestM4MaintenanceTablesNativeFirstRuntimeGate(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
+          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(",
+          "result": "matched",
+          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
+          "result": "passed",
+          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
           "verified_on": "2026-10-15"
         }
       ],
@@ -11723,7 +11802,10 @@
           "M4-D final tool source e125fff48364e1a0833f8f9f96f62135c3a77310 (fixed D c335/286 resources) actually passed all46 exact native names once RUN/PASS,0FAIL/SKIP/exit0,189.105s on owned MySQL8.0.36/Mongo7.0.31rs0. Receipt cee7384789c2318dbd55a3fe7448c4a6fe5de0cd20dd921edd5b6f1f295ccc50 and JSONL dc591f3f2fab012b61e1f59abe67eef6e648adee02852565781986316e02ba91 preserve actual harness argv and128 safe action receipts. No normalized replay argv is recorded as executed. Two owned containers/network/native process group were exactly released, cleanup empty; old CID/image/volume preserved, pre-existing nsqd Restart2986->2990 means old runtime stability is not signed. Current format2 includes5 raw tables plus8 retained modern table hashes, bounded restore/first-boundary/journal and fresh readonly verify-restored. Production full materials/capacity/freeze/formal images/full runtime/30-60min/RPO/business remain unverified.",
           "D integration merge2a4d54036af9a99269e3d93bbef26d8c976c2252 preserves actual main8c24e01992749727c1684c73f5eef719a26b4a0b and e125 native-source parents. All42 D package inputs including15 independently observed SHOW CREATE goldens remain byte-identical to actual e125 native. CI taske19d6bba3 adds a fresh D phase with exact46/actual compiled checkout/dependency source proof and a60min total job budget, retaining original A47/B37/metadata gates and8min per suite. Neither historical local native nor existing CI is renamed to this integrated or final head; fresh CI is still required. No production signoff is changed.",
           "Complete parent verified marker retained from e125fff48364e1a0833f8f9f96f62135c3a77310: {\"source_sha\":\"1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0\",\"verified_on\":\"2026-10-15\"}",
-          "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}"
+          "Complete parent verified marker retained from 8c24e01992749727c1684c73f5eef719a26b4a0b: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "Historical selector retained after exact53 replacement; complete original verification: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact46(\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D first-runtime gate source reviewed at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7. Actual source-QA ordinary/race214 each passed on precommit bytes independently bridged47 package inputs to 7f5f05f976dfad9239183ac56a8aa52e07f3244b; compile/vet/lint also passed. Original46 evidence remains at e125 and does not qualify changed runtime gate. New exact53 includes actual server MDL/session/unknown-release cases but has not yet run. Only the admitted mark-first-runtime CLI shares the fixed SQL database GET_LOCK with restore; external marker writers are outside this protocol. No production, full window, RPO or business signoff is granted."
         ]
       },
       "gaps": []
@@ -13088,7 +13170,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13692,7 +13774,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required."
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
         ]
       },
       "gaps": []
@@ -13811,7 +13895,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14226,7 +14310,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required."
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
         ]
       },
       "gaps": [
@@ -14245,7 +14331,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14521,7 +14607,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
-          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required."
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
         ]
       },
       "gaps": [
@@ -14547,7 +14635,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
+        "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -14847,7 +14935,9 @@
           "CI-only source3fa468655a5d2a1a0a705d21055da46976b925bc changes only the authenticated native job overall timeout from15 to45minutes: three8minute test limits plus up to9minutes of fixed readiness sleeps and12minutes of setup/compile/proof/cleanup allowance. It does not extend any test/tool deadline, alter m/a/b owned lifecycle/state/resource/cleanup, change A47/B37 selectors, or change Go/SQL. The45minute job deadline is a finite CI scheduling budget, not proof that every external Docker call completes or that cleanup succeeded. Relevant configcontract and actionlint/ShellCheck passed; this task did not run local native. Original fb882 CI/AI evidence remains bound tofb882, whose new P2 job-budget finding is retained; the new exact head requires fresh CI and AI before merge, without automatic retries or production qualification.",
           "Historical CI budget selector retained as complete original JSON; current D job budget is60: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
           "Prior complete verified marker retained before D shared-workflow review: {\"source_sha\":\"6186df273482c5c3fd3e802fd0659d867c639c3f\",\"verified_on\":\"2026-10-15\"}",
-          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required."
+          "D CI task e19d6bba3fd3d025e896538e2f2ada668241637c only extends the shared workflow with a later fresh D phase and60min overall job budget/private D TMPDIR. Existing metadata/A47/B37 commands, exact proof lists, dependencies and per-suite8min budgets remain byte-identical; no source, native, CI or production evidence for this document is relabelled or upgraded. The previous verified baseline and every verification remain retained. Fresh final-head CI remains required.",
+          "Prior verified marker preserved before D runtime gate review: {\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
+          "D CI53 source review at b8e44f2bb1f7778332a667ec9d0cbc063d6070c7 preserves ordinary go test scope/exit codes and original A47/B37/metadata phases; only bounded failure diagnostics and D selector53 were added. No runtime or production state was reverified."
         ]
       },
       "gaps": [
