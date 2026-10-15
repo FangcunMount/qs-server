@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
+    "sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
     "verified_on": "2026-10-15"
   },
   "status_policy": {
@@ -10925,7 +10925,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
+        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -11385,6 +11385,14 @@
           "result": "matched",
           "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
+          "result": "matched",
+          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -11421,7 +11429,8 @@
           "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
           "Source review3e7791b0d0664501a16b09ca5f30ff2bde70a993: only the A-only protection tool and its explicit47 required native selectors changed. This document's offline/migration/metadata modes, resources and execution semantics remain unchanged. This source/selector review does not relabel historical commands, native evidence, production refs or signoffs.",
-          "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof."
+          "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
         ]
       },
       "gaps": []
@@ -12786,7 +12795,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
+        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13272,6 +13281,14 @@
           "result": "matched",
           "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
+          "result": "matched",
+          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13285,7 +13302,8 @@
           "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
           "Source review3e7791b0d0664501a16b09ca5f30ff2bde70a993: only the A-only protection tool and its explicit47 required native selectors changed. This document's offline/migration/metadata modes, resources and execution semantics remain unchanged. This source/selector review does not relabel historical commands, native evidence, production refs or signoffs.",
-          "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof."
+          "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
         ]
       },
       "gaps": []
@@ -13404,7 +13422,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
+        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13685,6 +13703,14 @@
           "result": "matched",
           "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
+          "result": "matched",
+          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13714,7 +13740,8 @@
           "Source review94ab3a7cf090839da5283c7f09e9b7653f92b0e0: the only CI change since prior verified31b is the A object native required list adding four cross-charset children and two top-level selectors plus its diagnostic print. This document's existing offline/migration/metadata execution path and selector remain unchanged. Verification is a current source/CI-reference review only; all prior command/native and production records retain their original source and meaning, without a new runtime or production signoff.",
           "Source review5309241f9e79341f7c44ed94c8084fce4864148d: the related CI change requires the new A-tool DDL deadline selectors; this document's offline/migration/metadata execution path and selectors remain unchanged. This is a source and selector review only. Existing command, native and production records remain bound to their original sources, without a new runtime or production signoff.",
           "Source review3e7791b0d0664501a16b09ca5f30ff2bde70a993: only the A-only protection tool and its explicit47 required native selectors changed. This document's offline/migration/metadata modes, resources and execution semantics remain unchanged. This source/selector review does not relabel historical commands, native evidence, production refs or signoffs.",
-          "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof."
+          "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
         ]
       },
       "gaps": [
@@ -13733,7 +13760,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
+        "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
         "verified_on": "2026-10-15"
       },
       "fact_sources": [
@@ -13824,6 +13851,22 @@
           "result": "passed",
           "source_sha": "3e7791b0d0664501a16b09ca5f30ff2bde70a993",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": ".github/workflows/ci.yml",
+          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
+          "result": "matched",
+          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+          "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/oneoff/m4_sql_historical_protection/native_integration_test.go",
+          "selector": "assertOwnedRecoveryUnclaimed(t, h, args)",
+          "result": "matched",
+          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
+          "verified_on": "2026-10-15"
         }
       ],
       "production_evidence": {
@@ -13848,7 +13891,8 @@
           "Source3e7791b0d0664501a16b09ca5f30ff2bde70a993 prepares bounded full COUNT within the existing RR/action deadline, reverse outcome-to-assessment ADD and explicit fresh-operation continuation. Primary routing overrides URI read preference and hello proves actual typed primary while retaining identity bytes. The actual first canonical capture path anchors a private materialSHA boundary, the complete first approval except Operation, and operationSHA consumption containing the approval raw hash. Original marker, decision, deadline, expiry, freeze and responsibility cannot be reset; missing/corrupt boundary and moved material reject. Each ADD and ledger BEGIN/DELETE/INSERT/COMMIT rechecks immediately before the mutable call. Ordinary-race/tagged-vet/changed-code lint/actionlint passed;47 required native and capacity qualification are pending, not passed by compilation.",
           "The sole owned native38 attempt on source8517c6c9485cb4f888e48f2c7f87cbedc63461f6 failed before the new COUNT/continuation tops ran:27RUN/12PASS/13FAIL/0SKIP; same owned Mongo State actually reported Exit137 and OOMKilled=true. Exact runner termination triggered independent cleanup; two containers/network/volume absent, old IDs/images/volumes preserved but runtime metadata changed. Immutable receipt00e22650917275c83c2e210184b5eedae2acb2a4c58dba7dda566a14b778102b and native JSONL3633d8cb326ba720cc9625266227e18da411f177ec18a651640a6284b64bd5f7 remain failed evidence. No capacity run, new formal tool qualification, production mutation, RPO0 or30/60min signoff follows.",
           "CI-only sourceb87459069532d4fd214ae7aeeaf1446a58e3aaeb keeps all47 A native selectors and the same authenticated owned fixture flow, makes its Mongo memory/swap2GiB and WT0.25 explicit, and leaves the MySQL1GiB/default128MiB profile and product defaults unchanged. The A tool Go/SQL bytes remain identical to3e779, whose ordinary-race95RUN/PASS0FAIL/SKIP, tagged-vet, changed-code lint and actionlint actual QA are separately retained. This current source/CI-resource review is not new native or production proof.",
-          "Fixture-only source509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f additionally requires empty ReleaseError/no transaction-release uncertainty in every negative boundary case and all three actual close flags for the two cases that open clients before rejecting operation reuse. Pre-environment rejections retain unopened semantics. Product Go/SQL and ordinary tests remain byte-identical to3e779; its95-event ordinary proof is historical/component evidence. This is a source/fixture review only; complete final47 native and capacity qualification are still pending."
+          "Fixture-only source509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f additionally requires empty ReleaseError/no transaction-release uncertainty in every negative boundary case and all three actual close flags for the two cases that open clients before rejecting operation reuse. Pre-environment rejections retain unopened semantics. Product Go/SQL and ordinary tests remain byte-identical to3e779; its95-event ordinary proof is historical/component evidence. This is a source/fixture review only; complete final47 native and capacity qualification are still pending.",
+          "The test-only 5da54ff21 follow-up replaces two obsolete approval-filename consumption assertions with checks of the actual fixed material boundary and operation claim. Tagged race compilation (no tests run), tagged vet and incremental lint passed. This changes neither production Go nor SQL bytes, and does not qualify the pending current 47-event native matrix or capacity rehearsal."
         ]
       },
       "gaps": [
