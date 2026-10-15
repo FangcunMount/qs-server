@@ -63,6 +63,7 @@ func TestM4MaintenanceTablesNativeReadOnlyInspect(t *testing.T) {
 			}
 			reader := h.inspectionReader(name == "HiddenBoundary")
 			r := reader.action("inspect")
+			h.assertRestoreReleased(r)
 			failure := ""
 			switch name {
 			case "Dirty103", "Unknown104":
@@ -73,7 +74,6 @@ func TestM4MaintenanceTablesNativeReadOnlyInspect(t *testing.T) {
 				failure = "runtime_database_boundary_unknown"
 			}
 			if failure == "" {
-				h.assertRestoreReleased(r)
 				if !r.Complete || r.Error != "none" || r.InspectedSQLVersion == nil || *r.InspectedSQLVersion != version || !r.SQLSnapshot || r.DatabaseBoundary == nil || (r.DatabaseBoundaryRecord != nil) != committed {
 					t.Fatal("actual clean inspection did not prove its version and current record", r)
 				}
