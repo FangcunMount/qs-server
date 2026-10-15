@@ -39,11 +39,10 @@ func expectStoredRuntimeBoundary(mock sqlmock.Sqlmock, record runtimeBoundaryRec
 func TestLegacyMaterialCannotGuessInitialRuntimeBoundary(t *testing.T) {
 	m, _, _, _, _ := recoveryInputs(t)
 	m.Format = 1
-	raw, _ := json.Marshal(m)
 	// The independently supplied original SHA cannot upgrade a legacy format.
 	path := m.CapturePath + ".legacy"
 	m.CapturePath = path
-	raw, _ = json.Marshal(m)
+	raw, _ := json.Marshal(m)
 	if e := writeExclusive(path, raw); e != nil {
 		t.Fatal(e)
 	}
@@ -79,9 +78,10 @@ func TestRuntimeBoundaryAbsenceRequiresTypedMissingAndEmptyCatalog(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			db, mock := recoveryGateSQLMock(t)
 			err := error(&mysql.MySQLError{Number: 1146})
-			if name == "permission" {
+			switch name {
+			case "permission":
 				err = &mysql.MySQLError{Number: 1142}
-			} else if name == "wire" {
+			case "wire":
 				err = errors.New("missing table is not a typed server response")
 			}
 			mock.ExpectQuery(regexp.QuoteMeta(runtimeBoundaryShow)).WillReturnError(err)
