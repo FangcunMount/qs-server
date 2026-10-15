@@ -289,13 +289,7 @@ func TestM4SQLObjectNativeExistingEncodingMismatchRefusedBeforeClaim(t *testing.
 		t.Fatal("early mismatch refusal changed an object")
 	}
 	h.assertHead(101, true)
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--approval-file=") {
-			if _, e := os.Stat(strings.TrimPrefix(arg, "--approval-file=") + ".consumed"); !os.IsNotExist(e) {
-				t.Fatal("early mismatch refusal consumed authorization")
-			}
-		}
-	}
+	assertOwnedRecoveryUnclaimed(t, h, args)
 }
 func (h *nativeFixture) migrateSQL(source fs.FS, target uint) {
 	h.t.Helper()
@@ -535,13 +529,7 @@ func TestM4SQLObjectNativeOriginalDefinitionDriftRefused(t *testing.T) {
 				t.Fatal("early refusal changed the drifted original structure", e)
 			}
 			h.assertHead(101, true)
-			for _, arg := range args {
-				if strings.HasPrefix(arg, "--approval-file=") {
-					if _, e := os.Stat(strings.TrimPrefix(arg, "--approval-file=") + ".consumed"); !os.IsNotExist(e) {
-						t.Fatal("early definition refusal consumed authorization")
-					}
-				}
-			}
+			assertOwnedRecoveryUnclaimed(t, h, args)
 		})
 	}
 }
@@ -1326,4 +1314,31 @@ func waitOwnedCountStatement(t *testing.T, h *nativeFixture, pending bool, limit
 		time.Sleep(10 * time.Millisecond)
 	}
 	return false
+}
+
+func assertOwnedRecoveryUnclaimed(t *testing.T, h *nativeFixture, args []string) {
+	t.Helper()
+	var path, hash string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--approval-file=") {
+			path = strings.TrimPrefix(arg, "--approval-file=")
+		}
+		if strings.HasPrefix(arg, "--approval-sha256=") {
+			hash = strings.TrimPrefix(arg, "--approval-sha256=")
+		}
+	}
+	raw, e := readPrivate(path, hash, 32768)
+	var approved approval
+	if e != nil || strictDecode(raw, &approved) != nil {
+		t.Fatal("actual frozen approval unavailable for claim observation")
+	}
+	boundary, claim, e := recoveryPaths(h.material, h.materialHash, approved.Operation)
+	if e != nil {
+		t.Fatal("actual fixed recovery paths unavailable")
+	}
+	for _, ownedPath := range []string{boundary, claim} {
+		if _, e := os.Stat(ownedPath); !os.IsNotExist(e) {
+			t.Fatal("early refusal persisted original boundary or operation claim")
+		}
+	}
 }
