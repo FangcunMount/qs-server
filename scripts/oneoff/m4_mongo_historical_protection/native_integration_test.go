@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -35,6 +36,8 @@ import (
 )
 
 type nativeFixture struct {
+	witnessMu                                             sync.Mutex
+	indexEvents                                           []nativeIndexEvent
 	t                                                     *testing.T
 	name, dsn, uri, tool, dir, materialPath, materialHash string
 	root, db                                              *sql.DB
@@ -308,7 +311,8 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 	h.t.Helper()
 	args := []string{"--action=" + action, "--mysql-database=" + h.name, "--mongo-database=" + h.name, "--timeout=2m"}
 	args = append(args, extra...)
-	return run(h.t.Context(), args, func(key string) string {
+	start := h.indexEventCount()
+	r := run(h.t.Context(), args, func(key string) string {
 		if key == "QS_M4_OBJECT_MYSQL_DSN" {
 			return h.dsn
 		}
@@ -316,7 +320,12 @@ func (h *nativeFixture) action(action string, extra ...string) receipt {
 			return h.uri
 		}
 		return ""
-	}, h.tool)
+	}, h.tool, h.observeIndexes())
+	if rows := h.indexEventsFrom(start); len(rows) > 0 {
+		raw, _ := json.Marshal(rows)
+		h.t.Logf("test-only fixed createIndexes witness: %s", raw)
+	}
+	return r
 }
 func requirePhysicalReleased(t *testing.T, r receipt) {
 	t.Helper()
@@ -513,6 +522,8 @@ func (h *nativeFixture) assertOriginalTargetSpecs() {
 func assertDocuments(t *testing.T, before, after map[string][]bson.Raw) {
 	t.Helper()
 	if !reflect.DeepEqual(before, after) {
+		raw, _ := json.Marshal(nativeDocumentDiff(before, after))
+		t.Logf("synthetic BSON difference metadata only: %s", raw)
 		t.Fatal("tool changed retained full synthetic business BSON")
 	}
 }
@@ -616,7 +627,7 @@ func TestM4MongoObjectNativeIndexConflictKeepsDirty(t *testing.T) {
 	args, _, _ := h.approval()
 	r := h.action("restore", args...)
 	requireReleased(t, r)
-	if r.Complete || r.Error != "index_restore_failed_or_unknown" || r.LedgerCommitIssued {
+	if r.Complete || r.Error != "index_restore_failed_or_unknown" || r.LedgerCommitIssued || !h.hasTypedIndexCode(11000) {
 		t.Fatal("unique conflict advanced ledger", r)
 	}
 	after, afterUUID := h.head()

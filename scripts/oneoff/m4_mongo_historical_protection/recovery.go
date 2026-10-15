@@ -95,7 +95,11 @@ func (d *database) createOriginalIndex(ctx context.Context, m material, position
 	if e != nil {
 		return e
 	}
-	if d.mongo.Database(d.mongoName).RunCommand(ctx, cmd).Err() != nil {
+	err := d.mongo.Database(d.mongoName).RunCommand(ctx, cmd).Err()
+	if d.observeIndex != nil {
+		d.observeIndex(observeIndexResult(err))
+	}
+	if err != nil {
 		return errors.New("index_restore_failed_or_unknown")
 	}
 	return nil

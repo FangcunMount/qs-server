@@ -25,6 +25,7 @@ type sqlReader interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 type database struct {
+	observeIndex                    func(indexObservation)
 	conn                            *sql.Conn
 	mongo                           *mongo.Client
 	sqlName, mongoName              string

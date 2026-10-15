@@ -99,7 +99,7 @@ func main() {
 	}
 }
 func serve(ctx context.Context, args []string, getenv func(string) string, tool string, out io.Writer) int {
-	r := run(ctx, args, getenv, tool)
+	r := run(ctx, args, getenv, tool, nil)
 	if json.NewEncoder(out).Encode(r) != nil || !r.Complete {
 		return 1
 	}
@@ -121,7 +121,7 @@ func objectClientOptions(uri string) *options.ClientOptions {
 	return opts
 }
 
-func run(parent context.Context, args []string, getenv func(string) string, tool string) (r receipt) {
+func run(parent context.Context, args []string, getenv func(string) string, tool string, observer *indexObserver) (r receipt) {
 	r = receipt{BSource: bSource, BResources: bResources, BResourceFiles: bResourceFiles, Error: "arguments_invalid"}
 	a, e := parseArgs(args)
 	if e != nil || !sourceRE.MatchString(tool) {
@@ -192,6 +192,9 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	d := database{sqlName: a.sqlName, mongoName: a.mongoName}
+	if observer != nil {
+		d.observeIndex = observer.completed
+	}
 	ok := false
 	var rawMaterial []byte
 	defer func() {
@@ -255,7 +258,11 @@ func run(parent context.Context, args []string, getenv func(string) string, tool
 	// Operation contexts, not a client-wide timeout, bound each fixed read.
 	// This prevents a future approved createIndexes wait being silently capped
 	// by a URI timeoutMS/socketTimeoutMS or retried by the driver.
-	d.mongo, e = mongo.Connect(ctx, objectClientOptions(uri))
+	mongoOpts := objectClientOptions(uri)
+	if observer != nil {
+		mongoOpts.SetMonitor(observer.monitor)
+	}
+	d.mongo, e = mongo.Connect(ctx, mongoOpts)
 	if e != nil {
 		r.Error = "mongo_connect_failed"
 		return r

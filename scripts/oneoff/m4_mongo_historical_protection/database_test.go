@@ -171,7 +171,7 @@ func TestCanceledEntryReleasesOnlyOwnedPoolAndDoesNotCreateMaterial(t *testing.T
 			return "fixture:private-fixture-password@tcp(127.0.0.1:1)/qs_owned"
 		}
 		return "mongodb://127.0.0.1:1/qs_owned"
-	}, testSource)
+	}, testSource, nil)
 	if r.Complete || r.Error != "mysql_connection_failed" || r.SQLPoolClosed == nil || !*r.SQLPoolClosed || r.SQLConnectionClosed != nil || r.MongoClosed != nil || r.MongoCursorsClosed != nil || !r.BudgetExceeded {
 		t.Fatalf("incorrect owned release/cancellation evidence: %+v", r)
 	}
