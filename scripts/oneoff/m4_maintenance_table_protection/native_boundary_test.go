@@ -67,7 +67,11 @@ func (h *maintenanceNative) assertFailedRestore(r receipt, category string, cons
 
 func (h *maintenanceNative) assertFailedRestoreGateUnknown(r receipt, category string) {
 	h.t.Helper()
-	if r.Complete || r.Error != category || !r.ApprovalConsumed || r.ReadOnly || !r.SQLConnectionClosed || !r.SQLPoolClosed || !r.MongoClosed || !r.RuntimeGateAcquired || r.RuntimeGateReleased || !r.RuntimeGateReleaseUnproven || r.ReleaseError != "runtime_gate_release_unproven" || r.TransactionReleaseUnproven {
+	// On a failed wire, gate.release can mark the pinned sql.Conn done before
+	// the later Close returns sql.ErrConnDone. Preserve that actual receipt bool;
+	// do not require a positive local-close ACK or infer server lock release.
+	// SQLPoolClosed still includes the original zero-open/zero-in-use checks.
+	if r.Complete || r.Error != category || !r.ApprovalConsumed || r.ReadOnly || !r.SQLPoolClosed || !r.MongoClosed || !r.RuntimeGateAcquired || r.RuntimeGateReleased || !r.RuntimeGateReleaseUnproven || r.ReleaseError != "runtime_gate_release_unproven" || r.TransactionReleaseUnproven {
 		h.t.Fatal("wire loss must retain the original error and unproved server gate", r)
 	}
 }
