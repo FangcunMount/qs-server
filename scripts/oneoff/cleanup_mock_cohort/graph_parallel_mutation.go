@@ -55,6 +55,12 @@ func graphMutateOrdered(ctx context.Context, s graphBatchProvider, m graphArchiv
 		for end < len(ordered) && ordered[end].RestoreRank == ordered[start].RestoreRank && ordered[end].Store == ordered[start].Store && ordered[end].Name == ordered[start].Name {
 			end++
 		}
+		phaseWorkers := workers
+		if restore && ordered[start].Store == "mysql" {
+			// Missing-PK locking reads can hold overlapping gaps even for disjoint
+			// chunks. Serialize SQL inserts without weakening the transaction CAS.
+			phaseWorkers = 1
+		}
 		next := start
 		for next < end || active > 0 {
 			// Observe completed failures before loading or dispatching another job.
@@ -67,7 +73,7 @@ func graphMutateOrdered(ctx context.Context, s graphBatchProvider, m graphArchiv
 				}
 			}
 		drained:
-			if failure == nil && workCtx.Err() == nil && next < end && active < workers {
+			if failure == nil && workCtx.Err() == nil && next < end && active < phaseWorkers {
 				if err := authority(); err != nil {
 					stop(err)
 					continue

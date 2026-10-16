@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type graphParallelStore struct {
@@ -168,20 +170,98 @@ func TestGraphParallelMutationBoundsConcurrencyAndFsyncsPhaseBarriers(t *testing
 			go func() {
 				done <- graphMutateOrdered(ctx, s, m, dir, j, strings.Repeat("a", 64), restore, func() error { return nil }, 2)
 			}()
-			for range 2 {
+			wantPeak := 2
+			if restore {
+				wantPeak = 1 // SQL missing-PK restore phases must not overlap.
+			}
+			for range wantPeak {
 				select {
 				case <-entered:
 				case <-ctx.Done():
 					close(release)
-					t.Fatal("two workers did not actually overlap")
+					t.Fatal("required phase workers did not enter")
 				}
 			}
 			close(release)
 			if err := <-done; err != nil {
 				t.Fatal(err)
 			}
-			if s.peak != 2 || s.crossed || len(s.calls) != len(ordered) || s.reads != 0 || j.seq != len(ordered)*2 {
+			if s.peak != wantPeak || s.crossed || len(s.calls) != len(ordered) || s.reads != 0 || j.seq != len(ordered)*2 {
 				t.Fatalf("peak=%d crossed=%t calls=%d reads=%d journal=%d", s.peak, s.crossed, len(s.calls), s.reads, j.seq)
+			}
+		})
+	}
+}
+
+func TestGraphParallelMutationSerializesOnlyMySQLRestore(t *testing.T) {
+	for _, tc := range []struct {
+		name, store string
+		restore     bool
+		peak        int
+	}{
+		{"mysql_restore", "mysql", true, 1},
+		{"mysql_delete", "mysql", false, 2},
+		{"mongo_restore", "mongo", true, 2},
+		{"mongo_delete", "mongo", false, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, m, dir, j := graphParallelFixture(t)
+			for i := range 3 {
+				r := graphSQLFixture("assessment_score", fmt.Sprint(i+1), map[string]string{"testee_id": "1"})
+				rank := graphSQLTables[r.Object.Name]
+				if tc.store == "mongo" {
+					r = graphMongoFixture(t, "answersheets", bson.D{{Key: "domain_id", Value: int64(i + 1)}})
+					rank = graphMongoTables[r.Object.Name]
+				}
+				s.definitions[r.Object.Store+"/"+r.Object.Name] = r.Definition
+				if !tc.restore {
+					s.rows[objectID(r.Object)] = r
+				}
+				if err := archiveGraphPage(dir, &m, []record{r}, rank, false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			entered, release := make(chan struct{}, len(m.Targets)), make(chan struct{})
+			s.hook = func(ctx context.Context, _ []record) error {
+				entered <- struct{}{}
+				select {
+				case <-release:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				done <- graphMutateOrdered(ctx, s, m, dir, j, strings.Repeat("a", 64), tc.restore, func() error { return nil }, 2)
+			}()
+			for range tc.peak {
+				select {
+				case <-entered:
+				case <-ctx.Done():
+					close(release)
+					<-done
+					t.Fatal("required mutation concurrency did not enter")
+				}
+			}
+			overlapped := false
+			if tc.peak == 1 {
+				// Keep the first missing-PK restore transaction in flight. The next
+				// chunk must not enter while it can hold an overlapping gap lock.
+				select {
+				case <-entered:
+					overlapped = true
+				case <-time.After(100 * time.Millisecond):
+				}
+			}
+			close(release)
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			if overlapped || s.peak != tc.peak || len(s.calls) != 3 || s.active != 0 || j.seq != 6 {
+				t.Fatalf("restore-only SQL limit was not preserved: overlap=%t peak=%d calls=%d active=%d journal=%d", overlapped, s.peak, len(s.calls), s.active, j.seq)
 			}
 		})
 	}
