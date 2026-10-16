@@ -165,6 +165,11 @@ type graphWriter struct {
 }
 
 func (w *graphWriter) add(o graphObject, rank int) error {
+	return w.addPhysical(o, rank, objectID(o.Object))
+}
+
+// The lean planner has already computed this identity for the unchanged Object.
+func (w *graphWriter) addPhysical(o graphObject, rank int, physicalKey string) error {
 	o.RootIDs = graphRoots(o)
 	if e := validateObject(o.Object); e != nil {
 		return e
@@ -172,7 +177,7 @@ func (w *graphWriter) add(o graphObject, rank int) error {
 	if o.Object.Fingerprint != "" {
 		return errors.New("typed-key scope must not contain an original-value fingerprint")
 	}
-	if w.protected[objectID(o.Object)] {
+	if w.protected[physicalKey] {
 		return errors.New("discovered physical target intersects protection")
 	}
 	scope := o.Object.Store + "/" + o.Object.Name

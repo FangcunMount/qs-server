@@ -14,12 +14,15 @@ import (
 
 // The plan freezes identities and relationships. Only capture reads original
 // values, after the maintenance boundary has been established.
+type leanOwner struct {
+	Root, Physical string
+}
+
 type leanPlanner struct {
 	*cohortPlanner
 	groups        map[string]cohortIdentityGroup
-	owners        map[string]map[string]string
+	owners        map[string]map[string]leanOwner
 	parents       map[string]map[string]string
-	physical      map[string]map[string]string
 	seenMongo     map[string]string
 	statisticSeen map[string]map[uint64]string
 }
@@ -42,8 +45,8 @@ func (p *leanPlanner) hold(o graphObject, reason string, roots ...string) {
 	o.RootIDs = p.groupRoots(roots...)
 	p.holdObject(o, reason)
 }
-func (p *leanPlanner) owner(name, id string) string { return p.owners[name][id] }
-func (p *leanPlanner) remember(o graphObject, root string) {
+func (p *leanPlanner) owner(name, id string) string { return p.owners[name][id].Root }
+func (p *leanPlanner) remember(o graphObject, root, physicalKey string) {
 	name := o.Object.Name
 	id := o.Links["id"]
 	if o.Object.Store == "mongo" {
@@ -56,14 +59,12 @@ func (p *leanPlanner) remember(o graphObject, root string) {
 		return
 	}
 	if p.owners[name] == nil {
-		p.owners[name] = map[string]string{}
-		p.physical[name] = map[string]string{}
+		p.owners[name] = map[string]leanOwner{}
 	}
-	if old, ok := p.owners[name][id]; ok && p.physical[name][id] != objectID(o.Object) {
-		p.hold(o, name+":duplicate_typed_domain_identity", root, old)
+	if old, ok := p.owners[name][id]; ok && old.Physical != physicalKey {
+		p.hold(o, name+":duplicate_typed_domain_identity", root, old.Root)
 	}
-	p.owners[name][id] = root
-	p.physical[name][id] = objectID(o.Object)
+	p.owners[name][id] = leanOwner{Root: root, Physical: physicalKey}
 }
 func (p *leanPlanner) parent(o graphObject, key, name, root string, required bool) {
 	id := o.Links[key]
@@ -78,7 +79,7 @@ func (p *leanPlanner) parent(o graphObject, key, name, root string, required boo
 		p.hold(o, o.Object.Name+":typed_"+key+"_ownership_conflict", root, owner)
 	}
 }
-func (p *leanPlanner) emit(o graphObject, root string, rank int) error {
+func (p *leanPlanner) emit(o graphObject, root string, rank int, physicalKey string) error {
 	if root == "" || len(p.groups[root].TesteeIDs) == 0 {
 		return errors.New("typed candidate has no frozen identity component")
 	}
@@ -96,11 +97,11 @@ func (p *leanPlanner) emit(o graphObject, root string, rank int) error {
 		}
 		seen[id] = root
 	}
-	if p.writer.protected[objectID(o.Object)] {
+	if p.writer.protected[physicalKey] {
 		p.hold(o, "target_intersects_protected_physical_identity", root)
 		return nil
 	}
-	return p.writer.add(o, rank)
+	return p.writer.addPhysical(o, rank, physicalKey)
 }
 func (p *leanPlanner) processSQL(name string, r record, resolve func(graphObject) string, check func(graphObject, string)) error {
 	links := map[string]string{}
@@ -135,16 +136,17 @@ func (p *leanPlanner) processSQL(name string, r record, resolve func(graphObject
 		}
 	}
 
+	physicalKey := objectID(o.Object)
 	switch name {
 	case "testee", "clinician_relation", "assessment_entry_intake_log", "plan_enrollment", "assessment_task", "assessment", "evaluation_outcome", "runtime_checkpoint":
-		p.remember(o, root)
+		p.remember(o, root, physicalKey)
 	}
 	p.eventOwner(o.Links["committed_event_id"], root)
 	p.eventOwner(o.Links["retry_event_id"], root)
 	for _, ref := range o.References {
 		p.eventOwner(ref.EventID, root)
 	}
-	return p.emit(o, root, graphSQLTables[name])
+	return p.emit(o, root, graphSQLTables[name], physicalKey)
 }
 
 func (p *leanPlanner) indexedSQL(name string, ids []string, query func([]string) (string, []any), resolve func(graphObject) string, check func(graphObject, string)) error {
@@ -229,6 +231,10 @@ func (p *leanPlanner) sqlChildren() error {
 		}
 		if e := p.writer.flush(); e != nil {
 			return e
+		}
+		if name == "runtime_checkpoint" {
+			// Its duplicate-resource guard is complete, including every page.
+			delete(p.owners, name)
 		}
 	}
 	return p.byIDs("interpretation_admission_failure", "outcome_id", p.ids("evaluation_outcome"), true, func(o graphObject) string { return p.owner("evaluation_outcome", o.Links["outcome_id"]) }, func(o graphObject, root string) { p.parent(o, "assessment_id", "assessment", root, true) })
@@ -317,9 +323,9 @@ func (p *leanPlanner) mongoCandidate(name string, r record, root string) error {
 		p.eventOwner(ref.EventID, root)
 	}
 	if name != "report_query_catalog" {
-		p.remember(o, root)
+		p.remember(o, root, key)
 	}
-	return p.emit(o, root, graphMongoTables[name])
+	return p.emit(o, root, graphMongoTables[name], key)
 }
 func (p *leanPlanner) mongoByIDs(name, field, parent string, ids []string) error {
 	jobs := []leanReadJob{}
@@ -391,7 +397,15 @@ func (p *leanPlanner) mongoChildren() error {
 			return e
 		}
 	}
-	return p.catalogSharedParents()
+	if e := p.catalogSharedParents(); e != nil {
+		return e
+	}
+	// No later stage revisits Mongo candidates or these parent-chain checks.
+	p.seenMongo = nil
+	for _, name := range []string{"enrollment_plan", "sheet_root", "generation_outcome", "run_generation"} {
+		delete(p.parents, name)
+	}
+	return nil
 }
 func (p *leanPlanner) statistics() error {
 	sources := []struct{ table, kind, parent string }{
@@ -476,7 +490,7 @@ func leanPlanCohort(ctx context.Context, reader graphReader, c cohortSelector, p
 		protectedKeys[objectID(o)] = true
 	}
 	core := &cohortPlanner{context: ctx, reader: reader, selector: c, writer: &graphWriter{dir: dir, index: &index, protected: protectedKeys}, dir: dir}
-	p := &leanPlanner{cohortPlanner: core, groups: map[string]cohortIdentityGroup{}, owners: map[string]map[string]string{}, parents: map[string]map[string]string{}, physical: map[string]map[string]string{}, seenMongo: map[string]string{}}
+	p := &leanPlanner{cohortPlanner: core, groups: map[string]cohortIdentityGroup{}, owners: map[string]map[string]leanOwner{}, parents: map[string]map[string]string{}, seenMongo: map[string]string{}}
 	for _, name := range []string{"enrollment_plan", "sheet_root", "generation_outcome", "run_generation", "event_root"} {
 		p.parents[name] = map[string]string{}
 	}
@@ -531,8 +545,9 @@ func leanPlanCohort(ctx context.Context, reader graphReader, c cohortSelector, p
 			if !found {
 				p.hold(o, "testee:profile_identity_component_conflict", id)
 			}
-			p.remember(o, id)
-			return p.emit(o, id, graphSQLTables["testee"])
+			physicalKey := objectID(o.Object)
+			p.remember(o, id, physicalKey)
+			return p.emit(o, id, graphSQLTables["testee"], physicalKey)
 		})
 	})
 	if e != nil {
@@ -829,9 +844,9 @@ func (p *leanPlanner) catalogSharedParents() error {
 				continue
 			}
 			hints := []string{}
-			for candidate, root := range p.owners[field.parent] {
+			for candidate, entry := range p.owners[field.parent] {
 				if graphRawIDMember(raw, field.key, map[string]bool{candidate: true}) {
-					hints = append(hints, root)
+					hints = append(hints, entry.Root)
 				}
 			}
 			if len(hints) == 0 {
