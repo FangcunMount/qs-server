@@ -452,7 +452,7 @@ func sqlValue(c cell) (any, error) {
 }
 
 func generatedColumns(ctx context.Context, q sqlReader, table string) (map[string]bool, error) {
-	rows, e := q.QueryContext(ctx, "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND EXTRA LIKE '%GENERATED%'", table)
+	rows, e := q.QueryContext(ctx, "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND GENERATION_EXPRESSION IS NOT NULL AND GENERATION_EXPRESSION<>''", table)
 	if e != nil {
 		return nil, e
 	}
