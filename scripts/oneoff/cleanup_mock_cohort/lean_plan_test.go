@@ -1,6 +1,8 @@
 package main
 
 import (
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"os"
@@ -159,6 +161,11 @@ func TestLeanExecutionResponsibilitiesHoldWhileMockSchedulingCanRetire(t *testin
 				r := graphSQLFixture("runtime_checkpoint", "91", map[string]string{"assessment_id": "100", "status": "succeeded"})
 				r.Columns = append(r.Columns, cell{Name: "scope", Type: "VARCHAR", Raw: []byte("evaluation_run")})
 				if kind == "runtime_claim" {
+					for i := range r.Columns {
+						if r.Columns[i].Name == "status" {
+							r.Columns[i].Raw = []byte("running")
+						}
+					}
 					r.Columns = append(r.Columns, cell{Name: "claim_token", Type: "VARCHAR", Raw: []byte("actual-live-claim")})
 				} else {
 					r.Columns = append(r.Columns, cell{Name: "retry_disposition", Type: "VARCHAR", Raw: []byte("automatic")})
@@ -205,6 +212,88 @@ func TestLeanExecutionResponsibilitiesHoldWhileMockSchedulingCanRetire(t *testin
 				}
 			} else if !held {
 				t.Fatal("active execution/retry responsibility did not hold its User component", kind)
+			}
+		})
+	}
+}
+
+func TestLeanRuntimeCheckpointTerminalClaimIsHistoricalNotLiveResponsibility(t *testing.T) {
+	for _, tc := range []struct {
+		name, status, lease, disposition string
+		attempt                          int
+		retryable, next, hold, claim     bool
+	}{
+		{name: "succeeded_retains_actual_claim", status: "succeeded"},
+		{name: "failed_terminal_retains_actual_claim", status: "failed"},
+		{name: "succeeded_historical_lease", status: "succeeded", lease: "historical"},
+		{name: "failed_terminal_historical_lease", status: "failed", lease: "historical"},
+		{name: "running_live_claim", status: "running", hold: true, claim: true},
+		{name: "running_expired_claim", status: "running", lease: "expired", hold: true, claim: true},
+		{name: "running_without_claim_or_lease", status: "running", lease: "none", hold: true},
+		{name: "pending_without_claim_or_lease", status: "pending", hold: true},
+		{name: "unknown_status", status: "unknown", lease: "none", hold: true},
+		{name: "failed_automatic_retry", status: "failed", retryable: true, hold: true},
+		{name: "failed_manual_responsibility", status: "failed", attempt: retrygovernance.BusinessPolicy().MaxAutomaticAttempts, retryable: true, hold: true},
+		{name: "terminal_unknown_disposition", status: "succeeded", disposition: "unknown", hold: true},
+		{name: "terminal_next_attempt", status: "failed", next: true, hold: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+			run := evalrun.NewEvaluationRunWithAttempt(100, tc.attempt)
+			if tc.status != "pending" {
+				if err := run.Claim(evalrun.ClaimInput{Token: "original-persisted-claim", ClaimedAt: now, LeaseExpiresAt: now.Add(time.Minute)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch tc.status {
+			case "succeeded":
+				if err := run.Succeed(now.Add(time.Second)); err != nil {
+					t.Fatal(err)
+				}
+			case "failed":
+				if err := run.Fail(now.Add(time.Second), evalrun.Failure{Kind: evalrun.FailureKindInternal, Retryable: tc.retryable}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.status == "succeeded" || tc.status == "failed" {
+				if run.ClaimToken() != "original-persisted-claim" || run.LeaseExpiresAt() != nil || run.HasActiveLease(now) {
+					t.Fatal("real terminal producer no longer preserves historical claim and releases its lease")
+				}
+			}
+			reader, selector, protection, dir := graphFixture(t)
+			r := graphSQLFixture("runtime_checkpoint", "91", map[string]string{"assessment_id": "100", "status": tc.status})
+			r.Columns = append(r.Columns, cell{Name: "scope", Type: "VARCHAR", Raw: []byte("evaluation_run")})
+			if tc.lease != "none" && run.ClaimToken() != "" {
+				r.Columns = append(r.Columns, cell{Name: "claim_token", Type: "VARCHAR", Raw: []byte(run.ClaimToken())})
+			}
+			lease := run.LeaseExpiresAt()
+			if tc.lease == "expired" || tc.lease == "historical" {
+				at := now.Add(-time.Minute)
+				lease = &at
+			}
+			if lease != nil && tc.lease != "none" {
+				r.Columns = append(r.Columns, cell{Name: "lease_expires_at", Type: "DATETIME", Raw: []byte(lease.Format(time.RFC3339Nano))})
+			}
+			if decision := run.RetryDecision(); decision != nil {
+				r.Columns = append(r.Columns, cell{Name: "retry_disposition", Type: "VARCHAR", Raw: []byte(decision.Disposition)})
+				if decision.NextAttemptAt != nil {
+					r.Columns = append(r.Columns, cell{Name: "next_attempt_at", Type: "DATETIME", Raw: []byte(decision.NextAttemptAt.Format(time.RFC3339Nano))})
+				}
+			}
+			if tc.disposition != "" {
+				r.Columns = append(r.Columns, cell{Name: "retry_disposition", Type: "VARCHAR", Raw: []byte(tc.disposition)})
+			}
+			if tc.next {
+				r.Columns = append(r.Columns, cell{Name: "next_attempt_at", Type: "DATETIME", Raw: []byte(now.Add(time.Minute).Format(time.RFC3339Nano))})
+			}
+			reader.sqlRows["runtime_checkpoint"] = []record{r}
+			index, err := planCohort(t.Context(), reader, selector, protection, dir, digest(encode(selector)), strings.Repeat("c", 40))
+			if err != nil {
+				t.Fatal(err)
+			}
+			held := validateGraphHolds(dir, index, map[string]bool{"1": true}) != nil
+			if held != tc.hold || (index.RequiredActions["settle_runtime_claim"] != 0) != tc.claim {
+				t.Fatalf("terminal evidence was confused with execution responsibility: held=%t want=%t claim_action=%d want=%t", held, tc.hold, index.RequiredActions["settle_runtime_claim"], tc.claim)
 			}
 		})
 	}

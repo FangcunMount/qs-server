@@ -128,7 +128,9 @@ func (p *leanPlanner) processSQL(name string, r record, resolve func(graphObject
 	}
 	if name == "runtime_checkpoint" {
 		state, disposition := o.Links["status"], o.Links["retry_disposition"]
-		if state != "succeeded" && state != "failed" || disposition != "" && disposition != "terminal" || o.Links["claim_token"] != "" || o.Links["lease_expires_at"] != "" || o.Links["next_attempt_at"] != "" {
+		// Terminal producers retain their claim token for the final CAS. Only
+		// nonterminal state or a remaining retry responsibility holds the component.
+		if state != "succeeded" && state != "failed" || disposition != "" && disposition != "terminal" || o.Links["next_attempt_at"] != "" {
 			p.hold(o, "runtime_checkpoint:active_or_unsettled_execution", root)
 		}
 	}

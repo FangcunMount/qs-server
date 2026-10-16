@@ -75,7 +75,8 @@ func (p *cohortPlanner) sqlObject(r record, rootIDs ...string) (graphObject, err
 		if o.Links["scope"] != "evaluation_run" {
 			p.holdObject(o, "runtime_checkpoint:unknown_scope")
 		}
-		if o.Links["claim_token"] != "" || o.Links["lease_expires_at"] != "" {
+		terminal := o.Links["status"] == "succeeded" || o.Links["status"] == "failed"
+		if !terminal && (o.Links["claim_token"] != "" || o.Links["lease_expires_at"] != "") {
 			p.action("settle_runtime_claim")
 		}
 		if o.Links["retry_event_id"] != "" {
