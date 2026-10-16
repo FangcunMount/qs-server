@@ -150,6 +150,9 @@ func (p *cohortPlanner) mongoRootBatch(ctx context.Context, records []record) er
 	return nil
 }
 func (p *cohortPlanner) rootMongo(ctx context.Context, name string, ids []string) error {
+	if e := p.loadSQLReverseRoots(); e != nil {
+		return e
+	}
 	roots := map[string]bool{}
 	for _, id := range ids {
 		roots[id] = true
@@ -181,6 +184,9 @@ func (p *cohortPlanner) rootMongo(ctx context.Context, name string, ids []string
 			return nil
 		}
 		if !roots[testee] {
+			if linked := p.foreignSQLParentRoots(raw); len(linked) > 0 {
+				p.holdRecord(r, linked, name+":retained_object_links_target_parent")
+			}
 			return nil
 		}
 		n := len(encode(r))
@@ -444,4 +450,58 @@ func (p *cohortPlanner) runPage(ctx context.Context, generationIDs []string) err
 		}
 		return p.writer.add(o, graphMongoTables[r.Object.Name])
 	})
+}
+
+// SQL typed parents are already frozen before the single root-collection scan.
+// A retained Testee does not make a crosslinked artifact safe to ignore.
+func (p *cohortPlanner) loadSQLReverseRoots() error {
+	if p.reverseSQLRoots != nil {
+		return nil
+	}
+	p.reverseSQLRoots = map[string]map[string][]string{}
+	for _, ref := range p.writer.index.Shards {
+		if ref.Store != "mysql" || (ref.Name != "assessment" && ref.Name != "evaluation_outcome" && ref.Name != "assessment_task" && ref.Name != "plan_enrollment") {
+			continue
+		}
+		page, e := readGraphPage(p.dir, ref)
+		if e != nil {
+			return e
+		}
+		if p.reverseSQLRoots[ref.Name] == nil {
+			p.reverseSQLRoots[ref.Name] = map[string][]string{}
+		}
+		for _, o := range page.Objects {
+			p.reverseSQLRoots[ref.Name][o.Links["id"]] = graphRoots(o)
+		}
+	}
+	return nil
+}
+func (p *cohortPlanner) foreignSQLParentRoots(raw bson.Raw) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	add := func(v bson.RawValue, domain string) {
+		id := ""
+		switch v.Type {
+		case bson.TypeInt64:
+			id = fmt.Sprint(v.Int64())
+		case bson.TypeInt32:
+			id = fmt.Sprint(v.Int32())
+		case bson.TypeString:
+			id = v.StringValue()
+		}
+		for _, root := range p.reverseSQLRoots[domain][id] {
+			if !seen[root] {
+				seen[root] = true
+				out = append(out, root)
+			}
+		}
+	}
+	for _, v := range []struct{ key, domain string }{{"assessment_id", "assessment"}, {"outcome_id", "evaluation_outcome"}, {"task_id", "assessment_task"}} {
+		add(raw.Lookup(v.key), v.domain)
+	}
+	if v := raw.Lookup("attribution"); v.Type == bson.TypeEmbeddedDocument {
+		add(v.Document().Lookup("task_id"), "assessment_task")
+		add(v.Document().Lookup("enrollment_id"), "plan_enrollment")
+	}
+	return out
 }

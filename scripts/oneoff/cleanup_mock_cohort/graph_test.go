@@ -294,7 +294,7 @@ func TestGraphDeliveryCamelCaseOriginalIDsAndRetainedMissingRoot(t *testing.T) {
 	makeRow := func(id, testee, assessment string) record {
 		r := graphSQLFixture("event_delivery_dead_letter", id, map[string]string{"org_id": "1"})
 		payload := `{"id":"evt-` + id + `","eventType":"evaluation.requested","occurredAt":"2026-01-01T00:00:00Z","aggregateType":"Evaluation","aggregateID":"` + assessment + `","data":{"org_id":1,"testee_id":` + testee + `,"assessment_id":` + assessment + `}}`
-		r.Columns = append(r.Columns, cell{Name: "event_id", Type: "VARCHAR", Raw: []byte("evt-" + id)}, cell{Name: "payload_json", Type: "LONGTEXT", Raw: []byte(payload)})
+		r.Columns = append(r.Columns, cell{Name: "event_id", Type: "VARCHAR", Raw: []byte("evt-" + id)}, cell{Name: "payload_json", Type: "LONGTEXT", Raw: []byte(payload)}, cell{Name: "retry_disposition", Type: "VARCHAR", Raw: []byte("archived_mock")})
 		return r
 	}
 	if e := planner.classifyDeliveries(t.Context(), []record{makeRow("10", "1", "100"), makeRow("11", "999", "999")}, map[string]bool{"1": true}); e != nil {

@@ -26,6 +26,7 @@ type cohortPlanner struct {
 	held            []graphHold
 	holdError       error
 	referenceOwners map[string]graphObject
+	reverseSQLRoots map[string]map[string][]string
 }
 
 func (p *cohortPlanner) action(reason string) { p.writer.index.RequiredActions[reason]++ }
@@ -48,7 +49,7 @@ func (p *cohortPlanner) reference(e *eventevidence.EventEvidenceV1, o *graphObje
 func (p *cohortPlanner) sqlObject(r record) (graphObject, error) {
 	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}}
 	o.Object.Fingerprint = fingerprint(r)
-	for _, name := range []string{"id", "org_id", "testee_id", "profile_id", "assessment_id", "answer_sheet_id", "outcome_id", "evaluation_outcome_id", "enrollment_id", "plan_id", "task_id", "event_id", "retry_event_id", "committed_event_id", "opening_event_id", "source_type", "source_ref", "business_object_id", "scope", "status", "state", "claim_token", "lease_expires_at", "lease_until", "manual_replay_request_id", "request_id", "resource_id", "retry_disposition", "stat_date", "clinician_id", "entry_id", "conducting_store_id"} {
+	for _, name := range []string{"id", "org_id", "testee_id", "profile_id", "assessment_id", "answer_sheet_id", "answersheet_id", "report_id", "outcome_id", "evaluation_outcome_id", "enrollment_id", "plan_id", "task_id", "event_id", "retry_event_id", "committed_event_id", "opening_event_id", "source_type", "source_ref", "business_object_id", "scope", "status", "state", "claim_token", "lease_expires_at", "lease_until", "manual_replay_request_id", "request_id", "resource_id", "retry_disposition", "stat_date", "clinician_id", "entry_id", "conducting_store_id"} {
 		if v, ok := graphSQLValue(r, name); ok && v != "" {
 			if !utf8.ValidString(v) {
 				return o, errors.New("technical SQL link is not valid UTF-8")
@@ -80,10 +81,26 @@ func (p *cohortPlanner) sqlObject(r record) (graphObject, error) {
 		if o.Links["retry_event_id"] != "" {
 			p.action("settle_runtime_retry_event")
 		}
+	case "interpretation_attention_projection":
+		p.writer.index.Retained[r.Object.Name] = "successful complete event identity remains online as the report attention replay guard"
+		if o.Links["status"] != "succeeded" || o.Links["event_id"] == "" || !graphDecimal(o.Links["report_id"]) || !graphDecimal(o.Links["assessment_id"]) || !graphDecimal(o.Links["testee_id"]) {
+			p.holdObject(o, r.Object.Name+":incomplete_or_unsettled_projection")
+		}
 	case "task_opened_reminder_delivery", "task_opened_reminder_batch":
-		p.action("settle_" + r.Object.Name + ":" + o.Links["state"])
-	case "retry_event_hold", "event_delivery_dead_letter", "qs_rm_replay_requests", "qs_rm_replay_items":
-		p.action("settle_" + r.Object.Name)
+		p.writer.index.Retained[r.Object.Name] = "frozen recipients and terminal external outcome evidence remain online; no resend authority"
+		state := o.Links["state"]
+		settled := r.Object.Name == "task_opened_reminder_batch" && (state == "frozen" || state == "suppressed") || r.Object.Name == "task_opened_reminder_delivery" && (state == "confirmed" || state == "rejected" || state == "reviewed" || state == "suppressed")
+		if !settled || o.Links["claim_token"] != "" || o.Links["lease_until"] != "" {
+			p.action("settle_" + r.Object.Name + ":" + state)
+			p.holdObject(o, r.Object.Name+":unsettled_external_responsibility")
+		}
+	case "retry_event_hold", "event_delivery_dead_letter":
+		p.writer.index.Retained[r.Object.Name] = "original delivery identity, wire, retry and audit evidence retained online; settled ownership never grants deletion"
+		settled := r.Object.Name == "event_delivery_dead_letter" && (o.Links["retry_disposition"] == "archived_mock" || o.Links["retry_disposition"] == "terminal") || r.Object.Name == "retry_event_hold" && o.Links["status"] == "replayed" && (o.Links["retry_disposition"] == "" || o.Links["retry_disposition"] == "terminal")
+		if !settled || o.Links["claim_token"] != "" || o.Links["lease_until"] != "" || o.Links["lease_expires_at"] != "" {
+			p.action("settle_" + r.Object.Name)
+			p.holdObject(o, r.Object.Name+":unsettled_replay_responsibility")
+		}
 	case "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact", "statistics_store_activity_fact":
 		p.action("rebuild_shared_statistics_buckets")
 	}
@@ -205,6 +222,13 @@ func rootBatches(ids []string, limit int, fn func([]string) error) error {
 	}
 	return nil
 }
+func singleRootSQLScan(name string) bool {
+	switch name {
+	case "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact", "interpretation_attention_projection":
+		return true
+	}
+	return false
+}
 func (p *cohortPlanner) rootSQL(name string, ids []string) error {
 	slots, args := placeholders(ids)
 	org := p.selector.Selection.OrgID
@@ -227,12 +251,47 @@ func (p *cohortPlanner) rootSQL(name string, ids []string) error {
 		where = "x.org_id=? AND EXISTS (SELECT 1 FROM assessment a WHERE a.id=x.assessment_id AND a.testee_id IN (" + slots + ") AND a.org_id=?)"
 		args = append([]any{org}, args...)
 	}
+	// These four actual tables have no Testee-leading index. One PK keyset
+	// traversal avoids restarting the same candidate scan for each 1000 roots.
+	// Only exact frozen root membership reaches the existing ownership checks.
+	var roots map[string]bool
+	if singleRootSQLScan(name) {
+		roots = make(map[string]bool, len(ids))
+		for _, id := range ids {
+			roots[id] = true
+		}
+		where, args = "x.org_id=?", []any{org}
+		if name == "interpretation_attention_projection" {
+			where = "EXISTS (SELECT 1 FROM testee t WHERE t.id=x.testee_id AND t.org_id=?)"
+		}
+	}
+	read := func(emit func(record) error) error {
+		return p.reader.sqlPages(p.context, name, where, args, func(r record) error {
+			if roots != nil {
+				id, _ := graphSQLValue(r, "testee_id")
+				if !roots[id] {
+					return nil
+				}
+			}
+			return emit(r)
+		})
+	}
 	switch name {
-	case "evaluation_outcome", "assessment_score", "assessment_task", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref":
+	case "evaluation_outcome", "assessment_score", "assessment_task", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref", "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact":
 		batch := []record{}
 		size := 0
-		flush := func() error { e := p.sqlOwnedBatch(p.context, batch); batch = nil; size = 0; return e }
-		if e := p.reader.sqlPages(p.context, name, where, args, func(r record) error {
+		flush := func() error {
+			var e error
+			if graphStatisticTable(name) {
+				e = p.statisticBatch(p.context, batch)
+			} else {
+				e = p.sqlOwnedBatch(p.context, batch)
+			}
+			batch = nil
+			size = 0
+			return e
+		}
+		if e := read(func(r record) error {
 			n := len(encode(r))
 			if len(batch) > 0 && size+n > 64*1024*1024 {
 				if e := flush(); e != nil {
@@ -250,7 +309,7 @@ func (p *cohortPlanner) rootSQL(name string, ids []string) error {
 		}
 		return flush()
 	default:
-		return p.reader.sqlPages(p.context, name, where, args, p.emitSQL)
+		return read(p.emitSQL)
 	}
 }
 
@@ -288,7 +347,13 @@ func planCohort(ctx context.Context, reader graphReader, c cohortSelector, p pro
 	tables := []string{"clinician_relation", "testee_store_history", "assessment_entry_intake_log", "answering_start", "plan_enrollment", "assessment_task", "assessment", "evaluation_outcome", "assessment_score", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref", "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"}
 	for _, name := range tables {
 		index.Counts["mysql/"+name] = 0
-		if e := rootBatches(ids, 1000, func(batch []string) error { return planner.rootSQL(name, batch) }); e != nil {
+		var e error
+		if singleRootSQLScan(name) {
+			e = planner.rootSQL(name, ids)
+		} else {
+			e = rootBatches(ids, 1000, func(batch []string) error { return planner.rootSQL(name, batch) })
+		}
+		if e != nil {
 			return index, e
 		}
 		if e := writer.flush(); e != nil {

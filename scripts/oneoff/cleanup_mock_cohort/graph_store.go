@@ -30,12 +30,12 @@ func newGraphStore(s *liveStore) *graphStore {
 var graphSQLTables = map[string]int{
 	"testee": 10, "clinician_relation": 20, "testee_store_history": 20, "assessment_entry_intake_log": 20, "answering_start": 20,
 	"plan_enrollment": 30, "assessment_task": 40, "assessment": 50, "runtime_checkpoint": 60, "evaluation_outcome": 60, "assessment_score": 70,
-	"interpretation_attention_projection": 80, "interpretation_admission_failure": 80,
-	"qs_rm_evaluation_request_ref": 80, "qs_rm_replay_items": 90, "qs_rm_replay_requests": 85, "retry_event_hold": 90, "event_delivery_dead_letter": 90, "rm_outbox": 90,
-	"task_opened_reminder_batch": 80, "task_opened_reminder_delivery": 90,
+	"interpretation_attention_projection": 0, "interpretation_admission_failure": 80,
+	"qs_rm_evaluation_request_ref": 80, "qs_rm_replay_items": 0, "qs_rm_replay_requests": 0, "retry_event_hold": 0, "event_delivery_dead_letter": 0, "rm_outbox": 0,
+	"task_opened_reminder_batch": 0, "task_opened_reminder_delivery": 0,
 	"ai_bridge_requests": 0, "statistics_access_fact": 90, "statistics_assessment_fact": 90, "statistics_plan_fact": 90, "statistics_store_activity_fact": 90,
 }
-var graphMongoTables = map[string]int{"answersheets": 50, "report_generations": 70, "interpretation_runs": 80, "interpret_report_artifacts": 90, "report_query_catalog": 100, "rm_outbox": 110, "qs_rm_replay_requests": 110}
+var graphMongoTables = map[string]int{"answersheets": 50, "report_generations": 70, "interpretation_runs": 80, "interpret_report_artifacts": 90, "report_query_catalog": 100, "rm_outbox": 0, "qs_rm_replay_requests": 0}
 
 func graphSQLKind(dataType, columnType string) string {
 	switch dataType {
@@ -56,7 +56,7 @@ func (s *graphStore) shape(ctx context.Context, name string) (graphSQLShape, err
 		return v, nil
 	}
 	var v graphSQLShape
-	if _, ok := graphSQLTables[name]; !ok {
+	if _, ok := graphSQLTables[name]; !ok && !readableSQL[name] {
 		return v, errors.New("table outside fixed cohort graph")
 	}
 	rows, e := s.live.sql.QueryContext(ctx, "SELECT k.COLUMN_NAME,c.DATA_TYPE,c.COLUMN_TYPE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA=k.TABLE_SCHEMA AND c.TABLE_NAME=k.TABLE_NAME AND c.COLUMN_NAME=k.COLUMN_NAME WHERE k.TABLE_SCHEMA=DATABASE() AND k.TABLE_NAME=? AND k.CONSTRAINT_NAME='PRIMARY' ORDER BY k.COLUMN_NAME", name)

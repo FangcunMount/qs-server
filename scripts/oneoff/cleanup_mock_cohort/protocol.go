@@ -57,10 +57,11 @@ type selection struct {
 }
 
 type qsScope struct {
-	Selector   selection `json:"selector"`
-	Binding    binding   `json:"binding"`
-	Objects    []object  `json:"objects"`
-	Exclusions []string  `json:"exclusions"`
+	Graph      *graphBinding `json:"graph"`
+	Selector   selection     `json:"selector"`
+	Binding    binding       `json:"binding"`
+	Objects    []object      `json:"objects"`
+	Exclusions []string      `json:"exclusions"`
 }
 
 type group struct {

@@ -26,6 +26,7 @@ type config struct {
 	action, group, groupSHA, protection, protectionSHA, archive, materialSHA, approval, approvalSHA, output string
 	owner, freeze, freezeSHA                                                                                string
 	selector, selectorSHA, scopeDir                                                                         string
+	captureEvidence, captureEvidenceSHA                                                                     string
 	execute, original                                                                                       bool
 	timeout                                                                                                 time.Duration
 }
@@ -38,6 +39,8 @@ func flags(args []string) (config, error) {
 	f.StringVar(&c.selector, "selector-file", "", "fixed whole-cohort readonly selector")
 	f.StringVar(&c.selectorSHA, "selector-sha256", "", "selector raw SHA256")
 	f.StringVar(&c.scopeDir, "scope-dir", "", "fresh owned 0700 scope-shard directory")
+	f.StringVar(&c.captureEvidence, "capture-evidence-file", "", "external capture executor original stdout/exit evidence")
+	f.StringVar(&c.captureEvidenceSHA, "capture-evidence-sha256", "", "capture executor evidence raw SHA256")
 	f.StringVar(&c.group, "group-file", "", "private exact group JSON")
 	f.StringVar(&c.groupSHA, "group-sha256", "", "group raw SHA256")
 	f.StringVar(&c.protection, "protection-file", "", "private system/clack protection JSON")
@@ -55,6 +58,15 @@ func flags(args []string) (config, error) {
 	f.DurationVar(&c.timeout, "timeout", 20*time.Minute, "bounded CLI budget; cannot extend approval expiry")
 	if e := f.Parse(args); e != nil {
 		return c, e
+	}
+	evidenceProvided := false
+	f.Visit(func(v *flag.Flag) {
+		if v.Name == "capture-evidence-file" || v.Name == "capture-evidence-sha256" {
+			evidenceProvided = true
+		}
+	})
+	if evidenceProvided && (c.action == "plan" || c.action == "capture" || c.action == "plan-cohort") {
+		return c, errors.New("discovery/capture cannot accept capture execution evidence")
 	}
 	if f.NArg() != 0 {
 		return c, errors.New("positional inputs rejected")
@@ -179,6 +191,12 @@ func run(args []string, out io.Writer) error {
 	}
 	if g.ProtectedSHA != c.protectionSHA {
 		return errors.New("group protection hash mismatch")
+	}
+	if g.QS.Graph != nil {
+		return safePhase("graph_action", runGraphAction(c, g, p, out))
+	}
+	if c.captureEvidence != "" || c.captureEvidenceSHA != "" {
+		return errors.New("capture evidence only belongs to full graph consumers")
 	}
 	if e = validateGroup(g, p); e != nil {
 		return e

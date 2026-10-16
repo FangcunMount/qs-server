@@ -31,11 +31,13 @@ func (p *cohortPlanner) standardSQL(r record, ref eventevidence.StandardReferenc
 	if e != nil {
 		return e
 	}
-	if o.Links["state"] != "published" {
+	if o.Links["state"] != "published" || o.Links["claim_token"] != "" || o.Links["lease_until"] != "" {
 		p.action("settle_mysql_outbox:" + o.Links["state"])
+		p.holdObject(o, "mysql/rm_outbox:unsettled_publish_responsibility")
 	}
 	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
-	return p.writer.add(o, graphSQLTables["rm_outbox"])
+	p.writer.index.Retained["mysql/rm_outbox"] = "original full wire/state retained; separate frozen consumer/manual replay settlement is still required"
+	return p.writer.add(o, 0)
 }
 func (p *cohortPlanner) standardMongo(r record, ref eventevidence.StandardReference) error {
 	raw := bson.Raw(r.BSON)
@@ -58,11 +60,13 @@ func (p *cohortPlanner) standardMongo(r record, ref eventevidence.StandardRefere
 	if e != nil {
 		return e
 	}
-	if o.Links["state"] != "published" {
+	if o.Links["state"] != "published" || graphMongoString(raw, "claim_token") != "" || raw.Lookup("lease_until").Type != 0 && raw.Lookup("lease_until").Type != bson.TypeNull {
 		p.action("settle_mongo_outbox:" + o.Links["state"])
+		p.holdObject(o, "mongo/rm_outbox:unsettled_publish_responsibility")
 	}
 	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
-	return p.writer.add(o, graphMongoTables["rm_outbox"])
+	p.writer.index.Retained["mongo/rm_outbox"] = "original full wire/state retained; separate frozen consumer/manual replay settlement is still required"
+	return p.writer.add(o, 0)
 }
 func referenceKey(producer, id, destination string) string {
 	return digest(encode([]string{producer, id, destination}))
@@ -286,7 +290,11 @@ func (p *cohortPlanner) classifyDeliveries(ctx context.Context, records []record
 				}
 				owned = roots[owner]
 			} else {
-				p.writer.index.Holds[c.r.Object.Name+":missing_assessment"]++
+				if owned {
+					p.holdRecord(c.r, []string{c.testeeID}, c.r.Object.Name+":missing_assessment")
+				} else {
+					p.writer.index.Counts["retained/"+c.r.Object.Name+"/missing_assessment_without_current_root"]++
+				}
 				continue
 			}
 		}
