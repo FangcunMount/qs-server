@@ -46,30 +46,41 @@ func TestDirectedReferencesKeepNumericAliasesNestedParentsAndWrongDomains(t *tes
 	}
 }
 
-func TestDirectedReferences6000Roots20000ParentsStayWithinWireBudgets(t *testing.T) {
+func TestDirectedReferences6000RootsActualNonuniformParentsStayWithinWireBudgets(t *testing.T) {
 	roots, ids := map[string]bool{}, map[string]bool{}
 	for i := range 6000 {
 		roots[fmt.Sprint(600000000000000000+int64(i))] = true
 	}
-	for i := range 20000 {
+	for i := range 21405 {
 		ids[fmt.Sprint(700000000000000000+int64(i))] = true
 	}
 	f := graphFrozenReferences{ids: map[string]map[string]bool{}}
 	for _, scope := range []string{"mysql/assessment", "mysql/evaluation_outcome", "mysql/assessment_task", "mysql/plan_enrollment", "mysql/answering_start", "mongo/answersheets", "mongo/report_generations", "mongo/interpretation_runs", "mongo/interpret_report_artifacts", "mongo/report_query_catalog"} {
 		f.ids[scope] = ids
 	}
+	tasks, enrollments := map[string]bool{}, map[string]bool{}
+	for i := range 27376 {
+		tasks[fmt.Sprint(800000000000000000+int64(i))] = true
+	}
+	for i := range 3422 {
+		enrollments[fmt.Sprint(900000000000000000+int64(i))] = true
+	}
+	f.ids["mysql/assessment_task"], f.ids["mysql/plan_enrollment"], f.ids["mysql/answering_start"] = tasks, enrollments, nil
 	for _, name := range []string{"answersheets", "interpret_report_artifacts", "report_query_catalog", "report_generations", "interpretation_runs"} {
 		filter, err := graphFrozenMongoReferenceFilter(name, roots, roots, f)
 		if err != nil {
 			t.Fatal(name, err)
 		}
 		raw, err := bson.Marshal(filter)
+		t.Logf("synthetic actual shape Mongo %s BSON bytes=%d", name, len(raw))
 		if err != nil || len(raw) > graphMongoCommandBytes || len(filter) == 0 {
 			t.Fatal("unbounded directed Mongo query", name, len(raw), err)
 		}
 	}
 	for _, table := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"} {
-		where, args, err := graphFrozenStatisticsPredicate(table, roots, roots, map[string]map[string]bool{"assessment": ids}, f)
+		sources := map[string]map[string]bool{"assessment": ids, "answersheet": ids, "evaluation_outcome": ids, "interpret_report": ids, "interpretation_run": ids, "assessment_task": tasks, "plan_enrollment": enrollments, "clinician_relation": ids, "entry_intake": ids}
+		where, args, err := graphFrozenStatisticsPredicate(table, roots, roots, sources, f)
+		t.Logf("synthetic actual shape SQL %s conservative wire bytes=%d", table, len(encode(args))+len(where)+8192)
 		if err != nil || len(encode(args))+len(where)+8192 >= 64<<20 || strings.Count(where, "?") != len(args) {
 			t.Fatal("directed SQL packet/parameters changed", table, err)
 		}
