@@ -196,9 +196,6 @@ func graphClearanceLoad(c config) (graphClearanceManifest, []graphClearanceBatch
 		if e = validateGraphArchive(b.material, g, in.Group.SHA); e != nil {
 			return fail(e)
 		}
-		if e = validateGraphCoverage(b.material, g, protection, b.index, in.ScopeDirectory, cfg.archive); e != nil {
-			return fail(e)
-		}
 		if e = readGraphCaptureProof(in.CaptureEvidence.File, in.CaptureEvidence.SHA, b.material, in.MaterialSHA); e != nil {
 			return fail(e)
 		}
@@ -225,6 +222,11 @@ func graphClearanceLoad(c config) (graphClearanceManifest, []graphClearanceBatch
 			return fail(e)
 		}
 		if e = graphClearanceJournal(journal, b.material); e != nil {
+			return fail(e)
+		}
+		// Successful capture and every acknowledged apply bind these exact original
+		// shard hashes. Clearance reads only target keys, not restorable bodies.
+		if e = graphFrozenArchiveHeaders(b.material, g, protection, b.index); e != nil {
 			return fail(e)
 		}
 		freeze, e := graphClearanceRead(in.CurrentFreeze, 32<<10, nil, guard)
@@ -284,15 +286,13 @@ func graphClearanceJournal(raw []byte, m graphArchive) error {
 	return nil
 }
 func graphClearanceTargets(ctx context.Context, s graphBatchProvider, b graphClearanceBatch) error {
-	if e := protectGraph(ctx, s, b.material, b.material.Graph.ArchiveDirectory); e != nil {
-		return e
-	}
+	ctx = graphFrozenRuleDeleteContext(ctx, true)
 	for _, ref := range b.material.Targets {
-		records, e := readGraphArchivePage(b.material.Graph.ArchiveDirectory, b.material, ref)
+		records, e := readGraphFrozenKeys(b.material.Graph.ArchiveDirectory, b.material, ref)
 		if e != nil {
 			return e
 		}
-		absent, _, e := graphChunkState(ctx, s, records)
+		absent, _, e := graphVerificationState(ctx, s, records, false, false)
 		if e != nil {
 			return e
 		}
@@ -331,16 +331,11 @@ func runGraphClearance(c config, out io.Writer) error {
 		if e := check(); e != nil {
 			return e
 		}
-		for _, batch := range batches {
-			if e := graphClearanceTargets(ctx, s, batch); e != nil {
-				return e
-			}
-		}
 		if e := graphRelationshipReferences(ctx, newLeanReader(s), union, refs, false); e != nil {
 			return e
 		}
 		for _, batch := range batches {
-			if e := protectGraph(ctx, s, batch.material, batch.material.Graph.ArchiveDirectory); e != nil {
+			if e := graphClearanceTargets(ctx, s, batch); e != nil {
 				return e
 			}
 		}

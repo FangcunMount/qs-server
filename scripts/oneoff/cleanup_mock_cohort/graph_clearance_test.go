@@ -348,3 +348,49 @@ func TestGraphClearanceRejectsWholeIncompleteAndMismatchedApplyOriginals(t *test
 		})
 	}
 }
+
+func TestGraphClearanceKnownACKReadsProtectionOnceWithoutJournalMutation(t *testing.T) {
+	f := clearanceFixture(t)
+	_, batches, _, _, _, err := graphClearanceLoad(f.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	journalPath := filepath.Join(f.batch.material.Graph.ArchiveDirectory, "graph-journal.jsonl")
+	before, err := privateRead(journalPath, 128<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.store.readBatches = 0
+	if err = graphClearanceTargets(t.Context(), f.store, batches[0]); err != nil {
+		t.Fatal(err)
+	}
+	m := f.batch.material
+	if f.store.readBatches != len(m.Targets)+len(m.Guards)+len(m.Retained) || f.store.writes != 0 {
+		t.Fatal("clearance repeated protection comparison or issued mutation", f.store.readBatches)
+	}
+	after, err := privateRead(journalPath, 128<<20)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatal("clearance changed acknowledged journal")
+	}
+}
+
+func TestGraphClearanceKeyOnlyReadStillRequiresOriginalRawShardSHA(t *testing.T) {
+	f := clearanceFixture(t)
+	_, batches, _, _, _, err := graphClearanceLoad(f.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := f.batch.material.Targets[0]
+	path := filepath.Join(f.batch.material.Graph.ArchiveDirectory, ref.File)
+	raw, err := privateRead(path, int64(ref.Bytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw[len(raw)-1] = ' '
+	if err = os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = graphClearanceTargets(t.Context(), f.store, batches[0]); err == nil || f.store.writes != 0 {
+		t.Fatal("changed raw archive admitted through key-only clearance", err)
+	}
+}
