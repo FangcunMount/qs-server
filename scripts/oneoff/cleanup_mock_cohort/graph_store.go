@@ -157,6 +157,9 @@ func graphKeyset(keys []cell) (string, []any) {
 	return "(" + strings.Join(names, ",") + ") > (" + strings.Join(slots, ",") + ")", args
 }
 func (s *graphStore) sqlPages(ctx context.Context, name, where string, args []any, emit func(record) error) error {
+	return s.sqlPagesSelected(ctx, name, where, args, "x.*", emit)
+}
+func (s *graphStore) sqlPagesSelected(ctx context.Context, name, where string, args []any, columns string, emit func(record) error) error {
 	shape, e := s.shape(ctx, name)
 	if e != nil {
 		return e
@@ -177,7 +180,7 @@ func (s *graphStore) sqlPages(ctx context.Context, name, where string, args []an
 			condition = "(" + where + ") AND " + q
 			argv = append(argv, a...)
 		}
-		rows, e := s.live.sql.QueryContext(ctx, "SELECT x.* FROM `"+name+"` x WHERE "+condition+" ORDER BY "+strings.Join(order, ",")+" LIMIT 1000", argv...)
+		rows, e := s.live.sql.QueryContext(ctx, "SELECT "+columns+" FROM `"+name+"` x WHERE "+condition+" ORDER BY "+strings.Join(order, ",")+" LIMIT 1000", argv...)
 		if e != nil {
 			return e
 		}
@@ -304,11 +307,18 @@ func graphMongoObject(name string, raw bson.Raw, definition []byte) (record, err
 	return r, nil
 }
 func (s *graphStore) mongoPages(ctx context.Context, name string, filter bson.D, emit func(record) error) error {
+	return s.mongoPagesSelected(ctx, name, filter, nil, emit)
+}
+func (s *graphStore) mongoPagesSelected(ctx context.Context, name string, filter, projection bson.D, emit func(record) error) error {
 	definition, e := s.mongoDefinition(ctx, name)
 	if e != nil {
 		return e
 	}
-	cur, e := s.live.mongo.Database(s.live.mongoDB).Collection(name).Find(ctx, filter, options.Find().SetBatchSize(500).SetSort(bson.D{{Key: "_id", Value: 1}}).SetCollation(&options.Collation{Locale: "simple"}))
+	find := options.Find().SetBatchSize(500).SetSort(bson.D{{Key: "_id", Value: 1}}).SetCollation(&options.Collation{Locale: "simple"})
+	if projection != nil {
+		find.SetProjection(projection)
+	}
+	cur, e := s.live.mongo.Database(s.live.mongoDB).Collection(name).Find(ctx, filter, find)
 	if e != nil {
 		return e
 	}

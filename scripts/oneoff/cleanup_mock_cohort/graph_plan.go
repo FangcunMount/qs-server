@@ -16,6 +16,8 @@ import (
 type graphReader interface {
 	sqlPages(context.Context, string, string, []any, func(record) error) error
 	mongoPages(context.Context, string, bson.D, func(record) error) error
+	sqlOwnerPages(context.Context, string, []string, func(record) error) error
+	mongoOwnerPages(context.Context, string, []string, func(record) error) error
 }
 type cohortPlanner struct {
 	context         context.Context

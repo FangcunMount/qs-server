@@ -81,6 +81,14 @@ func (s *graphFake) mongoPages(_ context.Context, name string, filter bson.D, em
 	}
 	return nil
 }
+func (s *graphFake) sqlOwnerPages(ctx context.Context, name string, ids []string, emit func(record) error) error {
+	slots, args := placeholders(ids)
+	return s.sqlPages(ctx, name, "x.id IN ("+slots+")", args, emit)
+}
+func (s *graphFake) mongoOwnerPages(ctx context.Context, name string, ids []string, emit func(record) error) error {
+	return s.mongoPages(ctx, name, bson.D{{Key: "domain_id", Value: bson.D{{Key: "$in", Value: graphMongoIDs(ids)}}}}, emit)
+}
+
 func graphSQLFixture(name, id string, fields map[string]string) record {
 	r := record{Object: key(name, id), Definition: []byte("fixed original ddl/session"), Columns: []cell{{Name: "id", Type: "UNSIGNED BIGINT", Raw: []byte(id)}}}
 	for _, name := range []string{"org_id", "testee_id", "source", "assessment_id", "outcome_id", "plan_id", "enrollment_id", "status"} {

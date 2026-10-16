@@ -28,8 +28,7 @@ func (p *cohortPlanner) sqlLinkOwners(ctx context.Context, name string, ids []st
 	if len(ids) > 1000 {
 		return out, errors.New("ownership lookup exceeds fixed SQL batch")
 	}
-	slots, args := placeholders(ids)
-	e := p.reader.sqlPages(ctx, name, "x.id IN ("+slots+")", args, func(r record) error {
+	e := p.reader.sqlOwnerPages(ctx, name, ids, func(r record) error {
 		links := map[string]string{}
 		for _, key := range []string{"id", "testee_id", "org_id", "assessment_id", "outcome_id", "plan_id", "enrollment_id"} {
 			if value, ok := graphSQLValue(r, key); ok {
@@ -301,7 +300,7 @@ func (p *cohortPlanner) mongoLinkOwners(ctx context.Context, name string, ids []
 	if len(ids) > 500 {
 		return out, errors.New("mongo link ownership batch exceeds fixed 500")
 	}
-	e := p.reader.mongoPages(ctx, name, bson.D{{Key: "domain_id", Value: bson.D{{Key: "$in", Value: graphMongoIDs(ids)}}}}, func(r record) error {
+	e := p.reader.mongoOwnerPages(ctx, name, ids, func(r record) error {
 		raw := bson.Raw(r.BSON)
 		links := map[string]string{}
 		for _, name := range []string{"domain_id", "org_id", "testee_id", "assessment_id", "outcome_id", "generation_id", "interpretation_run_id", "report_id", "latest_run_id"} {
