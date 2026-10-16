@@ -217,6 +217,20 @@ write:
 // Header references cannot expand, omit, reorder or duplicate a single scope
 // object. Coverage is checked with only one raw archive page in memory.
 func validateGraphCoverage(m graphArchive, g group, p protected, index graphIndex, scopeDir, dir string) error {
+	return graphArchiveCoverage(m, g, p, index, scopeDir, dir, false)
+}
+
+// Fresh explicit capture already computed each complete preimage fingerprint,
+// encoded its original page, fsynced it and compared the exact readback bytes.
+// Repeat full scope/key coverage and raw SHA here without decoding those bodies
+// and computing their same fingerprints again. Other consumers remain full.
+func graphArchiveCoverage(m graphArchive, g group, p protected, index graphIndex, scopeDir, dir string, freshFrozen bool) error {
+	readPage := func(ref graphShard) ([]record, error) {
+		if freshFrozen {
+			return readGraphFrozenKeys(dir, m, ref)
+		}
+		return readGraphArchivePage(dir, m, ref)
+	}
 	if e := validateGraphArchive(m, g, m.GroupSHA); e != nil {
 		return e
 	}
@@ -245,7 +259,7 @@ func validateGraphCoverage(m graphArchive, g group, p protected, index graphInde
 						return errors.New("archive namespace differs from the typed-key plan")
 					}
 					var e error
-					current, e = readGraphArchivePage(dir, m, ref)
+					current, e = readPage(ref)
 					if e != nil {
 						return e
 					}
@@ -295,7 +309,7 @@ func validateGraphCoverage(m graphArchive, g group, p protected, index graphInde
 		if ref.File != graphArchiveFilename(true, i) {
 			return errors.New("archive guard ordinal changed")
 		}
-		records, e := readGraphArchivePage(dir, m, ref)
+		records, e := readPage(ref)
 		if e != nil {
 			return e
 		}

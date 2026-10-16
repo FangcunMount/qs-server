@@ -215,7 +215,7 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		}
 		m, e = captureGraph(ctx, store, g, p, index, c.scopeDir, c.archive, c.groupSHA, toolSource, c.workers)
 		if e == nil {
-			e = validateGraphCoverage(m, g, p, index, c.scopeDir, c.archive)
+			e = graphArchiveCoverage(m, g, p, index, c.scopeDir, c.archive, c.frozenRuleDelete)
 		}
 		if e == nil {
 			e = protectGraph(ctx, store, m, c.archive)

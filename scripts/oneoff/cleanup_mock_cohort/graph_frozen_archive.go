@@ -58,9 +58,10 @@ func graphFrozenArchiveHeaders(m graphArchive, g group, p protected, index graph
 	return nil
 }
 
-// The entire original file is still SHA-bound to the successful capture. Decode
-// only its physical identity fields; Columns/BSON and their base64 payloads stay
-// in the immutable original archive for default/unknown/restore consumers.
+// The entire original file is SHA-bound either by a successful capture proof
+// or by the fresh capture writer's computed raw SHA and exact durable readback.
+// Decode only physical identity fields; original Columns/BSON stay in the
+// immutable archive for full default/unknown/restore consumers.
 func readGraphFrozenKeys(dir string, m graphArchive, ref graphShard) ([]record, error) {
 	if !regexpArchiveShard.MatchString(ref.File) || ref.Bytes < 1 || ref.Bytes > graphBatchBytes || ref.Count < 1 || ref.Count > 1000 || ref.Store == "mongo" && ref.Count > 500 || !hashPattern.MatchString(ref.SHA) {
 		return nil, errors.New("invalid bounded frozen key shard")
@@ -80,7 +81,8 @@ func readGraphFrozenKeys(dir string, m graphArchive, ref graphShard) ([]record, 
 		} `json:"records"`
 	}
 	// This is not a replacement for strictDecode on authority or new archives.
-	// The same bytes already passed it in the successful capture execution.
+	// The same bytes were produced by archiveGraphPage from the complete
+	// originals, or already passed full validation in successful capture.
 	if err = json.Unmarshal(raw, &page); err != nil {
 		return nil, err
 	}
