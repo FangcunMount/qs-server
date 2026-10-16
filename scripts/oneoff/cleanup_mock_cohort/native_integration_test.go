@@ -305,7 +305,10 @@ func (h *cohortNative) seeded() (group, protected, []object) {
 	h.exec("INSERT INTO testee(id,org_id,name,gender,source,tags) VALUES(42,1,'synthetic-system',1,'retained',JSON_ARRAY()),(43,1,'synthetic-clack',1,'retained',JSON_ARRAY()),(44,1,'synthetic-cohort',1,'daily_simulation',JSON_ARRAY()),(45,1,'synthetic-real',1,'retained',JSON_ARRAY())")
 	h.exec("INSERT INTO assessment_plan(id,org_id,scale_code,schedule_type,total_times) VALUES(500,1,'synthetic','by_day',1)")
 	h.exec("INSERT INTO plan_enrollment(id,org_id,plan_id,testee_id,round,start_date,status,joined_at,record_origin) VALUES(501,1,500,44,1,'2026-01-01','active','2026-01-01','native'),(502,1,500,45,1,'2026-01-01','active','2026-01-01','native')")
-	h.exec("INSERT INTO assessment_score(id,assessment_id,testee_id,factor_code,factor_name,raw_score,risk_level) VALUES(1,101,44,'synthetic','synthetic',2.5,'low')")
+	// Ordinary DEFAULT_GENERATED timestamps are original data, not computed
+	// columns. Use an old instant so a restore that omits them cannot pass merely
+	// because capture and restore happened in the same wall-clock second.
+	h.exec("INSERT INTO assessment_score(id,assessment_id,testee_id,factor_code,factor_name,raw_score,risk_level,created_at,updated_at) VALUES(1,101,44,'synthetic','synthetic',2.5,'low','2026-01-01 01:02:03','2026-01-01 01:02:03')")
 	h.exec("INSERT INTO interpretation_attention_projection(event_id,report_id,assessment_id,testee_id,risk_level,status,created_at,updated_at) VALUES('evt-native','401','101',44,'low','complete','2026-01-01','2026-01-01')")
 	ctx := h.t.Context()
 	db := h.client.Database(h.name)
@@ -396,7 +399,7 @@ func TestMockCohortNativeOwnedPrimitives(t *testing.T) {
 		proposal := g
 		proposal.QS.Objects = append(append([]object{}, g.QS.Objects...), excluded...)
 		pOnly := p
-		pOnly.QS.Other = nil
+		pOnly.QS.Other = []object{}
 		proposal.ProtectedSHA = digest(encode(pOnly))
 		planned, err := plan(t.Context(), h.store, proposal, pOnly)
 		if err != nil {
@@ -480,6 +483,31 @@ func TestMockCohortNativeOwnedPrimitives(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := verify(t.Context(), h.store, m, dir, true); err != nil {
+			for _, ref := range m.Records {
+				original, archiveErr := archived(dir, ref)
+				current, exists, readErr := h.store.read(t.Context(), ref.Object)
+				if archiveErr != nil || readErr != nil {
+					t.Logf("restore comparison store=%s object=%s key_sha=%s archive_read_ok=%t current_read_ok=%t", ref.Object.Store, ref.Object.Name, objectID(ref.Object), archiveErr == nil, readErr == nil)
+					continue
+				}
+				if exists && sameRecord(original, current) {
+					continue
+				}
+				changed := []string{}
+				for _, before := range original.Columns {
+					matched := false
+					for _, after := range current.Columns {
+						if before.Name == after.Name {
+							matched = digest(encode(before)) == digest(encode(after))
+							break
+						}
+					}
+					if !matched {
+						changed = append(changed, before.Name)
+					}
+				}
+				t.Logf("restore mismatch store=%s object=%s key_sha=%s exists=%t original_sha=%s current_sha=%s definition_same=%t changed_columns=%v", ref.Object.Store, ref.Object.Name, objectID(ref.Object), exists, fingerprint(original), fingerprint(current), digest(original.Definition) == digest(current.Definition), changed)
+			}
 			t.Fatal(err)
 		}
 		h.assertGuards()
