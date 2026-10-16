@@ -130,10 +130,10 @@ func graphFrozenStatisticsPredicate(table string, roots, users map[string]bool, 
 		typ, selected := "BIGINT", "ids.id"
 		if text {
 			typ = "VARCHAR(64)"
-			// SQL052's source_ref is utf8mb4_unicode_ci (including PAD SPACE).
-			// Preserve that existing IN comparison rather than mixing JSON_TABLE's
-			// connection collation or silently changing it to binary equality.
-			selected += " COLLATE utf8mb4_unicode_ci"
+			// JSON_TABLE's VARCHAR inherits the connection charset. Convert the
+			// canonical decimal text before applying SQL052's source_ref collation,
+			// preserving its PAD SPACE equality even in non-utf8mb4 sessions.
+			selected = "CONVERT(ids.id USING utf8mb4) COLLATE utf8mb4_unicode_ci"
 		}
 		predicate := fmt.Sprintf("x.`%s` IN (SELECT %s FROM JSON_TABLE(?, '$[*]' COLUMNS(id %s PATH '$')) AS ids)", column, selected, typ)
 		if kind != "" {
