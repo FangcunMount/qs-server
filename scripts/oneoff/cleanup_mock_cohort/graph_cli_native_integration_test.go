@@ -152,7 +152,9 @@ func TestMockCohortGraphCLINativeOwnedCycle(t *testing.T) {
 			{"statistics_plan_fact", "enrollment_id", 501, true},
 			{"statistics_plan_fact", "task_id", 601, true},
 		} {
-			id := 900000 + n
+			// Stay below the original 811/812 maxima so SHOW CREATE TABLE keeps
+			// its frozen AUTO_INCREMENT value; this tests references, not DDL drift.
+			id := 100 + n
 			columns, values := "", ""
 			if link.table == "statistics_plan_fact" {
 				columns, values = ",plan_id", ",500"
