@@ -138,11 +138,15 @@ func graphBatchPredicate(objects []object, shape graphSQLShape) (string, []any, 
 }
 
 func graphReadSQLBatch(ctx context.Context, q sqlReader, objects []object, shape graphSQLShape, lock bool) ([]graphReadResult, error) {
+	return graphReadSQLBatchColumns(ctx, q, objects, shape, lock, "x.*")
+}
+
+func graphReadSQLBatchColumns(ctx context.Context, q sqlReader, objects []object, shape graphSQLShape, lock bool, columns string) ([]graphReadResult, error) {
 	where, args, err := graphBatchPredicate(objects, shape)
 	if err != nil {
 		return nil, err
 	}
-	query := "SELECT x.* FROM `" + objects[0].Name + "` x WHERE " + where
+	query := "SELECT " + columns + " FROM `" + objects[0].Name + "` x WHERE " + where
 	if lock {
 		query += " FOR UPDATE"
 	}
@@ -215,11 +219,19 @@ func graphMongoBatchFilter(objects []object) (bson.D, error) {
 }
 
 func (s *graphStore) readGraphMongoBatch(ctx context.Context, objects []object, definition []byte) ([]graphReadResult, error) {
+	return s.readGraphMongoBatchProjection(ctx, objects, definition, nil)
+}
+
+func (s *graphStore) readGraphMongoBatchProjection(ctx context.Context, objects []object, definition []byte, projection bson.D) ([]graphReadResult, error) {
 	filter, err := graphMongoBatchFilter(objects)
 	if err != nil {
 		return nil, err
 	}
-	cur, err := s.live.mongo.Database(s.live.mongoDB).Collection(objects[0].Name).Find(ctx, filter, options.Find().SetBatchSize(500).SetCollation(&options.Collation{Locale: "simple"}))
+	find := options.Find().SetBatchSize(500).SetCollation(&options.Collation{Locale: "simple"})
+	if projection != nil {
+		find.SetProjection(projection)
+	}
+	cur, err := s.live.mongo.Database(s.live.mongoDB).Collection(objects[0].Name).Find(ctx, filter, find)
 	if err != nil {
 		return nil, err
 	}
@@ -320,12 +332,15 @@ func (s *graphStore) preflightExactBatch(ctx context.Context, records []record, 
 		if !bytes.Equal(definition, r.Definition) {
 			return errors.New("mongo original namespace/UUID/index definition changed")
 		}
-		wire += len(r.BSON) + 2*len(encode(r.Object.Key)) + 128
+		wire += 2*len(encode(r.Object.Key)) + 128
+		if restore || !graphIsFrozenRuleDelete(ctx) {
+			wire += len(r.BSON)
+		}
 	}
 	if wire > graphMongoCommandBytes {
 		return fmt.Errorf("%w: graph batch exceeds conservative Mongo command budget before claim", errGraphBatchBudget)
 	}
-	if restore {
+	if restore && !graphIsFrozenRuleDelete(ctx) {
 		return s.graphMongoUniquePreflight(ctx, records, definition)
 	}
 	return nil
@@ -421,7 +436,7 @@ func graphSQLWritePlan(ctx context.Context, q sqlReader, records []record, shape
 	if wire >= packet || wire > graphBatchBytes || len(args) > graphBatchParameters {
 		return "", nil, fmt.Errorf("%w: SQL packet/parameter budget before claim", errGraphBatchBudget)
 	}
-	if restore {
+	if restore && !graphIsFrozenRuleDelete(ctx) {
 		if err = graphSQLUniquePreflight(ctx, q, records, shape, packet); err != nil {
 			return "", nil, err
 		}
@@ -981,6 +996,9 @@ func graphBatchPreimages(records []record, current []graphReadResult, restore bo
 }
 
 func (s *graphStore) mutateExactBatch(ctx context.Context, records []record, restore bool) (err error) {
+	if restore && graphIsFrozenRuleDelete(ctx) {
+		return errors.New("frozen rule delete cannot restore originals")
+	}
 	if err = s.preflightExactBatch(ctx, records, restore); err != nil {
 		return err
 	}
@@ -1007,11 +1025,11 @@ func (s *graphStore) mutateExactBatch(ctx context.Context, records []record, res
 				err = errors.Join(err, session.AbortTransaction(sc))
 			}
 		}()
-		current, err := s.readGraphMongoBatch(sc, objects, definition)
+		current, err := s.graphMutationMongoRead(sc, objects, definition)
 		if err != nil {
 			return err
 		}
-		pending, err := graphBatchPreimages(records, current, restore)
+		pending, err := graphMutationPreimages(ctx, records, current, restore)
 		if err != nil {
 			return err
 		}
@@ -1042,7 +1060,7 @@ func (s *graphStore) mutateExactBatch(ctx context.Context, records []record, res
 				}
 			}
 		}
-		current, err = s.readGraphMongoBatch(sc, objects, definition)
+		current, err = s.graphMutationMongoRead(sc, objects, definition)
 		if err != nil {
 			return err
 		}
@@ -1084,11 +1102,11 @@ func (s *graphStore) mutateGraphSQLBatch(ctx context.Context, objects []object, 
 	if err != nil {
 		return err
 	}
-	current, err := graphReadSQLBatch(ctx, tx, objects, shape, true)
+	current, err := graphMutationSQLRead(ctx, tx, objects, shape)
 	if err != nil {
 		return err
 	}
-	pending, err := graphBatchPreimages(records, current, restore)
+	pending, err := graphMutationPreimages(ctx, records, current, restore)
 	if err != nil {
 		return err
 	}
@@ -1106,7 +1124,7 @@ func (s *graphStore) mutateGraphSQLBatch(ctx context.Context, objects []object, 
 			return errors.Join(err, errors.New("graph SQL write acknowledgement count changed"))
 		}
 	}
-	current, err = graphReadSQLBatch(ctx, tx, objects, shape, true)
+	current, err = graphMutationSQLRead(ctx, tx, objects, shape)
 	if err != nil {
 		return err
 	}

@@ -27,8 +27,9 @@ type config struct {
 	owner, freeze, freezeSHA                                                                                string
 	selector, selectorSHA, scopeDir                                                                         string
 	captureEvidence, captureEvidenceSHA                                                                     string
+	clearanceManifest, clearanceManifestSHA                                                                 string
 	execute, original                                                                                       bool
-	ruleBatch                                                                                               bool
+	ruleBatch, frozenRuleDelete                                                                             bool
 	workers                                                                                                 int
 	timeout                                                                                                 time.Duration
 }
@@ -37,7 +38,9 @@ func flags(args []string) (config, error) {
 	var c config
 	f := flag.NewFlagSet("cleanup_mock_cohort", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&c.action, "action", "plan", "plan/capture/apply/verify/restore/plan-cohort")
+	f.StringVar(&c.action, "action", "plan", "plan/capture/apply/verify/restore/plan-cohort/clearance")
+	f.StringVar(&c.clearanceManifest, "clearance-manifest-file", "", "fixed original partial-batch inputs for read-only global clearance")
+	f.StringVar(&c.clearanceManifestSHA, "clearance-manifest-sha256", "", "clearance input manifest raw SHA256")
 	f.StringVar(&c.selector, "selector-file", "", "fixed whole-cohort readonly selector")
 	f.StringVar(&c.selectorSHA, "selector-sha256", "", "selector raw SHA256")
 	f.StringVar(&c.scopeDir, "scope-dir", "", "fresh owned 0700 scope-shard directory")
@@ -58,6 +61,7 @@ func flags(args []string) (config, error) {
 	f.BoolVar(&c.execute, "execute", false, "enable approved apply/restore; default is dry-run")
 	f.BoolVar(&c.original, "expect-original", false, "verify exact restored preimages instead of absence")
 	f.BoolVar(&c.ruleBatch, "rule-batch", false, "explicit rule subset; defer global residual clearance and emit partial data-action evidence")
+	f.BoolVar(&c.frozenRuleDelete, "frozen-rule-delete", false, "explicit frozen rule exact-key deletion; original values remain archived")
 	f.IntVar(&c.workers, "workers", 4, "bounded database workers, from 1 to 8")
 	f.DurationVar(&c.timeout, "timeout", 20*time.Minute, "bounded CLI budget; cannot extend approval expiry")
 	if e := f.Parse(args); e != nil {
@@ -76,7 +80,7 @@ func flags(args []string) (config, error) {
 		return c, errors.New("positional inputs rejected")
 	}
 	switch c.action {
-	case "plan", "capture", "apply", "verify", "restore", "plan-cohort":
+	case "plan", "capture", "apply", "verify", "restore", "plan-cohort", "clearance":
 	default:
 		return c, errors.New("unknown action")
 	}
@@ -85,6 +89,22 @@ func flags(args []string) (config, error) {
 	}
 	if c.ruleBatch && (c.original || c.action != "plan-cohort" && c.action != "capture" && c.action != "apply" && c.action != "verify") {
 		return c, errors.New("rule batch only belongs to graph discovery/capture/apply/absence verification")
+	}
+	if c.frozenRuleDelete && (!c.ruleBatch || c.original || c.action != "capture" && c.action != "apply" && c.action != "verify") {
+		return c, errors.New("frozen rule delete only belongs to explicit rule batch capture/apply/absence verification")
+	}
+	clearanceProvided := false
+	f.Visit(func(v *flag.Flag) {
+		if v.Name == "clearance-manifest-file" || v.Name == "clearance-manifest-sha256" {
+			clearanceProvided = true
+		}
+	})
+	if c.action == "clearance" {
+		if c.clearanceManifest == "" || !hashPattern.MatchString(c.clearanceManifestSHA) || c.execute || c.original || c.ruleBatch || c.frozenRuleDelete || c.group != "" || c.groupSHA != "" || c.owner != "" || c.freeze != "" || c.freezeSHA != "" || c.selector != "" || c.selectorSHA != "" || c.scopeDir != "" || c.archive != "" || c.materialSHA != "" || c.approval != "" || c.approvalSHA != "" || evidenceProvided || c.output != "" {
+			return c, errors.New("clearance accepts only its fixed batch manifest, common protection and readonly budget")
+		}
+	} else if clearanceProvided {
+		return c, errors.New("clearance manifest cannot authorize historical data actions")
 	}
 	if c.timeout <= 0 || c.timeout > 25*time.Minute {
 		return c, errors.New("CLI timeout must leave the five-minute maintenance reserve")
@@ -198,6 +218,9 @@ func run(args []string, out io.Writer) error {
 	if e != nil {
 		return e
 	}
+	if c.action == "clearance" {
+		return safePhase("graph_clearance", runGraphClearance(c, out))
+	}
 	if c.action == "plan-cohort" {
 		return safePhase("graph_plan", runGraphPlan(c, out))
 	}
@@ -215,7 +238,7 @@ func run(args []string, out io.Writer) error {
 	if g.QS.Graph != nil {
 		return safePhase("graph_action", runGraphAction(c, g, p, out))
 	}
-	if c.ruleBatch {
+	if c.ruleBatch || c.frozenRuleDelete {
 		return errors.New("rule batch requires an explicit graph identity component subset")
 	}
 	if c.captureEvidence != "" || c.captureEvidenceSHA != "" {

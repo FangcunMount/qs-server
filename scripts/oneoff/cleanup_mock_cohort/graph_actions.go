@@ -114,6 +114,7 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		}
 		defer stop()
 	}
+	ctx = graphFrozenRuleDeleteContext(ctx, c.frozenRuleDelete)
 	live, release, e := connectWithWorkers(ctx, g.QS.Binding, c.workers)
 	if e != nil {
 		return e

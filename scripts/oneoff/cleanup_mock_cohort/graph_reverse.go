@@ -84,6 +84,12 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 	if e != nil {
 		return e
 	}
+	return graphRelationshipReferences(ctx, r, g, f, allowOriginal)
+}
+
+// Clearance merges only frozen typed parent IDs; original materials stay separate.
+func graphRelationshipReferences(ctx context.Context, r graphReader, g group, f graphFrozenReferences, allowOriginal bool) error {
+	var e error
 	roots := graphRootSet(g.QS.Graph.RootIDs)
 	var iam iamScope
 	if e = json.Unmarshal(g.IAM, &iam); e != nil {

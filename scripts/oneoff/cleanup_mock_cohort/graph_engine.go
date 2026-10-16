@@ -42,6 +42,9 @@ func graphReadBounded(ctx context.Context, s graphBatchProvider, objects []objec
 		records[i] = v.Record
 	}
 	if restorePreflight {
+		if graphIsFrozenRuleDelete(ctx) {
+			return graphFrozenCapturePreflight(ctx, s, records, fn)
+		}
 		e = s.preflightExactBatch(ctx, records, true)
 		if errors.Is(e, errGraphBatchBudget) && len(objects) > 1 {
 			n := len(objects) / 2
@@ -391,11 +394,11 @@ func graphVerify(ctx context.Context, s graphBatchProvider, m graphArchive, dir 
 		if e != nil {
 			return e
 		}
-		absent, same, e := graphChunkState(ctx, s, records)
+		prior, found := j.latest[graphChunkID(ref)]
+		absent, same, e := graphVerificationState(ctx, s, records, original, found && (prior.State == "intent" || prior.State == "unknown"))
 		if e != nil {
 			return e
 		}
-		prior, found := j.latest[graphChunkID(ref)]
 		if found && (prior.State == "intent" || prior.State == "unknown") {
 			if !absent && !same {
 				return errors.New("mixed unknown batch remains blocked; no replay")
@@ -426,6 +429,11 @@ func graphPrecheck(ctx context.Context, s graphBatchProvider, m graphArchive, di
 		prior, found := j.latest[graphChunkID(ref)]
 		if found && (prior.State == "intent" || prior.State == "unknown") {
 			return errors.New("unknown batch requires read-only reconciliation before new approval")
+		}
+		// Entry already validated the complete immutable scope/archive coverage.
+		// Fresh direct deletes recheck typed keys and metadata in each transaction.
+		if graphIsFrozenRuleDelete(ctx) && !restore && !found {
+			continue
 		}
 		records, e := readGraphArchivePage(dir, m, ref)
 		if e != nil {
