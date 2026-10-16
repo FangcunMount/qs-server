@@ -286,7 +286,7 @@ func graphClearanceJournal(raw []byte, m graphArchive) error {
 	return nil
 }
 func graphClearanceTargets(ctx context.Context, s graphBatchProvider, b graphClearanceBatch) error {
-	ctx = graphFrozenRuleDeleteContext(ctx, true)
+	ctx = graphClearanceNamespaceContext(graphFrozenRuleDeleteContext(ctx, true))
 	for _, ref := range b.material.Targets {
 		records, e := readGraphFrozenKeys(b.material.Graph.ArchiveDirectory, b.material, ref)
 		if e != nil {

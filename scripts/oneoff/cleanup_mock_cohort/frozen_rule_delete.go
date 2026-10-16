@@ -122,7 +122,7 @@ func graphVerificationState(ctx context.Context, s graphBatchProvider, records [
 	}
 	absent := true
 	for i, v := range current {
-		if objectID(v.Record.Object) != objectID(objects[i]) || !bytes.Equal(v.Record.Definition, records[i].Definition) {
+		if objectID(v.Record.Object) != objectID(objects[i]) || !graphClearanceSameNamespace(ctx, objects[i].Store, v.Record.Definition, records[i].Definition) {
 			return false, false, errors.New("frozen rule absence namespace or physical key changed")
 		}
 		absent = absent && !v.Exists

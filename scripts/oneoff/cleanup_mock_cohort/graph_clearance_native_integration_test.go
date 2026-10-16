@@ -151,7 +151,14 @@ func TestMockCohortFrozenRuleClearanceCLINativeOwnedCycle(t *testing.T) {
 		JournalSHA: digest(journalRaw), CurrentFreeze: graphClearanceFile{currentFreezePath, digest(freezeRaw)},
 	}}}
 	manifestRaw := encode(manifest)
-	clearanceRaw, exit := cli.invoke(t, []string{"--action=clearance", "--timeout=60s", "--clearance-manifest-file=" + write("clearance-inputs.json", manifestRaw), "--clearance-manifest-sha256=" + digest(manifestRaw), "--protection-file=" + protectionPath, "--protection-sha256=" + digest(protectionRaw)})
+	// A legitimate unrelated insert advances the table-level counter after the
+	// old actual capture/apply, without changing any archived row or schema.
+	h.exec("INSERT INTO statistics_assessment_fact(id,org_id,fact_key,core_hash,fact_type,occurred_at,stat_date,source_type,source_ref,testee_id) VALUES(900000,1,'unrelated-counter',REPEAT('c',64),'assessment_completed','2026-01-01','2026-01-01','unrelated','999001',999001)")
+	var counter uint64
+	require.NoError(t, h.store.sql.QueryRowContext(ctx, "SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='statistics_assessment_fact'").Scan(&counter))
+	require.Greater(t, counter, uint64(900000))
+	clearanceArgs := []string{"--action=clearance", "--timeout=60s", "--clearance-manifest-file=" + write("clearance-inputs.json", manifestRaw), "--clearance-manifest-sha256=" + digest(manifestRaw), "--protection-file=" + protectionPath, "--protection-sha256=" + digest(protectionRaw)}
+	clearanceRaw, exit := cli.invoke(t, clearanceArgs)
 	require.Zero(t, exit)
 	var result graphClearanceReceipt
 	require.NoError(t, strictDecode(clearanceRaw, &result))
@@ -168,5 +175,18 @@ func TestMockCohortFrozenRuleClearanceCLINativeOwnedCycle(t *testing.T) {
 	finalGuards, e := nativeProtectionSnapshot(ctx, h.store, f.protected)
 	require.NoError(t, e)
 	require.Equal(t, guards, finalGuards)
+	materialAfter, e := privateRead(filepath.Join(archive, "material.json"), 16<<20)
+	require.NoError(t, e)
+	require.Equal(t, materialRaw, materialAfter, "counter normalization must not rewrite captured originals")
+	for _, ddl := range []string{
+		"ALTER TABLE statistics_assessment_fact COMMENT='schema change AUTO_INCREMENT=777'",
+		"ALTER TABLE statistics_assessment_fact COMMENT='', ADD COLUMN clearance_foreign_column INT NULL",
+	} {
+		h.exec(ddl)
+		rejectedDDL, ddlExit := cli.invoke(t, clearanceArgs)
+		require.NotZero(t, ddlExit, "real DDL drift must remain blocked")
+		require.Empty(t, rejectedDDL)
+	}
+	t.Log("readonly_clearance_actual_counter_advanced=true actual_comment_fake_token_and_column_DDL_rejected=true original_material_raw_unchanged=true")
 	t.Log("frozen_rule_actual_cli=true archived_raw_originals_once=true changed_body_same_physical_keys_deleted=true true_partial_apply=true later_readonly_clearance=true journal_and_forward_bytes_unchanged=true protected_unchanged=true synthetic_only=true")
 }

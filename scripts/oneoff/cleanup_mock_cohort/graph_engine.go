@@ -365,7 +365,7 @@ func protectGraph(ctx context.Context, s graphBatchProvider, m graphArchive, dir
 			return errors.New("protection result count changed")
 		}
 		for i, r := range original {
-			if !current[i].Exists || !sameRecord(current[i].Record, r) {
+			if !current[i].Exists || !graphClearanceSameRecord(ctx, current[i].Record, r) {
 				return errors.New("protected original changed; all target components stop")
 			}
 		}
