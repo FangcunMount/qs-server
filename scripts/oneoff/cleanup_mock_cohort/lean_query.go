@@ -91,12 +91,16 @@ func (r *leanGraphReader) sqlPages(ctx context.Context, name, where string, args
 	return r.store.sqlPagesSelected(ctx, name, where, args, columns, emit)
 }
 
-// A directed statistics intersection carries the complete frozen parent sets
-// once. Repeating a keyset query would resend those large JSON parameters for
-// every page. The callback only checks in-memory identities/holds; it must not
-// issue another query on this open cursor's connection.
+func leanStatisticsCursorTable(name string) bool {
+	return name == "statistics_access_fact" || name == "statistics_assessment_fact" || name == "statistics_plan_fact"
+}
+
+// Statistics source batches and directed parent intersections send their fixed
+// predicates once, rather than repeating selection/sorting for each keyset page.
+// The callback only checks in-memory identities/holds; it must not issue another
+// query on this open cursor's connection.
 func (r *leanGraphReader) sqlOneCursor(ctx context.Context, name, where string, args []any, emit func(record) error) (result error) {
-	if name != "statistics_access_fact" && name != "statistics_assessment_fact" && name != "statistics_plan_fact" {
+	if !leanStatisticsCursorTable(name) {
 		return errors.New("single-cursor query outside fixed statistics namespaces")
 	}
 	columns, e := r.sqlProjection(ctx, name)

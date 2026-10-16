@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
@@ -175,4 +177,112 @@ func TestLeanMongoDiscoveryUsesLeafIdentityProjection(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestLeanStatisticsSourceJobsUseOneTechnicalCursorAcrossPages(t *testing.T) {
+	for _, tc := range []struct{ name, columns string }{
+		{"statistics_access_fact", "x.`id`,x.`org_id`,x.`testee_id`,x.`source_type`,x.`source_ref`,x.`stat_date`,x.`clinician_id`,x.`entry_id`"},
+		{"statistics_plan_fact", "x.`id`,x.`org_id`,x.`testee_id`,x.`source_type`,x.`source_ref`,x.`stat_date`,x.`plan_id`,x.`enrollment_id`,x.`task_id`"},
+		{"statistics_assessment_fact", "x.`id`,x.`org_id`,x.`testee_id`,x.`filler_id`,x.`source_type`,x.`source_ref`,x.`stat_date`,x.`answersheet_id`,x.`assessment_id`,x.`outcome_id`,x.`report_id`,x.`plan_id`,x.`enrollment_id`,x.`task_id`"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, mock := graphBatchMock(t)
+			s.live.workers = 4
+			s.sqlShapes[tc.name] = graphSQLShape{keys: []cell{{Name: "id", Type: "uint64"}}, definition: graphBatchTestDefinition()}
+			graphBatchExpectShape(mock, tc.name, "id", "bigint", "bigint unsigned")
+			rows := sqlmock.NewRowsWithColumnDefinition(sqlmock.NewColumn("id").OfType("UNSIGNED BIGINT", ""), sqlmock.NewColumn("source_ref").OfType("VARCHAR", ""), sqlmock.NewColumn("testee_id").OfType("BIGINT", ""))
+			for n := 1; n <= 2001; n++ {
+				rows.AddRow(strconv.Itoa(n), "001", nil)
+			}
+			where := "x.source_type=? AND x.source_ref IN (?)"
+			mock.ExpectQuery("SELECT "+tc.columns+" FROM `"+tc.name+"` x WHERE "+where+" ORDER BY x.`id`").WithArgs("fixed_source_kind", "001").WillReturnRows(rows).RowsWillBeClosed()
+			count := 0
+			err := readLeanJobs(t.Context(), newLeanReader(s), []leanReadJob{{store: "mysql", name: tc.name, where: where, args: []any{"fixed_source_kind", "001"}}}, func(r record, _ leanReadJob) error {
+				count++
+				if id, err := statisticPhysicalID(r.Object); err != nil || id != uint64(count) {
+					return errors.New("physical identity or single-cursor order changed")
+				}
+				if source, _ := graphSQLValue(r, "source_ref"); source != "001" || string(r.Definition) != string(graphBatchTestDefinition()) {
+					return errors.New("source string or original namespace was changed")
+				}
+				if _, exists := graphSQLValue(r, "testee_id"); exists {
+					return errors.New("SQL NULL became a parent identity")
+				}
+				return nil
+			})
+			if err != nil || count != 2001 {
+				t.Fatal("statistics source job repeated or lost its bounded cursor", count, err)
+			}
+		})
+	}
+}
+
+func TestLeanStatisticsSourceFailureClosesAllFourWorkerCursors(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	db.SetMaxOpenConns(4)
+	mock.MatchExpectationsInOrder(false)
+	query := "SELECT x.`id`,x.`org_id`,x.`testee_id`,x.`source_type`,x.`source_ref`,x.`stat_date`,x.`plan_id`,x.`enrollment_id`,x.`task_id` FROM `statistics_plan_fact` x WHERE x.source_type=? AND x.source_ref IN (?) ORDER BY x.`id`"
+	jobs := make([]leanReadJob, 4)
+	for i := range jobs {
+		id := strconv.Itoa(i + 1)
+		jobs[i] = leanReadJob{store: "mysql", name: "statistics_plan_fact", where: "x.source_type=? AND x.source_ref IN (?)", args: []any{"assessment_task", id}}
+		rows := sqlmock.NewRowsWithColumnDefinition(sqlmock.NewColumn("id").OfType("UNSIGNED BIGINT", ""))
+		for n := 1; n <= 2001; n++ {
+			rows.AddRow(strconv.Itoa(i*10000 + n))
+		}
+		mock.ExpectQuery(query).WithArgs("assessment_task", id).WillReturnRows(rows).RowsWillBeClosed()
+	}
+	makeReader := func() graphReader {
+		s := newGraphStore(&liveStore{sqlPool: db})
+		s.sqlShapes["statistics_plan_fact"] = graphSQLShape{keys: []cell{{Name: "id", Type: "uint64"}}, definition: graphBatchTestDefinition()}
+		return newLeanReader(s)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	primary := errors.New("original typed-parent aggregation rejected")
+	allOpen := false
+	err = runLeanReadPool(ctx, 4, jobs, makeReader, nil, func(record, leanReadJob) error {
+		for db.Stats().InUse != 4 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Millisecond):
+			}
+		}
+		allOpen = true
+		return primary
+	})
+	if !errors.Is(err, primary) || !allOpen || db.Stats().InUse != 0 {
+		t.Fatal("primary failure or four-worker cursor release was lost", err, allOpen, db.Stats().InUse)
+	}
+	if err = mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLeanStatisticsCursorLeavesOtherSQLJobsPaged(t *testing.T) {
+	s, mock := graphBatchMock(t)
+	s.live.workers = 4
+	s.sqlShapes["statistics_store_activity_fact"] = graphSQLShape{keys: []cell{{Name: "id", Type: "uint64"}}, definition: graphBatchTestDefinition()}
+	graphBatchExpectShape(mock, "statistics_store_activity_fact", "id", "bigint", "bigint unsigned")
+	query := "SELECT x.`id`,x.`org_id`,x.`source_type`,x.`source_ref`,x.`stat_date`,x.`fact_type`,x.`business_object_id`,x.`conducting_store_id` FROM `statistics_store_activity_fact` x WHERE x.business_object_id IN (?) ORDER BY x.`id` LIMIT 1000"
+	mock.ExpectQuery(query).WithArgs("17").WillReturnRows(sqlmock.NewRowsWithColumnDefinition(sqlmock.NewColumn("id").OfType("UNSIGNED BIGINT", "")).AddRow("1")).RowsWillBeClosed()
+	count := 0
+	err := readLeanJobs(t.Context(), newLeanReader(s), []leanReadJob{{store: "mysql", name: "statistics_store_activity_fact", where: "x.business_object_id IN (?)", args: []any{"17"}}}, func(record, leanReadJob) error { count++; return nil })
+	if err != nil || count != 1 {
+		t.Fatal("three-table cursor whitelist widened to another namespace", count, err)
+	}
+}
+
+func TestLeanStatisticsFakeReaderKeepsExistingPageContract(t *testing.T) {
+	reads := 0
+	reader := &leanPoolTestReader{read: func(_ context.Context, emit func(record) error) error { reads++; return emit(record{}) }}
+	err := readLeanJobs(t.Context(), reader, []leanReadJob{{store: "mysql", name: "statistics_plan_fact"}}, func(record, leanReadJob) error { return nil })
+	if err != nil || reads != 1 {
+		t.Fatal("non-live reader acquired a new cursor interface requirement", reads, err)
+	}
 }

@@ -126,6 +126,10 @@ func runLeanReadPool(ctx context.Context, workers int, jobs []leanReadJob, makeR
 					}
 					switch job.store {
 					case "mysql":
+						if actual, ok := reader.(*leanGraphReader); ok && leanStatisticsCursorTable(job.name) {
+							e = actual.sqlOneCursor(workCtx, job.name, job.where, job.args, send)
+							break
+						}
 						e = reader.sqlPages(workCtx, job.name, job.where, job.args, send)
 					case "mongo":
 						e = reader.mongoPages(workCtx, job.name, job.filter, send)
