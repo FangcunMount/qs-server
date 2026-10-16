@@ -228,7 +228,7 @@ func (p *cohortPlanner) rootSQL(name string, ids []string) error {
 		args = append([]any{org}, args...)
 	}
 	switch name {
-	case "evaluation_outcome", "assessment_score", "assessment_task", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure":
+	case "evaluation_outcome", "assessment_score", "assessment_task", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref":
 		batch := []record{}
 		size := 0
 		flush := func() error { e := p.sqlOwnedBatch(p.context, batch); batch = nil; size = 0; return e }
@@ -360,16 +360,44 @@ func planCohort(ctx context.Context, reader graphReader, c cohortSelector, p pro
 
 func (p *cohortPlanner) discoverStoreFacts(ctx context.Context) error {
 	p.writer.index.Counts["mysql/statistics_store_activity_fact"] = 0
+	shards := append([]graphShard{}, p.writer.index.Shards...)
 	for _, source := range []struct{ store, name, link, fact string }{{"mongo", "answersheets", "domain_id", "answersheet_submitted"}, {"mysql", "assessment", "id", "assessment_completed"}} {
-		if e := graphIDs(p.dir, p.writer.index, source.store, source.name, source.link, 1000, func(ids []string) error {
+		for _, shard := range shards {
+			if shard.Store != source.store || shard.Name != source.name {
+				continue
+			}
+			page, e := readGraphPage(p.dir, shard)
+			if e != nil {
+				return e
+			}
+			ids := []string{}
+			roots := map[string][]string{}
+			for _, o := range page.Objects {
+				id := o.Links[source.link]
+				if !graphDecimal(id) {
+					return errors.New("store statistic parent identity missing")
+				}
+				ids = append(ids, id)
+				roots[id] = graphRoots(o)
+			}
 			slots, args := placeholders(ids)
 			args = append([]any{p.selector.Selection.OrgID, source.fact}, args...)
-			return p.reader.sqlPages(ctx, "statistics_store_activity_fact", "x.org_id=? AND BINARY x.source_type=BINARY ? AND x.business_object_id IN ("+slots+")", args, p.emitSQL)
-		}); e != nil {
-			return e
-		}
-		if e := p.writer.flush(); e != nil {
-			return e
+			if e = p.reader.sqlPages(ctx, "statistics_store_activity_fact", "x.org_id=? AND BINARY x.source_type=BINARY ? AND x.business_object_id IN ("+slots+")", args, func(r record) error {
+				o, e := p.sqlObject(r)
+				if e != nil {
+					return e
+				}
+				o.RootIDs = roots[o.Links["business_object_id"]]
+				if o.Links["source_ref"] != o.Links["business_object_id"] {
+					p.holdObject(o, "statistics_store_activity_fact:typed_source_ref_conflict")
+				}
+				return p.writer.add(o, graphSQLTables[r.Object.Name])
+			}); e != nil {
+				return e
+			}
+			if e = p.writer.flush(); e != nil {
+				return e
+			}
 		}
 	}
 	return nil

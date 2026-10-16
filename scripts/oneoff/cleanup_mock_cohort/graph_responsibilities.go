@@ -34,6 +34,7 @@ func (p *cohortPlanner) standardSQL(r record, ref eventevidence.StandardReferenc
 	if o.Links["state"] != "published" {
 		p.action("settle_mysql_outbox:" + o.Links["state"])
 	}
+	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
 	return p.writer.add(o, graphSQLTables["rm_outbox"])
 }
 func (p *cohortPlanner) standardMongo(r record, ref eventevidence.StandardReference) error {
@@ -60,6 +61,7 @@ func (p *cohortPlanner) standardMongo(r record, ref eventevidence.StandardRefere
 	if o.Links["state"] != "published" {
 		p.action("settle_mongo_outbox:" + o.Links["state"])
 	}
+	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
 	return p.writer.add(o, graphMongoTables["rm_outbox"])
 }
 func referenceKey(producer, id, destination string) string {
@@ -291,7 +293,16 @@ func (p *cohortPlanner) classifyDeliveries(ctx context.Context, records []record
 		if !owned {
 			continue
 		}
-		if e := p.emitSQL(c.r); e != nil {
+		o, e := p.sqlObject(c.r)
+		if e != nil {
+			return e
+		}
+		root := c.testeeID
+		if root == "" {
+			root = owners[c.assessmentID]
+		}
+		o.RootIDs = []string{root}
+		if e := p.writer.add(o, graphSQLTables[c.r.Object.Name]); e != nil {
 			return e
 		}
 	}

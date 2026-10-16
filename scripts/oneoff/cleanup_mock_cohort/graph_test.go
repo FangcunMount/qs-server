@@ -126,6 +126,15 @@ func graphFixture(t *testing.T) (*graphFake, cohortSelector, protected, string) 
 }
 func TestGraphPlannerFreezesIndependentAndPlanChainsWithoutSharedRoots(t *testing.T) {
 	s, c, p, dir := graphFixture(t)
+	runtime := graphSQLFixture("runtime_checkpoint", "1100", map[string]string{"assessment_id": "100"})
+	runtime.Columns = append(runtime.Columns, cell{Name: "scope", Type: "VARCHAR", Raw: []byte("evaluation_run")})
+	s.sqlRows["runtime_checkpoint"] = []record{runtime}
+	reminder := graphSQLFixture("task_opened_reminder_delivery", "1200", map[string]string{"org_id": "1"})
+	reminder.Columns = append(reminder.Columns, cell{Name: "task_id", Type: "VARBINARY", Raw: []byte("400")})
+	s.sqlRows["task_opened_reminder_delivery"] = []record{reminder}
+	ref := record{Object: object{Store: "mysql", Name: "qs_rm_evaluation_request_ref", Key: []cell{{Name: "event_id", Type: "bytes", Raw: []byte("fixture-evaluation")}}}, Definition: []byte("fixed definition"), Columns: []cell{{Name: "event_id", Type: "VARBINARY", Raw: []byte("fixture-evaluation")}, {Name: "org_id", Type: "BIGINT", Raw: []byte("1")}, {Name: "assessment_id", Type: "UNSIGNED BIGINT", Raw: []byte("100")}}}
+	s.sqlRows["qs_rm_evaluation_request_ref"] = []record{ref}
+
 	index, e := planCohort(t.Context(), s, c, p, dir, digest(encode(c)), strings.Repeat("c", 40))
 	if e != nil {
 		t.Fatal(e)
@@ -147,8 +156,14 @@ func TestGraphPlannerFreezesIndependentAndPlanChainsWithoutSharedRoots(t *testin
 		}
 	}
 	for _, shard := range index.Shards {
-		if _, e := readGraphPage(dir, shard); e != nil {
+		page, e := readGraphPage(dir, shard)
+		if e != nil {
 			t.Fatal(e)
+		}
+		for _, o := range page.Objects {
+			if len(o.RootIDs) != 1 || o.RootIDs[0] != "1" {
+				t.Fatalf("typed child must preserve exact subset root ownership: %s", o.Object.Name)
+			}
 		}
 	}
 }

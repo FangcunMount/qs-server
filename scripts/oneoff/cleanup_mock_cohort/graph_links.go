@@ -165,7 +165,19 @@ func (p *cohortPlanner) rootMongo(ctx context.Context, name string, ids []string
 		raw := bson.Raw(r.BSON)
 		testee, e := graphMongoID(raw, "testee_id", false)
 		if e != nil {
-			p.holdRecord(r, nil, name+":unassignable_testee_identity")
+			hints := []string{}
+			v := raw.Lookup("testee_id")
+			candidate := ""
+			if v.Type == bson.TypeInt32 && v.Int32() > 0 {
+				candidate = fmt.Sprint(v.Int32())
+			}
+			if v.Type == bson.TypeString {
+				candidate = v.StringValue()
+			}
+			if roots[candidate] {
+				hints = append(hints, candidate)
+			}
+			p.holdRecord(r, hints, name+":unassignable_testee_identity")
 			return nil
 		}
 		if !roots[testee] {
@@ -218,7 +230,26 @@ func (p *cohortPlanner) sqlOwnedBatch(ctx context.Context, records []record) err
 	if e != nil {
 		return e
 	}
+	tasks, e := p.sqlLinkOwners(ctx, "assessment_task", uniqueLinks(objects, "task_id"))
+	if e != nil {
+		return e
+	}
 	for _, o := range objects {
+		if owner, ok := assessments[o.Links["assessment_id"]]; ok && o.Links["testee_id"] == "" {
+			o.RootIDs = []string{owner["testee_id"]}
+		}
+		if id := o.Links["task_id"]; id != "" {
+			t, ok := tasks[id]
+			if !ok {
+				p.holdObject(o, o.Object.Name+":missing_task_ownership")
+			} else {
+				o.RootIDs = []string{t["testee_id"]}
+				if o.Links["org_id"] != "" && t["org_id"] != o.Links["org_id"] {
+					p.holdObject(o, o.Object.Name+":task_ownership_conflict")
+				}
+			}
+		}
+
 		if id := o.Links["assessment_id"]; id != "" && id != "0" {
 			a, ok := assessments[id]
 			if !ok {
