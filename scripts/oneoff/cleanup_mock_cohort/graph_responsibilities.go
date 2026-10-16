@@ -31,11 +31,11 @@ func (p *cohortPlanner) standardSQL(r record, ref eventevidence.StandardReferenc
 	if e != nil {
 		return e
 	}
+	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
 	if o.Links["state"] != "published" || o.Links["claim_token"] != "" || o.Links["lease_until"] != "" {
 		p.action("settle_mysql_outbox:" + o.Links["state"])
 		p.holdObject(o, "mysql/rm_outbox:unsettled_publish_responsibility")
 	}
-	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
 	p.writer.index.Retained["mysql/rm_outbox"] = "original full wire/state retained; separate frozen consumer/manual replay settlement is still required"
 	return p.writer.add(o, 0)
 }
@@ -60,11 +60,11 @@ func (p *cohortPlanner) standardMongo(r record, ref eventevidence.StandardRefere
 	if e != nil {
 		return e
 	}
+	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
 	if o.Links["state"] != "published" || graphMongoString(raw, "claim_token") != "" || raw.Lookup("lease_until").Type != 0 && raw.Lookup("lease_until").Type != bson.TypeNull {
 		p.action("settle_mongo_outbox:" + o.Links["state"])
 		p.holdObject(o, "mongo/rm_outbox:unsettled_publish_responsibility")
 	}
-	o.RootIDs = graphRoots(p.referenceOwners[referenceKey(ref.Producer, ref.EventID, ref.Destination)])
 	p.writer.index.Retained["mongo/rm_outbox"] = "original full wire/state retained; separate frozen consumer/manual replay settlement is still required"
 	return p.writer.add(o, 0)
 }
