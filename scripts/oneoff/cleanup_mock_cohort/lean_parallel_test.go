@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"strconv"
@@ -217,11 +218,73 @@ func TestLeanStatisticsSourceJobsUseOneTechnicalCursorAcrossPages(t *testing.T) 
 	}
 }
 
+// A reserved pool connection need not have returned a cursor yet. Hold each
+// real sqlmock cursor at its first Next until all four have actually started.
+type leanCursorStartConnector struct {
+	base            driver.Driver
+	dsn             string
+	started, closed atomic.Int32
+	allStarted      chan struct{}
+}
+
+func (c *leanCursorStartConnector) Driver() driver.Driver { return c.base }
+func (c *leanCursorStartConnector) Connect(context.Context) (driver.Conn, error) {
+	conn, err := c.base.Open(c.dsn)
+	if err != nil {
+		return nil, err
+	}
+	return &leanCursorStartConn{Conn: conn, barrier: c}, nil
+}
+
+type leanCursorStartConn struct {
+	driver.Conn
+	barrier *leanCursorStartConnector
+}
+
+func (c *leanCursorStartConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	rows, err := c.Conn.(driver.QueryerContext).QueryContext(ctx, query, args)
+	if err != nil {
+		return nil, err
+	}
+	return &leanCursorStartRows{Rows: rows, ctx: ctx, barrier: c.barrier}, nil
+}
+
+type leanCursorStartRows struct {
+	driver.Rows
+	ctx     context.Context
+	barrier *leanCursorStartConnector
+	first   sync.Once
+}
+
+func (r *leanCursorStartRows) Next(values []driver.Value) error {
+	r.first.Do(func() {
+		if r.barrier.started.Add(1) == 4 {
+			close(r.barrier.allStarted)
+		}
+	})
+	select {
+	case <-r.barrier.allStarted:
+	case <-r.ctx.Done():
+		return r.ctx.Err()
+	}
+	return r.Rows.Next(values)
+}
+func (r *leanCursorStartRows) Close() error {
+	r.barrier.closed.Add(1)
+	return r.Rows.Close()
+}
+func (r *leanCursorStartRows) ColumnTypeDatabaseTypeName(index int) string {
+	return r.Rows.(driver.RowsColumnTypeDatabaseTypeName).ColumnTypeDatabaseTypeName(index)
+}
+
 func TestLeanStatisticsSourceFailureClosesAllFourWorkerCursors(t *testing.T) {
-	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	mockDB, mock, err := sqlmock.NewWithDSN(t.Name(), sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = mockDB.Close() }()
+	barrier := &leanCursorStartConnector{base: mockDB.Driver(), dsn: t.Name(), allStarted: make(chan struct{})}
+	db := sql.OpenDB(barrier)
 	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(4)
 	mock.MatchExpectationsInOrder(false)
@@ -246,18 +309,11 @@ func TestLeanStatisticsSourceFailureClosesAllFourWorkerCursors(t *testing.T) {
 	primary := errors.New("original typed-parent aggregation rejected")
 	allOpen := false
 	err = runLeanReadPool(ctx, 4, jobs, makeReader, nil, func(record, leanReadJob) error {
-		for db.Stats().InUse != 4 {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(time.Millisecond):
-			}
-		}
-		allOpen = true
+		allOpen = barrier.started.Load() == 4 && db.Stats().InUse == 4
 		return primary
 	})
-	if !errors.Is(err, primary) || !allOpen || db.Stats().InUse != 0 {
-		t.Fatal("primary failure or four-worker cursor release was lost", err, allOpen, db.Stats().InUse)
+	if !errors.Is(err, primary) || !allOpen || barrier.started.Load() != 4 || barrier.closed.Load() != 4 || db.Stats().InUse != 0 {
+		t.Fatal("primary failure or four-worker cursor release was lost", err, allOpen, barrier.started.Load(), barrier.closed.Load(), db.Stats().InUse)
 	}
 	if err = mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
