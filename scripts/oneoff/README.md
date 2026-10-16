@@ -41,6 +41,7 @@ AnswerSheet、提交幂等/Outbox 以及下游 Outcome/Report 的反向引用审
 | 工具 | 用途 |
 | --- | --- |
 | `cleanup_perf_testee_data` | 按显式 Testee ID dry-run、备份并且只清理 `origin_type=adhoc` 临时测评数据 |
+| `cleanup_mock_cohort` | 仅处理已确认模拟群体的固定对象图；独立归档、执行和恢复，生产执行资格以现有验收台账及批准的整批执行包为准 |
 | `select_seeddata_duplicate_testees` | 只读识别 seeddata 重试产生的重复 Testee，并生成显式 Testee/Profile 清单 |
 | `rebuild_statistics` | 通过受保护 Run API 执行 validate、repair 或 publish |
 | `hotrank_day_rebuild` | 以完整 UTC+8 日的答卷受理事实及原 Outbox 摘要重建绝对计数和去重集；默认只读，写入须审计、同日租约和批准的完整源摘要 |
@@ -52,6 +53,20 @@ AnswerSheet、提交幂等/Outbox 以及下游 Outcome/Report 的反向引用审
 | `govern_evaluation_outcome_template_routes` | 以可回滚 manifest 显式化历史 EvaluationOutcome 冻结输入中的模板路由 |
 
 具体参数以各命令的 `--help`、相邻 README 和测试为准。
+
+`cleanup_mock_cohort` 的 `plan-cohort` 只读展开已固定 Testee ID 的对象图，不能作为删除授权。
+后续 `plan / capture / apply / verify / restore` 使用同一组原始清单、保护文件、编译来源和摘要；
+`capture` 还要求独立停写回执并重新比对目标，执行前必须保存该进程实际成功退出的原始证据。
+连接信息通过 `QS_MOCK_MYSQL_DSN_FILE`、`QS_MOCK_MONGO_URI_FILE` 指向私密文件，
+不放进参数、日志或版本库。生产用法及窗口子集从批准的执行包取得，不现场重跑来源条件扩大范围。
+
+此工具保留共享 Plan、正式定义和真实人员关联；与旧临时测评工具的 `adhoc` 语义分别维护。
+成功消息防重回执、已结算发布及治理凭证单独归档并继续在线保留，未知或未结责任阻断对应组件。
+SQL 每批最多1,000个主键、Mongo最多500份文档，原值、唯一约束和未知提交结果均须核实。
+IAM 身份与会话由 IAM 专属维护入口处理；QS 本地验证结果不代替 IAM 删除回执。
+维护及恢复沿用原绝对截止时间；首个业务启动意图后不得使用原对象恢复模式覆盖新增事实。
+清理后仍须修复统计、定向失效缓存并完成真实端验收；隔离测试通过不等于生产已执行。
+任务完成后退出此专用工具，恢复及审计材料按现有台账保留。
 
 ### 仅限全新环境初始化
 
