@@ -26,6 +26,7 @@ var toolSource = "development" // Set to the exact source commit with -ldflags.
 type config struct {
 	action, group, groupSHA, protection, protectionSHA, archive, materialSHA, approval, approvalSHA, output string
 	owner, freeze, freezeSHA                                                                                string
+	selector, selectorSHA, scopeDir                                                                         string
 	execute, original                                                                                       bool
 	timeout                                                                                                 time.Duration
 }
@@ -34,7 +35,10 @@ func flags(args []string) (config, error) {
 	var c config
 	f := flag.NewFlagSet("cleanup_mock_cohort", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
-	f.StringVar(&c.action, "action", "plan", "plan/capture/apply/verify/restore")
+	f.StringVar(&c.action, "action", "plan", "plan/capture/apply/verify/restore/plan-cohort")
+	f.StringVar(&c.selector, "selector-file", "", "fixed whole-cohort readonly selector")
+	f.StringVar(&c.selectorSHA, "selector-sha256", "", "selector raw SHA256")
+	f.StringVar(&c.scopeDir, "scope-dir", "", "fresh owned 0700 scope-shard directory")
 	f.StringVar(&c.group, "group-file", "", "private exact group JSON")
 	f.StringVar(&c.groupSHA, "group-sha256", "", "group raw SHA256")
 	f.StringVar(&c.protection, "protection-file", "", "private system/clack protection JSON")
@@ -57,7 +61,7 @@ func flags(args []string) (config, error) {
 		return c, errors.New("positional inputs rejected")
 	}
 	switch c.action {
-	case "plan", "capture", "apply", "verify", "restore":
+	case "plan", "capture", "apply", "verify", "restore", "plan-cohort":
 	default:
 		return c, errors.New("unknown action")
 	}
@@ -162,6 +166,9 @@ func run(args []string, out io.Writer) error {
 	c, e := flags(args)
 	if e != nil {
 		return e
+	}
+	if c.action == "plan-cohort" {
+		return runGraphPlan(c, out)
 	}
 	var g group
 	var p protected
