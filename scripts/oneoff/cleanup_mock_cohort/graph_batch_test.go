@@ -189,23 +189,52 @@ func graphBatchMongoDefinition(t *testing.T, name string, indexes ...bson.D) []b
 	}{raw(bson.D{{Key: "name", Value: name}, {Key: "type", Value: "collection"}, {Key: "options", Value: bson.D{}}}), all})
 }
 func TestGraphMongoBatchUniqueSpecificationsMatchOriginalMigrationResources(t *testing.T) {
-	for _, file := range []string{"000001_init_collections.up.json", "000011_add_interpretation_lifecycle_collections.up.json", "000015_add_report_query_catalog.up.json", "000034_answering_start_unique.up.json", "000037_original_event_evidence.up.json", "000038_add_historical_event_references.up.json"} {
-		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "internal", "pkg", "migration", "migrations", "mongodb", file))
+	files, err := filepath.Glob(filepath.Join("..", "..", "..", "internal", "pkg", "migration", "migrations", "mongodb", "*.up.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assemble the complete frozen 1..39 catalog, not a hand-picked subset of
+	// resource files. A later create/drop changes this same final catalog.
+	catalog := map[string]map[string]bson.D{}
+	expected := map[string]int{"answersheets": 4, "report_generations": 4, "interpretation_runs": 3, "interpret_report_artifacts": 2, "report_query_catalog": 1}
+	for name := range expected {
+		catalog[name] = map[string]bson.D{}
+	}
+	versions := 0
+	for _, file := range files {
+		version, err := strconv.Atoi(strings.SplitN(filepath.Base(file), "_", 2)[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version > 39 {
+			continue
+		}
+		versions++
+		raw, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var commands []struct {
 			Collection string            `json:"createIndexes"`
 			Indexes    []json.RawMessage `json:"indexes"`
+			Drop       string            `json:"dropIndexes"`
+			Index      string            `json:"index"`
 		}
 		if err = json.Unmarshal(raw, &commands); err != nil {
 			t.Fatal(err)
 		}
 		for _, command := range commands {
-			if _, ok := graphMongoTables[command.Collection]; !ok {
+			if indexes, ok := catalog[command.Drop]; ok {
+				if command.Index == "*" {
+					catalog[command.Drop] = map[string]bson.D{}
+				} else {
+					delete(indexes, command.Index)
+				}
+			}
+			indexes, ok := catalog[command.Collection]
+			if !ok {
 				continue
 			}
-			unique := []bson.D{}
 			for _, rawIndex := range command.Indexes {
 				var index bson.D
 				if err = bson.UnmarshalExtJSON(rawIndex, false, &index); err != nil {
@@ -215,13 +244,31 @@ func TestGraphMongoBatchUniqueSpecificationsMatchOriginalMigrationResources(t *t
 				if err != nil {
 					t.Fatal(err)
 				}
-				if v := bson.Raw(encoded).Lookup("unique"); v.Type == bson.TypeBoolean && v.Boolean() {
-					unique = append(unique, index)
+				name := bson.Raw(encoded).Lookup("name")
+				if name.Type != bson.TypeString {
+					t.Fatal("original index name missing:", file)
 				}
+				indexes[name.StringValue()] = index
 			}
-			if _, err = graphMongoUniqueIndexes(graphBatchMongoDefinition(t, command.Collection, unique...), command.Collection, "owned"); err != nil {
-				t.Fatalf("fixed original unique specifications in %s/%s rejected: %v", file, command.Collection, err)
+		}
+	}
+	if versions != 39 {
+		t.Fatalf("original resource closure has %d versions, want 1..39", versions)
+	}
+	for name, indexes := range catalog {
+		unique := []bson.D{}
+		for _, index := range indexes {
+			encoded, err := bson.Marshal(index)
+			if err != nil {
+				t.Fatal(err)
 			}
+			if v := bson.Raw(encoded).Lookup("unique"); v.Type == bson.TypeBoolean && v.Boolean() {
+				unique = append(unique, index)
+			}
+		}
+		specs, err := graphMongoUniqueIndexes(graphBatchMongoDefinition(t, name, unique...), name, "owned")
+		if err != nil || len(specs) != expected[name] {
+			t.Fatalf("complete original 1..39 unique specifications in %s rejected: specs=%d want=%d error=%v", name, len(specs), expected[name], err)
 		}
 	}
 }
@@ -262,6 +309,128 @@ func TestGraphMongoBatchUniquePartialAndMultikeyValues(t *testing.T) {
 	}
 	if _, err = graphMongoUniqueIndexes(graphBatchMongoDefinition(t, "answersheets", changed), "answersheets", "owned"); err == nil {
 		t.Fatal("changed partial specification accepted")
+	}
+}
+
+func graphBatchDurableIndex() bson.D {
+	return bson.D{{Key: "key", Value: bson.D{{Key: "durable_acceptance.event_id", Value: int32(1)}}}, {Key: "name", Value: "uk_answersheet_durable_event_id"}, {Key: "unique", Value: true}, {Key: "partialFilterExpression", Value: bson.D{{Key: "durable_acceptance.event_id", Value: bson.D{{Key: "$type", Value: "string"}}}}}}
+}
+
+func TestGraphMongoBatchDurableEventUsesOriginal024Partial(t *testing.T) {
+	index := graphBatchDurableIndex()
+	specs, err := graphMongoUniqueIndexes(graphBatchMongoDefinition(t, "answersheets", index), "answersheets", "owned")
+	if err != nil || len(specs) != 1 {
+		t.Fatal("original 024 unique spec rejected:", err)
+	}
+	for _, tc := range []struct {
+		name string
+		doc  bson.D
+		want int
+		fail bool
+	}{
+		{"missing_parent", bson.D{}, 0, false},
+		{"null_parent", bson.D{{Key: "durable_acceptance", Value: nil}}, 0, false},
+		{"missing_event", bson.D{{Key: "durable_acceptance", Value: bson.D{}}}, 0, false},
+		{"null_event", bson.D{{Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: nil}}}}, 0, false},
+		{"numeric_event", bson.D{{Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: int64(7)}}}}, 0, false},
+		{"empty_string_is_indexed", bson.D{{Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: ""}}}}, 1, false},
+		{"nonempty_string_is_indexed", bson.D{{Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: "Original-事件"}}}}, 1, false},
+		{"parent_array", bson.D{{Key: "durable_acceptance", Value: bson.A{bson.D{{Key: "event_id", Value: "original"}}}}}, 0, true},
+		{"parent_scalar", bson.D{{Key: "durable_acceptance", Value: "unknown"}}, 0, true},
+		{"event_array", bson.D{{Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: bson.A{"original"}}}}}, 0, true},
+		{"event_object", bson.D{{Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: bson.D{{Key: "unknown", Value: "original"}}}}}}, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := bson.Marshal(tc.doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			values, err := graphMongoUniqueValues(raw, specs[0])
+			if (err != nil) != tc.fail || len(values) != tc.want || errors.Is(err, errGraphBatchBudget) {
+				t.Fatalf("index entries=%d want=%d fail=%t error=%v", len(values), tc.want, tc.fail, err)
+			}
+			if tc.want == 1 && (values[0][0].Type != bson.TypeString || !reflect.DeepEqual(values[0][0], bson.Raw(raw).Lookup("durable_acceptance", "event_id"))) {
+				t.Fatal("original string bytes changed")
+			}
+		})
+	}
+	for _, changed := range []bson.E{
+		{Key: "name", Value: "unreviewed_unique_event"},
+		{Key: "key", Value: bson.D{{Key: "durable_acceptance.other_id", Value: int32(1)}}},
+		{Key: "partialFilterExpression", Value: bson.D{{Key: "durable_acceptance.event_id", Value: bson.D{{Key: "$type", Value: "string"}, {Key: "$gt", Value: ""}}}}},
+		{Key: "sparse", Value: true},
+	} {
+		t.Run("reject_changed_"+changed.Key, func(t *testing.T) {
+			altered := append(bson.D{}, index...)
+			found := false
+			for i := range altered {
+				if altered[i].Key == changed.Key {
+					altered[i], found = changed, true
+				}
+			}
+			if !found {
+				altered = append(altered, changed)
+			}
+			if _, err := graphMongoUniqueIndexes(graphBatchMongoDefinition(t, "answersheets", altered), "answersheets", "owned"); err == nil {
+				t.Fatal("changed/unknown unique contract accepted")
+			}
+		})
+	}
+}
+
+func TestGraphMongoBatchDurableEventCollisionUsesOnePhysicalBatch(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, kind := range []string{"exact_original", "foreign_physical_id", "ineligible_no_query"} {
+		mt.Run(kind, func(mt *mtest.T) {
+			definition := graphBatchMongoDefinition(mt.T, "answersheets", graphBatchDurableIndex())
+			records := []record{}
+			docs := []bson.D{}
+			for _, value := range []any{"", "original-event", int64(7)} {
+				if kind == "ineligible_no_query" && value != int64(7) {
+					continue
+				}
+				doc := bson.D{{Key: "_id", Value: primitive.NewObjectID()}, {Key: "durable_acceptance", Value: bson.D{{Key: "event_id", Value: value}}}}
+				raw, err := bson.Marshal(doc)
+				if err != nil {
+					mt.Fatal(err)
+				}
+				r, err := graphMongoObject("answersheets", raw, definition)
+				if err != nil {
+					mt.Fatal(err)
+				}
+				records = append(records, r)
+				docs = append(docs, doc)
+			}
+			if kind != "ineligible_no_query" {
+				if kind == "foreign_physical_id" {
+					docs[0][0].Value = primitive.NewObjectID()
+				}
+				mt.AddMockResponses(mtest.CreateCursorResponse(0, "owned.answersheets", mtest.FirstBatch, docs[0]))
+			}
+			s := newGraphStore(&liveStore{mongo: mt.Client, mongoDB: "owned"})
+			err := s.graphMongoUniquePreflight(mt.Context(), records, definition)
+			if (err != nil) != (kind == "foreign_physical_id") || errors.Is(err, errGraphBatchBudget) {
+				mt.Fatal("foreign physical ID was not rejected or original was rejected:", err)
+			}
+			event := mt.GetStartedEvent()
+			if kind == "ineligible_no_query" {
+				if event != nil {
+					mt.Fatal("non-string document generated a unique probe")
+				}
+				return
+			}
+			if event == nil || event.CommandName != "find" {
+				mt.Fatal("missing fixed unique collision Find")
+			}
+			clauses, err := event.Command.Lookup("filter", "$or").Array().Values()
+			if err != nil || len(clauses) != 2 {
+				mt.Fatal("eligible values were not combined in one bounded query:", err)
+			}
+			parts, err := clauses[0].Document().Lookup("$and").Array().Values()
+			if err != nil || len(parts) != 2 || parts[0].Document().Lookup("durable_acceptance.event_id", "$eq").StringValue() != "" || parts[1].Document().Lookup("durable_acceptance.event_id", "$type").StringValue() != "string" || mt.GetStartedEvent() != nil {
+				mt.Fatal("empty-string index entry/partial predicate lost or per-record queries issued:", err)
+			}
+		})
 	}
 }
 

@@ -560,7 +560,7 @@ type graphMongoUniqueSpec struct {
 }
 
 // This is the fixed 1..39 graph catalog, not an index-expression interpreter.
-// The five historical partial/multikey indexes retain their original complete
+// The six historical partial/multikey indexes retain their original complete
 // key/filter/collation contracts; a new or unsupported unique spec stops capture.
 func graphMongoUniqueIndexes(definition []byte, name, database string) ([]graphMongoUniqueSpec, error) {
 	var metadata struct {
@@ -587,6 +587,7 @@ func graphMongoUniqueIndexes(definition []byte, name, database string) ([]graphM
 		"report_query_catalog/uk_report_catalog_assessment":            {"assessment_id"},
 	}
 	partials := map[string]graphMongoUniqueSpec{
+		"answersheets/uk_answersheet_durable_event_id":                   {keys: []string{"durable_acceptance.event_id"}, partial: bson.D{{Key: "durable_acceptance.event_id", Value: bson.D{{Key: "$type", Value: "string"}}}}, mode: "durable_event"},
 		"answersheets/uk_answersheet_answering_start":                    {keys: []string{"start_context.id"}, partial: bson.D{{Key: "start_context.id", Value: bson.D{{Key: "$gt", Value: int32(0)}}}}, mode: "positive_start"},
 		"report_generations/uk_generation_generated_event_id":            {keys: []string{"generated_event_id"}, partial: bson.D{{Key: "generated_event_id", Value: bson.D{{Key: "$type", Value: "string"}, {Key: "$gt", Value: ""}}}}, mode: "nonempty_event"},
 		"interpretation_runs/uk_interpretation_run_retry_event_id":       {keys: []string{"retry_event_id"}, partial: bson.D{{Key: "retry_event_id", Value: bson.D{{Key: "$type", Value: "string"}, {Key: "$gt", Value: ""}}}}, mode: "nonempty_event"},
@@ -704,6 +705,23 @@ func graphMongoSimpleCollation(v bson.RawValue) bool {
 }
 
 func graphMongoUniqueValues(raw bson.Raw, spec graphMongoUniqueSpec) ([][]bson.RawValue, error) {
+	if spec.mode == "durable_event" {
+		parent := raw.Lookup("durable_acceptance")
+		if parent.Type == 0 || parent.Type == bson.TypeNull {
+			return nil, nil
+		}
+		if parent.Type != bson.TypeEmbeddedDocument {
+			return nil, errors.New("uninterpretable original durable acceptance unique shape")
+		}
+		v := parent.Document().Lookup("event_id")
+		if v.Type == bson.TypeArray || v.Type == bson.TypeEmbeddedDocument {
+			return nil, errors.New("uninterpretable original durable event unique value")
+		}
+		if v.Type != bson.TypeString {
+			return nil, nil
+		}
+		return [][]bson.RawValue{{v}}, nil // $type:string includes the empty string.
+	}
 	if spec.mode == "positive_start" {
 		parent := raw.Lookup("start_context")
 		if parent.Type == 0 || parent.Type == bson.TypeNull {
