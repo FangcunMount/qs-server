@@ -311,7 +311,13 @@ func graphBatchRecords(records []record) ([]object, error) {
 // Must be called by the engine before its durable claim. Failure requires a
 // smaller explicit batch; this provider never silently splits/retries a write.
 func (s *graphStore) preflightExactBatch(ctx context.Context, records []record, restore bool) error {
-	objects, err := graphBatchRecords(records)
+	var objects []object
+	var err error
+	if graphIsFrozenRuleDelete(ctx) && !restore {
+		objects, err = graphFrozenMutationObjects(records)
+	} else {
+		objects, err = graphBatchRecords(records)
+	}
 	if err != nil {
 		return err
 	}

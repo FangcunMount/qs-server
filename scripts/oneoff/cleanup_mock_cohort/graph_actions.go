@@ -67,10 +67,15 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		if e = validateGraphArchive(m, g, c.groupSHA); e != nil {
 			return e
 		}
-		if e = validateGraphCoverage(m, g, p, index, c.scopeDir, c.archive); e != nil {
+		if e = readGraphCaptureProof(c.captureEvidence, c.captureEvidenceSHA, m, c.materialSHA); e != nil {
 			return e
 		}
-		if e = readGraphCaptureProof(c.captureEvidence, c.captureEvidenceSHA, m, c.materialSHA); e != nil {
+		if c.frozenRuleDelete && (c.action == "verify" || c.action == "apply" && c.execute) {
+			e = graphFrozenArchiveHeaders(m, g, p, index)
+		} else {
+			e = validateGraphCoverage(m, g, p, index, c.scopeDir, c.archive)
+		}
+		if e != nil {
 			return e
 		}
 	}

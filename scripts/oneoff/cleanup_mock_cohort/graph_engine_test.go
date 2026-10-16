@@ -70,7 +70,7 @@ func (s *graphMemory) mutateExactBatch(ctx context.Context, records []record, re
 	if e != nil {
 		return e
 	}
-	pending, e := graphBatchPreimages(records, current, restore)
+	pending, e := graphMutationPreimages(ctx, records, current, restore)
 	if e != nil {
 		return e
 	}

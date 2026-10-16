@@ -79,12 +79,19 @@ func graphMutateOrdered(ctx context.Context, s graphBatchProvider, m graphArchiv
 					continue
 				}
 				ref := ordered[next]
-				records, err := readGraphArchivePage(dir, m, ref)
+				prior, found := j.latest[graphChunkID(ref)]
+				var records []record
+				var err error
+				if graphIsFrozenRuleDelete(ctx) && !restore && (!found || graphAcknowledgedAbsent(prior)) {
+					records, err = readGraphFrozenKeys(dir, m, ref)
+				} else {
+					records, err = readGraphArchivePage(dir, m, ref)
+				}
 				if err != nil {
 					stop(err)
 					continue
 				}
-				if prior, found := j.latest[graphChunkID(ref)]; found {
+				if found {
 					absent, same, err := graphKnownChunkState(workCtx, s, records, prior)
 					if err != nil {
 						stop(err)

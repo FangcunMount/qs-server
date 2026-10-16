@@ -385,17 +385,26 @@ func graphChunkState(ctx context.Context, s graphBatchProvider, records []record
 }
 func graphChunkID(ref graphShard) string { return digest(encode(ref)) }
 func graphVerify(ctx context.Context, s graphBatchProvider, m graphArchive, dir string, j *graphJournal, original bool) error {
-	if e := protectGraph(ctx, s, m, dir); e != nil {
-		return e
+	knownFast := graphIsFrozenRuleDelete(ctx) && !original && graphAllTargetsAcknowledged(m, j)
+	if !knownFast {
+		if e := protectGraph(ctx, s, m, dir); e != nil {
+			return e
+		}
 	}
 	complete := true
 	for _, ref := range m.Targets {
-		records, e := readGraphArchivePage(dir, m, ref)
+		var records []record
+		var e error
+		if knownFast {
+			records, e = readGraphFrozenKeys(dir, m, ref)
+		} else {
+			records, e = readGraphArchivePage(dir, m, ref)
+		}
 		if e != nil {
 			return e
 		}
 		prior, found := j.latest[graphChunkID(ref)]
-		absent, same, e := graphVerificationState(ctx, s, records, original, found && (prior.State == "intent" || prior.State == "unknown"))
+		absent, same, e := graphVerificationState(ctx, s, records, original, !knownFast)
 		if e != nil {
 			return e
 		}
@@ -435,7 +444,13 @@ func graphPrecheck(ctx context.Context, s graphBatchProvider, m graphArchive, di
 		if graphIsFrozenRuleDelete(ctx) && !restore && !found {
 			continue
 		}
-		records, e := readGraphArchivePage(dir, m, ref)
+		var records []record
+		var e error
+		if graphIsFrozenRuleDelete(ctx) && !restore && found && graphAcknowledgedAbsent(prior) {
+			records, e = readGraphFrozenKeys(dir, m, ref)
+		} else {
+			records, e = readGraphArchivePage(dir, m, ref)
+		}
 		if e != nil {
 			return e
 		}
@@ -458,7 +473,13 @@ func graphPrecheck(ctx context.Context, s graphBatchProvider, m graphArchive, di
 }
 
 func graphKnownChunkState(ctx context.Context, s graphBatchProvider, records []record, prior journalEntry) (bool, bool, error) {
-	absent, original, e := graphChunkState(ctx, s, records)
+	var absent, original bool
+	var e error
+	if graphIsFrozenRuleDelete(ctx) && graphAcknowledgedAbsent(prior) {
+		absent, original, e = graphVerificationState(ctx, s, records, false, false)
+	} else {
+		absent, original, e = graphChunkState(ctx, s, records)
+	}
 	if e != nil {
 		return false, false, e
 	}
