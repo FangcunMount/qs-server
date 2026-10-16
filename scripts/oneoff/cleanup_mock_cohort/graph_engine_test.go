@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,11 +15,27 @@ import (
 
 type graphMemory struct {
 	*memoryStore
+	mu             sync.Mutex
+	txMu           sync.RWMutex
 	preflightLimit int
 	preflights     int
+	readBatches    int
+	txChecks       int
+	beforeMutation func()
 }
 
 func (s *graphMemory) readExactBatch(ctx context.Context, objects []object) ([]graphReadResult, error) {
+	s.mu.Lock()
+	s.readBatches++
+	s.mu.Unlock()
+	return s.current(ctx, objects)
+}
+func (s *graphMemory) current(ctx context.Context, objects []object) ([]graphReadResult, error) {
+	s.txMu.RLock()
+	defer s.txMu.RUnlock()
+	return s.currentLocked(ctx, objects)
+}
+func (s *graphMemory) currentLocked(ctx context.Context, objects []object) ([]graphReadResult, error) {
 	out := make([]graphReadResult, len(objects))
 	for i, o := range objects {
 		r, exists, e := s.read(ctx, o)
@@ -30,14 +47,43 @@ func (s *graphMemory) readExactBatch(ctx context.Context, objects []object) ([]g
 	return out, nil
 }
 func (s *graphMemory) preflightExactBatch(_ context.Context, records []record, _ bool) error {
+	s.mu.Lock()
 	s.preflights++
+	s.mu.Unlock()
 	if s.preflightLimit > 0 && len(records) > s.preflightLimit {
 		return errGraphBatchBudget
 	}
 	return nil
 }
 func (s *graphMemory) mutateExactBatch(ctx context.Context, records []record, restore bool) error {
-	return s.mutate(ctx, records, restore)
+	s.txMu.Lock()
+	defer s.txMu.Unlock()
+	if s.beforeMutation != nil {
+		s.beforeMutation()
+	}
+	s.txChecks++
+	objects := make([]object, len(records))
+	for i, r := range records {
+		objects[i] = r.Object
+	}
+	current, e := s.currentLocked(ctx, objects)
+	if e != nil {
+		return e
+	}
+	pending, e := graphBatchPreimages(records, current, restore)
+	if e != nil {
+		return e
+	}
+	if len(pending) > 0 {
+		if e = s.mutate(ctx, pending, restore); e != nil {
+			return e
+		}
+	}
+	current, e = s.currentLocked(ctx, objects)
+	if e != nil {
+		return e
+	}
+	return graphBatchPostimages(records, current, restore)
 }
 func graphEngineFixture(t *testing.T) (*graphMemory, group, protected, graphIndex, graphArchive, string, string) {
 	t.Helper()
@@ -50,11 +96,10 @@ func graphEngineFixture(t *testing.T) (*graphMemory, group, protected, graphInde
 	s.definitions["mysql/testee"] = root.Definition
 	// Keep complete original SQL defaults and BSON bytes in separate namespaces.
 	score := s.rows[objectID(g.QS.Objects[0])]
-	score.Object.Fingerprint = fingerprint(score)
 	sheet := graphMongoFixture(t, "answersheets", bson.D{{Key: "domain_id", Value: int64(20)}, {Key: "org_id", Value: int64(1)}, {Key: "testee_id", Value: int64(1)}, {Key: "admission", Value: bson.D{{Key: "purpose", Value: "independent_questionnaire"}}}})
 	s.rows[objectID(sheet.Object)] = sheet
 	s.definitions["mongo/answersheets"] = sheet.Definition
-	index := graphIndex{Shards: []graphShard{}, Counts: map[string]int64{}}
+	index := graphIndex{Format: 2, Shards: []graphShard{}, Counts: map[string]int64{}, Definitions: map[string]string{}}
 	w := graphWriter{dir: scope, index: &index, protected: map[string]bool{}}
 	for _, v := range []struct {
 		r     record
@@ -62,7 +107,8 @@ func graphEngineFixture(t *testing.T) (*graphMemory, group, protected, graphInde
 		links map[string]string
 	}{{root, 10, map[string]string{"id": "1"}}, {score, 70, map[string]string{"id": "42", "testee_id": "1"}}, {sheet, 50, map[string]string{"domain_id": "20", "testee_id": "1"}}} {
 		o := v.r.Object
-		o.Fingerprint = fingerprint(v.r)
+		o.Fingerprint = ""
+		index.Definitions[o.Store+"/"+o.Name] = digest(v.r.Definition)
 		if e := w.add(graphObject{Object: o, Links: v.links, RootIDs: []string{"1"}}, v.rank); e != nil {
 			t.Fatal(e)
 		}
@@ -74,7 +120,7 @@ func graphEngineFixture(t *testing.T) (*graphMemory, group, protected, graphInde
 	g.QS.Exclusions = []string{}
 	g.QS.Graph = &graphBinding{ArchiveDirectory: dir, RootIDs: []string{"1"}, WindowStarted: time.Now().Add(-time.Minute), WindowExpires: time.Now().Add(29 * time.Minute)}
 	store := &graphMemory{memoryStore: s}
-	m, e := captureGraph(t.Context(), store, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40))
+	m, e := captureGraph(t.Context(), store, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40), 1)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -110,6 +156,331 @@ func TestGraphCompleteArchiveCoverageAndRawRestore(t *testing.T) {
 		t.Fatal("scope expansion admitted")
 	}
 }
+
+func TestGraphLeanScopeCapturesCurrentOriginalExactlyOnce(t *testing.T) {
+	s, g, p, index, _, scope, _ := graphEngineFixture(t)
+	changed := s.rows[objectID(key("assessment_score", "42"))]
+	changed.Columns = append([]cell{}, changed.Columns...)
+	changed.Columns[1].Raw = []byte(`{"value":"changed before freeze"}`)
+	s.rows[objectID(changed.Object)] = changed
+	dir := privateTestDir(t)
+	g.QS.Graph.ArchiveDirectory = dir
+	s.readBatches = 0
+	m, e := captureGraph(t.Context(), s, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40), 1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if s.readBatches != len(m.Targets)+len(m.Guards) || s.writes != 0 {
+		t.Fatal("capture reread target bodies or wrote business data", s.readBatches)
+	}
+	if e = validateGraphCoverage(m, g, p, index, scope, dir); e != nil {
+		t.Fatal("lean keys must qualify full captured preimages", e)
+	}
+	found := false
+	for _, ref := range m.Targets {
+		rows, err := readGraphArchivePage(dir, m, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			if row.Object.Fingerprint == "" || row.Object.Fingerprint != fingerprint(row) {
+				t.Fatal("raw archive did not freeze the complete original")
+			}
+			if objectID(row.Object) == objectID(changed.Object) {
+				found = sameRecord(row, changed)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("capture used the earlier planned body instead of the frozen original")
+	}
+	bad := index
+	bad.Definitions = map[string]string{}
+	for name, sha := range index.Definitions {
+		bad.Definitions[name] = sha
+	}
+	bad.Definitions["mysql/assessment_score"] = strings.Repeat("0", 64)
+	if e = validateGraphCoverage(m, g, p, bad, scope, dir); e == nil {
+		t.Fatal("body-free scope silently accepted different namespace metadata")
+	}
+}
+
+func TestGraphCaptureFreezesSettledTaskWithinSameIdentityGroup(t *testing.T) {
+	s, g, p, index, _, scope, _ := graphEngineFixture(t)
+	task := graphSQLFixture("assessment_task", "80", map[string]string{"testee_id": "1", "org_id": "1", "status": "opened", "enrollment_id": "70", "plan_id": "60"})
+	s.rows[objectID(task.Object)] = task
+	s.definitions["mysql/assessment_task"] = task.Definition
+	index.Definitions["mysql/assessment_task"] = digest(task.Definition)
+	writer := graphWriter{dir: scope, index: &index, protected: map[string]bool{}}
+	if e := writer.add(graphObject{Object: task.Object, RootIDs: []string{"1"}, Links: map[string]string{"testee_id": "1", "status": "opened", "enrollment_id": "70", "plan_id": "60"}}, graphSQLTables["assessment_task"]); e != nil {
+		t.Fatal(e)
+	}
+	if e := writer.flush(); e != nil {
+		t.Fatal(e)
+	}
+	for i := range task.Columns {
+		if task.Columns[i].Name == "status" {
+			task.Columns[i].Raw = []byte("closed")
+		}
+	}
+	s.rows[objectID(task.Object)] = task
+	freshDir := privateTestDir(t)
+	fresh := graphIndex{Format: 2, Definitions: index.Definitions, Counts: map[string]int64{}}
+	freshWriter := graphWriter{dir: freshDir, index: &fresh, protected: map[string]bool{}}
+	for _, ref := range index.Shards {
+		page, e := readGraphPage(scope, ref)
+		if e != nil {
+			t.Fatal(e)
+		}
+		for _, o := range page.Objects {
+			if o.Object.Name == "assessment_task" {
+				o.Links["status"] = "closed"
+			}
+			if e = freshWriter.add(o, ref.RestoreRank); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
+	if e := freshWriter.flush(); e != nil {
+		t.Fatal(e)
+	}
+	if e := compareFrozenScope(scope, index, g.QS.Graph.RootIDs, freshDir, fresh); e != nil {
+		t.Fatal("settled status changed no typed identity or complete component", e)
+	}
+	dir := privateTestDir(t)
+	g.QS.Graph.ArchiveDirectory = dir
+	m, e := captureGraph(t.Context(), s, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40), 1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = validateGraphCoverage(m, g, p, index, scope, dir); e != nil {
+		t.Fatal(e)
+	}
+	found := false
+	for _, ref := range m.Targets {
+		if ref.Name != "assessment_task" {
+			continue
+		}
+		rows, err := readGraphArchivePage(dir, m, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		status, ok := graphSQLValue(rows[0], "status")
+		found = ok && status == "closed" && sameRecord(rows[0], task)
+	}
+	if !found {
+		t.Fatal("T0 archive did not preserve the task's actual settled original")
+	}
+}
+
+type graphCaptureGate struct {
+	*graphMemory
+	firstID string
+	failID  string
+	wait    chan struct{}
+	started chan string
+	gateMu  sync.Mutex
+	active  int
+}
+
+func (s *graphCaptureGate) readExactBatch(ctx context.Context, objects []object) ([]graphReadResult, error) {
+	s.gateMu.Lock()
+	s.active++
+	s.gateMu.Unlock()
+	defer func() { s.gateMu.Lock(); s.active--; s.gateMu.Unlock() }()
+	id := objectID(objects[0])
+	select {
+	case s.started <- id:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if id == s.failID {
+		return nil, errors.New("exact capture reader failed")
+	}
+	if id == s.firstID {
+		select {
+		case <-s.wait:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return s.graphMemory.readExactBatch(ctx, objects)
+}
+
+func TestGraphConcurrentCaptureIsBoundedAndArchivesInOriginalOrder(t *testing.T) {
+	s, g, p, index, _, scope, _ := graphEngineFixture(t)
+	writer := graphWriter{dir: scope, index: &index, protected: map[string]bool{}}
+	for _, id := range []string{"101", "102", "103", "104", "105"} {
+		r := graphSQLFixture("assessment_score", id, map[string]string{"testee_id": "1", "assessment_id": "100"})
+		r.Definition = s.definitions["mysql/assessment_score"]
+		s.rows[objectID(r.Object)] = r
+		if e := writer.add(graphObject{Object: r.Object, RootIDs: []string{"1"}, Links: map[string]string{"id": id, "testee_id": "1"}}, graphSQLTables["assessment_score"]); e != nil {
+			t.Fatal(e)
+		}
+		if e := writer.flush(); e != nil {
+			t.Fatal(e)
+		}
+	}
+	dir := privateTestDir(t)
+	g.QS.Graph.ArchiveDirectory = dir
+	s.readBatches = 0
+	reader := &graphCaptureGate{graphMemory: s, firstID: objectID(keyRoot("1")), wait: make(chan struct{}), started: make(chan string, 16)}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	type outcome struct {
+		material graphArchive
+		err      error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		m, e := captureGraph(ctx, reader, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40), 4)
+		done <- outcome{m, e}
+	}()
+	for range 4 {
+		select {
+		case <-reader.started:
+		case <-ctx.Done():
+			t.Fatal("four independent reads did not start", ctx.Err())
+		}
+	}
+	select {
+	case id := <-reader.started:
+		t.Fatal("blocked first page allowed more than four in-flight jobs", id)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(reader.wait)
+	result := <-done
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	if e := validateGraphCoverage(result.material, g, p, index, scope, dir); e != nil {
+		t.Fatal("out-of-order reads reordered the original archive", e)
+	}
+	if s.readBatches != len(index.Shards)+len(result.material.Guards) || s.writes != 0 {
+		t.Fatal("parallel capture repeated bodies or made business writes")
+	}
+}
+
+func TestGraphConcurrentCaptureFailureCancelsAndJoinsReaders(t *testing.T) {
+	for _, failure := range []string{"reader", "writer"} {
+		t.Run(failure, func(t *testing.T) {
+			s, g, p, index, _, scope, _ := graphEngineFixture(t)
+			dir := privateTestDir(t)
+			g.QS.Graph.ArchiveDirectory = dir
+			reader := &graphCaptureGate{graphMemory: s, firstID: objectID(keyRoot("1")), wait: make(chan struct{}), started: make(chan string, 16)}
+			if failure == "reader" {
+				reader.failID = objectID(key("assessment_score", "42"))
+			} else {
+				close(reader.wait)
+				if e := writeNew(filepath.Join(dir, "t-00000000.json"), []byte("retained failed original")); e != nil {
+					t.Fatal(e)
+				}
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			_, e := captureGraph(ctx, reader, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40), 4)
+			if e == nil || ctx.Err() != nil {
+				t.Fatal("capture failure was lost or readers did not promptly join", e, ctx.Err())
+			}
+			if failure == "reader" && !strings.Contains(e.Error(), "exact capture reader failed") || failure == "writer" && !errors.Is(e, os.ErrExist) {
+				t.Fatal("reader cancellation replaced the original capture failure", e)
+			}
+			reader.gateMu.Lock()
+			active := reader.active
+			reader.gateMu.Unlock()
+			if active != 0 || s.writes != 0 {
+				t.Fatal("failed capture left a reader or business mutation")
+			}
+			if _, e := os.Lstat(filepath.Join(dir, "material.json")); !errors.Is(e, os.ErrNotExist) {
+				t.Fatal("failed capture received a successful material header")
+			}
+			if failure == "writer" {
+				raw, e := privateRead(filepath.Join(dir, "t-00000000.json"), 1024)
+				if e != nil || string(raw) != "retained failed original" {
+					t.Fatal("failure rewrote an earlier original", e)
+				}
+			}
+		})
+	}
+}
+
+func TestGraphFreshDeleteUsesTransactionCASWithoutBodyPrepasses(t *testing.T) {
+	s, _, _, _, m, _, dir := graphEngineFixture(t)
+	j, e := openGraphJournal(dir, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { _ = j.close() }()
+	s.readBatches = 0
+	s.beforeMutation = func() {
+		if s.readBatches != len(m.Guards) {
+			t.Fatalf("fresh delete performed a target-body prepass: %d reads", s.readBatches)
+		}
+	}
+	allow := func() error { return nil }
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("a", 64), false, allow, allow, 1); e != nil {
+		t.Fatal(e)
+	}
+	if s.txChecks != len(m.Targets) || s.writes != len(m.Targets) {
+		t.Fatal("fresh batches bypassed their transaction preimage checks")
+	}
+}
+
+func TestGraphTransactionCASRejectsDriftWithoutBlindResend(t *testing.T) {
+	s, _, _, _, m, _, dir := graphEngineFixture(t)
+	j, e := openGraphJournal(dir, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { _ = j.close() }()
+	first := graphOrderedShards(m, false)[0]
+	rows, e := readGraphArchivePage(dir, m, first)
+	if e != nil {
+		t.Fatal(e)
+	}
+	changed := rows[0]
+	changed.Columns = append([]cell{}, changed.Columns...)
+	changed.Columns[1].Raw = []byte(`{"new":"fact at locked read"}`)
+	s.beforeMutation = func() { s.rows[objectID(changed.Object)] = changed }
+	allow := func() error { return nil }
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("a", 64), false, allow, allow, 1); e == nil || s.writes != 0 || s.txChecks != 1 {
+		t.Fatal("transaction CAS deleted a new fact", e)
+	}
+	if !sameRecord(s.rows[objectID(changed.Object)], changed) || j.latest[graphChunkID(first)].State != "unknown" {
+		t.Fatal("failed mutation lost the current fact or its uncertain intent")
+	}
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("b", 64), false, allow, allow, 1); e == nil || s.txChecks != 1 {
+		t.Fatal("uncertain intent was automatically resent")
+	}
+	if _, e = os.Lstat(filepath.Join(dir, "approval-"+strings.Repeat("b", 64)+".consumed")); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("unknown transaction consumed the next approval")
+	}
+}
+
+func TestGraphCommittedDeleteDoesNotDeleteReappearedOriginal(t *testing.T) {
+	s, _, _, _, m, _, dir := graphEngineFixture(t)
+	j, e := openGraphJournal(dir, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { _ = j.close() }()
+	allow := func() error { return nil }
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("a", 64), false, allow, allow, 1); e != nil {
+		t.Fatal(e)
+	}
+	rows, e := readGraphArchivePage(dir, m, m.Targets[0])
+	if e != nil {
+		t.Fatal(e)
+	}
+	s.rows[objectID(rows[0].Object)] = rows[0]
+	writes := s.writes
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("b", 64), false, allow, allow, 1); e == nil || s.writes != writes {
+		t.Fatal("committed original reappearance was treated as an unprocessed delete")
+	}
+	if _, e = os.Lstat(filepath.Join(dir, "approval-"+strings.Repeat("b", 64)+".consumed")); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("changed committed state consumed another approval")
+	}
+}
 func TestGraphUnknownCommitReconcilesAllChunksWithoutAutomaticReplay(t *testing.T) {
 	s, _, _, _, m, _, dir := graphEngineFixture(t)
 	j, e := openGraphJournal(dir, true)
@@ -120,10 +491,10 @@ func TestGraphUnknownCommitReconcilesAllChunksWithoutAutomaticReplay(t *testing.
 	a := graphApproval{approval: approval{ArchiveSHA: strings.Repeat("1", 64), Expires: time.Now().Add(time.Minute)}}
 	authority := func() error { return nil }
 	s.ackUnknown = true
-	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("2", 64), false, authority, authority); e == nil || s.writes != 1 {
+	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("2", 64), false, authority, authority, 1); e == nil || s.writes != 1 {
 		t.Fatal("unknown ACK must fail after one actual batch")
 	}
-	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("3", 64), false, authority, authority); e == nil || s.writes != 1 {
+	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("3", 64), false, authority, authority, 1); e == nil || s.writes != 1 {
 		t.Fatal("unknown was automatically retried")
 	}
 	if _, e = os.Lstat(filepath.Join(dir, "approval-"+strings.Repeat("3", 64)+".consumed")); !errors.Is(e, os.ErrNotExist) {
@@ -138,12 +509,12 @@ func TestGraphUnknownCommitReconcilesAllChunksWithoutAutomaticReplay(t *testing.
 		}
 	}
 	s.ackUnknown = false
-	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("3", 64), false, authority, authority); e != nil || s.writes != 3 {
+	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("3", 64), false, authority, authority, 1); e != nil || s.writes != 3 {
 		t.Fatalf("remaining acknowledged batches: %v/%d", e, s.writes)
 	}
 	a.RecoveryStarted = time.Now()
 	a.RecoveryExpires = a.RecoveryStarted.Add(time.Hour)
-	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("4", 64), true, authority, authority); e != nil {
+	if e = mutateGraph(t.Context(), s, m, dir, j, a, strings.Repeat("4", 64), true, authority, authority, 1); e != nil {
 		t.Fatal(e)
 	}
 	if e = graphVerify(t.Context(), s, m, dir, j, true); e != nil {
@@ -160,7 +531,7 @@ func TestGraphProtectionAndNewFactConflictStopBeforeClaim(t *testing.T) {
 	r := s.rows[objectID(p.QS.Clack[0])]
 	r.Columns[1].Raw = []byte(`{"real":"changed"}`)
 	s.rows[objectID(r.Object)] = r
-	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("a", 64), false, func() error { return nil }, func() error { return nil }); e == nil || s.writes != 0 {
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, strings.Repeat("a", 64), false, func() error { return nil }, func() error { return nil }, 1); e == nil || s.writes != 0 {
 		t.Fatal("protected change did not stop before claim")
 	}
 	if _, e = os.Lstat(filepath.Join(dir, "approval-"+strings.Repeat("a", 64)+".consumed")); !errors.Is(e, os.ErrNotExist) {
@@ -183,7 +554,7 @@ func TestGraphNewTargetFactAndCanceledBudgetDoNotConsumeApproval(t *testing.T) {
 	changed.Columns[1].Raw = []byte(`{"new":"retained fact"}`)
 	s.rows[objectID(changed.Object)] = changed
 	sha := strings.Repeat("9", 64)
-	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, sha, true, func() error { return nil }, func() error { return nil }); e == nil || s.writes != 0 {
+	if e = mutateGraph(t.Context(), s, m, dir, j, graphApproval{}, sha, true, func() error { return nil }, func() error { return nil }, 1); e == nil || s.writes != 0 {
 		t.Fatal("new fact restore conflict must stop before claim")
 	}
 	if _, e = os.Lstat(filepath.Join(dir, "approval-"+sha+".consumed")); !errors.Is(e, os.ErrNotExist) {
@@ -192,7 +563,7 @@ func TestGraphNewTargetFactAndCanceledBudgetDoNotConsumeApproval(t *testing.T) {
 	s.rows[objectID(changed.Object)] = old[0]
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if e = mutateGraph(ctx, s, m, dir, j, graphApproval{}, sha, false, func() error { return nil }, func() error { return nil }); !errors.Is(e, context.Canceled) {
+	if e = mutateGraph(ctx, s, m, dir, j, graphApproval{}, sha, false, func() error { return nil }, func() error { return nil }, 1); !errors.Is(e, context.Canceled) {
 		t.Fatal("expired caller budget was not retained", e)
 	}
 	if _, e = os.Lstat(filepath.Join(dir, "approval-"+sha+".consumed")); !errors.Is(e, os.ErrNotExist) {
@@ -420,7 +791,7 @@ func TestGraphOpaqueEvaluationRunAndNumericaliasRemainNamedRelations(t *testing.
 	_, g, _, index, _, scope, _ := graphEngineFixture(t)
 	run := graphSQLFixture("runtime_checkpoint", "88", map[string]string{"assessment_id": "100"})
 	run.Columns = append(run.Columns, cell{Name: "scope", Type: "VARCHAR", Raw: []byte("evaluation_run")}, cell{Name: "resource_id", Type: "VARCHAR", Raw: []byte("100:1")})
-	run.Object.Fingerprint = fingerprint(run)
+	run.Object.Fingerprint = ""
 	writer := graphWriter{dir: scope, index: &index, protected: map[string]bool{}}
 	if e := writer.add(graphObject{Object: run.Object, RootIDs: []string{"1"}, Links: map[string]string{"id": "88", "scope": "evaluation_run", "resource_id": "100:1", "assessment_id": "100"}}, 60); e != nil {
 		t.Fatal(e)
@@ -483,7 +854,8 @@ func TestGraphRetainedReplayGuardIsArchivedUnchangedAndAllowedOnlyByExactPreimag
 	guard.Columns = append(guard.Columns, cell{Name: "event_id", Type: "VARCHAR", Raw: []byte("original-report-event")}, cell{Name: "report_id", Type: "VARCHAR", Raw: []byte("700")})
 	s.rows[objectID(guard.Object)] = guard
 	s.definitions["mysql/interpretation_attention_projection"] = guard.Definition
-	guard.Object.Fingerprint = fingerprint(guard)
+	guard.Object.Fingerprint = ""
+	index.Definitions["mysql/interpretation_attention_projection"] = digest(guard.Definition)
 	writer := graphWriter{dir: scope, index: &index, protected: map[string]bool{}}
 	if e := writer.add(graphObject{Object: guard.Object, RootIDs: []string{"1"}, Links: map[string]string{"testee_id": "1", "assessment_id": "100", "report_id": "700"}}, 0); e != nil {
 		t.Fatal(e)
@@ -493,7 +865,7 @@ func TestGraphRetainedReplayGuardIsArchivedUnchangedAndAllowedOnlyByExactPreimag
 	}
 	dir := privateTestDir(t)
 	g.QS.Graph.ArchiveDirectory = dir
-	m, e := captureGraph(t.Context(), s, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40))
+	m, e := captureGraph(t.Context(), s, g, p, index, scope, dir, strings.Repeat("c", 64), strings.Repeat("d", 40), 1)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -514,7 +886,7 @@ func TestGraphRetainedReplayGuardIsArchivedUnchangedAndAllowedOnlyByExactPreimag
 	}
 	defer func() { _ = journal.close() }()
 	authority := func() error { return nil }
-	if e = mutateGraph(t.Context(), s, m, dir, journal, graphApproval{}, strings.Repeat("a", 64), false, authority, authority); e != nil {
+	if e = mutateGraph(t.Context(), s, m, dir, journal, graphApproval{}, strings.Repeat("a", 64), false, authority, authority, 1); e != nil {
 		t.Fatal(e)
 	}
 	if _, exists := s.rows[objectID(guard.Object)]; !exists {
@@ -531,7 +903,9 @@ func TestGraphRetainedReplayGuardIsArchivedUnchangedAndAllowedOnlyByExactPreimag
 	if e = protectGraph(t.Context(), s, m, dir); e == nil {
 		t.Fatal("retained online evidence drift escaped final raw verification")
 	}
-	if e = graphNoRemainingReferences(t.Context(), reader, g, index, scope); e == nil {
-		t.Fatal("retained physical ID alone allowed a changed reference")
+	// The directed clearance check does not turn retained audit rows into delete
+	// targets or reread their bodies. The archived guard drift was rejected above.
+	if e = graphNoRemainingReferences(t.Context(), reader, g, index, scope); e != nil {
+		t.Fatal("retained replay guard was treated as a remaining delete target", e)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"strings"
 
 	standardoutbox "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -70,93 +69,6 @@ func (p *cohortPlanner) standardMongo(r record, ref eventevidence.StandardRefere
 }
 func referenceKey(producer, id, destination string) string {
 	return digest(encode([]string{producer, id, destination}))
-}
-func (p *cohortPlanner) standardBatch(ctx context.Context, refs []eventevidence.StandardReference) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	if len(refs) > 500 {
-		return errors.New("standard message query exceeds fixed 500 references")
-	}
-	expected := map[string]eventevidence.StandardReference{}
-	matches := map[string]int{}
-	parts := []string{}
-	args := []any{}
-	filters := bson.A{}
-	for _, ref := range refs {
-		key := referenceKey(ref.Producer, ref.EventID, ref.Destination)
-		expected[key] = ref
-		parts = append(parts, "(BINARY x.producer=BINARY ? AND BINARY x.message_id=BINARY ? AND BINARY x.destination=BINARY ?)")
-		args = append(args, ref.Producer, ref.EventID, ref.Destination)
-		filters = append(filters, bson.D{{Key: "producer", Value: ref.Producer}, {Key: "message_id", Value: ref.EventID}, {Key: "destination", Value: ref.Destination}})
-	}
-	if e := p.reader.sqlPages(ctx, "rm_outbox", strings.Join(parts, " OR "), args, func(r record) error {
-		key := referenceKey(string(graphSQLBytes(r, "producer")), string(graphSQLBytes(r, "message_id")), string(graphSQLBytes(r, "destination")))
-		ref, ok := expected[key]
-		if !ok {
-			return errors.New("SQL message query matched foreign physical reference")
-		}
-		matches[key]++
-		return p.standardSQL(r, ref)
-	}); e != nil {
-		return e
-	}
-	if e := p.reader.mongoPages(ctx, "rm_outbox", bson.D{{Key: "$or", Value: filters}}, func(r record) error {
-		raw := bson.Raw(r.BSON)
-		key := referenceKey(graphMongoString(raw, "producer"), graphMongoString(raw, "message_id"), graphMongoString(raw, "destination"))
-		ref, ok := expected[key]
-		if !ok {
-			return errors.New("mongo message query matched foreign physical reference")
-		}
-		matches[key]++
-		return p.standardMongo(r, ref)
-	}); e != nil {
-		return e
-	}
-	for key := range expected {
-		if matches[key] != 1 {
-			p.holdObject(p.referenceOwners[key], "standard_reference:missing_or_multiple_durable_owner")
-		}
-	}
-	return p.writer.flush()
-}
-func (p *cohortPlanner) discoverStandard(ctx context.Context) error {
-	// A bounded identity-only set prevents repeated references from selecting a
-	// row twice. Raw records remain page-local; larger reference sets require an
-	// explicitly smaller execution subset rather than more memory or time.
-	seen := map[string]bool{}
-	batch := []eventevidence.StandardReference{}
-	shards := append([]graphShard{}, p.writer.index.Shards...)
-	for _, shard := range shards {
-		page, e := readGraphPage(p.dir, shard)
-		if e != nil {
-			return e
-		}
-		for _, obj := range page.Objects {
-			for _, ref := range obj.References {
-				key := referenceKey(ref.Producer, ref.EventID, ref.Destination)
-				if seen[key] {
-					continue
-				}
-				if len(seen) >= 100000 {
-					return errors.New("message reference subset exceeds fixed 100000 identity bound")
-				}
-				seen[key] = true
-				if p.referenceOwners == nil {
-					p.referenceOwners = map[string]graphObject{}
-				}
-				p.referenceOwners[key] = obj
-				batch = append(batch, ref)
-				if len(batch) == 500 {
-					if e = p.standardBatch(ctx, batch); e != nil {
-						return e
-					}
-					batch = nil
-				}
-			}
-		}
-	}
-	return p.standardBatch(ctx, batch)
 }
 
 // Historical delivery rows are selected by their concrete payload's typed
@@ -311,75 +223,6 @@ func (p *cohortPlanner) classifyDeliveries(ctx context.Context, records []record
 		}
 		o.RootIDs = []string{root}
 		if e := p.writer.add(o, graphSQLTables[c.r.Object.Name]); e != nil {
-			return e
-		}
-	}
-	return nil
-}
-func (p *cohortPlanner) discoverResponsibilities(ctx context.Context) error {
-	if e := p.discoverStandard(ctx); e != nil {
-		return e
-	}
-	roots := map[string]bool{}
-	for _, id := range p.selector.TesteeIDs {
-		roots[id] = true
-	}
-	for _, name := range []string{"event_delivery_dead_letter", "retry_event_hold"} {
-		p.writer.index.Counts["mysql/"+name] = 0
-		batch := []record{}
-		flush := func() error {
-			if len(batch) == 0 {
-				return nil
-			}
-			e := p.classifyDeliveries(ctx, batch, roots)
-			batch = nil
-			return e
-		}
-		if e := p.reader.sqlPages(ctx, name, "x.org_id=?", []any{p.selector.Selection.OrgID}, func(r record) error {
-			batch = append(batch, r)
-			if len(batch) == 1000 {
-				return flush()
-			}
-			return nil
-		}); e != nil {
-			return e
-		}
-		if e := flush(); e != nil {
-			return e
-		}
-		if e := p.writer.flush(); e != nil {
-			return e
-		}
-	}
-	// AI scope is intentionally read-only and zero-only for this confirmed batch.
-	// Any target reference prevents a claim of a complete zero AI range; it does
-	// not silently authorize an AI purge or infer ownership of its real sessions.
-	p.writer.index.Counts["mysql/ai_bridge_requests_target"] = 0
-	if e := rootBatches(p.selector.TesteeIDs, 1000, func(ids []string) error {
-		slots, args := placeholders(ids)
-		args = append(args, p.selector.Selection.OrgID)
-		where := "x.organization_id=? AND (x.testee_id IN (" + slots + ") OR EXISTS (SELECT 1 FROM ai_bridge_request_assessments ra JOIN assessment a ON a.id=ra.assessment_id WHERE ra.request_id=x.request_id AND a.testee_id IN (" + slots + ") AND a.org_id=?))"
-		baseArgs := append([]any{}, args[:len(ids)]...)
-		args = append([]any{p.selector.Selection.OrgID}, baseArgs...)
-		args = append(args, baseArgs...)
-		args = append(args, p.selector.Selection.OrgID)
-		return p.reader.sqlPages(ctx, "ai_bridge_requests", where, args, func(r record) error {
-			p.writer.index.Counts["mysql/ai_bridge_requests_target"]++
-			p.holdRecord(r, nil, "ai_bridge_requests:requires_separate_shared_reference_resolution")
-			return nil
-		})
-	}); e != nil {
-		return e
-	}
-	p.writer.index.Retained["ai_bridge_requests/ai_messaging/qs-ai"] = "no purge implemented; real requests, sessions and their message graph remain protected; target intersection must be zero"
-	// Replay headers cannot be owned from an equal request string alone. Their
-	// local item/header relationship and all members require separate resolution.
-	for _, name := range []string{"qs_rm_replay_requests", "qs_rm_replay_items"} {
-		if e := p.reader.sqlPages(ctx, name, "x.org_id=?", []any{p.selector.Selection.OrgID}, func(r record) error {
-			p.writer.index.Retained[name] = "request is retained unless every typed item has proved target ownership"
-			p.holdRecord(r, nil, name+":manual_replay_responsibility")
-			return nil
-		}); e != nil {
 			return e
 		}
 	}

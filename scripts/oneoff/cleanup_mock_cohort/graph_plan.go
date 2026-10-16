@@ -28,7 +28,6 @@ type cohortPlanner struct {
 	held            []graphHold
 	holdError       error
 	referenceOwners map[string]graphObject
-	reverseSQLRoots map[string]map[string][]string
 }
 
 func (p *cohortPlanner) action(reason string) { p.writer.index.RequiredActions[reason]++ }
@@ -50,8 +49,7 @@ func (p *cohortPlanner) reference(e *eventevidence.EventEvidenceV1, o *graphObje
 }
 func (p *cohortPlanner) sqlObject(r record, rootIDs ...string) (graphObject, error) {
 	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}, RootIDs: append([]string{}, rootIDs...)}
-	o.Object.Fingerprint = fingerprint(r)
-	for _, name := range []string{"id", "org_id", "testee_id", "profile_id", "assessment_id", "answer_sheet_id", "answersheet_id", "report_id", "outcome_id", "evaluation_outcome_id", "enrollment_id", "plan_id", "task_id", "event_id", "retry_event_id", "committed_event_id", "opening_event_id", "source_type", "source_ref", "business_object_id", "scope", "status", "state", "claim_token", "lease_expires_at", "lease_until", "manual_replay_request_id", "request_id", "resource_id", "retry_disposition", "stat_date", "clinician_id", "entry_id", "conducting_store_id"} {
+	for _, name := range []string{"id", "org_id", "testee_id", "profile_id", "assessment_id", "answer_sheet_id", "answersheet_id", "report_id", "outcome_id", "evaluation_outcome_id", "evaluation_run_id", "enrollment_id", "plan_id", "task_id", "event_id", "retry_event_id", "committed_event_id", "opening_event_id", "source_type", "fact_type", "source_ref", "business_object_id", "scope", "status", "state", "claim_token", "lease_expires_at", "next_attempt_at", "lease_until", "manual_replay_request_id", "request_id", "resource_id", "retry_disposition", "stat_date", "clinician_id", "entry_id", "conducting_store_id"} {
 		if v, ok := graphSQLValue(r, name); ok && v != "" {
 			if !utf8.ValidString(v) {
 				return o, errors.New("technical SQL link is not valid UTF-8")
@@ -125,7 +123,6 @@ func (p *cohortPlanner) emitSQL(r record) error {
 }
 func (p *cohortPlanner) mongoObject(r record, rootIDs ...string) (graphObject, error) {
 	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}, RootIDs: append([]string{}, rootIDs...)}
-	o.Object.Fingerprint = fingerprint(r)
 	raw := bson.Raw(r.BSON)
 	for _, name := range []string{"domain_id", "org_id", "testee_id", "filler_id", "assessment_id", "outcome_id", "generation_id", "interpretation_run_id", "latest_run_id", "report_id", "source_id", "sort_report_id"} {
 		v, e := graphMongoID(raw, name, true)
@@ -145,6 +142,9 @@ func (p *cohortPlanner) mongoObject(r record, rootIDs ...string) (graphObject, e
 		p.holdObject(o, r.Object.Name+":organization_conflict")
 	}
 	if r.Object.Name == "answersheets" {
+		if x := raw.Lookup("durable_acceptance"); x.Type == bson.TypeEmbeddedDocument {
+			o.Links["durable_event_id"] = graphMongoString(x.Document(), "event_id")
+		}
 		if o.Links["domain_id"] == "" || o.Links["testee_id"] == "" || o.Links["org_id"] == "" {
 			return o, errors.New("answersheet missing actual typed ownership")
 		}
@@ -316,158 +316,7 @@ func (p *cohortPlanner) rootSQL(name string, ids []string) error {
 }
 
 func planCohort(ctx context.Context, reader graphReader, c cohortSelector, p protected, dir, selectorSHA, source string) (graphIndex, error) {
-	index := graphIndex{Format: 1, Kind: "mock_cohort_graph_index", Operation: c.Operation, SelectorSHA: selectorSHA, ProtectionSHA: c.ProtectionSHA, OwnerEvidenceSHA: c.OwnerEvidenceSHA, Source: source, Binding: c.Binding, Shards: []graphShard{}, Counts: map[string]int64{}, Retained: map[string]string{}, Holds: map[string]int64{}, HoldShards: []graphHoldShard{}, RequiredActions: map[string]int64{}, ReadOnly: true, WritePending: true}
-	if e := validateSelector(c, p); e != nil {
-		return index, e
-	}
-	if !hashPattern.MatchString(selectorSHA) {
-		return index, errors.New("exact selector hash required")
-	}
-	if e := privateDirectory(dir); e != nil {
-		return index, e
-	}
-	protectedKeys := map[string]bool{}
-	for _, o := range append(append(append([]object{}, p.QS.System...), p.QS.Clack...), p.QS.Other...) {
-		protectedKeys[objectID(o)] = true
-	}
-	writer := &graphWriter{dir: dir, index: &index, protected: protectedKeys}
-	planner := &cohortPlanner{context: ctx, reader: reader, selector: c, writer: writer, dir: dir, referenceOwners: map[string]graphObject{}}
-	// Exact roots are checked before any dependent discovery. Filtering a drifted
-	// root out is an error, never an apparently successful smaller cohort.
-	ids := sortedRootIDs(c.TesteeIDs)
-	if e := rootBatches(ids, 1000, func(batch []string) error { return planner.rootSQL("testee", batch) }); e != nil {
-		return index, e
-	}
-	if index.Counts["mysql/testee"] != int64(len(ids)) {
-		return index, errors.New("one or more frozen roots failed source/org/window verification")
-	}
-	if e := writer.flush(); e != nil {
-		return index, e
-	}
-	// Child discovery is rooted in this exact Testee subset. Shared Plan and Entry
-	// definitions and their unassignable resolve logs are deliberately retained.
-	tables := []string{"clinician_relation", "testee_store_history", "assessment_entry_intake_log", "answering_start", "plan_enrollment", "assessment_task", "assessment", "evaluation_outcome", "assessment_score", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref", "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"}
-	for _, name := range tables {
-		index.Counts["mysql/"+name] = 0
-		var e error
-		if singleRootSQLScan(name) {
-			e = planner.rootSQL(name, ids)
-		} else {
-			e = rootBatches(ids, 1000, func(batch []string) error { return planner.rootSQL(name, batch) })
-		}
-		if e != nil {
-			return index, e
-		}
-		if e := writer.flush(); e != nil {
-			return index, e
-		}
-	}
-	index.Counts["mongo/answersheets"] = 0
-	index.Counts["mongo/interpret_report_artifacts"] = 0
-	index.Counts["mongo/report_query_catalog"] = 0
-	for _, name := range []string{"answersheets", "interpret_report_artifacts", "report_query_catalog"} {
-		if e := planner.rootMongo(ctx, name, ids); e != nil {
-			return index, e
-		}
-		if e := writer.flush(); e != nil {
-			return index, e
-		}
-	}
-
-	index.Counts["mongo/report_generations"] = 0
-	if e := graphIDs(dir, &index, "mysql", "evaluation_outcome", "id", 500, func(batch []string) error {
-		return planner.generationPage(ctx, batch)
-	}); e != nil {
-		return index, e
-	}
-	if e := writer.flush(); e != nil {
-		return index, e
-	}
-	index.Counts["mongo/interpretation_runs"] = 0
-	if e := graphIDs(dir, &index, "mongo", "report_generations", "domain_id", 500, func(batch []string) error {
-		return planner.runPage(ctx, batch)
-	}); e != nil {
-		return index, e
-	}
-	if e := writer.flush(); e != nil {
-		return index, e
-	}
-	// Fixed shared objects are not converted into mock ownership by association.
-	for _, name := range []string{"assessment_plan", "assessment_entry", "assessment_entry_resolve_log", "actor_stores", "operators", "clinician", "questionnaires", "assessment_models", "assessment_norms", "interpretation_report_templates"} {
-		index.Retained[name] = "shared/formal definition or non-exclusive ownership; no deletion authority"
-	}
-	for _, id := range c.RetainPlanIDs {
-		index.Retained["assessment_plan/"+id] = "explicit shared plan; only exact cohort enrollment/task children are candidates"
-	}
-	for _, name := range []string{"statistics_org_snapshot", "statistics_access_daily", "statistics_assessment_daily", "statistics_plan_activity_daily", "statistics_plan_fulfillment_daily", "statistics_store_activity_daily"} {
-		index.Retained[name] = "shared aggregate buckets; exact affected buckets must be rebuilt from retained facts"
-	}
-	// These traversals are completed separately below rather than silently
-	// presenting the business rows alone as the complete reliable-message graph.
-	if e := planner.discoverResponsibilities(ctx); e != nil {
-		return index, e
-	}
-	if e := writer.flush(); e != nil {
-		return index, e
-	}
-	if e := planner.discoverStoreFacts(ctx); e != nil {
-		return index, e
-	}
-	if e := writer.flush(); e != nil {
-		return index, e
-	}
-	index.RequiredActions["targeted_cache_invalidation_before_reopen"] = 1
-	index.RequiredActions["generator_and_prepared_input_retirement"] = 1
-	if e := planner.flushHolds(); e != nil {
-		return index, e
-	}
-	index.DiscoveryComplete = true
-	return index, nil
-}
-
-func (p *cohortPlanner) discoverStoreFacts(ctx context.Context) error {
-	p.writer.index.Counts["mysql/statistics_store_activity_fact"] = 0
-	shards := append([]graphShard{}, p.writer.index.Shards...)
-	for _, source := range []struct{ store, name, link, fact string }{{"mongo", "answersheets", "domain_id", "answersheet_submitted"}, {"mysql", "assessment", "id", "assessment_completed"}} {
-		for _, shard := range shards {
-			if shard.Store != source.store || shard.Name != source.name {
-				continue
-			}
-			page, e := readGraphPage(p.dir, shard)
-			if e != nil {
-				return e
-			}
-			ids := []string{}
-			roots := map[string][]string{}
-			for _, o := range page.Objects {
-				id := o.Links[source.link]
-				if !graphDecimal(id) {
-					return errors.New("store statistic parent identity missing")
-				}
-				ids = append(ids, id)
-				roots[id] = graphRoots(o)
-			}
-			slots, args := placeholders(ids)
-			args = append([]any{p.selector.Selection.OrgID, source.fact}, args...)
-			if e = p.reader.sqlPages(ctx, "statistics_store_activity_fact", "x.org_id=? AND BINARY x.source_type=BINARY ? AND x.business_object_id IN ("+slots+")", args, func(r record) error {
-				o, e := p.sqlObject(r)
-				if e != nil {
-					return e
-				}
-				o.RootIDs = roots[o.Links["business_object_id"]]
-				if o.Links["source_ref"] != o.Links["business_object_id"] {
-					p.holdObject(o, "statistics_store_activity_fact:typed_source_ref_conflict")
-				}
-				return p.writer.add(o, graphSQLTables[r.Object.Name])
-			}); e != nil {
-				return e
-			}
-			if e = p.writer.flush(); e != nil {
-				return e
-			}
-		}
-	}
-	return nil
+	return leanPlanCohort(ctx, reader, c, p, dir, selectorSHA, source)
 }
 
 func readOnlyGraphResult(outPath string, index graphIndex) error {

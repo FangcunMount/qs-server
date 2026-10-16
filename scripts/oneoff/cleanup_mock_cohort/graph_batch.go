@@ -254,11 +254,11 @@ func (s *graphStore) readExactBatch(ctx context.Context, objects []object) ([]gr
 		return nil, err
 	}
 	if objects[0].Store == "mysql" {
-		shape, err := graphBatchSQLShape(ctx, s.live.sql, objects[0].Name)
+		shape, err := graphBatchSQLShape(ctx, s.live.readSQL(), objects[0].Name)
 		if err != nil {
 			return nil, err
 		}
-		return graphReadSQLBatch(ctx, s.live.sql, objects, shape, false)
+		return graphReadSQLBatch(ctx, s.live.readSQL(), objects, shape, false)
 	}
 	definition, err := newGraphStore(s.live).mongoDefinition(ctx, objects[0].Name)
 	if err != nil {
@@ -304,11 +304,11 @@ func (s *graphStore) preflightExactBatch(ctx context.Context, records []record, 
 		return err
 	}
 	if objects[0].Store == "mysql" {
-		shape, err := graphBatchSQLShape(ctx, s.live.sql, objects[0].Name)
+		shape, err := graphBatchSQLShape(ctx, s.live.readSQL(), objects[0].Name)
 		if err != nil {
 			return err
 		}
-		_, _, err = graphSQLWritePlan(ctx, s.live.sql, records, shape, restore)
+		_, _, err = graphSQLWritePlan(ctx, s.live.readSQL(), records, shape, restore)
 		return err
 	}
 	definition, err := newGraphStore(s.live).mongoDefinition(ctx, objects[0].Name)
@@ -1055,7 +1055,7 @@ func graphBatchPostimages(records []record, current []graphReadResult, restore b
 }
 
 func (s *graphStore) mutateGraphSQLBatch(ctx context.Context, objects []object, records []record, restore bool) (err error) {
-	tx, err := s.live.sql.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	tx, err := s.live.beginGraphTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 )
 
 // Split only read-only admission work before a durable write intent. A mutation
@@ -75,30 +76,139 @@ func graphObjectBatches(objects []object, fn func([]object) error) error {
 	}
 	return nil
 }
-func captureGraph(ctx context.Context, s graphBatchProvider, g group, p protected, index graphIndex, scopeDir, archiveDir, groupSHA, source string) (graphArchive, error) {
+func captureGraph(ctx context.Context, s graphBatchProvider, g group, p protected, index graphIndex, scopeDir, archiveDir, groupSHA, source string, workers int) (graphArchive, error) {
 	m := graphArchive{Format: 1, Kind: "mock_cohort_graph_archive", Operation: g.Operation, GroupSHA: groupSHA, ProtectionSHA: g.ProtectedSHA, Source: source, Binding: g.QS.Binding, Graph: *g.QS.Graph, Namespaces: map[string][]byte{}, Targets: []graphShard{}, Retained: []graphShard{}, Guards: []graphShard{}, Counts: map[string]int64{}}
-	if e := forSelectedScope(scopeDir, index, m.Graph.RootIDs, func(page []graphObject, rank int) error {
-		objects := make([]object, len(page))
-		for i, o := range page {
-			objects[i] = o.Object
-		}
-		return graphReadBounded(ctx, s, objects, true, func(records []record) error { return archiveGraphPage(archiveDir, &m, records, rank, false) })
-	}); e != nil {
-		return m, e
+	if workers < 1 || workers > 8 {
+		return m, errors.New("capture workers must be between one and eight")
 	}
-	if e := forRetainedScope(scopeDir, index, m.Graph.RootIDs, func(page []graphObject, _ int) error {
-		objects := make([]object, len(page))
-		for i, o := range page {
-			objects[i] = o.Object
-		}
-		return graphReadBounded(ctx, s, objects, false, func(records []record) error { return archiveGraphPage(archiveDir, &m, records, 0, false) })
-	}); e != nil {
-		return m, e
+	readCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type capturedPage struct {
+		records []record
+		written chan error
 	}
-	e := graphObjectBatches(graphGuardObjects(p), func(objects []object) error {
-		return graphReadBounded(ctx, s, objects, false, func(records []record) error { return archiveGraphPage(archiveDir, &m, records, 0, true) })
-	})
-	return m, e
+	type captureJob struct {
+		objects []object
+		rank    int
+		guard   bool
+		pages   chan capturedPage
+	}
+	jobs := make(chan captureJob)
+	ordered := make(chan captureJob, workers)
+	slots := make(chan struct{}, workers)
+	var joined sync.WaitGroup
+	var failed sync.Once
+	var cause error
+	fail := func(e error) {
+		if e != nil {
+			failed.Do(func() { cause = e; cancel() })
+		}
+	}
+	joined.Add(workers + 1)
+	for range workers {
+		go func() {
+			defer joined.Done()
+			reader := s
+			if real, ok := s.(*graphStore); ok {
+				reader = newGraphStore(real.live)
+			}
+			for job := range jobs {
+				e := graphReadBounded(readCtx, reader, job.objects, job.rank > 0 && !job.guard, func(records []record) error {
+					page := capturedPage{records: records, written: make(chan error, 1)}
+					select {
+					case job.pages <- page:
+					case <-readCtx.Done():
+						return readCtx.Err()
+					}
+					// The next readonly split cannot retain another raw page while
+					// this one is being encoded/fsynced by the sole archive writer.
+					select {
+					case e := <-page.written:
+						return e
+					case <-readCtx.Done():
+						return readCtx.Err()
+					}
+				})
+				fail(e)
+				close(job.pages)
+			}
+		}()
+	}
+	go func() {
+		defer joined.Done()
+		defer close(ordered)
+		defer close(jobs)
+		enqueue := func(objects []object, rank int, guard bool) error {
+			select {
+			case slots <- struct{}{}:
+			case <-readCtx.Done():
+				return readCtx.Err()
+			}
+			job := captureJob{objects: objects, rank: rank, guard: guard, pages: make(chan capturedPage)}
+			select {
+			case ordered <- job:
+			case <-readCtx.Done():
+				return readCtx.Err()
+			}
+			select {
+			case jobs <- job:
+				return nil
+			case <-readCtx.Done():
+				return readCtx.Err()
+			}
+		}
+		visit := func(page []graphObject, rank int) error {
+			objects := make([]object, len(page))
+			for i, o := range page {
+				objects[i] = o.Object
+			}
+			return enqueue(objects, rank, false)
+		}
+		e := forSelectedScope(scopeDir, index, m.Graph.RootIDs, visit)
+		if e == nil {
+			e = forRetainedScope(scopeDir, index, m.Graph.RootIDs, visit)
+		}
+		if e == nil {
+			e = graphObjectBatches(graphGuardObjects(p), func(objects []object) error { return enqueue(objects, 0, true) })
+		}
+		fail(e)
+	}()
+write:
+	for {
+		var job captureJob
+		var ok bool
+		select {
+		case job, ok = <-ordered:
+			if !ok {
+				break write
+			}
+		case <-readCtx.Done():
+			break write
+		}
+	pages:
+		for {
+			select {
+			case page, ok := <-job.pages:
+				if !ok {
+					<-slots
+					break pages
+				}
+				e := archiveGraphPage(archiveDir, &m, page.records, job.rank, job.guard)
+				page.written <- e
+				if e != nil {
+					fail(e)
+					break write
+				}
+			case <-readCtx.Done():
+				break write
+			}
+		}
+	}
+	joined.Wait()
+	if cause != nil {
+		return m, cause
+	}
+	return m, ctx.Err()
 }
 
 // Header references cannot expand, omit, reorder or duplicate a single scope
@@ -127,6 +237,10 @@ func validateGraphCoverage(m graphArchive, g group, p protected, index graphInde
 					if ref.File != file || ref.RestoreRank != rank {
 						return errors.New("archive scope ordinal/rank changed")
 					}
+					namespace := ref.Store + "/" + ref.Name
+					if !hashPattern.MatchString(index.Definitions[namespace]) || index.Definitions[namespace] != digest(m.Namespaces[namespace]) {
+						return errors.New("archive namespace differs from the typed-key plan")
+					}
 					var e error
 					current, e = readGraphArchivePage(dir, m, ref)
 					if e != nil {
@@ -139,8 +253,8 @@ func validateGraphCoverage(m graphArchive, g group, p protected, index graphInde
 				r := current[nextRecord]
 				nextRecord++
 				id := objectID(o.Object)
-				if seen[id] || objectID(r.Object) != id || r.Object.Fingerprint != o.Object.Fingerprint {
-					return errors.New("archive exact scope/preimage coverage changed")
+				if seen[id] || objectID(r.Object) != id || o.Object.Fingerprint != "" {
+					return errors.New("archive exact typed-key scope coverage changed")
 				}
 				seen[id] = true
 				if !retained {
@@ -309,6 +423,10 @@ func graphPrecheck(ctx context.Context, s graphBatchProvider, m graphArchive, di
 		return e
 	}
 	for _, ref := range graphOrderedShards(m, restore) {
+		prior, found := j.latest[graphChunkID(ref)]
+		if found && (prior.State == "intent" || prior.State == "unknown") {
+			return errors.New("unknown batch requires read-only reconciliation before new approval")
+		}
 		records, e := readGraphArchivePage(dir, m, ref)
 		if e != nil {
 			return e
@@ -316,24 +434,38 @@ func graphPrecheck(ctx context.Context, s graphBatchProvider, m graphArchive, di
 		if e = s.preflightExactBatch(ctx, records, restore); e != nil {
 			return e
 		}
-		absent, same, e := graphChunkState(ctx, s, records)
-		if e != nil {
-			return e
-		}
-		prior, found := j.latest[graphChunkID(ref)]
-		if found && (prior.State == "intent" || prior.State == "unknown") {
-			return errors.New("unknown batch requires read-only reconciliation before new approval")
-		}
-		if !restore && !absent && !same {
-			return errors.New("partial original delete batch lacks exact acknowledged state")
-		}
-		if !restore && absent && !found {
-			return errors.New("unacknowledged target absence cannot be skipped")
+		// Restore must find every foreign replacement before any earlier chunk is
+		// restored. New deletes instead use the provider's locked transaction CAS.
+		if found {
+			if _, _, e = graphKnownChunkState(ctx, s, records, prior); e != nil {
+				return e
+			}
+		} else if restore {
+			if _, _, e = graphChunkState(ctx, s, records); e != nil {
+				return e
+			}
 		}
 	}
 	return nil
 }
-func mutateGraph(ctx context.Context, s graphBatchProvider, m graphArchive, dir string, j *graphJournal, a graphApproval, approvalSHA string, restore bool, authority, beforeClaim func() error) error {
+
+func graphKnownChunkState(ctx context.Context, s graphBatchProvider, records []record, prior journalEntry) (bool, bool, error) {
+	absent, original, e := graphChunkState(ctx, s, records)
+	if e != nil {
+		return false, false, e
+	}
+	wantAbsent := prior.State == "reconciled_absent" || prior.State == "committed" && prior.Action == "apply"
+	wantOriginal := prior.State == "reconciled_original" || prior.State == "committed" && prior.Action == "restore"
+	if !wantAbsent && !wantOriginal || wantAbsent && !absent || wantOriginal && !original {
+		return false, false, errors.New("acknowledged chunk state changed; no automatic replay")
+	}
+	return absent, original, nil
+}
+
+func mutateGraph(ctx context.Context, s graphBatchProvider, m graphArchive, dir string, j *graphJournal, a graphApproval, approvalSHA string, restore bool, authority, beforeClaim func() error, workers int) error {
+	if workers < 1 || workers > 8 {
+		return errors.New("mutation workers must be between one and eight")
+	}
 	if e := graphPrecheck(ctx, s, m, dir, j, restore); e != nil {
 		return e
 	}
@@ -351,39 +483,8 @@ func mutateGraph(ctx context.Context, s graphBatchProvider, m graphArchive, dir 
 	if e := writeNew(filepath.Join(dir, "approval-"+approvalSHA+".consumed"), encode(a)); e != nil {
 		return errors.New("approval already consumed or private claim failed")
 	}
-	for _, ref := range graphOrderedShards(m, restore) {
-		if e := ctx.Err(); e != nil {
-			return e
-		}
-		if e := authority(); e != nil {
-			return e
-		}
-		records, e := readGraphArchivePage(dir, m, ref)
-		if e != nil {
-			return e
-		}
-		absent, same, e := graphChunkState(ctx, s, records)
-		if e != nil {
-			return e
-		}
-		if restore && same || !restore && absent {
-			continue
-		}
-		entry := journalEntry{Action: "apply", Chunk: graphChunkID(ref), ApprovalSHA: approvalSHA, State: "intent"}
-		if restore {
-			entry.Action = "restore"
-		}
-		if e = j.append(entry); e != nil {
-			return e
-		}
-		if e = s.mutateExactBatch(ctx, records, restore); e != nil {
-			entry.State = "unknown"
-			return errors.Join(errors.New("write outcome unknown; read-only reconciliation required"), e, j.append(entry))
-		}
-		entry.State = "committed"
-		if e = j.append(entry); e != nil {
-			return errors.Join(errors.New("acknowledged write terminal journal unproven; do not resend"), e)
-		}
+	if e := graphMutateOrdered(ctx, s, m, dir, j, approvalSHA, restore, authority, workers); e != nil {
+		return e
 	}
 	if e := authority(); e != nil {
 		return e

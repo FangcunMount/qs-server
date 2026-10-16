@@ -3,9 +3,11 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -57,6 +59,7 @@ func seedCohortGraphNative(t *testing.T) cohortGraphNative {
 	} {
 		h.exec(q)
 	}
+	h.exec("UPDATE testee SET profile_id=9000 WHERE id=44")
 	// Cross a real SQL LIMIT 1000 boundary without holding a large business body.
 	values, args := []string{}, []any{}
 	for id := 1; id <= 1001; id++ {
@@ -82,7 +85,7 @@ func seedCohortGraphNative(t *testing.T) cohortGraphNative {
 	}
 	catalogID := primitive.NewObjectID()
 	for name, doc := range map[string]bson.D{
-		"report_generations":         {{Key: "domain_id", Value: int64(301)}, {Key: "outcome_id", Value: int64(201)}, {Key: "latest_run_id", Value: int64(401)}, {Key: "report_id", Value: int64(501)}},
+		"report_generations":         {{Key: "domain_id", Value: int64(301)}, {Key: "outcome_id", Value: int64(201)}, {Key: "status", Value: "generated"}, {Key: "latest_run_id", Value: int64(401)}, {Key: "report_id", Value: int64(501)}},
 		"interpretation_runs":        {{Key: "domain_id", Value: int64(401)}, {Key: "generation_id", Value: int64(301)}, {Key: "status", Value: "succeeded"}},
 		"interpret_report_artifacts": {{Key: "domain_id", Value: int64(501)}, {Key: "org_id", Value: int64(1)}, {Key: "testee_id", Value: int64(44)}, {Key: "assessment_id", Value: int64(101)}, {Key: "outcome_id", Value: int64(201)}, {Key: "generation_id", Value: int64(301)}, {Key: "interpretation_run_id", Value: int64(401)}},
 		"report_query_catalog":       {{Key: "_id", Value: catalogID}, {Key: "org_id", Value: int64(1)}, {Key: "testee_id", Value: int64(44)}, {Key: "assessment_id", Value: int64(101)}, {Key: "outcome_id", Value: int64(201)}, {Key: "generation_id", Value: int64(301)}, {Key: "source_kind", Value: "artifact"}, {Key: "source_id", Value: int64(501)}, {Key: "sort_report_id", Value: int64(501)}},
@@ -105,7 +108,7 @@ func seedCohortGraphNative(t *testing.T) cohortGraphNative {
 	retained := nativeMongoObject(retainedSheet)
 	retained.Name = "answersheets"
 	p.QS.Other = append(p.QS.Other, retained)
-	c := cohortSelector{Format: 1, Kind: "mock_cohort_selector", Operation: "native-graph-" + strings.TrimPrefix(h.name, "qs_mock_cohort_"), OwnerEvidenceSHA: strings.Repeat("a", 64), ProtectionSHA: digest(encode(p)), Binding: h.binding, Selection: selection{Source: "daily_simulation", OrgID: "1", From: "2026-01-01T00:00:00+08:00", Through: "2026-01-02T00:00:00+08:00", Evidence: "owner-confirmed synthetic graph roots; no production deletion authority"}, TesteeIDs: []string{"44"}, RetainPlanIDs: []string{"500"}}
+	c := cohortSelector{Format: 2, Kind: "mock_cohort_selector", Operation: "native-graph-" + strings.TrimPrefix(h.name, "qs_mock_cohort_"), OwnerEvidenceSHA: strings.Repeat("a", 64), ProtectionSHA: digest(encode(p)), Binding: h.binding, Selection: selection{Source: "daily_simulation", OrgID: "1", From: "2026-01-01T00:00:00+08:00", Through: "2026-01-02T00:00:00+08:00", Evidence: "owner-confirmed synthetic graph roots; no production deletion authority"}, IdentityLinksSHA: strings.Repeat("d", 64), IdentityGroups: []cohortIdentityGroup{{UserIDs: []string{"800"}, ProfileIDs: []string{"9000"}, TesteeIDs: []string{"44"}}}, TesteeIDs: []string{"44"}, RetainPlanIDs: []string{"500"}}
 	return cohortGraphNative{h, c, p, catalogID}
 }
 
@@ -141,22 +144,32 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 	f := seedCohortGraphNative(t)
 	h := f.h
 	before := graphNativeSnapshot(t, h)
-	guards, err := observeGraphProtection(t.Context(), h.store, f.protected)
+	guards, err := nativeProtectionSnapshot(t.Context(), h.store, f.protected)
 	if err != nil {
 		t.Fatal(err)
 	}
 	dir := privateTestDir(t)
 	store := newGraphStore(h.store)
-	index, err := planCohort(t.Context(), store, f.selector, f.protected, dir, digest(encode(f.selector)), toolSource)
+	index, err := planCohort(t.Context(), newLeanReader(store), f.selector, f.protected, dir, digest(encode(f.selector)), toolSource)
 	if err != nil {
 		t.Fatal("real-provider graph discovery failed:", err)
 	}
 	if !index.ReadOnly || !index.DiscoveryComplete || !index.WritePending || index.Released || len(index.Holds) != 0 {
 		t.Fatalf("readonly graph authority/hold mismatch: complete=%t write_pending=%t released=%t holds=%v", index.DiscoveryComplete, index.WritePending, index.Released, index.Holds)
 	}
-	for _, name := range []string{"testee", "clinician_relation", "testee_store_history", "assessment_entry_intake_log", "answering_start", "plan_enrollment", "assessment_task", "assessment", "evaluation_outcome", "runtime_checkpoint", "interpretation_attention_projection", "interpretation_admission_failure", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref", "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact", "event_delivery_dead_letter", "retry_event_hold"} {
+	for _, name := range []string{"testee", "clinician_relation", "testee_store_history", "assessment_entry_intake_log", "answering_start", "plan_enrollment", "assessment_task", "assessment", "evaluation_outcome", "runtime_checkpoint", "interpretation_admission_failure", "statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"} {
 		if got := index.Counts["mysql/"+name]; got != 1 {
 			t.Fatalf("real graph branch %s: got %d want 1", name, got)
+		}
+	}
+	for _, name := range []string{"interpretation_attention_projection", "task_opened_reminder_batch", "task_opened_reminder_delivery", "qs_rm_evaluation_request_ref"} {
+		if index.Counts["retained/exact_target/mysql/"+name] != 1 {
+			t.Fatalf("exact target audit count missing %s", name)
+		}
+	}
+	for _, name := range []string{"event_delivery_dead_letter", "retry_event_hold"} {
+		if index.Counts["retained/all_org/mysql/"+name+"/total"] != 2 {
+			t.Fatalf("all-org retained audit count missing %s", name)
 		}
 	}
 	for name, want := range map[string]int64{"mysql/assessment_score": 1001, "mysql/statistics_store_activity_fact": 2, "mongo/answersheets": 501, "mongo/report_generations": 1, "mongo/interpretation_runs": 1, "mongo/interpret_report_artifacts": 1, "mongo/report_query_catalog": 1} {
@@ -167,7 +180,7 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 	if index.Retained["assessment_plan/500"] == "" || index.RequiredActions["settle_event_delivery_dead_letter"] != 0 || index.RequiredActions["settle_retry_event_hold"] != 0 {
 		t.Fatal("shared Plan must remain retained; already settled historical receipts do not create new replay work")
 	}
-	for _, name := range []string{"interpretation_attention_projection", "task_opened_reminder_batch", "task_opened_reminder_delivery", "event_delivery_dead_letter", "retry_event_hold"} {
+	for _, name := range []string{"interpretation_attention_projection", "task_opened_reminder_batch", "task_opened_reminder_delivery"} {
 		if index.Retained[name] == "" {
 			t.Fatal("online settled replay/notification evidence was not explicitly retained:", name)
 		}
@@ -188,8 +201,8 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 		pageCounts[shard.Store+"/"+shard.Name] = append(pageCounts[shard.Store+"/"+shard.Name], shard.Count)
 		for _, o := range page.Objects {
 			id := objectID(o.Object)
-			if seen[id] || !hashPattern.MatchString(o.Object.Fingerprint) {
-				t.Fatal("physical target duplicated or original fingerprint missing")
+			if seen[id] || o.Object.Fingerprint != "" {
+				t.Fatal("physical target duplicated or business preimage entered typed-ID plan")
 			}
 			seen[id] = true
 			if o.Object.Name == "answersheets" && o.Links["domain_id"] == "700" {
@@ -203,7 +216,7 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 	if _, err := store.verifyDefinitions(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	afterGuards, err := observeGraphProtection(t.Context(), h.store, f.protected)
+	afterGuards, err := nativeProtectionSnapshot(t.Context(), h.store, f.protected)
 	if err != nil || !reflect.DeepEqual(guards, afterGuards) || !reflect.DeepEqual(before, graphNativeSnapshot(t, h)) {
 		t.Fatal("readonly discovery changed original facts or protected/shared objects:", err)
 	}
@@ -217,8 +230,8 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 	if _, err = col.UpdateByID(t.Context(), f.catalogID, bson.D{{Key: "$set", Value: bson.D{{Key: "assessment_id", Value: int64(102)}}}}); err != nil {
 		t.Fatal(err)
 	}
-	index, err = planCohort(t.Context(), newGraphStore(h.store), f.selector, f.protected, privateTestDir(t), digest(encode(f.selector)), toolSource)
-	if err != nil || index.Holds["report_query_catalog:assessment_ownership_conflict"] != 1 || !index.WritePending || index.Released {
+	index, err = planCohort(t.Context(), newLeanReader(newGraphStore(h.store)), f.selector, f.protected, privateTestDir(t), digest(encode(f.selector)), toolSource)
+	if err != nil || index.Holds["report_query_catalog:typed_assessment_id_ownership_conflict"] != 1 || !index.WritePending || index.Released {
 		t.Fatal("retained cross-link must block whole-graph write qualification:", err)
 	}
 	// Equal numeric BSON values with a different actual type are not an identity
@@ -226,9 +239,28 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 	if _, err = col.UpdateByID(t.Context(), f.catalogID, bson.D{{Key: "$set", Value: bson.D{{Key: "assessment_id", Value: int64(101)}, {Key: "testee_id", Value: int32(44)}}}}); err != nil {
 		t.Fatal(err)
 	}
-	index, err = planCohort(t.Context(), newGraphStore(h.store), f.selector, f.protected, privateTestDir(t), digest(encode(f.selector)), toolSource)
+	index, err = planCohort(t.Context(), newLeanReader(newGraphStore(h.store)), f.selector, f.protected, privateTestDir(t), digest(encode(f.selector)), toolSource)
 	if err != nil || index.Holds["report_query_catalog:unassignable_testee_identity"] != 1 || index.Counts["mongo/report_query_catalog"] != 0 || !index.WritePending || index.Released {
 		t.Fatal("numeric BSON alias must remain held outside writable scope:", err)
 	}
 	t.Logf("graph_discovery_only=true whole_cohort_write_qualified=false sql_score_shards=%v mongo_answersheet_shards=%v physical_targets=%d", pageCounts["mysql/assessment_score"], pageCounts["mongo/answersheets"], len(seen))
+}
+
+// This test-only full-original witness protects the raw/BSON invariants of the
+// live fixture. The production plan itself reads technical identities only.
+func nativeProtectionSnapshot(ctx context.Context, s dataStore, p protected) ([]object, error) {
+	out := []object{}
+	guards := sortedObjects(append(append(append([]object{}, p.QS.System...), p.QS.Clack...), p.QS.Other...))
+	for _, o := range guards {
+		r, exists, e := s.read(ctx, o)
+		if e != nil {
+			return nil, e
+		}
+		if !exists {
+			return nil, errors.New("protected native witness missing")
+		}
+		o.Fingerprint = fingerprint(r)
+		out = append(out, o)
+	}
+	return out, nil
 }

@@ -47,9 +47,41 @@ type dataStore interface {
 }
 
 type liveStore struct {
-	sql     *sql.Conn
-	mongo   *mongo.Client
-	mongoDB string
+	sql            *sql.Conn
+	sqlPool        *sql.DB
+	workerIdentity workerSQLBinding
+	workers        int
+	mongo          *mongo.Client
+	mongoDB        string
+}
+
+// The pinned connection keeps GET_LOCK and identity checks independent from
+// worker I/O. Test fixtures can retain their explicit single SQL connection.
+func (s *liveStore) readSQL() sqlReader {
+	if s.sqlPool != nil {
+		return s.sqlPool
+	}
+	return s.sql
+}
+
+func (s *liveStore) beginGraphTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	if s.sqlPool == nil {
+		return s.sql.BeginTx(ctx, opts)
+	}
+	if !s.workerIdentity.valid() {
+		return nil, errors.New("fixed pooled SQL worker identity required")
+	}
+	tx, err := s.sqlPool.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if err = checkWorkerSQLTransaction(ctx, tx, s.workerIdentity); err != nil {
+		if rollback := tx.Rollback(); rollback != nil && !errors.Is(rollback, sql.ErrTxDone) {
+			err = errors.Join(err, rollback)
+		}
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (s *liveStore) identity(ctx context.Context, w binding) error {

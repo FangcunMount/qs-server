@@ -26,26 +26,53 @@ func (s *graphFake) sqlPages(_ context.Context, name, where string, args []any, 
 	if name == s.fail {
 		return errors.New("readonly page interrupted")
 	}
-	if strings.Contains(where, "x.org_id") && name == "interpretation_attention_projection" {
-		return errors.New("unknown physical org_id column")
-	}
 	for _, r := range s.sqlRows[name] {
-		if strings.HasPrefix(where, "x.id IN") && name != "testee" {
-			id, _ := graphSQLValue(r, "id")
-			match := false
-			for _, a := range args {
-				if a == id {
-					match = true
-				}
+		matched := true
+		for _, column := range []string{"id", "testee_id", "assessment_id", "outcome_id", "report_id", "task_id", "business_object_id", "source_ref", "profile_id", "user_id"} {
+			marker := "x.`" + column + "` IN ("
+			start := strings.Index(where, marker)
+			if start < 0 {
+				marker = "x." + column + " IN ("
+				start = strings.Index(where, marker)
 			}
-			if !match {
+			if start < 0 {
 				continue
 			}
-		} else if name == "assessment" {
-			testee, _ := graphSQLValue(r, "testee_id")
-			if testee != "1" {
-				continue
+			end := strings.Index(where[start:], ")")
+			if end < 0 {
+				panic("bad fixed fake IN")
 			}
+			offset := strings.Count(where[:start], "?")
+			n := strings.Count(where[start:start+end], "?")
+			value, _ := graphSQLValue(r, column)
+			found := false
+			for _, arg := range args[offset : offset+n] {
+				found = found || arg == value
+			}
+			matched = matched && found
+		}
+		for _, column := range []string{"org_id", "source_type", "fact_type"} {
+			marker := "x." + column + "=?"
+			at := strings.Index(where, marker)
+			if at >= 0 {
+				value, _ := graphSQLValue(r, column)
+				matched = matched && args[strings.Count(where[:at], "?")] == value
+			}
+		}
+		if name == "event_delivery_dead_letter" {
+			state, _ := graphSQLValue(r, "retry_disposition")
+			if state == "archived_mock" || state == "terminal" {
+				matched = false
+			}
+		}
+		if name == "retry_event_hold" {
+			state, _ := graphSQLValue(r, "status")
+			if state == "replayed" {
+				matched = false
+			}
+		}
+		if !matched {
+			continue
 		}
 		if e := emit(r); e != nil {
 			return e
@@ -53,6 +80,22 @@ func (s *graphFake) sqlPages(_ context.Context, name, where string, args []any, 
 	}
 	return nil
 }
+
+func (s *graphFake) sqlOneCursor(_ context.Context, name, where string, _ []any, emit func(record) error) error {
+	// Supply a candidate superset: the planner must still check the named
+	// typed-parent domains. Scalar IN(?) parsing does not model JSON_TABLE.
+	s.calls = append(s.calls, "mysql/"+name+":"+where)
+	if name == s.fail {
+		return errors.New("readonly page interrupted")
+	}
+	for _, r := range s.sqlRows[name] {
+		if e := emit(r); e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
 func (s *graphFake) mongoPages(_ context.Context, name string, filter bson.D, emit func(record) error) error {
 	s.calls = append(s.calls, "mongo/"+name)
 	if len(filter) == 0 {
@@ -60,21 +103,27 @@ func (s *graphFake) mongoPages(_ context.Context, name string, filter bson.D, em
 	}
 	for _, r := range s.mongoRows[name] {
 		if len(filter) > 0 && filter[0].Key != "$or" {
-			v := bson.Raw(r.BSON).Lookup(filter[0].Key)
-			if v.Type != bson.TypeInt64 {
-				continue
-			}
-			ids := filter[0].Value.(bson.D)[0].Value.(bson.A)
-			found := false
-			for _, id := range ids {
-				if id == v.Int64() {
-					found = true
+			value := bson.Raw(r.BSON).Lookup(filter[0].Key)
+			if expr, ok := filter[0].Value.(bson.D); ok && len(expr) > 0 && expr[0].Key == "$in" {
+				found := false
+				for _, id := range expr[0].Value.(bson.A) {
+					if n, ok := id.(int64); ok {
+						found = found || graphRawIDMember(bson.Raw(r.BSON), filter[0].Key, map[string]bool{strconv.FormatInt(n, 10): true})
+					}
+				}
+				if !found {
+					continue
+				}
+			} else if text, ok := filter[0].Value.(string); ok {
+				if value.Type != bson.TypeString || value.StringValue() != text {
+					continue
 				}
 			}
-			if !found {
-				continue
-			}
 		}
+		if name == "rm_outbox" && graphMongoString(bson.Raw(r.BSON), "state") == "published" {
+			continue
+		}
+
 		if e := emit(r); e != nil {
 			return e
 		}
@@ -91,7 +140,7 @@ func (s *graphFake) mongoOwnerPages(ctx context.Context, name string, ids []stri
 
 func graphSQLFixture(name, id string, fields map[string]string) record {
 	r := record{Object: key(name, id), Definition: []byte("fixed original ddl/session"), Columns: []cell{{Name: "id", Type: "UNSIGNED BIGINT", Raw: []byte(id)}}}
-	for _, name := range []string{"org_id", "testee_id", "source", "assessment_id", "outcome_id", "plan_id", "enrollment_id", "status"} {
+	for _, name := range []string{"org_id", "testee_id", "profile_id", "source", "assessment_id", "answer_sheet_id", "answersheet_id", "outcome_id", "plan_id", "enrollment_id", "status", "state", "source_type", "fact_type", "source_ref", "business_object_id", "report_id", "task_id"} {
 		if v, ok := fields[name]; ok {
 			r.Columns = append(r.Columns, cell{Name: name, Type: "VARCHAR", Raw: []byte(v)})
 		}
@@ -114,9 +163,9 @@ func graphFixture(t *testing.T) (*graphFake, cohortSelector, protected, string) 
 	t.Helper()
 	dir := privateTestDir(t)
 	p := protected{Format: 1, Kind: "mock_cohort_protected", IAM: []byte(`{"user_ids":["10001"],"profile_ids":[],"login_identity_ids":[]}`), QS: protectionScope{System: []object{key("testee", "42")}, Clack: []object{key("testee", "43")}, Other: []object{}}}
-	c := cohortSelector{Format: 1, Kind: "mock_cohort_selector", Operation: "graph-test", OwnerEvidenceSHA: strings.Repeat("a", 64), ProtectionSHA: digest(encode(p)), Binding: binding{SQLUUID: "fixture", SQLDatabase: "qs", MongoIdentity: strings.Repeat("b", 64), MongoDatabase: "qs", SQLVersion: 101, MongoVersion: 39}, Selection: selection{Source: "daily_simulation", OrgID: "1", From: "2025-01-01T00:00:00+08:00", Through: "2026-10-01T00:00:00+08:00", Evidence: "owner confirmed dedicated fixed roots"}, TesteeIDs: []string{"1"}, RetainPlanIDs: []string{"500"}}
+	c := cohortSelector{Format: 2, Kind: "mock_cohort_selector", Operation: "graph-test", OwnerEvidenceSHA: strings.Repeat("a", 64), ProtectionSHA: digest(encode(p)), Binding: binding{SQLUUID: "fixture", SQLDatabase: "qs", MongoIdentity: strings.Repeat("b", 64), MongoDatabase: "qs", SQLVersion: 101, MongoVersion: 39}, Selection: selection{Source: "daily_simulation", OrgID: "1", From: "2025-01-01T00:00:00+08:00", Through: "2026-10-01T00:00:00+08:00", Evidence: "owner confirmed dedicated fixed roots"}, IdentityLinksSHA: strings.Repeat("d", 64), IdentityGroups: []cohortIdentityGroup{{UserIDs: []string{"10"}, ProfileIDs: []string{"11"}, TesteeIDs: []string{"1"}}}, TesteeIDs: []string{"1"}, RetainPlanIDs: []string{"500"}}
 	s := &graphFake{sqlRows: map[string][]record{}, mongoRows: map[string][]record{}, mongoRootScans: map[string]int{}}
-	s.sqlRows["testee"] = []record{graphSQLFixture("testee", "1", map[string]string{"org_id": "1", "source": "daily_simulation"})}
+	s.sqlRows["testee"] = []record{graphSQLFixture("testee", "1", map[string]string{"org_id": "1", "profile_id": "11", "source": "daily_simulation"})}
 	s.sqlRows["assessment"] = []record{graphSQLFixture("assessment", "100", map[string]string{"org_id": "1", "testee_id": "1"}), graphSQLFixture("assessment", "101", map[string]string{"org_id": "1", "testee_id": "2"})}
 	s.sqlRows["evaluation_outcome"] = []record{graphSQLFixture("evaluation_outcome", "200", map[string]string{"org_id": "1", "testee_id": "1", "assessment_id": "100"})}
 	s.sqlRows["assessment_task"] = []record{graphSQLFixture("assessment_task", "400", map[string]string{"org_id": "1", "testee_id": "1", "plan_id": "500", "enrollment_id": "600", "status": "completed"})}
@@ -127,7 +176,7 @@ func graphFixture(t *testing.T) (*graphFake, cohortSelector, protected, string) 
 	}
 	s.mongoRows["answersheets"] = append(s.mongoRows["answersheets"], graphMongoFixture(t, "answersheets", bson.D{{Key: "domain_id", Value: int64(23)}, {Key: "org_id", Value: int64(1)}, {Key: "testee_id", Value: int64(2)}, {Key: "admission", Value: bson.D{{Key: "purpose", Value: "assessment"}}}}))
 	s.mongoRows["interpret_report_artifacts"] = []record{graphMongoFixture(t, "interpret_report_artifacts", bson.D{{Key: "domain_id", Value: int64(700)}, {Key: "org_id", Value: int64(1)}, {Key: "testee_id", Value: int64(1)}, {Key: "assessment_id", Value: int64(100)}, {Key: "outcome_id", Value: int64(200)}, {Key: "generation_id", Value: int64(800)}, {Key: "interpretation_run_id", Value: int64(900)}})}
-	s.mongoRows["report_generations"] = []record{graphMongoFixture(t, "report_generations", bson.D{{Key: "domain_id", Value: int64(800)}, {Key: "outcome_id", Value: int64(200)}, {Key: "latest_run_id", Value: int64(900)}, {Key: "report_id", Value: int64(700)}})}
+	s.mongoRows["report_generations"] = []record{graphMongoFixture(t, "report_generations", bson.D{{Key: "domain_id", Value: int64(800)}, {Key: "outcome_id", Value: int64(200)}, {Key: "status", Value: "generated"}, {Key: "latest_run_id", Value: int64(900)}, {Key: "report_id", Value: int64(700)}})}
 	s.mongoRows["interpretation_runs"] = []record{graphMongoFixture(t, "interpretation_runs", bson.D{{Key: "domain_id", Value: int64(900)}, {Key: "generation_id", Value: int64(800)}, {Key: "status", Value: "succeeded"}})}
 	s.mongoRows["report_query_catalog"] = []record{graphMongoFixture(t, "report_query_catalog", bson.D{{Key: "org_id", Value: int64(1)}, {Key: "testee_id", Value: int64(1)}, {Key: "assessment_id", Value: int64(100)}, {Key: "outcome_id", Value: int64(200)}, {Key: "generation_id", Value: int64(800)}, {Key: "source_kind", Value: "artifact"}, {Key: "source_id", Value: int64(700)}, {Key: "sort_report_id", Value: int64(700)}})}
 	return s, c, p, dir
@@ -153,10 +202,8 @@ func TestGraphPlannerFreezesIndependentAndPlanChainsWithoutSharedRoots(t *testin
 	if index.Counts["mysql/assessment"] != 1 || index.Counts["mongo/answersheets"] != 2 || index.Counts["mongo/report_generations"] != 1 || index.Counts["mongo/interpretation_runs"] != 1 || index.Retained["assessment_plan/500"] == "" {
 		t.Fatalf("fixed graph counts/shared root mismatch: %#v", index.Counts)
 	}
-	for _, name := range []string{"answersheets", "interpret_report_artifacts", "report_query_catalog"} {
-		if s.mongoRootScans[name] != 1 {
-			t.Fatal("unindexed root lookup must scan each collection only once")
-		}
+	if s.mongoRootScans["answersheets"] != 1 || s.mongoRootScans["interpret_report_artifacts"] != 0 || s.mongoRootScans["report_query_catalog"] != 0 {
+		t.Fatal("only the unindexed AnswerSheet root relation may require one technical scan")
 	}
 	for _, call := range s.calls {
 		if strings.Contains(call, "mysql/assessment_plan:") || strings.Contains(call, "mysql/assessment_entry:") {
@@ -211,7 +258,7 @@ func TestGraphPlannerHoldsRetainedAssessmentCrossLink(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if index.Holds["interpret_report_artifacts:assessment_ownership_conflict"] != 1 {
+	if index.Holds["interpret_report_artifacts:typed_assessment_id_ownership_conflict"] != 1 {
 		t.Fatal("equal numeric cross-link cannot be silently owned from Testee alone")
 	}
 	if len(index.HoldShards) == 0 {
@@ -224,7 +271,7 @@ func TestGraphPlannerHoldsRetainedAssessmentCrossLink(t *testing.T) {
 	}
 	found := false
 	for _, h := range holds.Holds {
-		if h.Reason == "interpret_report_artifacts:assessment_ownership_conflict" {
+		if h.Reason == "interpret_report_artifacts:typed_assessment_id_ownership_conflict" {
 			found = h.PhysicalSHA == objectID(r.Object) && len(h.RootIDs) == 1 && h.RootIDs[0] == "1"
 		}
 	}
@@ -239,7 +286,6 @@ func TestGraphScopeShardsBoundCountsAndStopOnTamper(t *testing.T) {
 	w := graphWriter{dir: dir, index: &index, protected: map[string]bool{}}
 	for i := 1; i <= 2501; i++ {
 		o := key("assessment", strconv.Itoa(i))
-		o.Fingerprint = strings.Repeat("a", 64)
 		if e := w.add(graphObject{Object: o, Links: map[string]string{"id": strconv.Itoa(i)}, References: nil}, 50); e != nil {
 			t.Fatal(e)
 		}
@@ -319,4 +365,21 @@ func TestGraphDeliveryCamelCaseOriginalIDsAndRetainedMissingRoot(t *testing.T) {
 	if e != nil || candidate.testeeID != "630514119807611438" || candidate.assessmentID != "630514128649204270" || !candidate.recognized {
 		t.Fatal("original 64-bit JSON IDs must not round through float64")
 	}
+}
+
+func (s *graphFake) retainedCounts(_ context.Context, org string) (map[string]int64, error) {
+	out := map[string]int64{}
+	for _, name := range []string{"event_delivery_dead_letter", "retry_event_hold", "rm_outbox", "qs_rm_replay_requests", "qs_rm_replay_items"} {
+		for _, r := range s.sqlRows[name] {
+			if v, ok := graphSQLValue(r, "org_id"); ok && v != org {
+				continue
+			}
+			state, _ := graphSQLValue(r, "state")
+			if state == "" {
+				state, _ = graphSQLValue(r, "status")
+			}
+			out["mysql/"+name+"/all_org/"+state]++
+		}
+	}
+	return out, nil
 }

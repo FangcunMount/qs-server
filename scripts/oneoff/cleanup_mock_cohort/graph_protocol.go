@@ -17,16 +17,24 @@ import (
 // A graph selector is a frozen, explicit subset of the owner-confirmed roots.
 // A subsequent execution window must name its own exact subset; pagination is
 // only an I/O bound and never creates a new maintenance budget.
+type cohortIdentityGroup struct {
+	UserIDs    []string `json:"user_ids"`
+	ProfileIDs []string `json:"profile_ids"`
+	TesteeIDs  []string `json:"testee_ids"`
+}
+
 type cohortSelector struct {
-	Format           int       `json:"format_version"`
-	Kind             string    `json:"kind"`
-	Operation        string    `json:"operation_id"`
-	OwnerEvidenceSHA string    `json:"owner_evidence_sha256"`
-	ProtectionSHA    string    `json:"protected_manifest_sha256"`
-	Binding          binding   `json:"binding"`
-	Selection        selection `json:"selector"`
-	TesteeIDs        []string  `json:"testee_ids"`
-	RetainPlanIDs    []string  `json:"retain_plan_ids"`
+	Format           int                   `json:"format_version"`
+	Kind             string                `json:"kind"`
+	Operation        string                `json:"operation_id"`
+	OwnerEvidenceSHA string                `json:"owner_evidence_sha256"`
+	ProtectionSHA    string                `json:"protected_manifest_sha256"`
+	Binding          binding               `json:"binding"`
+	Selection        selection             `json:"selector"`
+	TesteeIDs        []string              `json:"testee_ids"`
+	RetainPlanIDs    []string              `json:"retain_plan_ids"`
+	IdentityLinksSHA string                `json:"identity_links_sha256"`
+	IdentityGroups   []cohortIdentityGroup `json:"identity_groups"`
 }
 
 type graphObject struct {
@@ -90,7 +98,7 @@ func canonicalIDs(ids []string, allowEmpty bool) error {
 }
 
 func validateSelector(c cohortSelector, p protected) error {
-	if c.Format != 1 || c.Kind != "mock_cohort_selector" || !idPattern.MatchString(c.Operation) || !hashPattern.MatchString(c.OwnerEvidenceSHA) || !hashPattern.MatchString(c.ProtectionSHA) {
+	if c.Format != 2 || c.Kind != "mock_cohort_selector" || !idPattern.MatchString(c.Operation) || !hashPattern.MatchString(c.OwnerEvidenceSHA) || !hashPattern.MatchString(c.ProtectionSHA) {
 		return errors.New("invalid exact cohort selector authority")
 	}
 	if c.Binding.SQLVersion != 101 || c.Binding.MongoVersion != 39 || c.Binding.SQLUUID == "" || c.Binding.SQLDatabase == "" || !hashPattern.MatchString(c.Binding.MongoIdentity) || c.Binding.MongoDatabase == "" {
@@ -100,6 +108,9 @@ func validateSelector(c cohortSelector, p protected) error {
 		return e
 	}
 	if e := canonicalIDs(c.RetainPlanIDs, true); e != nil {
+		return e
+	}
+	if e := validateIdentityGroups(c); e != nil {
 		return e
 	}
 	if c.Selection.Source == "" || c.Selection.Evidence == "" {
@@ -139,8 +150,8 @@ func validateSelector(c cohortSelector, p protected) error {
 	return nil
 }
 
-// Scope shards contain only typed identities, preimage fingerprints and narrow
-// technical links. Full business values are never accumulated in the index.
+// Version 2 scope shards contain only typed identities and technical links.
+// Complete original values are captured once after the maintenance freeze.
 var regexpGraphShard = regexp.MustCompile(`^scope-[0-9]{8}\.json$`)
 
 type graphWriter struct {
@@ -158,8 +169,8 @@ func (w *graphWriter) add(o graphObject, rank int) error {
 	if e := validateObject(o.Object); e != nil {
 		return e
 	}
-	if !hashPattern.MatchString(o.Object.Fingerprint) {
-		return errors.New("scope object missing complete original preimage fingerprint")
+	if o.Object.Fingerprint != "" {
+		return errors.New("typed-key scope must not contain an original-value fingerprint")
 	}
 	if w.protected[objectID(o.Object)] {
 		return errors.New("discovered physical target intersects protection")
@@ -188,7 +199,7 @@ func (w *graphWriter) flush() error {
 	if len(w.current) == 0 {
 		return nil
 	}
-	p := graphPage{1, "mock_cohort_scope_shard", w.current}
+	p := graphPage{2, "mock_cohort_scope_shard", w.current}
 	raw := encode(p)
 	name := fmt.Sprintf("scope-%08d.json", len(w.index.Shards))
 	if e := writeNew(filepath.Join(w.dir, name), raw); e != nil {
@@ -207,7 +218,7 @@ func readGraphPage(dir string, s graphShard) (graphPage, error) {
 	if e := readExact(filepath.Join(dir, s.File), s.SHA, int64(s.Bytes), &p); e != nil {
 		return p, e
 	}
-	if p.Format != 1 || p.Kind != "mock_cohort_scope_shard" || len(p.Objects) != s.Count {
+	if p.Format != 2 || p.Kind != "mock_cohort_scope_shard" || len(p.Objects) != s.Count {
 		return p, errors.New("scope shard cardinality changed")
 	}
 	seen := map[string]bool{}
@@ -216,7 +227,7 @@ func readGraphPage(dir string, s graphShard) (graphPage, error) {
 			return p, e
 		}
 		id := objectID(o.Object)
-		if o.Object.Store != s.Store || o.Object.Name != s.Name || seen[id] || !hashPattern.MatchString(o.Object.Fingerprint) {
+		if o.Object.Store != s.Store || o.Object.Name != s.Name || seen[id] || o.Object.Fingerprint != "" {
 			return p, errors.New("scope shard object identity mismatch")
 		}
 		seen[id] = true
@@ -263,4 +274,46 @@ func sortedRootIDs(ids []string) []string {
 		return a < b
 	})
 	return out
+}
+
+func validateIdentityGroups(c cohortSelector) error {
+	if !hashPattern.MatchString(c.IdentityLinksSHA) || len(c.IdentityGroups) == 0 {
+		return errors.New("frozen identity links and complete identity groups required")
+	}
+	roots := map[string]bool{}
+	for _, id := range c.TesteeIDs {
+		roots[id] = true
+	}
+	seenRoots := map[string]bool{}
+	seenUsers := map[string]bool{}
+	seenProfiles := map[string]bool{}
+	for _, g := range c.IdentityGroups {
+		for _, ids := range [][]string{g.UserIDs, g.ProfileIDs, g.TesteeIDs} {
+			if err := canonicalIDs(ids, false); err != nil {
+				return err
+			}
+		}
+		for _, id := range g.UserIDs {
+			if seenUsers[id] {
+				return errors.New("identity User occurs in more than one component")
+			}
+			seenUsers[id] = true
+		}
+		for _, id := range g.ProfileIDs {
+			if seenProfiles[id] {
+				return errors.New("identity Profile occurs in more than one component")
+			}
+			seenProfiles[id] = true
+		}
+		for _, id := range g.TesteeIDs {
+			if !roots[id] || seenRoots[id] {
+				return errors.New("identity component expands or repeats frozen roots")
+			}
+			seenRoots[id] = true
+		}
+	}
+	if len(seenRoots) != len(roots) {
+		return errors.New("identity components do not cover every frozen root")
+	}
+	return nil
 }

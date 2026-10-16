@@ -45,7 +45,7 @@ func TestMockCohortGraphCLINativeOwnedCycle(t *testing.T) {
 	protectionPath := write(t, "protection.json", protectionRaw)
 	selectorPath := write(t, "selector.json", selectorRaw)
 	before := graphNativeSnapshot(t, h)
-	guards, err := observeGraphProtection(ctx, h.store, f.protected)
+	guards, err := nativeProtectionSnapshot(ctx, h.store, f.protected)
 	require.NoError(t, err)
 	var index graphIndex
 	var g group
@@ -68,7 +68,7 @@ func TestMockCohortGraphCLINativeOwnedCycle(t *testing.T) {
 		require.EqualValues(t, 1001, index.Counts["mysql/assessment_score"])
 		require.EqualValues(t, 501, index.Counts["mongo/answersheets"])
 		now := time.Now().UTC()
-		g = group{Format: 1, Kind: "mock_cohort", Operation: f.selector.Operation, ProtectedSHA: digest(protectionRaw), IAM: json.RawMessage(`{"user_ids":[],"profile_ids":[],"login_identity_ids":[]}`), QS: qsScope{Graph: &graphBinding{ArchiveDirectory: archiveDir, IndexSHA: digest(indexRaw), IndexSource: toolSource, SelectorSHA: digest(selectorRaw), RootIDs: []string{"44"}, WindowStarted: now.Add(-time.Second), WindowExpires: now.Add(20 * time.Minute)}, Selector: f.selector.Selection, Binding: h.binding, Objects: []object{}, Exclusions: []string{}}}
+		g = group{Format: 1, Kind: "mock_cohort", Operation: f.selector.Operation, ProtectedSHA: digest(protectionRaw), IAM: json.RawMessage(`{"user_ids":["800"],"profile_ids":["9000"],"login_identity_ids":[]}`), QS: qsScope{Graph: &graphBinding{ArchiveDirectory: archiveDir, IndexSHA: digest(indexRaw), IndexSource: toolSource, SelectorSHA: digest(selectorRaw), RootIDs: []string{"44"}, WindowStarted: now.Add(-time.Second), WindowExpires: now.Add(20 * time.Minute)}, Selector: f.selector.Selection, Binding: h.binding, Objects: []object{}, Exclusions: []string{}}}
 		ownerRaw := encode(ownerConfirmation{1, "mock_cohort_owner_confirmation", g.Operation, "10001", digest(g.IAM), digest(encode(g.QS)), g.ProtectedSHA, true, true, []string{}})
 		g.OwnerSHA = digest(ownerRaw)
 		groupRaw := encode(g)
@@ -133,6 +133,46 @@ func TestMockCohortGraphCLINativeOwnedCycle(t *testing.T) {
 		require.False(t, r.DryRun)
 		r = cli.action(t, "verify", common)
 		require.True(t, r.Whole)
+		// A real/shared subject's explicit parent link cannot hide behind its own
+		// source_ref or Testee. Exercise the real SQL predicates and CLI handoff,
+		// including equal numeric values from a different domain that must pass.
+		for n, link := range []struct {
+			table, column string
+			parent        int
+			blocked       bool
+		}{
+			{"statistics_assessment_fact", "report_id", 700, false},      // sheet ID, not a report
+			{"statistics_assessment_fact", "answersheet_id", 101, false}, // assessment ID, not a sheet
+			{"statistics_assessment_fact", "answersheet_id", 700, true},
+			{"statistics_assessment_fact", "assessment_id", 101, true},
+			{"statistics_assessment_fact", "outcome_id", 201, true},
+			{"statistics_assessment_fact", "report_id", 501, true},
+			{"statistics_assessment_fact", "enrollment_id", 501, true},
+			{"statistics_assessment_fact", "task_id", 601, true},
+			{"statistics_plan_fact", "enrollment_id", 501, true},
+			{"statistics_plan_fact", "task_id", 601, true},
+		} {
+			id := 900000 + n
+			columns, values := "", ""
+			if link.table == "statistics_plan_fact" {
+				columns, values = ",plan_id", ",500"
+			}
+			h.exec(fmt.Sprintf("INSERT INTO %s(id,org_id,fact_key,core_hash,fact_type,occurred_at,stat_date,source_type,source_ref,testee_id,`%s`%s) VALUES(?,1,?,REPEAT('f',64),'assessment_completed','2026-01-01','2026-01-01','assessment','102',45,?%s)", link.table, link.column, columns, values), id, fmt.Sprintf("foreign-native-parent-%d", n), link.parent)
+			args := append(append([]string{}, common...), "--action=verify")
+			raw, code := cli.invoke(t, args)
+			if link.blocked {
+				require.NotEqual(t, 0, code, "%s.%s must block a whole-cohort handoff", link.table, link.column)
+				require.Empty(t, raw, "failed clearance emitted a success receipt")
+			} else {
+				require.Equal(t, 0, code, "equal numeric IDs in different domains widened clearance")
+				var verified actionReceipt
+				require.NoError(t, strictDecode(raw, &verified))
+				require.True(t, verified.Whole)
+			}
+			h.exec("DELETE FROM "+link.table+" WHERE id=?", id)
+		}
+		r = cli.action(t, "verify", common)
+		require.True(t, r.Whole, "removing only the synthetic exception must restore clearance")
 		j, er := openGraphJournal(archiveDir, false)
 		require.NoError(t, er)
 		require.NotEmpty(t, j.latest)
@@ -141,7 +181,7 @@ func TestMockCohortGraphCLINativeOwnedCycle(t *testing.T) {
 			require.Equal(t, "committed", e.State)
 		}
 		require.NoError(t, j.close())
-		afterGuards, er := observeGraphProtection(ctx, h.store, f.protected)
+		afterGuards, er := nativeProtectionSnapshot(ctx, h.store, f.protected)
 		require.NoError(t, er)
 		require.True(t, reflect.DeepEqual(guards, afterGuards), "shared Plan/Entry, retained root and system/clack originals changed")
 	}) {
@@ -154,7 +194,7 @@ func TestMockCohortGraphCLINativeOwnedCycle(t *testing.T) {
 		r = cli.action(t, "verify", args)
 		require.False(t, r.Whole)
 		require.Equal(t, before, graphNativeSnapshot(t, h), "every original SQL value and physical BSON byte/type must be restored")
-		afterGuards, er := observeGraphProtection(ctx, h.store, f.protected)
+		afterGuards, er := nativeProtectionSnapshot(ctx, h.store, f.protected)
 		require.NoError(t, er)
 		require.Equal(t, guards, afterGuards)
 		require.NoError(t, h.store.identity(ctx, h.binding))

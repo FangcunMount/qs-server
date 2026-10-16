@@ -4,28 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"go.mongodb.org/mongo-driver/bson"
 	"math"
 	"sort"
 	"strconv"
-	"strings"
-
-	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type graphFrozenReferences struct {
-	ids        map[string]map[string]bool
-	references map[string]eventevidence.StandardReference
-	physical   map[string]string
-	retained   map[string]string
+	ids      map[string]map[string]bool
+	physical map[string]string
+}
+
+func graphParentScope(scope string) bool {
+	switch scope {
+	case "mysql/assessment_entry_intake_log", "mysql/clinician_relation",
+		"mysql/plan_enrollment", "mysql/assessment_task", "mysql/answering_start",
+		"mysql/assessment", "mysql/evaluation_outcome", "mongo/answersheets",
+		"mongo/report_generations", "mongo/interpretation_runs", "mongo/interpret_report_artifacts":
+		return true
+	}
+	return false
 }
 
 func frozenGraphReferences(dir string, index graphIndex, roots []string, physical bool) (graphFrozenReferences, error) {
-	f := graphFrozenReferences{ids: map[string]map[string]bool{}, references: map[string]eventevidence.StandardReference{}, physical: map[string]string{}, retained: map[string]string{}}
+	f := graphFrozenReferences{ids: map[string]map[string]bool{}, physical: map[string]string{}}
 	e := forSelectedScope(dir, index, roots, func(page []graphObject, _ int) error {
 		for _, o := range page {
 			if physical {
-				f.physical[objectID(o.Object)] = o.Object.Fingerprint
+				f.physical[objectID(o.Object)] = "planned_identity"
 			}
 			if o.Object.Name == "runtime_checkpoint" && o.Links["scope"] == "evaluation_run" && o.Links["resource_id"] != "" {
 				if f.ids["runtime/evaluation_run"] == nil {
@@ -38,14 +44,14 @@ func frozenGraphReferences(dir string, index graphIndex, roots []string, physica
 			if o.Object.Store == "mongo" {
 				id = o.Links["domain_id"]
 			}
-			if graphDecimal(id) {
+			// Only parent domains participate in residual relationship queries. Score
+			// and fact PKs already have exact archive verification; accumulating their
+			// millions of IDs again does not add a relationship check.
+			if graphParentScope(scope) && graphDecimal(id) {
 				if f.ids[scope] == nil {
 					f.ids[scope] = map[string]bool{}
 				}
 				f.ids[scope][id] = true
-			}
-			for _, ref := range o.References {
-				f.references[referenceKey(ref.Producer, ref.EventID, ref.Destination)] = ref
 			}
 		}
 		return nil
@@ -53,13 +59,7 @@ func frozenGraphReferences(dir string, index graphIndex, roots []string, physica
 	if e != nil {
 		return f, e
 	}
-	e = forRetainedScope(dir, index, roots, func(page []graphObject, _ int) error {
-		for _, o := range page {
-			f.retained[objectID(o.Object)] = o.Object.Fingerprint
-		}
-		return nil
-	})
-	return f, e
+	return f, nil
 }
 func sortedGraphIDs(ids map[string]bool) []string {
 	out := make([]string, 0, len(ids))
@@ -74,6 +74,9 @@ func sortedGraphIDs(ids map[string]bool) []string {
 // parents, not only the original physical PKs. New children and foreign-domain
 // crosslinks cannot disappear merely because their former SQL parent was deleted.
 func graphNoRemainingReferences(ctx context.Context, r graphReader, g group, index graphIndex, scopeDir string) error {
+	if store, ok := r.(*graphStore); ok {
+		r = newLeanReader(store)
+	}
 	return graphRelationshipCheck(ctx, r, g, index, scopeDir, false)
 }
 func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index graphIndex, scopeDir string, allowOriginal bool) error {
@@ -88,7 +91,7 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 	}
 	users := graphRootSet(iam.Users)
 	remains := func(row record) error {
-		if f.retained[objectID(row.Object)] == fingerprint(row) || allowOriginal && f.physical[objectID(row.Object)] == fingerprint(row) {
+		if allowOriginal && f.physical[objectID(row.Object)] != "" {
 			return nil
 		}
 		return errors.New("new or foreign reverse reference to the exact target graph remains")
@@ -111,7 +114,7 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 	if e = checkSQL("testee", "id", roots, false); e != nil {
 		return e
 	}
-	for _, table := range []string{"assessment_score", "runtime_checkpoint", "evaluation_outcome", "qs_rm_evaluation_request_ref"} {
+	for _, table := range []string{"assessment_score", "runtime_checkpoint", "evaluation_outcome"} {
 		if e = checkSQL(table, "assessment_id", f.ids["mysql/assessment"], false); e != nil {
 			return e
 		}
@@ -134,11 +137,6 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 	if e = checkSQL("assessment_task", "enrollment_id", f.ids["mysql/plan_enrollment"], false); e != nil {
 		return e
 	}
-	for _, table := range []string{"task_opened_reminder_batch", "task_opened_reminder_delivery"} {
-		if e = checkSQL(table, "task_id", f.ids["mysql/assessment_task"], true); e != nil {
-			return e
-		}
-	}
 	if e = checkSQL("assessment", "answer_sheet_id", f.ids["mongo/answersheets"], false); e != nil {
 		return e
 	}
@@ -148,18 +146,37 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 	for _, source := range sources {
 		typedSources[source.source] = f.ids[source.scope]
 	}
-	// Final validation uses the same single PK scan for these unindexed tables.
-	// Testee, IAM filler and source domains are tested together, not by repeating
-	// a full candidate scan for every frozen parent page or source type.
-	for _, table := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact", "interpretation_attention_projection"} {
-		if e = r.sqlPages(ctx, table, "1=1", nil, func(row record) error {
+	// Source domains use their actual composite index. The fallback predicates
+	// catch malformed/foreign source links through exact Testee or filler ownership
+	// on the server, returning only matches instead of shipping every fact row.
+	for _, table := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"} {
+		for kind, ids := range typedSources {
+			if e = rootBatches(sortedGraphIDs(ids), 1000, func(batch []string) error {
+				slots, args := placeholders(batch)
+				args = append([]any{kind, kind}, args...)
+				return r.sqlPages(ctx, table, "x.source_type=? AND BINARY x.source_type=BINARY ? AND x.source_ref IN ("+slots+")", args, remains)
+			}); e != nil {
+				return e
+			}
+		}
+		rootJSON, marshalErr := json.Marshal(sortedGraphIDs(roots))
+		if marshalErr != nil {
+			return marshalErr
+		}
+		where := "x.testee_id IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
+		args := []any{string(rootJSON)}
+		if table == "statistics_assessment_fact" && len(users) > 0 {
+			userJSON, marshalErr := json.Marshal(sortedGraphIDs(users))
+			if marshalErr != nil {
+				return marshalErr
+			}
+			where += " OR x.filler_id IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
+			args = append(args, string(userJSON))
+		}
+		if e = r.sqlPages(ctx, table, where, args, func(row record) error {
 			testee, _ := graphSQLValue(row, "testee_id")
 			matched := roots[testee]
-			if table == "interpretation_attention_projection" {
-				assessment, _ := graphSQLValue(row, "assessment_id")
-				report, _ := graphSQLValue(row, "report_id")
-				matched = matched || f.ids["mysql/assessment"][assessment] || f.ids["mongo/interpret_report_artifacts"][report]
-			} else {
+			{
 				kind, _ := graphSQLValue(row, "source_type")
 				ref, _ := graphSQLValue(row, "source_ref")
 				matched = matched || typedSources[kind][ref]
@@ -176,11 +193,36 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 			return e
 		}
 	}
+	// A fact's explicit parent columns remain meaningful even if its Testee or
+	// source_ref belongs to another component. Such rows are exceptions, never
+	// implicit deletion targets. Query those typed columns without transferring
+	// unrelated fact rows or confusing equal IDs from different parent domains.
+	for _, link := range []struct{ table, column, scope string }{
+		{"statistics_assessment_fact", "answersheet_id", "mongo/answersheets"},
+		{"statistics_assessment_fact", "assessment_id", "mysql/assessment"},
+		{"statistics_assessment_fact", "outcome_id", "mysql/evaluation_outcome"},
+		{"statistics_assessment_fact", "report_id", "mongo/interpret_report_artifacts"},
+		{"statistics_assessment_fact", "enrollment_id", "mysql/plan_enrollment"},
+		{"statistics_assessment_fact", "task_id", "mysql/assessment_task"},
+		{"statistics_plan_fact", "enrollment_id", "mysql/plan_enrollment"},
+		{"statistics_plan_fact", "task_id", "mysql/assessment_task"},
+	} {
+		if e = rootBatches(sortedGraphIDs(f.ids[link.scope]), 64000, func(batch []string) error {
+			ids, err := json.Marshal(batch)
+			if err != nil {
+				return err
+			}
+			where := "x.`" + link.column + "` IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
+			return r.sqlPages(ctx, link.table, where, []any{string(ids)}, remains)
+		}); e != nil {
+			return e
+		}
+	}
 	for _, source := range []struct{ kind, scope string }{{"answersheet_submitted", "mongo/answersheets"}, {"assessment_completed", "mysql/assessment"}} {
 		if e = rootBatches(sortedGraphIDs(f.ids[source.scope]), 1000, func(batch []string) error {
 			slots, args := placeholders(batch)
 			args = append([]any{source.kind}, args...)
-			return r.sqlPages(ctx, "statistics_store_activity_fact", "BINARY x.source_type=BINARY ? AND x.business_object_id IN ("+slots+")", args, remains)
+			return r.sqlPages(ctx, "statistics_store_activity_fact", "x.fact_type=? AND x.business_object_id IN ("+slots+")", args, remains)
 		}); e != nil {
 			return e
 		}
@@ -191,18 +233,13 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 	if e = checkSQL("operators", "user_id", users, false); e != nil {
 		return e
 	}
-	if e = checkSQL("task_opened_reminder_delivery", "user_id", users, true); e != nil {
-		return e
-	}
-	if e = checkSQL("task_opened_reminder_delivery", "login_identity_id", graphRootSet(iam.Identities), true); e != nil {
-		return e
-	}
 	if e = checkSQL("answering_start", "started_by_user_id", users, false); e != nil {
 		return e
 	}
-	// These three namespaces have no usable Testee index in production. Exactly
-	// one bounded cursor scan per collection avoids an IN-scan for every root page.
-	for _, name := range []string{"answersheets", "interpret_report_artifacts", "report_query_catalog"} {
+	// This runs after exact target deletion. It reads only technical fields from
+	// the remaining documents, including malformed numeric aliases and cross-domain
+	// links. Answers and report bodies are never requested by the lean reader.
+	for _, name := range []string{"answersheets", "interpret_report_artifacts", "report_query_catalog", "report_generations", "interpretation_runs"} {
 		if e = r.mongoPages(ctx, name, bson.D{}, func(row record) error {
 			raw := bson.Raw(row.BSON)
 			candidate := graphRawIDMember(raw, "testee_id", roots) || name == "answersheets" && graphRawIDMember(raw, "filler_id", users) || graphRawIDMember(raw, "domain_id", f.ids["mongo/"+name])
@@ -226,37 +263,9 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 			return e
 		}
 	}
-	for _, check := range []struct{ name, key, scope string }{{"report_generations", "outcome_id", "mysql/evaluation_outcome"}, {"interpretation_runs", "generation_id", "mongo/report_generations"}} {
-		if e = rootBatches(sortedGraphIDs(f.ids[check.scope]), 500, func(batch []string) error {
-			values := bson.A{}
-			for _, id := range batch {
-				n, _ := strconv.ParseInt(id, 10, 64)
-				values = append(values, n)
-			}
-			return r.mongoPages(ctx, check.name, bson.D{{Key: check.key, Value: bson.D{{Key: "$in", Value: values}}}}, remains)
-		}); e != nil {
-			return e
-		}
-	}
-	for _, name := range []string{"event_delivery_dead_letter", "retry_event_hold"} {
-		if e = r.sqlPages(ctx, name, "x.org_id=?", []any{g.QS.Selector.OrgID}, func(row record) error {
-			c, err := deliveryPayload(row)
-			if err != nil {
-				return err
-			}
-			if roots[c.testeeID] || f.ids["mysql/assessment"][c.assessmentID] {
-				return remains(row)
-			}
-			return nil
-		}); e != nil {
-			return e
-		}
-	}
-	for _, name := range []string{"qs_rm_replay_requests", "qs_rm_replay_items"} {
-		if e = r.sqlPages(ctx, name, "x.org_id=?", []any{g.QS.Selector.OrgID}, remains); e != nil {
-			return e
-		}
-	}
+	// Message wire, dedup, attention and external delivery evidence are retained
+	// online. Their settled state is checked by the rule plan; they are not deleted
+	// merely because their historical subject is being retired.
 	if e = checkSQL("ai_bridge_requests", "testee_id", roots, false); e != nil {
 		return e
 	}
@@ -265,33 +274,6 @@ func graphRelationshipCheck(ctx context.Context, r graphReader, g group, index g
 		return r.sqlPages(ctx, "ai_bridge_requests", "EXISTS (SELECT 1 FROM ai_bridge_request_assessments ra WHERE ra.request_id=x.request_id AND ra.assessment_id IN ("+slots+"))", args, remains)
 	}); e != nil {
 		return e
-	}
-	refs := []eventevidence.StandardReference{}
-	for _, ref := range f.references {
-		refs = append(refs, ref)
-	}
-	sort.Slice(refs, func(i, j int) bool {
-		return referenceKey(refs[i].Producer, refs[i].EventID, refs[i].Destination) < referenceKey(refs[j].Producer, refs[j].EventID, refs[j].Destination)
-	})
-	for start := 0; start < len(refs); start += 500 {
-		end := start + 500
-		if end > len(refs) {
-			end = len(refs)
-		}
-		parts := []string{}
-		args := []any{}
-		filters := bson.A{}
-		for _, ref := range refs[start:end] {
-			parts = append(parts, "(BINARY x.producer=BINARY ? AND BINARY x.message_id=BINARY ? AND BINARY x.destination=BINARY ?)")
-			args = append(args, ref.Producer, ref.EventID, ref.Destination)
-			filters = append(filters, bson.D{{Key: "producer", Value: ref.Producer}, {Key: "message_id", Value: ref.EventID}, {Key: "destination", Value: ref.Destination}})
-		}
-		if e = r.sqlPages(ctx, "rm_outbox", strings.Join(parts, " OR "), args, remains); e != nil {
-			return e
-		}
-		if e = r.mongoPages(ctx, "rm_outbox", bson.D{{Key: "$or", Value: filters}}, remains); e != nil {
-			return e
-		}
 	}
 	return nil
 }

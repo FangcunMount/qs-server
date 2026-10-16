@@ -77,7 +77,7 @@ func readGraphInputs(c config, g group, p protected) (graphIndex, cohortSelector
 	if e := validateSelector(selector, p); e != nil {
 		return index, selector, e
 	}
-	if index.Format != 1 || index.Kind != "mock_cohort_graph_index" || index.Source != b.IndexSource || index.SelectorSHA != b.SelectorSHA || index.ProtectionSHA != g.ProtectedSHA || selector.ProtectionSHA != g.ProtectedSHA || index.OwnerEvidenceSHA != selector.OwnerEvidenceSHA || !index.DiscoveryComplete || !index.ReadOnly || !index.Released || !reflect.DeepEqual(index.Binding, g.QS.Binding) || !reflect.DeepEqual(selector.Binding, g.QS.Binding) || !reflect.DeepEqual(selector.Selection, g.QS.Selector) {
+	if index.Format != 2 || index.Kind != "mock_cohort_graph_index" || index.Source != b.IndexSource || index.SelectorSHA != b.SelectorSHA || index.ProtectionSHA != g.ProtectedSHA || selector.ProtectionSHA != g.ProtectedSHA || index.OwnerEvidenceSHA != selector.OwnerEvidenceSHA || !index.DiscoveryComplete || !index.ReadOnly || !index.Released || !reflect.DeepEqual(index.Binding, g.QS.Binding) || !reflect.DeepEqual(selector.Binding, g.QS.Binding) || !reflect.DeepEqual(selector.Selection, g.QS.Selector) {
 		return index, selector, errors.New("original readonly graph/selector/group identity mismatch")
 	}
 	// Reuse the literal common owner/IAM/protection contract without granting the
@@ -99,6 +99,13 @@ func readGraphInputs(c config, g group, p protected) (graphIndex, cohortSelector
 		}
 		selected[id] = true
 	}
+	window, e := graphWindowSelector(selector, b.RootIDs)
+	if e != nil {
+		return index, selector, e
+	}
+	if e = validateGraphIAMWindow(window, g.IAM); e != nil {
+		return index, selector, e
+	}
 	for _, o := range append(append(append([]object{}, p.QS.System...), p.QS.Clack...), p.QS.Other...) {
 		if o.Store == "mysql" && o.Name == "testee" && len(o.Key) == 1 && selected[string(o.Key[0].Raw)] {
 			return index, selector, errors.New("window subset intersects protected Testee")
@@ -111,6 +118,77 @@ func readGraphInputs(c config, g group, p protected) (graphIndex, cohortSelector
 		return index, selector, e
 	}
 	return index, selector, nil
+}
+
+// A window may choose complete identity components, never part of a shared
+// User/Profile component. The external identity mapping keeps its original SHA.
+func graphWindowSelector(selector cohortSelector, roots []string) (cohortSelector, error) {
+	if e := validateIdentityGroups(selector); e != nil {
+		return selector, e
+	}
+	if e := canonicalIDs(roots, false); e != nil {
+		return selector, e
+	}
+	selected := graphRootSet(roots)
+	covered := map[string]bool{}
+	groups := []cohortIdentityGroup{}
+	for _, component := range selector.IdentityGroups {
+		n := 0
+		for _, id := range component.TesteeIDs {
+			if selected[id] {
+				n++
+				covered[id] = true
+			}
+		}
+		if n == 0 {
+			continue
+		}
+		if n != len(component.TesteeIDs) {
+			return selector, errors.New("window subset splits a frozen identity component")
+		}
+		groups = append(groups, component)
+	}
+	if len(covered) != len(selected) {
+		return selector, errors.New("window subset expands frozen identity components")
+	}
+	selector.TesteeIDs = append([]string{}, roots...)
+	selector.IdentityGroups = groups
+	return selector, nil
+}
+
+func validateGraphIAMWindow(window cohortSelector, raw []byte) error {
+	var scope iamScope
+	if e := strictDecode(raw, &scope); e != nil {
+		return e
+	}
+	for _, ids := range [][]string{scope.Users, scope.Profiles, scope.Identities} {
+		if e := canonicalIDs(ids, true); e != nil {
+			return e
+		}
+	}
+	users, profiles := map[string]bool{}, map[string]bool{}
+	for _, component := range window.IdentityGroups {
+		for _, id := range component.UserIDs {
+			users[id] = true
+		}
+		for _, id := range component.ProfileIDs {
+			profiles[id] = true
+		}
+	}
+	for i, ids := range [][]string{scope.Users, scope.Profiles} {
+		expected := []map[string]bool{users, profiles}[i]
+		if len(ids) != len(expected) {
+			return errors.New("IAM scope differs from the selected complete identity components")
+		}
+		for _, id := range ids {
+			if !expected[id] {
+				return errors.New("IAM scope crosses selected identity components")
+			}
+		}
+	}
+	// Components do not carry LoginIdentity IDs. Their ownership remains the
+	// separate IAM archive/handoff responsibility; equal numbers prove no link.
+	return nil
 }
 func keyRoot(id string) object {
 	return object{Store: "mysql", Name: "testee", Key: []cell{{Name: "id", Type: "uint64", Raw: []byte(id)}}}

@@ -14,14 +14,15 @@ type graphScanReader struct {
 }
 
 func (r *graphScanReader) sqlPages(ctx context.Context, name, where string, args []any, emit func(record) error) error {
-	if name != "testee" {
+	if name != "testee" || !strings.Contains(where, "created_at") {
 		return r.graphFake.sqlPages(ctx, name, where, args, emit)
 	}
 	r.calls = append(r.calls, "mysql/"+name+":"+where)
 	for _, arg := range args[:len(args)-4] {
 		id, ok := arg.(string)
 		if ok && r.roots[id] {
-			if e := emit(graphSQLFixture("testee", id, map[string]string{"org_id": "1", "source": "daily_simulation"})); e != nil {
+			n, _ := strconv.Atoi(id)
+			if e := emit(graphSQLFixture("testee", id, map[string]string{"org_id": "1", "profile_id": strconv.Itoa(n + 20000), "source": "daily_simulation"})); e != nil {
 				return e
 			}
 		}
@@ -29,44 +30,53 @@ func (r *graphScanReader) sqlPages(ctx context.Context, name, where string, args
 	return nil
 }
 
-func TestGraphUnindexedSQLScanVisitsEachTableOnceAndKeepsExactRoots(t *testing.T) {
+func TestGraphStatisticsUseTypedSourceIndexWithoutOrgScan(t *testing.T) {
 	fake, c, protection, dir := graphFixture(t)
 	fake.sqlRows = map[string][]record{}
 	fake.mongoRows = nil
 	c.TesteeIDs = []string{}
+	c.IdentityGroups = []cohortIdentityGroup{}
 	reader := &graphScanReader{graphFake: fake, roots: map[string]bool{}}
 	for n := 1; n <= 2001; n++ {
 		id := strconv.Itoa(n)
 		c.TesteeIDs = append(c.TesteeIDs, id)
 		reader.roots[id] = true
+		c.IdentityGroups = append(c.IdentityGroups, cohortIdentityGroup{UserIDs: []string{strconv.Itoa(n + 10000)}, ProfileIDs: []string{strconv.Itoa(n + 20000)}, TesteeIDs: []string{id}})
 	}
-	// The shared fake protection uses roots 42/43; retain a different pair here.
+	// All synthetic roots have their own real projected Profile identity.
 	protection.QS.System = []object{key("testee", "90001")}
 	protection.QS.Clack = []object{key("testee", "90002")}
 	c.ProtectionSHA = digest(encode(protection))
-	for _, name := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact", "interpretation_attention_projection"} {
-		fake.sqlRows[name] = []record{
-			graphSQLFixture(name, "11", map[string]string{"org_id": "1", "testee_id": "1"}),
-			graphSQLFixture(name, "12", map[string]string{"org_id": "1", "testee_id": "2001"}),
-			graphSQLFixture(name, "13", map[string]string{"org_id": "1", "testee_id": "999999"}),
-		}
+	fake.sqlRows["clinician_relation"] = []record{graphSQLFixture("clinician_relation", "11", map[string]string{"org_id": "1", "testee_id": "1"}), graphSQLFixture("clinician_relation", "12", map[string]string{"org_id": "1", "testee_id": "2001"})}
+	fake.sqlRows["statistics_access_fact"] = []record{graphSQLFixture("statistics_access_fact", "21", map[string]string{"org_id": "1", "testee_id": "1", "source_type": "clinician_relation", "source_ref": "11"}), graphSQLFixture("statistics_access_fact", "22", map[string]string{"org_id": "1", "testee_id": "2001", "source_type": "clinician_relation", "source_ref": "12"}), graphSQLFixture("statistics_access_fact", "23", map[string]string{"org_id": "1", "source_type": "clinician_relation", "source_ref": "999999"})}
+	index, e := planCohort(t.Context(), reader, c, protection, dir, digest(encode(c)), strings.Repeat("c", 40))
+	if e != nil {
+		t.Fatal(e)
 	}
-	index, err := planCohort(t.Context(), reader, c, protection, dir, digest(encode(c)), strings.Repeat("c", 40))
-	if err != nil {
-		t.Fatal(err)
+	if index.Counts["mysql/statistics_access_fact"] != 2 {
+		t.Fatal("typed source lookup lost exact facts", index.Counts)
 	}
-	for _, name := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact", "interpretation_attention_projection"} {
-		calls := 0
-		for _, call := range reader.calls {
-			if strings.HasPrefix(call, "mysql/"+name+":") {
-				calls++
-				if strings.Contains(call, "testee_id IN") {
-					t.Fatal("unindexed table still repeats a root-IN candidate scan")
-				}
-			}
+	indexed, directed := 0, map[string]int{}
+	for _, call := range reader.calls {
+		if !strings.HasPrefix(call, "mysql/statistics_") {
+			continue
 		}
-		if calls != 1 || index.Counts["mysql/"+name] != 2 {
-			t.Fatalf("%s scans=%d selected=%d, want one scan and two exact roots", name, calls, index.Counts["mysql/"+name])
+		if strings.Contains(call, "x.source_type=? AND x.source_ref IN (") {
+			indexed++
+			continue
+		}
+		if !strings.Contains(call, " IN (SELECT fixed_ids.id FROM JSON_TABLE(") || strings.Contains(call, "EXISTS (") || strings.Contains(call, "x.testee_id IN (") {
+			t.Fatal("statistics restarted an org/Testee batch scan", call)
+		}
+		namespace := strings.SplitN(call, ":", 2)[0]
+		directed[namespace]++
+	}
+	if indexed != 1 || len(directed) != 3 {
+		t.Fatal("indexed source lookup plus one directed query per namespace required", indexed, directed)
+	}
+	for _, count := range directed {
+		if count != 1 {
+			t.Fatal("explicit parent scan repeated with a root batch", directed)
 		}
 	}
 }

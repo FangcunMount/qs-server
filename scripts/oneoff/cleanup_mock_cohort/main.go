@@ -28,6 +28,7 @@ type config struct {
 	selector, selectorSHA, scopeDir                                                                         string
 	captureEvidence, captureEvidenceSHA                                                                     string
 	execute, original                                                                                       bool
+	workers                                                                                                 int
 	timeout                                                                                                 time.Duration
 }
 
@@ -55,6 +56,7 @@ func flags(args []string) (config, error) {
 	f.StringVar(&c.freezeSHA, "frozen-receipt-sha256", "", "freeze receipt raw SHA256")
 	f.BoolVar(&c.execute, "execute", false, "enable approved apply/restore; default is dry-run")
 	f.BoolVar(&c.original, "expect-original", false, "verify exact restored preimages instead of absence")
+	f.IntVar(&c.workers, "workers", 4, "bounded database workers, from 1 to 8")
 	f.DurationVar(&c.timeout, "timeout", 20*time.Minute, "bounded CLI budget; cannot extend approval expiry")
 	if e := f.Parse(args); e != nil {
 		return c, e
@@ -82,10 +84,16 @@ func flags(args []string) (config, error) {
 	if c.timeout <= 0 || c.timeout > 25*time.Minute {
 		return c, errors.New("CLI timeout must leave the five-minute maintenance reserve")
 	}
+	if c.workers < 1 || c.workers > 8 {
+		return c, errors.New("workers must be between one and eight")
+	}
 	return c, nil
 }
 
-func connect(ctx context.Context, w binding) (*liveStore, func() error, error) {
+func connectWithWorkers(ctx context.Context, w binding, workers int) (*liveStore, func() error, error) {
+	if workers < 1 || workers > 8 {
+		return nil, nil, errors.New("bounded database worker count required")
+	}
 	dsn, e := privateRead(os.Getenv("QS_MOCK_MYSQL_DSN_FILE"), 64*1024)
 	if e != nil {
 		return nil, nil, safePhase("mysql_configuration", errors.New("private MySQL DSN file required"))
@@ -106,24 +114,31 @@ func connect(ctx context.Context, w binding) (*liveStore, func() error, error) {
 	cfg.Timeout = 10 * time.Second
 	cfg.ReadTimeout = 30 * time.Second
 	cfg.WriteTimeout = 30 * time.Second
-	db, e := sql.Open("mysql", cfg.FormatDSN())
+	connector, e := mysqldriver.NewConnector(cfg)
 	if e != nil {
 		return nil, nil, safePhase("mysql_open", e)
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	workerIdentity := workerSQLBinding{uuid: w.SQLUUID, database: w.SQLDatabase}
+	if !workerIdentity.valid() {
+		return nil, nil, errors.New("fixed worker SQL identity required")
+	}
+	db := sql.OpenDB(workerSQLConnector{base: connector, identity: workerIdentity})
+	// One connection owns the serialization gate for the whole operation; worker
+	// reads and independent transactions use the remaining bounded connections.
+	db.SetMaxOpenConns(workers + 1)
+	db.SetMaxIdleConns(workers)
 	conn, e := db.Conn(ctx)
 	if e != nil {
 		_ = db.Close()
 		return nil, nil, safePhase("mysql_connection", e)
 	}
-	client, e := mongo.Connect(ctx, options.Client().ApplyURI(strings.TrimSpace(string(uri))).SetMaxPoolSize(1).SetMinPoolSize(0).SetConnectTimeout(10*time.Second))
+	client, e := mongo.Connect(ctx, options.Client().ApplyURI(strings.TrimSpace(string(uri))).SetMaxPoolSize(uint64(workers)).SetMinPoolSize(0).SetConnectTimeout(10*time.Second))
 	if e != nil {
 		_ = conn.Close()
 		_ = db.Close()
 		return nil, nil, safePhase("mongo_connection", e)
 	}
-	store := &liveStore{sql: conn, mongo: client, mongoDB: w.MongoDatabase}
+	store := &liveStore{sql: conn, sqlPool: db, workerIdentity: workerIdentity, workers: workers, mongo: client, mongoDB: w.MongoDatabase}
 	held := false
 	lock := "qs_mock_cohort_" + digest(encode([]string{w.SQLUUID, w.SQLDatabase}))[:32]
 	closeAll := func() error {
@@ -260,7 +275,7 @@ func run(args []string, out io.Writer) error {
 		ctx, stop = context.WithDeadline(ctx, a.Expires)
 		defer stop()
 	}
-	s, closeAll, e := connect(ctx, g.QS.Binding)
+	s, closeAll, e := connectWithWorkers(ctx, g.QS.Binding, c.workers)
 	if e != nil {
 		return e
 	}

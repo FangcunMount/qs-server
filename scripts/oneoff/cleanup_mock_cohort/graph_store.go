@@ -59,7 +59,7 @@ func (s *graphStore) shape(ctx context.Context, name string) (graphSQLShape, err
 	if _, ok := graphSQLTables[name]; !ok && !readableSQL[name] {
 		return v, errors.New("table outside fixed cohort graph")
 	}
-	rows, e := s.live.sql.QueryContext(ctx, "SELECT k.COLUMN_NAME,c.DATA_TYPE,c.COLUMN_TYPE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA=k.TABLE_SCHEMA AND c.TABLE_NAME=k.TABLE_NAME AND c.COLUMN_NAME=k.COLUMN_NAME WHERE k.TABLE_SCHEMA=DATABASE() AND k.TABLE_NAME=? AND k.CONSTRAINT_NAME='PRIMARY' ORDER BY k.COLUMN_NAME", name)
+	rows, e := s.live.readSQL().QueryContext(ctx, "SELECT k.COLUMN_NAME,c.DATA_TYPE,c.COLUMN_TYPE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA=k.TABLE_SCHEMA AND c.TABLE_NAME=k.TABLE_NAME AND c.COLUMN_NAME=k.COLUMN_NAME WHERE k.TABLE_SCHEMA=DATABASE() AND k.TABLE_NAME=? AND k.CONSTRAINT_NAME='PRIMARY' ORDER BY k.COLUMN_NAME", name)
 	if e != nil {
 		return v, e
 	}
@@ -87,10 +87,10 @@ func (s *graphStore) shape(ctx context.Context, name string) (graphSQLShape, err
 		return v, errors.New("actual primary key required for graph namespace")
 	}
 	var table, ddl, zone, charset, mode string
-	if e = s.live.sql.QueryRowContext(ctx, "SHOW CREATE TABLE `"+name+"`").Scan(&table, &ddl); e != nil {
+	if e = s.live.readSQL().QueryRowContext(ctx, "SHOW CREATE TABLE `"+name+"`").Scan(&table, &ddl); e != nil {
 		return v, e
 	}
-	if e = s.live.sql.QueryRowContext(ctx, "SELECT @@session.time_zone,@@session.character_set_results,@@session.sql_mode").Scan(&zone, &charset, &mode); e != nil {
+	if e = s.live.readSQL().QueryRowContext(ctx, "SELECT @@session.time_zone,@@session.character_set_results,@@session.sql_mode").Scan(&zone, &charset, &mode); e != nil {
 		return v, e
 	}
 	v.definition = encode([]string{ddl, zone, charset, mode})
@@ -180,7 +180,7 @@ func (s *graphStore) sqlPagesSelected(ctx context.Context, name, where string, a
 			condition = "(" + where + ") AND " + q
 			argv = append(argv, a...)
 		}
-		rows, e := s.live.sql.QueryContext(ctx, "SELECT "+columns+" FROM `"+name+"` x WHERE "+condition+" ORDER BY "+strings.Join(order, ",")+" LIMIT 1000", argv...)
+		rows, e := s.live.readSQL().QueryContext(ctx, "SELECT "+columns+" FROM `"+name+"` x WHERE "+condition+" ORDER BY "+strings.Join(order, ",")+" LIMIT 1000", argv...)
 		if e != nil {
 			return e
 		}

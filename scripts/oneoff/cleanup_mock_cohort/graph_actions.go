@@ -113,7 +113,7 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		}
 		defer stop()
 	}
-	live, release, e := connect(ctx, g.QS.Binding)
+	live, release, e := connectWithWorkers(ctx, g.QS.Binding, c.workers)
 	if e != nil {
 		return e
 	}
@@ -182,9 +182,15 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		if err != nil {
 			return finish(err)
 		}
-		freshSelector := selector
-		freshSelector.TesteeIDs = append([]string{}, g.QS.Graph.RootIDs...)
-		fresh, err := planCohort(ctx, store, freshSelector, p, freshDir, digest(encode(freshSelector)), toolSource)
+		freshSelector, err := graphWindowSelector(selector, g.QS.Graph.RootIDs)
+		if err != nil {
+			return finish(err)
+		}
+		fresh, err := planCohort(ctx, newLeanReader(store), freshSelector, p, freshDir, digest(encode(freshSelector)), toolSource)
+		if err != nil {
+			return finish(err)
+		}
+		fresh.Definitions, err = store.verifyDefinitions(ctx)
 		if err != nil {
 			return finish(err)
 		}
@@ -194,10 +200,7 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		if err = compareFrozenScope(c.scopeDir, index, g.QS.Graph.RootIDs, freshDir, fresh); err != nil {
 			return finish(err)
 		}
-		if err = graphRelationshipCheck(ctx, store, g, index, c.scopeDir, true); err != nil {
-			return finish(err)
-		}
-		m, e = captureGraph(ctx, store, g, p, index, c.scopeDir, c.archive, c.groupSHA, toolSource)
+		m, e = captureGraph(ctx, store, g, p, index, c.scopeDir, c.archive, c.groupSHA, toolSource, c.workers)
 		if e == nil {
 			e = validateGraphCoverage(m, g, p, index, c.scopeDir, c.archive)
 		}
@@ -242,17 +245,12 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 			return finish(e)
 		}
 		if e = authority(); e == nil {
-			if c.execute {
-				e = graphRelationshipCheck(ctx, store, g, index, c.scopeDir, true)
-			}
-			if e == nil {
-				if c.action == "verify" {
-					e = graphVerify(ctx, store, m, c.archive, journal, c.original)
-				} else if c.execute {
-					e = mutateGraph(ctx, store, m, c.archive, journal, a, c.approvalSHA, c.action == "restore", authority, claimAuthority)
-				} else {
-					e = graphPrecheck(ctx, store, m, c.archive, journal, c.action == "restore")
-				}
+			if c.action == "verify" {
+				e = graphVerify(ctx, store, m, c.archive, journal, c.original)
+			} else if c.execute {
+				e = mutateGraph(ctx, store, m, c.archive, journal, a, c.approvalSHA, c.action == "restore", authority, claimAuthority, c.workers)
+			} else {
+				e = graphPrecheck(ctx, store, m, c.archive, journal, c.action == "restore")
 			}
 		}
 		if e == nil && (c.action == "verify" && !c.original || c.action == "apply" && c.execute) {
@@ -296,11 +294,15 @@ func graphRootSet(ids []string) map[string]bool {
 	return out
 }
 func compareFrozenScope(originalDir string, index graphIndex, roots []string, freshDir string, fresh graphIndex) error {
-	// Both writable identities and retained replay evidence belong to the exact
-	// frozen plan. Changing a retention role is not an implicit scope update.
+	if index.Format != 2 || fresh.Format != 2 {
+		return errors.New("frozen scope requires version two typed-key plans")
+	}
+	// The plan freezes physical identities, complete identity groups and schema.
+	// The fresh plan revalidates current ownership/responsibility; its states and
+	// event references are not earlier copies of the original values at T0.
 	type planned struct {
-		fingerprint string
-		rank        int
+		roots []string
+		rank  int
 	}
 	expected := map[string]planned{}
 	visit := func(dir string, current graphIndex, fn func([]graphObject, int) error) error {
@@ -313,11 +315,14 @@ func compareFrozenScope(originalDir string, index graphIndex, roots []string, fr
 	}
 	if e := visit(originalDir, index, func(page []graphObject, rank int) error {
 		for _, o := range page {
+			if o.Object.Fingerprint != "" {
+				return errors.New("frozen typed scope cannot contain body fingerprints")
+			}
 			id := objectID(o.Object)
 			if _, exists := expected[id]; exists {
 				return errors.New("duplicate physical identity in original scope")
 			}
-			expected[id] = planned{o.Object.Fingerprint, rank}
+			expected[id] = planned{o.RootIDs, rank}
 		}
 		return nil
 	}); e != nil {
@@ -327,8 +332,12 @@ func compareFrozenScope(originalDir string, index graphIndex, roots []string, fr
 		for _, o := range page {
 			id := objectID(o.Object)
 			original, exists := expected[id]
-			if !exists || original.fingerprint != o.Object.Fingerprint || original.rank != rank {
+			if !exists || !reflect.DeepEqual(original.roots, o.RootIDs) || original.rank != rank {
 				return errors.New("frozen graph differs from original plan; no automatic scope expansion")
+			}
+			namespace := o.Object.Store + "/" + o.Object.Name
+			if !hashPattern.MatchString(index.Definitions[namespace]) || index.Definitions[namespace] != fresh.Definitions[namespace] {
+				return errors.New("frozen graph namespace metadata differs from original plan")
 			}
 			delete(expected, id)
 		}

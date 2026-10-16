@@ -9,22 +9,6 @@ import (
 	"reflect"
 )
 
-func observeGraphProtection(ctx context.Context, s dataStore, p protected) ([]object, error) {
-	out := []object{}
-	guards := sortedObjects(append(append(append([]object{}, p.QS.System...), p.QS.Clack...), p.QS.Other...))
-	for _, o := range guards {
-		r, exists, e := s.read(ctx, o)
-		if e != nil {
-			return nil, e
-		}
-		if !exists {
-			return nil, errors.New("protected original object is missing")
-		}
-		o.Fingerprint = fingerprint(r)
-		out = append(out, o)
-	}
-	return out, nil
-}
 func runGraphPlan(c config, out io.Writer) error {
 	if c.execute || c.original || c.group != "" || c.groupSHA != "" || c.archive != "" || c.materialSHA != "" || c.approval != "" || c.approvalSHA != "" || c.freeze != "" || c.freezeSHA != "" || c.owner != "" {
 		return errors.New("readonly whole-cohort discovery does not accept data-action authority")
@@ -58,22 +42,23 @@ func runGraphPlan(c config, out io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	s, closeAll, e := connect(ctx, selector.Binding)
+	s, closeAll, e := connectWithWorkers(ctx, selector.Binding, c.workers)
 	if e != nil {
 		return e
 	}
-	original, e := observeGraphProtection(ctx, s, protection)
+	graphStore := newGraphStore(s)
+	leanReader := newLeanReader(graphStore)
+	original, e := observeLeanProtection(ctx, leanReader, protection)
 	if e != nil {
 		return errors.Join(e, closeAll())
 	}
-	graphStore := newGraphStore(s)
-	index, e := planCohort(ctx, graphStore, selector, protection, c.scopeDir, c.selectorSHA, toolSource)
+	index, e := planCohort(ctx, leanReader, selector, protection, c.scopeDir, c.selectorSHA, toolSource)
 	if e == nil {
 		index.Definitions, e = graphStore.verifyDefinitions(ctx)
 	}
 	if e == nil {
 		var current []object
-		current, e = observeGraphProtection(ctx, s, protection)
+		current, e = observeLeanProtection(ctx, leanReader, protection)
 		if e == nil && !reflect.DeepEqual(original, current) {
 			e = errors.New("protection closure drifted during readonly discovery")
 		}
