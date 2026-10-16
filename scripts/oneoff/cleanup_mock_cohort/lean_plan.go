@@ -360,7 +360,11 @@ func (p *leanPlanner) mongoByIDs(name, field, parent string, ids []string) error
 func (p *leanPlanner) mongoChildren() error {
 	// No Testee-leading AnswerSheet index exists at 101/39. Exactly one cursor
 	// projects only technical IDs, including the independent-questionnaire roots.
-	if e := p.reader.mongoPages(p.context, "answersheets", bson.D{}, func(r record) error {
+	filter, e := graphRuleBatchAnswersheets(p.context, p.selector.TesteeIDs, p.parents["sheet_root"])
+	if e != nil {
+		return e
+	}
+	if e := p.reader.mongoPages(p.context, "answersheets", filter, func(r record) error {
 		raw := bson.Raw(r.BSON)
 		id, e := graphMongoID(raw, "testee_id", false)
 		if e != nil {

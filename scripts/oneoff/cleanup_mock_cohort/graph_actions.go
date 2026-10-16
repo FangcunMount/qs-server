@@ -91,6 +91,7 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
+	ctx = graphRuleBatchContext(ctx, c.ruleBatch)
 	if c.execute {
 		var stop context.CancelFunc
 		ctx, stop, e = graphActionContext(ctx, m, a, c.action == "restore")
@@ -178,27 +179,33 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 		if err != nil {
 			return finish(err)
 		}
-		freshDir, err := graphFreshDirectory(c.archive, "frozen-scope")
-		if err != nil {
-			return finish(err)
-		}
-		freshSelector, err := graphWindowSelector(selector, g.QS.Graph.RootIDs)
-		if err != nil {
-			return finish(err)
-		}
-		fresh, err := planCohort(ctx, newLeanReader(store), freshSelector, p, freshDir, digest(encode(freshSelector)), toolSource)
-		if err != nil {
-			return finish(err)
-		}
-		fresh.Definitions, err = store.verifyDefinitions(ctx)
-		if err != nil {
-			return finish(err)
-		}
-		if err = validateGraphHolds(freshDir, fresh, graphRootSet(g.QS.Graph.RootIDs)); err != nil {
-			return finish(err)
-		}
-		if err = compareFrozenScope(c.scopeDir, index, g.QS.Graph.RootIDs, freshDir, fresh); err != nil {
-			return finish(err)
+		if c.ruleBatch {
+			if err = graphRuleBatchReuse(index, selector, g, time.Now()); err != nil {
+				return finish(err)
+			}
+		} else {
+			freshDir, err := graphFreshDirectory(c.archive, "frozen-scope")
+			if err != nil {
+				return finish(err)
+			}
+			freshSelector, err := graphWindowSelector(selector, g.QS.Graph.RootIDs)
+			if err != nil {
+				return finish(err)
+			}
+			fresh, err := planCohort(ctx, newLeanReader(store), freshSelector, p, freshDir, digest(encode(freshSelector)), toolSource)
+			if err != nil {
+				return finish(err)
+			}
+			fresh.Definitions, err = store.verifyDefinitions(ctx)
+			if err != nil {
+				return finish(err)
+			}
+			if err = validateGraphHolds(freshDir, fresh, graphRootSet(g.QS.Graph.RootIDs)); err != nil {
+				return finish(err)
+			}
+			if err = compareFrozenScope(c.scopeDir, index, g.QS.Graph.RootIDs, freshDir, fresh); err != nil {
+				return finish(err)
+			}
 		}
 		m, e = captureGraph(ctx, store, g, p, index, c.scopeDir, c.archive, c.groupSHA, toolSource, c.workers)
 		if e == nil {
@@ -253,7 +260,7 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 				e = graphPrecheck(ctx, store, m, c.archive, journal, c.action == "restore")
 			}
 		}
-		if e == nil && (c.action == "verify" && !c.original || c.action == "apply" && c.execute) {
+		if e == nil && !c.ruleBatch && (c.action == "verify" && !c.original || c.action == "apply" && c.execute) {
 			e = graphNoRemainingReferences(ctx, store, g, index, c.scopeDir)
 		}
 		if e == nil {
@@ -282,7 +289,8 @@ func runGraphAction(c config, g group, p protected, out io.Writer) error {
 	}
 }
 func graphEmit(out io.Writer, c config, g group, sha string, dry, whole bool) error {
-	r := actionReceipt{Format: 1, Kind: "mock_cohort_qs_action_result", Action: c.action, Operation: g.Operation, GroupSHA: c.groupSHA, Source: toolSource, MaterialSHA: sha, Complete: true, DryRun: dry, Whole: whole, Pending: false, Exclusions: 0, Released: true}
+	partial := c.ruleBatch && (c.action == "apply" || c.action == "verify")
+	r := actionReceipt{Format: 1, Kind: "mock_cohort_qs_action_result", Action: c.action, Operation: g.Operation, GroupSHA: c.groupSHA, Source: toolSource, MaterialSHA: sha, Complete: true, DryRun: dry, Whole: whole && !partial, Pending: partial, Exclusions: 0, Released: true}
 	_, e := out.Write(append(encode(r), '\n'))
 	return e
 }

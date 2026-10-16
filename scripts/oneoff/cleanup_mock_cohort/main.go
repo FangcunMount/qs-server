@@ -28,6 +28,7 @@ type config struct {
 	selector, selectorSHA, scopeDir                                                                         string
 	captureEvidence, captureEvidenceSHA                                                                     string
 	execute, original                                                                                       bool
+	ruleBatch                                                                                               bool
 	workers                                                                                                 int
 	timeout                                                                                                 time.Duration
 }
@@ -56,6 +57,7 @@ func flags(args []string) (config, error) {
 	f.StringVar(&c.freezeSHA, "frozen-receipt-sha256", "", "freeze receipt raw SHA256")
 	f.BoolVar(&c.execute, "execute", false, "enable approved apply/restore; default is dry-run")
 	f.BoolVar(&c.original, "expect-original", false, "verify exact restored preimages instead of absence")
+	f.BoolVar(&c.ruleBatch, "rule-batch", false, "explicit rule subset; defer global residual clearance and emit partial data-action evidence")
 	f.IntVar(&c.workers, "workers", 4, "bounded database workers, from 1 to 8")
 	f.DurationVar(&c.timeout, "timeout", 20*time.Minute, "bounded CLI budget; cannot extend approval expiry")
 	if e := f.Parse(args); e != nil {
@@ -80,6 +82,9 @@ func flags(args []string) (config, error) {
 	}
 	if c.execute && c.action != "apply" && c.action != "restore" {
 		return c, errors.New("execute only belongs to approved data actions")
+	}
+	if c.ruleBatch && (c.original || c.action != "plan-cohort" && c.action != "capture" && c.action != "apply" && c.action != "verify") {
+		return c, errors.New("rule batch only belongs to graph discovery/capture/apply/absence verification")
 	}
 	if c.timeout <= 0 || c.timeout > 25*time.Minute {
 		return c, errors.New("CLI timeout must leave the five-minute maintenance reserve")
@@ -209,6 +214,9 @@ func run(args []string, out io.Writer) error {
 	}
 	if g.QS.Graph != nil {
 		return safePhase("graph_action", runGraphAction(c, g, p, out))
+	}
+	if c.ruleBatch {
+		return errors.New("rule batch requires an explicit graph identity component subset")
 	}
 	if c.captureEvidence != "" || c.captureEvidenceSHA != "" {
 		return errors.New("capture evidence only belongs to full graph consumers")

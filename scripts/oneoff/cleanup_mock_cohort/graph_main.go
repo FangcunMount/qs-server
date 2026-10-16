@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"time"
 )
 
 func runGraphPlan(c config, out io.Writer) error {
@@ -42,12 +43,14 @@ func runGraphPlan(c config, out io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
+	ctx = graphRuleBatchContext(ctx, c.ruleBatch)
 	s, closeAll, e := connectWithWorkers(ctx, selector.Binding, c.workers)
 	if e != nil {
 		return e
 	}
 	graphStore := newGraphStore(s)
 	leanReader := newLeanReader(graphStore)
+	observedAt := time.Now().UTC()
 	original, e := observeLeanProtection(ctx, leanReader, protection)
 	if e != nil {
 		return errors.Join(e, closeAll())
@@ -71,6 +74,9 @@ func runGraphPlan(c config, out io.Writer) error {
 		return e
 	}
 	index.Released = true
+	if c.ruleBatch {
+		index.RuleBatch = &graphRuleBatchObservation{Started: observedAt, Released: time.Now().UTC()}
+	}
 	if e = readOnlyGraphResult(filepath.Join(c.scopeDir, "graph-index.json"), index); e != nil {
 		return e
 	}

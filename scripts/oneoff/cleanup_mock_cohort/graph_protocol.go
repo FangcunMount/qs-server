@@ -61,25 +61,26 @@ type graphPage struct {
 }
 
 type graphIndex struct {
-	Format            int               `json:"format_version"`
-	Kind              string            `json:"kind"`
-	Operation         string            `json:"operation_id"`
-	SelectorSHA       string            `json:"selector_sha256"`
-	ProtectionSHA     string            `json:"protected_manifest_sha256"`
-	OwnerEvidenceSHA  string            `json:"owner_evidence_sha256"`
-	Source            string            `json:"compiled_source"`
-	Binding           binding           `json:"binding"`
-	Definitions       map[string]string `json:"namespace_definition_sha256"`
-	Shards            []graphShard      `json:"shards"`
-	Counts            map[string]int64  `json:"counts"`
-	Retained          map[string]string `json:"retained_objects"`
-	HoldShards        []graphHoldShard  `json:"component_hold_shards"`
-	Holds             map[string]int64  `json:"component_holds"`
-	RequiredActions   map[string]int64  `json:"required_actions"`
-	ReadOnly          bool              `json:"database_read_only"`
-	DiscoveryComplete bool              `json:"discovery_complete"`
-	WritePending      bool              `json:"full_graph_write_implementation_pending"`
-	Released          bool              `json:"resource_release_proven"`
+	Format            int                        `json:"format_version"`
+	Kind              string                     `json:"kind"`
+	Operation         string                     `json:"operation_id"`
+	SelectorSHA       string                     `json:"selector_sha256"`
+	ProtectionSHA     string                     `json:"protected_manifest_sha256"`
+	OwnerEvidenceSHA  string                     `json:"owner_evidence_sha256"`
+	Source            string                     `json:"compiled_source"`
+	Binding           binding                    `json:"binding"`
+	Definitions       map[string]string          `json:"namespace_definition_sha256"`
+	Shards            []graphShard               `json:"shards"`
+	Counts            map[string]int64           `json:"counts"`
+	Retained          map[string]string          `json:"retained_objects"`
+	HoldShards        []graphHoldShard           `json:"component_hold_shards"`
+	Holds             map[string]int64           `json:"component_holds"`
+	RequiredActions   map[string]int64           `json:"required_actions"`
+	ReadOnly          bool                       `json:"database_read_only"`
+	DiscoveryComplete bool                       `json:"discovery_complete"`
+	WritePending      bool                       `json:"full_graph_write_implementation_pending"`
+	Released          bool                       `json:"resource_release_proven"`
+	RuleBatch         *graphRuleBatchObservation `json:"rule_batch_observation,omitempty"`
 }
 
 func canonicalIDs(ids []string, allowEmpty bool) error {
