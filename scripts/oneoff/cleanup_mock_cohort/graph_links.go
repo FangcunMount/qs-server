@@ -220,13 +220,16 @@ func (p *cohortPlanner) sqlOwnedBatch(ctx context.Context, records []record) err
 	if len(records) == 0 {
 		return nil
 	}
+	// Resolve the narrow parent IDs before lifecycle/evidence classification,
+	// so a pending child hold is already bound to its exact typed component.
 	objects := make([]graphObject, len(records))
 	for i, r := range records {
-		o, e := p.sqlObject(r)
-		if e != nil {
-			return e
+		objects[i].Links = map[string]string{}
+		for _, name := range []string{"assessment_id", "enrollment_id", "task_id"} {
+			if value, ok := graphSQLValue(r, name); ok {
+				objects[i].Links[name] = value
+			}
 		}
-		objects[i] = o
 	}
 	assessments, e := p.sqlLinkOwners(ctx, "assessment", uniqueLinks(objects, "assessment_id"))
 	if e != nil {
@@ -240,7 +243,18 @@ func (p *cohortPlanner) sqlOwnedBatch(ctx context.Context, records []record) err
 	if e != nil {
 		return e
 	}
-	for _, o := range objects {
+	for i, links := range objects {
+		roots := []string{}
+		if owner, ok := assessments[links.Links["assessment_id"]]; ok {
+			roots = append(roots, owner["testee_id"])
+		}
+		if owner, ok := tasks[links.Links["task_id"]]; ok {
+			roots = append(roots, owner["testee_id"])
+		}
+		o, e := p.sqlObject(records[i], roots...)
+		if e != nil {
+			return e
+		}
 		if owner, ok := assessments[o.Links["assessment_id"]]; ok && o.Links["testee_id"] == "" {
 			o.RootIDs = []string{owner["testee_id"]}
 		}
@@ -405,11 +419,19 @@ func (p *cohortPlanner) generationPage(ctx context.Context, outcomeIDs []string)
 		return e
 	}
 	return p.reader.mongoPages(ctx, "report_generations", bson.D{{Key: "outcome_id", Value: bson.D{{Key: "$in", Value: graphMongoIDs(outcomeIDs)}}}}, func(r record) error {
-		o, e := p.mongoObject(r)
+		id, e := graphMongoID(bson.Raw(r.BSON), "outcome_id", false)
 		if e != nil {
 			return e
 		}
-		owner, ok := owners[o.Links["outcome_id"]]
+		owner, ok := owners[id]
+		roots := []string{}
+		if ok {
+			roots = append(roots, owner["testee_id"])
+		}
+		o, e := p.mongoObject(r, roots...)
+		if e != nil {
+			return e
+		}
 		if !ok {
 			p.holdObject(o, "report_generations:missing_outcome_ownership")
 		} else {
@@ -437,12 +459,20 @@ func (p *cohortPlanner) runPage(ctx context.Context, generationIDs []string) err
 		return e
 	}
 	return p.reader.mongoPages(ctx, "interpretation_runs", bson.D{{Key: "generation_id", Value: bson.D{{Key: "$in", Value: graphMongoIDs(generationIDs)}}}}, func(r record) error {
-		o, e := p.mongoObject(r)
+		id, e := graphMongoID(bson.Raw(r.BSON), "generation_id", false)
 		if e != nil {
 			return e
 		}
-		parent, ok := parents[o.Links["generation_id"]]
+		parent, ok := parents[id]
 		owner, hasOwner := owners[parent["outcome_id"]]
+		roots := []string{}
+		if ok && hasOwner {
+			roots = append(roots, owner["testee_id"])
+		}
+		o, e := p.mongoObject(r, roots...)
+		if e != nil {
+			return e
+		}
 		if !ok || !hasOwner {
 			p.holdObject(o, "interpretation_runs:missing_generation_ownership")
 		} else {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,5 +85,56 @@ func TestGraphOriginalStandardWireBindsPendingHoldToItsActualTargetRoot(t *testi
 				}
 			})
 		}
+	}
+}
+
+func TestGraphDerivedParentRootsExistBeforePendingAndEvidenceClassification(t *testing.T) {
+	for _, kind := range []string{"runtime", "reminder", "generation", "run"} {
+		t.Run(kind, func(t *testing.T) {
+			reader, selector, protection, dir := graphFixture(t)
+			reason := ""
+			switch kind {
+			case "runtime":
+				r := graphSQLFixture("runtime_checkpoint", "90", map[string]string{"assessment_id": "100"})
+				r.Columns = append(r.Columns, cell{Name: "scope", Type: "VARCHAR", Raw: []byte("unknown_scope")})
+				reader.sqlRows["runtime_checkpoint"] = []record{r}
+				reason = "runtime_checkpoint:unknown_scope"
+			case "reminder":
+				r := graphSQLFixture("task_opened_reminder_delivery", "91", map[string]string{"org_id": "1"})
+				r.Columns = append(r.Columns, cell{Name: "task_id", Type: "VARBINARY", Raw: []byte("400")}, cell{Name: "state", Type: "VARCHAR", Raw: []byte("pending")})
+				reader.sqlRows["task_opened_reminder_delivery"] = []record{r}
+				reason = "task_opened_reminder_delivery:unsettled_external_responsibility"
+			case "generation", "run":
+				name, key := "report_generations", "generated_event_evidence"
+				if kind == "run" {
+					name, key = "interpretation_runs", "retry_event_evidence"
+				}
+				r := reader.mongoRows[name][0]
+				var doc bson.D
+				if err := bson.Unmarshal(r.BSON, &doc); err != nil {
+					t.Fatal(err)
+				}
+				doc = append(doc, bson.E{Key: key, Value: bson.D{}})
+				raw, err := bson.Marshal(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				reader.mongoRows[name][0].BSON = raw
+				reason = "mongo/" + name + ":invalid_event_evidence"
+			}
+			index, err := planCohort(t.Context(), reader, selector, protection, dir, digest(encode(selector)), strings.Repeat("a", 40))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if index.Holds[reason] != 1 {
+				t.Fatal("typed derived responsibility was not classified", reason, index.Holds)
+			}
+			if err = validateGraphHolds(dir, index, map[string]bool{"1": true}); err == nil {
+				t.Fatal("pending/evidence failure lost its parent component before hold classification")
+			}
+			if err = validateGraphHolds(dir, index, map[string]bool{"999": true}); err != nil {
+				t.Fatal("unrelated component was globally blocked", err)
+			}
+		})
 	}
 }

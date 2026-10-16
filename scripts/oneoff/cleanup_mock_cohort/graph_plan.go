@@ -46,8 +46,8 @@ func (p *cohortPlanner) reference(e *eventevidence.EventEvidenceV1, o *graphObje
 		o.References = append(o.References, *e.Reference)
 	}
 }
-func (p *cohortPlanner) sqlObject(r record) (graphObject, error) {
-	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}}
+func (p *cohortPlanner) sqlObject(r record, rootIDs ...string) (graphObject, error) {
+	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}, RootIDs: append([]string{}, rootIDs...)}
 	o.Object.Fingerprint = fingerprint(r)
 	for _, name := range []string{"id", "org_id", "testee_id", "profile_id", "assessment_id", "answer_sheet_id", "answersheet_id", "report_id", "outcome_id", "evaluation_outcome_id", "enrollment_id", "plan_id", "task_id", "event_id", "retry_event_id", "committed_event_id", "opening_event_id", "source_type", "source_ref", "business_object_id", "scope", "status", "state", "claim_token", "lease_expires_at", "lease_until", "manual_replay_request_id", "request_id", "resource_id", "retry_disposition", "stat_date", "clinician_id", "entry_id", "conducting_store_id"} {
 		if v, ok := graphSQLValue(r, name); ok && v != "" {
@@ -121,8 +121,8 @@ func (p *cohortPlanner) emitSQL(r record) error {
 	}
 	return p.writer.add(o, graphSQLTables[r.Object.Name])
 }
-func (p *cohortPlanner) mongoObject(r record) (graphObject, error) {
-	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}}
+func (p *cohortPlanner) mongoObject(r record, rootIDs ...string) (graphObject, error) {
+	o := graphObject{Object: r.Object, Links: map[string]string{}, References: []eventevidence.StandardReference{}, RootIDs: append([]string{}, rootIDs...)}
 	o.Object.Fingerprint = fingerprint(r)
 	raw := bson.Raw(r.BSON)
 	for _, name := range []string{"domain_id", "org_id", "testee_id", "filler_id", "assessment_id", "outcome_id", "generation_id", "interpretation_run_id", "latest_run_id", "report_id", "source_id", "sort_report_id"} {
