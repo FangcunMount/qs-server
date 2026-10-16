@@ -331,7 +331,7 @@ func runGraphClearance(c config, out io.Writer) error {
 		if e := check(); e != nil {
 			return e
 		}
-		if e := graphRelationshipReferences(ctx, newLeanReader(s), union, refs, false); e != nil {
+		if e := graphRelationshipReferences(graphFrozenRuleDeleteContext(ctx, true), newLeanReader(s), union, refs, false); e != nil {
 			return e
 		}
 		for _, batch := range batches {

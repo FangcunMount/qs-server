@@ -152,76 +152,82 @@ func graphRelationshipReferences(ctx context.Context, r graphReader, g group, f 
 	for _, source := range sources {
 		typedSources[source.source] = f.ids[source.scope]
 	}
-	// Source domains use their actual composite index. The fallback predicates
-	// catch malformed/foreign source links through exact Testee or filler ownership
-	// on the server, returning only matches instead of shipping every fact row.
-	for _, table := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"} {
-		for kind, ids := range typedSources {
-			if e = rootBatches(sortedGraphIDs(ids), 1000, func(batch []string) error {
-				slots, args := placeholders(batch)
-				args = append([]any{kind, kind}, args...)
-				return r.sqlPages(ctx, table, "x.source_type=? AND BINARY x.source_type=BINARY ? AND x.source_ref IN ("+slots+")", args, remains)
+	if graphIsFrozenRuleDelete(ctx) && !allowOriginal {
+		if e = graphFrozenStatisticsReferences(ctx, r, roots, users, typedSources, f, remains); e != nil {
+			return e
+		}
+	} else {
+		// Source domains use their actual composite index. The fallback predicates
+		// catch malformed/foreign source links through exact Testee or filler ownership
+		// on the server, returning only matches instead of shipping every fact row.
+		for _, table := range []string{"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact"} {
+			for kind, ids := range typedSources {
+				if e = rootBatches(sortedGraphIDs(ids), 1000, func(batch []string) error {
+					slots, args := placeholders(batch)
+					args = append([]any{kind, kind}, args...)
+					return r.sqlPages(ctx, table, "x.source_type=? AND BINARY x.source_type=BINARY ? AND x.source_ref IN ("+slots+")", args, remains)
+				}); e != nil {
+					return e
+				}
+			}
+			rootJSON, marshalErr := json.Marshal(sortedGraphIDs(roots))
+			if marshalErr != nil {
+				return marshalErr
+			}
+			where := "x.testee_id IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
+			args := []any{string(rootJSON)}
+			if table == "statistics_assessment_fact" && len(users) > 0 {
+				userJSON, marshalErr := json.Marshal(sortedGraphIDs(users))
+				if marshalErr != nil {
+					return marshalErr
+				}
+				where += " OR x.filler_id IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
+				args = append(args, string(userJSON))
+			}
+			if e = r.sqlPages(ctx, table, where, args, func(row record) error {
+				testee, _ := graphSQLValue(row, "testee_id")
+				matched := roots[testee]
+				{
+					kind, _ := graphSQLValue(row, "source_type")
+					ref, _ := graphSQLValue(row, "source_ref")
+					matched = matched || typedSources[kind][ref]
+					if table == "statistics_assessment_fact" {
+						filler, _ := graphSQLValue(row, "filler_id")
+						matched = matched || users[filler]
+					}
+				}
+				if matched {
+					return remains(row)
+				}
+				return nil
 			}); e != nil {
 				return e
 			}
 		}
-		rootJSON, marshalErr := json.Marshal(sortedGraphIDs(roots))
-		if marshalErr != nil {
-			return marshalErr
-		}
-		where := "x.testee_id IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
-		args := []any{string(rootJSON)}
-		if table == "statistics_assessment_fact" && len(users) > 0 {
-			userJSON, marshalErr := json.Marshal(sortedGraphIDs(users))
-			if marshalErr != nil {
-				return marshalErr
-			}
-			where += " OR x.filler_id IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
-			args = append(args, string(userJSON))
-		}
-		if e = r.sqlPages(ctx, table, where, args, func(row record) error {
-			testee, _ := graphSQLValue(row, "testee_id")
-			matched := roots[testee]
-			{
-				kind, _ := graphSQLValue(row, "source_type")
-				ref, _ := graphSQLValue(row, "source_ref")
-				matched = matched || typedSources[kind][ref]
-				if table == "statistics_assessment_fact" {
-					filler, _ := graphSQLValue(row, "filler_id")
-					matched = matched || users[filler]
+		// A fact's explicit parent columns remain meaningful even if its Testee or
+		// source_ref belongs to another component. Such rows are exceptions, never
+		// implicit deletion targets. Query those typed columns without transferring
+		// unrelated fact rows or confusing equal IDs from different parent domains.
+		for _, link := range []struct{ table, column, scope string }{
+			{"statistics_assessment_fact", "answersheet_id", "mongo/answersheets"},
+			{"statistics_assessment_fact", "assessment_id", "mysql/assessment"},
+			{"statistics_assessment_fact", "outcome_id", "mysql/evaluation_outcome"},
+			{"statistics_assessment_fact", "report_id", "mongo/interpret_report_artifacts"},
+			{"statistics_assessment_fact", "enrollment_id", "mysql/plan_enrollment"},
+			{"statistics_assessment_fact", "task_id", "mysql/assessment_task"},
+			{"statistics_plan_fact", "enrollment_id", "mysql/plan_enrollment"},
+			{"statistics_plan_fact", "task_id", "mysql/assessment_task"},
+		} {
+			if e = rootBatches(sortedGraphIDs(f.ids[link.scope]), 64000, func(batch []string) error {
+				ids, err := json.Marshal(batch)
+				if err != nil {
+					return err
 				}
+				where := "x.`" + link.column + "` IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
+				return r.sqlPages(ctx, link.table, where, []any{string(ids)}, remains)
+			}); e != nil {
+				return e
 			}
-			if matched {
-				return remains(row)
-			}
-			return nil
-		}); e != nil {
-			return e
-		}
-	}
-	// A fact's explicit parent columns remain meaningful even if its Testee or
-	// source_ref belongs to another component. Such rows are exceptions, never
-	// implicit deletion targets. Query those typed columns without transferring
-	// unrelated fact rows or confusing equal IDs from different parent domains.
-	for _, link := range []struct{ table, column, scope string }{
-		{"statistics_assessment_fact", "answersheet_id", "mongo/answersheets"},
-		{"statistics_assessment_fact", "assessment_id", "mysql/assessment"},
-		{"statistics_assessment_fact", "outcome_id", "mysql/evaluation_outcome"},
-		{"statistics_assessment_fact", "report_id", "mongo/interpret_report_artifacts"},
-		{"statistics_assessment_fact", "enrollment_id", "mysql/plan_enrollment"},
-		{"statistics_assessment_fact", "task_id", "mysql/assessment_task"},
-		{"statistics_plan_fact", "enrollment_id", "mysql/plan_enrollment"},
-		{"statistics_plan_fact", "task_id", "mysql/assessment_task"},
-	} {
-		if e = rootBatches(sortedGraphIDs(f.ids[link.scope]), 64000, func(batch []string) error {
-			ids, err := json.Marshal(batch)
-			if err != nil {
-				return err
-			}
-			where := "x.`" + link.column + "` IN (SELECT ids.id FROM JSON_TABLE(?, '$[*]' COLUMNS(id BIGINT PATH '$')) AS ids)"
-			return r.sqlPages(ctx, link.table, where, []any{string(ids)}, remains)
-		}); e != nil {
-			return e
 		}
 	}
 	for _, source := range []struct{ kind, scope string }{{"answersheet_submitted", "mongo/answersheets"}, {"assessment_completed", "mysql/assessment"}} {
@@ -246,7 +252,14 @@ func graphRelationshipReferences(ctx context.Context, r graphReader, g group, f 
 	// the remaining documents, including malformed numeric aliases and cross-domain
 	// links. Answers and report bodies are never requested by the lean reader.
 	for _, name := range []string{"answersheets", "interpret_report_artifacts", "report_query_catalog", "report_generations", "interpretation_runs"} {
-		if e = r.mongoPages(ctx, name, bson.D{}, func(row record) error {
+		filter := bson.D{}
+		if graphIsFrozenRuleDelete(ctx) && !allowOriginal {
+			filter, e = graphFrozenMongoReferenceFilter(name, roots, users, f)
+			if e != nil {
+				return e
+			}
+		}
+		if e = r.mongoPages(ctx, name, filter, func(row record) error {
 			raw := bson.Raw(row.BSON)
 			candidate := graphRawIDMember(raw, "testee_id", roots) || name == "answersheets" && graphRawIDMember(raw, "filler_id", users) || graphRawIDMember(raw, "domain_id", f.ids["mongo/"+name])
 			for _, link := range []struct{ key, scope string }{{"assessment_id", "mysql/assessment"}, {"outcome_id", "mysql/evaluation_outcome"}, {"generation_id", "mongo/report_generations"}, {"interpretation_run_id", "mongo/interpretation_runs"}, {"latest_run_id", "mongo/interpretation_runs"}, {"report_id", "mongo/interpret_report_artifacts"}, {"sort_report_id", "mongo/interpret_report_artifacts"}, {"task_id", "mysql/assessment_task"}} {
