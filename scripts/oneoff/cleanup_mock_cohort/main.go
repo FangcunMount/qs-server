@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -77,11 +76,11 @@ func flags(args []string) (config, error) {
 func connect(ctx context.Context, w binding) (*liveStore, func() error, error) {
 	dsn, e := privateRead(os.Getenv("QS_MOCK_MYSQL_DSN_FILE"), 64*1024)
 	if e != nil {
-		return nil, nil, errors.New("private MySQL DSN file required")
+		return nil, nil, safePhase("mysql_configuration", errors.New("private MySQL DSN file required"))
 	}
 	uri, e := privateRead(os.Getenv("QS_MOCK_MONGO_URI_FILE"), 64*1024)
 	if e != nil {
-		return nil, nil, errors.New("private Mongo URI file required")
+		return nil, nil, safePhase("mongo_configuration", errors.New("private Mongo URI file required"))
 	}
 	cfg, e := mysqldriver.ParseDSN(strings.TrimSpace(string(dsn)))
 	if e != nil {
@@ -97,20 +96,20 @@ func connect(ctx context.Context, w binding) (*liveStore, func() error, error) {
 	cfg.WriteTimeout = 30 * time.Second
 	db, e := sql.Open("mysql", cfg.FormatDSN())
 	if e != nil {
-		return nil, nil, e
+		return nil, nil, safePhase("mysql_open", e)
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	conn, e := db.Conn(ctx)
 	if e != nil {
 		_ = db.Close()
-		return nil, nil, e
+		return nil, nil, safePhase("mysql_connection", e)
 	}
 	client, e := mongo.Connect(ctx, options.Client().ApplyURI(strings.TrimSpace(string(uri))).SetMaxPoolSize(1).SetMinPoolSize(0).SetConnectTimeout(10*time.Second))
 	if e != nil {
 		_ = conn.Close()
 		_ = db.Close()
-		return nil, nil, e
+		return nil, nil, safePhase("mongo_connection", e)
 	}
 	store := &liveStore{sql: conn, mongo: client, mongoDB: w.MongoDatabase}
 	held := false
@@ -128,15 +127,15 @@ func connect(ctx context.Context, w binding) (*liveStore, func() error, error) {
 		return errors.Join(release, conn.Close(), db.Close(), client.Disconnect(q))
 	}
 	if e = store.identity(ctx, w); e != nil {
-		return nil, nil, errors.Join(e, closeAll())
+		return nil, nil, errors.Join(safePhase("initial_identity", e), closeAll())
 	}
 	var ok sql.NullInt64
 	if e = conn.QueryRowContext(ctx, "SELECT GET_LOCK(?,0)", lock).Scan(&ok); e != nil || !ok.Valid || ok.Int64 != 1 {
-		return nil, nil, errors.Join(errors.New("same-database cleanup executor gate unavailable"), closeAll())
+		return nil, nil, errors.Join(safePhase("mysql_gate", errors.Join(errors.New("same-database cleanup executor gate unavailable"), e)), closeAll())
 	}
 	held = true
 	if e = store.identity(ctx, w); e != nil {
-		return nil, nil, errors.Join(e, closeAll())
+		return nil, nil, errors.Join(safePhase("locked_identity", e), closeAll())
 	}
 	return store, closeAll, nil
 }
@@ -168,7 +167,7 @@ func run(args []string, out io.Writer) error {
 		return e
 	}
 	if c.action == "plan-cohort" {
-		return runGraphPlan(c, out)
+		return safePhase("graph_plan", runGraphPlan(c, out))
 	}
 	var g group
 	var p protected
@@ -292,7 +291,7 @@ func run(args []string, out io.Writer) error {
 
 func main() {
 	if e := run(os.Args[1:], os.Stdout); e != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "mock cleanup failed; no successful whole-cohort clearance")
+		_, _ = os.Stderr.Write(append(encode(safeFailure(e)), '\n'))
 		os.Exit(1)
 	}
 }
