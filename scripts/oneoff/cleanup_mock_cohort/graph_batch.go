@@ -587,6 +587,7 @@ func graphMongoUniqueIndexes(definition []byte, name, database string) ([]graphM
 		"report_query_catalog/uk_report_catalog_assessment":            {"assessment_id"},
 	}
 	partials := map[string]graphMongoUniqueSpec{
+		"answersheets/uk_answersheet_submit_intent":                      {keys: []string{"submit_meta.writer_id", "submit_meta.idempotency_key"}, partial: bson.D{{Key: "submit_meta.idempotency_key", Value: bson.D{{Key: "$exists", Value: true}}}}, mode: "submit_intent"},
 		"answersheets/uk_answersheet_durable_event_id":                   {keys: []string{"durable_acceptance.event_id"}, partial: bson.D{{Key: "durable_acceptance.event_id", Value: bson.D{{Key: "$type", Value: "string"}}}}, mode: "durable_event"},
 		"answersheets/uk_answersheet_answering_start":                    {keys: []string{"start_context.id"}, partial: bson.D{{Key: "start_context.id", Value: bson.D{{Key: "$gt", Value: int32(0)}}}}, mode: "positive_start"},
 		"report_generations/uk_generation_generated_event_id":            {keys: []string{"generated_event_id"}, partial: bson.D{{Key: "generated_event_id", Value: bson.D{{Key: "$type", Value: "string"}, {Key: "$gt", Value: ""}}}}, mode: "nonempty_event"},
@@ -705,6 +706,18 @@ func graphMongoSimpleCollation(v bson.RawValue) bool {
 }
 
 func graphMongoUniqueValues(raw bson.Raw, spec graphMongoUniqueSpec) ([][]bson.RawValue, error) {
+	if spec.mode == "submit_intent" {
+		parent := raw.Lookup("submit_meta")
+		if parent.Type == 0 || parent.Type == bson.TypeNull {
+			return nil, nil
+		}
+		if parent.Type != bson.TypeEmbeddedDocument {
+			return nil, errors.New("uninterpretable original submission unique shape")
+		}
+		if parent.Document().Lookup("idempotency_key").Type == 0 {
+			return nil, nil
+		}
+	}
 	if spec.mode == "durable_event" {
 		parent := raw.Lookup("durable_acceptance")
 		if parent.Type == 0 || parent.Type == bson.TypeNull {
@@ -804,7 +817,7 @@ func graphMongoUniqueValues(raw bson.Raw, spec graphMongoUniqueSpec) ([][]bson.R
 	}
 	values := make([]bson.RawValue, len(spec.keys))
 	for i, key := range spec.keys {
-		v := raw.Lookup(key)
+		v := raw.Lookup(strings.Split(key, ".")...)
 		if v.Type == 0 {
 			v = bson.RawValue{Type: bson.TypeNull}
 		}
