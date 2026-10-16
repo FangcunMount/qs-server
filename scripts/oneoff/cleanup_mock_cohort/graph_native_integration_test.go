@@ -164,8 +164,18 @@ func TestMockCohortGraphNativeOwnedDiscovery(t *testing.T) {
 			t.Fatalf("bounded real graph count %s: got %d want %d", name, index.Counts[name], want)
 		}
 	}
-	if index.Retained["assessment_plan/500"] == "" || index.RequiredActions["settle_event_delivery_dead_letter"] != 1 || index.RequiredActions["settle_retry_event_hold"] != 1 {
-		t.Fatal("shared Plan or unresolved historical responsibility was promoted to write authority")
+	if index.Retained["assessment_plan/500"] == "" || index.RequiredActions["settle_event_delivery_dead_letter"] != 0 || index.RequiredActions["settle_retry_event_hold"] != 0 {
+		t.Fatal("shared Plan must remain retained; already settled historical receipts do not create new replay work")
+	}
+	for _, name := range []string{"interpretation_attention_projection", "task_opened_reminder_batch", "task_opened_reminder_delivery", "event_delivery_dead_letter", "retry_event_hold"} {
+		if index.Retained[name] == "" {
+			t.Fatal("online settled replay/notification evidence was not explicitly retained:", name)
+		}
+		for _, shard := range index.Shards {
+			if shard.Store == "mysql" && shard.Name == name && shard.RestoreRank != 0 {
+				t.Fatal("retained replay evidence was promoted into a writable shard:", name)
+			}
+		}
 	}
 	pageCounts := map[string][]int{}
 	seen := map[string]bool{}
