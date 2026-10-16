@@ -26,6 +26,9 @@ func TestMockCohortSafeFailureDoesNotExposeDriverOrNetworkInputs(t *testing.T) {
 	if len(r.Drivers) != 2 || r.Drivers[0].Code != 1045 || r.Drivers[0].SQLState != "28000" || r.Drivers[1].Code != 13 || r.Drivers[1].Name != "Unauthorized" || !r.NetworkFailure || !r.Deadline || len(r.Codes) != 1 || r.Codes[0] != "mongo_identity_changed" {
 		t.Fatalf("safe actionable categories missing: %+v", r)
 	}
+	if len(r.ErrorTypes) == 0 {
+		t.Fatal("safe concrete error types missing")
+	}
 	if len(r.Phases) != 1 || r.Phases[0] != "initial_identity" {
 		t.Fatal("phase missing")
 	}

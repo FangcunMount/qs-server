@@ -55,14 +55,14 @@ type liveStore struct {
 func (s *liveStore) identity(ctx context.Context, w binding) error {
 	var uuid, name string
 	if e := s.sql.QueryRowContext(ctx, "SELECT @@server_uuid,DATABASE()").Scan(&uuid, &name); e != nil {
-		return e
+		return safePhase("mysql_identity", e)
 	}
 	if uuid != w.SQLUUID || name != w.SQLDatabase {
 		return errors.New("SQL identity changed")
 	}
 	rows, e := s.sql.QueryContext(ctx, "SELECT version,dirty FROM schema_migrations ORDER BY version LIMIT 2")
 	if e != nil {
-		return e
+		return safePhase("mysql_ledger", e)
 	}
 	n := 0
 	var version int64
@@ -71,15 +71,15 @@ func (s *liveStore) identity(ctx context.Context, w binding) error {
 		n++
 		if e = rows.Scan(&version, &dirty); e != nil {
 			_ = rows.Close()
-			return e
+			return safePhase("mysql_ledger", e)
 		}
 	}
 	re, ce := rows.Err(), rows.Close()
 	if re != nil {
-		return re
+		return safePhase("mysql_ledger", re)
 	}
 	if ce != nil {
-		return ce
+		return safePhase("mysql_ledger", ce)
 	}
 	if n != 1 || version != 101 || dirty {
 		return errors.New("clean SQL101 required")
@@ -91,7 +91,7 @@ func (s *liveStore) identity(ctx context.Context, w binding) error {
 		Msg     string   `bson:"msg"`
 	}
 	if e = s.mongo.Database("admin").RunCommand(ctx, bson.D{{Key: "hello", Value: 1}}).Decode(&hello); e != nil {
-		return e
+		return safePhase("mongo_hello", e)
 	}
 	if hello.Set == "" || !hello.Primary || hello.Msg != "" || len(hello.Hosts) == 0 {
 		return errors.New("known Mongo primary replica set required")
@@ -108,7 +108,7 @@ func (s *liveStore) identity(ctx context.Context, w binding) error {
 	}
 	cur, e := s.mongo.Database(s.mongoDB).Collection("schema_migrations").Find(ctx, bson.D{}, options.Find().SetLimit(2))
 	if e != nil {
-		return e
+		return safePhase("mongo_ledger", e)
 	}
 	n = 0
 	for cur.Next(ctx) {
@@ -119,7 +119,7 @@ func (s *liveStore) identity(ctx context.Context, w binding) error {
 		}
 		if e = cur.Decode(&row); e != nil {
 			_ = cur.Close(ctx)
-			return e
+			return safePhase("mongo_ledger", e)
 		}
 		if row.Version != 39 || row.Dirty == nil || *row.Dirty {
 			_ = cur.Close(ctx)
@@ -128,10 +128,10 @@ func (s *liveStore) identity(ctx context.Context, w binding) error {
 	}
 	re, ce = cur.Err(), cur.Close(ctx)
 	if re != nil {
-		return re
+		return safePhase("mongo_ledger", re)
 	}
 	if ce != nil {
-		return ce
+		return safePhase("mongo_ledger", ce)
 	}
 	if n != 1 {
 		return errors.New("one Mongo migration ledger required")

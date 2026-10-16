@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"reflect"
 	"regexp"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
@@ -36,6 +37,7 @@ type safeDriverFailure struct {
 type safeFailureReport struct {
 	Format           int                 `json:"format_version"`
 	Kind             string              `json:"kind"`
+	ErrorTypes       []string            `json:"error_types"`
 	Phases           []string            `json:"phases"`
 	Codes            []string            `json:"codes"`
 	Drivers          []safeDriverFailure `json:"drivers"`
@@ -104,7 +106,7 @@ var diagnosticOwnCodes = map[string]string{
 }
 
 func safeFailure(root error) safeFailureReport {
-	r := safeFailureReport{Format: 1, Kind: "mock_cohort_safe_failure", Phases: []string{}, Codes: []string{}, Drivers: []safeDriverFailure{}, Canceled: errors.Is(root, context.Canceled), Deadline: errors.Is(root, context.DeadlineExceeded)}
+	r := safeFailureReport{Format: 1, Kind: "mock_cohort_safe_failure", ErrorTypes: []string{}, Phases: []string{}, Codes: []string{}, Drivers: []safeDriverFailure{}, Canceled: errors.Is(root, context.Canceled), Deadline: errors.Is(root, context.DeadlineExceeded)}
 	seen := map[string]bool{}
 	add := func(dst *[]string, s string) {
 		if !seen[s] {
@@ -121,6 +123,7 @@ func safeFailure(root error) safeFailureReport {
 		if e == nil {
 			continue
 		}
+		add(&r.ErrorTypes, reflect.TypeOf(e).String())
 		switch v := e.(type) {
 		case *phaseFailure:
 			add(&r.Phases, v.phase)
