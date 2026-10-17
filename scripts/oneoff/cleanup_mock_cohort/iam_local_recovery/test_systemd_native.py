@@ -86,7 +86,11 @@ class PID1Native(unittest.TestCase):
  def test_client_exit_deadline_forced_group_reap_gc_and_reentry(self):
   before=self.client();self.timer();self.wait(lambda:(self.control/'service-recovery.json').exists())
   proof=g.decode(g.read(self.control/'plan-unit-stop-proof.json'));self.assertTrue(proof['stop_ACK']);self.assertTrue(proof['all_original_processes_gone']);self.assertGreaterEqual(len(proof['process_binding']['processes']),2)
-  self.c.ops.original_gone(self.c.unit('plan'),proof['process_binding']);self.wait(lambda:self.c.ops.info(self.c.unit('plan')).get('LoadState')=='not-found')
+  self.c.ops.original_gone(self.c.unit('plan'),proof['process_binding'])
+  # systemd retains a failed unit after forcibly reaping its dummy group.
+  # Simulate later GC only after retaining and validating the actual stop proof.
+  subprocess.run(['/usr/bin/systemctl','reset-failed',self.c.unit('plan')],check=True,capture_output=True,timeout=10)
+  self.wait(lambda:self.c.ops.info(self.c.unit('plan')).get('LoadState')=='not-found')
   original=g.read(self.control/'service-recovery.json');again=self.c.recover('normal');self.assertEqual(g.read(self.control/'service-recovery.json'),original);self.assertFalse(again['IAM_delete_completion_asserted'])
   self.assertTrue((self.control/'fake-service-restored.json').exists());self.assertFalse((self.control/'plan-execution.json').exists())
  def test_completed_success_phase_retains_metadata_until_recovery(self):
