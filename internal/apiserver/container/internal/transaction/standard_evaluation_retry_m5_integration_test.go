@@ -4,7 +4,10 @@ package transaction
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -61,11 +64,7 @@ func (m5GovernedAccess) ValidateTesteeStoreAccess(_ context.Context, orgID, user
 // in the same MySQL transaction. Rejecting the second Outbox insert rolls back
 // both business updates and the first event, while the earlier claim remains.
 func TestM5StandardEvaluationFailureAndScheduledRetryTransaction(t *testing.T) {
-	dsn := os.Getenv("RM_QS_M5_MYSQL_DSN")
-	parsed, err := mysqldriver.ParseDSN(dsn)
-	if err != nil || parsed.Net != "tcp" || parsed.Addr != "mysql:3306" || parsed.DBName != "m5_qs_retry" {
-		t.Fatal("disposable m5_qs_retry MySQL required")
-	}
+	dsn := evaluationRetryFixtureDSN(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	defer cancel()
 	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
@@ -287,4 +286,54 @@ events:
 	_, err = governed.Authorize(permissionContext("force_retry"), actor, force)
 	require.Error(t, err)
 	require.Equal(t, beforeForce+1, countRows())
+}
+
+// Keep the original Docker-network fixture and allow an explicitly configured
+// loopback test server. The loopback path owns a fresh database for this test.
+func evaluationRetryFixtureDSN(t *testing.T) string {
+	t.Helper()
+	if dsn := os.Getenv("RM_QS_M5_MYSQL_DSN"); dsn != "" {
+		cfg, err := mysqldriver.ParseDSN(dsn)
+		if err != nil || cfg.Net != "tcp" || cfg.Addr != "mysql:3306" || cfg.DBName != "m5_qs_retry" {
+			t.Fatal("disposable m5_qs_retry MySQL required")
+		}
+		return dsn
+	}
+	dsn := os.Getenv("QS_SERVER_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Fatal("QS_SERVER_TEST_MYSQL_DSN is required; SKIP is not allowed")
+	}
+	cfg, err := mysqldriver.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, _, err := net.SplitHostPort(cfg.Addr)
+	if err != nil || cfg.Net != "tcp" || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
+		t.Fatal("explicit loopback MySQL test server required")
+	}
+	cfg.DBName = ""
+	cfg.ParseTime, cfg.MultiStatements = true, true
+	cfg.Loc = time.UTC
+	admin, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := fmt.Sprintf("qs_cleanup_m7_test_%d", time.Now().UnixNano())
+	if _, err := admin.ExecContext(t.Context(), "CREATE DATABASE `"+name+"`"); err != nil {
+		_ = admin.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if _, err := admin.ExecContext(ctx, "DROP DATABASE `"+name+"`"); err != nil {
+			t.Errorf("drop owned test database: %v", err)
+		}
+		if err := admin.Close(); err != nil {
+			t.Errorf("close test administrator: %v", err)
+		}
+	})
+	cfg.DBName = name
+	t.Logf("isolated MySQL failure/retry database=%s", name)
+	return cfg.FormatDSN()
 }

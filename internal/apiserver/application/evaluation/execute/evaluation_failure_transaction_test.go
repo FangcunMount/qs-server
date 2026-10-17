@@ -2,41 +2,37 @@ package execute
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	routing "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
-type preExecutionFailureGateStub struct{ calls int }
-
-func (g *preExecutionFailureGateStub) TryFail(_ context.Context, _ *assessment.Assessment, _ *evaluationinput.InputSnapshot, run *evalrun.EvaluationRun) (bool, error) {
-	g.calls++
-	return run.Attempt().Number == 1, nil
-}
-
-func TestControlledEvaluationFailureCommitsRetryBeforeModelExecution(t *testing.T) {
+func TestEvaluatorFailureCommitsRetryInBusinessTransaction(t *testing.T) {
 	a := splitPhaseAssessment(t)
 	repo := &fakeAssessmentRepo{assessment: a}
 	runs := &stubRunRepo{}
 	stager := &engineRecordingEventStager{}
-	evaluator := &countingEvaluator{key: routing.ExecutionIdentityScaleDefault}
-	gate := &preExecutionFailureGateStub{}
+	calls := 0
+	cause := errors.New("isolated evaluator failure")
+	evaluator := evaluatorStub{key: routing.ExecutionIdentityScaleDefault, execute: func(context.Context, ExecutionInput) (*domainoutcome.Execution, error) {
+		calls++
+		return nil, cause
+	}}
 	svc := NewEngine(repo, stubInputResolver{},
 		withTestEvaluator(evaluator), WithRunRepository(runs),
 		WithTransactionalOutbox(&engineRecordingTxRunner{}, stager),
-		WithPreExecutionFailureGate(gate),
 	).(*service)
 
 	if err := svc.Evaluate(t.Context(), a.ID().Uint64()); err == nil {
 		t.Fatal("controlled failure returned no error")
 	}
-	if evaluator.calls != 0 || gate.calls != 1 {
-		t.Fatalf("evaluator calls=%d gate calls=%d, want 0/1", evaluator.calls, gate.calls)
+	if calls != 1 {
+		t.Fatalf("evaluator calls=%d, want 1", calls)
 	}
 	if repo.assessment == nil || !repo.assessment.Status().IsFailed() {
 		t.Fatalf("assessment status=%v, want failed", repo.assessment)
@@ -44,8 +40,8 @@ func TestControlledEvaluationFailureCommitsRetryBeforeModelExecution(t *testing.
 	if runs.latest == nil || runs.latest.Attempt().Status != evalrun.StatusFailed || !runs.latest.Retryable() {
 		t.Fatalf("latest run=%v, want retryable failure", runs.latest)
 	}
-	if failure := runs.latest.Failure(); failure == nil || failure.Message != "controlled_evaluation_failure" {
-		t.Fatalf("failure=%v, want controlled audit code", failure)
+	if failure := runs.latest.Failure(); failure == nil || failure.Message != cause.Error() || failure.Kind != evalrun.FailureKindCalculation {
+		t.Fatalf("failure=%v, want original evaluator failure", failure)
 	}
 	if !slices.Contains(stager.eventTypes, eventcatalog.EvaluationFailed) ||
 		len(stager.scheduledEventTypes) != 1 || stager.scheduledEventTypes[0] != eventcatalog.EvaluationRetryRequested {

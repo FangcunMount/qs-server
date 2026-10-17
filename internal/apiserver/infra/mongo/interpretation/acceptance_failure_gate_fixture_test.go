@@ -14,8 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// AcceptanceFailureScope must identify a dedicated test identity. Its window
-// is deliberately short; an absent configuration never creates this gate.
+// AcceptanceFailureScope bounds the test-only durable fault fixture to one identity and a short window.
 type AcceptanceFailureScope struct {
 	Token     string    `json:"token"`
 	OrgID     int64     `json:"org_id"`

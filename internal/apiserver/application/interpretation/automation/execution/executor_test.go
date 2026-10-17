@@ -27,13 +27,6 @@ type executorBuilder struct {
 	draft *report.Draft
 }
 
-type controlledFailureGateStub struct{ calls int }
-
-func (g *controlledFailureGateStub) TryFail(_ context.Context, _ interpinput.InterpretationInput, run *interpretationrun.InterpretationRun) (bool, error) {
-	g.calls++
-	return run.Attempt() == 1, nil
-}
-
 func (*executorBuilder) ReportType() policy.ReportType           { return policy.ReportTypeStandard }
 func (*executorBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
 func (*executorBuilder) BuilderIdentity() string                 { return report.BuilderIdentityFactorScoring }
@@ -150,26 +143,28 @@ func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 	}
 }
 
-func TestExecutorControlledFailureUsesOriginalOutcomeForAuthorizedRetry(t *testing.T) {
-	builder := &executorBuilder{}
-	service, _, runs, reports, stager, _ := newExecutorFixture(t, builder)
-	gate := &controlledFailureGateStub{}
-	service.buildFailureGate = gate
+func TestExecutorBuilderFailureUsesOriginalOutcomeForAuthorizedRetry(t *testing.T) {
+	builder := &executorBuilder{err: errors.New("isolated builder failure")}
+	service, gens, runs, reports, stager, tx := newExecutorFixture(t, builder)
 	input := executorInput()
 	_, err := service.Execute(context.Background(), input, "initial")
 	failed, ok := FailureFrom(err)
-	if !ok || failed.Failure.Code != "controlled_build_failure" || !failed.Failure.Retryable ||
+	if !ok || failed.Failure.Code != "build_failed" || !failed.Failure.Retryable ||
 		failed.Decision == nil || failed.Decision.RetryEventID == "" {
-		t.Fatalf("controlled first attempt = %#v, %v", failed, err)
+		t.Fatalf("builder first attempt = %#v, %v", failed, err)
 	}
-	if builder.calls != 0 || len(reports.items) != 0 || len(stager.events) != 1 || len(stager.scheduled) != 1 {
+	if builder.calls != 1 || len(reports.items) != 0 || len(stager.events) != 1 || len(stager.scheduled) != 1 {
 		t.Fatalf("builder=%d reports=%d events=%d scheduled=%d", builder.calls, len(reports.items), len(stager.events), len(stager.scheduled))
 	}
+	if tx.calls != 2 {
+		t.Fatalf("failure transaction calls=%d want 2 for claim and commit", tx.calls)
+	}
 	blocked, err := service.Execute(context.Background(), input, "unapproved")
-	if err != nil || blocked.Status != ExecuteStatusBlocked || builder.calls != 0 {
+	if err != nil || blocked.Status != ExecuteStatusBlocked || builder.calls != 1 {
 		t.Fatalf("unapproved retry = %#v, %v; builder=%d", blocked, err, builder.calls)
 	}
 	next := *failed.Decision.NextAttemptAt
+	builder.err = nil
 	service.now = func() time.Time { return next }
 	service.starter.(*starter).now = func() time.Time { return next }
 	ctx := retrygovernance.WithAuthorization(context.Background(), retrygovernance.Authorization{
@@ -180,11 +175,14 @@ func TestExecutorControlledFailureUsesOriginalOutcomeForAuthorizedRetry(t *testi
 		t.Fatalf("authorized retry = %#v, %v", result, err)
 	}
 	run, err := runs.FindByID(ctx, result.InterpretReport.InterpretationRunID())
-	if err != nil || run.Attempt() != 2 || builder.calls != 1 || gate.calls != 2 || len(reports.items) != 1 {
-		t.Fatalf("run=%#v err=%v builder=%d gate=%d reports=%d", run, err, builder.calls, gate.calls, len(reports.items))
+	if err != nil || run.Attempt() != 2 || builder.calls != 2 || len(reports.items) != 1 {
+		t.Fatalf("run=%#v err=%v builder=%d reports=%d", run, err, builder.calls, len(reports.items))
+	}
+	if result.InterpretReport.OutcomeID() != input.OutcomeID || result.Generation.Key().OutcomeID != input.OutcomeID || len(gens.items) != 1 {
+		t.Fatal("authorized retry must retain the original frozen Outcome and generation")
 	}
 	_, err = service.Execute(ctx, input, "duplicate")
-	if err != nil || builder.calls != 1 || len(reports.items) != 1 {
+	if err != nil || builder.calls != 2 || len(reports.items) != 1 {
 		t.Fatalf("duplicate rebuilt: err=%v builder=%d reports=%d", err, builder.calls, len(reports.items))
 	}
 }
