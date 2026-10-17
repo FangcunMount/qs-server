@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
-    "verified_on": "2026-10-16"
+    "sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+    "verified_on": "2026-10-17"
   },
   "status_policy": {
     "doc_status": [
@@ -326,8 +326,8 @@
       "owner": "ci",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
-        "verified_on": "2026-10-16"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -425,34 +425,6 @@
         {
           "kind": "source",
           "path": "scripts/dbops/test-mysql-metadata-profile-ssh.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/run.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/prepare.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/approve.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/test_source.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/fixture_test.go.txt"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/remote-maintenance.py"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/testing/m4-a-formal-carrier/original-api-binding.json"
         }
       ],
       "verification": [
@@ -764,13 +736,6 @@
         },
         {
           "kind": "command",
-          "command": "python3 -B scripts/testing/m4-a-formal-carrier/test_source.py",
-          "result": "passed",
-          "source_sha": "a96db6726fcc84861801a81c8fcb97eb62fe0d8a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
           "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
           "result": "passed",
           "source_sha": "a96db6726fcc84861801a81c8fcb97eb62fe0d8a",
@@ -781,13 +746,6 @@
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "a96db6726fcc84861801a81c8fcb97eb62fe0d8a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/testing/m4-a-formal-carrier/test_source.py",
-          "result": "passed",
-          "source_sha": "5c2fc6bda8de53bfb5a9930931bbd885e09920fb",
           "verified_on": "2026-10-16"
         },
         {
@@ -806,7 +764,7 @@
         },
         {
           "kind": "command",
-          "command": "python3 -B scripts/testing/m4-a-formal-carrier/test_source.py",
+          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
           "result": "passed",
           "source_sha": "46ad7c801acd0c4f12cd8d165189566218f1b3b9",
           "verified_on": "2026-10-16"
@@ -815,37 +773,7 @@
           "kind": "command",
           "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
           "result": "passed",
-          "source_sha": "46ad7c801acd0c4f12cd8d165189566218f1b3b9",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "python3 -B scripts/testing/m4-a-formal-carrier/test_source.py",
-          "result": "passed",
           "source_sha": "1618f7de2f293a42c5d169ea228d8c178cc83c71",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "1618f7de2f293a42c5d169ea228d8c178cc83c71",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "| tee -- \"${RUNNER_TEMP}/a-carrier-actual.tar\" > /dev/null",
-          "result": "matched",
-          "source_sha": "08df11df78e3811674f284b8db636d28593dfdaa",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/testing/m4-a-formal-carrier/run.py",
-          "selector": "def require_mysql_image(image):",
-          "result": "matched",
-          "source_sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
           "verified_on": "2026-10-16"
         }
       ],
@@ -901,7 +829,8 @@
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\", \"verified_on\": \"2026-10-15\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Archive redirection CI-only repair08df after normal actualmain7ca integration: original current metadata retained as complete JSON {\"source_baseline\": {\"sha\": \"46ad7c801acd0c4f12cd8d165189566218f1b3b9\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"1618f7de2f293a42c5d169ea228d8c178cc83c71\", \"verified_on\": \"2026-10-16\"}}. Only the original sudo tar output is piped through runner-owned tee; pipefail, archive step1m and carrier job85m unchanged. Actual ShellCheck0.11.0 reproduced original soleSC2024 and fixed snippet/actionlint passed without disabling ShellCheck; original14 pure and selected workflow contracts84 ordinary/race oncePASS, no full ordinary/native rerun. QA bf4fbd88daba543cca337c4548daec7fe953de0f742aceaa1ba79310708a9474. The independently retained f8f original carrier success belongs to f8f/run38799062964/job116643032956 only (raw79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd), not new-head runtime/CI. Its DeploymentContracts failure is preserved; new-head CI/AI pending. All seven carrier helpers, fixed Tool/V10 and budgets retain f8f bytes; D completion/old-CLI/inventory fixture retain actualmain7ca bytes. Historical source/command/native/production/signoff evidence is not relabelled; no DB/Docker/SSH/production or dispatch.",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"ca9af3af5dbf402f9a3ab84a08e61983a784a7bd\", \"verified_on\": \"2026-10-15\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
-        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed."
+        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
       ]
     },
     {
@@ -1324,8 +1253,8 @@
       "owner": "overview",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
-        "verified_on": "2026-10-16"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -1343,10 +1272,6 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/migrations/**/*"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_actor_column_protection/*.go"
         }
       ],
       "verification": [
@@ -1365,41 +1290,11 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
-          "selector": "func TestM4ActorColumnsNativeRestoreOriginalStates(",
-          "result": "matched",
-          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
-          "selector": "func TestM4ActorColumnsNativeRestoreContinuation(",
-          "result": "matched",
-          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
           "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
-          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -1424,7 +1319,8 @@
       "notes": [
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"5d313332a28b76149ff76258db68f1ac4336617f\",\"verified_on\":\"2026-10-15\"}",
         "Prior verified binding retained unchanged as complete JSON: {\"source_sha\": \"716aa7008f4821f78abbff4a8e268e874791163b\", \"verified_on\": \"2026-10-15\"}. Current actual mainbeeee integration3961 has A204/B354/C192/config72 ordinary/race oncePASS,tagcompile-only/vet/ordinary lint/tagged changed-line lint and syntax checks. Historical b2fab24success/1designskip is not current merged-head CI/native/AI; production evidence is unchanged. Exact argv/GOMAXPROCS2/GOMEMLIMIT1GiB and per-package source inputs remain in sourceQA72d04d5bbdcb7eff7d04d81cec19190a08576bf50226fab784224629e0134881.",
-        "Review4283979852 current GraphQL comment.commit and REST commit_id bind b2fab27295a23e3beb766803ee88be9b78e95c86; REST original_commit_id separately records e8618b8929228ce12eccc03a0344253e3518fd7f. Thread remains unresolved pending current-head/sourceQA/freshCI verification. Completion or no newly added comments in automated review is not a substitute for disposition of that actual linked warning. No prior history is rewritten."
+        "Review4283979852 current GraphQL comment.commit and REST commit_id bind b2fab27295a23e3beb766803ee88be9b78e95c86; REST original_commit_id separately records e8618b8929228ce12eccc03a0344253e3518fd7f. Thread remains unresolved pending current-head/sourceQA/freshCI verification. Completion or no newly added comments in automated review is not a substitute for disposition of that actual linked warning. No prior history is rewritten.",
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
       ]
     },
     {
@@ -4663,8 +4559,8 @@
       "owner": "actor",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
-        "verified_on": "2026-10-16"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -4729,59 +4625,7 @@
         },
         {
           "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/testdata/original_shapes/*.sql"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go"
-        },
-        {
-          "kind": "source",
           "path": ".github/workflows/ci.yml"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_actor_column_protection/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_actor_column_protection/original_actor_schema.sql"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_actor_column_protection/original_role_projection.sql"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_actor_column_protection/capture_evidence.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_actor_column_workflow_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_actor_runtime_workflow_test.go"
         }
       ],
       "verification": [
@@ -4908,177 +4752,9 @@
         },
         {
           "kind": "command",
-          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "f571d36d7e755d7ae843d7e02c7c7245acf1e7b2",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_integration_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(",
-          "result": "matched",
-          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture d",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_recovery_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeRestorePrefixes(",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_boundary_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof(",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_gate.go",
-          "selector": "func acquireRuntimeGate(",
-          "result": "matched",
-          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_intent.go",
-          "selector": "func (d database) markFirstRuntime(",
-          "result": "matched",
-          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeFirstRuntimeGate(",
-          "result": "matched",
-          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
-          "result": "passed",
-          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
-          "result": "passed",
-          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/protocol_test.go",
-          "selector": "os.MkdirTemp(home, \"m4-d-private-\")",
-          "result": "matched",
-          "source_sha": "6f0245491547bc8bed5849e57707cb27563e93cc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/recovery_boundary_test.go",
-          "selector": "dir := privateFixture(t)",
-          "result": "matched",
-          "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
-          "selector": "func readCaptureEvidence(",
-          "result": "matched",
-          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
-          "selector": "func decodeCaptureDocument(",
-          "result": "matched",
-          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence_test.go",
-          "selector": "func TestCaptureDocumentsRequireOriginalLiteralTypedMembers(",
-          "result": "matched",
-          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
-          "selector": "func (h *maintenanceNative) connectionLossRestoreArgs(",
-          "result": "matched",
-          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
-          "selector": "func TestRuntimeConnectionLossFixtureInputReachesEnvironment(",
-          "result": "matched",
-          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
           "verified_on": "2026-10-15"
         },
         {
@@ -5096,77 +4772,6 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
-          "selector": "func verifyTarget(original, target material) error",
-          "result": "matched",
-          "source_sha": "db7db9b9ac30b86f1d2307e7ca888e369816b293",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/protocol.go",
-          "selector": "e != nil || len(elements) != 3",
-          "result": "matched",
-          "source_sha": "744e1ec62e555bc1f31d9fdd4e5cbd145986f7a0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/main.go",
-          "selector": "SetReadPreference(readpref.Primary())",
-          "result": "matched",
-          "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
-          "selector": "func primaryReplicaHosts(raw bson.Raw) ([]string, error)",
-          "result": "matched",
-          "source_sha": "5b8cf6f517117dd739226890e899c20335dcb480",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_integration_test.go",
-          "selector": "func TestM4ActorColumnsNativeCaptureUpgradeVerify(t *testing.T)",
-          "result": "matched",
-          "source_sha": "db3328fc9ea1d622db286d9740338cf6b1872011",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_integration_test.go",
-          "selector": "func (h *actorNative) seedModernRecords()",
-          "result": "matched",
-          "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_integration_test.go",
-          "selector": "h.repo.FindTask(h.t.Context(), 1, id)",
-          "result": "matched",
-          "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_integration_test.go",
-          "selector": "h.repo.FindRecovery(h.t.Context(), request)",
-          "result": "matched",
-          "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_actor_column_protection",
-          "result": "passed",
-          "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
@@ -5178,53 +4783,6 @@
           "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
           "result": "passed",
           "source_sha": "af97da6af9a590c0957e3e16540a9e25babbf065",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/recovery.go",
-          "selector": "func (d *database) restore(",
-          "result": "matched",
-          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/recovery_journal.go",
-          "selector": "func verifyRecoveryJournal(",
-          "result": "matched",
-          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
-          "selector": "func verifyCompleteRangeCount(",
-          "result": "matched",
-          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
-          "selector": "func TestM4ActorColumnsNativeRestoreOriginalStates(",
-          "result": "matched",
-          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
-          "selector": "func TestM4ActorColumnsNativeRestoreContinuation(",
-          "result": "matched",
-          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_actor_column_protection",
-          "result": "passed",
-          "source_sha": "6973dff1ba06b013f445280e76c9a06b44c5b7c7",
           "verified_on": "2026-10-15"
         },
         {
@@ -5242,50 +4800,10 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
-          "selector": "func TestM4ActorColumnsNativeRestoreOriginalStates(",
-          "result": "matched",
-          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_recovery_test.go",
-          "selector": "func TestM4ActorColumnsNativeRestoreContinuation(",
-          "result": "matched",
-          "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "command",
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "716aa7008f4821f78abbff4a8e268e874791163b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/capture_evidence.go",
-          "selector": "func readCaptureEvidence(",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "PY_ACTOR_OBJECT_PROOF",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/protocol_test.go",
-          "selector": "dir := privateRecoveryDir(t)",
-          "result": "matched",
-          "source_sha": "7d1cd57eece7819f289ade03205b15b7d41810bb",
           "verified_on": "2026-10-15"
         },
         {
@@ -5303,296 +4821,6 @@
           "result": "matched",
           "source_sha": "ad092d50db54caec5b0df1009ebbd95553ab151a",
           "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_sql_historical_protection ./scripts/oneoff/m4_mongo_historical_protection ./scripts/oneoff/m4_actor_column_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "3961a948e1d1e465e1b1bd48e9d83b45a6b982da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
-          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/inspection.go",
-          "selector": "func readInspectionVersion(",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_boundary.go",
-          "selector": "const runtimeBoundaryTable = \"m4_d_runtime_boundary\"",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
-          "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/recovery_gate.go",
-          "selector": "func acquireRecoveryGate(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/recovery_gate_test.go",
-          "selector": "func TestRecoveryGateRequiresActualOwnershipAndReleaseACK(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/verify_restored.go",
-          "selector": "func verifyRestored(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/verify_restored_test.go",
-          "selector": "func TestVerifyRestoredRequiresConsumedOriginalOperationBeforeEnvironment(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_verify_restored_test.go",
-          "selector": "func TestM4ActorColumnsRestoredVerificationNative(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
-          "selector": "func mongoSelectedIdentity(",
-          "result": "matched",
-          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database_test.go",
-          "selector": "func TestMongoSelectedIdentityUsesActualReplicaSet(",
-          "result": "matched",
-          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary.go",
-          "selector": "const runtimeBoundaryTable = \"m4_c_runtime_boundary\"",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary_test.go",
-          "selector": "func TestRuntimeBoundaryAbsenceRequiresTypedMissingAndEmptyCatalog(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent.go",
-          "selector": "func (d database) markFirstRuntime(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent_test.go",
-          "selector": "func TestMarkerIsFrozenBeforeCommitAndNeverReferencesContainingRecordHash(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/capture_marker_name_test.go",
-          "selector": "func TestCaptureCannotOccupyReservedRuntimeMarker(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_runtime_boundary_test.go",
-          "selector": "func TestM4ActorColumnsNativeRuntimeGeneration(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
-          "selector": "const completionAuthorizationMode = \"idempotent_current_fact_confirmation\"",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
-          "selector": "func (d database) completeFirstRuntime(",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
-          "selector": "func (v runtimeCompletionInputs) checkConsumedHistory(",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
-          "selector": "func TestM4MaintenanceTablesCommittedRuntimeCompletionNative(",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
-          "selector": "func TestCommittedRuntimeCompletionProofRejectsIncompleteOrForeignEvidence(",
-          "result": "matched",
-          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "-run='^TestM4MaintenanceTablesCommittedRuntimeCompletionNative$'",
-          "result": "matched",
-          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 110",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "-run='^TestM4ActorColumnsNativeRuntimeGeneration$'",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_runtime_boundary_test.go",
-          "selector": "actual compiled C fixture tool=%s phase=before_dependency_binding",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_actor_runtime_workflow_test.go",
-          "selector": "func TestActorRuntimeGenerationProofRejectsIncompleteOrForeignEvidence(",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
-          "selector": "const completionOldCLISource = \"5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c\"",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
-          "selector": "func nativeCompletionAcrossActualOldCLI(",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
-          "selector": "func TestCommittedRuntimeCompletionRequiresFixedActualOldCLI(",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "export QS_M4_D_COMPLETION_OLD_CLI_REQUIRED=1",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
-          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -5724,7 +4952,8 @@
         "Current pending-source integration review only: original complete current binding retained as JSON: {\"source_baseline\": {\"sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}}. Current source b4c7 is a normal merge of frozen C a325 with pending D ab9, not an actualmain merge. Joint ordinary/race C300/D444/metadata153/config188 each oncePASS, compile-only/vet/pinned lint/actionlint/syntax passed; QA receipt 6dcf2c4339c9c7474678ba523ce872d7625c8ee14c52f89e4a0b0cec0cb0471a. All old command/native/CI results, failure evidence, archived selectors, limitations and production/signoff attribution remain unchanged. C44 and integrated-head hosted CI/AI remain pending; no DB/Docker/SSH/production or new cancellation/completion API.",
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
-        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed."
+        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
       ]
     },
     {
@@ -11619,8 +10848,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
-        "verified_on": "2026-10-15"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -11677,8 +10906,8 @@
       "owner": "governance",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5d313332a28b76149ff76258db68f1ac4336617f",
-        "verified_on": "2026-10-15"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -11947,8 +11176,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
-        "verified_on": "2026-10-16"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -12006,46 +11235,6 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/testdata/original_shapes/*.sql"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_actor_column_protection/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_actor_column_workflow_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/configcontract/m4_actor_runtime_workflow_test.go"
         }
       ],
       "verification": [
@@ -12435,157 +11624,9 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRestoreDDLDeadlines/pending_over_five_seconds_then_complete",
-          "result": "matched",
-          "source_sha": "5309241f9e79341f7c44ed94c8084fce4864148d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "f571d36d7e755d7ae843d7e02c7c7245acf1e7b2",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json -count=1 ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_integration_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeCaptureUpgradeVerify(",
-          "result": "matched",
-          "source_sha": "1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
-          "result": "matched",
-          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
-          "result": "matched",
-          "source_sha": "1356621084e26eaacd82cfd776a583920931a445",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK4",
-          "result": "matched",
-          "source_sha": "fe45c321f10cdebb8462e05b81f14e895b79523b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeFirstRuntimeDuringFinalSQLRead",
-          "result": "matched",
-          "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
           "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
-          "result": "matched",
-          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
-          "result": "matched",
-          "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
-          "result": "matched",
-          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
-          "result": "matched",
-          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture a",
-          "result": "matched",
-          "source_sha": "75e1f66631cfcb6583bd7381bea64c93858b8543",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture b",
-          "result": "matched",
-          "source_sha": "75e1f66631cfcb6583bd7381bea64c93858b8543",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture d",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_recovery_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeRestorePrefixes(",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_boundary_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeLedgerCommitACKLossReadOnlyProof(",
-          "result": "matched",
-          "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
           "verified_on": "2026-10-15"
         },
         {
@@ -12593,114 +11634,6 @@
           "command": "make docs-check",
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_gate.go",
-          "selector": "func acquireRuntimeGate(",
-          "result": "matched",
-          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_intent.go",
-          "selector": "func (d database) markFirstRuntime(",
-          "result": "matched",
-          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
-          "selector": "func TestM4MaintenanceTablesNativeFirstRuntimeGate(",
-          "result": "matched",
-          "source_sha": "b8e44f2bb1f7778332a667ec9d0cbc063d6070c7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
-          "result": "passed",
-          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -json ./scripts/oneoff/m4_maintenance_table_protection -count=1",
-          "result": "passed",
-          "source_sha": "7f5f05f976dfad9239183ac56a8aa52e07f3244b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/protocol_test.go",
-          "selector": "os.MkdirTemp(home, \"m4-d-private-\")",
-          "result": "matched",
-          "source_sha": "6f0245491547bc8bed5849e57707cb27563e93cc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/recovery_boundary_test.go",
-          "selector": "dir := privateFixture(t)",
-          "result": "matched",
-          "source_sha": "a604813588978d9cebb1aae03b74219c23041fe2",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
-          "selector": "func readCaptureEvidence(",
-          "result": "matched",
-          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence.go",
-          "selector": "func decodeCaptureDocument(",
-          "result": "matched",
-          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/capture_evidence_test.go",
-          "selector": "func TestCaptureDocumentsRequireOriginalLiteralTypedMembers(",
-          "result": "matched",
-          "source_sha": "ef43851a8b4226245e6d638c407e9833509af08d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
-          "selector": "func (h *maintenanceNative) connectionLossRestoreArgs(",
-          "result": "matched",
-          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_gate_test.go",
-          "selector": "func TestRuntimeConnectionLossFixtureInputReachesEnvironment(",
-          "result": "matched",
-          "source_sha": "5aa2bd811d2e148d7bc56226bfdd7ed7b35462bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection",
-          "result": "passed",
-          "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
           "verified_on": "2026-10-15"
         },
         {
@@ -12716,290 +11649,6 @@
           "result": "passed",
           "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
           "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "PY_ACTOR_OBJECT_PROOF",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_maintenance_table_workflow_test.go",
-          "selector": "func TestMaintenanceTableNativeWorkflowRequiresFreshExact74(",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/inspection.go",
-          "selector": "func readInspectionVersion(",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_boundary.go",
-          "selector": "const runtimeBoundaryTable = \"m4_d_runtime_boundary\"",
-          "result": "matched",
-          "source_sha": "fc40b4a7ea3a02ddfedef763fca905f6345bc36d",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
-          "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/recovery_gate.go",
-          "selector": "func acquireRecoveryGate(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/recovery_gate_test.go",
-          "selector": "func TestRecoveryGateRequiresActualOwnershipAndReleaseACK(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/verify_restored.go",
-          "selector": "func verifyRestored(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/verify_restored_test.go",
-          "selector": "func TestVerifyRestoredRequiresConsumedOriginalOperationBeforeEnvironment(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_verify_restored_test.go",
-          "selector": "func TestM4ActorColumnsRestoredVerificationNative(",
-          "result": "matched",
-          "source_sha": "cdac7465087e4f745159df4ffbdf05a48643447f",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database.go",
-          "selector": "func mongoSelectedIdentity(",
-          "result": "matched",
-          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/database_test.go",
-          "selector": "func TestMongoSelectedIdentityUsesActualReplicaSet(",
-          "result": "matched",
-          "source_sha": "9fbe9d04f0f688df30758d0eef3a224ce4fee589",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary.go",
-          "selector": "const runtimeBoundaryTable = \"m4_c_runtime_boundary\"",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_boundary_test.go",
-          "selector": "func TestRuntimeBoundaryAbsenceRequiresTypedMissingAndEmptyCatalog(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent.go",
-          "selector": "func (d database) markFirstRuntime(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/runtime_intent_test.go",
-          "selector": "func TestMarkerIsFrozenBeforeCommitAndNeverReferencesContainingRecordHash(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/capture_marker_name_test.go",
-          "selector": "func TestCaptureCannotOccupyReservedRuntimeMarker(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_runtime_boundary_test.go",
-          "selector": "func TestM4ActorColumnsNativeRuntimeGeneration(",
-          "result": "matched",
-          "source_sha": "93c4dd10cd5a02dd2515545c00adadc2c7fea501",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
-          "selector": "const completionAuthorizationMode = \"idempotent_current_fact_confirmation\"",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
-          "selector": "func (d database) completeFirstRuntime(",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/runtime_completion.go",
-          "selector": "func (v runtimeCompletionInputs) checkConsumedHistory(",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
-          "selector": "func TestM4MaintenanceTablesCommittedRuntimeCompletionNative(",
-          "result": "matched",
-          "source_sha": "6ed3be19efc2a15335c6b374e8855f264ff65e1a",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
-          "selector": "func TestCommittedRuntimeCompletionProofRejectsIncompleteOrForeignEvidence(",
-          "result": "matched",
-          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "-run='^TestM4MaintenanceTablesCommittedRuntimeCompletionNative$'",
-          "result": "matched",
-          "source_sha": "1b58651863e03ff319623b9b7c47d27fc8f2cefb",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_actor_column_protection ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "e5c019008744591c1f64dbd2cae8842c397f33da",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 110",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "-run='^TestM4ActorColumnsNativeRuntimeGeneration$'",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_actor_column_protection/native_runtime_boundary_test.go",
-          "selector": "actual compiled C fixture tool=%s phase=before_dependency_binding",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_actor_runtime_workflow_test.go",
-          "selector": "func TestActorRuntimeGenerationProofRejectsIncompleteOrForeignEvidence(",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
-          "selector": "const completionOldCLISource = \"5707bfdcdbf38bb2d5cf74d45d9db04e85f49b9c\"",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "scripts/oneoff/m4_maintenance_table_protection/native_runtime_completion_test.go",
-          "selector": "func nativeCompletionAcrossActualOldCLI(",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/pkg/configcontract/m4_runtime_completion_workflow_test.go",
-          "selector": "func TestCommittedRuntimeCompletionRequiresFixedActualOldCLI(",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "export QS_M4_D_COMPLETION_OLD_CLI_REQUIRED=1",
-          "result": "matched",
-          "source_sha": "57d19d8f784746208c48a68af9983b4b24f202b8",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 -json ./scripts/oneoff/m4_maintenance_table_protection ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "0a8ce49ce481b7468d237b69cd701fe66d2c0338",
-          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -13133,7 +11782,8 @@
         "Current pending-source integration review only: original complete current binding retained as JSON: {\"source_baseline\": {\"sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}}. Current source b4c7 is a normal merge of frozen C a325 with pending D ab9, not an actualmain merge. Joint ordinary/race C300/D444/metadata153/config188 each oncePASS, compile-only/vet/pinned lint/actionlint/syntax passed; QA receipt 6dcf2c4339c9c7474678ba523ce872d7625c8ee14c52f89e4a0b0cec0cb0471a. All old command/native/CI results, failure evidence, archived selectors, limitations and production/signoff attribution remain unchanged. C44 and integrated-head hosted CI/AI remain pending; no DB/Docker/SSH/production or new cancellation/completion API.",
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
-        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed."
+        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
       ]
     },
     {
@@ -14496,8 +13146,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
-        "verified_on": "2026-10-16"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -14970,97 +13620,9 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRestoreDDLDeadlines/pending_over_five_seconds_then_complete",
-          "result": "matched",
-          "source_sha": "5309241f9e79341f7c44ed94c8084fce4864148d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
-          "result": "matched",
-          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
-          "result": "matched",
-          "source_sha": "1356621084e26eaacd82cfd776a583920931a445",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK4",
-          "result": "matched",
-          "source_sha": "fe45c321f10cdebb8462e05b81f14e895b79523b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeFirstRuntimeDuringFinalSQLRead",
-          "result": "matched",
-          "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
           "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
-          "result": "matched",
-          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
-          "result": "matched",
-          "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
-          "result": "matched",
-          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
-          "result": "matched",
-          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture a",
-          "result": "matched",
-          "source_sha": "75e1f66631cfcb6583bd7381bea64c93858b8543",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture b",
-          "result": "matched",
-          "source_sha": "75e1f66631cfcb6583bd7381bea64c93858b8543",
           "verified_on": "2026-10-15"
         },
         {
@@ -15069,30 +13631,6 @@
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
           "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "PY_ACTOR_OBJECT_PROOF",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
-          "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 110",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
         },
         {
           "kind": "source_selector",
@@ -15170,7 +13708,8 @@
         "Current pending-source integration review only: original complete current binding retained as JSON: {\"source_baseline\": {\"sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}}. Current source b4c7 is a normal merge of frozen C a325 with pending D ab9, not an actualmain merge. Joint ordinary/race C300/D444/metadata153/config188 each oncePASS, compile-only/vet/pinned lint/actionlint/syntax passed; QA receipt 6dcf2c4339c9c7474678ba523ce872d7625c8ee14c52f89e4a0b0cec0cb0471a. All old command/native/CI results, failure evidence, archived selectors, limitations and production/signoff attribution remain unchanged. C44 and integrated-head hosted CI/AI remain pending; no DB/Docker/SSH/production or new cancellation/completion API.",
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
-        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed."
+        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
       ]
     },
     {
@@ -15287,8 +13826,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f28e623211c6f0651ec7a8e1edb5cf8ccac1ce1",
-        "verified_on": "2026-10-16"
+        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
+        "verified_on": "2026-10-17"
       },
       "fact_sources": [
         {
@@ -15556,97 +14095,9 @@
         {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRestoreDDLDeadlines/pending_over_five_seconds_then_complete",
-          "result": "matched",
-          "source_sha": "5309241f9e79341f7c44ed94c8084fce4864148d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
-          "result": "matched",
-          "source_sha": "33511c0751e14d08073e44aa1038f5a50384b011",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRestoreMatrix/DirtyPrefix4",
-          "result": "matched",
-          "source_sha": "1356621084e26eaacd82cfd776a583920931a445",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeInterruptedIndexRestoreResumesWithNewApproval/CleanAfterACK4",
-          "result": "matched",
-          "source_sha": "fe45c321f10cdebb8462e05b81f14e895b79523b",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeFirstRuntimeDuringFinalSQLRead",
-          "result": "matched",
-          "source_sha": "64f25149e6c0c0734ff7ca95a8d217eff62b2c6d",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
           "selector": "--publish 127.0.0.1::27017 --memory=2g --memory-swap=2g --cpus=1",
           "result": "matched",
           "source_sha": "727558f29dc0a65cfa6716826bdb4bdf4b13a288",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4MongoObjectNativeRecoveryApprovalIdentityAndBoundary/DeletedConsumedClaim",
-          "result": "matched",
-          "source_sha": "99e1b9a89a6ebff5e296d51883f0d2be6ca083bc",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
-          "result": "matched",
-          "source_sha": "509ab0d1c9904ea83180e0d7ecaf14e57a59fd7f",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeRecoveryBoundaryAttacks/CopiedApprovalPath",
-          "result": "matched",
-          "source_sha": "5da54ff210f7c71757aadfcc9dbd4e556b1ae30c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4SQLObjectNativeCommitResponseLossRemainsUnknown",
-          "result": "matched",
-          "source_sha": "a01d30ede0ee85e5e25b6300ace90a0b1be3690c",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture a",
-          "result": "matched",
-          "source_sha": "75e1f66631cfcb6583bd7381bea64c93858b8543",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "start_owned_fixture b",
-          "result": "matched",
-          "source_sha": "75e1f66631cfcb6583bd7381bea64c93858b8543",
           "verified_on": "2026-10-15"
         },
         {
@@ -15655,30 +14106,6 @@
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
           "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "PY_ACTOR_OBJECT_PROOF",
-          "result": "matched",
-          "source_sha": "3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "TestM4ActorColumnsRestoredVerificationNative/ReleaseACKUnknownNeverComplete",
-          "result": "matched",
-          "source_sha": "997723552807fc78a4d427f586a9b685900c5031",
-          "verified_on": "2026-10-16"
-        },
-        {
-          "kind": "source_selector",
-          "path": ".github/workflows/ci.yml",
-          "selector": "timeout-minutes: 110",
-          "result": "matched",
-          "source_sha": "2520780947fe2ba452cce070b297050db59627e6",
-          "verified_on": "2026-10-16"
         }
       ],
       "production_evidence": {
@@ -15771,7 +14198,8 @@
         "Current pending-source integration review only: original complete current binding retained as JSON: {\"source_baseline\": {\"sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"2520780947fe2ba452cce070b297050db59627e6\", \"verified_on\": \"2026-10-16\"}}. Current source b4c7 is a normal merge of frozen C a325 with pending D ab9, not an actualmain merge. Joint ordinary/race C300/D444/metadata153/config188 each oncePASS, compile-only/vet/pinned lint/actionlint/syntax passed; QA receipt 6dcf2c4339c9c7474678ba523ce872d7625c8ee14c52f89e4a0b0cec0cb0471a. All old command/native/CI results, failure evidence, archived selectors, limitations and production/signoff attribution remain unchanged. C44 and integrated-head hosted CI/AI remain pending; no DB/Docker/SSH/production or new cancellation/completion API.",
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
-        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed."
+        "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
       ]
     },
     {

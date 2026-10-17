@@ -68,27 +68,9 @@ MySQL未知typed服务端错误使用 `query_mysql_error` 并保留可选uint16�
 
 CI 为两个 reader 各建独立 fixture：MySQL 8.0.36、认证 MongoDB 7.0.31 rs0。必须设置 required 标记，精确 selector 的 JSON 事件必须实际 RUN/PASS；任意 SKIP、缺失 selector 或依赖未就绪均失败。Mongo fixture 使用固定官方 digest、owned network/container label 和唯一 127.0.0.1 随机端口，不复用业务 runtime fixture。
 
-### 3.1. 可选 M4-A 正式载体隔离验证
+### 3.1. 已退役的 M4 专属设施
 
-`ci.yml` 的 `m4_a_formal_carrier` 输入默认为 false；仅在本仓库手工派发且明确开启时，独立 `m4-a-formal-carrier` job 才运行。同次手工派发仍会运行既有 CI jobs；普通 push／PR 的原门禁不借用此结果。固定夹具位于 [m4-a-formal-carrier](../../scripts/testing/m4-a-formal-carrier/run.py)，不接收数据库地址、主机、SQL、镜像替代值或生产批准。
-
-该任务从固定 `602710eb…` 源码以 Go 1.25.12 重建工具，产物必须与原 `2c314163…` SHA 完全一致。原 M2 API 仅从既有 ACR 的固定 manifest 读取，另核原始配置摘要、18 个层摘要和 ELF；取不到或不一致时失败，不回退 tag、最新镜像或近似构建。Registry Secret 仅通过原 `ALIYUN_ACR_*` 登录输入及可选 `DOCKERHUB_USERNAME`／`DOCKERHUB_TOKEN` 只读拉取登录使用，不进入固定夹具和证据包。
-
-MySQL 依赖固定为 `docker.io/library/mysql@sha256:a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964`，只选择 Linux/AMD64。workflow pull 与夹具使用同一内容引用；夹具记录实际 `RepoDigests`、镜像 `Id` 和自有容器的 `Image`，核对同次身份链及实际服务版本 `8.0.36` 后才可签合格。Registry digest 不等同于镜像配置或 engine ID，不能用可变 tag 或仅版本相同的内容替代。
-
-固定 M2 镜像内容为 230,144,789 字节，加上 tar 元数据后超过通用命令的 150MiB 输出上限；只有读取该镜像原始 archive 的调用使用 256MiB 上限，其余命令仍为 150MiB。这是隔离夹具进程的读取上限，原载体 512MiB、工具、查询／IO 和步骤／窗口期限保持不变。
-
-夹具只构造原 V10 Receiver 的隔离上下文，明确绕过生产主机、SSH、Nginx 和配置装配构造入口；`native`、`run_native_carrier`、Engine 创建、guard 和释放方法保持原字节。真实 Linux 原生 Docker 上使用 root、512MiB、同一 canonical 私有路径的 host bind、原 API 网络命名空间，以及独占合成 `qs` 双库；每张目标表为 247,463 行，材料约 50MB。原始 capture stdout 与同 CID 实际 exit0 才能生成执行证明。固定独立批准进程核原三件和局部 dirty101 事实，再执行原 restore／verify-restored，最后验证 clean101/39；不启动六个业务进程，也不重复六实例演练。
-
-固定纯校验步骤先由同一 `python3` 显式安装 `pyyaml`，再运行 JSON／workflow 解析测试；两者共同受原 1 分钟上限约束，安装或测试失败即停止。
-
-归档步骤只由 `sudo tar` 读取原 root 私有证据目录，输出流经 runner 用户的 `tee` 创建归档；原目录和文件 owner 不变，归档受 `umask 077` 保护。`pipefail` 同时保留读取与写入失败，归档步骤仍限 1 分钟。
-
-任务的 CI 外层上限为 85 分钟：checkout／Go 准备／纯校验／源码依赖／固定构建／两次只读登录／拉取／隔离执行／归档／上传的步骤上限依次为 1／2／1／2／22／1／1／4／42／1／3 分钟，合计 80 分钟，另留 5 分钟 Action 收尾。固定构建内两次编译各最多 600 秒；隔离程序自身仍受 240 秒准备、180 秒数据准备、原 1800 秒 native 窗口、120 秒证明及 120 秒清理约束。不会扩大 512MiB、原查询／IO／内核期限或 300 秒启动预留。任何失败、OOM、未知 ACK 或释放失败均不签合格；限定 nonce 资源清理成功不能把原载体的未知释放改成成功。首次失败材料保留，不自动重试或生成成功证明。
-
-CI artifact 的 30 天保留只是隔离证据保留策略，不证明 Mac mini 已托管原三件。原始材料、stdout 和 envelope 的 Mac 私有目录复制、原 V10 mirror／逐字读回属于后续单独的非生产托管步骤。此 job 成功也不证明生产 SSH、供给、维护 30 分钟／恢复 60 分钟、RPO=0 或真实业务验收，更不授予生产停写、迁移或启动权限。
-
-该可选夹具属于 M4-A 临时验收设施；对应验收与恢复责任结清后，由 M7 单独退役，历史原件按已有保留责任处理。
+M4-A正式carrier及A/B/C/D对象保护工具已完成职责，由R3退出活动源码和专属CI阶段；固定历史源码见[13dea3f35](https://github.com/FangcunMount/qs-server/tree/13dea3f35f2ba835d03255d73ea100ac1554c862)。原始演练、失败/取消和生产回执继续保留在现有版本与生产证据台账中；恢复二进制与定向材料按原责任保留，不因源码退役删除。通用MySQL/Mongo只读权限及元数据检查、M3迁移异常保护和现用业务数据库验证继续运行。
 
 ## 4. 本地非缓存验证
 
@@ -102,7 +84,6 @@ python3 -B scripts/dbops/test-mysql-metadata-readiness.py
 python3 -B scripts/dbops/test-mysql-retirement-inventory.py
 python3 -B scripts/dbops/test-mongodb-metadata-profile.py
 python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
-python3 -B scripts/testing/m4-a-formal-carrier/test_source.py
 # 仅在各自独占 fixture 和 required 身份变量已绑定后执行：
 make test-metadata-readiness-mysql-native
 make test-metadata-readiness-mongodb-native
