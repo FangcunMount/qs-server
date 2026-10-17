@@ -3,13 +3,27 @@ name: Compatibility Observation
 on:
   workflow_dispatch:
     inputs:
-      window_days:
-        description: 'Prometheus lookback in days (1-90)'
+      observation_mode:
+        description: 'preflight checks current capability; window audits the approved T0'
+        required: true
+        type: choice
+        options: [preflight, window]
+        default: preflight
+      source_sha:
+        description: 'Approved full compiled SHA, never inferred from observed instances'
         required: true
         type: string
-        default: '30'
+      window_days:
+        description: 'Approved W in days; window requires W >= 14'
+        required: true
+        type: string
+        default: '14'
+      started_at:
+        description: 'Approved T0 in UTC YYYY-MM-DDTHH:MM:SSZ; required for window'
+        required: false
+        type: string
   schedule:
-    - cron: '0 18 * * *' # Beijing 02:00, after the scheduled database backup window starts.
+    - cron: '0 18 * * *' # Beijing 02:00; never starts or approves a window.
 
 permissions:
   contents: read
@@ -24,35 +38,65 @@ jobs:
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
-    timeout-minutes: 10
+    timeout-minutes: 30
     environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Validate SSH configuration
+      - name: Setup observation SSH
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: compatibility-observation
+          DEPLOY_NODE_HOSTNAME: serverA
+        run: bash scripts/cd/setup-runner-ssh.sh
+
+      - name: Audit approved observation evidence
+        env:
+          OBSERVATION_MODE: ${{ inputs.observation_mode || vars.QS_COMPAT_OBSERVATION_MODE || 'preflight' }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha || vars.QS_COMPAT_SOURCE_SHA }}
+          WINDOW_DAYS: ${{ inputs.window_days || vars.QS_COMPAT_WINDOW_DAYS || '14' }}
+          OBSERVATION_STARTED_AT: ${{ inputs.started_at || vars.QS_COMPAT_STARTED_AT }}
+          EXPECTED_APISERVER_CONTAINERS: ${{ vars.QS_COMPAT_APISERVER_CONTAINERS }}
+          EXPECTED_COLLECTION_CONTAINERS: ${{ vars.QS_COMPAT_COLLECTION_CONTAINERS }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          RUNNER_SSH_ALIAS: compatibility-observation
         run: |
           set -Eeuo pipefail
-          : "${SVRA_HOST:?SVRA_HOST is empty}"
-          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
-          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
-          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+          payload=$(mktemp "${RUNNER_TEMP}/qs-compatibility.XXXXXX")
+          trap 'rm -f "$payload"' EXIT
+          chmod 600 "$payload"
+          python3 - "$payload" <<'PY'
+          import os
+          import re
+          import shlex
+          import sys
+          from pathlib import Path
+          mode = os.environ['OBSERVATION_MODE']
+          if mode not in {'preflight', 'window'}:
+              raise SystemExit('invalid observation mode')
+          if re.fullmatch(r'[0-9a-f]{40}', os.environ['EXPECTED_SOURCE_SHA']) is None:
+              raise SystemExit('approved full source SHA is required')
+          days = os.environ['WINDOW_DAYS']
+          if re.fullmatch(r'[1-9][0-9]*', days) is None or (mode == 'window' and int(days) < 14):
+              raise SystemExit('invalid approved observation period')
+          if mode == 'window' and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z', os.environ['OBSERVATION_STARTED_AT']) is None:
+              raise SystemExit('approved UTC T0 is required')
+          for field in ('EXPECTED_APISERVER_CONTAINERS', 'EXPECTED_COLLECTION_CONTAINERS'):
+              names = os.environ[field].split(',')
+              if not names or len(names) > 16 or len(set(names)) != len(names) or any(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', name) is None for name in names):
+                  raise SystemExit('approved complete instance inventory is required')
+          fields = ('OBSERVATION_MODE', 'EXPECTED_SOURCE_SHA', 'WINDOW_DAYS', 'OBSERVATION_STARTED_AT', 'EXPECTED_APISERVER_CONTAINERS', 'EXPECTED_COLLECTION_CONTAINERS', 'SUDO_PASSWORD')
+          exports = ''.join('export '+field+'='+shlex.quote(os.environ[field])+'\n' for field in fields)
+          script = Path('scripts/cd/audit-compatibility-observation.sh').read_text()
+          Path(sys.argv[1]).write_text(exports+'if [ "$(id -u)" = 0 ]; then export PRIVILEGE_RUNNER=; else export PRIVILEGE_RUNNER=sudo; fi\n'+script)
+          PY
+          ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" 'bash -s' < "$payload"
 
-      - name: Audit compatibility observation window
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          WINDOW_DAYS: ${{ github.event.inputs.window_days || '30' }}
-          PRIVILEGE_RUNNER: sudo
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: WINDOW_DAYS,PRIVILEGE_RUNNER
-          script_path: scripts/cd/audit-compatibility-observation.sh
+      - name: Cleanup observation SSH
+        if: always()
+        run: |
+          rm -f "${RUNNER_SSH_KEY_FILE:-}" "${RUNNER_SSH_CONFIG:-}" 2>/dev/null || true

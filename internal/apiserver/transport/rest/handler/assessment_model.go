@@ -267,6 +267,7 @@ func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
 // @Failure 400 {object} core.Response{data=response.AssessmentModelValidationResponse}
 // @Router /api/v1/assessment-models/{code}/definition [put]
 func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
+	defer observeDefinitionWrite(c)()
 	var req request.UpdateAssessmentModelDefinitionRequest
 	if err := h.bindAndValidate(c, &req); err != nil {
 		h.Error(c, err)

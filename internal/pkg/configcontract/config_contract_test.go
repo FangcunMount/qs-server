@@ -803,9 +803,13 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 		"scripts/cd/audit-compatibility-observation.sh",
 		"http://prometheus:9090",
 		"qs_evaluation_assessment_intake_legacy_binding_total",
-		"observation_window_incomplete",
 		"zero_window_candidate",
-		"counter semantics and caller/data-owner confirmation are still required before removal",
+		"EXPECTED_SOURCE_SHA",
+		"OBSERVATION_STARTED_AT",
+		"storage.tsdb.retention.time",
+		"qs_auth_token_source_total",
+		"qs_model_definition_write_total",
+		"setup-runner-ssh.sh",
 	} {
 		if !strings.Contains(content, required) {
 			t.Errorf("compatibility observation contract must contain %q", required)
