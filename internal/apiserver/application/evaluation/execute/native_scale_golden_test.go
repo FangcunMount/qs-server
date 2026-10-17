@@ -35,6 +35,29 @@ func TestM5NativeKernelGoldenScaleReverseContribution(t *testing.T) {
 	}
 }
 
+func TestM5NativeKernelGoldenScaleWeightedContributions(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, first, second, outcome string
+		want                         float64
+	}{
+		{"below", "a", "a", "low", 4},     // 2*0.5 + 1.5*2
+		{"boundary", "b", "a", "high", 5}, // 4*0.5 + 1.5*2
+		{"above", "b", "b", "high", 8},    // 4*0.5 + 3*2
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			def := nativeDefinition()
+			def.Measure.Scoring[0].Sources = []factor.ScoringSource{
+				{Kind: factor.ScoringSourceQuestion, Code: "q1", ScoringMode: factor.QuestionScoringModeOptionOverride, Sign: 1, Weight: 0.5, OptionScores: map[string]float64{"a": 2, "b": 4}},
+				{Kind: factor.ScoringSourceQuestion, Code: "q2", ScoringMode: factor.QuestionScoringModeOptionOverride, Sign: 1, Weight: 2, OptionScores: map[string]float64{"a": 1.5, "b": 3}},
+			}
+			def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{FactorCode: "total", Rules: nativeRules(5)}}
+			input := nativeScaleChoiceInput(t, def, []string{tc.first, tc.second})
+			nativeAssertScaleChoiceResult(t, input, tc.want, tc.outcome, map[string]float64{"total": tc.want})
+		})
+	}
+}
+
 // Choose options, not precomputed factor scores: the production contribution
 // evaluator must resolve each option override before applying sign and weight.
 func nativeScaleChoiceInput(t *testing.T, def *definition.Definition, choices []string) *evaluationinput.InputSnapshot {
