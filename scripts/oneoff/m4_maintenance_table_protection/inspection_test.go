@@ -77,8 +77,8 @@ func TestInspectionFieldDoesNotChangeSuccessfulCaptureStdout(t *testing.T) {
 	m := originalMaterial()
 	r := unitCaptureReceipt(m, fingerprint([]byte("inspect backward-compatible capture")))
 	var stdout bytes.Buffer
-	if emitReceipt(r, &stdout) != 0 || fingerprint(stdout.Bytes()) != "1a5905e6428e15c382b0e5c9c714d4101e8a4d756ca6abeb0d6425c13cbcfb71" || bytes.Contains(stdout.Bytes(), []byte("inspected_sql_version")) {
-		t.Fatal("capture stdout changed from the independently recorded 506b baseline")
+	if emitReceipt(r, &stdout) != 0 || fingerprint(bytes.Replace(stdout.Bytes(), []byte(dSource), []byte("c335b2a1a34dd69830261e2d8e11b16da3f8befb"), 1)) != "1a5905e6428e15c382b0e5c9c714d4101e8a4d756ca6abeb0d6425c13cbcfb71" || bytes.Contains(stdout.Bytes(), []byte("inspected_sql_version")) {
+		t.Fatal("capture stdout encoding apart from the release binding changed from the independently recorded 506b baseline")
 	}
 	var decoded receipt
 	if decodeCaptureDocument(stdout.Bytes(), &decoded) != nil || decoded.InspectedSQLVersion != nil {
