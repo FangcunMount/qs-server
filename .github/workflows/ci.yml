@@ -858,6 +858,38 @@ jobs:
           grep -q -- '--- PASS: TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites ' /tmp/report-assets-projection-tests.log
           grep -q -- '--- PASS: TestReportAssetsVersionRealMongoHeadEditDoesNotBackfillLegacyReads ' /tmp/report-assets-projection-tests.log
 
+      - name: Run Mongo-backed norm calculation regression
+        id: m5_native_norm
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m5_real_norm_test
+          QS_M5_NATIVE_NORM_ARTIFACT_DIR: ${{ runner.temp }}/qs-m5-native-norm
+        run: |
+          set -euo pipefail
+          selector='^TestM5RealMongoNormRuntime'
+          package='./internal/apiserver/container/modules/evaluation'
+          go test -tags=integration "$package" -list "$selector" > /tmp/m5-real-norm-selected.txt
+          test "$(grep -c '^TestM5RealMongoNormRuntime' /tmp/m5-real-norm-selected.txt)" -eq 2
+          go test -race -tags=integration -count=1 -timeout=5m -v "$package" -run "$selector" | tee /tmp/m5-real-norm-tests.log
+          if grep -q -- '--- SKIP:' /tmp/m5-real-norm-tests.log; then
+            echo 'Mongo-backed norm regression must not skip' >&2
+            exit 1
+          fi
+          grep -q -- '--- PASS: TestM5RealMongoNormRuntimeBehavioralRetainedVersion ' /tmp/m5-real-norm-tests.log
+          grep -q -- '--- PASS: TestM5RealMongoNormRuntimeCognitiveFrozenAnswers ' /tmp/m5-real-norm-tests.log
+          python3 -c 'import os,pathlib; assert len(list(pathlib.Path(os.environ["QS_M5_NATIVE_NORM_ARTIFACT_DIR"]).glob("*.json"))) == 5'
+
+      - name: Preserve Mongo-backed norm corpus
+        if: always() && steps.m5_native_norm.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: m5-native-mongo-norm-corpus
+          path: |
+            ${{ runner.temp }}/qs-m5-native-norm/
+            /tmp/m5-real-norm-tests.log
+            /tmp/m5-real-norm-selected.txt
+          retention-days: 30
+
       - name: Run Mongo runtime-ledger retirement guards
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0

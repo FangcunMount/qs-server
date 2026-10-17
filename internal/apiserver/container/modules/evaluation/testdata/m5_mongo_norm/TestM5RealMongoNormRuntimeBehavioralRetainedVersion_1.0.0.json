@@ -1,0 +1,197 @@
+{
+  "case": "TestM5RealMongoNormRuntimeBehavioralRetainedVersion/1.0.0",
+  "definition_hash": "6d5fb53f307cfafc91a745c730e166a9b08fd41c9bfec96408a1eabb9feb8cee",
+  "input_identity": {
+    "ModelCode": "M5_MONGO_NORM",
+    "ModelVersion": "1.0.0",
+    "ModelDigest": "632f09fce7c4476c5e32ff4773474b614e9fe37b65ba875084a809f908d87457",
+    "QuestionnaireCode": "M5_MONGO_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireDigest": "d1e45ab3e4fa9adddc5628b6bf406ebd1ff932973be122a81dec5a614592eef5",
+    "AnswerSheetID": 7102,
+    "AnswerSheetDigest": "e0ec67e58c83fc3bed242f0d1d3c858822edb1c73752d68ee72011fa8d650ebe",
+    "SubjectDigest": "29dc536656eb6c1b1a9927c5cb8262158ad4bc86dc7ed100050f943157e8e7ed",
+    "CompositeDigest": "b29e2aa84a1f6b1818eb4640d457032a741f2ca3cf387ed778e9b4a6e5d0666f"
+  },
+  "calculation": {
+    "ModelRef": {
+      "kind": "behavioral_rating",
+      "algorithm": "brief2",
+      "code": "M5_MONGO_NORM",
+      "version": "1.0.0",
+      "title": "Mongo-backed norm corpus"
+    },
+    "Summary": {
+      "PrimaryLabel": "none",
+      "Score": 5,
+      "Level": "none",
+      "Tags": null
+    },
+    "Detail": {
+      "Kind": "behavioral_rating",
+      "Payload": null
+    },
+    "Primary": {
+      "Kind": "raw_total",
+      "Value": 5,
+      "Label": "",
+      "Max": null
+    },
+    "Level": {
+      "Code": "low",
+      "Label": "",
+      "Severity": ""
+    },
+    "Profile": null,
+    "Dimensions": [
+      {
+        "Code": "total",
+        "Name": "Total",
+        "Kind": "factor",
+        "Role": "total",
+        "ParentCode": "",
+        "HierarchyLevel": 1,
+        "SortOrder": 1,
+        "Score": {
+          "Kind": "raw_total",
+          "Value": 5,
+          "Label": "",
+          "Max": null
+        },
+        "DerivedScores": [
+          {
+            "Kind": "t_score",
+            "Value": 60,
+            "Label": "",
+            "Max": null
+          },
+          {
+            "Kind": "percentile",
+            "Value": 84,
+            "Label": "",
+            "Max": null
+          }
+        ],
+        "Level": {
+          "Code": "low",
+          "Label": "",
+          "Severity": ""
+        },
+        "NormReference": {
+          "ScoreKind": "t_score",
+          "Benchmark": 50,
+          "TableVersion": "mongo-brief-v1",
+          "FormVariant": "parent",
+          "MinAgeMonths": 60,
+          "MaxAgeMonths": 143,
+          "Gender": "female"
+        },
+        "Preference": "",
+        "Strength": null,
+        "LeftPole": "",
+        "RightPole": "",
+        "Model": ""
+      }
+    ],
+    "Validity": []
+  },
+  "report_input": {
+    "schema_version": 3,
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "Low",
+          "Summary": "frozen low",
+          "Description": ""
+        },
+        {
+          "OutcomeCode": "high",
+          "Title": "High",
+          "Summary": "frozen high",
+          "Description": ""
+        }
+      ],
+      "Profiles": null,
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "scores",
+            "Title": "",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "factor_scores",
+            "AdapterKey": "",
+            "TemplateID": "",
+            "TemplateVersion": "",
+            "CategoryLabel": ""
+          }
+        ]
+      }
+    },
+    "model_ref": {
+      "Kind": "behavioral_rating",
+      "Algorithm": "brief2",
+      "Code": "M5_MONGO_NORM",
+      "Version": "1.0.0",
+      "Title": "Mongo-backed norm corpus"
+    },
+    "factor_catalog": [
+      {
+        "code": "total",
+        "title": "Total",
+        "is_total_score": true
+      }
+    ],
+    "norming": {
+      "norm_tables": {
+        "FormVariant": "parent",
+        "NormTableVersion": "mongo-brief-v1",
+        "Factors": [
+          {
+            "FactorCode": "total",
+            "Bands": [],
+            "Lookup": [
+              {
+                "RawMin": 0,
+                "RawMax": 20,
+                "MinAgeMonths": 60,
+                "MaxAgeMonths": 143,
+                "Gender": "female",
+                "TScore": 60,
+                "Percentile": 84,
+                "StandardScore": null
+              }
+            ]
+          }
+        ],
+        "TScoreRules": [
+          {
+            "FactorCode": "total",
+            "Ranges": [
+              {
+                "MinT": 0,
+                "MaxT": 70,
+                "MaxInclusive": false,
+                "UnboundedMax": false,
+                "Level": "low",
+                "Conclusion": "",
+                "Suggestion": ""
+              },
+              {
+                "MinT": 70,
+                "MaxT": 0,
+                "MaxInclusive": false,
+                "UnboundedMax": true,
+                "Level": "high",
+                "Conclusion": "",
+                "Suggestion": ""
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

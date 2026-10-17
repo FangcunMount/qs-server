@@ -1,0 +1,188 @@
+{
+  "case": "TestM5RealMongoNormRuntimeCognitiveFrozenAnswers/mixed",
+  "definition_hash": "a287a35f2edba958a706f049ec3b58578f8d6ad56a9688c6c16e47c2bb1df5f2",
+  "input_identity": {
+    "ModelCode": "M5_MONGO_NORM",
+    "ModelVersion": "1.0.0",
+    "ModelDigest": "89ee7a79f32ef93e77ffa6f6393809a1a2f24551a5a23e283c89e4ea05bac456",
+    "QuestionnaireCode": "M5_MONGO_Q",
+    "QuestionnaireVersion": "1.0.0",
+    "QuestionnaireDigest": "3bc0cf6dc1e4d38aa8fa28888aba0fea0a9d0010ecc63ac9b50412ef3d24845e",
+    "AnswerSheetID": 7102,
+    "AnswerSheetDigest": "f031ec01c9521241266fdea93987d2daf64591085e53e8ecc0875bd08aa035d4",
+    "SubjectDigest": "29dc536656eb6c1b1a9927c5cb8262158ad4bc86dc7ed100050f943157e8e7ed",
+    "CompositeDigest": "ef0dfe3f65f4399014fe48c06ddbf5612ad6ccac9aa3053285686518e6745f08"
+  },
+  "calculation": {
+    "ModelRef": {
+      "kind": "cognitive",
+      "algorithm": "spm",
+      "code": "M5_MONGO_NORM",
+      "version": "1.0.0",
+      "title": "Mongo-backed norm corpus"
+    },
+    "Summary": {
+      "PrimaryLabel": "",
+      "Score": 1,
+      "Level": "low",
+      "Tags": null
+    },
+    "Detail": {
+      "Kind": "cognitive",
+      "Payload": null
+    },
+    "Primary": {
+      "Kind": "raw_total",
+      "Value": 1,
+      "Label": "",
+      "Max": 3
+    },
+    "Level": {
+      "Code": "low",
+      "Label": "",
+      "Severity": ""
+    },
+    "Profile": null,
+    "Dimensions": [
+      {
+        "Code": "A",
+        "Name": "A",
+        "Kind": "ability",
+        "Role": "task_set",
+        "ParentCode": "",
+        "HierarchyLevel": 0,
+        "SortOrder": 0,
+        "Score": {
+          "Kind": "raw_total",
+          "Value": 1,
+          "Label": "",
+          "Max": 2
+        },
+        "DerivedScores": null,
+        "Level": null,
+        "NormReference": null,
+        "Preference": "",
+        "Strength": null,
+        "LeftPole": "",
+        "RightPole": "",
+        "Model": ""
+      },
+      {
+        "Code": "B",
+        "Name": "B",
+        "Kind": "ability",
+        "Role": "task_set",
+        "ParentCode": "",
+        "HierarchyLevel": 0,
+        "SortOrder": 0,
+        "Score": {
+          "Kind": "raw_total",
+          "Value": 0,
+          "Label": "",
+          "Max": 1
+        },
+        "DerivedScores": null,
+        "Level": null,
+        "NormReference": null,
+        "Preference": "",
+        "Strength": null,
+        "LeftPole": "",
+        "RightPole": "",
+        "Model": ""
+      },
+      {
+        "Code": "total",
+        "Name": "total",
+        "Kind": "ability",
+        "Role": "total",
+        "ParentCode": "",
+        "HierarchyLevel": 0,
+        "SortOrder": 0,
+        "Score": {
+          "Kind": "raw_total",
+          "Value": 1,
+          "Label": "",
+          "Max": 3
+        },
+        "DerivedScores": [
+          {
+            "Kind": "percentile",
+            "Value": 25,
+            "Label": "",
+            "Max": null
+          }
+        ],
+        "Level": {
+          "Code": "low",
+          "Label": "",
+          "Severity": ""
+        },
+        "NormReference": {
+          "ScoreKind": "percentile",
+          "Benchmark": 0,
+          "TableVersion": "mongo-spm-v1",
+          "FormVariant": "standard",
+          "MinAgeMonths": 60,
+          "MaxAgeMonths": 143,
+          "Gender": "female"
+        },
+        "Preference": "",
+        "Strength": null,
+        "LeftPole": "",
+        "RightPole": "",
+        "Model": ""
+      }
+    ],
+    "Validity": []
+  },
+  "report_input": {
+    "schema_version": 3,
+    "InterpretationAssets": {
+      "Outcomes": [
+        {
+          "OutcomeCode": "low",
+          "Title": "Low",
+          "Summary": "frozen low",
+          "Description": ""
+        },
+        {
+          "OutcomeCode": "high",
+          "Title": "High",
+          "Summary": "frozen high",
+          "Description": ""
+        }
+      ],
+      "Profiles": null,
+      "ReportSpec": {
+        "Sections": [
+          {
+            "Code": "scores",
+            "Title": "",
+            "SourceRefs": [
+              "total"
+            ],
+            "Kind": "factor_scores",
+            "AdapterKey": "",
+            "TemplateID": "",
+            "TemplateVersion": "",
+            "CategoryLabel": ""
+          }
+        ]
+      }
+    },
+    "model_ref": {
+      "Kind": "cognitive",
+      "Algorithm": "spm",
+      "Code": "M5_MONGO_NORM",
+      "Version": "1.0.0",
+      "Title": "Mongo-backed norm corpus"
+    },
+    "factor_catalog": [
+      {
+        "code": "total",
+        "title": "Total",
+        "is_total_score": true
+      }
+    ]
+  }
+}
