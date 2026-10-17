@@ -7,6 +7,25 @@ CID='b4aa3ebe562c912dcf80392a5197acb63a91a1832fabc26e53c198bd397638c0'
 RUNTIME_SHA='f4f2d6f39c25a57219c44e80a65ad487968639d652eb38b894c5dfcae42b69d1'
 GROUP_SHA='84314eea560b97c8af6ccdce0df9b62628b67cf8d542e0384e442f4b88ad862b'
 GATE_SHA='a9b452db9c7360e39a59bf9642113233fc439851151f3acec37bd9fe9d0f4a27'
+MASTER_SHA='2960dd93051c1c9d50554b75b2e0ff64f426fdf9153e9bbba6908c7d830d0674'
+PROTECTION_SHA='0a1222db9a85c30d3be94900b4ebd5c5d3c9b2ac41775c8aff108355e768e7c8'
+# Only non-sensitive digests/counts are embedded; fixed private originals stay outside Git.
+FIXED_BATCHES={
+ 'next-batch-0001':('0440d70763de04ac218e421361a37ee0d0a0dc2493fb15665d5a2f6a3c87415e','0bbad888f27f85260c4dc202030b69e2a80344ceb6c91efa42e1bc860a6df51b',(6000, 6000, 6000, 6000)),
+ 'next-batch-0002':('87f971061fa1b6a439bc469dbed2889276891ec918dcb0e6f051d880f67ed5e5','06670bd3c3c4994ca699d867ab69d6b869619ebc19dbc05c279d5483eda13517',(6000, 6000, 6000, 6000)),
+ 'next-batch-0003':('0b3c9e15d73ac675a5eafd3f77734e7ad19ffa143b1ed520a9fcff893dddf62b','aa10a86ab0250726c61a566bb8745f0117596dad03e5d45b17fc256ddaa217a9',(6000, 6000, 6000, 6000)),
+ 'next-batch-0004':('55f8ac1ce4e5a2e4c67ea7affbb50453f5e4d66b9c804426e23c3d787bce8bb3','01ec2aee0ec9db0a9d3e5eabbe1d9d156286e0b19ba16690052768c78be82834',(6000, 6000, 6000, 6000)),
+ 'next-batch-0005':('950a58fe3d57ebdbe49ee8e7332f6090e98bef84b7892b835d24d1b6c412eed7','0d1f4b5623ea6830a6fbb3191c4f69141d68d5bc390afd437f27ec0dfee1de5b',(6000, 6000, 6000, 6000)),
+ 'next-batch-0006':('bcd6c680fdb6ce50b91a053e35cf698353319787b37bda3ad46f5afdb5e93ee2','49b3b93332216a7a25d4ec2e8c27e4edd9afd452d5519b80dc7561374afc862b',(6000, 6000, 6000, 6000)),
+ 'next-batch-0007':('baf1b27c93c382f48490db16d0e65b5ed30e8d7614f74ff89c9acd9938882c16','af04e9a5552968c52019981231955cd4e74080c09fd76ce40bc8a20d57ced0f3',(6000, 6000, 6000, 6000)),
+ 'next-batch-0008':('d7ff9457f404f542b9ba7a4bef056d749cd302eddd67cea22e82df62b27387cf','75ec7a09f9ef4070b6a19d7720561e813cc5253fb53ccfc8cefddd550b54088c',(6000, 6000, 6000, 6000)),
+ 'next-batch-0009':('d4ea0adbfff62d2e3048a7c4c00461542f7210086a4eea69132a251ca449bb38','dfda4109543d19aacab88e4f3d2d235ade084c1946c655e88230fa00d9eb9ac6',(6000, 6000, 6000, 6000)),
+ 'next-batch-0010':('cc35f9351cefc472ac480fe180a92194a45d79d1ec8f5d97672d6127f61a2ca8','b932fbc1d6deb607e0722daec9b3fe726e762400715bc1c9d563e15dc03ccb18',(5985, 4456, 5985, 4456)),
+ 'next-batch-0011':('d4fa23108baf302c56f9e03e589a2b5524bbf03451198e8b5daf32f3c4e689de','fedd5021507b2b9c4abdfd2c13a5a04a6c167dca4a783c543e68d44d6789f5ef',(5947, 295, 5947, 295)),
+ 'next-batch-0012':('164c90d8c11173bffc7c7af8fab891be778ae3a664fefaee9faec63fbfce3ee1','61b192311ba2fb90a34313e41917a505aa2f8e602e75c04a75298654017e73af',(5936, 1402, 5942, 1402)),
+ 'next-batch-0013':('5b1d5e8cb3796b84196609f39d9541db0efc588ccead0020d447721844b7e3a1','f951d8cd15c9553223ba2c1360a3981bc145015e91fbbb3330a3d54fc813ab3d',(5999, 5612, 6000, 5612)),
+ 'next-batch-0014':('b10cd8b6296bf671087e50e7ff89d8656a16bc0529172bc04b657f3383882b52','d4d8e52fe0e459d5e71022834bf165ad2bb442f4e94e2a6da989b6045f90765b',(921, 849, 921, 849)),
+}
 ACTIONS=('plan','capture','apply','verify')
 ENV_KEYS={'IAM_MOCK_CLEANUP_MYSQL_DSN','IAM_MOCK_CLEANUP_REDIS_URL'}
 COMMON={'group','owner-confirmation','protected','frozen','event-catalog','archive'}
@@ -21,6 +40,22 @@ def decode(raw):
   for k,v in items:need(k not in out,'duplicate_json_key');out[k]=v
   return out
  return json.loads(raw,object_pairs_hook=pairs)
+def fixed_batch(d):
+ name=d.get('logical_batch');need(isinstance(name,str) and name in FIXED_BATCHES,'fixed_batch_required')
+ selector,scope,counts=FIXED_BATCHES[name]
+ need(d.get('selector_sha256')==selector and d.get('iam_scope_sha256')==scope,'fixed_batch_original_SHA_required')
+ return name,counts
+def batch_originals(window,d):
+ name,counts=fixed_batch(d)
+ selector_raw=read(window/'fixed-batch-selector.json',16<<20);scope_raw=read(window/'fixed-batch-iam-scope.json',16<<20)
+ need(sha(selector_raw)==d['selector_sha256'] and sha(scope_raw)==d['iam_scope_sha256'],'fixed_batch_original_changed')
+ selector,scope=decode(selector_raw),decode(scope_raw)
+ need(set(scope)=={'user_ids','profile_ids','login_identity_ids'},'fixed_IAM_scope_fields_required')
+ ids=[selector.get('testee_ids'),scope['user_ids'],scope['profile_ids'],scope['login_identity_ids']]
+ for values,count in zip(ids,counts):
+  need(isinstance(values,list) and len(values)==count and all(isinstance(x,str) and re.fullmatch('[1-9][0-9]*',x) for x in values) and len(set(values))==count,'fixed_batch_typed_identity_required')
+ need(selector.get('operation_id')=='daily-simulation-cohort-20261016' and selector.get('protected_manifest_sha256')==PROTECTION_SHA,'fixed_batch_protection_required')
+ return selector,scope
 def stamp(s):
  value=dt.datetime.fromisoformat(s.replace('Z','+00:00'));need(value.tzinfo is not None,'timezone_required');return value
 def now():return dt.datetime.now(dt.timezone.utc)
@@ -156,7 +191,9 @@ class Ops:
 class Control:
  def __init__(self,control,d,ops=None):
   self.control=pathlib.Path(control);self.d=d;self.window=pathlib.Path(d['window_directory']);self.ops=ops or Ops()
-  self.prefix='qs-iam-'+sha(wire(d))[:16];self.run=self.window/'iam-batches'/MEMBER/'iam-run'
+  self.batch,self.batch_counts=fixed_batch(d)
+  self.member=MEMBER if self.batch=='next-batch-0001' else 'window'+self.window.name[len('rule-window-'):]+'-batch0001'
+  self.prefix='qs-iam-'+sha(wire(d))[:16];self.run=self.window/'iam-batches'/self.member/'iam-run'
   self.guard=self.window/'iam-local-guard.py'
  def unit(self,stage):need(stage in ACTIONS,'unknown_stage');return self.prefix+'-'+stage+'.service'
  def own(self,unit,info):
@@ -164,7 +201,15 @@ class Control:
   need(info.get('Description')==self.prefix+':'+unit.split('-')[-1].split('.')[0] and info.get('FragmentPath')=='/run/systemd/transient/'+unit and info.get('KillMode')=='control-group' and info.get('Delegate')=='no','owned_unit_identity_unproven')
  def before_cutoff(self):need(now()<stamp(self.d['data_deadline']),'original_data_deadline_expired')
  def unfenced(self):need(not os.path.lexists(self.control/'recovery-fence.json'),'recovery_fence_blocks_all_stages')
- def validate_argv(self,stage,argv):
+ def group_authority(self,values):
+  selector,scope=batch_originals(self.window,self.d);raw=read(values['group-file']);need(sha(raw)==values['group-sha256'],'group_original_changed');group=decode(raw)
+  need(group.get('iam')==scope,'group_IAM_scope_differs_from_fixed_batch')
+  qs=group.get('qs',{});graph=qs.get('graph',{})
+  need(group.get('operation_id')==selector['operation_id'] and group.get('protected_manifest_sha256')==PROTECTION_SHA and graph.get('selector_sha256')==self.d['selector_sha256'] and graph.get('root_testee_ids')==selector['testee_ids'] and qs.get('selector')==selector.get('selector') and qs.get('binding')==selector.get('binding'),'group_QS_scope_differs_from_fixed_batch')
+  if self.batch=='next-batch-0001':need(values['group-sha256']==GROUP_SHA,'fixed_first_group_required')
+  return {'kind':'fixed_IAM_batch_group_binding','master_sha256':MASTER_SHA,'logical_batch':self.batch,'file':values['group-file'],'sha256':values['group-sha256'],'selector_sha256':self.d['selector_sha256'],'iam_scope_sha256':self.d['iam_scope_sha256']}
+ def group_binding(self):return decode(read(self.control/'group-binding.json',65536))
+ def validate_argv(self,stage,argv,allow_unsealed_plan=False):
   need(stage in ACTIONS and isinstance(argv,list) and argv and argv[0]==str(self.window/'iam-cleanup'),'fixed_binary_and_stage_required')
   values={}
   for arg in argv[1:]:
@@ -180,13 +225,15 @@ class Control:
    empty=(name=='archive' and stage in ['plan','capture']) or (name=='journal' and stage in ['apply','verify'])
    need((digest=='' and empty) or re.fullmatch('[a-f0-9]{64}',digest),'input_SHA_required')
    if digest:need(sha(read(path))==digest,'input_original_changed')
-  need(values['group-sha256']==GROUP_SHA,'fixed_6000_group_required')
+  authority=self.group_authority(values);seal=self.control/'group-binding.json'
+  if os.path.lexists(seal):need(decode(read(seal,65536))==authority,'sealed_group_original_changed')
+  else:need(stage=='plan' and allow_unsealed_plan,'sealed_group_required')
   return values
  def prior(self,stage):
   if stage=='plan':return
   previous=ACTIONS[ACTIONS.index(stage)-1];p=decode(read(self.run/(previous+'-execution.json'),65536));out=read(self.run/(previous+'-stdout.json'),65536)
   need(p=={'format_version':1,'kind':'mock_cohort_iam_'+previous+'_execution','receipt_file':str(self.run/(previous+'-stdout.json')),'receipt_sha256':sha(out),'termination':'exited','exit_code':0} and type(p['exit_code']) is int and type(p['format_version']) is int,'prior_stage_not_known_success')
-  r=decode(out);need(type(r.get('format_version')) is int and r['format_version']==1 and r.get('kind')=='mock_cohort_iam_receipt' and r.get('compiled_source')==self.d['iam_tool_source'] and r.get('action')==previous and r.get('group_manifest_sha256')==GROUP_SHA and r.get('iam_counts')==dict(users=6000,profiles=6000,login_identities=6000) and r.get('error_category')=='' and all(r.get(k) is True for k in ['complete','sql_closed','redis_closed','gate_released']),'prior_stage_release_unproven')
+  r=decode(out);need(type(r.get('format_version')) is int and r['format_version']==1 and r.get('kind')=='mock_cohort_iam_receipt' and r.get('compiled_source')==self.d['iam_tool_source'] and r.get('action')==previous and r.get('group_manifest_sha256')==self.group_binding()['sha256'] and r.get('iam_counts')==dict(zip(['users','profiles','login_identities'],self.batch_counts[1:])) and r.get('error_category')=='' and all(r.get(k) is True for k in ['complete','sql_closed','redis_closed','gate_released']),'prior_stage_release_unproven')
  def stop(self):
   with locked(self.control):
    self.unfenced();self.before_cutoff()
@@ -211,9 +258,10 @@ class Control:
   self.ops.runtime(self,'stopped')
  def submit(self,stage,argv):
   with locked(self.control):
-   self.unfenced();self.before_cutoff();self.validate_argv(stage,argv);self.prior(stage);self.stopped()
+   self.unfenced();self.before_cutoff();values=self.validate_argv(stage,argv,allow_unsealed_plan=True);self.prior(stage);self.stopped()
    need(sha(read(self.window/'iam-cleanup',32<<20,0o500))==self.d['iam_tool_sha256'],'tool_binding_changed')
    need(self.ops.info(self.unit(stage)).get('LoadState')=='not-found','stage_already_dispatched_no_retry')
+   if not os.path.lexists(self.control/'group-binding.json'):save(self.control/'group-binding.json',wire(self.group_authority(values)))
    save(self.control/(stage+'-request.json'),wire({'stage':stage,'argv':argv}))
    save(self.run/(stage+'-intent.json'),wire({'action':stage,'compiled_source':self.d['iam_tool_source'],'window_expires_at':self.d['data_deadline']}))
    remaining=max(1,math.floor((stamp(self.d['data_deadline'])-now()).total_seconds()))
@@ -281,8 +329,9 @@ def load(control):
  d=decode(read(control/'descriptor.json',65536));need(sha(wire(d))==decode(read(control/'descriptor-sha.json',65536))['sha256'],'descriptor_changed')
  validate(d);need(read(control/'boot-id',128).decode()==pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'boot_identity_changed');need(pathlib.Path(d['window_directory'])==control.parent,'window_binding_changed');return Control(control,d)
 def validate(d):
- fields={'format_version','kind','window_directory','window_started_at','data_deadline','hard_deadline','iam_tool_source','iam_tool_sha256','guard_sha256','gate_observer_sha256'}
- need(set(d)==fields and type(d['format_version']) is int and d['format_version']==1 and d['kind']=='fixed_6000_IAM_only_local_recovery','fixed_descriptor_required')
+ fields={'format_version','kind','window_directory','window_started_at','data_deadline','hard_deadline','iam_tool_source','iam_tool_sha256','guard_sha256','gate_observer_sha256','logical_batch','selector_sha256','iam_scope_sha256'}
+ need(set(d)==fields and type(d['format_version']) is int and d['format_version']==1 and d['kind']=='fixed_batch_IAM_only_local_recovery','fixed_descriptor_required')
+ fixed_batch(d)
  w=canonical(d['window_directory']);need(w.parent==BASE and re.fullmatch('rule-window-[0-9]{5}',w.name) and w.name not in ['rule-window-00518','rule-window-00618'],'new_IAM_only_window_required')
  need(re.fullmatch('[a-f0-9]{40}',d['iam_tool_source']),'source_SHA_required')
  for key in ['iam_tool_sha256','guard_sha256','gate_observer_sha256']:need(re.fullmatch('[a-f0-9]{64}',d[key]),'artifact_SHA_required')
@@ -294,7 +343,7 @@ def validate(d):
  need(sha(read(w/'iam-runtime-recovery.py',128<<10))==RUNTIME_SHA,'runtime_library_changed')
 def arm(path,digest):
  raw=read(path,65536);need(sha(raw)==digest,'descriptor_input_SHA_mismatch');d=decode(raw);validate(d);need(stamp(d['window_started_at'])<=now()<stamp(d['data_deadline'])-dt.timedelta(seconds=60),'arm_within_original_window_required')
- w=pathlib.Path(d['window_directory']);control=w/'local-recovery';control.mkdir(mode=0o700);save(control/'descriptor.json',wire(d));save(control/'descriptor-sha.json',wire({'sha256':sha(wire(d))}));save(control/'boot-id',pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip().encode());c=Control(control,d)
+ w=pathlib.Path(d['window_directory']);control=w/'local-recovery';control.mkdir(mode=0o700);save(control/'descriptor.json',wire(d));save(control/'descriptor-sha.json',wire({'sha256':sha(wire(d))}));save(control/'boot-id',pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip().encode());c=Control(control,d);batch_originals(w,d)
  # Snapshot the one original container before B is stopped; no new runtime.
  actual=decode(c.ops.command(['/usr/bin/docker','--host','unix:///var/run/docker.sock','inspect','--type','container',CID],10))[0]
  need(actual['Id']==CID and actual['State']['Running'],'original_IAM_running_required');save(control/'runtime-before.json',wire([actual]));c.ops.runtime(c,'verify')

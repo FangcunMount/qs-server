@@ -25,17 +25,32 @@ class FakeOps:
 class GuardTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.base=pathlib.Path(self.tmp.name).resolve();self.window=self.base/'rule-window-00718';self.window.mkdir(mode=0o700);self.control=self.window/'local-recovery';self.control.mkdir(mode=0o700)
-  self.run=self.window/'iam-batches'/g.MEMBER/'iam-run';self.run.mkdir(mode=0o700,parents=True)
+  self.fixture_batches={};self.batch_patch=mock.patch.object(g,'FIXED_BATCHES',self.fixture_batches);self.batch_patch.start()
   now=g.now();self.d={'window_directory':str(self.window),'window_started_at':now.isoformat(),'data_deadline':(now+dt.timedelta(minutes=25)).isoformat(),'hard_deadline':(now+dt.timedelta(minutes=30)).isoformat(),'iam_tool_source':'a'*40,'iam_tool_sha256':g.sha(b'tool')}
+  self.configure_batch('next-batch-0001',(1,1,1,1))
+  self.group_patch=mock.patch.object(g,'GROUP_SHA',g.sha(self.group));self.group_patch.start()
   binary=self.window/'iam-cleanup';binary.write_bytes(b'tool');binary.chmod(0o500)
   g.save(self.window/'writers-stopped.json',g.wire({'host':'serverB','all_stopped':True,'count':1,'forced_kill_used':False,'instances':[{'cid':g.CID}]}))
-  self.ops=FakeOps();self.c=g.Control(self.control,self.d,self.ops);self.patch=mock.patch.object(g,'BASE',self.base);self.patch.start()
+  self.ops=FakeOps();self.c=g.Control(self.control,self.d,self.ops);self.run=self.c.run;self.run.mkdir(mode=0o700,parents=True);self.patch=mock.patch.object(g,'BASE',self.base);self.patch.start()
   g.save(self.control/'runtime-stop-ACK.json',g.wire({'actual_stop_complete':True,'CID':g.CID,'descriptor_sha256':g.sha(g.wire(self.d)),'writers_stopped':{'file':str(self.window/'writers-stopped.json'),'sha256':g.sha(g.read(self.window/'writers-stopped.json'))}}))
   g.save(self.control/'armed.json',g.wire({'descriptor_sha256':g.sha(g.wire(self.d)),'only_guard_stop_permitted_after_this_ACK':True}))
   g.save(self.control/'runtime-before.json',b'[]')
   self.ops.units[self.c.prefix+'-recovery.timer']={'LoadState':'loaded','ActiveState':'active'}
-  self.group=b'{}';self.group_patch=mock.patch.object(g,'GROUP_SHA',g.sha(self.group));self.group_patch.start()
- def tearDown(self):self.group_patch.stop();self.patch.stop();self.tmp.cleanup()
+ def tearDown(self):self.group_patch.stop();self.batch_patch.stop();self.patch.stop();self.tmp.cleanup()
+ def configure_batch(self,name,counts):
+  roots,users,profiles,logins=[list(map(str,range(base,base+count))) for base,count in zip([1000,2000,3000,4000],counts)]
+  scope={'user_ids':users,'profile_ids':profiles,'login_identity_ids':logins}
+  selector={'operation_id':'daily-simulation-cohort-20261016','protected_manifest_sha256':g.PROTECTION_SHA,'testee_ids':roots,'selector':{'source':'synthetic_only'},'binding':{'synthetic':True}}
+  sr,ir=g.wire(selector),g.wire(scope);self.fixture_batches[name]=(g.sha(sr),g.sha(ir),counts)
+  self.d.update(logical_batch=name,selector_sha256=g.sha(sr),iam_scope_sha256=g.sha(ir))
+  for file,raw in [('fixed-batch-selector.json',sr),('fixed-batch-iam-scope.json',ir)]:
+   p=self.window/file
+   if p.exists():p.unlink()
+   g.save(p,raw)
+  self.group=g.wire({'operation_id':selector['operation_id'],'protected_manifest_sha256':g.PROTECTION_SHA,'iam':scope,'qs':{'graph':{'selector_sha256':g.sha(sr),'root_testee_ids':roots},'selector':selector['selector'],'binding':selector['binding']}})
+ def future_batch(self,counts=(4,2,3,2)):
+  self.configure_batch('next-batch-0011',counts);self.c=g.Control(self.control,self.d,self.ops);self.run=self.c.run;self.run.mkdir(mode=0o700,parents=True)
+  p=self.control/'runtime-stop-ACK.json';p.unlink();g.save(p,g.wire({'actual_stop_complete':True,'CID':g.CID,'descriptor_sha256':g.sha(g.wire(self.d)),'writers_stopped':{'file':str(self.window/'writers-stopped.json'),'sha256':g.sha(g.read(self.window/'writers-stopped.json'))}}))
  def argv(self,action):
   names=g.COMMON|(g.EXTRA if action in ['apply','verify'] else set())
   if action=='verify':names-= {'qs-clearance','qs-clearance-execution'}
@@ -160,4 +175,49 @@ class GuardTests(unittest.TestCase):
   actual={'State':{'Running':False,'Pid':0,'Status':'exited','FinishedAt':'fixed-finished','ExitCode':0}}
   g.observe_original_stop(self.c,actual);actual['State'].update(Running=True,Pid=77,Status='running')
   with self.assertRaisesRegex(RuntimeError,'forward_marker'):g.observe_original_stop(self.c,actual)
+ def test_unknown_batch_or_wrong_fixed_original_SHA_is_rejected(self):
+  for change in [{'logical_batch':'next-batch-0099'},{'selector_sha256':'0'*64},{'iam_scope_sha256':'0'*64}]:
+   with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'fixed_batch'):g.Control(self.control,{**self.d,**change},self.ops)
+ def test_full_IAM_and_QS_sets_are_checked_not_only_counts(self):
+  self.future_batch((2,2,2,2));argv=self.argv('plan');path=self.window/'group.json';base=g.decode(g.read(path))
+  for change in ['foreign_user','foreign_profile','foreign_login','foreign_root','wrong_selector']:
+   value=g.decode(g.wire(base))
+   if change.startswith('foreign_'):
+    kind=change[len('foreign_'):]
+    if kind=='root':value['qs']['graph']['root_testee_ids'][0]='9999'
+    else:value['iam'][{'user':'user_ids','profile':'profile_ids','login':'login_identity_ids'}[kind]][0]='9999'
+   else:value['qs']['graph']['selector_sha256']='0'*64
+   raw=g.wire(value);path.unlink();g.save(path,raw)
+   args=[('--group-sha256='+g.sha(raw)) if x.startswith('--group-sha256=') else x for x in argv]
+   with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'scope_differs'):self.c.submit('plan',args)
+   self.assertFalse((self.control/'group-binding.json').exists())
+ def test_plan_seals_one_group_and_refuses_changed_same_scope_group(self):
+  self.future_batch();argv=self.argv('plan');self.c.submit('plan',argv);original=g.read(self.control/'group-binding.json')
+  value=g.decode(self.group);value['owner_confirmation_sha256']='b'*64;raw=g.wire(value);path=self.window/'group.json';path.unlink();g.save(path,raw)
+  args=[('--group-sha256='+g.sha(raw)) if x.startswith('--group-sha256=') else x for x in argv]
+  with self.assertRaisesRegex(RuntimeError,'sealed_group_original_changed'):self.c.submit('plan',args)
+  self.assertEqual(g.read(self.control/'group-binding.json'),original)
+  self.assertEqual(sum(e[0]=='start' for e in self.ops.events),1)
+ def test_missing_seal_or_changed_external_original_refuses_work_admission(self):
+  argv=self.argv('plan')
+  with self.assertRaisesRegex(RuntimeError,'sealed_group_required'):self.c.validate_argv('plan',argv)
+  p=self.window/'fixed-batch-iam-scope.json';p.unlink();g.save(p,b'{}')
+  with self.assertRaisesRegex(RuntimeError,'fixed_batch_original_changed'):self.c.submit('plan',argv)
+ def test_first_historical_group_stays_exact(self):
+  argv=self.argv('plan');value=g.decode(self.group);value['owner_confirmation_sha256']='b'*64;raw=g.wire(value);p=self.window/'group.json';p.unlink();g.save(p,raw)
+  args=[('--group-sha256='+g.sha(raw)) if x.startswith('--group-sha256=') else x for x in argv]
+  with self.assertRaisesRegex(RuntimeError,'fixed_first_group_required'):self.c.submit('plan',args)
+ def test_non6000_batch_prior_uses_exact_independent_IAM_counts(self):
+  self.future_batch();self.c.submit('plan',self.argv('plan'))
+  row={'format_version':1,'kind':'mock_cohort_iam_receipt','compiled_source':self.d['iam_tool_source'],'action':'plan','group_manifest_sha256':g.sha(self.group),'iam_counts':dict(users=2,profiles=3,login_identities=2),'error_category':'','complete':True,'sql_closed':True,'redis_closed':True,'gate_released':True}
+  out=self.run/'plan-stdout.json';proof=self.run/'plan-execution.json'
+  def receipt(counts):
+   row['iam_counts']=counts;raw=g.wire(row)
+   for p in [out,proof]:
+    if p.exists():p.unlink()
+   g.save(out,raw);g.save(proof,g.wire({'format_version':1,'kind':'mock_cohort_iam_plan_execution','receipt_file':str(out),'receipt_sha256':g.sha(raw),'termination':'exited','exit_code':0}))
+  receipt(dict(users=6000,profiles=6000,login_identities=6000))
+  with self.assertRaisesRegex(RuntimeError,'prior_stage_release_unproven'):self.c.prior('capture')
+  receipt(dict(users=2,profiles=3,login_identities=2));self.c.prior('capture')
+  self.assertEqual(self.c.run,self.window/'iam-batches/window00718-batch0001/iam-run')
 if __name__=='__main__':unittest.main()

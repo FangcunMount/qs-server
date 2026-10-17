@@ -51,7 +51,7 @@ class PID1Native(unittest.TestCase):
  def setUp(self):
   self.window=pathlib.Path('/var/tmp')/('iam-local-recovery-native-'+secrets.token_hex(8));self.window.mkdir(mode=0o700)
   self.control=self.window/'local-recovery';self.control.mkdir(mode=0o700)
-  self.d={'window_directory':str(self.window),'window_started_at':g.now().isoformat(),'data_deadline':(g.now()+g.dt.timedelta(seconds=2)).isoformat(),'hard_deadline':(g.now()+g.dt.timedelta(minutes=5,seconds=2)).isoformat(),'iam_tool_source':'0'*40}
+  self.d={'window_directory':str(self.window),'window_started_at':g.now().isoformat(),'data_deadline':(g.now()+g.dt.timedelta(seconds=2)).isoformat(),'hard_deadline':(g.now()+g.dt.timedelta(minutes=5,seconds=2)).isoformat(),'iam_tool_source':'0'*40,'logical_batch':'next-batch-0001','selector_sha256':g.FIXED_BATCHES['next-batch-0001'][0],'iam_scope_sha256':g.FIXED_BATCHES['next-batch-0001'][1]}
   self.c=g.Control(self.control,self.d,FileCallbacks());g.save(self.control/'native-descriptor.json',g.wire(self.d));g.save(self.control/'native-fixture.json',g.wire({'gate_known':True}))
  def tearDown(self):
   # Only names derived from this random fixture descriptor may be stopped/reset.
