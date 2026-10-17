@@ -11,15 +11,16 @@ import (
 )
 
 type canonicalReaderStub struct {
-	err error
+	err   error
+	model *rulesetport.PublishedModel
 }
 
 func (s canonicalReaderStub) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
-	return nil, s.err
+	return s.model, s.err
 }
 
 func (s canonicalReaderStub) FindPublishedModelByQuestionnaire(context.Context, string, string) (*rulesetport.PublishedModel, error) {
-	return nil, s.err
+	return s.model, s.err
 }
 
 func assertModelCatalogDependency(t *testing.T, err error) {

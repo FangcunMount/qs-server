@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -35,6 +37,9 @@ func (r *DraftRepository) Create(ctx context.Context, model *domain.AssessmentMo
 		return fmt.Errorf("assessment model is nil")
 	}
 	po := r.mapper.ToPO(model)
+	// Creating a record uses the current legacy encoder; existing head updates
+	// preserve their marker unless an explicit Definition edit assigned V1.
+	po.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
 	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 	data, err := po.ToBsonM()

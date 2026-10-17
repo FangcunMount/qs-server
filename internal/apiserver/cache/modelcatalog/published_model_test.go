@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -321,7 +321,7 @@ func TestCachedPublishedModelStoreFindPublishedModelByCodeDelegatesToInner(t *te
 	if inner.findByCodeCalls != 1 {
 		t.Fatalf("source calls after second read = %d, want 1", inner.findByCodeCalls)
 	}
-	key := keyspace.NewBuilderWithNamespace("test-ns").BuildPublishedAssessmentModelLatestByCodeKey("typology", "mbti")
+	key := cached.latestByCodeCacheKey(domain.KindTypology, "mbti")
 	if !mr.Exists(key) {
 		t.Fatalf("latest-by-code cache key %q does not exist", key)
 	}
@@ -472,7 +472,7 @@ func TestCachedPublishedModelStoreWarmByCodeSynchronouslyPublishesVisibleEntry(t
 	if err := cached.WarmByCode(context.Background(), cachetarget.WarmupKindStaticScale, "3adyDE"); err != nil {
 		t.Fatalf("WarmByCode() error = %v", err)
 	}
-	key := "static:assessment_model:published:latest:scale:3adyde"
+	key := "static:assessment_model:published:latest:scale:3adyde:payload-v2"
 	if !mr.Exists(key) {
 		t.Fatalf("warmup returned ok before %q existed", key)
 	}

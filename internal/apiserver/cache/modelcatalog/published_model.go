@@ -328,8 +328,13 @@ func publishedModelKindForWarmup(kind cachetarget.WarmupKind) (domain.Kind, bool
 	}
 }
 
+// Payload V2 carries the internal projection marker. Separate payload keys keep
+// entries written by older processes from hiding it during a rolling release.
+// This is a cache schema version, not activation of asset projection V2.
+const publishedModelPayloadSchemaSuffix = ":payload-v2"
+
 func (c *CachedPublishedModelStore) latestByCodeCacheKey(kind domain.Kind, code string) string {
-	return c.keys.BuildPublishedAssessmentModelLatestByCodeKey(string(kind), strings.ToLower(strings.TrimSpace(code)))
+	return c.keys.BuildPublishedAssessmentModelLatestByCodeKey(string(kind), strings.ToLower(strings.TrimSpace(code))) + publishedModelPayloadSchemaSuffix
 }
 
 func (c *CachedPublishedModelStore) questionnaireCacheKey(questionnaireCode, questionnaireVersion string, catalogVersion uint64) string {
@@ -475,7 +480,7 @@ func (c *CachedPublishedModelStore) refCacheKey(ref port.Ref) string {
 		string(ref.Algorithm),
 		strings.ToLower(ref.Code),
 		strings.ToLower(ref.Version),
-	)
+	) + publishedModelPayloadSchemaSuffix
 }
 
 func (c *CachedPublishedModelStore) invalidatePublishedModel(ctx context.Context, model *port.PublishedModel) {

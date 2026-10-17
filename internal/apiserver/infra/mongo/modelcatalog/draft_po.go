@@ -3,6 +3,8 @@ package modelcatalog
 import (
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -15,25 +17,26 @@ import (
 type AssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
-	Code                    string        `bson:"code"`
-	Kind                    string        `bson:"kind"`
-	Algorithm               string        `bson:"algorithm,omitempty"`
-	Title                   string        `bson:"title"`
-	Description             string        `bson:"description,omitempty"`
-	Category                string        `bson:"category,omitempty"`
-	Stages                  []string      `bson:"stages,omitempty"`
-	ApplicableAges          []string      `bson:"applicable_ages,omitempty"`
-	Reporters               []string      `bson:"reporters,omitempty"`
-	Tags                    []string      `bson:"tags,omitempty"`
-	Status                  string        `bson:"status"`
-	QuestionnaireCode       string        `bson:"questionnaire_code,omitempty"`
-	QuestionnaireVersion    string        `bson:"questionnaire_version,omitempty"`
-	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
-	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
-	RecordRole              string        `bson:"record_role"`
-	Revision                int64         `bson:"revision"`
-	PublishedAt             *time.Time    `bson:"published_at,omitempty"`
-	ArchivedAt              *time.Time    `bson:"archived_at,omitempty"`
+	Code                          string                                 `bson:"code"`
+	Kind                          string                                 `bson:"kind"`
+	Algorithm                     string                                 `bson:"algorithm,omitempty"`
+	Title                         string                                 `bson:"title"`
+	Description                   string                                 `bson:"description,omitempty"`
+	Category                      string                                 `bson:"category,omitempty"`
+	Stages                        []string                               `bson:"stages,omitempty"`
+	ApplicableAges                []string                               `bson:"applicable_ages,omitempty"`
+	Reporters                     []string                               `bson:"reporters,omitempty"`
+	Tags                          []string                               `bson:"tags,omitempty"`
+	Status                        string                                 `bson:"status"`
+	QuestionnaireCode             string                                 `bson:"questionnaire_code,omitempty"`
+	QuestionnaireVersion          string                                 `bson:"questionnaire_version,omitempty"`
+	DefinitionSchemaVersion       string                                 `bson:"definition_schema_version,omitempty"`
+	DefinitionV2                  *DefinitionPO                          `bson:"definition_v2,omitempty"`
+	ReportAssetsProjectionVersion interpretationassets.ProjectionVersion `bson:"report_assets_projection_version,omitempty"`
+	RecordRole                    string                                 `bson:"record_role"`
+	Revision                      int64                                  `bson:"revision"`
+	PublishedAt                   *time.Time                             `bson:"published_at,omitempty"`
+	ArchivedAt                    *time.Time                             `bson:"archived_at,omitempty"`
 }
 
 func (AssessmentModelPO) CollectionName() string {

@@ -3,7 +3,9 @@ package evaluationinput
 import (
 	"context"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -32,7 +34,7 @@ func attachPublishedCanonical(
 	if published == nil || published.DefinitionV2 == nil {
 		return nil
 	}
-	port.AttachCanonicalDefinition(snapshot, published.DefinitionV2)
+	attachCanonicalWithProjectionShadow(ctx, snapshot, published)
 	return nil
 }
 
@@ -78,10 +80,22 @@ func attachBehavioralCanonical(ctx context.Context, reader rulesetport.Published
 		if requested != "" && published.Algorithm != requested {
 			continue
 		}
-		port.AttachCanonicalDefinition(snapshot, published.DefinitionV2)
+		attachCanonicalWithProjectionShadow(ctx, snapshot, published)
 		return nil
 	}
 	return nil
+}
+
+func attachCanonicalWithProjectionShadow(ctx context.Context, snapshot *port.InputSnapshot, published *rulesetport.PublishedModel) {
+	status := modeldefinition.CheckReportAssetsProjection(published.DefinitionV2, published.ReportAssetsProjectionVersion)
+	if status == modeldefinition.ReportAssetsProjectionMismatched {
+		// Observation has fixed labels and record identity only. It must neither
+		// replace existing assets nor turn a preparation finding into an error.
+		logger.L(ctx).Warnw("report assets projection shadow mismatch",
+			"model_code", published.Code, "model_version", published.Version,
+			"projection_version", published.ReportAssetsProjectionVersion, "status", status)
+	}
+	port.AttachCanonicalDefinition(snapshot, published.DefinitionV2)
 }
 
 func attachCognitiveCanonical(ctx context.Context, reader rulesetport.PublishedModelReader, ref port.InputRef, snapshot *port.InputSnapshot) error {
