@@ -151,3 +151,9 @@ RPC／mTLS 或模型调用证明。CI 以新建所属 broker 避免旧 channel �
 ## 原评估重试／报告首次接单缺口
 
 [effect_gap_recover](effect_gap_recover/README.md)沿原标准确认意图和原授权核对单个业务缺口；持久预留后通过正常Worker mTLS入口调用一次，不广播NSQ、不批量重置、不替换冻结输入。未知结果／缺回执禁止换原操作身份重试。
+
+## M4 已完成工具的退役边界
+
+M4-A/B/C/D对象保护和A原生carrier已完成各自职责，本轮从活动源码与CI入口退出。历史实现固定在[发布源码13dea3f35](https://github.com/FangcunMount/qs-server/tree/13dea3f35f2ba835d03255d73ea100ac1554c862/scripts/oneoff)，原迁移资源不改写。各批定向材料、匹配ELF、原始退出/释放证明及原schema解释继续由system（10001）在Mac mini既定backup目录保管，验收后至少30天；退役源码不等于删除恢复材料或批准旧恢复。
+
+当前通用离线迁移执行器、MySQL/Mongo元数据只读盘点及现用重试/恢复工具继续保留。两个C/D临时首次启动保护表保留具名责任，待后续schema使旧工具不可再承接且恢复责任结清后单独退役；不把它们混入57张应用表。生产未知提交、dirty及首次启动后的向前恢复边界不变，不能由旧全量备份覆盖新事实。

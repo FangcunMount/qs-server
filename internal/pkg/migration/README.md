@@ -87,7 +87,7 @@ SQL103 只删除 `testee_store_migration_reversions`、`testee_store_migration_i
 
 #### 已保留的只读阶段
 
-D 定向工具 `scripts/oneoff/m4_maintenance_table_protection` 在最初只读阶段的源码与实际编译 `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已通过只读原生验收，状态为 `read_only_native_verified / restore_not_implemented`。固定执行源 `c335b2a1a34dd69830261e2d8e11b16da3f8befb`，原 SQL1..103/Mongo1..40 的286个 up/down 资源按 `[backend,path,rawSHA256]` 顺序编码后的摘要为 `20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d`；这与独立编译的工具 SHA 分别登记，不用后续 main 的资源替换。该阶段工具未调用迁移 provider、DDL、恢复、批准或 journal。当前 format2 恢复协议与实际验证见下节。
+D 定向工具 [已退役的D对象保护工具](https://github.com/FangcunMount/qs-server/tree/13dea3f35f2ba835d03255d73ea100ac1554c862/scripts/oneoff/m4_maintenance_table_protection) 在最初只读阶段的源码与实际编译 `1e7c26f63b825034d8a1c08ca3ac2b626ecf6ec0` 已通过只读原生验收，状态为 `read_only_native_verified / restore_not_implemented`。固定执行源 `c335b2a1a34dd69830261e2d8e11b16da3f8befb`，原 SQL1..103/Mongo1..40 的286个 up/down 资源按 `[backend,path,rawSHA256]` 顺序编码后的摘要为 `20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d`；这与独立编译的工具 SHA 分别登记，不用后续 main 的资源替换。该阶段工具未调用迁移 provider、DDL、恢复、批准或 journal。当前 format2 恢复协议与实际验证见下节。
 
 默认 `inspect` 只检查 clean102/40、五张原 InnoDB BASE TABLE 的列/主键形状和原 DDL。`capture` 在同一 SQL 只读 RR 中完整保存五表原 DDL、固定列与完整主键、逐行服务端 `CAST AS BINARY` 原值及 SQL NULL 标记、行摘要、完整原 SQL 账本及其 DDL；`ParseTime=false`、固定 UTC/结果字符集/SQL mode，DATETIME(6) 微秒、LONGTEXT 空白/键顺序、已有摘要均不经 Go 时间或 JSON map 重编码、不重签。字符串主键按完整 binary bytes 排序；复合主键再按 uint64 数值排序，边界使用 `DECIMAL(20,0)`，保留空字符串、0 与 Uint64MAX，每表额外读取空 EOF 并在同 RR 执行完整 COUNT 守恒。
 
