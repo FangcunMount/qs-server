@@ -50,6 +50,21 @@ def locked(directory):
   s=os.fstat(fd);need(stat.S_ISREG(s.st_mode) and s.st_uid==os.geteuid() and stat.S_IMODE(s.st_mode)==0o600 and s.st_nlink==1,'private_lock_required')
   fcntl.flock(fd,fcntl.LOCK_EX);yield
  finally:fcntl.flock(fd,fcntl.LOCK_UN);os.close(fd)
+def observe_original_stop(c,actual):
+ # A Docker stop client timeout is not a daemon stop ACK. Only a fixed-CID
+ # stopped observation may close that uncertainty; the old intent is untouched.
+ intent_path=c.control/'runtime-stop-intent.json';intent_raw=read(intent_path,65536);intent=decode(intent_raw)
+ need(intent.get('CID')==CID and intent.get('descriptor_sha256')==sha(wire(c.d)),'original_stop_intent_binding')
+ before_sha=sha(read(c.control/'runtime-before.json',4<<20));path=c.control/'original-runtime-stopped.json'
+ if path.exists():
+  witness=decode(read(path,65536))
+  need(witness.get('kind')=='fixed_original_IAM_stopped_observation' and witness.get('CID')==CID and witness.get('descriptor_sha256')==sha(wire(c.d)) and witness.get('runtime_before_sha256')==before_sha and witness.get('stop_intent_sha256')==sha(intent_raw) and witness.get('state_verified_stopped') is True,'original_stopped_observation_binding')
+  if actual['State']['Running']:need(os.path.lexists(c.window/'first-runtime-start-intent.json'),'running_requires_original_forward_marker')
+  return witness
+ state=actual['State']
+ need(state.get('Running') is False and state.get('Pid')==0 and state.get('Status')=='exited' and state.get('Restarting',False) is False and state.get('Dead',False) is False,'inflight_original_stop_unknown')
+ witness={'kind':'fixed_original_IAM_stopped_observation','CID':CID,'descriptor_sha256':sha(wire(c.d)),'runtime_before_sha256':before_sha,'stop_intent_sha256':sha(intent_raw),'state_verified_stopped':True,'observed_at':now().isoformat(),'finished_at':state['FinishedAt'],'exit_code':state['ExitCode'],'no_Docker_stop_reissued':True}
+ save(path,wire(witness));return witness
 class Ops:
  def command(self,args,seconds=20):
   r=subprocess.run(args,stdin=subprocess.DEVNULL,capture_output=True,timeout=seconds,env={'PATH':'/usr/bin:/bin','LANG':'C','TZ':'UTC'})
@@ -129,7 +144,7 @@ class Ops:
   actual=n['inspect'](CID)
   if not (c.control/'runtime-stop-intent.json').exists():
    need(actual['State']['Running'],'unexpected_stop_without_guard_intent');return n['verify']()
-  if not (c.control/'runtime-stop-ACK.json').exists():need(not actual['State']['Running'],'inflight_original_stop_unknown')
+  observe_original_stop(c,actual)
   n['forward']() # Existing exact marker is reused; never erase/rebuild it.
   if not n['inspect'](CID)['State']['Running']:n['start']()
   else:n['policy'](CID,n['BEFORE'][0]) # Covers start ACK followed by lost policy ACK.
@@ -186,7 +201,7 @@ class Control:
    save(self.window/'writers-before.json',before)
    save(self.window/'stop-started.json',wire({'started':started}))
    actual=self.ops.runtime(self,'stop');need(actual.get('stopped') is True,'actual_original_stop_required')
-   proof={'kind':'authorized_mock_writers_stopped','host':'serverB','window_started_at':started,'window_expires_at':self.d['hard_deadline'],'all_stopped':True,'count':1,'forced_kill_used':False,'instances':[{'cid':CID,'exit_code':actual['exit_code'],'finished_at':actual['finished_at'],'oom_killed':actual.get('oom_killed',False)}]}
+   proof={'kind':'authorized_mock_writers_stopped','host':'serverB','window_started_at':self.d['window_started_at'],'actual_B_stop_started_at':started,'window_expires_at':self.d['hard_deadline'],'all_stopped':True,'count':1,'forced_kill_used':False,'instances':[{'cid':CID,'exit_code':actual['exit_code'],'finished_at':actual['finished_at'],'oom_killed':actual.get('oom_killed',False)}]}
    ref=save(self.window/'writers-stopped.json',wire(proof))
    save(self.control/'runtime-stop-ACK.json',wire({'kind':'fixed_IAM_guard_stop_ACK','CID':CID,'descriptor_sha256':sha(wire(self.d)),'writers_stopped':ref,'actual_stop_complete':True}))
    return proof
@@ -233,6 +248,7 @@ class Control:
    fence=self.control/'recovery-fence.json'
    if not fence.exists():save(fence,wire({'kind':'fixed_IAM_forward_recovery_fence','descriptor_sha256':sha(wire(self.d)),'entered_at':now().isoformat(),'reason':reason,'all_subsequent_CLI_stages_forbidden':True}))
    else:need(decode(read(fence,65536))['descriptor_sha256']==sha(wire(self.d)),'foreign_recovery_fence')
+   if now()>stamp(self.d['hard_deadline']) and not (self.control/'recovery-window-exceeded.json').exists():save(self.control/'recovery-window-exceeded.json',wire({'original_window_started_at':self.d['window_started_at'],'original_data_deadline':self.d['data_deadline'],'original_hard_deadline':self.d['hard_deadline'],'observed_at':now().isoformat(),'maintenance_30_minute_target_met':False,'data_deadline_not_extended':True,'service_recovery_only_may_continue':True}))
    stopped=[]
    for stage in ACTIONS:
     unit=self.unit(stage);before=self.ops.info(unit)
@@ -254,7 +270,7 @@ class Control:
     stopped.append(proof)
    gate=self.ops.gate(self) # A free advisory gate never substitutes for reaping.
    ready=self.ops.runtime(self,'recover')
-   receipt={'kind':'fixed_IAM_local_forward_service_recovery','source_runtime':'c8fc1fe61a32056368148e232e96d32763c15ba5','CID':CID,'recovered_at':now().isoformat(),'reason':reason,'stopped_owned_units':stopped,'maintenance_gate':gate,'runtime':ready,'IAM_delete_completion_asserted':False,'unknown_action_results_not_reclassified':True,'archive_restore_performed':False,'entry_opened':False}
+   receipt={'kind':'fixed_IAM_local_forward_service_recovery','source_runtime':'c8fc1fe61a32056368148e232e96d32763c15ba5','CID':CID,'recovered_at':now().isoformat(),'original_window_started_at':self.d['window_started_at'],'original_data_deadline':self.d['data_deadline'],'original_hard_deadline':self.d['hard_deadline'],'iam_ready_before_original_hard_deadline':now()<=stamp(self.d['hard_deadline']),'iam_ready_within_60_minutes_of_original_start':now()<=stamp(self.d['window_started_at'])+dt.timedelta(minutes=60),'whole_business_maintenance_and_recovery_targets_not_evaluated':True,'data_deadline_not_extended':True,'stopped_owned_units':stopped,'maintenance_gate':gate,'runtime':ready,'IAM_delete_completion_asserted':False,'unknown_action_results_not_reclassified':True,'archive_restore_performed':False,'entry_opened':False}
    path=self.control/'service-recovery.json'
    if not path.exists():save(path,wire(receipt))
    else:receipt['existing_recovery_original_sha256']=sha(read(path,1<<20));receipt['fresh_runtime_verified_without_rewriting_original']=True
@@ -286,7 +302,7 @@ def arm(path,digest):
  remaining=math.ceil((stamp(d['data_deadline'])-now()).total_seconds());need(remaining>=1,'arm_deadline_expired')
  unit=c.prefix+'-recovery.service'
  need(c.ops.info(unit).get('LoadState')=='not-found' and c.ops.info(c.prefix+'-recovery.timer').get('LoadState')=='not-found','preexisting_recovery_unit_refused')
- properties=['Description='+c.prefix+':recovery','Type=oneshot','User=root','KillMode=control-group','Delegate=no','MemoryMax=192M','MemorySwapMax=0','CPUQuota=100%','TasksMax=64','Restart=no','TimeoutStartSec=240s']
+ properties=['Description='+c.prefix+':recovery','Type=oneshot','User=root','KillMode=control-group','Delegate=no','MemoryMax=192M','MemorySwapMax=0','CPUQuota=100%','TasksMax=64','Restart=on-failure','RestartSec=3s','StartLimitIntervalSec=0','TimeoutStartSec=240s']
  c.ops.start(unit,properties,['/usr/bin/python3','-I','-B','-S',str(c.guard),'recover',str(control),'deadline'],timer=remaining)
  timer=c.ops.info(c.prefix+'-recovery.timer');need(timer.get('LoadState')=='loaded' and timer.get('ActiveState')=='active','PID1_timer_not_armed')
  result={'kind':'fixed_IAM_local_recovery_armed','descriptor_sha256':sha(wire(d)),'timer':c.prefix+'-recovery.timer','data_deadline':d['data_deadline'],'only_guard_stop_permitted_after_this_ACK':True,'no_IAM_data_action_dispatched':True};save(control/'armed.json',wire(result));return result

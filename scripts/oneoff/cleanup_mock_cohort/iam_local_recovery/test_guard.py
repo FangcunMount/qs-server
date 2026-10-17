@@ -133,4 +133,31 @@ class GuardTests(unittest.TestCase):
    release.set();stop.join(3);recovery.join(3)
    self.assertFalse(stop.is_alive());self.assertFalse(recovery.is_alive());self.assertTrue(acquired.is_set());self.assertEqual(errors,[])
    self.assertTrue((self.control/'runtime-stop-ACK.json').exists());self.assertTrue((self.control/'recovery-fence.json').exists())
+   proof=g.decode(g.read(self.window/'writers-stopped.json'))
+   self.assertEqual(proof['window_started_at'],self.d['window_started_at'])
+   self.assertGreaterEqual(g.stamp(proof['actual_B_stop_started_at']),g.stamp(self.d['window_started_at']))
+ def test_late_stop_then_unknown_start_can_be_observed_without_repeating_stop(self):
+  (self.control/'runtime-stop-ACK.json').unlink()
+  g.save(self.control/'runtime-stop-intent.json',g.wire({'CID':g.CID,'descriptor_sha256':g.sha(g.wire(self.d))}))
+  actual={'State':{'Running':True,'Pid':77,'Status':'running','FinishedAt':'','ExitCode':0}};attempts=[]
+  def runtime(c,op):
+   self.assertEqual(op,'recover');attempts.append(op);g.observe_original_stop(c,actual)
+   marker=self.window/'first-runtime-start-intent.json'
+   if not marker.exists():
+    g.save(marker,b'{"native_fake_marker":true}');actual['State'].update(Running=True,Pid=77,Status='running');raise RuntimeError('start_response_unknown')
+   return {'ready':True}
+  with mock.patch.object(self.ops,'runtime',side_effect=runtime):
+   with self.assertRaisesRegex(RuntimeError,'inflight_original_stop_unknown'):self.c.recover('normal')
+   self.assertFalse((self.control/'original-runtime-stopped.json').exists());self.assertFalse((self.control/'service-recovery.json').exists())
+   actual['State'].update(Running=False,Pid=0,Status='exited',FinishedAt='fixed-finished')
+   with self.assertRaisesRegex(RuntimeError,'start_response_unknown'):self.c.recover('normal')
+   witness=g.read(self.control/'original-runtime-stopped.json');self.assertFalse((self.control/'service-recovery.json').exists())
+   result=self.c.recover('normal');self.assertEqual(g.read(self.control/'original-runtime-stopped.json'),witness)
+   self.assertFalse(result['IAM_delete_completion_asserted']);self.assertEqual(attempts,['recover']*3)
+   self.assertFalse(any(e[0]=='stop' for e in self.ops.events))
+ def test_running_without_original_forward_marker_cannot_reuse_stopped_witness(self):
+  g.save(self.control/'runtime-stop-intent.json',g.wire({'CID':g.CID,'descriptor_sha256':g.sha(g.wire(self.d))}))
+  actual={'State':{'Running':False,'Pid':0,'Status':'exited','FinishedAt':'fixed-finished','ExitCode':0}}
+  g.observe_original_stop(self.c,actual);actual['State'].update(Running=True,Pid=77,Status='running')
+  with self.assertRaisesRegex(RuntimeError,'forward_marker'):g.observe_original_stop(self.c,actual)
 if __name__=='__main__':unittest.main()

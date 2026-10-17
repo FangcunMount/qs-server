@@ -17,6 +17,11 @@ class FileCallbacks(g.Ops):
      g.need(time.monotonic()<end,'native_stop_release_deadline');time.sleep(.02)
    g.save(c.control/'fake-service-stopped.json',g.wire({'native_file_callback_only':True}));return {'stopped':True,'exit_code':0,'finished_at':'fixture'}
   g.need(op=='recover','native_only_recovery_callback')
+  if (c.control/'native-late-stop-mode.json').exists():
+   sequence=len(list(c.control.glob('native-runtime-attempt-*.json')))+1;g.save(c.control/('native-runtime-attempt-'+str(sequence)+'.json'),b'{}')
+   actual=g.decode(g.read(c.control/'native-service-state.json'))
+   g.observe_original_stop(c,actual)
+   if not (c.window/'first-runtime-start-intent.json').exists():g.save(c.window/'first-runtime-start-intent.json',b'{"file_callback_marker_only":true}')
   p=c.control/'fake-service-restored.json'
   if not p.exists():g.save(p,g.wire({'fake_service_ready':True,'no_IAM_or_business_service_touched':True}))
   return {'ready':True,'native_file_callback_only':True}
@@ -31,7 +36,8 @@ def child_entry(action,path):
   if action=='native-normal-recover':g.save(c.control/'native-recovery-attempt.json',b'{}')
   try:r=c.recover('deadline' if action=='native-recover' else 'normal');print(json.dumps(r,separators=(',',':')));return 0
   except RuntimeError:
-   g.save(c.control/'native-recovery-refused.json',g.wire({'recovery_refused':True,'fake_service_not_started':not (c.control/'fake-service-restored.json').exists()}));return 1
+   if not (c.control/'native-recovery-refused.json').exists():g.save(c.control/'native-recovery-refused.json',g.wire({'recovery_refused':True,'fake_service_not_started':not (c.control/'fake-service-restored.json').exists()}))
+   return 1
  g.need(action=='native-client','closed_native_entry')
  dummy="import os,signal,subprocess,sys,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);p=subprocess.Popen([sys.executable,'-c','import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(600)']);open(sys.argv[1],'w').write(str(os.getpid())+' '+str(p.pid));time.sleep(600)"
  g.save(c.control/'plan-request.json',g.wire({'native_dummy_only':True}))
@@ -45,7 +51,7 @@ class PID1Native(unittest.TestCase):
  def setUp(self):
   self.window=pathlib.Path('/var/tmp')/('iam-local-recovery-native-'+secrets.token_hex(8));self.window.mkdir(mode=0o700)
   self.control=self.window/'local-recovery';self.control.mkdir(mode=0o700)
-  self.d={'window_directory':str(self.window),'data_deadline':(g.now()+g.dt.timedelta(seconds=2)).isoformat(),'hard_deadline':(g.now()+g.dt.timedelta(minutes=5,seconds=2)).isoformat(),'iam_tool_source':'0'*40}
+  self.d={'window_directory':str(self.window),'window_started_at':g.now().isoformat(),'data_deadline':(g.now()+g.dt.timedelta(seconds=2)).isoformat(),'hard_deadline':(g.now()+g.dt.timedelta(minutes=5,seconds=2)).isoformat(),'iam_tool_source':'0'*40}
   self.c=g.Control(self.control,self.d,FileCallbacks());g.save(self.control/'native-descriptor.json',g.wire(self.d));g.save(self.control/'native-fixture.json',g.wire({'gate_known':True}))
  def tearDown(self):
   # Only names derived from this random fixture descriptor may be stopped/reset.
@@ -73,10 +79,10 @@ class PID1Native(unittest.TestCase):
   info=self.c.ops.info(self.c.unit('plan'));self.c.own(self.c.unit('plan'),info);self.assertEqual(info['ActiveState'],'active')
   pids=[int(p) for p in (self.control/'native-pids').read_text().split()];self.assertEqual(len(pids),2)
   self.assertTrue(all(pathlib.Path('/proc',str(p)).exists() for p in pids));return info
- def timer(self):
+ def timer(self,retry=False):
   # Actual PID1 timer invokes the production recovery coordinator with only
   # explicit file-only callbacks in this test module, never production CLI flags.
-  self.c.ops.start(self.c.prefix+'-recovery.service',['Description='+self.c.prefix+':native-recovery','Type=oneshot','MemoryMax=64M','TasksMax=16','TimeoutStartSec=20s'],['/usr/bin/python3','-I','-B','-S',str(HERE),'native-recover',str(self.window)],timer=3)
+  self.c.ops.start(self.c.prefix+'-recovery.service',['Description='+self.c.prefix+':native-recovery','Type=oneshot','MemoryMax=64M','TasksMax=16','TimeoutStartSec=20s']+(['Restart=on-failure','RestartSec=1s','StartLimitIntervalSec=0'] if retry else []),['/usr/bin/python3','-I','-B','-S',str(HERE),'native-recover',str(self.window)],timer=3)
  def test_client_exit_deadline_forced_group_reap_gc_and_reentry(self):
   before=self.client();self.timer();self.wait(lambda:(self.control/'service-recovery.json').exists())
   proof=g.decode(g.read(self.control/'plan-unit-stop-proof.json'));self.assertTrue(proof['stop_ACK']);self.assertTrue(proof['all_original_processes_gone']);self.assertGreaterEqual(len(proof['process_binding']['processes']),2)
@@ -110,6 +116,18 @@ class PID1Native(unittest.TestCase):
   _,stop_error=stop.communicate(timeout=15);_,recover_error=recovery.communicate(timeout=15)
   self.assertEqual(stop.returncode,0,stop_error.decode()[-200:]);self.assertEqual(recovery.returncode,0,recover_error.decode()[-200:])
   self.assertLessEqual((self.control/'runtime-stop-ACK.json').stat().st_mtime_ns,(self.control/'fake-service-restored.json').stat().st_mtime_ns)
+ def test_actual_PID1_on_failure_retries_after_late_stop_without_new_delete(self):
+  g.save(self.control/'runtime-before.json',b'[]')
+  g.save(self.control/'runtime-stop-intent.json',g.wire({'CID':g.CID,'descriptor_sha256':g.sha(g.wire(self.d))}))
+  g.save(self.control/'native-late-stop-mode.json',b'{}')
+  state=self.control/'native-service-state.json';g.save(state,g.wire({'State':{'Running':True,'Pid':77,'Status':'running','FinishedAt':'','ExitCode':0}}))
+  self.timer(retry=True);self.wait(lambda:(self.control/'native-recovery-refused.json').exists())
+  self.assertFalse((self.control/'service-recovery.json').exists());self.assertTrue((self.control/'recovery-fence.json').exists())
+  replacement=self.control/'native-state-replacement.json';g.save(replacement,g.wire({'State':{'Running':False,'Pid':0,'Status':'exited','FinishedAt':'fixed-finished','ExitCode':0}}));os.replace(replacement,state)
+  self.wait(lambda:(self.control/'service-recovery.json').exists())
+  self.assertGreaterEqual(len(list(self.control.glob('native-runtime-attempt-*.json'))),2)
+  self.assertTrue((self.control/'original-runtime-stopped.json').exists());self.assertTrue((self.control/'fake-service-restored.json').exists())
+  self.assertFalse((self.control/'plan-request.json').exists());self.assertFalse(g.decode(g.read(self.control/'service-recovery.json'))['IAM_delete_completion_asserted'])
 if __name__=='__main__':
  if len(sys.argv)==3 and sys.argv[1] in ['native-client','native-recover','native-stop','native-normal-recover']:sys.exit(child_entry(sys.argv[1],sys.argv[2]))
  g.need(os.getenv('IAM_LOCAL_RECOVERY_SYSTEMD_NATIVE_REQUIRED')=='1' and os.getuid()==0 and sys.platform=='linux' and pathlib.Path('/proc/1/comm').read_text().strip()=='systemd' and pathlib.Path('/run/systemd/system').is_dir(),'explicit_native_root_PID1_lane_required')
