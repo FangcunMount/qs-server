@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
-    "verified_on": "2026-10-17"
+    "sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+    "verified_on": "2026-10-18"
   },
   "status_policy": {
     "doc_status": [
@@ -11176,8 +11176,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
-        "verified_on": "2026-10-17"
+        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -11649,6 +11649,14 @@
           "result": "passed",
           "source_sha": "d4b61353b909657d056077716b51a9308d0853f0",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "result": "matched",
+          "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+          "verified_on": "2026-10-18",
+          "path": ".github/workflows/ci.yml",
+          "selector": "Run Mongo-backed norm calculation regression"
         }
       ],
       "production_evidence": {
@@ -13146,8 +13154,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
-        "verified_on": "2026-10-17"
+        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -13639,6 +13647,14 @@
           "result": "matched",
           "source_sha": "abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e",
           "verified_on": "2026-10-16"
+        },
+        {
+          "kind": "source_selector",
+          "result": "matched",
+          "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+          "verified_on": "2026-10-18",
+          "path": ".github/workflows/ci.yml",
+          "selector": "Run Mongo-backed norm calculation regression"
         }
       ],
       "production_evidence": {
@@ -13826,8 +13842,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6d3f10de257bd93de25e020f72277c9b6092dc10",
-        "verified_on": "2026-10-17"
+        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -14106,6 +14122,14 @@
           "result": "passed",
           "source_sha": "e19d6bba3fd3d025e896538e2f2ada668241637c",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "source_selector",
+          "result": "matched",
+          "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+          "verified_on": "2026-10-18",
+          "path": ".github/workflows/ci.yml",
+          "selector": "Run Mongo-backed norm calculation regression"
         }
       ],
       "production_evidence": {
