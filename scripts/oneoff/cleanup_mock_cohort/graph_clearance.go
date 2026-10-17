@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -287,20 +288,68 @@ func graphClearanceJournal(raw []byte, m graphArchive) error {
 }
 func graphClearanceTargets(ctx context.Context, s graphBatchProvider, b graphClearanceBatch) error {
 	ctx = graphClearanceNamespaceContext(graphFrozenRuleDeleteContext(ctx, true))
-	for _, ref := range b.material.Targets {
-		records, e := readGraphFrozenKeys(b.material.Graph.ArchiveDirectory, b.material, ref)
-		if e != nil {
-			return e
-		}
-		absent, _, e := graphVerificationState(ctx, s, records, false, false)
-		if e != nil {
-			return e
-		}
-		if !absent {
-			return errors.New("clearance exact archived targets remain")
-		}
+	workers := 1
+	if real, ok := s.(*graphStore); ok && real.live.sqlPool != nil {
+		workers = min(real.live.workers, 4)
+	}
+	if e := graphClearanceTargetShards(ctx, s, b, workers); e != nil {
+		return e
 	}
 	return protectGraph(ctx, s, b.material, b.material.Graph.ArchiveDirectory)
+}
+
+func graphClearanceTargetShards(ctx context.Context, s graphBatchProvider, b graphClearanceBatch, workers int) error {
+	if s == nil || workers < 1 || workers > 4 {
+		return errors.New("clearance requires one to four bounded target readers")
+	}
+	for start := 0; start < len(b.material.Targets); start += workers {
+		if e := ctx.Err(); e != nil {
+			return e
+		}
+		end := min(start+workers, len(b.material.Targets))
+		errs := make([]error, end-start)
+		var pending sync.WaitGroup
+		for i := start; i < end; i++ {
+			pending.Add(1)
+			go func(i int) {
+				defer pending.Done()
+				provider := s
+				if real, ok := s.(*graphStore); ok {
+					// Every shard must reread live metadata, even within one worker.
+					provider = newGraphStore(real.live)
+				}
+				errs[i-start] = graphClearanceTargetShard(ctx, provider, b, b.material.Targets[i])
+			}(i)
+		}
+		// Do not cancel earlier shards on a later failure: preserve the original
+		// first-error order. The caller's deadline still cancels every read, and
+		// all readers must exit before protection checks or resource release.
+		pending.Wait()
+		for _, e := range errs {
+			if e != nil {
+				return e
+			}
+		}
+	}
+	return nil
+}
+
+func graphClearanceTargetShard(ctx context.Context, s graphBatchProvider, b graphClearanceBatch, ref graphShard) error {
+	if e := ctx.Err(); e != nil {
+		return e
+	}
+	records, e := readGraphFrozenKeys(b.material.Graph.ArchiveDirectory, b.material, ref)
+	if e != nil {
+		return e
+	}
+	absent, _, e := graphVerificationState(ctx, s, records, false, false)
+	if e != nil {
+		return e
+	}
+	if !absent {
+		return errors.New("clearance exact archived targets remain")
+	}
+	return nil
 }
 func runGraphClearance(c config, out io.Writer) error {
 	started := time.Now().UTC()
