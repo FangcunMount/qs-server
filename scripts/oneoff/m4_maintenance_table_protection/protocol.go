@@ -20,7 +20,7 @@ import (
 )
 
 // These identify the D release, not the tool's independently compiled source.
-const dSource = "c335b2a1a34dd69830261e2d8e11b16da3f8befb"
+const dSource = "13dea3f35f2ba835d03255d73ea100ac1554c862"
 const dResources = "20e0096ffa50a50a7818bfd09741fa48ce8d6e0dc909bf0cf49e0292ba254c4d"
 const dResourceFiles = 286
 const pageSize = 500
