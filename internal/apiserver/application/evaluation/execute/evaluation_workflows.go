@@ -182,7 +182,12 @@ func runFailureFromExecutionError(err error) evalrun.Failure {
 	if failure, ok := runFailureFromNormError(err); ok {
 		return failure
 	}
-	return evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true}
+	retryable := true
+	var carrier evaluationinput.RetryableCarrier
+	if stderrors.As(err, &carrier) {
+		retryable = carrier.Retryable()
+	}
+	return evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: retryable}
 }
 
 // runFailureKindCarrier is implemented by norm ResolutionError (and wrappers)

@@ -1,7 +1,6 @@
 package scoring
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
@@ -10,22 +9,22 @@ import (
 
 func collectFactorValues(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) ([]float64, error) {
 	if len(factor.ChildCodes) > 0 {
-		return nil, fmt.Errorf("composite factor %s must be scored from child factor scores", factor.Code)
+		return nil, invalidInput("composite factor %s must be scored from child factor scores", factor.Code)
 	}
 	code, ok := capability.Canonical(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, factor.ScoringStrategy)
 	if !ok {
-		return nil, fmt.Errorf("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
+		return nil, invalidInput("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
 	switch Strategy(code) {
 	case StrategySum, StrategyAvg:
 		return collectQuestionScores(factor, sheet), nil
 	case StrategyCnt:
 		if qnr == nil {
-			return nil, fmt.Errorf("questionnaire is required")
+			return nil, invalidInput("questionnaire is required")
 		}
 		return collectCntMatches(factor, sheet, qnr), nil
 	default:
-		return nil, fmt.Errorf("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
+		return nil, invalidInput("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
 }
 

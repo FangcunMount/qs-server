@@ -82,7 +82,9 @@ type scoringRegistry struct {
 }
 
 func (r scoringRegistry) ScoreFactor(ctx context.Context, factor calcscoring.Factor, values []float64) (float64, error) {
-	if r.scorer == nil {
+	// Composite inputs have already been weighted by the domain evaluator.
+	// The infrastructure scorer exposes only question aggregation strategies.
+	if len(factor.ChildCodes) > 0 || r.scorer == nil {
 		return calcscoring.DefaultStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
 	return r.scorer.ScoreFactor(ctx, factor.Code, values, factor.ScoringStrategy, nil)

@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 )
@@ -53,7 +52,7 @@ func (DefaultStrategyRegistry) ScoreFactor(_ context.Context, factor Factor, val
 	usage := usageForFactor(factor)
 	code, ok := capability.Canonical(capability.PathScaleDescriptor, usage, factor.ScoringStrategy)
 	if !ok {
-		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
+		return 0, invalidInput("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
 	switch code {
 	case "sum", "weighted_sum":
@@ -69,7 +68,7 @@ func (DefaultStrategyRegistry) ScoreFactor(_ context.Context, factor Factor, val
 	case "none", "lookup", "custom":
 		return 0, nil
 	default:
-		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
+		return 0, invalidInput("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
 }
 

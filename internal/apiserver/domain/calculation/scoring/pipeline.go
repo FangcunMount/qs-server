@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 )
@@ -60,7 +59,7 @@ func (e *Evaluator) calculateScores(ctx context.Context, input Input) ([]FactorS
 	for _, factor := range input.Model.Factors {
 		rawScore, ok := rawByCode[factor.Code]
 		if !ok {
-			return nil, 0, fmt.Errorf("unable to score factor %s (unresolved composite dependencies)", factor.Code)
+			return nil, 0, invalidInput("unable to score factor %s (unresolved composite dependencies)", factor.Code)
 		}
 		factorScores = append(factorScores, FactorScore{
 			FactorCode:   factor.Code,
@@ -89,7 +88,7 @@ func compositeChildrenReady(factor Factor, factorsByCode map[string]Factor, rawB
 
 func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor Factor, sheet *AnswerSheet, qnr *Questionnaire) (float64, error) {
 	if sheet == nil {
-		return 0, fmt.Errorf("answer sheet is required for scale factor scoring")
+		return 0, invalidInput("answer sheet is required for scale factor scoring")
 	}
 	if e == nil || e.scoringRegistry == nil {
 		return 0, nil

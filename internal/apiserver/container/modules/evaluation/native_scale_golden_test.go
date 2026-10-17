@@ -82,27 +82,7 @@ func TestM5NativeKernelGoldenScaleComposite(t *testing.T) {
 		{"above", "b", "b", "high", 8, 2, 10, "high", "high"},  // 8 + 2
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			def := nativeDefinition()
-			def.Measure.Factors = []factor.Factor{
-				{Code: "total", Title: "Total", Role: factor.FactorRoleTotal},
-				{Code: "left", Title: "Left", Role: factor.FactorRoleDimension},
-				{Code: "right", Title: "Right", Role: factor.FactorRoleDimension},
-			}
-			def.Measure.FactorGraph = factor.FactorGraph{
-				Roots:      []string{"total"},
-				Edges:      []factor.FactorEdge{{ParentCode: "total", ChildCode: "left"}, {ParentCode: "total", ChildCode: "right"}},
-				SortOrders: map[string]int{"total": 1, "left": 2, "right": 3},
-			}
-			def.Measure.Scoring = []factor.Scoring{
-				{FactorCode: "total", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceFactor, Code: "left"}, {Kind: factor.ScoringSourceFactor, Code: "right"}}},
-				{FactorCode: "left", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q1", ScoringMode: factor.QuestionScoringModeOptionOverride, Sign: 1, Weight: 1, OptionScores: map[string]float64{"a": 4, "b": 8}}}},
-				{FactorCode: "right", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q2", ScoringMode: factor.QuestionScoringModeOptionOverride, Sign: 1, Weight: 1, OptionScores: map[string]float64{"a": 1, "b": 2}}}},
-			}
-			def.Conclusions = []conclusion.Conclusion{
-				conclusion.RiskConclusion{FactorCode: "total", Rules: nativeRules(6)},
-				conclusion.RiskConclusion{FactorCode: "left", Rules: nativeRules(6)},
-				conclusion.RiskConclusion{FactorCode: "right", Rules: nativeRules(2)},
-			}
+			def := nativeCompositeScaleDefinition(factor.ScoringStrategySum, nil)
 			input := nativeScaleChoiceInput(t, def, []string{tc.first, tc.second})
 			replayed := nativeAssertScaleChoiceResult(t, input, tc.total, tc.outcome, map[string]nativeScaleFactorExpectation{
 				"total": {tc.total, tc.outcome}, "left": {tc.left, tc.leftOutcome}, "right": {tc.right, tc.rightOutcome},
@@ -118,6 +98,61 @@ func TestM5NativeKernelGoldenScaleComposite(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestM5NativeKernelGoldenScaleCompositeWeightedSum(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, first, second, outcome string
+		left, right, total           float64
+		leftOutcome, rightOutcome    string
+	}{
+		{"below", "a", "a", "low", 4, 1, 4, "low", "low"},      // left*0.5 + right*2
+		{"boundary", "a", "b", "high", 4, 2, 6, "low", "high"}, // 4*0.5 + 2*2
+		{"above", "b", "b", "high", 8, 2, 8, "high", "high"},   // 8*0.5 + 2*2
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			def := nativeCompositeScaleDefinition(factor.ScoringStrategyWeightedSum, map[string]float64{"left": 0.5, "right": 2})
+			input := nativeScaleChoiceInput(t, def, []string{tc.first, tc.second})
+			replayed := nativeAssertScaleChoiceResult(t, input, tc.total, tc.outcome, map[string]nativeScaleFactorExpectation{
+				"total": {tc.total, tc.outcome}, "left": {tc.left, tc.leftOutcome}, "right": {tc.right, tc.rightOutcome},
+			})
+			def.Measure.Factors[0].Title = "later total title"
+			wantCatalog := []evaluationinput.FactorCatalogEntry{
+				{Code: "total", Title: "Total", IsTotalScore: true},
+				{Code: "left", Title: "Left"},
+				{Code: "right", Title: "Right"},
+			}
+			if !reflect.DeepEqual(replayed.FactorCatalog, wantCatalog) {
+				t.Fatalf("frozen composite report catalog = %#v, want %#v", replayed.FactorCatalog, wantCatalog)
+			}
+		})
+	}
+}
+
+func nativeCompositeScaleDefinition(strategy factor.ScoringStrategy, weights map[string]float64) *definition.Definition {
+	def := nativeDefinition()
+	def.Measure.Factors = []factor.Factor{
+		{Code: "total", Title: "Total", Role: factor.FactorRoleTotal},
+		{Code: "left", Title: "Left", Role: factor.FactorRoleDimension},
+		{Code: "right", Title: "Right", Role: factor.FactorRoleDimension},
+	}
+	def.Measure.FactorGraph = factor.FactorGraph{
+		Roots:      []string{"total"},
+		Edges:      []factor.FactorEdge{{ParentCode: "total", ChildCode: "left"}, {ParentCode: "total", ChildCode: "right"}},
+		SortOrders: map[string]int{"total": 1, "left": 2, "right": 3},
+	}
+	def.Measure.Scoring = []factor.Scoring{
+		{FactorCode: "total", Strategy: strategy, Weights: weights, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceFactor, Code: "left"}, {Kind: factor.ScoringSourceFactor, Code: "right"}}},
+		{FactorCode: "left", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q1", ScoringMode: factor.QuestionScoringModeOptionOverride, Sign: 1, Weight: 1, OptionScores: map[string]float64{"a": 4, "b": 8}}}},
+		{FactorCode: "right", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q2", ScoringMode: factor.QuestionScoringModeOptionOverride, Sign: 1, Weight: 1, OptionScores: map[string]float64{"a": 1, "b": 2}}}},
+	}
+	def.Conclusions = []conclusion.Conclusion{
+		conclusion.RiskConclusion{FactorCode: "total", Rules: nativeRules(6)},
+		conclusion.RiskConclusion{FactorCode: "left", Rules: nativeRules(6)},
+		conclusion.RiskConclusion{FactorCode: "right", Rules: nativeRules(2)},
+	}
+	return def
 }
 
 // Choose options, not precomputed factor scores: the production contribution
