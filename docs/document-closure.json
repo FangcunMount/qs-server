@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 48,
+      "expected_count": 47,
       "budgeted": false
     }
   },
@@ -16662,41 +16662,6 @@
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed."
-      ]
-    },
-    {
-      "path": "cmd/testee-store-migrate/README.md",
-      "class": "sidecar",
-      "owner": "runtime",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [
-        {
-          "kind": "source",
-          "path": "cmd/testee-store-migrate/main.go"
-        }
-      ],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "Maintenance migration not yet executed in production."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "TESTEE-MIGRATION-CLI-RELEASE",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Local migration and rollback checks completed; committed-revision and production evidence pending.",
-          "exit_criteria": "Verify release revision, private preflight, maintenance cutover and business acceptance."
-        }
       ]
     },
     {

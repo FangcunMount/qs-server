@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,6 +41,69 @@ func TestFetchResilienceSkipsUnconfiguredCapabilityAndKeepsFetchFailures(t *test
 	}
 	if collection.Available || !strings.Contains(collection.Reason, "status=503") {
 		t.Fatalf("collection-server result = %#v, want configured fetch failure preserved", collection)
+	}
+}
+
+func TestDNSDiscoveryKeepsFirstAddressDuplicateAndFullErrorCoverage(t *testing.T) {
+	for _, capability := range []string{"resilience", "cache"} {
+		t.Run(capability, func(t *testing.T) {
+			adapter := NewAdapter(map[string]*options.GovernanceComponentOptions{
+				"collection-server": {
+					Discovery: "dns", MinimumInstances: 4,
+					ResilienceURL: "http://collection.test:8080/governance/resilience",
+					CacheURL:      "http://collection.test:8080/governance/redis", Timeout: time.Second,
+				},
+			})
+			adapter.resolver = staticResolver{addresses: []net.IPAddr{
+				{IP: net.ParseIP("10.0.0.4")}, {IP: net.ParseIP("10.0.0.2")},
+				{IP: net.ParseIP("10.0.0.1")}, {IP: net.ParseIP("10.0.0.3")},
+			}}
+			laterAddressReturned := make(chan struct{})
+			var release sync.Once
+			adapter.http = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				switch req.URL.Hostname() {
+				case "10.0.0.1":
+					select {
+					case <-laterAddressReturned:
+					case <-req.Context().Done():
+						return nil, req.Context().Err()
+					}
+					return jsonResponse(http.StatusOK, `{"component":"collection-server","instance_id":" instance-a ","generation":"first","summary":{"ready":true}}`), nil
+				case "10.0.0.2":
+					release.Do(func() { close(laterAddressReturned) })
+					return jsonResponse(http.StatusOK, `{"component":"collection-server","instance_id":"instance-a","generation":"second","summary":{"ready":false}}`), nil
+				case "10.0.0.3":
+					return jsonResponse(http.StatusOK, `{"component":"collection-server","instance_id":"  "}`), nil
+				default:
+					return nil, errors.New("connection refused")
+				}
+			})}
+			var available, partial bool
+			var discovered, count int
+			var instanceID, generation, reason string
+			var targetErrors map[string]string
+			if capability == "resilience" {
+				result := adapter.FetchResilience(context.Background())["collection-server"]
+				available, partial, discovered, count, reason = result.Available, result.Partial, result.DiscoveredInstanceCount, result.AvailableInstanceCount, result.Reason
+				targetErrors = result.TargetErrors
+				if result.Snapshot != nil && result.Instances["instance-a"] == result.Snapshot {
+					instanceID, generation = result.Snapshot.InstanceID, result.Snapshot.Generation
+				}
+			} else {
+				result := adapter.FetchCache(context.Background())["collection-server"]
+				available, partial, discovered, count, reason = result.Available, result.Partial, result.DiscoveredInstanceCount, result.AvailableInstanceCount, result.Reason
+				targetErrors = result.TargetErrors
+				if result.Snapshot != nil && result.Instances["instance-a"] == result.Snapshot {
+					instanceID, generation = result.Snapshot.InstanceID, result.Snapshot.Generation
+				}
+			}
+			if !available || !partial || discovered != 4 || count != 1 || reason != "available 1/4 instances" || instanceID != " instance-a " || generation != "first" {
+				t.Fatalf("availability=%v partial=%v counts=%d/%d reason=%q representative=%q/%q", available, partial, count, discovered, reason, instanceID, generation)
+			}
+			if len(targetErrors) != 3 || targetErrors["10.0.0.2"] != "duplicate instance_id: instance-a" || targetErrors["10.0.0.3"] != "empty instance_id" || !strings.Contains(targetErrors["10.0.0.4"], "connection refused") {
+				t.Fatalf("target errors changed: %#v", targetErrors)
+			}
+		})
 	}
 }
 

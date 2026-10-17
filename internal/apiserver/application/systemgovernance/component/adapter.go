@@ -290,24 +290,7 @@ func (a *Adapter) fetchDNSResilience(ctx context.Context, cfg *options.Governanc
 	responses := fetchTargets(ctx, targets, func(ctx context.Context, target requestTarget) (*resilience.RuntimeSnapshot, error) {
 		return a.fetchResilience(ctx, target, componentTimeout(cfg))
 	})
-	instances := make(map[string]*resilience.RuntimeSnapshot)
-	targetErrors := make(map[string]string)
-	for _, item := range responses {
-		if item.err != nil {
-			targetErrors[item.target.Address] = item.err.Error()
-			continue
-		}
-		instanceID := strings.TrimSpace(item.snapshot.InstanceID)
-		if instanceID == "" {
-			targetErrors[item.target.Address] = "empty instance_id"
-			continue
-		}
-		if _, exists := instances[instanceID]; exists {
-			targetErrors[item.target.Address] = "duplicate instance_id: " + instanceID
-			continue
-		}
-		instances[instanceID] = item.snapshot
-	}
+	instances, targetErrors := collectDNSInstances(responses, func(snapshot *resilience.RuntimeSnapshot) string { return snapshot.InstanceID })
 	result := ResilienceResult{
 		Available:               len(instances) > 0,
 		Instances:               instances,
@@ -329,24 +312,7 @@ func (a *Adapter) fetchDNSCache(ctx context.Context, cfg *options.GovernanceComp
 	responses := fetchTargets(ctx, targets, func(ctx context.Context, target requestTarget) (*observability.RuntimeSnapshot, error) {
 		return a.fetchCache(ctx, target, componentTimeout(cfg))
 	})
-	instances := make(map[string]*observability.RuntimeSnapshot)
-	targetErrors := make(map[string]string)
-	for _, item := range responses {
-		if item.err != nil {
-			targetErrors[item.target.Address] = item.err.Error()
-			continue
-		}
-		instanceID := strings.TrimSpace(item.snapshot.InstanceID)
-		if instanceID == "" {
-			targetErrors[item.target.Address] = "empty instance_id"
-			continue
-		}
-		if _, exists := instances[instanceID]; exists {
-			targetErrors[item.target.Address] = "duplicate instance_id: " + instanceID
-			continue
-		}
-		instances[instanceID] = item.snapshot
-	}
+	instances, targetErrors := collectDNSInstances(responses, func(snapshot *observability.RuntimeSnapshot) string { return snapshot.InstanceID })
 	result := CacheResult{
 		Available:               len(instances) > 0,
 		Instances:               instances,
@@ -412,6 +378,28 @@ type targetResponse[T any] struct {
 	target   requestTarget
 	snapshot *T
 	err      error
+}
+
+func collectDNSInstances[T any](responses []targetResponse[T], identity func(*T) string) (map[string]*T, map[string]string) {
+	instances := make(map[string]*T)
+	targetErrors := make(map[string]string)
+	for _, item := range responses {
+		if item.err != nil {
+			targetErrors[item.target.Address] = item.err.Error()
+			continue
+		}
+		instanceID := strings.TrimSpace(identity(item.snapshot))
+		if instanceID == "" {
+			targetErrors[item.target.Address] = "empty instance_id"
+			continue
+		}
+		if _, exists := instances[instanceID]; exists {
+			targetErrors[item.target.Address] = "duplicate instance_id: " + instanceID
+			continue
+		}
+		instances[instanceID] = item.snapshot
+	}
+	return instances, targetErrors
 }
 
 func fetchTargets[T any](

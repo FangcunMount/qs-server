@@ -115,6 +115,39 @@ func TestClassifyDriftMatrix(t *testing.T) {
 	}
 }
 
+func TestClassifyDriftsKeepsOrderedCompoundFindings(t *testing.T) {
+	now := time.Date(2026, 10, 13, 8, 0, 0, 0, time.UTC)
+	outcome := testOutcome(modelcatalog.KindScale, "canonical-run")
+	evidence := consistencyEvidence{
+		status: domainassessment.StatusEvaluated, outcome: outcome,
+		run:        &evaluationconsistency.RunEvidence{ID: "other-run", Status: string(evalrun.StatusFailed)},
+		projection: &evaluationconsistency.ProjectionEvidence{RowCount: 2, UnlinkedRowCount: 1, DistinctOutcomeCount: 2},
+		outbox:     &evaluationconsistency.CommittedOutboxEvidence{RowCount: 2},
+	}
+	want := []*mismatch{
+		{Kind: mismatchProjectionOutcomeMismatch, Severity: severityHigh, RecommendedAction: "replace projection from the canonical outcome after operator confirmation", DetectedAt: now},
+		{Kind: mismatchCommittedOutboxMismatch, Severity: severityHigh, RecommendedAction: "quarantine conflicting outbox evidence and require operator decision", DetectedAt: now},
+		{Kind: mismatchRunOutcomeReferenceMismatch, Severity: severityHigh, RecommendedAction: "locate the exact run referenced by the canonical outcome", DetectedAt: now},
+		{Kind: mismatchRunStatusMismatch, Severity: severityMedium, RecommendedAction: "audit run/status mismatch; manual confirmation required", DetectedAt: now},
+	}
+	if got := classifyDrifts(evidence, now); !reflect.DeepEqual(got, want) {
+		t.Fatalf("ordered findings=%#v want=%#v", got, want)
+	}
+	evidence.status, evidence.outcome = domainassessment.StatusSubmitted, nil
+	evidence.run = &evaluationconsistency.RunEvidence{Status: string(evalrun.StatusRunning), LeaseExpiresAt: &now}
+	want = []*mismatch{
+		{Kind: mismatchProjectionWithoutOutcome, Severity: severityHigh, RecommendedAction: "remove or rebuild projection only after locating the canonical outcome", DetectedAt: now},
+		{Kind: mismatchCommittedOutboxWithoutOutcome, Severity: severityHigh, RecommendedAction: "quarantine committed event and investigate missing canonical outcome", DetectedAt: now},
+		{Kind: mismatchLeaseRecoveryCandidate, Severity: severityMedium, RecommendedAction: "lease recovery / redelivery; do not rewrite assessment status here", DetectedAt: now},
+	}
+	if got := classifyDrifts(evidence, now); !reflect.DeepEqual(got, want) {
+		t.Fatalf("orphan/lease findings=%#v want=%#v", got, want)
+	}
+	if got := classifyDrifts(consistencyEvidence{}, now); got == nil || len(got) != 0 {
+		t.Fatalf("empty result shape changed: %#v", got)
+	}
+}
+
 func TestAuditBatchRejectsMissingReader(t *testing.T) {
 	if _, err := NewService(nil).AuditBatch(context.Background(), 0, 10); err == nil {
 		t.Fatal("expected module configuration error")

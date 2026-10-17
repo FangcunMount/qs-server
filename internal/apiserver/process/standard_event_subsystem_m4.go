@@ -64,36 +64,11 @@ func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (
 // producer and a shared bounded shutdown boundary.
 
 func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions) (*eventsubsystem.Subsystem, error) {
-	if cfg == nil || cfg.MessagingOptions == nil || !cfg.MessagingOptions.Enabled ||
-		cfg.MessagingOptions.Provider != "nsq" || cfg.MessagingOptions.NSQAddr == "" ||
-		opts.WirePublisher == nil || opts.PublisherMode != eventruntime.PublishModeMQ {
-		return nil, errors.New("M4 standard outbox requires a live NSQ-backed messaging configuration")
-	}
-	if selected.Mongo && opts.MongoDB == nil || selected.Assessment && opts.MySQLDB == nil {
-		return nil, errors.New("M4 standard outbox requires its host database")
-	}
-	// Retirement forbids a mixed standard/legacy writer set. Validate before
-	// storage preflight or acquiring the shared publisher resource.
-	if opts.MongoDB != nil && !selected.Mongo {
-		return nil, errors.New("standard Mongo outbox is required for its host database")
-	}
-	if opts.MySQLDB != nil && !selected.Assessment {
-		return nil, errors.New("standard assessment outbox is required for its host database")
-	}
-	registry, err := eventcatalog.NewEffectiveRegistry(opts.Catalog, eventcatalog.DefaultSpecs())
+	routes, err := validatedStandardEventRoutes(opts, cfg, selected)
 	if err != nil {
 		return nil, err
 	}
-	routes := make(map[string]string)
-	for _, event := range registry.Snapshot() {
-		if event.OutboxProfile == eventcatalog.OutboxProfileMongoDomain && selected.Mongo ||
-			event.OutboxProfile == eventcatalog.OutboxProfileAssessmentMySQL && selected.Assessment {
-			routes[event.Topic] = event.Topic
-		}
-	}
-	if len(routes) == 0 {
-		return nil, errors.New("M4 standard profiles have no reliable NSQ routes")
-	}
+
 	preflightCtx, cancelPreflight := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelPreflight()
 	if err := preflightM4StandardStorage(preflightCtx, opts, selected); err != nil {
@@ -106,16 +81,11 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		writeTimeout   = 5 * time.Second
 		drainTimeout   = 15 * time.Second
 	)
-	concurrency := 0
-	if selected.Mongo {
-		concurrency += opts.Mongo.PublishWorkers
+	concurrency, err := standardEventConcurrency(opts, selected)
+	if err != nil {
+		return nil, err
 	}
-	if selected.Assessment {
-		concurrency += opts.Assessment.PublishWorkers
-	}
-	if concurrency < 1 || concurrency > 1000 {
-		return nil, fmt.Errorf("M4 standard outbox concurrency must be 1..1000, got %d", concurrency)
-	}
+
 	producerConfig := goNSQ.NewConfig()
 	producerConfig.DialTimeout = 5 * time.Second
 	producerConfig.HeartbeatInterval = 5 * time.Second
@@ -254,6 +224,55 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 	owned = false
 
 	return subsystem, nil
+}
+
+// Validate configuration and select routes before storage or publisher acquisition.
+func validatedStandardEventRoutes(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions) (map[string]string, error) {
+	if cfg == nil || cfg.MessagingOptions == nil || !cfg.MessagingOptions.Enabled ||
+		cfg.MessagingOptions.Provider != "nsq" || cfg.MessagingOptions.NSQAddr == "" ||
+		opts.WirePublisher == nil || opts.PublisherMode != eventruntime.PublishModeMQ {
+		return nil, errors.New("M4 standard outbox requires a live NSQ-backed messaging configuration")
+	}
+	if selected.Mongo && opts.MongoDB == nil || selected.Assessment && opts.MySQLDB == nil {
+		return nil, errors.New("M4 standard outbox requires its host database")
+	}
+	// Retirement forbids a mixed standard/legacy writer set. Validate before
+	// storage preflight or acquiring the shared publisher resource.
+	if opts.MongoDB != nil && !selected.Mongo {
+		return nil, errors.New("standard Mongo outbox is required for its host database")
+	}
+	if opts.MySQLDB != nil && !selected.Assessment {
+		return nil, errors.New("standard assessment outbox is required for its host database")
+	}
+	registry, err := eventcatalog.NewEffectiveRegistry(opts.Catalog, eventcatalog.DefaultSpecs())
+	if err != nil {
+		return nil, err
+	}
+	routes := make(map[string]string)
+	for _, event := range registry.Snapshot() {
+		if event.OutboxProfile == eventcatalog.OutboxProfileMongoDomain && selected.Mongo ||
+			event.OutboxProfile == eventcatalog.OutboxProfileAssessmentMySQL && selected.Assessment {
+			routes[event.Topic] = event.Topic
+		}
+	}
+	if len(routes) == 0 {
+		return nil, errors.New("M4 standard profiles have no reliable NSQ routes")
+	}
+	return routes, nil
+}
+
+func standardEventConcurrency(opts eventsubsystem.Options, selected options.StandardOutboxOptions) (int, error) {
+	concurrency := 0
+	if selected.Mongo {
+		concurrency += opts.Mongo.PublishWorkers
+	}
+	if selected.Assessment {
+		concurrency += opts.Assessment.PublishWorkers
+	}
+	if concurrency < 1 || concurrency > 1000 {
+		return 0, fmt.Errorf("M4 standard outbox concurrency must be 1..1000, got %d", concurrency)
+	}
+	return concurrency, nil
 }
 
 var _ sdktransport.Publisher = (*sdknsq.ManagedPublisher)(nil)

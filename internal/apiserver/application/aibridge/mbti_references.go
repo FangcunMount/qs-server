@@ -51,52 +51,84 @@ func referenceText(s string, limit int) bool {
 }
 
 func validateMBTIReferences(a Artifact) error {
+	material, err := decodeMBTIReferenceSelection(a)
+	if err != nil {
+		return err
+	}
+	poles, err := validateMBTIReferenceIdentity(material)
+	if err != nil {
+		return err
+	}
+	sources, err := validateMBTIReferenceSources(material.Sources)
+	if err != nil {
+		return err
+	}
+	entries, err := validateMBTIReferenceEntries(material, poles, sources)
+	if err != nil {
+		return err
+	}
+	return validateMBTIReferenceLinks(a.ContentJSON, entries)
+}
+
+func decodeMBTIReferenceSelection(a Artifact) (mbtiReferenceSelection, error) {
 	if len(a.ReferenceMaterialJSON) == 0 || len(a.ReferenceMaterialJSON) > 131072 || !digest(a.ReferenceMaterialFingerprint, true) {
-		return ErrInvalid
+		return mbtiReferenceSelection{}, ErrInvalid
 	}
 	sum := sha256.Sum256([]byte(a.ReferenceMaterialJSON))
 	if a.ReferenceMaterialFingerprint != "sha256:"+hex.EncodeToString(sum[:]) {
-		return ErrInvalid
+		return mbtiReferenceSelection{}, ErrInvalid
 	}
 	var material mbtiReferenceSelection
 	dec := json.NewDecoder(bytes.NewBufferString(a.ReferenceMaterialJSON))
 	dec.DisallowUnknownFields()
 	if dec.Decode(&material) != nil || dec.Decode(new(any)) != io.EOF {
-		return ErrInvalid
+		return mbtiReferenceSelection{}, ErrInvalid
 	}
+	return material, nil
+}
+
+func validateMBTIReferenceIdentity(material mbtiReferenceSelection) (map[string]string, error) {
 	_, supported := mbticontract.Lookup(material.ModelCode, material.ModelVersion)
 	if !supported || material.SchemaVersion != "mbti-reference-selection/v1" || !referenceVersion.MatchString(material.Version) || len(material.TypeCode) != 4 || len(material.Sources) < 1 || len(material.Sources) > 8 || len(material.Entries) < 12 || len(material.Entries) > 24 {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	axes := []string{"EI", "SN", "TF", "JP"}
 	poles := make(map[string]string, 4)
 	for i, axis := range axes {
 		pole := string(material.TypeCode[i])
 		if !strings.Contains(axis, pole) {
-			return ErrInvalid
+			return nil, ErrInvalid
 		}
 		poles[axis] = pole
 	}
-	sources := make(map[string]bool, len(material.Sources))
-	for _, source := range material.Sources {
+	return poles, nil
+}
+
+func validateMBTIReferenceSources(material []mbtiReferenceSource) (map[string]bool, error) {
+	sources := make(map[string]bool, len(material))
+	for _, source := range material {
 		parsed, err := url.Parse(source.URL)
 		parsedDate, dateErr := time.Parse("2006-01-02", source.AccessedOn)
 		if !referenceIdentity.MatchString(source.ID) || sources[source.ID] || !referenceText(source.Title, 255) || !referenceText(source.URL, 2048) || !referenceText(source.SupportScope, 1000) || err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || strings.IndexFunc(source.URL, unicode.IsSpace) >= 0 || dateErr != nil || parsedDate.Format("2006-01-02") != source.AccessedOn {
-			return ErrInvalid
+			return nil, ErrInvalid
 		}
 		sources[source.ID] = true
 	}
+	return sources, nil
+}
+
+func validateMBTIReferenceEntries(material mbtiReferenceSelection, poles map[string]string, sources map[string]bool) (map[string]mbtiReferenceEntry, error) {
 	entries := make(map[string]mbtiReferenceEntry, len(material.Entries))
 	coverage, usedSources := map[string]bool{}, map[string]bool{}
 	for _, entry := range material.Entries {
 		_, duplicate := entries[entry.ID]
 		if !referenceIdentity.MatchString(entry.ID) || duplicate || (entry.Topic != "personality" && entry.Topic != "career" && entry.Topic != "relationships") || poles[entry.Axis] == "" || poles[entry.Axis] != entry.Pole || !referenceText(entry.Content, 1000) || !referenceText(entry.UsageBoundary, 500) || len(entry.SourceIDs) < 1 || len(entry.SourceIDs) > 3 {
-			return ErrInvalid
+			return nil, ErrInvalid
 		}
 		linked := map[string]bool{}
 		for _, id := range entry.SourceIDs {
 			if !sources[id] || linked[id] {
-				return ErrInvalid
+				return nil, ErrInvalid
 			}
 			linked[id], usedSources[id] = true, true
 		}
@@ -104,8 +136,12 @@ func validateMBTIReferences(a Artifact) error {
 		coverage[entry.Topic+":"+entry.Axis] = true
 	}
 	if len(coverage) != 12 || len(usedSources) != len(sources) {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
+	return entries, nil
+}
+
+func validateMBTIReferenceLinks(contentJSON string, entries map[string]mbtiReferenceEntry) error {
 	var output struct {
 		Sections []struct {
 			Topic     string               `json:"topic"`
@@ -114,7 +150,7 @@ func validateMBTIReferences(a Artifact) error {
 			Actions   []mbtiReferenceLinks `json:"actions"`
 		} `json:"sections"`
 	}
-	if json.Unmarshal([]byte(a.ContentJSON), &output) != nil {
+	if json.Unmarshal([]byte(contentJSON), &output) != nil {
 		return ErrInvalid
 	}
 	for _, section := range output.Sections {
