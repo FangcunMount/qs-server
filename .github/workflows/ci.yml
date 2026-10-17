@@ -23,6 +23,33 @@ env:
   CI_DOCKERHUB_LOGIN: ${{ secrets.DOCKERHUB_USERNAME != '' || secrets.DOCKERHUB_TOKEN != '' }}
 
 jobs:
+  iam-local-recovery-pid1:
+    name: IAM Local Recovery PID1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify control flow and actual PID1 recovery lifecycle
+        timeout-minutes: 5
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          evidence="${RUNNER_TEMP}/iam-local-recovery-evidence"
+          mkdir -m 700 "$evidence"
+          source_dir=scripts/oneoff/cleanup_mock_cohort/iam_local_recovery
+          git rev-parse HEAD > "$evidence/source-commit.txt"
+          sha256sum "$source_dir"/*.py > "$evidence/source-sha256.txt"
+          python3 -B "$source_dir/test_guard.py" -v 2>&1 | tee "$evidence/pure-tests.log"
+          sudo env IAM_LOCAL_RECOVERY_SYSTEMD_NATIVE_REQUIRED=1 python3 -B "$source_dir/test_systemd_native.py" -v 2>&1 | tee "$evidence/pid1-tests.log"
+      - name: Preserve source-bound synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: iam-local-recovery-pid1-${{ github.sha }}
+          path: ${{ runner.temp }}/iam-local-recovery-evidence
+          if-no-files-found: error
+          retention-days: 30
+
   m4-a-formal-carrier:
     name: Optional A Original Linux Carrier
     if: github.event_name == 'workflow_dispatch' && inputs.m4_a_formal_carrier == true && github.repository == 'FangcunMount/qs-server'
@@ -1881,7 +1908,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, actor-store-mysql, runtime-closure-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy, docs]
+    needs: [test, actor-store-mysql, runtime-closure-e2e, iam-local-recovery-pid1, lint, lint-boundaries, deployment-contracts, tier1-test-policy, docs]
     runs-on: ubuntu-latest
     strategy:
       matrix:
