@@ -25,18 +25,18 @@ func (s *definitionContractService) SaveDefinition(_ context.Context, _ modelcat
 
 func TestDefinitionWritesRejectRetiredDerivedInputs(t *testing.T) {
 	for _, tc := range []struct {
-		name, body, input, decision, assets, result string
-		status                                      int
+		name, body, input, result string
+		status                    int
 	}{
-		{"canonical", "{}", "canonical", "absent", "absent", "accepted", 200},
-		{"both null", `{"DecisionSpec":null,"InterpretationAssets":null}`, "derived", "present", "present", "rejected", 400},
-		{"empty decision", `{"DecisionSpec":{}}`, "derived", "present", "absent", "rejected", 400},
-		{"empty assets", `{"InterpretationAssets":{}}`, "derived", "absent", "present", "rejected", 400},
-		{"case folded keys", `{"decisionspec":null,"INTERPRETATIONASSETS":{}}`, "derived", "present", "present", "rejected", 400},
-		{"nested fields are not input", `{"unknown":{"DecisionSpec":{}}}`, "canonical", "absent", "absent", "accepted", 200},
-		{"trailing bytes preserve binder contract", `{} trailing`, "canonical", "absent", "absent", "accepted", 200},
-		{"invalid decision", `{"DecisionSpec":42}`, "derived", "present", "absent", "rejected", 400},
-		{"malformed", `{`, "unreadable", "unreadable", "unreadable", "rejected", 500},
+		{"canonical", "{}", "canonical", "accepted", 200},
+		{"both null", `{"DecisionSpec":null,"InterpretationAssets":null}`, "derived", "rejected", 400},
+		{"empty decision", `{"DecisionSpec":{}}`, "derived", "rejected", 400},
+		{"empty assets", `{"InterpretationAssets":{}}`, "derived", "rejected", 400},
+		{"case folded keys", `{"decisionspec":null,"INTERPRETATIONASSETS":{}}`, "derived", "rejected", 400},
+		{"nested fields are not input", `{"unknown":{"DecisionSpec":{}}}`, "canonical", "accepted", 200},
+		{"trailing bytes preserve binder contract", `{} trailing`, "canonical", "accepted", 200},
+		{"invalid decision", `{"DecisionSpec":42}`, "derived", "rejected", 400},
+		{"malformed", `{`, "unreadable", "rejected", 500},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &definitionContractService{}

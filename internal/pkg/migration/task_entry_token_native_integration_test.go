@@ -50,7 +50,21 @@ VALUES(900123,900124,900125,1,7,900126,'scale','2026-10-18','opened','retired-te
 	if err := p.VerifyComplete(t.Context()); err == nil {
 		t.Fatal("disabled DDL accepted a database awaiting token retirement")
 	}
-	n.runBoth(t, p)
+	cfg := offlineNativeApproval(t, n, current)
+	_, snapshot, err := inspectOffline(t.Context(), n.db, n.client, cfg.Pair, current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := readOfflineAuthorization(cfg, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.ProtectionScope = offlineProtectionTaskEntryToken
+	writeOfflineApproval(t, &cfg, a)
+	result, err := runOffline(t.Context(), n.db, n.client, cfg, current)
+	if err != nil || !result.Verified || !result.AuthorizationConsumed || result.MySQLChanged == nil || !*result.MySQLChanged || result.MongoChanged == nil || *result.MongoChanged {
+		t.Fatal("Task-only offline retirement failed", result, err)
+	}
 	if err := actor.RequireCurrentOperatorPlanSchema(t.Context(), db); err != nil {
 		t.Fatal("current maintenance plans rejected SQL104", err)
 	}

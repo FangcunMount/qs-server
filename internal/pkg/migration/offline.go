@@ -91,6 +91,7 @@ const (
 	offlineProtectionMongoHistoricalIndexes  = "m4_mongo_historical_indexes"
 	offlineProtectionActorColumns            = "m4_actor_columns"
 	offlineProtectionLegacyMaintenanceTables = "m4_legacy_maintenance_tables"
+	offlineProtectionTaskEntryToken          = "m6_task_entry_token"
 )
 
 // InspectOffline reads only identities and guarded installed migration metadata.
@@ -154,6 +155,9 @@ func validOfflineProtectionScope(a offlineAuthorization) bool {
 	case offlineProtectionLegacyMaintenanceTables:
 		return a.InitialMySQLVersion == 102 && a.InitialMongoVersion == 40 &&
 			a.TargetMySQLVersion == 103 && a.TargetMongoVersion == 40
+	case offlineProtectionTaskEntryToken:
+		return a.InitialMySQLVersion == 103 && a.InitialMongoVersion == 40 &&
+			a.TargetMySQLVersion == 104 && a.TargetMongoVersion == 40
 	default:
 		return false
 	}
