@@ -1298,13 +1298,16 @@
         }
       ],
       "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
+        "level": "historical",
+        "refs": [
+          "docs/infrastructure-production-evidence.json"
+        ],
+        "deployed_sha": "689b6cb3ebb798c919739bdcc520d31ef4cc700b",
+        "observed_at": "2026-10-18T13:16:32.557426+08:00",
         "limitations": [
           "Current CI, deployment and runtime evidence is unbound. Prior deployment and Mongo audit observations are preserved in the separate historical production ledger.",
-          "Actual C-tool native source/compiled716aa7008f4821f78abbff4a8e268e874791163b passed8 required database tops plus13 children,21 unique RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/Mongo7.0.31rs0. The13 children include6 original rejected-material cases,4 genuine dirty102/clean102 original-DROP states and3 actual-server-OK response-loss continuations. Raw JSONLe21cecbde9a925f2496540d057c0186d99d80985d509fd8c0b4c79b9c1aa7c9f/receipt07633956eba5e2c097fd515e623c1c2d6dcc2acec607df6e4318a1eec995305e/independent summary6d3a59b66ba110be019418aa34046e38f87b189d90089502627c7f396fafa3c3 retain exact actual argv, all required names, source/binary/runner bindings and owned cleanup. These prove formal C capture/verify/original raw values and four-table facts, genuine ledger-last restoration, partial100-row/nullable continuation with new operation, valid immutable modern FindTask/FindRecovery reads and foreign-partial refusal. Earlier6973 ordinary/source-only and historical native records remain bound to their own sources. Both owned containers/bridge/child group released, prior IDs/images/volumes retained; old NSQ Restart2777-to2779 means global runtime metadata stability is false.84.170656s is only this small synthetic suite (including209-row-per-target scenarios), not production window/recovery/RPO. No production access/T0 material/freeze/business runtime/full three-service startup/current CI/release is attested; other unexecuted recovery failures and read-only unknown-ledger-commit terminal proof remain open. Equivalent replay is not recorded as an actual passed command."
+          "Actual C-tool native source/compiled716aa7008f4821f78abbff4a8e268e874791163b passed8 required database tops plus13 children,21 unique RUN/PASS,0FAIL/SKIP,exit0 on owned MySQL8.0.36/Mongo7.0.31rs0. The13 children include6 original rejected-material cases,4 genuine dirty102/clean102 original-DROP states and3 actual-server-OK response-loss continuations. Raw JSONLe21cecbde9a925f2496540d057c0186d99d80985d509fd8c0b4c79b9c1aa7c9f/receipt07633956eba5e2c097fd515e623c1c2d6dcc2acec607df6e4318a1eec995305e/independent summary6d3a59b66ba110be019418aa34046e38f87b189d90089502627c7f396fafa3c3 retain exact actual argv, all required names, source/binary/runner bindings and owned cleanup. These prove formal C capture/verify/original raw values and four-table facts, genuine ledger-last restoration, partial100-row/nullable continuation with new operation, valid immutable modern FindTask/FindRecovery reads and foreign-partial refusal. Earlier6973 ordinary/source-only and historical native records remain bound to their own sources. Both owned containers/bridge/child group released, prior IDs/images/volumes retained; old NSQ Restart2777-to2779 means global runtime metadata stability is false.84.170656s is only this small synthetic suite (including209-row-per-target scenarios), not production window/recovery/RPO. No production access/T0 material/freeze/business runtime/full three-service startup/current CI/release is attested; other unexecuted recovery failures and read-only unknown-ledger-commit terminal proof remain open. Equivalent replay is not recorded as an actual passed command.",
+          "M6 exact-source CI and six-instance production evidence is recorded in version ledger 9.11; this dated scope does not sign off the whole current checkout, full live Options or remaining business/performance acceptance."
         ]
       },
       "gaps": [
@@ -1344,10 +1347,11 @@
         "refs": [
           "docs/infrastructure-production-evidence.json"
         ],
-        "deployed_sha": null,
-        "observed_at": null,
+        "deployed_sha": "689b6cb3ebb798c919739bdcc520d31ef4cc700b",
+        "observed_at": "2026-10-18T13:16:32.557426+08:00",
         "limitations": [
-          "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance."
+          "The referenced infrastructure records are historical and do not cover the current checkout, current effective configuration, or a current production acceptance.",
+          "M6 exact-source CI and six-instance production evidence is recorded in version ledger 9.11; this dated scope does not sign off the whole current checkout, full live Options or remaining business/performance acceptance."
         ]
       },
       "gaps": [
