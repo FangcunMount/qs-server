@@ -22,7 +22,7 @@ func (s *openingStagerSpy) Stage(context.Context, ...event.DomainEvent) error { 
 func TestReminderProducerDisabledDoesNotStageAvailableOutbox(t *testing.T) {
 	now := time.Now()
 	task := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 1, 1, testee.NewID(2), "scale", now.Add(-time.Minute), now)
-	if err := domainplan.NewTaskLifecycle().OpenAt(t.Context(), task, "", "https://example.test?task_id="+task.GetID().String(), now); err != nil {
+	if err := domainplan.NewTaskLifecycle().OpenAt(t.Context(), task, "https://example.test?task_id="+task.GetID().String(), now); err != nil {
 		t.Fatal(err)
 	}
 	tasks := &schedulerTaskRepoStub{}

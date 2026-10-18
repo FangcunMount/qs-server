@@ -79,7 +79,7 @@ events:
 		t.Helper()
 		sequence++
 		task := plan.NewAssessmentTaskAt(plan.NewAssessmentPlanID(), sequence, 7, testee.NewID(99), "scale", openAt.Add(-time.Minute), openAt.Add(-time.Minute))
-		require.NoError(t, plan.NewTaskLifecycle().OpenAt(t.Context(), task, "test-entry", "https://example.invalid/task", openAt))
+		require.NoError(t, plan.NewTaskLifecycle().OpenAt(t.Context(), task, "https://example.invalid/task", openAt))
 		opened := plan.NewTaskOpenedEvent(task.GetID(), task.GetPlanID(), 7, task.GetTesteeID(), "https://example.invalid/task", openAt)
 		reminder := plan.NewTaskOpenedReminderRequestedEvent(opened, task.GetScheduleRevision())
 		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

@@ -109,9 +109,9 @@ type entryGeneratorStub struct {
 	calls int
 }
 
-func (g *entryGeneratorStub) GenerateEntry(context.Context, *domainPlan.AssessmentTask) (string, string, error) {
+func (g *entryGeneratorStub) GenerateEntry(context.Context, *domainPlan.AssessmentTask) (string, error) {
 	g.calls++
-	return "token", "https://example.com/entry", nil
+	return "https://example.com/entry", nil
 }
 
 func TestTaskSchedulerServiceCancelsPendingTaskForInactivePlan(t *testing.T) {
@@ -331,7 +331,7 @@ func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
 		openedAt,
 	)
 	taskLifecycle := domainPlan.NewTaskLifecycle()
-	if err := taskLifecycle.OpenAt(context.Background(), expiredTask, "token", "https://example.com/entry", openedAt); err != nil {
+	if err := taskLifecycle.OpenAt(context.Background(), expiredTask, "https://example.com/entry", openedAt); err != nil {
 		t.Fatalf("open expiredTask returned error: %v", err)
 	}
 

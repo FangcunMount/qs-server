@@ -49,8 +49,7 @@ type AssessmentTask struct {
 	assessmentID     *assessment.ID
 
 	// === 入口信息 ===
-	entryToken string // 入口令牌（用于生成二维码/链接）
-	entryURL   string // 入口 URL
+	entryURL string // 入口 URL
 
 	// === 领域事件 ===
 	events []event.DomainEvent
@@ -191,11 +190,6 @@ func (t *AssessmentTask) GetAssessmentID() *assessment.ID {
 	return t.assessmentID
 }
 
-// GetEntryToken 获取入口令牌
-func (t *AssessmentTask) GetEntryToken() string {
-	return t.entryToken
-}
-
 // GetEntryURL 获取入口URL
 func (t *AssessmentTask) GetEntryURL() string {
 	return t.entryURL
@@ -234,7 +228,7 @@ func (t *AssessmentTask) IsTerminal() bool {
 // ==================== 包内私有方法（供领域服务调用）===================
 
 // open 开放任务（包内方法）
-func (t *AssessmentTask) open(entryToken string, entryURL string, openAt time.Time, expireAt time.Time) error {
+func (t *AssessmentTask) open(entryURL string, openAt time.Time, expireAt time.Time) error {
 	if t.status != TaskStatusPending {
 		return ErrTaskNotPending
 	}
@@ -242,7 +236,6 @@ func (t *AssessmentTask) open(entryToken string, entryURL string, openAt time.Ti
 	t.status = TaskStatusOpened
 	t.openAt = &openAt
 	t.expireAt = &expireAt
-	t.entryToken = entryToken
 	t.entryURL = entryURL
 
 	// 发布任务开放事件
@@ -349,7 +342,6 @@ func (t *AssessmentTask) reschedule(plannedAt, actionAt time.Time) error {
 	t.canceledAt = nil
 	t.expirationReason = ""
 	t.assessmentID = nil
-	t.entryToken = ""
 	t.entryURL = ""
 	return nil
 }
@@ -411,7 +403,6 @@ func (t *AssessmentTask) RestoreFromRepository(
 	expiredAt *time.Time,
 	canceledAt *time.Time,
 	assessmentID *assessment.ID,
-	entryToken string,
 	entryURL string,
 ) {
 	t.id = id
@@ -423,7 +414,6 @@ func (t *AssessmentTask) RestoreFromRepository(
 	t.expiredAt = expiredAt
 	t.canceledAt = canceledAt
 	t.assessmentID = assessmentID
-	t.entryToken = entryToken
 	t.entryURL = entryURL
 	t.ClearEvents()
 }

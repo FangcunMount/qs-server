@@ -88,7 +88,7 @@ func createBatchUpdateTables(t *testing.T, ctx context.Context, db *sql.DB) {
             due_at DATETIME(3) NULL, open_at DATETIME(3) NULL, expire_at DATETIME(3) NULL,
             completed_at DATETIME(3) NULL, expired_at DATETIME(3) NULL, canceled_at DATETIME(3) NULL,
             expiration_reason VARCHAR(32) NULL, assessment_id BIGINT UNSIGNED NULL,
-            entry_token VARCHAR(255) NULL, entry_url VARCHAR(500) NULL,
+            entry_url VARCHAR(500) NULL,
             updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), deleted_at DATETIME(3) NULL
         ) ENGINE=InnoDB`,
 	}

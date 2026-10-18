@@ -11,10 +11,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// TaskEntryResolver checks current task state; legacy tokens are ignored. Collection
+// TaskEntryResolver checks current task state by TaskID. Collection
 // must also prove the IAM User -> Testee relationship before returning it.
 type TaskEntryResolver interface {
-	ResolveTaskEntry(context.Context, string, string) (*ResolvedTaskEntry, error)
+	ResolveTaskEntry(context.Context, string) (*ResolvedTaskEntry, error)
 }
 
 type ResolvedTaskEntry struct {
@@ -56,7 +56,7 @@ func NewTaskEntryResolver(tasks taskEntryFinder, scales ScaleCatalog, enrollment
 	return &taskEntryResolver{tasks: tasks, scales: scales, now: time.Now, enrollments: enrollments}, nil
 }
 
-func (r *taskEntryResolver) ResolveTaskEntry(ctx context.Context, taskIDRaw, token string) (*ResolvedTaskEntry, error) {
+func (r *taskEntryResolver) ResolveTaskEntry(ctx context.Context, taskIDRaw string) (*ResolvedTaskEntry, error) {
 	notFound := func() error { return errors.WithCode(code.ErrPageNotFound, "task entry not found") }
 	taskID, err := domainplan.ParseAssessmentTaskID(taskIDRaw)
 	if err != nil {

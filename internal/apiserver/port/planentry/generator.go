@@ -8,5 +8,5 @@ import (
 
 // Generator produces task entry tokens and URLs for opened plan tasks.
 type Generator interface {
-	GenerateEntry(ctx context.Context, task *planDomain.AssessmentTask) (token string, url string, err error)
+	GenerateEntry(ctx context.Context, task *planDomain.AssessmentTask) (url string, err error)
 }

@@ -42,7 +42,6 @@ type TaskResponse struct {
 	ExpirationReason *string `json:"expiration_reason,omitempty"` // 过期原因
 	StatusLabel      string  `json:"status_label,omitempty"`      // 状态中文
 	AssessmentID     *string `json:"assessment_id,omitempty"`     // 关联的测评ID
-	EntryToken       string  `json:"entry_token,omitempty"`       // 入口令牌
 	EntryURL         string  `json:"entry_url,omitempty"`         // 入口URL
 }
 
@@ -140,7 +139,6 @@ func NewTaskResponse(result *plan.TaskResult) *TaskResponse {
 		ExpirationReason: result.ExpirationReason,
 		StatusLabel:      domainPlan.TaskStatus(result.Status).DisplayName(),
 		AssessmentID:     result.AssessmentID,
-		EntryToken:       result.EntryToken,
 		EntryURL:         result.EntryURL,
 	}
 }

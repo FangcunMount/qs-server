@@ -27,7 +27,7 @@ type Entry struct {
 }
 
 type Reader interface {
-	ResolveTaskEntry(context.Context, string, string) (*Entry, error)
+	ResolveTaskEntry(context.Context, string) (*Entry, error)
 }
 
 type AccessAuthorizer interface {
@@ -35,7 +35,7 @@ type AccessAuthorizer interface {
 }
 
 // Service only releases an entry after the current IAM User has an active
-// ProfileLink to the target Testee. The task token is not an authorization.
+// ProfileLink to the target Testee.
 type Service struct {
 	reader Reader
 	access AccessAuthorizer
@@ -45,14 +45,14 @@ func NewService(reader Reader, access AccessAuthorizer) *Service {
 	return &Service{reader: reader, access: access}
 }
 
-func (s *Service) Resolve(ctx context.Context, userID, taskID, token string) (*Entry, error) {
+func (s *Service) Resolve(ctx context.Context, userID, taskID string) (*Entry, error) {
 	if s == nil || s.reader == nil || s.access == nil {
 		return nil, testeeaccess.ErrAccessUnavailable
 	}
 	if userID == "" {
 		return nil, testeeaccess.ErrAccessDenied
 	}
-	entry, err := s.reader.ResolveTaskEntry(ctx, taskID, token)
+	entry, err := s.reader.ResolveTaskEntry(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}

@@ -18,10 +18,10 @@ func NewPlanEntryClient(client *Client) *PlanEntryClient {
 	return &PlanEntryClient{client: client, grpcClient: pb.NewPlanEntryServiceClient(client.Conn())}
 }
 
-func (c *PlanEntryClient) ResolveTaskEntry(ctx context.Context, taskID, token string) (*planentry.Entry, error) {
+func (c *PlanEntryClient) ResolveTaskEntry(ctx context.Context, taskID string) (*planentry.Entry, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
-	result, err := c.grpcClient.ResolveTaskEntry(ctx, &pb.ResolveTaskEntryRequest{TaskId: taskID, Token: token})
+	result, err := c.grpcClient.ResolveTaskEntry(ctx, &pb.ResolveTaskEntryRequest{TaskId: taskID})
 	if status.Code(err) == codes.NotFound {
 		return nil, planentry.ErrInvalidEntry
 	}

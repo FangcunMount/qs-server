@@ -176,7 +176,6 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 		BusinessCreatedAt: domain.GetBusinessCreatedAt(),
 		ScheduleRevision:  domain.GetScheduleRevision(),
 		Status:            string(domain.GetStatus()),
-		EntryToken:        domain.GetEntryToken(),
 		EntryURL:          domain.GetEntryURL(),
 	}
 	dueAt := domain.GetDueAt()
@@ -248,7 +247,6 @@ func (m *TaskMapper) ToDomain(po *AssessmentTaskPO) *domainPlan.AssessmentTask {
 		po.ExpiredAt,
 		po.CanceledAt,
 		assessmentIDPtr,
-		po.EntryToken,
 		po.EntryURL,
 	)
 	task.RestoreTimeSemantics(po.DueAt, domainPlan.TaskExpirationReason(stringValue(po.ExpirationReason)))
@@ -298,7 +296,6 @@ func (m *TaskMapper) SyncID(po *AssessmentTaskPO, domain *domainPlan.AssessmentT
 			po.ExpiredAt,
 			po.CanceledAt,
 			assessmentIDPtr,
-			po.EntryToken,
 			po.EntryURL,
 		)
 		domain.RestoreTimeSemantics(po.DueAt, domainPlan.TaskExpirationReason(stringValue(po.ExpirationReason)))

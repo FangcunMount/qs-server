@@ -33,7 +33,7 @@ func TestSaveRescheduledUsesExpectedRevisionCASAndWritesClearedFields(t *testing
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec("(?s)UPDATE `assessment_task` SET .*`assessment_id`=\\?.*`canceled_at`=\\?.*`completed_at`=\\?.*`entry_token`=\\?.*`expired_at`=\\?.*`open_at`=\\?.*`schedule_revision`=\\?.*`status`=\\?.* WHERE id = \\? AND org_id = \\? AND schedule_revision = \\? AND deleted_at IS NULL").
+	mock.ExpectExec("(?s)UPDATE `assessment_task` SET .*`assessment_id`=\\?.*`canceled_at`=\\?.*`completed_at`=\\?.*`expired_at`=\\?.*`open_at`=\\?.*`schedule_revision`=\\?.*`status`=\\?.* WHERE id = \\? AND org_id = \\? AND schedule_revision = \\? AND deleted_at IS NULL").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	if err := repository.SaveRescheduled(context.Background(), task, 1); err != nil {

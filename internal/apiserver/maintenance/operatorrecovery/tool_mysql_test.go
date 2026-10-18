@@ -100,6 +100,14 @@ func TestMySQLRecoveryToolPreflightDriftReplayAndReceiptIntegrity(t *testing.T) 
 		t.Fatal(err)
 	}
 	actorfixture.RetireMaintenanceTables(t, db, actorUp, maintenanceUp)
+	taskUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000104_retire_task_entry_token.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("CREATE TABLE assessment_task(id BIGINT PRIMARY KEY, entry_token VARCHAR(255))").Error; err != nil {
+		t.Fatal(err)
+	}
+	actorfixture.RetireTaskEntryToken(t, db, maintenanceUp, taskUp)
 	for _, name := range []string{"000074_operator_retirement_tasks.up.sql", "000079_operator_recovery_archives.up.sql"} {
 		raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", name))
 		if err != nil {

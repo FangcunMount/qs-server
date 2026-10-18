@@ -11,7 +11,7 @@ import (
 func TestTaskOpenedEventCarriesOrganizationScope(t *testing.T) {
 	openedAt := time.Date(2026, 9, 25, 10, 0, 0, 0, taskBusinessLocation)
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 501, testee.NewID(21), "scale", openedAt)
-	if err := NewTaskLifecycle().OpenAt(t.Context(), task, "token", "https://example.test/task", openedAt); err != nil {
+	if err := NewTaskLifecycle().OpenAt(t.Context(), task, "https://example.test/task", openedAt); err != nil {
 		t.Fatal(err)
 	}
 	if len(task.Events()) != 1 {

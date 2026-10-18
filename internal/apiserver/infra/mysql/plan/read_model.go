@@ -410,7 +410,6 @@ func taskRowFromPO(po *AssessmentTaskPO) planreadmodel.TaskRow {
 		Status:           po.Status,
 		ExpirationReason: stringValue(po.ExpirationReason),
 		AssessmentID:     po.AssessmentID,
-		EntryToken:       po.EntryToken,
 		EntryURL:         po.EntryURL,
 	}
 }

@@ -159,8 +159,11 @@ func TestLegacyMaintenanceNativeUpgradeRestartAndCurrentWrites(t *testing.T) {
 		t.Fatal("old source accepted SQL103")
 	}
 	db, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: n.db, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true, Logger: logger.Default.LogMode(logger.Silent)})
-	if err != nil || actor.RequireCurrentOperatorPlanSchema(t.Context(), db) != nil {
-		t.Fatal("current plans rejected clean SQL103", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actor.RequireCurrentOperatorPlanSchema(t.Context(), db) == nil {
+		t.Fatal("current plans accepted historical clean SQL103")
 	}
 	op := operatorDomain.NewOperator(1, 800010, "new synthetic identity")
 	op.SetID(10)

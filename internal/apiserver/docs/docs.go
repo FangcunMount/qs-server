@@ -18395,13 +18395,6 @@ const docTemplate = `{
         "response.AssessmentModelValidationResponse": {
             "type": "object",
             "properties": {
-                "errors": {
-                    "description": "Deprecated: 派生 从 Issues 用于 向后兼容。",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "issues": {
                     "type": "array",
                     "items": {
@@ -18409,10 +18402,6 @@ const docTemplate = `{
                     }
                 },
                 "passed": {
-                    "type": "boolean"
-                },
-                "valid": {
-                    "description": "Deprecated: mirror Passed 用于 向后兼容。",
                     "type": "boolean"
                 }
             }
@@ -20930,10 +20919,6 @@ const docTemplate = `{
                 },
                 "due_at": {
                     "description": "履约截止时间",
-                    "type": "string"
-                },
-                "entry_token": {
-                    "description": "入口令牌",
                     "type": "string"
                 },
                 "entry_url": {

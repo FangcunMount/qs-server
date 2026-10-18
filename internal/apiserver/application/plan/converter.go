@@ -53,7 +53,6 @@ type TaskResult struct {
 	Status           string  // 状态
 	ExpirationReason *string // 过期原因
 	AssessmentID     *string // 关联的测评ID
-	EntryToken       string  // 入口令牌
 	EntryURL         string  // 入口URL
 }
 
@@ -166,16 +165,15 @@ func toTaskResult(t *plan.AssessmentTask) *TaskResult {
 	}
 
 	result := &TaskResult{
-		ID:         t.GetID().String(),
-		PlanID:     t.GetPlanID().String(),
-		Seq:        t.GetSeq(),
-		OrgID:      t.GetOrgID(),
-		TesteeID:   t.GetTesteeID().String(),
-		ScaleCode:  t.GetScaleCode(),
-		PlannedAt:  t.GetPlannedAt().Format("2006-01-02 15:04:05"),
-		Status:     string(t.GetStatus()),
-		EntryToken: t.GetEntryToken(),
-		EntryURL:   t.GetEntryURL(),
+		ID:        t.GetID().String(),
+		PlanID:    t.GetPlanID().String(),
+		Seq:       t.GetSeq(),
+		OrgID:     t.GetOrgID(),
+		TesteeID:  t.GetTesteeID().String(),
+		ScaleCode: t.GetScaleCode(),
+		PlannedAt: t.GetPlannedAt().Format("2006-01-02 15:04:05"),
+		Status:    string(t.GetStatus()),
+		EntryURL:  t.GetEntryURL(),
 	}
 	dueAtStr := t.GetDueAt().Format("2006-01-02 15:04:05")
 	result.DueAt = &dueAtStr
@@ -206,16 +204,15 @@ func toTaskResult(t *plan.AssessmentTask) *TaskResult {
 
 func toTaskResultFromRow(row planreadmodel.TaskRow) *TaskResult {
 	result := &TaskResult{
-		ID:         meta.FromUint64(row.ID).String(),
-		PlanID:     meta.FromUint64(row.PlanID).String(),
-		Seq:        row.Seq,
-		OrgID:      row.OrgID,
-		TesteeID:   meta.FromUint64(row.TesteeID).String(),
-		ScaleCode:  row.ScaleCode,
-		PlannedAt:  row.PlannedAt.Format("2006-01-02 15:04:05"),
-		Status:     row.Status,
-		EntryToken: row.EntryToken,
-		EntryURL:   row.EntryURL,
+		ID:        meta.FromUint64(row.ID).String(),
+		PlanID:    meta.FromUint64(row.PlanID).String(),
+		Seq:       row.Seq,
+		OrgID:     row.OrgID,
+		TesteeID:  meta.FromUint64(row.TesteeID).String(),
+		ScaleCode: row.ScaleCode,
+		PlannedAt: row.PlannedAt.Format("2006-01-02 15:04:05"),
+		Status:    row.Status,
+		EntryURL:  row.EntryURL,
 	}
 	if row.DueAt != nil {
 		dueAt := row.DueAt.Format("2006-01-02 15:04:05")

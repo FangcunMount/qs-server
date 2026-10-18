@@ -155,7 +155,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 生成入口
-		token, url, err := s.entryGenerator.GenerateEntry(ctx, task)
+		url, err := s.entryGenerator.GenerateEntry(ctx, task)
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to generate entry",
 				"action", "schedule_pending_tasks",
@@ -168,7 +168,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 
 		// 开放任务
 		openedAt := time.Now()
-		if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt); err != nil {
+		if err := s.taskLifecycle.OpenAt(ctx, task, url, openedAt); err != nil {
 			logger.L(ctx).Errorw("Failed to open task",
 				"action", "schedule_pending_tasks",
 				"task_id", task.GetID().String(),

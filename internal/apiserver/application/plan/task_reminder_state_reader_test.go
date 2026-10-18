@@ -32,7 +32,7 @@ func reminderStateTask(t *testing.T, status domainplan.TaskStatus) *domainplan.A
 	task := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 2, 19, testee.NewID(31), "scale", definedAt, definedAt)
 	task.RestoreScheduleSemantics(3, &definedAt, definedAt)
 	task.RestoreFromRepository(task.GetID(), 0, status, &openAt, &expireAt, nil, nil, nil, nil,
-		"private-token", "https://collect.example.com/entry?token=private-token")
+		"https://collect.example.com/entry?token=private-token")
 	return task
 }
 

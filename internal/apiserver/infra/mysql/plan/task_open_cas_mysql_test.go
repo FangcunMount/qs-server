@@ -50,9 +50,9 @@ func (r *concurrentOpenRepository) FindByID(ctx context.Context, id domainplan.A
 
 type uniqueOpenEntryGenerator struct{ next atomic.Uint64 }
 
-func (g *uniqueOpenEntryGenerator) GenerateEntry(_ context.Context, task *domainplan.AssessmentTask) (string, string, error) {
+func (g *uniqueOpenEntryGenerator) GenerateEntry(_ context.Context, task *domainplan.AssessmentTask) (string, error) {
 	n := g.next.Add(1)
-	return fmt.Sprintf("token-%d", n), fmt.Sprintf("https://example.test/entry/%d?task_id=%s", n, task.GetID().String()), nil
+	return fmt.Sprintf("https://example.test/entry/%d?task_id=%s", n, task.GetID().String()), nil
 }
 
 type openEventRecorder struct {
@@ -146,7 +146,6 @@ func TestConcurrentTaskOpenHasOnePersistedEntryAndOneEventMySQL(t *testing.T) {
 	var persisted mysqlplan.AssessmentTaskPO
 	require.NoError(t, db.Where("id = ?", task.GetID().Uint64()).Take(&persisted).Error)
 	require.Equal(t, domainplan.TaskStatusOpened.String(), persisted.Status)
-	require.NotEmpty(t, persisted.EntryToken)
 	require.NotEmpty(t, persisted.EntryURL)
 	recorder.mu.Lock()
 	defer recorder.mu.Unlock()

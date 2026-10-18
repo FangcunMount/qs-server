@@ -54,7 +54,6 @@ func TestTaskPOToReadRowMapsReadModelFields(t *testing.T) {
 		CompletedAt:  &completedAt,
 		Status:       "completed",
 		AssessmentID: &assessmentID,
-		EntryToken:   "token",
 		EntryURL:     "https://entry.example.com",
 	})
 

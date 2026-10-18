@@ -3262,19 +3262,11 @@ definitions:
     type: object
   response.AssessmentModelValidationResponse:
     properties:
-      errors:
-        description: 'Deprecated: 派生 从 Issues 用于 向后兼容。'
-        items:
-          type: string
-        type: array
       issues:
         items:
           $ref: '#/definitions/modelcatalog.ValidationIssue'
         type: array
       passed:
-        type: boolean
-      valid:
-        description: 'Deprecated: mirror Passed 用于 向后兼容。'
         type: boolean
     type: object
   response.AssessmentOutcomeListResponse:
@@ -4966,9 +4958,6 @@ definitions:
         type: string
       due_at:
         description: 履约截止时间
-        type: string
-      entry_token:
-        description: 入口令牌
         type: string
       entry_url:
         description: 入口URL

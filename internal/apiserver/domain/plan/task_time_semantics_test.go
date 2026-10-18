@@ -24,7 +24,7 @@ func TestAssessmentTaskDueAndRescheduleUseCalendarDays(t *testing.T) {
 
 	lifecycle := NewTaskLifecycle()
 	openAt := planned
-	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", openAt); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), task, "url", openAt); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.ExpireManually(task, openAt.Add(time.Hour)); err != nil {
@@ -78,7 +78,7 @@ func TestTaskCompletionAllowsOverdueBeforeEntryExpiry(t *testing.T) {
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
 	lifecycle := NewTaskLifecycle()
 	openAt := planned.Add(23 * time.Hour)
-	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", openAt); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), task, "url", openAt); err != nil {
 		t.Fatal(err)
 	}
 	if task.GetExpireAt() == nil || !task.GetExpireAt().Equal(TaskEntryExpiresAt(openAt)) {
@@ -98,7 +98,7 @@ func TestTaskCompletionRejectsEntryExpiryBoundary(t *testing.T) {
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
 	lifecycle := NewTaskLifecycle()
 	expireAt := TaskEntryExpiresAt(planned)
-	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", planned); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), task, "url", planned); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.CompleteAt(t.Context(), task, assessment.ID(9), expireAt); err == nil {
@@ -124,19 +124,19 @@ func TestTaskOpenWindowBoundaries(t *testing.T) {
 	lifecycle := NewTaskLifecycle()
 
 	tooEarly := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
-	if err := lifecycle.OpenAt(t.Context(), tooEarly, "token", "url", planned.Add(-time.Nanosecond)); err == nil {
+	if err := lifecycle.OpenAt(t.Context(), tooEarly, "url", planned.Add(-time.Nanosecond)); err == nil {
 		t.Fatal("opening before planned_at must fail")
 	}
 
 	atBoundary := NewAssessmentTask(NewAssessmentPlanID(), 2, 1, testee.NewID(1), "scale", planned)
 	windowEnd := TaskOpenWindowEndsAt(planned)
-	if err := lifecycle.OpenAt(t.Context(), atBoundary, "token", "url", windowEnd); err == nil {
+	if err := lifecycle.OpenAt(t.Context(), atBoundary, "url", windowEnd); err == nil {
 		t.Fatal("opening at planned_at+24h must fail")
 	}
 
 	inside := NewAssessmentTask(NewAssessmentPlanID(), 3, 1, testee.NewID(1), "scale", planned)
 	openAt := windowEnd.Add(-time.Nanosecond)
-	if err := lifecycle.OpenAt(t.Context(), inside, "token", "url", openAt); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), inside, "url", openAt); err != nil {
 		t.Fatalf("opening immediately before window end should succeed: %v", err)
 	}
 }
@@ -154,7 +154,7 @@ func TestTaskLifecycleRejectsIllegalExpirationTransitions(t *testing.T) {
 
 	opened := NewAssessmentTask(NewAssessmentPlanID(), 2, 1, testee.NewID(1), "scale", planned)
 	openAt := planned
-	if err := lifecycle.OpenAt(t.Context(), opened, "token", "url", openAt); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), opened, "url", openAt); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.ExpireMissedOpenWindow(opened, TaskOpenWindowEndsAt(planned)); err == nil {

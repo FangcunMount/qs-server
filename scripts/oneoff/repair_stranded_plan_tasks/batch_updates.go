@@ -102,7 +102,7 @@ func updateMissedBatch(ctx context.Context, tx *sql.Tx, cfg config, batch []task
 		query.WriteString("WHEN ? THEN ? ")
 		args = append(args, before.ID, expiredAt)
 	}
-	query.WriteString("ELSE expired_at END,version=version+1 WHERE org_id=? AND status='pending' AND open_at IS NULL AND expire_at IS NULL AND completed_at IS NULL AND expired_at IS NULL AND canceled_at IS NULL AND assessment_id IS NULL AND COALESCE(entry_token,'')='' AND COALESCE(entry_url,'')='' AND COALESCE(expiration_reason,'')='' AND deleted_at IS NULL AND (")
+	query.WriteString("ELSE expired_at END,version=version+1 WHERE org_id=? AND status='pending' AND open_at IS NULL AND expire_at IS NULL AND completed_at IS NULL AND expired_at IS NULL AND canceled_at IS NULL AND assessment_id IS NULL AND COALESCE(entry_url,'')='' AND COALESCE(expiration_reason,'')='' AND deleted_at IS NULL AND (")
 	args = append(args, cfg.orgID)
 	for index, before := range batch {
 		if index > 0 {

@@ -304,6 +304,15 @@ func observeSQLPair(ctx context.Context, db retirementSQLReader, name string, re
 			}
 		}
 	}
+	if s.version >= 104 {
+		var columns int
+		if err := db.QueryRowContext(q, "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='assessment_task' AND column_name='entry_token'").Scan(&columns); err != nil {
+			return s, retirementError("task entry token retirement visibility unknown")
+		}
+		if columns != 0 {
+			return s, retirementError("retired task entry token column present")
+		}
+	}
 	return s, nil
 }
 func observeMongoPair(ctx context.Context, client *mongo.Client, name string, resources *migrationResources) (pairStoreState, error) {

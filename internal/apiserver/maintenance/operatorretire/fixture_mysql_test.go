@@ -147,6 +147,14 @@ func installCurrentActorColumns(t *testing.T, db *gorm.DB) {
 		t.Fatal(err)
 	}
 	actorfixture.RetireMaintenanceTables(t, db, raw, maintenanceUp)
+	taskUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000104_retire_task_entry_token.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("ALTER TABLE assessment_task ADD COLUMN entry_token VARCHAR(255)").Error; err != nil {
+		t.Fatal(err)
+	}
+	actorfixture.RetireTaskEntryToken(t, db, maintenanceUp, taskUp)
 }
 
 func retained(facts []authz.AssignmentRoleFact) []authz.AssignmentRoleFact {

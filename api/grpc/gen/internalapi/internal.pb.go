@@ -23,10 +23,8 @@ const (
 )
 
 type ResolveTaskEntryRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	TaskId string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	// Deprecated: Marked as deprecated in internalapi/internal.proto.
-	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"` // Legacy locator only; never authorization.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -64,14 +62,6 @@ func (*ResolveTaskEntryRequest) Descriptor() ([]byte, []int) {
 func (x *ResolveTaskEntryRequest) GetTaskId() string {
 	if x != nil {
 		return x.TaskId
-	}
-	return ""
-}
-
-// Deprecated: Marked as deprecated in internalapi/internal.proto.
-func (x *ResolveTaskEntryRequest) GetToken() string {
-	if x != nil {
-		return x.Token
 	}
 	return ""
 }
@@ -434,7 +424,6 @@ type TaskResultMessage struct {
 	CompletedAt      *string                `protobuf:"bytes,10,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
 	Status           string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
 	AssessmentId     *string                `protobuf:"bytes,12,opt,name=assessment_id,json=assessmentId,proto3,oneof" json:"assessment_id,omitempty"`
-	EntryToken       string                 `protobuf:"bytes,13,opt,name=entry_token,json=entryToken,proto3" json:"entry_token,omitempty"`
 	EntryUrl         string                 `protobuf:"bytes,14,opt,name=entry_url,json=entryUrl,proto3" json:"entry_url,omitempty"`
 	DueAt            *string                `protobuf:"bytes,15,opt,name=due_at,json=dueAt,proto3,oneof" json:"due_at,omitempty"`
 	ExpirationReason *string                `protobuf:"bytes,16,opt,name=expiration_reason,json=expirationReason,proto3,oneof" json:"expiration_reason,omitempty"`
@@ -552,13 +541,6 @@ func (x *TaskResultMessage) GetStatus() string {
 func (x *TaskResultMessage) GetAssessmentId() string {
 	if x != nil && x.AssessmentId != nil {
 		return *x.AssessmentId
-	}
-	return ""
-}
-
-func (x *TaskResultMessage) GetEntryToken() string {
-	if x != nil {
-		return x.EntryToken
 	}
 	return ""
 }
@@ -2820,10 +2802,9 @@ var File_internalapi_internal_proto protoreflect.FileDescriptor
 
 const file_internalapi_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x1ainternalapi/internal.proto\x12\vinternalapi\x1a\x1fgoogle/protobuf/timestamp.proto\"L\n" +
+	"\x1ainternalapi/internal.proto\x12\vinternalapi\x1a\x1fgoogle/protobuf/timestamp.proto\"?\n" +
 	"\x17ResolveTaskEntryRequest\x12\x17\n" +
-	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x18\n" +
-	"\x05token\x18\x02 \x01(\tB\x02\x18\x01R\x05token\"\xb4\x03\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskIdJ\x04\b\x02\x10\x03R\x05token\"\xb4\x03\n" +
 	"\x18ResolveTaskEntryResponse\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1b\n" +
 	"\ttestee_id\x18\x02 \x01(\tR\btesteeId\x12\x1d\n" +
@@ -2860,7 +2841,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x0erelative_weeks\x18\b \x03(\x05R\rrelativeWeeks\x12\x16\n" +
 	"\x06status\x18\t \x01(\tR\x06status\x12!\n" +
 	"\ftrigger_time\x18\n" +
-	" \x01(\tR\vtriggerTime\"\xd4\x04\n" +
+	" \x01(\tR\vtriggerTime\"\xc6\x04\n" +
 	"\x11TaskResultMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aplan_id\x18\x02 \x01(\tR\x06planId\x12\x10\n" +
@@ -2876,9 +2857,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\fcompleted_at\x18\n" +
 	" \x01(\tH\x02R\vcompletedAt\x88\x01\x01\x12\x16\n" +
 	"\x06status\x18\v \x01(\tR\x06status\x12(\n" +
-	"\rassessment_id\x18\f \x01(\tH\x03R\fassessmentId\x88\x01\x01\x12\x1f\n" +
-	"\ventry_token\x18\r \x01(\tR\n" +
-	"entryToken\x12\x1b\n" +
+	"\rassessment_id\x18\f \x01(\tH\x03R\fassessmentId\x88\x01\x01\x12\x1b\n" +
 	"\tentry_url\x18\x0e \x01(\tR\bentryUrl\x12\x1a\n" +
 	"\x06due_at\x18\x0f \x01(\tH\x04R\x05dueAt\x88\x01\x01\x120\n" +
 	"\x11expiration_reason\x18\x10 \x01(\tH\x05R\x10expirationReason\x88\x01\x01B\n" +
@@ -2889,7 +2868,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\r_completed_atB\x10\n" +
 	"\x0e_assessment_idB\t\n" +
 	"\a_due_atB\x14\n" +
-	"\x12_expiration_reason\"\xb6\x01\n" +
+	"\x12_expiration_reasonJ\x04\b\r\x10\x0eR\ventry_token\"\xb6\x01\n" +
 	"\x17EnrollmentResultMessage\x12\x17\n" +
 	"\aplan_id\x18\x01 \x01(\tR\x06planId\x124\n" +
 	"\x05tasks\x18\x02 \x03(\v2\x1e.internalapi.TaskResultMessageR\x05tasks\x12\x1e\n" +

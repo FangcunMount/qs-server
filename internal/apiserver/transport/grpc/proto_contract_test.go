@@ -6,7 +6,23 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
+
+func TestTaskEntryWireContractReservesRetiredFields(t *testing.T) {
+	request := (&pb.ResolveTaskEntryRequest{}).ProtoReflect().Descriptor()
+	if request.Fields().ByNumber(2) != nil || !request.ReservedRanges().Has(2) || !request.ReservedNames().Has("token") {
+		t.Fatal("Task token request field must remain reserved by number and name")
+	}
+	result := (&pb.TaskResultMessage{}).ProtoReflect().Descriptor()
+	if result.Fields().ByNumber(13) != nil || !result.ReservedRanges().Has(13) || !result.ReservedNames().Has("entry_token") {
+		t.Fatal("Task token result field must remain reserved by number and name")
+	}
+	if entryURL := result.Fields().ByNumber(14); entryURL == nil || entryURL.Name() != "entry_url" {
+		t.Fatal("Task entry URL must retain its wire identity")
+	}
+}
 
 func TestProtoGoPackageContractUsesSharedGRPCGenPath(t *testing.T) {
 	t.Parallel()

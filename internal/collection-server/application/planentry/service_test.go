@@ -13,7 +13,7 @@ type entryReader struct {
 	err   error
 }
 
-func (r entryReader) ResolveTaskEntry(context.Context, string, string) (*Entry, error) {
+func (r entryReader) ResolveTaskEntry(context.Context, string) (*Entry, error) {
 	return r.entry, r.err
 }
 
@@ -47,7 +47,7 @@ func TestResolveRequiresActiveUserTesteeRelationship(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			access := &accessProbe{err: tc.accessErr}
-			got, err := NewService(tc.reader, access).Resolve(t.Context(), tc.userID, "task-1", "token")
+			got, err := NewService(tc.reader, access).Resolve(t.Context(), tc.userID, "task-1")
 			if !errors.Is(err, tc.wantErr) || (tc.wantErr == nil && err != nil) {
 				t.Fatalf("Resolve error = %v, want %v", err, tc.wantErr)
 			}

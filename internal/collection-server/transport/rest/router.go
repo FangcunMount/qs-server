@@ -7,6 +7,7 @@ import (
 
 	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
 	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/planentry"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
@@ -88,7 +89,6 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 // registerBusinessRoutes 注册业务路由
 func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	api := engine.Group("/api/v1")
-	api.Use(observePlanEntryRoutes())
 
 	// 应用 IAM JWT 认证中间件（如果启用，使用 SDK TokenVerifier 本地验签）
 	r.applyIAMAuth(api, isPublicCatalogReadOnly)
@@ -98,7 +98,7 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 答卷相关路由
 	r.registerAnswerSheetRoutes(api)
-	r.registerPlanEntryRoutes(api)
+	r.registerPlanEntryRoutes(api, r.container.PlanEntryService())
 
 	// 测评相关路由
 	r.registerEvaluationRoutes(api)
@@ -122,15 +122,13 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	r.registerReportEventsRoutes(api)
 }
 
-func (r *Router) registerPlanEntryRoutes(api *gin.RouterGroup) {
-	service := r.container.PlanEntryService()
+func (r *Router) registerPlanEntryRoutes(api *gin.RouterGroup, service *planentry.Service) {
 	if service == nil {
 		return
 	}
 	h := handler.NewPlanEntryHandler(service)
 	api.GET("/plan-tasks", r.queryHandlers(h.List)...)
 	api.GET("/plan-task-entries/:task_id", r.queryHandlers(h.Resolve)...)
-	api.GET("/plan-task-entries/:task_id/:token", r.queryHandlers(h.ResolveLegacy)...)
 }
 
 func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool) {

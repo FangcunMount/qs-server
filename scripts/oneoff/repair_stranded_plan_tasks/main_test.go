@@ -279,10 +279,10 @@ func TestRollbackTaskSkipsDurableAuditRecordWhoseTransactionDidNotCommit(t *test
 	after.DueAt = &due
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE assessment_task SET")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_token,''),COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL")).
 		WithArgs(int64(1), uint64(10)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "version", "status", "planned_at", "due_at", "schedule_revision", "schedule_defined_at", "open_at", "expire_at", "completed_at", "expired_at", "canceled_at", "expiration_reason", "assessment_id", "entry_token", "entry_url"}).
-			AddRow(10, 3, "pending", planned, nil, 1, definedAt, nil, nil, nil, nil, nil, nil, nil, "", ""))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "version", "status", "planned_at", "due_at", "schedule_revision", "schedule_defined_at", "open_at", "expire_at", "completed_at", "expired_at", "canceled_at", "expiration_reason", "assessment_id", "entry_url"}).
+			AddRow(10, 3, "pending", planned, nil, 1, definedAt, nil, nil, nil, nil, nil, nil, nil, ""))
 
 	changed, err := rollbackTask(context.Background(), db, config{orgID: 1}, before, after)
 	if err != nil || changed {

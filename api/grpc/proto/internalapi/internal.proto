@@ -81,7 +81,8 @@ service PlanEntryService {
 
 message ResolveTaskEntryRequest {
   string task_id = 1;
-  string token = 2 [deprecated = true]; // Legacy locator only; never authorization.
+  reserved 2;
+  reserved "token";
 }
 
 message ResolveTaskEntryResponse {
@@ -130,7 +131,8 @@ message TaskResultMessage {
   optional string completed_at = 10;
   string status = 11;
   optional string assessment_id = 12;
-  string entry_token = 13;
+  reserved 13;
+  reserved "entry_token";
   string entry_url = 14;
   optional string due_at = 15;
   optional string expiration_reason = 16;

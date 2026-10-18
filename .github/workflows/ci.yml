@@ -801,6 +801,24 @@ jobs:
             exit 1
           fi
 
+      - name: Verify SQL104 Task token retirement on real databases
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m6_task_token_ci_test
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=3m -v \
+            -run '^TestTaskEntryTokenNativeRetirement$' ./internal/pkg/migration \
+            | tee "${RUNNER_TEMP}/task-token-retirement.log"
+          grep -q -- '=== RUN   TestTaskEntryTokenNativeRetirement$' "${RUNNER_TEMP}/task-token-retirement.log"
+          grep -q -- '--- PASS: TestTaskEntryTokenNativeRetirement ' "${RUNNER_TEMP}/task-token-retirement.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/task-token-retirement.log"; then
+            echo 'Task token retirement must not skip' >&2
+            exit 1
+          fi
+
       - name: Stop owned Mongo index auth fixture
         if: always()
         run: |
@@ -1162,14 +1180,6 @@ jobs:
 
       - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
-
-      - name: Validate compatibility observation contract
-        env:
-          M6_QUERY_ARTIFACT: ${{ runner.temp }}/qs-compat-queries.jsonl
-        run: bash scripts/cd/test-compatibility-observation.sh
-
-      - name: Verify observation expressions with native Prometheus
-        run: python3 scripts/cd/test-compatibility-prometheus.py "${RUNNER_TEMP}/qs-compat-queries.jsonl"
 
       - name: Validate production AuthZ matrix contract
         run: bash scripts/cd/test-verify-authz-production-matrix.sh

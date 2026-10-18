@@ -16,7 +16,7 @@ type taskEntryReader struct {
 	err   error
 }
 
-func (r taskEntryReader) ResolveTaskEntry(context.Context, string, string) (*planentry.Entry, error) {
+func (r taskEntryReader) ResolveTaskEntry(context.Context, string) (*planentry.Entry, error) {
 	return r.entry, r.err
 }
 

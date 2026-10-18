@@ -74,6 +74,31 @@ func RetireMaintenanceTables(t testing.TB, db *gorm.DB, actorUp, up []byte) {
 	if err := db.Raw("SELECT version,dirty FROM schema_migrations LIMIT 2").Scan(&initial).Error; err != nil || len(initial) != 1 || initial[0].Version != 102 || initial[0].Dirty {
 		t.Fatal("fixed maintenance fixture requires real clean SQL102", err)
 	}
+	applyFixtureResources(t, db, fstest.MapFS{
+		"000102_retire_actor_compatibility_columns.up.sql": &fstest.MapFile{Data: actorUp},
+		"000103_retire_legacy_maintenance_tables.up.sql":   &fstest.MapFile{Data: up},
+	}, 103)
+}
+
+// RetireTaskEntryToken executes original SQL104 on a real clean103 disposable
+// fixture whose Task table includes the original token column.
+func RetireTaskEntryToken(t testing.TB, db *gorm.DB, maintenanceUp, up []byte) {
+	t.Helper()
+	var initial []struct {
+		Version uint64
+		Dirty   bool
+	}
+	if err := db.Raw("SELECT version,dirty FROM schema_migrations LIMIT 2").Scan(&initial).Error; err != nil || len(initial) != 1 || initial[0].Version != 103 || initial[0].Dirty {
+		t.Fatal("fixed Task fixture requires real clean SQL103", err)
+	}
+	applyFixtureResources(t, db, fstest.MapFS{
+		"000103_retire_legacy_maintenance_tables.up.sql": &fstest.MapFile{Data: maintenanceUp},
+		"000104_retire_task_entry_token.up.sql":          &fstest.MapFile{Data: up},
+	}, 104)
+}
+
+func applyFixtureResources(t testing.TB, db *gorm.DB, files fstest.MapFS, target uint64) {
+	t.Helper()
 	pool, err := db.DB()
 	if err != nil {
 		t.Fatal(err)
@@ -89,11 +114,7 @@ func RetireMaintenanceTables(t testing.TB, db *gorm.DB, actorUp, up []byte) {
 		_ = conn.Close()
 		t.Fatal(err)
 	}
-	source, err := iofs.New(fstest.MapFS{
-		// The provider validates its already-applied current resource without rerunning it.
-		"000102_retire_actor_compatibility_columns.up.sql": &fstest.MapFile{Data: actorUp},
-		"000103_retire_legacy_maintenance_tables.up.sql":   &fstest.MapFile{Data: up},
-	}, ".")
+	source, err := iofs.New(files, ".")
 	if err != nil {
 		_ = provider.Close()
 		t.Fatal(err)
@@ -104,16 +125,16 @@ func RetireMaintenanceTables(t testing.TB, db *gorm.DB, actorUp, up []byte) {
 		_ = provider.Close()
 		t.Fatal(err)
 	}
-	runErr := m.Migrate(103)
+	runErr := m.Migrate(uint(target))
 	sourceErr, closeErr := m.Close()
 	if runErr != nil || sourceErr != nil || closeErr != nil {
-		t.Fatalf("fixed maintenance fixture migration or release failed: %v / %v / %v", runErr, sourceErr, closeErr)
+		t.Fatalf("fixed fixture migration or release failed: %v / %v / %v", runErr, sourceErr, closeErr)
 	}
 	var rows []struct {
 		Version uint64
 		Dirty   bool
 	}
-	if err := db.Raw("SELECT version,dirty FROM schema_migrations").Scan(&rows).Error; err != nil || len(rows) != 1 || rows[0].Version != 103 || rows[0].Dirty {
-		t.Fatal("fixed maintenance fixture did not finish at clean SQL103", err)
+	if err := db.Raw("SELECT version,dirty FROM schema_migrations").Scan(&rows).Error; err != nil || len(rows) != 1 || rows[0].Version != target || rows[0].Dirty {
+		t.Fatalf("fixed fixture did not finish at clean SQL%d: %v", target, err)
 	}
 }

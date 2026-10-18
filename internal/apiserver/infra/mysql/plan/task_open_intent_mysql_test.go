@@ -86,7 +86,7 @@ events:
 	precisionTask := domainplan.NewAssessmentTaskAt(domainplan.NewAssessmentPlanID(), 99, 501,
 		testee.NewID(21), "scale", preciseOpenAt.Add(-time.Minute), preciseOpenAt.Add(-time.Minute))
 	require.NoError(t, domainplan.NewTaskLifecycle().OpenAt(t.Context(), precisionTask,
-		"test-entry", "https://example.invalid/entry", preciseOpenAt))
+		"https://example.invalid/entry", preciseOpenAt))
 	persistOpeningScope(t, db, precisionTask)
 	require.NoError(t, repository.Save(t.Context(), precisionTask))
 	precisionState, err := appplan.NewTaskReminderStateReader(repository).GetTaskReminderState(

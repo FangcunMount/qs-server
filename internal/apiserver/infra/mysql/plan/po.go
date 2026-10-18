@@ -93,8 +93,7 @@ type AssessmentTaskPO struct {
 	AssessmentID     *uint64 `gorm:"column:assessment_id;index:idx_assessment_id"`
 
 	// 入口信息
-	EntryToken string `gorm:"column:entry_token;size:255"`
-	EntryURL   string `gorm:"column:entry_url;size:500"`
+	EntryURL string `gorm:"column:entry_url;size:500"`
 
 	// 唯一索引：计划ID + 受试者ID + 序号（保证同一受试者在同一计划下每个 seq 只有一条任务）
 }

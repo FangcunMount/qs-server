@@ -10,7 +10,7 @@ import (
 )
 
 // entryGenerator 入口生成器实现
-// 负责生成测评入口（token、URL）
+// 负责生成测评入口（TaskID URL）
 type entryGenerator struct {
 	baseURL string // 测评入口的基础URL（例如：https://collect.fangcunmount.cn/entry）
 }
@@ -23,7 +23,7 @@ func NewEntryGenerator(baseURL string) planentryport.Generator {
 }
 
 // GenerateEntry 生成测评入口
-func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.AssessmentTask) (token string, url string, err error) {
+func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.AssessmentTask) (url string, err error) {
 	taskID := task.GetID().String()
 	logger.L(ctx).Infow("Generating entry for task",
 		"infra_action", "generate_entry",
@@ -31,10 +31,9 @@ func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.Ass
 	)
 
 	// Task IDs locate tasks; login and active profile relationships authorize access.
-	token = ""
 	base, parseErr := urlpkg.Parse(g.baseURL)
 	if parseErr != nil {
-		return "", "", parseErr
+		return "", parseErr
 	}
 	query := urlpkg.Values{}
 	query.Set("task_id", taskID)
@@ -47,5 +46,5 @@ func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.Ass
 		"task_id", taskID,
 	)
 
-	return token, url, nil
+	return url, nil
 }

@@ -381,7 +381,6 @@ func toPBTaskResult(result *planApp.TaskResult) (*pb.TaskResultMessage, error) {
 		CompletedAt:      cloneOptionalString(result.CompletedAt),
 		Status:           result.Status,
 		AssessmentId:     cloneOptionalString(result.AssessmentID),
-		EntryToken:       result.EntryToken,
 		EntryUrl:         result.EntryURL,
 		DueAt:            cloneOptionalString(result.DueAt),
 		ExpirationReason: cloneOptionalString(result.ExpirationReason),

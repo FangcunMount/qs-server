@@ -13,15 +13,15 @@ import (
 func TestNewTaskLinkAndOpenedEventContainOnlyTaskID(t *testing.T) {
 	now := time.Now()
 	task := domain.NewAssessmentTaskAt(domain.NewAssessmentPlanID(), 1, 7, testee.NewID(31), "scale", now, now)
-	token, link, err := NewEntryGenerator("https://collect.example/entry?token=legacy&q=forged#legacy").GenerateEntry(t.Context(), task)
+	link, err := NewEntryGenerator("https://collect.example/entry?token=legacy&q=forged#legacy").GenerateEntry(t.Context(), task)
 	if err != nil {
 		t.Fatal(err)
 	}
 	parsed, _ := url.Parse(link)
-	if token != "" || len(parsed.Query()) != 1 || parsed.Query().Get("task_id") != task.GetID().String() {
+	if len(parsed.Query()) != 1 || parsed.Query().Get("task_id") != task.GetID().String() {
 		t.Fatalf("token or unrelated locator retained: %s", link)
 	}
-	if err := domain.NewTaskLifecycle().OpenAt(t.Context(), task, token, link, now); err != nil {
+	if err := domain.NewTaskLifecycle().OpenAt(t.Context(), task, link, now); err != nil {
 		t.Fatal(err)
 	}
 	for _, event := range task.Events() {

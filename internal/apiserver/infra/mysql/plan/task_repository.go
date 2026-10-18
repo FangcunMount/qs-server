@@ -293,13 +293,12 @@ func (r *taskRepository) updateAndSyncTask(ctx context.Context, po *AssessmentTa
 		// A stale pending Task must never overwrite a winner's entry URL and
 		// publish a second task.opened event.
 		updates := map[string]any{
-			"status":      po.Status,
-			"open_at":     po.OpenAt,
-			"expire_at":   po.ExpireAt,
-			"entry_token": po.EntryToken,
-			"entry_url":   po.EntryURL,
-			"updated_at":  time.Now().UTC(),
-			"version":     gorm.Expr("version + 1"),
+			"status":     po.Status,
+			"open_at":    po.OpenAt,
+			"expire_at":  po.ExpireAt,
+			"entry_url":  po.EntryURL,
+			"updated_at": time.Now().UTC(),
+			"version":    gorm.Expr("version + 1"),
 		}
 		if userID := middleware.GetUserIDFromContext(ctx); userID > 0 {
 			updates["updated_by"] = userID
@@ -341,7 +340,6 @@ func (r *taskRepository) SaveRescheduled(ctx context.Context, task *domainPlan.A
 		"canceled_at":         po.CanceledAt,
 		"expiration_reason":   po.ExpirationReason,
 		"assessment_id":       po.AssessmentID,
-		"entry_token":         po.EntryToken,
 		"entry_url":           po.EntryURL,
 		"updated_at":          time.Now().UTC(),
 		"version":             gorm.Expr("version + 1"),

@@ -93,7 +93,6 @@ type TaskRow struct {
 	Status           string
 	ExpirationReason string
 	AssessmentID     *uint64
-	EntryToken       string
 	EntryURL         string
 }
 

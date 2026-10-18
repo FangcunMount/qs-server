@@ -20,7 +20,7 @@ func NewPlanEntryHandler(service *planentry.Service) *PlanEntryHandler {
 }
 
 // Resolve returns task content only after login and an active User -> Testee
-// relationship check. The task token alone conveys no access.
+// relationship check.
 // @Summary 解析当前用户的计划任务测评入口
 // @Tags Plan-Entry
 // @Produce json
@@ -35,7 +35,7 @@ func (h *PlanEntryHandler) Resolve(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
-	entry, err := h.service.Resolve(c.Request.Context(), claims.UserID, c.Param("task_id"), c.Param("token"))
+	entry, err := h.service.Resolve(c.Request.Context(), claims.UserID, c.Param("task_id"))
 	if err != nil {
 		switch {
 		case errors.Is(err, planentry.ErrInvalidEntry):
@@ -76,13 +76,3 @@ func (h *PlanEntryHandler) List(c *gin.Context) {
 	}
 	h.Success(c, gin.H{"items": entries})
 }
-
-// ResolveLegacy keeps old links under exactly the same authenticated authorization.
-// @Summary 兼容旧计划任务入口
-// @Tags Plan-Entry
-// @Produce json
-// @Param task_id path string true "任务ID"
-// @Param token path string true "历史入口参数，忽略且不授权"
-// @Success 200 {object} core.Response{data=planentry.Entry}
-// @Router /api/v1/plan-task-entries/{task_id}/{token} [get]
-func (h *PlanEntryHandler) ResolveLegacy(c *gin.Context) { h.Resolve(c) }

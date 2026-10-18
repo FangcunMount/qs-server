@@ -15880,19 +15880,11 @@ components:
     response.AssessmentModelValidationResponse:
       type: object
       properties:
-        errors:
-          description: 'Deprecated: 派生 从 Issues 用于 向后兼容。'
-          type: array
-          items:
-            type: string
         issues:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.ValidationIssue'
         passed:
-          type: boolean
-        valid:
-          description: 'Deprecated: mirror Passed 用于 向后兼容。'
           type: boolean
     response.AssessmentOutcomeListResponse:
       type: object
@@ -17584,9 +17576,6 @@ components:
           type: string
         due_at:
           description: 履约截止时间
-          type: string
-        entry_token:
-          description: 入口令牌
           type: string
         entry_url:
           description: 入口URL

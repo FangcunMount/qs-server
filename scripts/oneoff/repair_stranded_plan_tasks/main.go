@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -80,7 +81,6 @@ type taskState struct {
 	CanceledAt        *time.Time `json:"canceled_at,omitempty"`
 	ExpirationReason  *string    `json:"expiration_reason,omitempty"`
 	AssessmentID      *uint64    `json:"assessment_id,omitempty"`
-	EntryToken        string     `json:"entry_token"`
 	EntryURL          string     `json:"entry_url"`
 }
 
@@ -424,7 +424,7 @@ func writeScheduleInferenceAudit(ctx context.Context, db *sql.DB, cfg config, cp
 }
 
 const parentJoinSQL = ` FROM assessment_task t LEFT JOIN assessment_plan p ON p.id=t.plan_id AND p.org_id=t.org_id AND p.deleted_at IS NULL LEFT JOIN plan_enrollment e ON e.id=t.enrollment_id AND e.plan_id=t.plan_id AND e.org_id=t.org_id AND e.deleted_at IS NULL `
-const cleanPredicate = ` t.open_at IS NULL AND t.expire_at IS NULL AND t.completed_at IS NULL AND t.expired_at IS NULL AND t.canceled_at IS NULL AND t.assessment_id IS NULL AND COALESCE(t.entry_token,'')='' AND COALESCE(t.entry_url,'')='' AND COALESCE(t.expiration_reason,'')='' `
+const cleanPredicate = ` t.open_at IS NULL AND t.expire_at IS NULL AND t.completed_at IS NULL AND t.expired_at IS NULL AND t.canceled_at IS NULL AND t.assessment_id IS NULL AND COALESCE(t.entry_url,'')='' AND COALESCE(t.expiration_reason,'')='' `
 const cleanMissedCountSQL = `SELECT COUNT(*)` + parentJoinSQL + `WHERE t.org_id=? AND t.status='pending' AND t.planned_at<=? AND t.deleted_at IS NULL AND p.status='active' AND e.status='active' AND ` + cleanPredicate
 const dirtyMissedCountSQL = `SELECT COUNT(*)` + parentJoinSQL + `WHERE t.org_id=? AND t.status='pending' AND t.planned_at<=? AND t.deleted_at IS NULL AND p.status='active' AND e.status='active' AND NOT (` + cleanPredicate + `)`
 const inactiveMissedCountSQL = `SELECT COUNT(*)` + parentJoinSQL + `WHERE t.org_id=? AND t.status='pending' AND t.planned_at<=? AND t.deleted_at IS NULL AND (p.id IS NULL OR e.id IS NULL OR p.status<>'active' OR e.status<>'active')`
@@ -544,7 +544,7 @@ func backfillSchedule(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 
 func backfillDue(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, writer *auditWriter, out io.Writer) error {
 	for {
-		rows, err := db.QueryContext(ctx, `SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_token,''),COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND deleted_at IS NULL AND due_at IS NULL AND id>? ORDER BY id LIMIT ?`, cfg.orgID, cp.LastID, batchSize)
+		rows, err := db.QueryContext(ctx, `SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND deleted_at IS NULL AND due_at IS NULL AND id>? ORDER BY id LIMIT ?`, cfg.orgID, cp.LastID, batchSize)
 		if err != nil {
 			return err
 		}
@@ -596,7 +596,7 @@ func backfillDue(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 
 func expireMissed(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, writer *auditWriter, out io.Writer) error {
 	threshold := cfg.cutoff.Add(-openWindow)
-	query := `SELECT t.id,t.version,t.status,t.planned_at,t.due_at,t.schedule_revision,t.schedule_defined_at,t.open_at,t.expire_at,t.completed_at,t.expired_at,t.canceled_at,t.expiration_reason,t.assessment_id,COALESCE(t.entry_token,''),COALESCE(t.entry_url,'')` + parentJoinSQL + `WHERE t.org_id=? AND t.status='pending' AND t.planned_at<=? AND t.id>? AND t.deleted_at IS NULL AND p.status='active' AND e.status='active' AND ` + cleanPredicate + ` ORDER BY t.id LIMIT ?`
+	query := `SELECT t.id,t.version,t.status,t.planned_at,t.due_at,t.schedule_revision,t.schedule_defined_at,t.open_at,t.expire_at,t.completed_at,t.expired_at,t.canceled_at,t.expiration_reason,t.assessment_id,COALESCE(t.entry_url,'')` + parentJoinSQL + `WHERE t.org_id=? AND t.status='pending' AND t.planned_at<=? AND t.id>? AND t.deleted_at IS NULL AND p.status='active' AND e.status='active' AND ` + cleanPredicate + ` ORDER BY t.id LIMIT ?`
 	for {
 		rows, err := db.QueryContext(ctx, query, cfg.orgID, threshold, cp.LastID, batchSize)
 		if err != nil {
@@ -658,7 +658,7 @@ func scanTaskState(row rowScanner) (taskState, error) {
 	var due, scheduleDefined, open, expire, completed, expired, canceled sql.NullTime
 	var reason sql.NullString
 	var assessmentID sql.NullInt64
-	err := row.Scan(&s.ID, &s.Version, &s.Status, &s.PlannedAt, &due, &s.ScheduleRevision, &scheduleDefined, &open, &expire, &completed, &expired, &canceled, &reason, &assessmentID, &s.EntryToken, &s.EntryURL)
+	err := row.Scan(&s.ID, &s.Version, &s.Status, &s.PlannedAt, &due, &s.ScheduleRevision, &scheduleDefined, &open, &expire, &completed, &expired, &canceled, &reason, &assessmentID, &s.EntryURL)
 	if err != nil {
 		return s, err
 	}
@@ -916,6 +916,16 @@ func readAuditRecords(path, runID string) (records []auditRecord, readErr error)
 			return nil, err
 		}
 		if record.RunID == runID && (record.Kind == "task" || record.Kind == "task_schedule" || record.Kind == "enrollment") {
+			if record.Kind == "task" {
+				for _, raw := range []json.RawMessage{record.Before, record.After} {
+					decoder := json.NewDecoder(bytes.NewReader(raw))
+					decoder.DisallowUnknownFields()
+					var state taskState
+					if err := decoder.Decode(&state); err != nil {
+						return nil, fmt.Errorf("current Task evidence required; legacy token evidence belongs to isolated old-schema recovery: %w", err)
+					}
+				}
+			}
 			records = append(records, record)
 		}
 	}
@@ -923,7 +933,7 @@ func readAuditRecords(path, runID string) (records []auditRecord, readErr error)
 }
 
 func rollbackTask(ctx context.Context, db *sql.DB, cfg config, before, after taskState) (bool, error) {
-	res, err := db.ExecContext(ctx, `UPDATE assessment_task SET status=?,due_at=?,schedule_revision=?,schedule_defined_at=?,open_at=?,expire_at=?,completed_at=?,expired_at=?,canceled_at=?,expiration_reason=?,assessment_id=?,entry_token=?,entry_url=?,version=? WHERE org_id=? AND id=? AND version=? AND status=? AND due_at <=> ? AND schedule_revision=? AND schedule_defined_at <=> ? AND open_at <=> ? AND expire_at <=> ? AND completed_at <=> ? AND expired_at <=> ? AND canceled_at <=> ? AND expiration_reason <=> ? AND assessment_id <=> ? AND entry_token=? AND entry_url=? AND deleted_at IS NULL`, before.Status, nullableValue(before.DueAt), before.ScheduleRevision, nullableValue(before.ScheduleDefinedAt), nullableValue(before.OpenAt), nullableValue(before.ExpireAt), nullableValue(before.CompletedAt), nullableValue(before.ExpiredAt), nullableValue(before.CanceledAt), nullableValue(before.ExpirationReason), nullableValue(before.AssessmentID), before.EntryToken, before.EntryURL, before.Version, cfg.orgID, before.ID, after.Version, after.Status, nullableValue(after.DueAt), after.ScheduleRevision, nullableValue(after.ScheduleDefinedAt), nullableValue(after.OpenAt), nullableValue(after.ExpireAt), nullableValue(after.CompletedAt), nullableValue(after.ExpiredAt), nullableValue(after.CanceledAt), nullableValue(after.ExpirationReason), nullableValue(after.AssessmentID), after.EntryToken, after.EntryURL)
+	res, err := db.ExecContext(ctx, `UPDATE assessment_task SET status=?,due_at=?,schedule_revision=?,schedule_defined_at=?,open_at=?,expire_at=?,completed_at=?,expired_at=?,canceled_at=?,expiration_reason=?,assessment_id=?,entry_url=?,version=? WHERE org_id=? AND id=? AND version=? AND status=? AND due_at <=> ? AND schedule_revision=? AND schedule_defined_at <=> ? AND open_at <=> ? AND expire_at <=> ? AND completed_at <=> ? AND expired_at <=> ? AND canceled_at <=> ? AND expiration_reason <=> ? AND assessment_id <=> ? AND entry_url=? AND deleted_at IS NULL`, before.Status, nullableValue(before.DueAt), before.ScheduleRevision, nullableValue(before.ScheduleDefinedAt), nullableValue(before.OpenAt), nullableValue(before.ExpireAt), nullableValue(before.CompletedAt), nullableValue(before.ExpiredAt), nullableValue(before.CanceledAt), nullableValue(before.ExpirationReason), nullableValue(before.AssessmentID), before.EntryURL, before.Version, cfg.orgID, before.ID, after.Version, after.Status, nullableValue(after.DueAt), after.ScheduleRevision, nullableValue(after.ScheduleDefinedAt), nullableValue(after.OpenAt), nullableValue(after.ExpireAt), nullableValue(after.CompletedAt), nullableValue(after.ExpiredAt), nullableValue(after.CanceledAt), nullableValue(after.ExpirationReason), nullableValue(after.AssessmentID), after.EntryURL)
 	if err != nil {
 		return false, err
 	}
@@ -980,7 +990,7 @@ func rollbackEnrollment(ctx context.Context, db *sql.DB, cfg config, before, aft
 }
 
 func loadTaskState(ctx context.Context, db *sql.DB, orgID int64, id uint64) (taskState, error) {
-	row := db.QueryRowContext(ctx, `SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_token,''),COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL`, orgID, id)
+	row := db.QueryRowContext(ctx, `SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL`, orgID, id)
 	return scanTaskState(row)
 }
 
@@ -990,7 +1000,7 @@ func taskStatesEqual(left, right taskState) bool {
 		timesEqual(left.DueAt, right.DueAt) && timesEqual(left.OpenAt, right.OpenAt) && timesEqual(left.ExpireAt, right.ExpireAt) &&
 		timesEqual(left.CompletedAt, right.CompletedAt) && timesEqual(left.ExpiredAt, right.ExpiredAt) && timesEqual(left.CanceledAt, right.CanceledAt) &&
 		stringsEqual(left.ExpirationReason, right.ExpirationReason) && uint64sEqual(left.AssessmentID, right.AssessmentID) &&
-		left.EntryToken == right.EntryToken && left.EntryURL == right.EntryURL
+		left.EntryURL == right.EntryURL
 }
 
 func timesEqual(left, right *time.Time) bool {
