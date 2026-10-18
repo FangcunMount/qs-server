@@ -65,9 +65,8 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	if issues := handler.ValidateForPublish(ctx, model); domain.HasValidationErrors(issues) {
 		return nil, modelcatalog.NewValidationFailedError(issues)
 	}
-	if model.DefinitionV2 != nil {
-		modeldefinition.MaterializeLayers(model.DefinitionV2)
-		model.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+	if model.DefinitionV2 != nil && !model.IsPublished() {
+		model.ReportAssetsProjectionVersion = interpretationassets.ProjectionCanonicalV2
 	}
 	now := p.now()
 	if model.IsPublished() {
@@ -132,7 +131,7 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Material
 		QuestionnaireVersion:          model.Binding.QuestionnaireVersion,
 		Source:                        map[string]any{},
 		DefinitionV2:                  model.DefinitionV2,
-		ReportAssetsProjectionVersion: interpretationassets.ProjectionLegacyV1,
+		ReportAssetsProjectionVersion: model.ReportAssetsProjectionVersion,
 	}
 	return snapshot
 }

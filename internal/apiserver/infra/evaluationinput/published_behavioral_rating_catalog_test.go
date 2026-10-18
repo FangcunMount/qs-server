@@ -459,7 +459,8 @@ func retainedBehavioralModel(algorithm domain.Algorithm, revision int64, normVer
 		execution.Brief2 = &modeldefinition.Brief2Spec{FormVariant: "parent", PrimaryFactorCode: "total"}
 	}
 	return &domain.AssessmentModel{
-		Kind: domain.KindBehavioralRating, Algorithm: algorithm, Code: "behavioral-retained", Version: revision,
+		ReportAssetsProjectionVersion: 2,
+		Kind:                          domain.KindBehavioralRating, Algorithm: algorithm, Code: "behavioral-retained", Version: revision,
 		Title: "Behavioral retained", Status: domain.ModelStatusPublished,
 		Binding: domain.QuestionnaireBinding{QuestionnaireCode: "Q-BEH", QuestionnaireVersion: "1"},
 		DefinitionV2: &modeldefinition.Definition{

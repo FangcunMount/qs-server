@@ -798,7 +798,6 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 	}
 	content := string(workflow) + "\n" + string(script)
 	for _, required := range []string{
-		"schedule:",
 		"Compatibility Metrics",
 		"scripts/cd/audit-compatibility-observation.sh",
 		"http://prometheus:9090",

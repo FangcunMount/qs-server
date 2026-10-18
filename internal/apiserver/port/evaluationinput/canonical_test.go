@@ -10,27 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-func TestAttachCanonicalDefinitionMaterializesAssets(t *testing.T) {
-	t.Parallel()
-	def := &modeldefinition.Definition{
-		Measure:  modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "总分"}}},
-		Outcomes: []conclusion.Outcome{{Code: "low", Title: "低", Summary: "摘要"}},
-	}
-	modeldefinition.MaterializeLayers(def)
-	snapshot := &evaluationinput.InputSnapshot{}
-	evaluationinput.AttachCanonicalDefinition(snapshot, def)
-	if snapshot.DefinitionV2 == nil {
-		t.Fatal("expected definition v2")
-	}
-	if snapshot.InterpretationAssets == nil {
-		t.Fatal("expected interpretation assets")
-	}
-	got, ok := snapshot.InterpretationAssets.FindOutcome("low")
-	if !ok || got.Summary != "摘要" {
-		t.Fatalf("assets = %#v ok=%v", got, ok)
-	}
-}
-
 func TestFactorCatalogFromDefinitionUsesMeasure(t *testing.T) {
 	t.Parallel()
 	max := 27.0
@@ -43,17 +22,20 @@ func TestFactorCatalogFromDefinitionUsesMeasure(t *testing.T) {
 	}
 }
 
-func TestInterpretationAssetsFromSnapshotPrefersCanonical(t *testing.T) {
+func TestInterpretationAssetsFromSnapshotRequiresFrozenAssets(t *testing.T) {
 	t.Parallel()
 	def := &modeldefinition.Definition{
 		Outcomes: []conclusion.Outcome{{Code: "low", Summary: "canonical"}},
 	}
-	modeldefinition.MaterializeLayers(def)
 	snapshot := &evaluationinput.InputSnapshot{DefinitionV2: def}
+	if _, ok := evaluationinput.InterpretationAssetsFromSnapshot(snapshot); ok {
+		t.Fatal("unversioned Definition became report assets")
+	}
+	frozen := interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "low", Summary: "frozen"}}}
+	snapshot.InterpretationAssets = &frozen
 	assets, ok := evaluationinput.InterpretationAssetsFromSnapshot(snapshot)
 	got, found := assets.FindOutcome("low")
-	if !ok || !found || got.Summary != "canonical" {
-		t.Fatalf("assets = %#v ok=%v found=%v", assets, ok, found)
+	if !ok || !found || got.Summary != "frozen" {
+		t.Fatal("frozen report assets lost")
 	}
-	_ = interpretationassets.Assets{}
 }

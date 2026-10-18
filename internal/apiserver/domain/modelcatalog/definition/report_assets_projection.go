@@ -2,7 +2,6 @@ package definition
 
 import (
 	"errors"
-	"reflect"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
@@ -24,26 +23,15 @@ func ReportAssetsProjectionFrom(def *Definition, version interpretationassets.Pr
 	}
 }
 
-var (
-	ErrMissingReportAssetsDefinition  = errors.New("report assets definition is missing")
-	ErrReportAssetsProjectionMismatch = errors.New("stored report assets differ from the declared projection")
-)
+var ErrMissingReportAssetsDefinition = errors.New("report assets definition is missing")
 
-// ResolveReportAssetsProjection enforces the published record's encoding version.
-// Retained stored assets must agree before switching reads to the pure projection.
-// Once retired fields are absent, V1 still reproduces the old codec semantics.
+// ResolveReportAssetsProjection requires an explicit version for every runtime
+// read. Old model versions retain the immutable v1 encoding after field removal.
 func ResolveReportAssetsProjection(def *Definition, version interpretationassets.ProjectionVersion) (interpretationassets.Assets, error) {
 	if def == nil {
 		return interpretationassets.Assets{}, ErrMissingReportAssetsDefinition
 	}
-	projected, err := ReportAssetsProjectionFrom(def, version)
-	if err != nil {
-		return interpretationassets.Assets{}, err
-	}
-	if def.InterpretationAssets.IsMaterialized() && !reflect.DeepEqual(normalizeReportAssets(projected), normalizeReportAssets(def.InterpretationAssets)) {
-		return interpretationassets.Assets{}, ErrReportAssetsProjectionMismatch
-	}
-	return projected, nil
+	return ReportAssetsProjectionFrom(def, version)
 }
 
 // The frozen v1 encoding DTO deliberately does not depend on today's Mongo PO
@@ -114,25 +102,6 @@ func decodeReportAssetsV1(encoded reportAssetsV1) interpretationassets.Assets {
 			Kind: item.Kind, AdapterKey: item.AdapterKey, TemplateID: item.TemplateID,
 			TemplateVersion: item.TemplateVersion, CategoryLabel: item.CategoryLabel,
 		})
-	}
-	return out
-}
-
-// Only nil versus empty collections are normalized. Order, duplicate codes,
-// routing, all copy and all Rarity fields remain exact.
-func normalizeReportAssets(assets interpretationassets.Assets) interpretationassets.Assets {
-	out := assets
-	out.Outcomes = append([]interpretationassets.OutcomePresentation(nil), assets.Outcomes...)
-	out.Profiles = append([]interpretationassets.TypeProfilePresentation(nil), assets.Profiles...)
-	for i := range out.Profiles {
-		out.Profiles[i].Traits = append([]string(nil), assets.Profiles[i].Traits...)
-		out.Profiles[i].Strengths = append([]string(nil), assets.Profiles[i].Strengths...)
-		out.Profiles[i].Weaknesses = append([]string(nil), assets.Profiles[i].Weaknesses...)
-		out.Profiles[i].Suggestions = append([]string(nil), assets.Profiles[i].Suggestions...)
-	}
-	out.ReportSpec.Sections = append([]interpretationassets.ReportSection(nil), assets.ReportSpec.Sections...)
-	for i := range out.ReportSpec.Sections {
-		out.ReportSpec.Sections[i].SourceRefs = append([]string(nil), assets.ReportSpec.Sections[i].SourceRefs...)
 	}
 	return out
 }

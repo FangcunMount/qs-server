@@ -99,7 +99,7 @@ func New(input NewInput) (*AssessmentModel, error) {
 		Reporters:                     append([]string(nil), input.Reporters...),
 		Tags:                          append([]string(nil), input.Tags...),
 		Status:                        StatusDraft,
-		ReportAssetsProjectionVersion: interpretationassets.ProjectionLegacyV1,
+		ReportAssetsProjectionVersion: interpretationassets.ProjectionCanonicalV2,
 		Version:                       1,
 		CreatedAt:                     now,
 		UpdatedAt:                     now,
@@ -236,7 +236,7 @@ func (m *AssessmentModel) UpdateDefinition(value *definition.Definition, now tim
 		return fmt.Errorf("%w: definition_v2 is required", ErrInvalidArgument)
 	}
 	m.DefinitionV2 = value
-	m.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+	m.ReportAssetsProjectionVersion = interpretationassets.ProjectionCanonicalV2
 	m.touch(now)
 	return nil
 }

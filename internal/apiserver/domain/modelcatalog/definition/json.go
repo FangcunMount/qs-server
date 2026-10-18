@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/decision"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
 // MarshalJSON makes the polymorphic conclusion layer explicit at transport
@@ -18,14 +16,12 @@ func (d Definition) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(definitionJSON{
-		Measure:              d.Measure,
-		Calibration:          d.Calibration,
-		Execution:            d.Execution,
-		Conclusions:          items,
-		Outcomes:             d.Outcomes,
-		ReportMap:            d.ReportMap,
-		DecisionSpec:         d.DecisionSpec,
-		InterpretationAssets: d.InterpretationAssets,
+		Measure:     d.Measure,
+		Calibration: d.Calibration,
+		Execution:   d.Execution,
+		Conclusions: items,
+		Outcomes:    d.Outcomes,
+		ReportMap:   d.ReportMap,
 	})
 }
 
@@ -42,27 +38,23 @@ func (d *Definition) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*d = Definition{
-		Measure:              raw.Measure,
-		Calibration:          raw.Calibration,
-		Execution:            raw.Execution,
-		Conclusions:          items,
-		Outcomes:             raw.Outcomes,
-		ReportMap:            raw.ReportMap,
-		DecisionSpec:         raw.DecisionSpec,
-		InterpretationAssets: raw.InterpretationAssets,
+		Measure:     raw.Measure,
+		Calibration: raw.Calibration,
+		Execution:   raw.Execution,
+		Conclusions: items,
+		Outcomes:    raw.Outcomes,
+		ReportMap:   raw.ReportMap,
 	}
 	return nil
 }
 
 type definitionJSON struct {
-	Measure              MeasureSpec                 `json:"Measure"`
-	Calibration          Calibration                 `json:"Calibration"`
-	Execution            ExecutionSpec               `json:"Execution"`
-	Conclusions          []conclusionJSON            `json:"Conclusions"`
-	Outcomes             []conclusion.Outcome        `json:"Outcomes"`
-	ReportMap            ReportMap                   `json:"ReportMap"`
-	DecisionSpec         decision.Spec               `json:"DecisionSpec,omitempty"`
-	InterpretationAssets interpretationassets.Assets `json:"InterpretationAssets,omitempty"`
+	Measure     MeasureSpec          `json:"Measure"`
+	Calibration Calibration          `json:"Calibration"`
+	Execution   ExecutionSpec        `json:"Execution"`
+	Conclusions []conclusionJSON     `json:"Conclusions"`
+	Outcomes    []conclusion.Outcome `json:"Outcomes"`
+	ReportMap   ReportMap            `json:"ReportMap"`
 }
 
 type conclusionJSON struct {

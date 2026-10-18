@@ -21,9 +21,8 @@ func TestStrictProjectionPreservesStoredReadIdentityAndFrozenReportBytes(t *test
 	var identityBaseline port.InputSnapshotIdentity
 	for _, version := range []interpretationassets.ProjectionVersion{1, 2} {
 		def := &domain.Definition{
-			Measure:              modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "Total", Role: factor.FactorRoleTotal}}},
-			Outcomes:             []conclusion.Outcome{{Code: "low", Summary: "retained"}},
-			InterpretationAssets: interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "low", Summary: "retained"}}},
+			Measure:  modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "Total", Role: factor.FactorRoleTotal}}},
+			Outcomes: []conclusion.Outcome{{Code: "low", Summary: "retained"}},
 		}
 		published := &modelport.PublishedModel{Code: "M", Version: "v1", DefinitionV2: def, ReportAssetsProjectionVersion: version}
 		input := &port.InputSnapshot{
@@ -32,7 +31,9 @@ func TestStrictProjectionPreservesStoredReadIdentityAndFrozenReportBytes(t *test
 			AnswerSheet:   &port.AnswerSheetSnapshot{ID: 1, QuestionnaireCode: "Q", QuestionnaireVersion: "v1"},
 		}
 		legacy := *input
-		port.AttachCanonicalDefinition(&legacy, def)
+		legacy.DefinitionV2 = def
+		legacyAssets, _ := modeldefinition.ResolveReportAssetsProjection(def, version)
+		legacy.InterpretationAssets = &legacyAssets
 		legacyIdentity, _ := port.NewInputSnapshotIdentity(&legacy)
 		legacyRef := port.ModelRef{Kind: port.EvaluationModelKindScale, Code: "M", Version: "v1"}
 		legacyFrozen, legacyErr := port.MarshalReportInput(port.BuildFreezeOptionsFromSnapshot(&legacy, legacyRef, domain.DecisionKindScoreRange))
@@ -85,7 +86,9 @@ func TestStrictProjectionPreservesStoredReadIdentityAndFrozenReportBytes(t *test
 		if err != nil {
 			t.Fatal(err)
 		}
-		port.AttachCanonicalDefinition(replayed, def)
+		if err := attachCanonicalWithProjection(replayed, published); err != nil {
+			t.Fatal(err)
+		}
 		assets, _ = port.InterpretationAssetsFromSnapshot(replayed)
 		if assets.Outcomes[0].Summary != "retained" {
 			t.Fatal("historical frozen input replaced by canonical assets")
@@ -93,11 +96,11 @@ func TestStrictProjectionPreservesStoredReadIdentityAndFrozenReportBytes(t *test
 	}
 }
 
-func TestStrictProjectionRejectsUnassignedUnknownAndMismatchedAssets(t *testing.T) {
-	for _, version := range []interpretationassets.ProjectionVersion{0, 1, 2, 99} {
+func TestStrictProjectionRejectsUnassignedAndUnknownVersions(t *testing.T) {
+	for _, version := range []interpretationassets.ProjectionVersion{0, 99} {
 		for _, family := range []string{"scale", "typology", "behavioral", "cognitive"} {
 			t.Run(fmt.Sprint(version)+"/"+family, func(t *testing.T) {
-				def := &domain.Definition{Outcomes: []conclusion.Outcome{{Code: "low", Summary: "canonical"}}, InterpretationAssets: interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "low", Summary: "retained"}}}}
+				def := &domain.Definition{Outcomes: []conclusion.Outcome{{Code: "low", Summary: "canonical"}}}
 				input := &port.InputSnapshot{}
 				published := &modelport.PublishedModel{Code: "M", Version: "v1", DefinitionV2: def, ReportAssetsProjectionVersion: version}
 				ref := port.InputRef{ModelRef: port.ModelRef{Code: "M", Version: "v1"}}

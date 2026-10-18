@@ -106,8 +106,8 @@ func TestPublisherPublishAttachesDefinitionHash(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("published snapshot missing")
 	}
-	if snapshot.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 || model.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
-		t.Fatal("publish did not assign legacy assets encoding version")
+	if snapshot.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 || model.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 {
+		t.Fatal("publish did not assign canonical assets encoding version")
 	}
 	if snapshot.Source[port.SourceDefinitionContentHash] == "" || snapshot.Source[port.SourceDefinitionHashSchema] == "" {
 		t.Fatalf("definition hash = %#v", snapshot.Source)
@@ -233,4 +233,28 @@ func newPublishedTestModel(t *testing.T) *domain.AssessmentModel {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 	return model
+}
+
+func TestPublisherKeepsLegacyProjectionOnlyForPublishedRetry(t *testing.T) {
+	for _, retry := range []bool{false, true} {
+		model := newPublishedTestModel(t)
+		model.DefinitionV2 = completeScaleDefinitionForPublishTest()
+		model.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+		if retry {
+			model.Status = domain.ModelStatusPublished
+		}
+		repo := &publishedRepo{}
+		publisher := publication.Publisher{Registry: definition.NewRegistry(warningSnapshotHandler{}), ModelRepo: &publishedModelRepo{}, Repo: repo}
+		snapshot, err := publisher.Publish(context.Background(), model, publication.PublishOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := interpretationassets.ProjectionCanonicalV2
+		if retry {
+			want = interpretationassets.ProjectionLegacyV1
+		}
+		if snapshot.ReportAssetsProjectionVersion != want || model.ReportAssetsProjectionVersion != want {
+			t.Fatalf("retry=%v projection=%v want=%v", retry, snapshot.ReportAssetsProjectionVersion, want)
+		}
+	}
 }

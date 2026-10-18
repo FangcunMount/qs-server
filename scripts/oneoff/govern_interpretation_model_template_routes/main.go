@@ -232,7 +232,6 @@ func attachCanonicalHashes(record map[string]any, po *mongomodelcatalog.Publishe
 		target.ReportMap.Sections[index].TemplateID = templateID
 		target.ReportMap.Sections[index].TemplateVersion = targetTemplateVersion
 	}
-	modeldefinition.MaterializeLayers(target)
 	targetHash, err := modeldefinition.CanonicalContentHash(target)
 	if err != nil {
 		return fmt.Errorf("hash target DefinitionV2: %w", err)

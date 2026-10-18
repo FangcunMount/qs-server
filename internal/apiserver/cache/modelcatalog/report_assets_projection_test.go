@@ -9,6 +9,8 @@ import (
 	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -23,7 +25,7 @@ func TestPublishedCacheProjectionVersionSurvivesExactLatestQuestionnaireAndList(
 			mr := miniredis.RunT(t)
 			client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 			t.Cleanup(func() { _ = client.Close() })
-			model := &port.PublishedModel{Kind: domain.KindScale, Code: "MODEL", Version: "v1", ReportAssetsProjectionVersion: version}
+			model := &port.PublishedModel{Kind: domain.KindScale, Code: "MODEL", Version: "v1", ReportAssetsProjectionVersion: version, DefinitionV2: &domain.Definition{Conclusions: []conclusion.Conclusion{conclusion.TypeConclusion{Profiles: []conclusion.TypeOutcomeProfile{{OutcomeCode: "INTJ", Rarity: conclusion.Rarity{OneInX: 48}}}}}}}
 			inner := &publishedModelStoreStub{getByRef: model, findByCode: model, findByQuestionnaire: model, listPublished: []*port.PublishedModel{model}, listPublishedTotal: 1}
 			newCache := func() *CachedPublishedModelStore {
 				return NewCachedPublishedModelStore(inner, client, keyspace.NewBuilderWithNamespace("test"), publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
@@ -47,6 +49,18 @@ func TestPublishedCacheProjectionVersionSurvivesExactLatestQuestionnaireAndList(
 				if err != nil || len(list) != 1 || list[0].ReportAssetsProjectionVersion != version {
 					t.Fatalf("list: %#v %v", list, err)
 				}
+				if version.IsKnown() {
+					for _, entry := range []*port.PublishedModel{exact, latest, byQuestionnaire, list[0]} {
+						assets, err := definition.ResolveReportAssetsProjection(entry.DefinitionV2, entry.ReportAssetsProjectionVersion)
+						want := 0
+						if version == interpretationassets.ProjectionCanonicalV2 {
+							want = 48
+						}
+						if err != nil || assets.Profiles[0].Rarity.OneInX != want {
+							t.Fatalf("L2 changed versioned report semantics: %v", err)
+						}
+					}
+				}
 			}
 			if inner.getByRefCalls != 1 || inner.findByCodeCalls != 1 || inner.findByQuestionnaireCalls != 1 || inner.listPublishedCalls != 1 {
 				t.Fatalf("L2 failed: %#v", inner)
@@ -62,8 +76,8 @@ func TestPublishedPayloadSchemaBypassesOldExactAndLatestEntries(t *testing.T) {
 	keys := keyspace.NewBuilderWithNamespace("test")
 	stale := &port.PublishedModel{Kind: domain.KindScale, Code: "MODEL", Version: "v1"}
 	data, _ := json.Marshal(stale)
-	oldRef := keys.BuildPublishedAssessmentModelByRefKey("scale", "", "", "model", "v1") + ":payload-v2"
-	oldLatest := keys.BuildPublishedAssessmentModelLatestByCodeKey("scale", "model") + ":payload-v2"
+	oldRef := keys.BuildPublishedAssessmentModelByRefKey("scale", "", "", "model", "v1") + ":payload-v3"
+	oldLatest := keys.BuildPublishedAssessmentModelLatestByCodeKey("scale", "model") + ":payload-v3"
 	if err := client.Set(context.Background(), oldRef, data, time.Hour).Err(); err != nil {
 		t.Fatal(err)
 	}
@@ -75,8 +89,8 @@ func TestPublishedPayloadSchemaBypassesOldExactAndLatestEntries(t *testing.T) {
 	inner := &publishedModelStoreStub{getByRef: &fresh, findByCode: &fresh, findByQuestionnaire: &fresh, listPublished: []*port.PublishedModel{&fresh}, listPublishedTotal: 1}
 	cached := NewCachedPublishedModelStore(inner, client, keys, publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
 	filter := port.ListPublishedFilter{Page: 1, PageSize: 1}
-	oldQuestionnaire := strings.TrimSuffix(cached.questionnaireCacheKey("Q", "v1", 0), publishedModelPayloadSchemaSuffix) + ":payload-v2"
-	oldList := strings.TrimSuffix(cached.listCatalogCacheKeyAtVersion(filter, 0), publishedModelPayloadSchemaSuffix) + ":payload-v2"
+	oldQuestionnaire := strings.TrimSuffix(cached.questionnaireCacheKey("Q", "v1", 0), publishedModelPayloadSchemaSuffix) + ":payload-v3"
+	oldList := strings.TrimSuffix(cached.listCatalogCacheKeyAtVersion(filter, 0), publishedModelPayloadSchemaSuffix) + ":payload-v3"
 	listData, _ := json.Marshal(publishedModelCatalogListPage{Models: []*port.PublishedModel{stale}, Total: 1})
 	if err := client.Set(context.Background(), oldQuestionnaire, data, time.Hour).Err(); err != nil {
 		t.Fatal(err)

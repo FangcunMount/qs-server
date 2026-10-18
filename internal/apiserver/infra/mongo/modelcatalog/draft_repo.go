@@ -37,9 +37,9 @@ func (r *DraftRepository) Create(ctx context.Context, model *domain.AssessmentMo
 		return fmt.Errorf("assessment model is nil")
 	}
 	po := r.mapper.ToPO(model)
-	// Creating a record uses the current legacy encoder; existing head updates
-	// preserve their marker unless an explicit Definition edit assigned V1.
-	po.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+	// New drafts use the complete canonical projection. Existing metadata-only
+	// updates preserve the version selected by their Definition revision.
+	po.ReportAssetsProjectionVersion = interpretationassets.ProjectionCanonicalV2
 	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 	data, err := po.ToBsonM()

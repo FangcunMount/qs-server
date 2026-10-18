@@ -6405,7 +6405,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -6476,7 +6476,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -6521,7 +6521,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -6600,7 +6600,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -6844,7 +6844,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -6900,7 +6900,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -7101,7 +7101,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -7164,7 +7164,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -14304,8 +14304,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6ab70c496df64fececffd38438269afde298cd12",
-        "verified_on": "2026-10-14"
+        "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -14347,6 +14347,20 @@
           "result": "passed",
           "source_sha": "6ab70c496df64fececffd38438269afde298cd12",
           "verified_on": "2026-10-14"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/middleware",
+          "result": "passed",
+          "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test ./internal/pkg/configcontract -run=TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed -count=1",
+          "result": "passed",
+          "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -14355,7 +14369,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Pinned raw sample and closing-bracket checks, the synthetic 23-method fail-closed matrix and native Prometheus API regressions do not attest production continuous sampling, business organization authorization, client release or approved T0. Strict per-instance cadence/jitter and unknown-input guards invalidate incomplete evidence rather than proving zero."
+          "Pinned raw sample and closing-bracket checks, the synthetic 23-method fail-closed matrix and native Prometheus API regressions do not attest production continuous sampling, business organization authorization, client release or approved T0. Strict per-instance cadence/jitter and unknown-input guards invalidate incomplete evidence rather than proving zero.",
+          "User waived the long observation gate on 2026-10-18. Scheduled execution removed; manual historical-window audit remains available. No production observation window or new deployment is attested by this source-only change."
         ]
       },
       "gaps": []

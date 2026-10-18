@@ -135,8 +135,9 @@ func extractToken(c *gin.Context) (string, string) {
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			return strings.TrimPrefix(authHeader, "Bearer "), "bearer"
 		}
-		// 直接是 token
-		return authHeader, "bare"
+		// An explicit unsupported header is rejected; do not fall back to a
+		// query or cookie token when the caller supplied Authorization.
+		return "", "bare"
 	}
 
 	// 2. Query Parameter

@@ -1082,8 +1082,9 @@ paths:
       tags:
       - AssessmentModel
       summary: 更新测评模型定义
+      description: 完整替换 Measure、Calibration、Execution、Conclusions、Outcomes、ReportMap
+        六区块。DecisionSpec 和 InterpretationAssets 为派生字段，提交时（包括 null 或空对象）返回 400。
       operationId: 更新测评模型定义
-      description: 更新测评模型定义
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -12972,9 +12973,21 @@ components:
           type: string
         finalization:
           type: object
+        original_reviews:
+          type: array
+          items:
+            type: object
         parallel_call_limit:
           type: integer
         resolutions:
+          type: array
+          items:
+            type: object
+        review_corrections:
+          type: array
+          items:
+            type: object
+        review_fingerprints:
           type: array
           items:
             type: object
@@ -13681,31 +13694,6 @@ components:
           type: integer
         reason:
           type: string
-    binding.DecisionKind:
-      type: string
-      enum:
-      - score_range
-      - pole_composition
-      - trait_profile
-      - nearest_pattern
-      - dominant_factor
-      - norm_lookup
-      - ability_level
-      - score_range
-      - pole_composition
-      - trait_profile
-      - nearest_pattern
-      - dominant_factor
-      - norm_lookup
-      - ability_level
-      x-enum-varnames:
-      - DecisionKindScoreRange
-      - DecisionKindPoleComposition
-      - DecisionKindTraitProfile
-      - DecisionKindNearestPattern
-      - DecisionKindDominantFactor
-      - DecisionKindNormLookup
-      - DecisionKindAbilityLevel
     cachemodel.CapabilityPolicyView:
       type: object
       properties:
@@ -14079,69 +14067,6 @@ components:
         reference:
           description: Reference 返回参考文档（错误时使用）
           type: string
-    decision.FactorScoreRanges:
-      type: object
-      properties:
-        factorCode:
-          type: string
-        kind:
-          description: risk | norm | ability
-          type: string
-        primary:
-          type: boolean
-        rules:
-          type: array
-          items:
-            $ref: '#/components/schemas/decision.ScoreRangeRule'
-    decision.OutcomeRef:
-      type: object
-      properties:
-        code:
-          type: string
-    decision.ScoreRangeRule:
-      type: object
-      properties:
-        level:
-          type: string
-        maxInclusive:
-          type: boolean
-        maxScore:
-          type: number
-        minScore:
-          type: number
-        outcomeCode:
-          type: string
-        unboundedMax:
-          type: boolean
-    decision.Spec:
-      type: object
-      properties:
-        outcomeRefs:
-          type: array
-          items:
-            $ref: '#/components/schemas/decision.OutcomeRef'
-        scoreRanges:
-          type: array
-          items:
-            $ref: '#/components/schemas/decision.FactorScoreRanges'
-        specialOutcomes:
-          description: special-rule / profile outcome codes referenced by decision
-          type: array
-          items:
-            type: string
-        typeDecision:
-          $ref: '#/components/schemas/decision.TypeDecisionFact'
-    decision.TypeDecisionFact:
-      type: object
-      properties:
-        fallbackCode:
-          type: string
-        fallbackSimilarityThreshold:
-          type: number
-        kind:
-          $ref: '#/components/schemas/binding.DecisionKind'
-        topK:
-          type: integer
     definition.Brief2Spec:
       type: object
       properties:
@@ -14535,102 +14460,6 @@ components:
           type: string
         status_url:
           type: string
-    interpretationassets.Assets:
-      type: object
-      properties:
-        outcomes:
-          type: array
-          items:
-            $ref: '#/components/schemas/interpretationassets.OutcomePresentation'
-        profiles:
-          type: array
-          items:
-            $ref: '#/components/schemas/interpretationassets.TypeProfilePresentation'
-        reportSpec:
-          $ref: '#/components/schemas/interpretationassets.ReportSpec'
-    interpretationassets.OutcomePresentation:
-      type: object
-      properties:
-        description:
-          type: string
-        outcomeCode:
-          type: string
-        summary:
-          type: string
-        title:
-          type: string
-    interpretationassets.RarityPresentation:
-      type: object
-      properties:
-        label:
-          type: string
-        oneInX:
-          type: integer
-        percent:
-          type: number
-    interpretationassets.ReportSection:
-      type: object
-      properties:
-        adapterKey:
-          type: string
-        categoryLabel:
-          type: string
-        code:
-          type: string
-        kind:
-          type: string
-        sourceRefs:
-          type: array
-          items:
-            type: string
-        templateID:
-          type: string
-        templateVersion:
-          type: string
-        title:
-          type: string
-    interpretationassets.ReportSpec:
-      type: object
-      properties:
-        sections:
-          type: array
-          items:
-            $ref: '#/components/schemas/interpretationassets.ReportSection'
-    interpretationassets.TypeProfilePresentation:
-      type: object
-      properties:
-        commentary:
-          type: string
-        image:
-          type: string
-        imageURL:
-          type: string
-        isSpecial:
-          type: boolean
-        outcomeCode:
-          type: string
-        pattern:
-          type: string
-        rarity:
-          $ref: '#/components/schemas/interpretationassets.RarityPresentation'
-        strengths:
-          type: array
-          items:
-            type: string
-        suggestions:
-          type: array
-          items:
-            type: string
-        traits:
-          type: array
-          items:
-            type: string
-        trigger:
-          type: string
-        weaknesses:
-          type: array
-          items:
-            type: string
     meta.ID:
       type: integer
       enum:
@@ -14674,10 +14503,6 @@ components:
     modelcatalog.Definition:
       type: object
       properties:
-        DecisionSpec:
-          $ref: '#/components/schemas/decision.Spec'
-        InterpretationAssets:
-          $ref: '#/components/schemas/interpretationassets.Assets'
         calibration:
           $ref: '#/components/schemas/definition.Calibration'
         conclusions:
@@ -16405,6 +16230,21 @@ components:
           type: string
         task_id:
           type: string
+    response.DefinitionBrief2Wire:
+      type: object
+      properties:
+        FormVariant:
+          type: string
+        IndexFactorCodes:
+          type: array
+          items:
+            type: string
+        PrimaryFactorCode:
+          type: string
+        ValidityFactorCodes:
+          type: array
+          items:
+            type: string
     response.DefinitionCalibrationWire:
       type: object
       properties:
@@ -16456,6 +16296,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/response.DefinitionTypeSpecialRuleWire'
+    response.DefinitionExecutionWire:
+      type: object
+      properties:
+        Brief2:
+          $ref: '#/components/schemas/response.DefinitionBrief2Wire'
+        SPM:
+          $ref: '#/components/schemas/response.DefinitionSPMWire'
     response.DefinitionFactorEdgeWire:
       type: object
       properties:
@@ -16552,6 +16399,33 @@ components:
         TemplateID:
           type: string
         Title:
+          type: string
+    response.DefinitionSPMItemSetWire:
+      type: object
+      properties:
+        Code:
+          type: string
+        Items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.DefinitionSPMItemWire'
+    response.DefinitionSPMItemWire:
+      type: object
+      properties:
+        CorrectOptionCode:
+          type: string
+        QuestionCode:
+          type: string
+    response.DefinitionSPMWire:
+      type: object
+      properties:
+        ItemSets:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.DefinitionSPMItemSetWire'
+        TimeLimitSeconds:
+          type: integer
+        TotalFactorCode:
           type: string
     response.DefinitionScoreRangeWire:
       type: object
@@ -16743,6 +16617,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/response.DefinitionConclusionWire'
+        Execution:
+          $ref: '#/components/schemas/response.DefinitionExecutionWire'
         Measure:
           $ref: '#/components/schemas/response.DefinitionMeasureWire'
         Outcomes:

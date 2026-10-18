@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
 	authjwks "github.com/FangcunMount/iam/v5/pkg/sdk/auth/jwks"
 	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
+	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
@@ -240,4 +243,58 @@ func signContractToken(t *testing.T, privateKey *rsa.PrivateKey, claims map[stri
 		t.Fatalf("Sign() error = %v", err)
 	}
 	return string(signed)
+}
+
+// Exercise the HTTP boundary with a genuinely signed access token so a bare
+// header cannot pass merely because its JWT payload is otherwise valid.
+func TestHTTPAuthorizationRequiresBearerHeader(t *testing.T) {
+	privateKey, manager := newContractJWKS(t)
+	verifier, err := auth.NewTokenVerifier(contractTokenVerifyConfig(), manager, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := signContractToken(t, privateKey, contractClaims(time.Now().UTC(), "access"))
+	for _, tc := range []struct {
+		name, header  string
+		query, cookie bool
+		want          int
+	}{
+		{name: "bearer", header: "Bearer " + token, want: http.StatusOK},
+		{name: "bare signed token", header: token, want: http.StatusUnauthorized},
+		{name: "unsupported scheme", header: "Basic " + token, want: http.StatusUnauthorized},
+		{name: "invalid header cannot fall back", header: token, query: true, cookie: true, want: http.StatusUnauthorized},
+		{name: "empty bearer cannot fall back", header: "Bearer ", query: true, cookie: true, want: http.StatusUnauthorized},
+		{name: "existing query carrier", query: true, want: http.StatusOK},
+		{name: "existing cookie carrier", cookie: true, want: http.StatusOK},
+		{name: "missing", want: http.StatusUnauthorized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(JWTAuthMiddlewareWithOptions(verifier, nil))
+			reached := false
+			router.GET("/protected", func(c *gin.Context) {
+				reached = true
+				if claims := GetUserClaims(c); claims == nil || claims.UserID != "1001" {
+					t.Fatal("verified identity lost")
+				}
+				c.Status(http.StatusOK)
+			})
+			target := "/protected"
+			if tc.query {
+				target += "?access_token=" + token
+			}
+			req := httptest.NewRequest(http.MethodGet, target, nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			if tc.cookie {
+				req.AddCookie(&http.Cookie{Name: "access_token", Value: token})
+			}
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+			if recorder.Code != tc.want || reached != (tc.want == http.StatusOK) {
+				t.Fatalf("status=%d reached=%v want=%d", recorder.Code, reached, tc.want)
+			}
+		})
+	}
 }

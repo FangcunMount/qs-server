@@ -22,8 +22,8 @@ on:
         description: 'Approved T0 in UTC YYYY-MM-DDTHH:MM:SSZ; required for window'
         required: false
         type: string
-  schedule:
-    - cron: '0 18 * * *' # Beijing 02:00; never starts or approves a window.
+  # Scheduled long-window observation retired by the user on 2026-10-18.
+  # Manual preflight and historical-window audits remain read-only tools.
 
 permissions:
   contents: read

@@ -156,7 +156,7 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 				ScoreKind: string(dimension.NormReference.ScoreKind), Benchmark: dimension.NormReference.Benchmark,
 				TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant,
 			}
-			assets := def.ResolvedInterpretationAssets()
+			assets := definition.InterpretationAssetsFrom(def)
 			reportBuilder := rendering.NewNormProfileBuilder(builder.NewDefaultReportBuilder())
 			draft, err := reportBuilder.Build(context.Background(), interpinput.InterpretationInput{
 				OutcomeID:   meta.FromUint64(100),

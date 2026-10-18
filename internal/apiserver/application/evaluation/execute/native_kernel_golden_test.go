@@ -222,8 +222,9 @@ func nativeInput(kind modelcatalog.Kind, algorithm modelcatalog.Algorithm, decis
 		input.Questionnaire.Questions = append(input.Questionnaire.Questions, evaluationinput.QuestionSnapshot{Code: code, Type: "radio", Options: []evaluationinput.OptionSnapshot{{Code: "a", Score: 0}, {Code: "b", Score: 1}}})
 		input.AnswerSheet.Answers = append(input.AnswerSheet.Answers, evaluationinput.AnswerSnapshot{QuestionCode: code, Value: "b"})
 	}
-	definition.MaterializeLayers(def)
-	evaluationinput.AttachCanonicalDefinition(input, def)
+	input.DefinitionV2 = def
+	assets := definition.InterpretationAssetsFrom(def)
+	input.InterpretationAssets = &assets
 	return input
 }
 func nativeRules(boundary float64) []conclusion.ScoreRangeOutcome {
@@ -355,8 +356,6 @@ func nativeFreezeReplay(t *testing.T, input *evaluationinput.InputSnapshot) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input.DefinitionV2.InterpretationAssets.Outcomes[0].Summary = "later stored copy"
-	input.DefinitionV2.DecisionSpec.OutcomeRefs = nil
 	after, ok := evaluationinput.NewInputSnapshotIdentity(input)
 	if !ok || before != after {
 		t.Fatal("derived storage changed native identity")

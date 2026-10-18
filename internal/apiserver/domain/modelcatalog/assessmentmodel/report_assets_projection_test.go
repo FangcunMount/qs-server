@@ -9,12 +9,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
-func TestNewAndDefinitionEditAssignCurrentLegacyAssetVersion(t *testing.T) {
+func TestNewAndDefinitionEditAssignCurrentCanonicalAssetVersion(t *testing.T) {
 	model, err := New(NewInput{Code: "M", Title: "model", Kind: binding.KindScale})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if model.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
+	if model.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 {
 		t.Fatal("new draft marker absent")
 	}
 	model.ReportAssetsProjectionVersion = 0 // Historical head read.
@@ -27,7 +27,7 @@ func TestNewAndDefinitionEditAssignCurrentLegacyAssetVersion(t *testing.T) {
 	if err := model.UpdateDefinition(&definition.Definition{}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if model.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
+	if model.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 {
 		t.Fatal("new Definition revision not stamped")
 	}
 }

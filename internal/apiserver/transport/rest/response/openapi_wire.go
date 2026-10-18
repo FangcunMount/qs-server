@@ -5,9 +5,39 @@ package response
 type DefinitionV2Wire struct {
 	Measure     DefinitionMeasureWire      `json:"Measure"`
 	Calibration DefinitionCalibrationWire  `json:"Calibration"`
+	Execution   DefinitionExecutionWire    `json:"Execution"`
 	Conclusions []DefinitionConclusionWire `json:"Conclusions"`
 	Outcomes    []DefinitionOutcomeWire    `json:"Outcomes"`
 	ReportMap   DefinitionReportMapWire    `json:"ReportMap"`
+}
+
+// DefinitionExecutionWire carries frozen algorithm inputs alongside generic scoring.
+type DefinitionExecutionWire struct {
+	Brief2 *DefinitionBrief2Wire `json:"Brief2"`
+	SPM    *DefinitionSPMWire    `json:"SPM"`
+}
+
+type DefinitionBrief2Wire struct {
+	FormVariant         string   `json:"FormVariant"`
+	PrimaryFactorCode   string   `json:"PrimaryFactorCode"`
+	IndexFactorCodes    []string `json:"IndexFactorCodes"`
+	ValidityFactorCodes []string `json:"ValidityFactorCodes"`
+}
+
+type DefinitionSPMWire struct {
+	TimeLimitSeconds int                        `json:"TimeLimitSeconds"`
+	TotalFactorCode  string                     `json:"TotalFactorCode"`
+	ItemSets         []DefinitionSPMItemSetWire `json:"ItemSets"`
+}
+
+type DefinitionSPMItemSetWire struct {
+	Code  string                  `json:"Code"`
+	Items []DefinitionSPMItemWire `json:"Items"`
+}
+
+type DefinitionSPMItemWire struct {
+	QuestionCode      string `json:"QuestionCode"`
+	CorrectOptionCode string `json:"CorrectOptionCode"`
 }
 
 type DefinitionMeasureWire struct {

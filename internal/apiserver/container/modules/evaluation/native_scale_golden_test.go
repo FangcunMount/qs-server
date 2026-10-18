@@ -172,8 +172,12 @@ func nativeScaleChoiceInput(t *testing.T, def *definition.Definition, choices []
 		input.Questionnaire.Questions = append(input.Questionnaire.Questions, evaluationinput.QuestionSnapshot{Code: code, Type: "radio", Options: []evaluationinput.OptionSnapshot{{Code: "a", Score: 0}, {Code: "b", Score: 1}}})
 		input.AnswerSheet.Answers = append(input.AnswerSheet.Answers, evaluationinput.AnswerSnapshot{QuestionCode: code})
 	}
-	definition.MaterializeLayers(def)
-	evaluationinput.AttachCanonicalDefinition(input, def)
+	input.DefinitionV2 = def
+	assets, projectionErr := definition.ResolveReportAssetsProjection(def, 2)
+	if projectionErr != nil {
+		t.Fatal(projectionErr)
+	}
+	input.InterpretationAssets = &assets
 	if len(choices) != len(input.AnswerSheet.Answers) {
 		t.Fatal("choice count does not match the frozen questionnaire")
 	}
@@ -330,8 +334,6 @@ func nativeFreezeReplay(t *testing.T, input *evaluationinput.InputSnapshot) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input.DefinitionV2.InterpretationAssets.Outcomes[0].Summary = "later stored copy"
-	input.DefinitionV2.DecisionSpec.OutcomeRefs = nil
 	after, ok := evaluationinput.NewInputSnapshotIdentity(input)
 	if !ok || before != after {
 		t.Fatal("derived storage changed native scale identity")

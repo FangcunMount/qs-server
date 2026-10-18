@@ -472,7 +472,7 @@ func TestCachedPublishedModelStoreWarmByCodeSynchronouslyPublishesVisibleEntry(t
 	if err := cached.WarmByCode(context.Background(), cachetarget.WarmupKindStaticScale, "3adyDE"); err != nil {
 		t.Fatalf("WarmByCode() error = %v", err)
 	}
-	key := "static:assessment_model:published:latest:scale:3adyde:payload-v3"
+	key := "static:assessment_model:published:latest:scale:3adyde:payload-v4"
 	if !mr.Exists(key) {
 		t.Fatalf("warmup returned ok before %q existed", key)
 	}

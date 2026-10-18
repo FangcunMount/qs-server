@@ -10,7 +10,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -22,23 +21,22 @@ type observingDefinitionService struct {
 
 func (s *observingDefinitionService) SaveDefinition(_ context.Context, _ modelcatalog.ActorContext, _ string, value *domain.Definition) (*domain.Definition, error) {
 	s.called = true
-	modeldefinition.MaterializeLayers(value)
 	return value, s.saveErr
 }
 
-func TestDefinitionObservationKeepsOriginalFieldPresenceAndBinding(t *testing.T) {
+func TestDefinitionWritesRejectDerivedFieldsAndObserveOriginalInput(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, input, decision, assets, result string
 		status                                      int
 	}{
 		{"canonical", "{}", "canonical", "absent", "absent", "accepted", 200},
-		{"both null", `{"DecisionSpec":null,"InterpretationAssets":null}`, "derived", "present", "present", "accepted", 200},
-		{"empty decision", `{"DecisionSpec":{}}`, "derived", "present", "absent", "accepted", 200},
-		{"empty assets", `{"InterpretationAssets":{}}`, "derived", "absent", "present", "accepted", 200},
-		{"case folded keys", `{"decisionspec":null,"INTERPRETATIONASSETS":{}}`, "derived", "present", "present", "accepted", 200},
+		{"both null", `{"DecisionSpec":null,"InterpretationAssets":null}`, "derived", "present", "present", "rejected", 400},
+		{"empty decision", `{"DecisionSpec":{}}`, "derived", "present", "absent", "rejected", 400},
+		{"empty assets", `{"InterpretationAssets":{}}`, "derived", "absent", "present", "rejected", 400},
+		{"case folded keys", `{"decisionspec":null,"INTERPRETATIONASSETS":{}}`, "derived", "present", "present", "rejected", 400},
 		{"nested fields are not input", `{"unknown":{"DecisionSpec":{}}}`, "canonical", "absent", "absent", "accepted", 200},
 		{"trailing bytes preserve binder contract", `{} trailing`, "canonical", "absent", "absent", "accepted", 200},
-		{"invalid decision", `{"DecisionSpec":42}`, "derived", "present", "absent", "rejected", 500},
+		{"invalid decision", `{"DecisionSpec":42}`, "derived", "present", "absent", "rejected", 400},
 		{"malformed", `{`, "unreadable", "unreadable", "unreadable", "rejected", 500},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -56,6 +54,9 @@ func TestDefinitionObservationKeepsOriginalFieldPresenceAndBinding(t *testing.T)
 			h.UpdateDefinition(c)
 			if recorder.Code != tc.status {
 				t.Fatalf("status=%d want=%d body=%s", recorder.Code, tc.status, recorder.Body)
+			}
+			if tc.input == "derived" && !strings.Contains(recorder.Body.String(), "is derived; submit only") {
+				t.Fatalf("missing actionable retired-field error: %s", recorder.Body)
 			}
 			if svc.called != (tc.result == "accepted") {
 				t.Fatalf("service called=%t", svc.called)

@@ -2,7 +2,6 @@ package modelcatalog
 
 import (
 	"encoding/json"
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -26,7 +25,7 @@ func durableProjectionDefinition() *domain.Definition {
 	}
 }
 
-func TestReportAssetsLegacyProjectionMatchesActualBSONCodecForFourFamilies(t *testing.T) {
+func TestVersionedProjectionSurvivesCanonicalBSONForFourFamilies(t *testing.T) {
 	for _, family := range []string{"factor_scoring", "factor_norm", "task_performance", "factor_classification"} {
 		t.Run(family, func(t *testing.T) {
 			def := durableProjectionDefinition()
@@ -39,7 +38,10 @@ func TestReportAssetsLegacyProjectionMatchesActualBSONCodecForFourFamilies(t *te
 			case "task_performance":
 				def.Conclusions = []conclusion.Conclusion{conclusion.AbilityConclusion{FactorCode: "total", Rules: rules}}
 			}
-			modeldefinition.MaterializeLayers(def)
+			want, err := modeldefinition.ResolveReportAssetsProjection(def, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
 			canonicalBefore, _ := json.Marshal(def)
 			raw, err := bson.Marshal(definitionToPO(def))
 			if err != nil {
@@ -54,7 +56,7 @@ func TestReportAssetsLegacyProjectionMatchesActualBSONCodecForFourFamilies(t *te
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(legacy, read.InterpretationAssets) {
+			if !reflect.DeepEqual(legacy, want) {
 				t.Fatal("frozen legacy codec differs from actual durable whole assets")
 			}
 			if _, err := modeldefinition.ResolveReportAssetsProjection(read, 1); err != nil {
@@ -64,8 +66,9 @@ func TestReportAssetsLegacyProjectionMatchesActualBSONCodecForFourFamilies(t *te
 				if read.Conclusions[0].(conclusion.TypeConclusion).Profiles[0].Rarity.Label != "rare" {
 					t.Fatal("canonical Rarity lost")
 				}
-				if _, err := modeldefinition.ResolveReportAssetsProjection(read, 2); !errors.Is(err, modeldefinition.ErrReportAssetsProjectionMismatch) {
-					t.Fatal("V2 hid durable Rarity loss")
+				full, err := modeldefinition.ResolveReportAssetsProjection(read, 2)
+				if err != nil || full.Profiles[0].Rarity.Label != "rare" || legacy.Profiles[0].Rarity.Label != "" {
+					t.Fatal("projection version semantics changed", err)
 				}
 			}
 			canonicalAfter, _ := json.Marshal(def)
@@ -119,20 +122,16 @@ func TestReportAssetsProjectionMarkerRoundTripsOnlyAtRecordTopLevel(t *testing.T
 	}
 }
 
-func TestLegacyUnassignedMarkerIsIdempotentWithoutEquatingV2(t *testing.T) {
-	a := &port.PublishedModel{Code: "M", Version: "v1", DefinitionV2: durableProjectionDefinition()}
+func TestImmutableComparisonKeepsReportAssetVersion(t *testing.T) {
+	a := &port.PublishedModel{Code: "M", Version: "v1", DefinitionV2: durableProjectionDefinition(), ReportAssetsProjectionVersion: 1}
 	b := *a
-	b.ReportAssetsProjectionVersion = 1
 	if !sameImmutablePublishedContent(a, &b) {
-		t.Fatal("legacy repeat publication became a conflict")
+		t.Fatal("same revision no longer idempotent")
 	}
-	if a.ReportAssetsProjectionVersion != 0 {
-		t.Fatal("comparison assigned persisted marker")
-	}
-	for _, version := range []interpretationassets.ProjectionVersion{2, 99} {
+	for _, version := range []interpretationassets.ProjectionVersion{0, 2, 99} {
 		b.ReportAssetsProjectionVersion = version
 		if sameImmutablePublishedContent(a, &b) {
-			t.Fatal("different encoding equated to legacy")
+			t.Fatal("different report semantics equated")
 		}
 	}
 }

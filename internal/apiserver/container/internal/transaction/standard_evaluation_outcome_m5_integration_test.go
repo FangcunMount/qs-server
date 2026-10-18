@@ -157,9 +157,9 @@ events:
 			DecisionKind: string(modelcatalog.DecisionKindScoreRange), Code: "SCALE-1", Version: "1.0.0",
 		},
 		DefinitionV2: &modeldefinition.Definition{
-			Measure:              modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}}},
-			InterpretationAssets: interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "high", Title: "高风险"}}},
+			Measure: modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}}},
 		},
+		InterpretationAssets: &interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "high", Title: "高风险"}}},
 	}
 	request := func(a *assessment.Assessment, run *evalrun.EvaluationRun, execution *domainoutcome.Execution) outcomecommit.CommitRequest {
 		return outcomecommit.CommitRequest{

@@ -100,4 +100,4 @@ go test -count=1 ./internal/pkg/configcontract ./internal/pkg/architecture
 make docs-hygiene
 ```
 
-发布模型exact、latest、list和by-questionnaire四类载荷统一使用 `payload-v3`，避免严格投影读取命中准备阶段的零投影版本或缺失hash旧载荷；既有catalog版本令牌、有效TTL及预热能力不变，旧Redis键自然过期，不进行全库清理。载荷版本不代表报告资产投影v2启用。
+发布模型exact、latest、list和by-questionnaire四类载荷统一使用 `payload-v4`，仅缓存canonical六区块及记录顶层的显式投影版本，绕开旧载荷中的派生字段。旧模型版本按v1保持原报告编码，新Definition修订和新发布使用完整v2投影；同版本重试不得改变投影版本。既有catalog版本令牌、有效TTL和预热入口不变，旧Redis键自然过期，不全库清理。缓存编码v4与报告资产投影v1/v2是不同版本。

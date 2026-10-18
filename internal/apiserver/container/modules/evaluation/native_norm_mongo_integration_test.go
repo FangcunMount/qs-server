@@ -177,7 +177,6 @@ func mongoNormSaveModel(t *testing.T, repo *mongocatalog.Repository, kind modelc
 	if issues := definition.Validate(*def); len(issues) != 0 {
 		t.Fatalf("illegal canonical norm fixture: %#v", issues)
 	}
-	definition.MaterializeLayers(def)
 	hash, err := definition.CanonicalContentHash(def)
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +200,10 @@ func mongoNormInput(def *definition.Definition, questions, answers []string) *ev
 		input.Questionnaire.Questions = append(input.Questionnaire.Questions, evaluationinput.QuestionSnapshot{Code: code, Type: "radio", Options: []evaluationinput.OptionSnapshot{{Code: "a", Score: 0}, {Code: "b", Score: 1}}})
 		input.AnswerSheet.Answers = append(input.AnswerSheet.Answers, evaluationinput.AnswerSnapshot{QuestionCode: code, Value: answers[i], Score: 999})
 	}
-	evaluationinput.AttachCanonicalDefinition(input, def)
+	input.DefinitionV2 = def
+	// This calculation fixture freezes the complete canonical v2 assets.
+	assets := definition.InterpretationAssetsFrom(def)
+	input.InterpretationAssets = &assets
 	return input
 }
 

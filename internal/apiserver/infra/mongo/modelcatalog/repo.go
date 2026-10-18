@@ -88,12 +88,13 @@ func (r *Repository) DeletePublished(ctx context.Context, kind domain.Kind, code
 
 func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
 	po := r.mapper.ToPO(model)
-	// V2 writes remain closed during preparation. An absent marker on a new
-	// internal seed uses today's legacy encoder; reads never assign it.
-	if po.ReportAssetsProjectionVersion != interpretationassets.ProjectionUnassigned && po.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
-		return fmt.Errorf("%w: report assets projection write version is not enabled", domain.ErrInvalidArgument)
+	if po.ReportAssetsProjectionVersion == interpretationassets.ProjectionUnassigned {
+		po.ReportAssetsProjectionVersion = interpretationassets.ProjectionCanonicalV2
 	}
-	po.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
+	if po.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 && po.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 {
+		return fmt.Errorf("%w: unknown report assets projection write version", domain.ErrInvalidArgument)
+	}
+
 	now := time.Now()
 	po.Status = statusPublished
 	po.ReleaseStatus = string(domain.ReleaseStatusActive)
@@ -116,6 +117,10 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.Publi
 	}
 	if findErr != mongo.ErrNoDocuments {
 		return findErr
+	}
+
+	if po.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 {
+		return fmt.Errorf("%w: a new model version requires canonical report assets projection", domain.ErrInvalidArgument)
 	}
 
 	// Earlier active releases remain immutable and are archived in the same
@@ -146,14 +151,7 @@ func sameImmutablePublishedContent(a, b *port.PublishedModel) bool {
 		return a == b
 	}
 	aCopy, bCopy := *a, *b
-	// Legacy rows have no marker. Treat 0 and 1 as the same immutable old
-	// encoding only for idempotence; the existing BSON is not rewritten.
-	if aCopy.ReportAssetsProjectionVersion == interpretationassets.ProjectionUnassigned {
-		aCopy.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
-	}
-	if bCopy.ReportAssetsProjectionVersion == interpretationassets.ProjectionUnassigned {
-		bCopy.ReportAssetsProjectionVersion = interpretationassets.ProjectionLegacyV1
-	}
+
 	aCopy.ReleaseStatus, bCopy.ReleaseStatus = "", ""
 	aCopy.PublishedAt, bCopy.PublishedAt = nil, nil
 	aCopy.ReleaseArchivedAt, bCopy.ReleaseArchivedAt = nil, nil

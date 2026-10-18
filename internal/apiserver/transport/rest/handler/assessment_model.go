@@ -257,6 +257,7 @@ func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
 
 // UpdateDefinition replaces the complete canonical DefinitionV2.
 // @Summary 更新测评模型定义
+// @Description 完整替换 Measure、Calibration、Execution、Conclusions、Outcomes、ReportMap 六区块。DecisionSpec 和 InterpretationAssets 为派生字段，提交时（包括 null 或空对象）返回 400。
 // @Tags AssessmentModel
 // @Accept json
 // @Produce json
