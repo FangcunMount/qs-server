@@ -116,7 +116,7 @@ func TestRESTTokenCarrierResultAndPriority(t *testing.T) {
 		status                                      int
 	}{
 		{name: "bearer dominates query and cookie", header: "Bearer " + token, query: "bad", cookie: "bad", source: "bearer", result: "accepted", status: 204},
-		{name: "bare dominates query and cookie", header: token, query: "bad", cookie: "bad", source: "bare", result: "accepted", status: 204},
+		{name: "bare signed token is rejected", header: token, query: "bad", cookie: "bad", source: "bare", result: "rejected", status: 401},
 		{name: "invalid bare never falls back", header: "bad", query: token, cookie: token, source: "bare", result: "rejected", status: 401},
 		{name: "invalid bearer never falls back", header: "Bearer bad", query: token, source: "bearer", result: "rejected", status: 401},
 		{name: "query retains precedence", query: token, cookie: "bad", source: "query", result: "accepted", status: 204},
