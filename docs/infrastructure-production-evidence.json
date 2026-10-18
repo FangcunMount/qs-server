@@ -410,6 +410,65 @@
         "No DB restore, new production measurement, original replay-event rewrite or historical ReportInput write.",
         "Mini formal publication, Task/validation contract exit and NEO authoritative definition remain pending; long observation was waived."
       ]
+    },
+    {
+      "id": "infra-2026-10-18-m7-a6e0c5adb",
+      "topics": [
+        "deployment_cd_network",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-18T08:45:23.960990Z",
+      "environment": "production/serverA-serverD; read-only Mongo ledger on serverC",
+      "deployed_sha": "a6e0c5adb2e1c9b60ae95e318c7b95b43fad9d5a",
+      "source_baseline_sha": "73830ed7bd7310dfc77123c6d61bcfbf1d50ba2a",
+      "effective_config_hash": "sha256:63530b49e931d5ce69395b7752cdf6abe3024d83d55883695eff062f476babc3",
+      "effective_config_hash_limitation": null,
+      "command": "Fixed Root -> Mac mini -> serverA/serverD rolling replacement; exact runtime/config qualification, normal IAM/API/Collection gRPC reads, clean pair and precise archive cleanup. Private release receipt b0c08dfc03db97c390cbdbc90f58df328d53c64a9f5d82a2f4fd1de9f032c803.",
+      "result": {
+        "status": "passed",
+        "summary": "Maintenance command families and exact MySQL opening timestamp rounding delivered to six instances; no DDL or business data retirement.",
+        "measurements": {
+          "api_instances": 1,
+          "collection_instances": 2,
+          "worker_instances": 3,
+          "mysql_version": 103,
+          "mongo_version": 40,
+          "old_exact_CIDs_removed": 6,
+          "normal_IAM_and_API_HTTP": 200,
+          "collection_actor_GRPC_HTTP": 200,
+          "bare_Authorization_HTTP": 401,
+          "retired_derived_input_HTTP": 400,
+          "DDL_dispatched": false,
+          "business_data_retirement_dispatched": false,
+          "long_observation_waived": true
+        }
+      },
+      "owner": "system (10001)",
+      "expires_on": "2026-11-17",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/39111734744"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/39111734743"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md"
+        }
+      ],
+      "limitations": [
+        "Dated scoped production evidence; remaining real-business/performance acceptance is separate.",
+        "Actual PID1 inputs and a finite source-matched decoder were verified; full in-memory Options were not dumped.",
+        "Engine config IDs/rootfs and exact ELF were proven; no registry manifest digest is claimed.",
+        "No DB restore, new production measurement, original replay-event rewrite or historical ReportInput write.",
+        "Mini formal publication, Task/validation contract exit and NEO authoritative definition remain pending; long observation was waived.",
+        "Native fixture platform mismatch was retained as a failed attempt; the corrected native run actually passed. PR checks bind the exact deployed SHA; docs-only closeout does not relabel the deployed source."
+      ]
     }
   ]
 }
