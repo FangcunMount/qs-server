@@ -249,10 +249,10 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 			ReportMap: modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
 				Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
 			}}},
-			InterpretationAssets: interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
-				Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
-			}}}},
 		},
+		InterpretationAssets: &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+			Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+		}}}},
 	}
 
 	order := make([]string, 0, 5)
@@ -386,9 +386,6 @@ func commitTestInput() *evaluationinput.InputSnapshot {
 		Measure: modeldefinition.MeasureSpec{
 			Factors: []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}},
 		},
-		InterpretationAssets: interpretationassets.Assets{
-			Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "high", Title: "高风险"}},
-		},
 	}
 	return &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
@@ -396,7 +393,8 @@ func commitTestInput() *evaluationinput.InputSnapshot {
 			DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 			Code:         "SCALE-1", Version: "1.0.0",
 		},
-		DefinitionV2: def,
+		DefinitionV2:         def,
+		InterpretationAssets: &interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "high", Title: "高风险"}}},
 	}
 }
 
