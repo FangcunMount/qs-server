@@ -86,12 +86,12 @@ jobs:
             go test -count=1 -race -json ./internal/apiserver/transport/rest/handler ./internal/apiserver/transport/rest -run '^TestMQ'
             go test -count=1 -race -json ./internal/apiserver/container/modules/interpretation ./internal/apiserver/options ./internal/apiserver/transport/grpc/service ./internal/collection-server/transport/rest/handler -run '^TestMQ'
             go test -count=1 -race -json ./internal/apiserver/transport/grpc ./internal/collection-server/infra/grpcclient ./internal/collection-server/application/aiexplanation ./internal/collection-server/transport/rest
-            go test -tags=integration -count=1 -race -json ./cmd/qs-ai-messaging
-            go test -count=1 -race -json ./internal/apiserver/maintenance/aimessagingbinding ./cmd/qs-ai-messaging-preflight
+            go test -tags=integration -count=1 -race -json ./scripts/maintenance/qs-ai-messaging
+            go test -count=1 -race -json ./internal/apiserver/maintenance/aimessagingbinding ./scripts/maintenance/qs-ai-messaging-preflight
           } >> artifacts/ai-mq-tests.json
           go build ./cmd/qs-apiserver ./cmd/collection-server
-          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging ./cmd/qs-ai-messaging
-          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-preflight ./cmd/qs-ai-messaging-preflight
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging ./scripts/maintenance/qs-ai-messaging
+          go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-preflight ./scripts/maintenance/qs-ai-messaging-preflight
           python3 scripts/cd/test_ai_messaging_release.py > artifacts/ai-mq-release-tests.json
           go build ./scripts/testing/ai-mq-process
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json

@@ -376,11 +376,11 @@ build-all: ## 构建所有服务
 	@$(MAKE) build-worker
 	@echo "$(COLOR_GREEN)✅ 所有服务构建完成$(COLOR_RESET)"
 
-build-maintenance: ## 构建人员、AuthZ、MQ维护命令及独立离线预检（不启动服务）
+build-maintenance: ## 构建人员、AuthZ、MQ维护命令及独立离线工具（不启动服务）
 	@$(MAKE) create-dirs
-	@for command in qs-operator qs-authz qs-ai-messaging qs-ai-messaging-preflight; do \
+	@for command in qs-operator qs-authz qs-ai-messaging qs-ai-messaging-preflight qs-migrate-offline; do \
 		$(GO_BUILD) -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(shell git rev-parse HEAD) -X main.sourceSHA=$(shell git rev-parse HEAD)" \
-			-o "$(BIN_DIR)/$$command" "./cmd/$$command" || exit 1; \
+			-o "$(BIN_DIR)/$$command" "./scripts/maintenance/$$command" || exit 1; \
 	done
 
 build-apiserver: ## 构建 API 服务器

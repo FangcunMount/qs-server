@@ -1,6 +1,6 @@
 # AuthZ 维护命令族
 
-使用 `make build-maintenance` 构建；两个子命令继续使用 QS_APISERVER_ 配置前缀，保持现有 IAM 服务身份和证据 JSON。
+源码位于 `scripts/maintenance/qs-authz/`，保留 Go 实现。使用 `make build-maintenance` 构建；两个子命令继续使用 QS_APISERVER_ 配置前缀，保持现有 IAM 服务身份和证据 JSON。
 
 | 命令 | 能力 |
 | --- | --- |

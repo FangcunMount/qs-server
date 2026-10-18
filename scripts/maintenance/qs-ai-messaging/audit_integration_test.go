@@ -58,7 +58,7 @@ func auditDatabase(t *testing.T, mq bool) *sql.DB {
 		migrations = append(migrations, "000091_ai_messaging", "000092_ai_messaging_failures", "000093_ai_messaging_legacy_commands", "000094_ai_messaging_admission", "000095_ai_messaging_observations", "000097_ai_command_retirement")
 	}
 	for _, migration := range migrations {
-		body, err := os.ReadFile(filepath.Join("..", "..", "internal", "pkg", "migration", "migrations", "mysql", migration+".up.sql"))
+		body, err := os.ReadFile(filepath.Join("..", "..", "..", "internal", "pkg", "migration", "migrations", "mysql", migration+".up.sql"))
 		if err != nil {
 			t.Fatal(err)
 		}

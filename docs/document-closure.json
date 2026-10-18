@@ -8903,15 +8903,15 @@
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging/audit.go"
+          "path": "scripts/maintenance/qs-ai-messaging/audit.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging/admission.go"
+          "path": "scripts/maintenance/qs-ai-messaging/admission.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-preflight/main.go"
+          "path": "scripts/maintenance/qs-ai-messaging-preflight/main.go"
         },
         {
           "kind": "source",
@@ -9014,6 +9014,14 @@
           "severity": "medium",
           "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
           "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
+          "historical_evidence": []
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
           "historical_evidence": []
         }
       ]
@@ -11379,7 +11387,7 @@
       "path": "internal/pkg/migration/README.md",
       "class": "sidecar",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
         "verified_on": "2026-10-18"
@@ -11411,7 +11419,7 @@
         },
         {
           "kind": "source",
-          "path": "cmd/qs-operator/*.go"
+          "path": "scripts/maintenance/qs-operator/*.go"
         },
         {
           "kind": "source",
@@ -11467,13 +11475,6 @@
           "verified_on": "2026-10-13"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
-          "verified_on": "2026-10-14"
-        },
-        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
@@ -11512,13 +11513,6 @@
         },
         {
           "kind": "command",
-          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
-          "result": "passed",
-          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
           "command": "go test -p=2 -tags=integration ./internal/pkg/migration -run=^TestOfflineApproval -count=1",
           "result": "passed",
           "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
@@ -11546,13 +11540,6 @@
           "result": "matched",
           "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
           "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
-          "result": "passed",
-          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
-          "verified_on": "2026-10-15"
         },
         {
           "kind": "source_selector",
@@ -11669,13 +11656,6 @@
           "result": "passed",
           "source_sha": "77ed6e600626d2cc160256ab9e091becfb19475c",
           "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
-          "result": "passed",
-          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
-          "verified_on": "2026-10-15"
         },
         {
           "kind": "source_selector",
@@ -11827,13 +11807,6 @@
           "verified_on": "2026-10-18",
           "path": ".github/workflows/ci.yml",
           "selector": "Run Mongo-backed norm calculation regression"
-        },
-        {
-          "kind": "command",
-          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
-          "result": "passed",
-          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
-          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -11978,6 +11951,50 @@
               "result": "passed",
               "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
               "verified_on": "2026-10-15"
+            }
+          ]
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
+              "result": "passed",
+              "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+              "result": "passed",
+              "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+              "result": "passed",
+              "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+              "result": "passed",
+              "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
             }
           ]
         }
@@ -12647,10 +12664,10 @@
       ]
     },
     {
-      "path": "cmd/qs-operator/README.md",
+      "path": "scripts/maintenance/qs-operator/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
         "verified_on": "2026-10-18"
@@ -12658,7 +12675,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-operator/*.go"
+          "path": "scripts/maintenance/qs-operator/*.go"
         },
         {
           "kind": "source",
@@ -12677,15 +12694,7 @@
           "path": "Makefile"
         }
       ],
-      "verification": [
-        {
-          "kind": "command",
-          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
-          "result": "passed",
-          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
-          "verified_on": "2026-10-18"
-        }
-      ],
+      "verification": [],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -12711,6 +12720,22 @@
           "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
           "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": []
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
         }
       ]
     },
@@ -13299,7 +13324,7 @@
       "path": "scripts/oneoff/mysql_metadata_profile/README.md",
       "class": "sidecar",
       "owner": "tooling",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
         "verified_on": "2026-10-18"
@@ -13854,7 +13879,15 @@
           "Maintenance build target source review only: prior verified and top baseline retained as JSON: {\"source_baseline\": {\"sha\": \"7de5adbd31b588450735f11b3501292da89a6ada\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}}. Makefile adds a separate build-maintenance target and phony declaration; existing metadata targets and all metadata source/fixture/workflow bytes remain unchanged. This rebinds only current source references; no prior command/native/CI/production evidence is relabelled."
         ]
       },
-      "gaps": [],
+      "gaps": [
+        {
+          "id": "MAINTENANCE-BUILD-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "low",
+          "summary": "Makefile moves maintenance build sources and adds the offline migration binary to the maintenance-only build target. Existing metadata targets remain unchanged.",
+          "exit_criteria": "Rebind the current source after reviewing the Makefile delta; do not relabel prior native or production results."
+        }
+      ],
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
@@ -13896,7 +13929,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging/audit.go"
+          "path": "scripts/maintenance/qs-ai-messaging/audit.go"
         },
         {
           "kind": "source",
@@ -13997,14 +14030,22 @@
           "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
           "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": []
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
+          "historical_evidence": []
         }
       ]
     },
     {
-      "path": "cmd/qs-migrate-offline/README.md",
+      "path": "scripts/maintenance/qs-migrate-offline/README.md",
       "class": "sidecar",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
         "verified_on": "2026-10-18"
@@ -14012,7 +14053,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-migrate-offline/*.go"
+          "path": "scripts/maintenance/qs-migrate-offline/*.go"
         },
         {
           "kind": "source",
@@ -14050,13 +14091,6 @@
       "verification": [
         {
           "kind": "command",
-          "command": "go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration",
-          "result": "passed",
-          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
-          "verified_on": "2026-10-13"
-        },
-        {
-          "kind": "command",
           "command": "go test -race -tags=integration -count=1 -timeout=8m -run=^TestOfflineNative ./internal/pkg/migration",
           "result": "passed",
           "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
@@ -14071,13 +14105,6 @@
           "verified_on": "2026-10-13"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
-          "verified_on": "2026-10-14"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/pkg/migration/offline.go",
           "selector": "func RunOffline(",
@@ -14090,13 +14117,6 @@
           "command": "go test -p=2 -race -tags=integration -count=1 -timeout=8m -v -run=^TestOfflineNative ./internal/pkg/migration",
           "result": "passed",
           "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
-          "result": "passed",
-          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
           "verified_on": "2026-10-14"
         },
         {
@@ -14130,25 +14150,11 @@
           "verified_on": "2026-10-14"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
-          "result": "passed",
-          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/pkg/migration/offline.go",
           "selector": "func validOfflineProtectionScope(",
           "result": "matched",
           "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
-          "result": "passed",
-          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
           "verified_on": "2026-10-15"
         },
         {
@@ -14369,6 +14375,50 @@
               "verified_on": "2026-10-15"
             }
           ]
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration",
+              "result": "passed",
+              "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+              "verified_on": "2026-10-13"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
+              "result": "passed",
+              "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+              "result": "passed",
+              "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+              "result": "passed",
+              "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+              "result": "passed",
+              "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+              "verified_on": "2026-10-15"
+            }
+          ]
         }
       ],
       "notes": [
@@ -14477,10 +14527,10 @@
       "gaps": []
     },
     {
-      "path": "cmd/qs-authz/README.md",
+      "path": "scripts/maintenance/qs-authz/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
         "verified_on": "2026-10-18"
@@ -14488,7 +14538,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-authz/*.go"
+          "path": "scripts/maintenance/qs-authz/*.go"
         },
         {
           "kind": "source",
@@ -14505,16 +14555,13 @@
         {
           "kind": "source",
           "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": ".dockerignore"
         }
       ],
       "verification": [
-        {
-          "kind": "command",
-          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
-          "result": "passed",
-          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
-          "verified_on": "2026-10-18"
-        },
         {
           "kind": "command",
           "command": "bash scripts/cd/test-verify-authz-production-matrix.sh",
@@ -14548,14 +14595,30 @@
           "severity": "medium",
           "summary": "Local routing, build and safety checks passed; exact-image CI and actual operational acceptance remain independent.",
           "exit_criteria": "Verify the deployed command family and real operations against its exact release; retain offline/read/write and confirmation boundaries."
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
         }
       ]
     },
     {
-      "path": "cmd/qs-ai-messaging/README.md",
+      "path": "scripts/maintenance/qs-ai-messaging/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
         "verified_on": "2026-10-18"
@@ -14563,11 +14626,11 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging/*.go"
+          "path": "scripts/maintenance/qs-ai-messaging/*.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-preflight/main.go"
+          "path": "scripts/maintenance/qs-ai-messaging-preflight/main.go"
         },
         {
           "kind": "source",
@@ -14580,17 +14643,13 @@
         {
           "kind": "source",
           "path": "Makefile"
-        }
-      ],
-      "verification": [
+        },
         {
-          "kind": "command",
-          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
-          "result": "passed",
-          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
-          "verified_on": "2026-10-18"
+          "kind": "source",
+          "path": ".dockerignore"
         }
       ],
+      "verification": [],
       "production_evidence": {
         "level": "none",
         "refs": [],
@@ -14608,6 +14667,22 @@
           "severity": "medium",
           "summary": "Local routing, build and safety checks passed; exact-image CI and actual operational acceptance remain independent.",
           "exit_criteria": "Verify the deployed command family and real operations against its exact release; retain offline/read/write and confirmation boundaries."
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints moved out of cmd into scripts/maintenance; original verification objects retain their historical paths and source attribution.",
+          "exit_criteria": "Verify new package paths, unchanged binary interfaces, image build context and release bindings; production execution remains independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
         }
       ]
     }

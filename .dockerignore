@@ -43,6 +43,8 @@ coverage.html
 # 脚本和工具
 script/
 scripts/
+!scripts/maintenance/
+!scripts/maintenance/**
 Makefile
 *.sh
 *.bash

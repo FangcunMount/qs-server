@@ -42,7 +42,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -X github.com/FangcunMount/qs-server/pkg/version.GitBranch=${GIT_BRANCH} \
     -X github.com/FangcunMount/qs-server/pkg/version.BuildDate=${BUILD_TIME}" \
     -o /build/bin/qs-authz \
-    ./cmd/qs-authz/
+    ./scripts/maintenance/qs-authz/
 
 # ===================================
 # 运行阶段
@@ -50,12 +50,12 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # Explicit, offline/maintenance entrypoints; the normal server entrypoint is unchanged.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
     -ldflags "-s -w -X main.sourceSHA=${GIT_COMMIT}" \
-    -o /build/bin/qs-ai-messaging ./cmd/qs-ai-messaging
+    -o /build/bin/qs-ai-messaging ./scripts/maintenance/qs-ai-messaging
 
 # Offline companion retains its own import graph and release entrypoint.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
     -ldflags "-s -w -X main.sourceSHA=${GIT_COMMIT}" \
-    -o /build/bin/qs-ai-messaging-preflight ./cmd/qs-ai-messaging-preflight
+    -o /build/bin/qs-ai-messaging-preflight ./scripts/maintenance/qs-ai-messaging-preflight
 
 FROM alpine:3.21
 
