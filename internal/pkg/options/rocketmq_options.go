@@ -5,9 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"github.com/spf13/pflag"
 	"os"
 	"time"
+
+	"github.com/spf13/pflag"
 
 	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"

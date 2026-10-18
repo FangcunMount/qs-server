@@ -2,8 +2,9 @@ package transport
 
 import (
 	"fmt"
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"time"
+
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 
 	"github.com/nsqio/go-nsq"
 )
