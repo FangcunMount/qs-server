@@ -785,52 +785,6 @@ func TestDBOpsAttentionRecoveryAuditOnlyCountsHighRiskSideEffects(t *testing.T) 
 	}
 }
 
-func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
-	t.Parallel()
-
-	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "compatibility-observation.yml"))
-	if err != nil {
-		t.Fatalf("read compatibility observation workflow: %v", err)
-	}
-	script, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "cd", "audit-compatibility-observation.sh"))
-	if err != nil {
-		t.Fatalf("read compatibility observation script: %v", err)
-	}
-	content := string(workflow) + "\n" + string(script)
-	for _, required := range []string{
-		"Compatibility Metrics",
-		"scripts/cd/audit-compatibility-observation.sh",
-		"http://prometheus:9090",
-		"zero_window_candidate",
-		"EXPECTED_SOURCE_SHA",
-		"OBSERVATION_STARTED_AT",
-		"storage.tsdb.retention.time",
-		"qs_auth_token_source_total",
-		"qs_model_definition_write_total",
-		"setup-runner-ssh.sh",
-	} {
-		if !strings.Contains(content, required) {
-			t.Errorf("compatibility observation contract must contain %q", required)
-		}
-	}
-	for _, forbidden := range []string{
-		"qs_actor_deprecated_practitioner_route_total",
-		"qs_statistics_deprecated_validate_only_total",
-		"qs_interpretation_deprecated_generate_report_from_assessment_total",
-		"qs_answersheet_legacy_idempotency_fallback_lookup_total",
-		"qs_answersheet_legacy_idempotency_fallback_hit_total",
-		"docker restart",
-		"docker rm",
-		"DELETE FROM",
-		"UPDATE ",
-		"DROP ",
-	} {
-		if strings.Contains(content, forbidden) {
-			t.Errorf("compatibility observation must not contain %q", forbidden)
-		}
-	}
-}
-
 func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	t.Parallel()
 

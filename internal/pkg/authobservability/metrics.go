@@ -1,7 +1,6 @@
 package authobservability
 
 import (
-	"github.com/FangcunMount/qs-server/pkg/version"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -24,19 +23,14 @@ func init() {
 		}
 	}
 	for field, sources := range map[string][]string{
-		"user_id":    {"canonical", "missing", "extra_user_id", "extra_uid", "extra_sub"},
-		"account_id": {"canonical", "missing", "extra_account_id", "extra_accountId", "extra_aid"},
-		"org_id":     {"canonical", "missing", "extra_org_id", "extra_organization_id"},
+		"user_id":    {"canonical", "missing"},
+		"account_id": {"canonical", "missing"},
+		"org_id":     {"canonical", "missing"},
 	} {
 		for _, source := range sources {
 			authClaimSourceTotal.WithLabelValues(field, source)
 		}
 	}
-	promauto.NewGauge(prometheus.GaugeOpts{
-		Name:        "qs_auth_compatibility_observation_info",
-		Help:        "REST auth observation capability version 1 and compiled source SHA.",
-		ConstLabels: prometheus.Labels{"source_sha": version.Get().GitCommit, "capability": "1"},
-	}).Set(1)
 }
 
 // RecordTokenVerification is used only by the REST authentication boundary.
@@ -53,8 +47,7 @@ func RecordTokenVerification(source, result string) {
 }
 
 // RecordVerifiedClaimSources receives selections from the verified REST mapper.
-// Only canonical or missing selections are admitted. Reserved old zero-valued
-// series remain for the historical audit reader until the remaining M6 contracts retire.
+// Only canonical or missing selections are admitted.
 func RecordVerifiedClaimSources(sources [3]string) {
 	for index, field := range []string{"user_id", "account_id", "org_id"} {
 		source := sources[index]

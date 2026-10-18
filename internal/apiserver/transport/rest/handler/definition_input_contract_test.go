@@ -11,20 +11,19 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-type observingDefinitionService struct {
+type definitionContractService struct {
 	assessmentModelDefinitionStub
 	called bool
 }
 
-func (s *observingDefinitionService) SaveDefinition(_ context.Context, _ modelcatalog.ActorContext, _ string, value *domain.Definition) (*domain.Definition, error) {
+func (s *definitionContractService) SaveDefinition(_ context.Context, _ modelcatalog.ActorContext, _ string, value *domain.Definition) (*domain.Definition, error) {
 	s.called = true
 	return value, s.saveErr
 }
 
-func TestDefinitionWritesRejectDerivedFieldsAndObserveOriginalInput(t *testing.T) {
+func TestDefinitionWritesRejectRetiredDerivedInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, input, decision, assets, result string
 		status                                      int
@@ -40,10 +39,7 @@ func TestDefinitionWritesRejectDerivedFieldsAndObserveOriginalInput(t *testing.T
 		{"malformed", `{`, "unreadable", "unreadable", "unreadable", "rejected", 500},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			totalBefore := testutil.ToFloat64(definitionWriteTotal.WithLabelValues(tc.input, tc.result))
-			decisionBefore := testutil.ToFloat64(definitionInputFieldTotal.WithLabelValues("DecisionSpec", tc.decision, tc.result))
-			assetsBefore := testutil.ToFloat64(definitionInputFieldTotal.WithLabelValues("InterpretationAssets", tc.assets, tc.result))
-			svc := &observingDefinitionService{}
+			svc := &definitionContractService{}
 			h := NewAssessmentModelHandler(nil, svc, nil)
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
@@ -64,27 +60,18 @@ func TestDefinitionWritesRejectDerivedFieldsAndObserveOriginalInput(t *testing.T
 			if c.Request.Body != original {
 				t.Fatal("body ownership changed")
 			}
-			if delta := testutil.ToFloat64(definitionWriteTotal.WithLabelValues(tc.input, tc.result)) - totalBefore; delta != 1 {
-				t.Fatalf("total delta=%g", delta)
-			}
-			if delta := testutil.ToFloat64(definitionInputFieldTotal.WithLabelValues("DecisionSpec", tc.decision, tc.result)) - decisionBefore; delta != 1 {
-				t.Fatalf("decision delta=%g", delta)
-			}
-			if delta := testutil.ToFloat64(definitionInputFieldTotal.WithLabelValues("InterpretationAssets", tc.assets, tc.result)) - assetsBefore; delta != 1 {
-				t.Fatalf("assets delta=%g", delta)
-			}
 		})
 	}
 }
 
-func TestDefinitionObservationPreservesReadError(t *testing.T) {
+func TestDefinitionInputReadFailurePreservesBodyOwnership(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPut, "/definition", nil)
 	original := &definitionErrorBody{}
 	c.Request.Body = original
 	setAssessmentModelActor(c)
-	NewAssessmentModelHandler(nil, &observingDefinitionService{}, nil).UpdateDefinition(c)
+	NewAssessmentModelHandler(nil, &definitionContractService{}, nil).UpdateDefinition(c)
 	if recorder.Code != 500 || c.Request.Body != original || original.closed {
 		t.Fatalf("status=%d closed=%t", recorder.Code, original.closed)
 	}

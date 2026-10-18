@@ -56,9 +56,9 @@ func TestVerifiedRESTClaimsObserveOnlySelectedSources(t *testing.T) {
 			fields := []string{"user_id", "account_id", "org_id"}
 			before := map[string]map[string]float64{}
 			fieldSources := map[string][]string{
-				"user_id":    {"canonical", "missing", "extra_user_id", "extra_uid", "extra_sub"},
-				"account_id": {"canonical", "missing", "extra_account_id", "extra_accountId", "extra_aid"},
-				"org_id":     {"canonical", "missing", "extra_org_id", "extra_organization_id"},
+				"user_id":    {"canonical", "missing"},
+				"account_id": {"canonical", "missing"},
+				"org_id":     {"canonical", "missing"},
 			}
 			for field, sources := range fieldSources {
 				before[field] = map[string]float64{}
@@ -209,11 +209,11 @@ func TestRESTTokenCarrierResultAndPriority(t *testing.T) {
 	}
 }
 
-func TestAuthObservationRegistersOnlyBoundedSeries(t *testing.T) {
+func TestAuthMetricsRegisterOnlyBoundedCanonicalSeries(t *testing.T) {
 	if got := metricSeriesCount(t, "qs_auth_token_source_total"); got != 12 {
 		t.Fatalf("token series=%d", got)
 	}
-	if got := metricSeriesCount(t, "qs_auth_claim_source_total"); got != 14 {
+	if got := metricSeriesCount(t, "qs_auth_claim_source_total"); got != 6 {
 		t.Fatalf("claim series=%d", got)
 	}
 }
