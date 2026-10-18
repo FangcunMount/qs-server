@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -56,20 +57,20 @@ func TestReportAssetsLegacyProjectionMatchesActualBSONCodecForFourFamilies(t *te
 			if !reflect.DeepEqual(legacy, read.InterpretationAssets) {
 				t.Fatal("frozen legacy codec differs from actual durable whole assets")
 			}
-			if got := modeldefinition.CheckReportAssetsProjection(read, 1); got != modeldefinition.ReportAssetsProjectionMatched {
-				t.Fatal(got)
+			if _, err := modeldefinition.ResolveReportAssetsProjection(read, 1); err != nil {
+				t.Fatal(err)
 			}
 			if family == "factor_classification" {
 				if read.Conclusions[0].(conclusion.TypeConclusion).Profiles[0].Rarity.Label != "rare" {
 					t.Fatal("canonical Rarity lost")
 				}
-				if got := modeldefinition.CheckReportAssetsProjection(read, 2); got != modeldefinition.ReportAssetsProjectionMismatched {
+				if _, err := modeldefinition.ResolveReportAssetsProjection(read, 2); !errors.Is(err, modeldefinition.ErrReportAssetsProjectionMismatch) {
 					t.Fatal("V2 hid durable Rarity loss")
 				}
 			}
 			canonicalAfter, _ := json.Marshal(def)
 			if string(canonicalBefore) != string(canonicalAfter) {
-				t.Fatal("shadow mutated source Definition")
+				t.Fatal("projection mutated source Definition")
 			}
 		})
 	}

@@ -2,8 +2,8 @@ package evaluationinput
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -34,8 +34,7 @@ func attachPublishedCanonical(
 	if published == nil || published.DefinitionV2 == nil {
 		return nil
 	}
-	attachCanonicalWithProjectionShadow(ctx, snapshot, published)
-	return nil
+	return attachCanonicalWithProjection(snapshot, published)
 }
 
 func attachScaleCanonical(ctx context.Context, reader rulesetport.PublishedModelReader, ref port.InputRef, snapshot *port.InputSnapshot) error {
@@ -80,22 +79,25 @@ func attachBehavioralCanonical(ctx context.Context, reader rulesetport.Published
 		if requested != "" && published.Algorithm != requested {
 			continue
 		}
-		attachCanonicalWithProjectionShadow(ctx, snapshot, published)
-		return nil
+		return attachCanonicalWithProjection(snapshot, published)
 	}
 	return nil
 }
 
-func attachCanonicalWithProjectionShadow(ctx context.Context, snapshot *port.InputSnapshot, published *rulesetport.PublishedModel) {
-	status := modeldefinition.CheckReportAssetsProjection(published.DefinitionV2, published.ReportAssetsProjectionVersion)
-	if status == modeldefinition.ReportAssetsProjectionMismatched {
-		// Observation has fixed labels and record identity only. It must neither
-		// replace existing assets nor turn a preparation finding into an error.
-		logger.L(ctx).Warnw("report assets projection shadow mismatch",
-			"model_code", published.Code, "model_version", published.Version,
-			"projection_version", published.ReportAssetsProjectionVersion, "status", status)
+func attachCanonicalWithProjection(snapshot *port.InputSnapshot, published *rulesetport.PublishedModel) error {
+	assets, err := modeldefinition.ResolveReportAssetsProjection(published.DefinitionV2, published.ReportAssetsProjectionVersion)
+	if err != nil {
+		return port.NewResolveError(port.FailureKindUnsupportedModel,
+			fmt.Errorf("model %s/%s projection version %d: %w", published.Code, published.Version, published.ReportAssetsProjectionVersion, err),
+			"解释模型报告资产无效", "加载解释模型失败")
 	}
-	port.AttachCanonicalDefinition(snapshot, published.DefinitionV2)
+	snapshot.DefinitionV2 = published.DefinitionV2
+	// A previously frozen ReportInput owns its presentation assets. Fresh inputs
+	// select the explicit pure projection, never an unversioned stored-first read.
+	if (snapshot.InterpretationAssets == nil || !snapshot.InterpretationAssets.IsMaterialized()) && assets.IsMaterialized() {
+		snapshot.InterpretationAssets = &assets
+	}
+	return nil
 }
 
 func attachCognitiveCanonical(ctx context.Context, reader rulesetport.PublishedModelReader, ref port.InputRef, snapshot *port.InputSnapshot) error {

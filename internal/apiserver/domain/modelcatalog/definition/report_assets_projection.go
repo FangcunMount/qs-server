@@ -24,34 +24,26 @@ func ReportAssetsProjectionFrom(def *Definition, version interpretationassets.Pr
 	}
 }
 
-type ReportAssetsProjectionStatus string
-
-const (
-	ReportAssetsProjectionMatched    ReportAssetsProjectionStatus = "matched"
-	ReportAssetsProjectionMismatched ReportAssetsProjectionStatus = "mismatched"
-	ReportAssetsProjectionUnassigned ReportAssetsProjectionStatus = "unassigned"
-	ReportAssetsProjectionUnknown    ReportAssetsProjectionStatus = "unknown"
-	ReportAssetsProjectionMissing    ReportAssetsProjectionStatus = "missing_definition"
+var (
+	ErrMissingReportAssetsDefinition  = errors.New("report assets definition is missing")
+	ErrReportAssetsProjectionMismatch = errors.New("stored report assets differ from the declared projection")
 )
 
-// CheckReportAssetsProjection compares the entire projected asset value with
-// today's effective stored-first read. It is an observation only: missing or
-// unknown versions never become a successful match and never alter that read.
-func CheckReportAssetsProjection(def *Definition, version interpretationassets.ProjectionVersion) ReportAssetsProjectionStatus {
-	if version == interpretationassets.ProjectionUnassigned {
-		return ReportAssetsProjectionUnassigned
-	}
-	if !version.IsKnown() {
-		return ReportAssetsProjectionUnknown
-	}
+// ResolveReportAssetsProjection enforces the published record's encoding version.
+// Retained stored assets must agree before switching reads to the pure projection.
+// Once retired fields are absent, V1 still reproduces the old codec semantics.
+func ResolveReportAssetsProjection(def *Definition, version interpretationassets.ProjectionVersion) (interpretationassets.Assets, error) {
 	if def == nil {
-		return ReportAssetsProjectionMissing
+		return interpretationassets.Assets{}, ErrMissingReportAssetsDefinition
 	}
-	expected, _ := ReportAssetsProjectionFrom(def, version)
-	if !reflect.DeepEqual(normalizeReportAssets(expected), normalizeReportAssets(def.ResolvedInterpretationAssets())) {
-		return ReportAssetsProjectionMismatched
+	projected, err := ReportAssetsProjectionFrom(def, version)
+	if err != nil {
+		return interpretationassets.Assets{}, err
 	}
-	return ReportAssetsProjectionMatched
+	if def.InterpretationAssets.IsMaterialized() && !reflect.DeepEqual(normalizeReportAssets(projected), normalizeReportAssets(def.InterpretationAssets)) {
+		return interpretationassets.Assets{}, ErrReportAssetsProjectionMismatch
+	}
+	return projected, nil
 }
 
 // The frozen v1 encoding DTO deliberately does not depend on today's Mongo PO

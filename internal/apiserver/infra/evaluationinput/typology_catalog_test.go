@@ -174,7 +174,7 @@ func TestConfiguredTypologyProviderPreservesCanonicalAttach(t *testing.T) {
 		model *rulesetport.PublishedModel
 		err   error
 	}{
-		{name: "canonical definition", model: &rulesetport.PublishedModel{DefinitionV2: definition}},
+		{name: "canonical definition", model: &rulesetport.PublishedModel{DefinitionV2: definition, ReportAssetsProjectionVersion: 1}},
 		{name: "canonical absent", err: modelcatalog.ErrNotFound},
 		{name: "canonical unavailable", err: context.DeadlineExceeded},
 	} {

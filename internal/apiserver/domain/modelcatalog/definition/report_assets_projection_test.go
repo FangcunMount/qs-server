@@ -3,6 +3,7 @@ package definition
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -56,7 +57,7 @@ func TestReportAssetsProjectionVersionsPreserveCanonicalAndLegacySemantics(t *te
 	}
 }
 
-func TestReportAssetsShadowChecksAllFieldsWithoutLooseningOrderOrDuplicates(t *testing.T) {
+func TestResolveReportAssetsChecksAllFieldsWithoutLooseningOrderOrDuplicates(t *testing.T) {
 	mutations := map[string]func(*interpretationassets.Assets){
 		"outcome code":        func(a *interpretationassets.Assets) { a.Outcomes[0].OutcomeCode += "x" },
 		"outcome title":       func(a *interpretationassets.Assets) { a.Outcomes[0].Title += "x" },
@@ -92,31 +93,76 @@ func TestReportAssetsShadowChecksAllFieldsWithoutLooseningOrderOrDuplicates(t *t
 			def := projectionDefinition()
 			def.Outcomes = append(def.Outcomes, conclusion.Outcome{Code: "ENFP", Title: "second"})
 			def.InterpretationAssets, _ = ReportAssetsProjectionFrom(def, interpretationassets.ProjectionLegacyV1)
-			if got := CheckReportAssetsProjection(def, 1); got != ReportAssetsProjectionMatched {
-				t.Fatalf("before = %s", got)
+			if _, err := ResolveReportAssetsProjection(def, 1); err != nil {
+				t.Fatal(err)
 			}
 			mutate(&def.InterpretationAssets)
-			if got := CheckReportAssetsProjection(def, 1); got != ReportAssetsProjectionMismatched {
-				t.Fatalf("after = %s", got)
+			if _, err := ResolveReportAssetsProjection(def, 1); !errors.Is(err, ErrReportAssetsProjectionMismatch) {
+				t.Fatalf("after mutation: %v", err)
 			}
 		})
 	}
 }
 
-func TestReportAssetsShadowOnlyNormalizesNilEmptyAndNeverAssignsVersion(t *testing.T) {
+func TestResolveReportAssetsOnlyNormalizesNilEmptyAndRejectsUnknownVersions(t *testing.T) {
 	def := projectionDefinition()
 	def.InterpretationAssets, _ = ReportAssetsProjectionFrom(def, 1)
 	def.InterpretationAssets.Profiles[0].Traits = nil
 	def.Conclusions[0].(conclusion.TypeConclusion).Profiles[0].Traits = []string{}
-	if got := CheckReportAssetsProjection(def, 1); got != ReportAssetsProjectionMatched {
-		t.Fatal(got)
+	if _, err := ResolveReportAssetsProjection(def, 1); err != nil {
+		t.Fatal(err)
 	}
-	for version, want := range map[interpretationassets.ProjectionVersion]ReportAssetsProjectionStatus{0: ReportAssetsProjectionUnassigned, 99: ReportAssetsProjectionUnknown, 2: ReportAssetsProjectionMismatched} {
-		if got := CheckReportAssetsProjection(def, version); got != want {
-			t.Fatalf("%d: %s", version, got)
+	for _, version := range []interpretationassets.ProjectionVersion{0, 99} {
+		if _, err := ResolveReportAssetsProjection(def, version); !errors.Is(err, ErrUnknownReportAssetsProjection) {
+			t.Fatalf("%d: %v", version, err)
 		}
 	}
-	if got := CheckReportAssetsProjection(nil, 1); got != ReportAssetsProjectionMissing {
-		t.Fatal(got)
+	if _, err := ResolveReportAssetsProjection(def, 2); !errors.Is(err, ErrReportAssetsProjectionMismatch) {
+		t.Fatal(err)
+	}
+	if _, err := ResolveReportAssetsProjection(nil, 1); !errors.Is(err, ErrMissingReportAssetsDefinition) {
+		t.Fatal(err)
+	}
+
+}
+
+func TestResolveReportAssetsProjectionKeepsLegacyAfterStoredFieldsRetire(t *testing.T) {
+	for _, version := range []interpretationassets.ProjectionVersion{1, 2} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) {
+			def := projectionDefinition()
+			def.InterpretationAssets, _ = ReportAssetsProjectionFrom(def, version)
+			expected, _ := json.Marshal(def.InterpretationAssets)
+			if _, err := ResolveReportAssetsProjection(def, version); err != nil {
+				t.Fatal(err)
+			}
+			def.InterpretationAssets = interpretationassets.Assets{}
+			got, err := ResolveReportAssetsProjection(def, version)
+			if err != nil {
+				t.Fatal(err)
+			}
+			actual, _ := json.Marshal(got)
+			if string(actual) != string(expected) {
+				t.Fatal("stored-field retirement changed versioned projection")
+			}
+			if version == 1 && got.Profiles[0].Rarity != (interpretationassets.RarityPresentation{}) {
+				t.Fatal("old version gained rarity")
+			}
+			if version == 2 && got.Profiles[0].Rarity.OneInX != 48 {
+				t.Fatal("new version lost rarity")
+			}
+		})
+	}
+	if _, err := ResolveReportAssetsProjection(nil, 1); !errors.Is(err, ErrMissingReportAssetsDefinition) {
+		t.Fatal(err)
+	}
+	for _, version := range []interpretationassets.ProjectionVersion{0, 99} {
+		if _, err := ResolveReportAssetsProjection(projectionDefinition(), version); !errors.Is(err, ErrUnknownReportAssetsProjection) {
+			t.Fatal(err)
+		}
+	}
+	def := projectionDefinition()
+	def.InterpretationAssets, _ = ReportAssetsProjectionFrom(def, 1)
+	if _, err := ResolveReportAssetsProjection(def, 2); !errors.Is(err, ErrReportAssetsProjectionMismatch) {
+		t.Fatal("v2 silently replaced v1 stored assets", err)
 	}
 }

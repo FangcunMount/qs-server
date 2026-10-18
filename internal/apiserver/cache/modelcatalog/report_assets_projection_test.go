@@ -62,8 +62,8 @@ func TestPublishedPayloadSchemaBypassesOldExactAndLatestEntries(t *testing.T) {
 	keys := keyspace.NewBuilderWithNamespace("test")
 	stale := &port.PublishedModel{Kind: domain.KindScale, Code: "MODEL", Version: "v1"}
 	data, _ := json.Marshal(stale)
-	oldRef := keys.BuildPublishedAssessmentModelByRefKey("scale", "", "", "model", "v1")
-	oldLatest := keys.BuildPublishedAssessmentModelLatestByCodeKey("scale", "model")
+	oldRef := keys.BuildPublishedAssessmentModelByRefKey("scale", "", "", "model", "v1") + ":payload-v2"
+	oldLatest := keys.BuildPublishedAssessmentModelLatestByCodeKey("scale", "model") + ":payload-v2"
 	if err := client.Set(context.Background(), oldRef, data, time.Hour).Err(); err != nil {
 		t.Fatal(err)
 	}
@@ -72,8 +72,18 @@ func TestPublishedPayloadSchemaBypassesOldExactAndLatestEntries(t *testing.T) {
 	}
 	fresh := *stale
 	fresh.ReportAssetsProjectionVersion = 1
-	inner := &publishedModelStoreStub{getByRef: &fresh, findByCode: &fresh}
+	inner := &publishedModelStoreStub{getByRef: &fresh, findByCode: &fresh, findByQuestionnaire: &fresh, listPublished: []*port.PublishedModel{&fresh}, listPublishedTotal: 1}
 	cached := NewCachedPublishedModelStore(inner, client, keys, publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
+	filter := port.ListPublishedFilter{Page: 1, PageSize: 1}
+	oldQuestionnaire := strings.TrimSuffix(cached.questionnaireCacheKey("Q", "v1", 0), publishedModelPayloadSchemaSuffix) + ":payload-v2"
+	oldList := strings.TrimSuffix(cached.listCatalogCacheKeyAtVersion(filter, 0), publishedModelPayloadSchemaSuffix) + ":payload-v2"
+	listData, _ := json.Marshal(publishedModelCatalogListPage{Models: []*port.PublishedModel{stale}, Total: 1})
+	if err := client.Set(context.Background(), oldQuestionnaire, data, time.Hour).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Set(context.Background(), oldList, listData, time.Hour).Err(); err != nil {
+		t.Fatal(err)
+	}
 	exact, err := cached.GetPublishedModelByRef(context.Background(), port.Ref{Kind: fresh.Kind, Code: fresh.Code, Version: fresh.Version})
 	if err != nil || exact.ReportAssetsProjectionVersion != 1 || inner.getByRefCalls != 1 {
 		t.Fatalf("old exact payload reused: %#v %v", exact, err)
@@ -82,12 +92,20 @@ func TestPublishedPayloadSchemaBypassesOldExactAndLatestEntries(t *testing.T) {
 	if err != nil || latest.ReportAssetsProjectionVersion != 1 || inner.findByCodeCalls != 1 {
 		t.Fatalf("old latest payload reused: %#v %v", latest, err)
 	}
+	byQuestionnaire, err := cached.FindPublishedModelByQuestionnaire(context.Background(), "Q", "v1")
+	if err != nil || byQuestionnaire.ReportAssetsProjectionVersion != 1 || inner.findByQuestionnaireCalls != 1 {
+		t.Fatal("old questionnaire payload reused", err)
+	}
+	list, _, err := cached.ListPublishedModels(context.Background(), filter)
+	if err != nil || len(list) != 1 || list[0].ReportAssetsProjectionVersion != 1 || inner.listPublishedCalls != 1 {
+		t.Fatal("old list payload reused", err)
+	}
 	for _, key := range []string{cached.refCacheKey(port.Ref{}), cached.latestByCodeCacheKey("", ""), cached.questionnaireCacheKey("Q", "v1", 0), cached.listCatalogCacheKeyAtVersion(port.ListPublishedFilter{}, 0)} {
 		if !strings.HasSuffix(key, publishedModelPayloadSchemaSuffix) {
 			t.Fatalf("payload not versioned: %q", key)
 		}
 	}
-	if !mr.Exists(oldRef) || !mr.Exists(oldLatest) {
+	if !mr.Exists(oldRef) || !mr.Exists(oldLatest) || !mr.Exists(oldQuestionnaire) || !mr.Exists(oldList) {
 		t.Fatal("preparation deleted old-process cache entries")
 	}
 }
