@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+    "sha": "7de5adbd31b588450735f11b3501292da89a6ada",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -3975,6 +3975,13 @@
           "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
           "result": "matched",
           "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/pkg/configcontract ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
           "verified_on": "2026-10-18"
         }
       ],
@@ -8966,6 +8973,13 @@
           "result": "matched",
           "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/pkg/configcontract ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -9684,6 +9698,13 @@
           "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
           "result": "matched",
           "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/pkg/configcontract ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
           "verified_on": "2026-10-18"
         }
       ],
