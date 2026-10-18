@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+    "sha": "77b7db3cefca382327161dd7cc97ab9ee47f860e",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -6377,7 +6377,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -6448,7 +6448,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -6493,7 +6493,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -6572,7 +6572,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -6816,7 +6816,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -6872,7 +6872,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
@@ -7073,7 +7073,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "source_sha": "321f7be1a78b50e12a33df527ff7a2ec444960f4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -7136,7 +7136,7 @@
         {
           "kind": "source_selector",
           "path": "internal/apiserver/cache/modelcatalog/published_model.go",
-          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v4\"",
           "result": "matched",
           "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
           "verified_on": "2026-10-18"
