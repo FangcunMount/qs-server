@@ -94,10 +94,6 @@ def metrics(accepted, key, bare=0, defect=None):
             sample("qs_model_definition_input_field_total", job, instance,
                    accepted if (presence, result) == ("absent", "accepted") else 0,
                    field=field, presence=presence, result=result)
-        # This retained Worker metric remains supplementary to the new contracts.
-        for result in ("resolved", "not_found", "dependency_error", "unavailable"):
-            sample("qs_evaluation_assessment_intake_legacy_binding_total", "qs-worker", "worker:8081", 0,
-                   result=result)
     return ("\n".join(lines) + "\n").encode()
 
 

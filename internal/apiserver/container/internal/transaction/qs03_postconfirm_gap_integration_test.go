@@ -201,7 +201,7 @@ func TestQS03PostConfirmRecover(t *testing.T) {
 	stager, err := mysqlstandard.NewStager(qs03Catalog(t, "evaluation.requested"), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	intake := appintake.NewService(assessmentcache.NewInvalidatingAssessmentRepository(assessmentmysql.NewAssessmentRepository(mysqlDB), nil), proofModelValidator{}, NewMySQLRunner(mysqlDB), stager)
-	ensure := journey.NewService(nil, nil, nil, nil, intake, nil, sheetRepo)
+	ensure := journey.NewService(nil, nil, nil, intake, nil, sheetRepo)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	server := grpc.NewServer()

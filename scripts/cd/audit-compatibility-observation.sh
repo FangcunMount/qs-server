@@ -451,25 +451,10 @@ def main():
                 fail("current capability or counter sample is stale")
     up = 'up{job=~"qs-apiserver|qs-collection-server"}'
     exact_values(current_values(up, all_instances), 1, "service scrape is not up")
-    # The retained legacy admission counter is supplementary: it cannot settle
-    # pending/hold/dead-letter/manual replay responsibility or attest Worker SHA.
-    admission = "qs_evaluation_assessment_intake_legacy_binding_total"
-    current_admission = query("count(" + admission + ")")
-    if len(current_admission) != 1 or finite(current_admission[0]["value"][1]) < 1:
-        fail("legacy admission metric is absent; absence is not zero")
     if mode == "preflight":
         print("M6 preflight ready: current deployment/source/zero-series coverage verified; observation_window=not_started")
         return
     traffic = check_raw_window(selectors, intervals, start, end, source)
-    # Supplementary Worker intake is fixed to this same historical end. It does
-    # not have a reviewed Worker inventory and cannot sign off its zero usage.
-    admission_duration = str(math.ceil(end - start + 2 * max(intervals.values()))) + "s"
-    admission_increase = query("sum(increase(" + admission + "[" + admission_duration + "]))", end=end)
-    if len(admission_increase) != 1:
-        fail("legacy admission observation history is missing")
-    admission_value = finite(admission_increase[0]["value"][1])
-    if admission_value < 0: fail("negative legacy admission increase")
-    print("M6\tevaluation_legacy_binding\t" + ("active_compatibility" if admission_value > 0 else "supplementary_zero"))
     required = [("bearer", all_instances), ("user_id", all_instances), ("account_id", all_instances),
                 ("org_id", all_instances), ("task", collection_instances), ("definition", api_instances)]
     for contract, expected in required:

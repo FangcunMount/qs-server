@@ -13,21 +13,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-type activeReaderStub struct {
-	called   bool
-	lastRef  port.Ref
-	snapshot *port.PublishedModel
-	err      error
-}
-
-func (s *activeReaderStub) GetActivePublishedModelByRef(_ context.Context, ref port.Ref) (*port.PublishedModel, error) {
-	s.called = true
-	s.lastRef = ref
-	return s.snapshot, s.err
-}
-
 type frozenReleaseReaderStub struct {
-	activeReaderStub
+	lastRef        port.Ref
 	retainedCalled bool
 	retained       *port.PublishedModel
 	retainedErr    error
@@ -39,7 +26,7 @@ func (s *frozenReleaseReaderStub) GetPublishedModelByRef(_ context.Context, ref 
 	return s.retained, s.retainedErr
 }
 
-func TestPublishedModelValidatorFailsClosedForInvalidModeAndMissingSelectedReader(t *testing.T) {
+func TestPublishedModelValidatorFailsClosedWithoutRetainedReader(t *testing.T) {
 	t.Parallel()
 
 	modelRef := evalassessment.NewEvaluationModelRefWithIdentity(
@@ -53,32 +40,14 @@ func TestPublishedModelValidatorFailsClosedForInvalidModeAndMissingSelectedReade
 	)
 	questionnaireRef := evalassessment.NewQuestionnaireRefByCode(meta.NewCode("Q-1"), "1.0.0")
 
-	t.Run("invalid mode", func(t *testing.T) {
-		validator := NewPublishedEvaluationModelValidator(&activeReaderStub{}, nil)
-		err := validator.ValidateEvaluationModel(context.Background(), modelRef, questionnaireRef, ModelValidationMode("unknown"))
-		if !cberrors.IsCode(err, errorCode.ErrInvalidArgument) {
-			t.Fatalf("error = %v, want InvalidArgument", err)
-		}
-	})
-
-	t.Run("active reader missing", func(t *testing.T) {
-		validator := NewPublishedEvaluationModelValidator(nil, &frozenReleaseReaderStub{})
-		err := validator.ValidateEvaluationModel(context.Background(), modelRef, questionnaireRef, ModelValidationModeActiveRelease)
-		if !cberrors.IsCode(err, errorCode.ErrModuleInitializationFailed) {
-			t.Fatalf("error = %v, want ModuleNotConfigured", err)
-		}
-	})
-
-	t.Run("retained reader missing", func(t *testing.T) {
-		validator := NewPublishedEvaluationModelValidator(&activeReaderStub{}, nil)
-		err := validator.ValidateEvaluationModel(context.Background(), modelRef, questionnaireRef, ModelValidationModeRetainedExact)
-		if !cberrors.IsCode(err, errorCode.ErrModuleInitializationFailed) {
-			t.Fatalf("error = %v, want ModuleNotConfigured", err)
-		}
-	})
+	validator := NewPublishedEvaluationModelValidator(nil)
+	err := validator.ValidateEvaluationModel(context.Background(), modelRef, questionnaireRef)
+	if !cberrors.IsCode(err, errorCode.ErrModuleInitializationFailed) {
+		t.Fatalf("error=%v want ModuleNotConfigured", err)
+	}
 }
 
-func TestPublishedModelValidatorChecksQuestionnaireInBothModes(t *testing.T) {
+func TestPublishedModelValidatorChecksQuestionnaireForFrozenRelease(t *testing.T) {
 	t.Parallel()
 
 	snapshot := &port.PublishedModel{
@@ -90,8 +59,7 @@ func TestPublishedModelValidatorChecksQuestionnaireInBothModes(t *testing.T) {
 		QuestionnaireVersion: "1.0.0",
 	}
 	reader := &frozenReleaseReaderStub{
-		activeReaderStub: activeReaderStub{snapshot: snapshot},
-		retained:         snapshot,
+		retained: snapshot,
 	}
 	modelRef := evalassessment.NewEvaluationModelRefWithIdentity(
 		domainmodel.KindScale,
@@ -104,19 +72,18 @@ func TestPublishedModelValidatorChecksQuestionnaireInBothModes(t *testing.T) {
 	)
 	questionnaireRef := evalassessment.NewQuestionnaireRefByCode(meta.NewCode("Q-1"), "1.0.0")
 
-	for _, mode := range []ModelValidationMode{ModelValidationModeActiveRelease, ModelValidationModeRetainedExact} {
-		if err := NewPublishedEvaluationModelValidator(reader, reader).ValidateEvaluationModel(
+	{
+		if err := NewPublishedEvaluationModelValidator(reader).ValidateEvaluationModel(
 			context.Background(),
 			modelRef,
 			questionnaireRef,
-			mode,
 		); !errors.Is(err, evalassessment.ErrEvaluationModelQuestionnaireMismatch) {
-			t.Fatalf("mode %q error = %v, want questionnaire mismatch", mode, err)
+			t.Fatalf("error = %v, want questionnaire mismatch", err)
 		}
 	}
 }
 
-func TestPublishedModelValidatorRejectsReturnedIdentityMismatchInBothModes(t *testing.T) {
+func TestPublishedModelValidatorRejectsReturnedIdentityMismatchForFrozenRelease(t *testing.T) {
 	t.Parallel()
 
 	snapshot := &port.PublishedModel{
@@ -128,8 +95,7 @@ func TestPublishedModelValidatorRejectsReturnedIdentityMismatchInBothModes(t *te
 		QuestionnaireVersion: "1.0.0",
 	}
 	reader := &frozenReleaseReaderStub{
-		activeReaderStub: activeReaderStub{snapshot: snapshot},
-		retained:         snapshot,
+		retained: snapshot,
 	}
 	modelRef := evalassessment.NewEvaluationModelRefWithIdentity(
 		domainmodel.KindScale,
@@ -142,14 +108,13 @@ func TestPublishedModelValidatorRejectsReturnedIdentityMismatchInBothModes(t *te
 	)
 	questionnaireRef := evalassessment.NewQuestionnaireRefByCode(meta.NewCode("Q-1"), "1.0.0")
 
-	for _, mode := range []ModelValidationMode{ModelValidationModeActiveRelease, ModelValidationModeRetainedExact} {
-		if err := NewPublishedEvaluationModelValidator(reader, reader).ValidateEvaluationModel(
+	{
+		if err := NewPublishedEvaluationModelValidator(reader).ValidateEvaluationModel(
 			context.Background(),
 			modelRef,
 			questionnaireRef,
-			mode,
 		); !errors.Is(err, evalassessment.ErrEvaluationModelNotPublished) {
-			t.Fatalf("mode %q error = %v, want identity mismatch rejection", mode, err)
+			t.Fatalf("error = %v, want identity mismatch rejection", err)
 		}
 	}
 }
@@ -162,7 +127,6 @@ func TestPublishedModelValidatorAcceptsFrozenRetainedReleaseAfterArchive(t *test
 	t.Parallel()
 
 	reader := &frozenReleaseReaderStub{
-		activeReaderStub: activeReaderStub{err: domainmodel.ErrNotFound},
 		retained: &port.PublishedModel{
 			Kind:                 domainmodel.KindScale,
 			Algorithm:            domainmodel.AlgorithmScaleDefault,
@@ -172,7 +136,7 @@ func TestPublishedModelValidatorAcceptsFrozenRetainedReleaseAfterArchive(t *test
 			QuestionnaireVersion: "1.0.0",
 		},
 	}
-	validator := NewPublishedEvaluationModelValidator(reader, reader)
+	validator := NewPublishedEvaluationModelValidator(reader)
 
 	err := validator.ValidateEvaluationModel(
 		context.Background(),
@@ -186,7 +150,6 @@ func TestPublishedModelValidatorAcceptsFrozenRetainedReleaseAfterArchive(t *test
 			"Model",
 		),
 		evalassessment.NewQuestionnaireRefByCode(meta.NewCode("Q-1"), "1.0.0"),
-		ModelValidationModeRetainedExact,
 	)
 	if err != nil {
 		t.Fatalf("submit-time frozen retained release was rejected after archive: %v", err)
@@ -196,7 +159,7 @@ func TestPublishedModelValidatorAcceptsFrozenRetainedReleaseAfterArchive(t *test
 	}
 }
 
-func TestPublishedModelValidatorUsesActiveReleaseBoundaryForEveryKind(t *testing.T) {
+func TestPublishedModelValidatorUsesRetainedReleaseForEveryKind(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -213,18 +176,17 @@ func TestPublishedModelValidatorUsesActiveReleaseBoundaryForEveryKind(t *testing
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			reader := &activeReaderStub{err: domainmodel.ErrNotFound}
-			validator := NewPublishedEvaluationModelValidator(reader, nil)
+			reader := &frozenReleaseReaderStub{retainedErr: domainmodel.ErrNotFound}
+			validator := NewPublishedEvaluationModelValidator(reader)
 			err := validator.ValidateEvaluationModel(
 				context.Background(),
 				evalassessment.NewEvaluationModelRefWithIdentity(
 					tc.kind, tc.subKind, tc.algorithm, 0, meta.NewCode("MODEL-1"), "v1", "Model",
 				),
 				evalassessment.NewQuestionnaireRefByCode(meta.NewCode("Q-1"), "1.0.0"),
-				ModelValidationModeActiveRelease,
 			)
-			if !reader.called || reader.lastRef.Kind != tc.kind {
-				t.Fatalf("active release lookup = called:%t ref:%#v", reader.called, reader.lastRef)
+			if !reader.retainedCalled || reader.lastRef.Kind != tc.kind {
+				t.Fatalf("retained release lookup = called:%t ref:%#v", reader.retainedCalled, reader.lastRef)
 			}
 			if !errors.Is(err, evalassessment.ErrEvaluationModelNotPublished) {
 				t.Fatalf("error = %v, want ErrEvaluationModelNotPublished", err)

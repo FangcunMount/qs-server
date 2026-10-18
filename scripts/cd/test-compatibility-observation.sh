@@ -112,12 +112,7 @@ elif arguments[0] == "exec":
         elif query.startswith("max(time()-timestamp("):
             emit({"resultType": "vector", "result": [{"metric": {}, "value": [now, "3600" if scenario == "stale_scrape" else "1"]}]})
         elif metric not in family:
-            if metric != "qs_evaluation_assessment_intake_legacy_binding_total":
-                raise SystemExit("unexpected observation query: " + query)
-            if scenario == "admission_absent":
-                emit({"resultType": "vector", "result": []})
-            else:
-                emit({"resultType": "vector", "result": [{"metric": {}, "value": [now, "4" if query.startswith("count(") else "0"]}]})
+            raise SystemExit("unexpected observation query: " + query)
         else:
             count, keys = family[metric]
             keys = list(keys)
@@ -207,7 +202,7 @@ printf '%s\n' "$zero_output" "$window_output"
 # Short raw-sample matrices cover the counterexamples without replaying an
 # invented 14-day history for every malformed point or label.
 python3 "$SCRIPT_DIR/test-compatibility-raw-window.py"
-for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance nan retention_short admission_absent; do
+for scenario in partial_deploy missing_target wrong_source down stale_scrape restarted missing_zero_series unexpected_instance nan retention_short; do
   if env "${COMMON_ENV[@]}" OBSERVATION_MODE=window WINDOW_DAYS=14 FAKE_M6_SCENARIO="$scenario" \
     "$SCRIPT_DIR/audit-compatibility-observation.sh" >"$TEST_ROOT/$scenario.log" 2>&1; then
     echo "M6 observation accepted incomplete evidence: $scenario" >&2

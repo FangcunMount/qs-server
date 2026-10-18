@@ -178,7 +178,7 @@ message EnsureAssessmentRequest {
   string task_id = 7;
   string origin_type = 8;
   string origin_id = 9;
-  // Submit-time frozen evaluation admission (EV-R001). Empty purpose = legacy.
+  // Submit-time frozen evaluation admission (EV-R001). Required for execution; empty purpose is rejected.
   AssessmentAdmission admission = 10;
 }
 

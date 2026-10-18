@@ -111,12 +111,12 @@ func TestResolveAssessmentByAnswerSheetIDReadinessPhases(t *testing.T) {
 			wantPhase: readinessPhasePending, wantAssessmentID: 0,
 		},
 		{
-			name:   "legacy sheet without admission pending",
+			name:   "legacy sheet without admission cannot promise execution",
 			intake: resolveIntakeStub{err: evalerrors.AssessmentNotFound(errors.New("missing"), "assessment missing")},
 			sheets: resolveSheetStub{sheet: &appanswersheet.AnswerSheetResult{
 				ID: 42, TesteeID: 7,
 			}},
-			wantPhase: readinessPhasePending, wantAssessmentID: 0,
+			wantCode: codes.FailedPrecondition,
 		},
 		{
 			name:     "dependency error surfaces",

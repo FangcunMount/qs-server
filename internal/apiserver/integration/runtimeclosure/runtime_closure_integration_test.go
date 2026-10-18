@@ -48,7 +48,6 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mongoModelCatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	modelport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
@@ -243,7 +242,7 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	answerService := grpcservice.NewAnswerSheetService(grpcDeps.Survey.AnswerSheetSubmissionService)
 	journey := assessmentintakejourney.NewService(
 		grpcDeps.Survey.AnswerSheetScoringService,
-		rulesetInfra.NewAssessmentBindingResolver(grpcDeps.PublishedModelCatalog),
+
 		grpcDeps.Plan.TaskAssessmentResolver,
 		grpcDeps.Plan.CommandService,
 		grpcDeps.Evaluation.IntakeService,

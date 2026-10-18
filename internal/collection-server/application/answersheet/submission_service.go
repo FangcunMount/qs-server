@@ -405,12 +405,6 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 		return nil, status.Error(codes.Unavailable, "assessment readiness is unavailable")
 	}
 	resolvedTesteeID, assessmentID, readinessPhase, err := s.assessmentResolver.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
-	if status.Code(err) == codes.NotFound {
-		// Legacy servers that still return NotFound for missing Assessment.
-		logger.L(ctx).Infow("测评尚未就绪", "action", "assessment_readiness", "stage", "assessment_pending",
-			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "result", "pending")
-		return &AssessmentReadinessResponse{Status: "pending", AnswerSheetID: strconv.FormatUint(answerSheetID, 10), NextPollAfterMs: 2000}, nil
-	}
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "assessment readiness is unavailable")
 	}
@@ -418,18 +412,8 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 		return nil, status.Error(codes.Unavailable, "assessment readiness is inconsistent")
 	}
 
-	phase := readinessPhase
-	if phase == "" {
-		// Old clients/servers without readiness_phase: ID present => ready, else pending.
-		if assessmentID != 0 {
-			phase = "ready"
-		} else {
-			phase = "pending"
-		}
-	}
-
 	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
-	switch phase {
+	switch readinessPhase {
 	case "pending":
 		logger.L(ctx).Infow("测评尚未就绪", "action", "assessment_readiness", "stage", "assessment_pending",
 			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "result", "pending")
@@ -463,10 +447,7 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 			AssessmentID:  strconv.FormatUint(assessmentID, 10),
 		}, nil
 	default:
-		// Unknown phase: keep polling so old/new clients do not hang on a terminal assumption.
-		logger.L(ctx).Infow("未知 readiness phase，按 pending 轮询", "action", "assessment_readiness", "stage", "assessment_pending",
-			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "readiness_phase", phase, "result", "pending")
-		return &AssessmentReadinessResponse{Status: "pending", AnswerSheetID: answerSheetIDStr, NextPollAfterMs: 2000}, nil
+		return nil, status.Error(codes.Unavailable, "assessment readiness phase is unsupported")
 	}
 }
 

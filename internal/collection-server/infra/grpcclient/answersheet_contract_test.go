@@ -100,10 +100,15 @@ func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
 
 	reader := acl.NewAnswerSheetBFFReader(grpcClient)
 	pendingService := collectionanswersheet.NewSubmissionService(nil, nil, reader, contractActorLookup{}, contractProfileLink{}, nil,
-		contractAssessmentResolver{err: status.Error(codes.NotFound, "not ready")}, nil, time.Second)
+		contractAssessmentResolver{testeeID: 77, readinessPhase: "pending"}, nil, time.Second)
 	pending, err := pendingService.GetAssessmentReadiness(t.Context(), 11, 42, 77)
 	if err != nil || pending.Status != "pending" || pending.AnswerSheetID != "42" {
 		t.Fatalf("pending readiness = %#v, error = %v", pending, err)
+	}
+
+	legacyService := collectionanswersheet.NewSubmissionService(nil, nil, reader, contractActorLookup{}, contractProfileLink{}, nil, contractAssessmentResolver{err: status.Error(codes.NotFound, "old reply")}, nil, time.Second)
+	if got, err := legacyService.GetAssessmentReadiness(t.Context(), 11, 42, 77); got != nil || status.Code(err) != codes.Unavailable {
+		t.Fatalf("legacy reply invented readiness: %+v err=%v", got, err)
 	}
 
 	readyService := collectionanswersheet.NewSubmissionService(nil, nil, reader, contractActorLookup{}, contractProfileLink{}, nil,

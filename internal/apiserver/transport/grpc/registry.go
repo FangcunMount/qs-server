@@ -25,7 +25,6 @@ import (
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	bridgeTransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/aibridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
@@ -233,7 +232,7 @@ func (r *Registry) registerEvaluationService() error {
 
 	journey := assessmentintakejourney.NewService(
 		r.deps.Survey.AnswerSheetScoringService,
-		rulesetInfra.NewAssessmentBindingResolver(r.deps.PublishedModelCatalog),
+
 		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,
 		r.deps.Evaluation.IntakeService,

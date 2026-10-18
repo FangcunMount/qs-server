@@ -14,7 +14,7 @@ import (
 
 type proofModelValidator struct{}
 
-func (proofModelValidator) ValidateEvaluationModel(context.Context, domain.EvaluationModelRef, domain.QuestionnaireRef, intake.ModelValidationMode) error {
+func (proofModelValidator) ValidateEvaluationModel(context.Context, domain.EvaluationModelRef, domain.QuestionnaireRef) error {
 	return nil
 }
 

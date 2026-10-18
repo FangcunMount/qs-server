@@ -105,6 +105,9 @@ func (s *AssessmentIntakeService) ResolveAssessmentByAnswerSheetID(ctx context.C
 		return nil, status.Error(codes.NotFound, "answer sheet not found")
 	}
 
+	if sheet.AdmissionPurpose != string(domainanswersheet.AdmissionPurposeAssessment) && sheet.AdmissionPurpose != string(domainanswersheet.AdmissionPurposeIndependentQuestionnaire) {
+		return nil, status.Error(codes.FailedPrecondition, "frozen admission is unavailable for this answer sheet")
+	}
 	phase := readinessPhasePending
 	if sheet.AdmissionPurpose == string(domainanswersheet.AdmissionPurposeIndependentQuestionnaire) {
 		phase = readinessPhaseNoAssessmentRequired
