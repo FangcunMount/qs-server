@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7de5adbd31b588450735f11b3501292da89a6ada",
+    "sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -9012,8 +9012,8 @@
           "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
-          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": []
         }
       ]
@@ -11379,9 +11379,9 @@
       "path": "internal/pkg/migration/README.md",
       "class": "sidecar",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -11827,6 +11827,13 @@
           "verified_on": "2026-10-18",
           "path": ".github/workflows/ci.yml",
           "selector": "Run Mongo-backed norm calculation regression"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -11918,7 +11925,8 @@
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(\",\"result\":\"matched\",\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
-          "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged."
+          "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged.",
+          "Command-family source review preserves prior verified marker as JSON: {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}. Only maintenance command spellings and source paths changed. New CLI race tests passed; migration SQL, maintenance application implementations and original native proofs remain byte-identical and retain their original sources. No current native or production execution is claimed."
         ]
       },
       "gaps": [
@@ -11933,8 +11941,8 @@
           "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
-          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": [
             {
               "kind": "command",
@@ -12642,29 +12650,50 @@
       "path": "cmd/qs-operator/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-operator/prepare.go"
+          "path": "cmd/qs-operator/*.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/maintenance/operatorprepare/tool.go"
+          "path": "internal/apiserver/maintenance/operatorprepare/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorrecovery/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorretire/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+          "verified_on": "2026-10-18"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Live read-only preflight passed; Operator creation and Scope activation are not yet executed."
+          "Live read-only preflight passed; Operator creation and Scope activation are not yet executed.",
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied."
         ]
       },
       "gaps": [
@@ -12679,8 +12708,8 @@
           "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
-          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": []
         }
       ]
@@ -13270,9 +13299,9 @@
       "path": "scripts/oneoff/mysql_metadata_profile/README.md",
       "class": "sidecar",
       "owner": "tooling",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -13773,6 +13802,14 @@
           "verified_on": "2026-10-18",
           "path": ".github/workflows/ci.yml",
           "selector": "Run Mongo-backed norm calculation regression"
+        },
+        {
+          "kind": "source_selector",
+          "path": "Makefile",
+          "selector": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "matched",
+          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -13813,18 +13850,11 @@
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
           "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
-          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Maintenance build target source review only: prior verified and top baseline retained as JSON: {\"source_baseline\": {\"sha\": \"7de5adbd31b588450735f11b3501292da89a6ada\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}}. Makefile adds a separate build-maintenance target and phony declaration; existing metadata targets and all metadata source/fixture/workflow bytes remain unchanged. This rebinds only current source references; no prior command/native/CI/production evidence is relabelled."
         ]
       },
-      "gaps": [
-        {
-          "id": "MAINTENANCE-BUILD-TARGET-20261018",
-          "kind": "source_review",
-          "severity": "low",
-          "summary": "Makefile adds an independent maintenance build target; review that metadata build and execution contracts remain unchanged.",
-          "exit_criteria": "Rebind current source after reviewing the Makefile-only addition; historical native and production evidence remain unchanged."
-        }
-      ],
+      "gaps": [],
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
@@ -13964,8 +13994,8 @@
           "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
-          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": []
         }
       ]
@@ -14321,8 +14351,8 @@
           "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
           "kind": "retired_source_contract",
           "severity": "medium",
-          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
-          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
           "historical_evidence": [
             {
               "kind": "command",
@@ -14450,10 +14480,10 @@
       "path": "cmd/qs-authz/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -14471,16 +14501,29 @@
         {
           "kind": "source",
           "path": "scripts/cd/provision-authz-production-matrix-evaluator.sh"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+          "verified_on": "2026-10-18"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Command-family implementation and local checks do not establish deployment or real operational acceptance."
+          "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied."
         ]
       },
       "gaps": [
@@ -14488,8 +14531,8 @@
           "id": "QS-AUTHZ-RELEASE",
           "kind": "verification",
           "severity": "medium",
-          "summary": "New command family requires source tests and version-bound release verification.",
-          "exit_criteria": "Verify routing and original safety contracts locally; verify deployed image and actual operations separately."
+          "summary": "Local routing, build and safety checks passed; exact-image CI and actual operational acceptance remain independent.",
+          "exit_criteria": "Verify the deployed command family and real operations against its exact release; retain offline/read/write and confirmation boundaries."
         }
       ]
     },
@@ -14497,10 +14540,10 @@
       "path": "cmd/qs-ai-messaging/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -14518,16 +14561,29 @@
         {
           "kind": "source",
           "path": "build/docker/Dockerfile.qs-apiserver"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+          "verified_on": "2026-10-18"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Command-family implementation and local checks do not establish deployment or real operational acceptance."
+          "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied."
         ]
       },
       "gaps": [
@@ -14535,8 +14591,8 @@
           "id": "QS-AI-MESSAGING-RELEASE",
           "kind": "verification",
           "severity": "medium",
-          "summary": "New command family requires source tests and version-bound release verification.",
-          "exit_criteria": "Verify routing and original safety contracts locally; verify deployed image and actual operations separately."
+          "summary": "Local routing, build and safety checks passed; exact-image CI and actual operational acceptance remain independent.",
+          "exit_criteria": "Verify the deployed command family and real operations against its exact release; retain offline/read/write and confirmation boundaries."
         }
       ]
     }
