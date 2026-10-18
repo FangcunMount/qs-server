@@ -12,6 +12,7 @@ import (
 	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
 	authjwks "github.com/FangcunMount/iam/v5/pkg/sdk/auth/jwks"
 	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
+	qsgrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -19,13 +20,18 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/prometheus/client_golang/prometheus"
+	ggrpc "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestVerifiedRESTClaimsObserveOnlySelectedSources(t *testing.T) {
 	privateKey, manager := newContractJWKS(t)
 	config := contractTokenVerifyConfig()
 	// This fixture retains signature/issuer/audience/expiry/access-token checks;
-	// allowing an omitted canonical user claim exercises the legacy attributes.
+	// omitting the SDK required-user check proves the host boundary still rejects
+	// alias-only identities instead of admitting an empty canonical principal.
 	config.RequiredClaims = []string{"sub", "exp", "tenant_id"}
 	verifier, err := auth.NewTokenVerifier(config, manager, nil)
 	if err != nil {
@@ -37,13 +43,14 @@ func TestVerifiedRESTClaimsObserveOnlySelectedSources(t *testing.T) {
 		extra              map[string]interface{}
 		want               [3]string
 		sources            [3]string
+		status             int
 	}{
-		{name: "canonical beats user and org aliases; account keeps old priority", user: "11", account: "21", org: "31", extra: map[string]interface{}{"uid": "99", "organization_id": "98", "aid": "41", "service_id": "worker", "username": "alice"}, want: [3]string{"11", "41", "31"}, sources: [3]string{"canonical", "extra_aid", "canonical"}},
-		{name: "canonical only", user: "11", account: "21", org: "31", want: [3]string{"11", "21", "31"}, sources: [3]string{"canonical", "canonical", "canonical"}},
-		{name: "first aliases", extra: map[string]interface{}{"user_id": "11", "uid": "12", "account_id": "21", "accountId": "22", "org_id": "31", "organization_id": "32"}, want: [3]string{"11", "21", "31"}, sources: [3]string{"extra_user_id", "extra_account_id", "extra_org_id"}},
-		{name: "empty first aliases", extra: map[string]interface{}{"user_id": " ", "uid": 12, "account_id": " ", "accountId": 22, "org_id": " ", "organization_id": 32}, want: [3]string{"12", "22", "32"}, sources: [3]string{"extra_uid", "extra_accountId", "extra_organization_id"}},
-		{name: "last aliases", extra: map[string]interface{}{"sub": "13", "aid": 23}, want: [3]string{"13", "23", ""}, sources: [3]string{"extra_sub", "extra_aid", "missing"}},
-		{name: "unused extensions are not identity fallback", extra: map[string]interface{}{"username": "alice", "service_id": "worker"}, sources: [3]string{"missing", "missing", "missing"}},
+		{name: "canonical beats all identity aliases", user: "11", account: "21", org: "31", extra: map[string]interface{}{"uid": "99", "organization_id": "98", "aid": "41", "service_id": "worker", "username": "alice"}, want: [3]string{"11", "21", "31"}, sources: [3]string{"canonical", "canonical", "canonical"}, status: 204},
+		{name: "canonical only", user: "11", account: "21", org: "31", want: [3]string{"11", "21", "31"}, sources: [3]string{"canonical", "canonical", "canonical"}, status: 204},
+		{name: "aliases alone rejected", extra: map[string]interface{}{"user_id": "11", "uid": "12", "account_id": "21", "accountId": "22", "org_id": "31", "organization_id": "32"}, sources: [3]string{"missing", "missing", "missing"}, status: 401},
+		{name: "numeric aliases rejected", extra: map[string]interface{}{"uid": 12, "accountId": 22, "organization_id": 32}, sources: [3]string{"missing", "missing", "missing"}, status: 401},
+		{name: "optional identity and organization cannot come from attributes", user: "11", extra: map[string]interface{}{"aid": "21", "org_id": "31"}, want: [3]string{"11", "", ""}, sources: [3]string{"canonical", "missing", "missing"}, status: 204},
+		{name: "extensions alone rejected", extra: map[string]interface{}{"username": "alice", "service_id": "worker"}, sources: [3]string{"missing", "missing", "missing"}, status: 401},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fields := []string{"user_id", "account_id", "org_id"}
@@ -74,7 +81,9 @@ func TestVerifiedRESTClaimsObserveOnlySelectedSources(t *testing.T) {
 			token := signContractToken(t, privateKey, claims)
 			engine := gin.New()
 			engine.Use(middleware.JWTAuthMiddlewareWithOptions(verifier, nil))
+			called := false
 			engine.GET("/proof", func(c *gin.Context) {
+				called = true
 				mapped := middleware.GetUserClaims(c)
 				got := [3]string{mapped.UserID, mapped.AccountID, mapped.OrgID}
 				if got != tc.want {
@@ -86,7 +95,7 @@ func TestVerifiedRESTClaimsObserveOnlySelectedSources(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "/proof", nil)
 			request.Header.Set("Authorization", "Bearer "+token)
 			engine.ServeHTTP(recorder, request)
-			if recorder.Code != http.StatusNoContent {
+			if recorder.Code != tc.status || called != (tc.status == http.StatusNoContent) {
 				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body)
 			}
 			for index, field := range fields {
@@ -99,6 +108,52 @@ func TestVerifiedRESTClaimsObserveOnlySelectedSources(t *testing.T) {
 						t.Fatalf("%s/%s delta=%g want=%g", field, source, delta, wantDelta)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestVerifiedGRPCCanonicalIdentityRejectsAliases(t *testing.T) {
+	privateKey, manager := newContractJWKS(t)
+	config := contractTokenVerifyConfig()
+	config.RequiredClaims = []string{"sub", "exp", "tenant_id"}
+	verifier, err := auth.NewTokenVerifier(config, manager, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	interceptor := qsgrpc.NewIAMAuthInterceptor(verifier, &qsgrpc.AuthConfig{Enabled: true})
+	for _, tc := range []struct {
+		name, user, account, prefix string
+		wantCode                    codes.Code
+	}{
+		{"canonical beats alias", "11", "21", "Bearer ", codes.OK},
+		{"absent login identity ignores alias", "11", "", "Bearer ", codes.OK},
+		{"alias-only user rejected", "", "", "Bearer ", codes.Unauthenticated},
+		{"bare signed token rejected", "11", "21", "", codes.Unauthenticated},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := contractClaims(time.Now().UTC(), "access")
+			delete(claims, "user_id")
+			if tc.user != "" {
+				claims["user_id"] = tc.user
+			}
+			if tc.account != "" {
+				claims["login_identity_id"] = tc.account
+			}
+			claims["sid"] = "session-proof"
+			claims["attributes"] = map[string]interface{}{"user_id": "99", "uid": "98", "aid": "97", "account_id": "96", "username": "alice"}
+			token := signContractToken(t, privateKey, claims)
+			ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", tc.prefix+token))
+			called := false
+			_, err := interceptor.UnaryServerInterceptor()(ctx, nil, &ggrpc.UnaryServerInfo{FullMethod: "/proof.Canonical/Get"}, func(ctx context.Context, _ interface{}) (interface{}, error) {
+				called = true
+				if qsgrpc.UserIDFromContext(ctx) != tc.user || qsgrpc.AccountIDFromContext(ctx) != tc.account || qsgrpc.SessionIDFromContext(ctx) != "session-proof" || qsgrpc.UsernameFromContext(ctx) != "alice" {
+					t.Fatal("canonical or session/optional-name projection changed")
+				}
+				return nil, nil
+			})
+			if status.Code(err) != tc.wantCode || called != (tc.wantCode == codes.OK) {
+				t.Fatalf("code=%s called=%t err=%v", status.Code(err), called, err)
 			}
 		})
 	}

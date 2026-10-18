@@ -2,10 +2,7 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -23,7 +20,7 @@ type UserClaimsContextKey struct{}
 // UserClaims 简化的用户声明
 type UserClaims struct {
 	UserID    string
-	AccountID string
+	AccountID string // IAM canonical LoginIdentityID; retains the existing context key.
 	OrgID     string // IAM 业务组织 ID（JWT org_id 透传）
 	SessionID string
 	TokenID   string
@@ -110,8 +107,12 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 
 		claims, sources := buildUserClaims(result)
 		authobservability.RecordVerifiedClaimSources(sources)
+		if claims.UserID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "canonical user_id claim is required"})
+			c.Abort()
+			return
+		}
 		outcome = "accepted"
-		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
 		if claims.Metadata != nil {
@@ -188,57 +189,14 @@ func GetUserID(c *gin.Context) string {
 	return ""
 }
 
-// resolveOrgIDClaim 读取 JWT 中明确的业务组织声明。
-func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) (string, string) {
-	if tokenClaims == nil {
+// canonicalClaim maps only a verified SDK canonical identity field. Attributes
+// may contain user-defined names, but cannot supply or override an identity.
+func canonicalClaim(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
 		return "", "missing"
 	}
-	if raw := strings.TrimSpace(tokenClaims.OrgID); raw != "" {
-		return raw, "canonical"
-	}
-	if len(tokenClaims.Extra) == 0 {
-		return "", "missing"
-	}
-	for _, key := range []string{"org_id", "organization_id"} {
-		if v, ok := tokenClaims.Extra[key]; ok {
-			if s := claimValueToString(v); s != "" {
-				return s, "extra_" + key
-			}
-		}
-	}
-	return "", "missing"
-}
-
-// logJWTClaimMapping 在用户标识映射为空时记录调试信息，不记录声明值。
-func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaims) {
-	if mapped == nil {
-		logger.L(c.Request.Context()).Debugw("jwt claims mapped is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
-		return
-	}
-	if mapped.UserID != "" {
-		logger.L(c.Request.Context()).Debugw("jwt claims mapped with user_id", "path", c.Request.URL.Path, "method", c.Request.Method)
-		return
-	}
-	keys := sortedExtraKeys(raw)
-	logger.L(c.Request.Context()).Debugw("jwt claims mapped with missing user_id",
-		"path", c.Request.URL.Path,
-		"method", c.Request.Method,
-		"mapped_user_empty", mapped.UserID == "",
-		"raw_user_empty", strings.TrimSpace(raw.UserID) == "",
-		"extra_keys", keys,
-	)
-}
-
-func sortedExtraKeys(raw *auth.TokenClaims) []string {
-	if raw == nil || len(raw.Extra) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(raw.Extra))
-	for k := range raw.Extra {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return value, "canonical"
 }
 
 func buildUserClaims(result *auth.VerifyResult) (*UserClaims, [3]string) {
@@ -246,9 +204,9 @@ func buildUserClaims(result *auth.VerifyResult) (*UserClaims, [3]string) {
 		return nil, [3]string{}
 	}
 	tokenClaims := result.Claims
-	userID, userSource := resolveUserID(tokenClaims.UserID, tokenClaims.Extra)
-	accountID, accountSource := resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra)
-	orgID, orgSource := resolveOrgIDClaim(tokenClaims)
+	userID, userSource := canonicalClaim(tokenClaims.UserID)
+	accountID, accountSource := canonicalClaim(tokenClaims.LoginIdentityID)
+	orgID, orgSource := canonicalClaim(tokenClaims.OrgID)
 	return &UserClaims{
 		UserID:    userID,
 		AccountID: accountID,
@@ -259,61 +217,4 @@ func buildUserClaims(result *auth.VerifyResult) (*UserClaims, [3]string) {
 		AMR:       tokenClaims.AMR,
 		Metadata:  result.Metadata,
 	}, [3]string{userSource, accountSource, orgSource}
-}
-
-// resolveAccountID keeps qs-server's historical AccountID context key compatible with IAM v2 LoginIdentityID.
-func resolveAccountID(loginIdentityID string, extra map[string]interface{}) (string, string) {
-	if len(extra) > 0 {
-		for _, key := range []string{"account_id", "accountId", "aid"} {
-			if v, ok := extra[key]; ok {
-				if s := claimValueToString(v); s != "" {
-					return s, "extra_" + key
-				}
-			}
-		}
-	}
-	value := strings.TrimSpace(loginIdentityID)
-	if value == "" {
-		return "", "missing"
-	}
-	return value, "canonical"
-}
-
-// resolveUserID 优先使用标准 UserID 字段，缺失时从 Extra 兼容提取。
-func resolveUserID(userID string, extra map[string]interface{}) (string, string) {
-	if userID != "" {
-		return userID, "canonical"
-	}
-	if len(extra) == 0 {
-		return "", "missing"
-	}
-	for _, key := range []string{"user_id", "uid", "sub"} {
-		if v, ok := extra[key]; ok {
-			if s := claimValueToString(v); s != "" {
-				return s, "extra_" + key
-			}
-		}
-	}
-	return "", "missing"
-}
-
-func claimValueToString(v interface{}) string {
-	switch x := v.(type) {
-	case string:
-		return strings.TrimSpace(x)
-	case fmt.Stringer:
-		return strings.TrimSpace(x.String())
-	case int:
-		return strconv.Itoa(x)
-	case int8, int16, int32, int64:
-		return strconv.FormatInt(reflect.ValueOf(x).Int(), 10)
-	case uint, uint8, uint16, uint32, uint64:
-		return strconv.FormatUint(reflect.ValueOf(x).Uint(), 10)
-	case float32:
-		return strconv.FormatFloat(float64(x), 'f', -1, 32)
-	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64)
-	default:
-		return ""
-	}
 }
