@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+    "sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -6377,8 +6377,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "7dea2e569c2ea22d296a05301e42a93c46e9b695",
-        "verified_on": "2026-10-13"
+        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -6444,6 +6444,14 @@
           "result": "passed",
           "source_sha": "3ac71517f0ed04ab65f609060ca800497bc291a8",
           "verified_on": "2026-09-22"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "result": "matched",
+          "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -6485,8 +6493,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "7dea2e569c2ea22d296a05301e42a93c46e9b695",
-        "verified_on": "2026-10-13"
+        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -6560,6 +6568,14 @@
           "result": "passed",
           "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
           "verified_on": "2026-10-02"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "result": "matched",
+          "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -6800,8 +6816,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "7dea2e569c2ea22d296a05301e42a93c46e9b695",
-        "verified_on": "2026-10-13"
+        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -6852,6 +6868,14 @@
           "result": "passed",
           "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
           "verified_on": "2026-10-02"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "result": "matched",
+          "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -7049,8 +7073,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "7dea2e569c2ea22d296a05301e42a93c46e9b695",
-        "verified_on": "2026-10-13"
+        "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -7108,6 +7132,14 @@
           "result": "passed",
           "source_sha": "4f74b23cb64314dc59a39a5aa724c329ce27d1ba",
           "verified_on": "2026-10-02"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go",
+          "selector": "const publishedModelPayloadSchemaSuffix = \":payload-v3\"",
+          "result": "matched",
+          "source_sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {

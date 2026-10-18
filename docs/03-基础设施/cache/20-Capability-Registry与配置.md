@@ -271,3 +271,5 @@ Cache governance status 在原有 runtime/warmup 字段外提供：
 - Registry、配置、adapter 与 architecture contract test。
 
 只有配置、没有 runtime consumer 的条目不得进入 production YAML。
+
+发布模型exact、latest、list和by-questionnaire四类载荷统一使用 `payload-v3`，避免严格投影读取命中准备阶段的零投影版本或缺失hash旧载荷；既有catalog版本令牌、有效TTL及预热能力不变，旧Redis键自然过期，不进行全库清理。载荷版本不代表报告资产投影v2启用。

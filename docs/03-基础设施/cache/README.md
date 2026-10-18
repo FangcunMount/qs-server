@@ -99,3 +99,5 @@ go test -count=1 ./internal/apiserver/cache/... ./internal/collection-server/cac
 go test -count=1 ./internal/pkg/configcontract ./internal/pkg/architecture
 make docs-hygiene
 ```
+
+发布模型exact、latest、list和by-questionnaire四类载荷统一使用 `payload-v3`，避免严格投影读取命中准备阶段的零投影版本或缺失hash旧载荷；既有catalog版本令牌、有效TTL及预热能力不变，旧Redis键自然过期，不进行全库清理。载荷版本不代表报告资产投影v2启用。
