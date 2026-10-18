@@ -1,7 +1,7 @@
 # 关键链路：从 AnswerSheet 到 Assessment
 
 > 状态：AnswerSheet 可靠受理、durable Outbox、Worker 单一入口、基础题分派生、提交时冻结 Admission、Assessment 幂等创建和 `evaluation.requested` 事务提交已经形成主链路。
-> 无 Admission 的历史事件仍保留 live binding 兼容入口。
+> 缺少冻结 Admission 的历史事件明确拒绝，旧 live-binding 执行分支已退役。
 
 ## 1. 本文回答
 
@@ -406,13 +406,12 @@ T2  AnswerSheet + Admission + Outbox commit
 T3  HTTP 返回 202
 T4  Worker 消费冻结 Admission
 T5  frozen assessment -> retained_exact
-    legacy no-admission -> active_release
+    missing frozen admission -> InvalidArgument before scoring
 ```
 
-两种模式都校验 model identity、version 与 QuestionnaireRef。`retained_exact` 只读取保留的精确版本，允许冻结后 release 已归档；`active_release` 仍拒绝归档版本。
-选中 reader 未装配或 mode 非法时 fail closed，不跨模式降级。
+Intake 只校验冻结的 model identity、version 与 QuestionnaireRef，并读取保留的精确版本；冻结后 release 已归档仍可执行。双模式选择、空 mode 默认 active 与相应装配字段已退出，缺少 retained reader 明确失败。当前 active 选择只属于 Survey 提交准入，不属于事件重放。
 
-无 Admission 的历史事件仍通过 live binding 解析当前 active release；该兼容入口不改变新提交必须冻结意图与精确版本的要求。
+无 Admission 的历史事件明确拒绝执行；不再根据当前 active release 猜测提交时的意图。
 
 ---
 
@@ -445,7 +444,7 @@ flowchart TD
 | 冻结 `assessment + exact release` | 使用 `retained_exact` 校验，创建/复用并自动提交 Assessment |
 | 冻结 `independent_questionnaire` | 基础计分后成功结束，返回 `no_assessment_required` |
 | Admission model identity 不完整 | fail closed |
-| 历史事件无 Admission | 走 live binding，并使用 `active_release` |
+| 历史事件无 Admission | 计分前返回 InvalidArgument，不查询当前绑定 |
 
 Plan Task 和 queued report-status 只在真正创建 Assessment 后进入后续处理。独立问卷不产生 `evaluation.requested`。
 
@@ -621,6 +620,8 @@ sequenceDiagram
 
     MP->>CS: POST /answersheets + idempotency_key
     CS->>AS: SaveAnswerSheet
+    AS->>MC: Resolve active release and freeze Admission
+    MC-->>AS: frozen purpose and exact identity
     AS->>MO: AnswerSheet + idempotency + submitted event
     MO-->>AS: Mongo transaction committed
     AS-->>CS: durable AnswerSheet ID
@@ -630,14 +631,15 @@ sequenceDiagram
     MQ-->>W: at-least-once delivery
     W->>G: EnsureAssessment(answerSheet context)
     G->>J: Ensure(command)
+    J->>J: Require frozen Admission (missing = InvalidArgument)
     J->>AS: CalculateAndSave base scores
-    J->>MC: ResolveAssessmentBinding(code, version)
+    J->>J: Read frozen purpose and exact identity
 
     alt independent questionnaire target
         J-->>G: no_assessment_required
         G-->>W: success
         W-->>MQ: ACK
-    else published binding exists
+    else frozen assessment admission
         J->>EI: FindByAnswerSheetID
         alt missing
             J->>EI: CreateForAnswerSheet(exact refs)
@@ -649,14 +651,14 @@ sequenceDiagram
         J-->>G: assessment_id
         G-->>W: success
         W-->>MQ: ACK
-    else assessment expected but binding unavailable target
+    else frozen admission invalid
         J-->>G: explicit retryable/manual failure
         G-->>W: error
         W-->>MQ: NACK or governed settlement
     end
 ```
 
-图中独立问卷与测评型 Admission 已按冻结 purpose 分流；无 Admission 的历史事件仍由 legacy live binding 兼容处理。
+图中独立问卷与测评型 Admission 按冻结 purpose 分流；无 Admission 的事件不进入评分、模型选择或创建流程。
 
 ---
 
@@ -701,7 +703,7 @@ collection-server 会：
 | Binding 查询返回错误 | AnswerSheet，基础分可能已写 | handler error，NACK | 再次解析 Binding |
 | 冻结独立问卷 Admission | AnswerSheet + frozen Admission | 基础计分后正常结束 | readiness=`no_assessment_required` |
 | 冻结测评 Admission 不完整 | AnswerSheet + frozen Admission | fail closed，handler error | 修正准入事实后重放 |
-| 历史事件无 Admission 且 live binding 缺失 | AnswerSheet | `legacy_unclassified`，handler error | 治理历史事件或恢复 binding 后重放 |
+| 历史事件无 Admission | 原 AnswerSheet | InvalidArgument，handler error | 具名责任核查；不能补猜当前 binding 或改写原事件 |
 | Assessment 查询暂时失败 | AnswerSheet | handler error，不继续 Create | 重放后重新查询 |
 | 并发 Create duplicate | 一个胜出 Assessment | duplicate then read | 复用胜出记录 |
 | Assessment 已创建，Submit 失败 | pending Assessment | handler error，NACK | 重放后再次 Submit |
@@ -766,20 +768,19 @@ at-least-once delivery
 
 ## 19. 当前兼容面与验收边界
 
-### 19.1 无 Admission 的历史事件仍使用 live binding
+### 19.1 旧 live-binding 执行已退役
 
-新提交已在可靠受理事务中冻结 purpose 与 exact release。只有历史 `answersheet.submitted` 没有 Admission 时才查询当前 active binding；
-查不到时明确返回 `legacy_unclassified`，不再把它当成独立问卷，也不创建 unbound Assessment。移除该入口前必须证明历史事件已经排空，并完成跨仓消费者核对。
+可靠受理事务冻结 purpose 与 exact release。M6 已核对现存答卷、可重投原始事件及队列／hold／死信责任，移除 Journey 的 binding 依赖和该指标；缺失 Admission 在计分前明确拒绝，不改写原始事件、历史报告或已结清回执。实际核查范围与阶段结果见版本台账。
 
 ### 19.2 历史空壳 Assessment 仍可能被幂等查询命中
 
 新链路不会创建无模型 Assessment，`Assessment.SubmitAt` 也会用完整 ModelRef、QuestionnaireRef 和 AnswerSheetRef 作为领域前置条件。但历史空壳行仍可能被 `FindByAnswerSheetID` 命中；
 是否存在、处于何种状态以及能否删除，需要生产只读盘点和备份证据，不能仅凭静态代码判断。
 
-### 19.3 readiness 仍保留旧服务返回值兼容
+### 19.3 readiness 必须返回明确的 canonical phase
 
 canonical readiness 已区分 `pending`、`ready`、`no_assessment_required` 和 `failed`。
-collection-server 对没有 `readiness_phase` 的旧响应仍按“有 ID 即 ready、无 ID 即 pending”解释；移除前需要客户端与服务版本覆盖证据。
+collection-server 不再把空 phase、未知 phase 或旧 NotFound 回复猜成 pending／ready；不符合当前服务契约时返回 Unavailable。实际 pending、ready、no_assessment_required 和 failed 保持原语义；已知六实例自 M5 起均提供 canonical phase。
 
 ### 19.4 Plan 完成仍是跨模块 best-effort
 
@@ -788,7 +789,7 @@ collection-server 对没有 `readiness_phase` 的旧响应仍按“有 ID 即 re
 ### 19.5 生产数据退出需要单独证据
 
 代码已关闭 EV-R001、EV-R002、EV-R003、EV-R006 和 EV-R007 对应的结构性问题，但这不等于历史行已经清零。
-生产验收仍需核对 unbound Assessment、pending 空壳、冻结 Admission 覆盖率和 `legacy_unclassified` 命中量，再决定是否执行数据退役。
+生产具名核查按版本台账登记冻结 Admission、原始可重投输入和责任范围；源码退出不自动授权额外数据删除，历史空壳与其余数据仍分别核查。
 
 这些问题已按优先级和验收边界进入 [设计问题与重构清单](./90-设计问题与重构清单.md)。
 

@@ -44,7 +44,7 @@ AnswerSheet 只表示一次正式、最终提交，系统不定义客户端与�
 - 跨 Survey、ModelCatalog、Plan 和 Evaluation 的编排属于 `application/journey/assessmentintake`。
 
 > **已实现、兼容观察：独立问卷终止边界。** 新提交未找到 AssessmentModel binding 时会冻结 `independent_questionnaire` admission；
-> `assessmentintake.Service.Ensure` 在基础计分后正常结束，不创建 Assessment。历史无 admission 事件仍走 live binding，该分支只服务旧事件，不承载新写入。
+> `assessmentintake.Service.Ensure` 在基础计分后正常结束，不创建 Assessment。缺少冻结 Admission 的事件在计分前拒绝，不从当前模型推断原始意图。
 >
 > **已关闭：答卷详情资源归属授权。** collection 详情读取会把当前 writer 传入应用服务；服务仅允许原 writer、testee 或具有 active ProfileLink 的访问者读取，其他调用返回拒绝。
 > 该资源级授权已由定向测试保护。
