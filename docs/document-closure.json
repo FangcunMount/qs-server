@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "72425b4bc850dbc436b1b0c44d59a9a5df38cf2e",
+    "sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -3961,6 +3961,21 @@
           "result": "passed",
           "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go",
+          "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
+          "result": "matched",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -8936,6 +8951,21 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go",
+          "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
+          "result": "matched",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -9640,6 +9670,21 @@
           "result": "passed",
           "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go",
+          "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
+          "result": "matched",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
