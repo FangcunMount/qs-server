@@ -39,7 +39,7 @@ func main() {
 
 func parseAuthzArgs(args []string) (string, []string, error) {
 	if len(args) == 0 {
-		return "", nil, errors.New(authzUsage)
+		return "", nil, errors.New("an AuthZ command is required; use qs-authz --help")
 	}
 	if args[0] != "verify" && args[0] != "provision" {
 		return "", nil, errors.New("unsupported AuthZ command; use qs-authz --help")

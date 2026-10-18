@@ -34,7 +34,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New(messagingUsage)
+		return errors.New("maintenance command is required; use qs-ai-messaging --help")
 	}
 	switch args[0] {
 	case "audit":

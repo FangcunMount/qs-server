@@ -41,7 +41,7 @@ func main() {
 
 func parseOperatorArgs(args []string) (family, action string, flags []string, err error) {
 	if len(args) < 2 {
-		return "", "", nil, errors.New(operatorUsage)
+		return "", "", nil, errors.New("operator maintenance command and action are required; use qs-operator --help")
 	}
 	family, action = args[0], args[1]
 	switch family {
