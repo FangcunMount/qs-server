@@ -145,7 +145,7 @@ func (i *IAMAuthInterceptor) extractToken(ctx context.Context) (string, error) {
 
 	parts := strings.Fields(authHeaders[0])
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return "", fmt.Errorf("Bearer authorization is required")
+		return "", fmt.Errorf("bearer authorization is required")
 	}
 	return parts[1], nil
 }
