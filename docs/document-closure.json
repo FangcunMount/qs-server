@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+    "sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -14482,7 +14482,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+        "source_sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14514,6 +14514,20 @@
           "result": "passed",
           "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/cd/test-verify-authz-production-matrix.sh",
+          "result": "passed",
+          "source_sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/cd/test-provision-authz-production-matrix-evaluator.sh",
+          "result": "passed",
+          "source_sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -14523,7 +14537,8 @@
         "observed_at": null,
         "limitations": [
           "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
-          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied."
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
+          "AuthZ availability-probe followup retains prior current bindings as JSON: {\"source_baseline\": {\"sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Only the explicit missing-entrypoint status42 selects the old-image command. Generic exec/privilege errors, probe125 and command failure42 refuse without a legacy retry; fake-container shell contracts and ShellCheck passed. No real Docker or production operation occurred."
         ]
       },
       "gaps": [
