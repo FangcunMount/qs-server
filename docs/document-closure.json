@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f5d4c50012dd9a79901748353b667e524c223a02",
+    "sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -14325,7 +14325,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+        "source_sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14359,28 +14359,14 @@
           "kind": "command",
           "command": "bash scripts/cd/test-compatibility-observation.sh",
           "result": "passed",
-          "source_sha": "6ab70c496df64fececffd38438269afde298cd12",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/cd/test-compatibility-prometheus.py /tmp/qs-cleanup-m6-raw-stable-queries.jsonl",
-          "result": "passed",
-          "source_sha": "6ab70c496df64fececffd38438269afde298cd12",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race ./internal/pkg/middleware",
-          "result": "passed",
-          "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+          "source_sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
           "verified_on": "2026-10-18"
         },
         {
           "kind": "command",
-          "command": "go test ./internal/pkg/configcontract -run=TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed -count=1",
+          "command": "go test -race ./internal/pkg/middleware ./internal/pkg/grpc ./internal/pkg/authobservability",
           "result": "passed",
-          "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+          "source_sha": "32975f6bc48957421326b145b6498aab59015dde",
           "verified_on": "2026-10-18"
         }
       ],
@@ -15645,7 +15631,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "DecisionKind-only dispatch and frozen independent Admission are implemented; new independent submissions do not create an unbound Assessment. Legacy classification, client terminal behavior and historical data disposition remain separate verification conditions.",
+            "rationale": "Frozen independent Admission skips Assessment creation; execution requires frozen exact Admission and no longer resolves live bindings. Historical disposition and production client behavior remain separately evidenced in the version ledger.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -15658,10 +15644,10 @@
               {
                 "kind": "source_selector",
                 "path": "internal/apiserver/application/journey/assessmentintake/service.go",
-                "selector": "applyAdmissionOrBinding(ctx context.Context",
+                "selector": "func applyAdmission(command Command",
                 "result": "matched",
-                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-                "verified_on": "2026-10-07"
+                "source_sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
+                "verified_on": "2026-10-18"
               }
             ],
             "gaps": [
