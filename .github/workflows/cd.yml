@@ -54,6 +54,12 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      operation:
+        description: '仅构建候选镜像，或按部署门禁发布'
+        required: true
+        type: choice
+        default: deploy
+        options: [deploy, build]
       service:
         description: '要部署的服务'
         required: true
@@ -173,7 +179,8 @@ jobs:
     environment:
       name: production
     if: |
-      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      (vars.PRODUCTION_DEPLOY_PAUSED != 'true' ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'build')) &&
       needs.plan.outputs.has_services == 'true'
     env:
       WWW_UID: ${{ secrets.WWW_UID }}
@@ -225,6 +232,43 @@ jobs:
             DEPLOY_SHA="${DEPLOY_SHA}" \
             BUILD_TIME="${BUILD_TIME}"
 
+
+      - name: Export build-only candidate with immutable receipt
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'build'
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -Eeuo pipefail
+          . scripts/cd/image-metadata.sh
+          image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${DEPLOY_SHA}"
+          docker pull --platform linux/amd64 "$image"
+          mkdir candidate-image
+          IMAGE_REF="$image" python3 - <<'PYIMAGE'
+          import json, os, subprocess
+          from pathlib import Path
+          image = os.environ['IMAGE_REF']
+          row = json.loads(subprocess.check_output(['docker', 'image', 'inspect', image]))[0]
+          assert row['Os'] == 'linux' and row['Architecture'] == 'amd64'
+          Path('candidate-image/receipt.json').write_text(json.dumps({
+              'source_sha': os.environ['DEPLOY_SHA'], 'image_reference': image,
+              'image_config_digest': row['Id'], 'repo_digests': row['RepoDigests'],
+              'platform': 'linux/amd64', 'status': 'built_not_deployed',
+          }, indent=2) + '\n')
+          PYIMAGE
+          docker save --output candidate-image/image.tar "$image"
+          gzip -1 candidate-image/image.tar
+          (cd candidate-image && sha256sum image.tar.gz receipt.json > SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'build'
+        with:
+          name: candidate-${{ matrix.service }}-${{ env.DEPLOY_SHA }}
+          path: candidate-image/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
   deploy-apiserver:
     name: Deploy API Server
     needs: [plan, docker]
@@ -238,6 +282,7 @@ jobs:
     if: |
       always() &&
       vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      inputs.operation != 'build' &&
       needs.docker.result == 'success' &&
       needs.plan.outputs.apiserver == 'true'
     env:
@@ -373,6 +418,7 @@ jobs:
     if: |
       always() &&
       vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      inputs.operation != 'build' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
       needs.plan.outputs.collection == 'true'
@@ -494,6 +540,7 @@ jobs:
     if: |
       always() &&
       vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      inputs.operation != 'build' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
       needs.plan.outputs.worker == 'true'
