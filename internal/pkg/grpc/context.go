@@ -13,15 +13,14 @@ import (
 type authContextKey string
 
 const (
-	authContextKeyUserID       authContextKey = "user_id"
-	authContextKeyAccountID    authContextKey = "account_id"
-	authContextKeyOrgID        authContextKey = "org_id"
-	authContextKeySessionID    authContextKey = "session_id"
-	authContextKeyTokenID      authContextKey = "token_id"
-	authContextKeyAMR          authContextKey = "amr"
-	authContextKeyCustomClaims authContextKey = "custom_claims"
-	authContextKeyUsername     authContextKey = "username"
-	authContextKeyTokenMeta    authContextKey = "token_metadata"
+	authContextKeyUserID    authContextKey = "user_id"
+	authContextKeyAccountID authContextKey = "account_id"
+	authContextKeyOrgID     authContextKey = "org_id"
+	authContextKeySessionID authContextKey = "session_id"
+	authContextKeyTokenID   authContextKey = "token_id"
+	authContextKeyAMR       authContextKey = "amr"
+	authContextKeyUsername  authContextKey = "username"
+	authContextKeyTokenMeta authContextKey = "token_metadata"
 )
 
 func contextStringValue(ctx context.Context, key authContextKey) string {
@@ -38,7 +37,7 @@ func UserIDFromContext(ctx context.Context) string {
 	return contextStringValue(ctx, authContextKeyUserID)
 }
 
-// AccountIDFromContext returns the IAM account ID from a gRPC request context.
+// AccountIDFromContext returns canonical IAM LoginIdentityID using the retained context key.
 func AccountIDFromContext(ctx context.Context) string {
 	return contextStringValue(ctx, authContextKeyAccountID)
 }

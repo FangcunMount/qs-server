@@ -14,7 +14,6 @@ import (
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -35,7 +34,7 @@ type Command struct {
 	OriginType           string // 来源类型
 	OriginID             string // 来源ID
 	// Admission is the submit-time frozen evaluation intent (EV-R001).
-	// Nil means legacy event without admission; Journey falls back to live binding.
+	// Required for every execution; missing historical intent is rejected, never inferred.
 	Admission *Admission
 }
 
@@ -81,7 +80,6 @@ type SubmissionReader interface {
 type service struct {
 	submissions  SubmissionReader
 	scoring      answersheetapp.AnswerSheetScoringService
-	binding      rulesetport.AssessmentBindingResolver
 	plans        planapp.TaskAssessmentResolver
 	planCommands planapp.PlanCommandService
 	intake       evaluationintake.Service
@@ -89,12 +87,8 @@ type service struct {
 }
 
 // NewService 创建评估入库服务
-func NewService(scoring answersheetapp.AnswerSheetScoringService, binding rulesetport.AssessmentBindingResolver, plans planapp.TaskAssessmentResolver, planCommands planapp.PlanCommandService, intake evaluationintake.Service, reportStatus *reportstatus.Reporter, readers ...SubmissionReader) Service {
-	s := &service{scoring: scoring, binding: binding, plans: plans, planCommands: planCommands, intake: intake, reportStatus: reportStatus}
-	if len(readers) > 0 {
-		s.submissions = readers[0]
-	}
-	return s
+func NewService(scoring answersheetapp.AnswerSheetScoringService, plans planapp.TaskAssessmentResolver, planCommands planapp.PlanCommandService, intake evaluationintake.Service, reportStatus *reportstatus.Reporter, submissions SubmissionReader) Service {
+	return &service{scoring: scoring, plans: plans, planCommands: planCommands, intake: intake, reportStatus: reportStatus, submissions: submissions}
 }
 
 // Ensure 确保评估入库
@@ -113,6 +107,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	// 验证命令参数
 	if command.OrgID == 0 || command.AnswerSheetID == 0 || command.QuestionnaireCode == "" || command.QuestionnaireVersion == "" || command.TesteeID == 0 || command.FillerID == 0 {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "assessment intake command is incomplete")
+	}
+	if command.Admission == nil {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "frozen admission is required; live binding inference is retired")
 	}
 	if s.intake == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation intake is not configured")
@@ -141,13 +138,13 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		dto.OriginID = &command.OriginID
 	}
 
-	// 应用绑定：优先消费提交时冻结的 Admission（EV-R001）。
-	bound, admissionSource, err := s.applyAdmissionOrBinding(ctx, command, &dto)
+	// 仅消费提交时冻结的 Admission；不读取当前模型绑定。
+	bound, err := applyAdmission(command, &dto)
 	if err != nil {
 		l.Errorw("答卷测评准入来源解析失败",
 			"action", "ensure_assessment",
 			"answersheet_id", command.AnswerSheetID,
-			"admission_source", admissionSource,
+			"admission_source", "frozen_admission",
 			"error", err.Error(),
 		)
 		return nil, err
@@ -156,7 +153,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		"action", "ensure_assessment",
 		"answersheet_id", command.AnswerSheetID,
 		"bound", bound,
-		"admission_source", admissionSource,
+		"admission_source", "frozen_admission",
 		"model_kind", valueOrEmpty(dto.ModelKind),
 		"model_code", valueOrEmpty(dto.ModelCode),
 		"model_version", valueOrEmpty(dto.ModelVersion),
@@ -357,21 +354,21 @@ func valueOrEmpty(value *string) string {
 	return *value
 }
 
-// applyAdmissionOrBinding prefers submit-time Admission; legacy events fall back to live binding.
-func (s *service) applyAdmissionOrBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bound bool, source string, err error) {
-	if command.Admission != nil {
-		if command.Admission.IsIndependent() {
-			return false, "frozen_admission", nil
-		}
-		if command.Admission.RequiresAssessment() {
-			if err := applyFrozenAdmission(command.Admission, dto); err != nil {
-				return false, "frozen_admission", err
-			}
-			return true, "frozen_admission", nil
-		}
-		return false, "frozen_admission", errors.WithCode(code.ErrInvalidArgument, "admission purpose is invalid: %s", command.Admission.Purpose)
+// applyAdmission consumes the submit-time purpose and exact release only.
+func applyAdmission(command Command, dto *evaluationintake.CreateCommand) (bool, error) {
+	if command.Admission == nil {
+		return false, errors.WithCode(code.ErrInvalidArgument, "frozen admission is required")
 	}
-	return s.applyBinding(ctx, command, dto)
+	if command.Admission.IsIndependent() {
+		return false, nil
+	}
+	if command.Admission.RequiresAssessment() {
+		if err := applyFrozenAdmission(command.Admission, dto); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, errors.WithCode(code.ErrInvalidArgument, "admission purpose is invalid: %s", command.Admission.Purpose)
 }
 
 func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateCommand) error {
@@ -395,48 +392,11 @@ func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateComm
 	modelVersion := admission.ModelVersion
 	dto.ModelCode = &modelCode
 	dto.ModelVersion = &modelVersion
-	dto.ModelValidationMode = evaluationintake.ModelValidationModeRetainedExact
 	if admission.ModelTitle != "" {
 		title := admission.ModelTitle
 		dto.ModelTitle = &title
 	}
 	return nil
-}
-
-// applyBinding 应用绑定
-func (s *service) applyBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bool, string, error) {
-	if s.binding == nil {
-		observeLegacyBinding(legacyBindingUnavailable)
-		return false, "legacy_binding", errors.WithCode(code.ErrModuleInitializationFailed, "assessment binding resolver is not configured for legacy admission")
-	}
-	binding, ok, err := s.binding.ResolveAssessmentBinding(ctx, command.QuestionnaireCode, command.QuestionnaireVersion)
-	if err != nil {
-		observeLegacyBinding(legacyBindingDependencyErr)
-		return false, "legacy_binding", err
-	}
-	if !ok {
-		observeLegacyBinding(legacyBindingNotFound)
-		return false, "legacy_unclassified", errors.WithCode(
-			code.ErrAssessmentModelValidationFailed,
-			"legacy_unclassified: answer sheet has no frozen admission and live binding is unavailable",
-		)
-	}
-	k := binding.Ref.Kind.String()
-	dto.ModelKind = &k
-	if binding.Ref.SubKind != "" {
-		v := binding.Ref.SubKind.String()
-		dto.ModelSubKind = &v
-	}
-	if binding.Ref.Algorithm != "" {
-		v := binding.Ref.Algorithm.String()
-		dto.ModelAlgorithm = &v
-	}
-	dto.ModelCode = &binding.Ref.Code
-	dto.ModelVersion = &binding.Ref.Version
-	dto.ModelTitle = &binding.Ref.Title
-	dto.ModelValidationMode = evaluationintake.ModelValidationModeActiveRelease
-	observeLegacyBinding(legacyBindingResolved)
-	return true, "legacy_binding", nil
 }
 
 // matchPlan 匹配计划

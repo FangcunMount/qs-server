@@ -11,8 +11,6 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -97,12 +95,6 @@ func TestSubmitPendingBoundAssessmentRechecksConcurrentEffect(t *testing.T) {
 	}
 }
 
-type bindingStub struct {
-	binding rulesetport.AssessmentBinding
-	ok      bool
-	err     error
-}
-
 type failingTaskManagementStub struct{ err error }
 
 func (*failingTaskManagementStub) OpenTask(context.Context, int64, string) (*planapp.TaskResult, error) {
@@ -118,21 +110,8 @@ func (*failingTaskManagementStub) CancelTask(context.Context, int64, string) err
 	return errors.New("not implemented")
 }
 
-func (s bindingStub) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.Ref, bool, error) {
-	return s.binding.Ref, s.ok, s.err
-}
-
-func (s bindingStub) ResolveAssessmentBinding(context.Context, string, string) (rulesetport.AssessmentBinding, bool, error) {
-	return s.binding, s.ok, s.err
-}
-
-func boundScaleBinding() bindingStub {
-	return bindingStub{
-		binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{
-			Kind: modelcatalog.KindScale, Code: "MODEL-1", Version: "v1", Title: "model",
-		}},
-		ok: true,
-	}
+func frozenScaleAdmission() *Admission {
+	return &Admission{Purpose: "assessment", QuestionnaireCode: "Q", QuestionnaireVersion: "1", ModelKind: "scale", ModelCode: "MODEL-1", ModelVersion: "v1", ModelTitle: "model"}
 }
 
 func TestCompletePlanPreservesBestEffort(t *testing.T) {
@@ -149,7 +128,7 @@ func TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment(t *testing.T) {
 	before := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeNoAssessmentRequired))
 	calls := []string{}
 	intake := &intakeStub{calls: &calls, created: &evaluationintake.Assessment{ID: 91}}
-	svc := newLegacyService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 	result, err := svc.Ensure(context.Background(), Command{
 		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
 		Admission: &Admission{Purpose: "independent_questionnaire", QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
@@ -174,7 +153,7 @@ func TestEnsureIndependentReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T
 		calls:    &calls,
 		existing: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
 	result, err := svc.Ensure(context.Background(), Command{
 		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
@@ -191,42 +170,12 @@ func TestEnsureIndependentReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T
 	}
 }
 
-func TestEnsureLegacyMissingBindingResolverFailsClosed(t *testing.T) {
+func TestEnsureMissingFrozenAdmissionHasNoSideEffects(t *testing.T) {
 	calls := []string{}
-	svc := newLegacyService(scoringStub{calls: &calls}, nil, nil, nil, &intakeStub{calls: &calls}, nil)
-
-	_, err := svc.Ensure(context.Background(), Command{
-		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
-	})
-	if !cberrors.IsCode(err, code.ErrModuleInitializationFailed) {
-		t.Fatalf("error = %v, want ModuleNotConfigured", err)
-	}
-	if !reflect.DeepEqual(calls, []string{"score"}) {
-		t.Fatalf("calls = %v, want scoring only", calls)
-	}
-}
-
-func TestEnsureLegacyWithoutLiveBindingIsUnclassified(t *testing.T) {
-	calls := []string{}
-	impl := newLegacyService(scoringStub{calls: &calls}, bindingStub{}, nil, nil, &intakeStub{calls: &calls}, nil).(*service)
-	svc := Service(impl)
-
-	_, err := svc.Ensure(context.Background(), Command{
-		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
-	})
-	if !cberrors.IsCode(err, code.ErrAssessmentModelValidationFailed) {
-		t.Fatalf("error = %v, want AssessmentModelValidationFailed", err)
-	}
-	_, source, sourceErr := impl.applyAdmissionOrBinding(
-		context.Background(),
-		Command{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
-		&evaluationintake.CreateCommand{},
-	)
-	if sourceErr == nil || source != "legacy_unclassified" {
-		t.Fatalf("source = %q, error = %v, want legacy_unclassified", source, sourceErr)
-	}
-	if !reflect.DeepEqual(calls, []string{"score"}) {
-		t.Fatalf("calls = %v, want scoring only", calls)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, &intakeStub{calls: &calls})
+	_, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	if !cberrors.IsCode(err, code.ErrInvalidArgument) || len(calls) != 0 {
+		t.Fatalf("error=%v side effects=%v", err, calls)
 	}
 }
 
@@ -236,9 +185,9 @@ func TestEnsureBoundAnswerSheetCreatesAndAutoSubmits(t *testing.T) {
 		calls:   &calls,
 		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,42 +197,12 @@ func TestEnsureBoundAnswerSheetCreatesAndAutoSubmits(t *testing.T) {
 	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit"}) {
 		t.Fatalf("calls = %v", calls)
 	}
-	if intake.lastCreateCmd.ModelValidationMode != evaluationintake.ModelValidationModeActiveRelease {
-		t.Fatalf("validation mode = %q, want active_release", intake.lastCreateCmd.ModelValidationMode)
-	}
-}
-
-func TestLegacyBindingFallbackMetricsClassifyResults(t *testing.T) {
-	tests := []struct {
-		name    string
-		binding rulesetport.AssessmentBindingResolver
-		result  string
-	}{
-		{name: "unavailable", result: legacyBindingUnavailable},
-		{name: "not found", binding: bindingStub{}, result: legacyBindingNotFound},
-		{name: "dependency error", binding: bindingStub{err: errors.New("catalog unavailable")}, result: legacyBindingDependencyErr},
-		{name: "resolved", binding: boundScaleBinding(), result: legacyBindingResolved},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			before := testutil.ToFloat64(assessmentIntakeLegacyBindingTotal.WithLabelValues(tt.result))
-			impl := &service{binding: tt.binding}
-			_, _, _ = impl.applyAdmissionOrBinding(
-				context.Background(),
-				Command{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
-				&evaluationintake.CreateCommand{},
-			)
-			if delta := testutil.ToFloat64(assessmentIntakeLegacyBindingTotal.WithLabelValues(tt.result)) - before; delta != 1 {
-				t.Fatalf("metric delta=%v, want 1", delta)
-			}
-		})
-	}
 }
 
 func TestEnsureTreatsScoringFailureAsHardFailure(t *testing.T) {
 	calls := []string{}
-	svc := newLegacyService(scoringStub{calls: &calls, err: errors.New("score failed")}, nil, nil, nil, &intakeStub{calls: &calls}, nil)
-	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8}); err == nil {
+	svc := newIntakeService(scoringStub{calls: &calls, err: errors.New("score failed")}, nil, nil, &intakeStub{calls: &calls})
+	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()}); err == nil {
 		t.Fatal("expected scoring error")
 	}
 	if !reflect.DeepEqual(calls, []string{"score"}) {
@@ -298,9 +217,9 @@ func TestEnsureReturnsAutoSubmitFailureAfterCreation(t *testing.T) {
 		created:   &evaluationintake.Assessment{ID: 91, Status: "pending"},
 		submitErr: errors.New("submit failed"),
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()})
 	if err == nil {
 		t.Fatal("expected automatic submission failure")
 	}
@@ -319,9 +238,9 @@ func TestEnsureWorkerReplaySubmitsExistingBoundPendingAssessment(t *testing.T) {
 		calls:    &calls,
 		existing: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,19 +255,16 @@ func TestEnsureWorkerReplaySubmitsExistingBoundPendingAssessment(t *testing.T) {
 	}
 }
 
-func TestEnsureFrozenAdmissionIgnoresLiveBindingVersionDrift(t *testing.T) {
+func TestEnsureFrozenAdmissionRetainsExactVersion(t *testing.T) {
 	calls := []string{}
 	intake := &intakeStub{
 		calls:   &calls,
 		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 	}
-	// Live binding would resolve to a newer version; frozen admission must win.
-	svc := newLegacyService(scoringStub{calls: &calls}, bindingStub{
-		binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{
-			Kind: modelcatalog.KindScale, Code: "MODEL-1", Version: "9.9.9", Title: "new",
-		}},
-		ok: true,
-	}, nil, nil, intake, nil)
+	// Retained exact release is carried by the frozen command, without a catalog resolver.
+	svc := newIntakeService(scoringStub{calls: &calls},
+
+		nil, nil, intake)
 
 	result, err := svc.Ensure(context.Background(), Command{
 		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
@@ -366,15 +282,12 @@ func TestEnsureFrozenAdmissionIgnoresLiveBindingVersionDrift(t *testing.T) {
 	if intake.lastCreateCmd.ModelVersion == nil || *intake.lastCreateCmd.ModelVersion != "1.0.0" {
 		t.Fatalf("create cmd model version = %#v, want frozen 1.0.0", intake.lastCreateCmd.ModelVersion)
 	}
-	if intake.lastCreateCmd.ModelValidationMode != evaluationintake.ModelValidationModeRetainedExact {
-		t.Fatalf("validation mode = %q, want retained_exact", intake.lastCreateCmd.ModelValidationMode)
-	}
 }
 
 func TestEnsureFrozenIndependentAdmissionSkipsAssessment(t *testing.T) {
 	calls := []string{}
 	intake := &intakeStub{calls: &calls, created: &evaluationintake.Assessment{ID: 91}}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
 	result, err := svc.Ensure(context.Background(), Command{
 		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
@@ -393,7 +306,7 @@ func TestEnsureFrozenIndependentAdmissionSkipsAssessment(t *testing.T) {
 
 func TestEnsureIncompleteFrozenAdmissionFailsClosed(t *testing.T) {
 	calls := []string{}
-	svc := newLegacyService(scoringStub{calls: &calls}, nil, nil, nil, &intakeStub{calls: &calls}, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, &intakeStub{calls: &calls})
 	if _, err := svc.Ensure(context.Background(), Command{
 		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
 		Admission: &Admission{Purpose: "assessment", QuestionnaireCode: "Q", QuestionnaireVersion: "1", ModelKind: "scale"},
@@ -413,9 +326,9 @@ func TestEnsureFindDependencyErrorDoesNotCreate(t *testing.T) {
 		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 		findErr: evalerrors.Database(errors.New("timeout"), "查询测评失败"),
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
-	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8}); err == nil {
+	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()}); err == nil {
 		t.Fatal("expected dependency error")
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
@@ -434,9 +347,9 @@ func TestEnsureNotFoundCreatesBoundAssessment(t *testing.T) {
 		calls:   &calls,
 		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
 
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -488,8 +401,8 @@ func TestEnsureDuplicateThenRefindReusesAssessment(t *testing.T) {
 		calls:    &calls,
 		existing: &evaluationintake.Assessment{ID: 91, Status: "pending"},
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,8 +423,8 @@ func TestEnsureDuplicateThenRefindDependencyFails(t *testing.T) {
 		calls:     &calls,
 		refindErr: evalerrors.Database(errors.New("timeout"), "查询测评失败"),
 	}
-	svc := newLegacyService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
-	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8}); err == nil {
+	svc := newIntakeService(scoringStub{calls: &calls}, nil, nil, intake)
+	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8, Admission: frozenScaleAdmission()}); err == nil {
 		t.Fatal("expected dependency error after duplicate")
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "find"}) {

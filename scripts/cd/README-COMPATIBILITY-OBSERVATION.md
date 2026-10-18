@@ -1,6 +1,6 @@
 # 兼容契约退役观测
 
-用户于2026-10-18取消M6长期观察门槛，改为直接分批退出，见[当前版本台账第9.7节](../../docs/00-总览/09-当前版本定档验收台账.md#97-取消m6长期观察直接分批收口2026-10-18)。每日自动调度已退出，以下window规则仅说明暂留的手工历史审计能力，不再阻塞发布，也不表示曾完成14天生产观察。本工具只读、不删除契约或数据；现用legacy admission汇总不证明各Worker源码或结清待处理／人工可重放责任。
+用户于2026-10-18取消M6长期观察门槛，改为直接分批退出，见[当前版本台账第9.7节](../../docs/00-总览/09-当前版本定档验收台账.md#97-取消m6长期观察直接分批收口2026-10-18)。每日自动调度已退出，以下window规则仅说明暂留的手工历史审计能力，不再阻塞发布，也不表示曾完成14天生产观察。本工具只读、不删除契约或数据。M6已退役live-binding及其指标，工具不再查询该旧指标；Worker／待处理和人工可重放责任由具名只读清单核对，不以指标缺失充零。
 
 ## 四项计量
 
@@ -32,7 +32,7 @@
 - 每个实例都有 accepted bearer、UserID 与 AccountID canonical 来源的真实正流量，以及各自服务的 TaskID 路由／无衍生字段 Definition 写入。只接受两个端点均位于 [T0,E] 的 counter 正增量；仅首条窗内抓取相对 T0 前基线的 canonical 增长仍属证据不足，E 后操作不补充窗内流量。OrgID 合法可选：原逻辑已验签选出的 canonical 或 missing 来源可满足正流量。用户或登录身份缺失、Org两者都零、只在基线增长均失败。
 - Extra 真实选中、bare 请求（含拒绝）、旧 Task 路由（含拒绝）、带衍生字段写入（含拒绝）任一出现，保留 `active_compatibility`。Definition 写入或固定字段 presence 的 `unreadable` 增长单独记为 `unknown_input` 并使审核失败：无法证明该请求未携带旧字段，也不能把损坏 JSON 推断成旧客户端命中。四项全零且无上述缺口也只得到候选，仍需客户端、数据负责人和业务退出确认。
 
-`active_compatibility` 表示成功读取到了仍应保留的兼容证据，脚本 exit 0 不代表退役验收通过；`zero_window_candidate`仅是原窗口算法输出，不再是当前契约退出的前置条件。现用 legacy admission 汇总读取也固定到 E，但仍是补充证据，不能代替 Worker 实例、持续采样或未结责任验收。
+`active_compatibility` 表示成功读取到了仍应保留的兼容证据，脚本 exit 0 不代表退役验收通过；`zero_window_candidate`仅是原窗口算法输出，不再是当前契约退出的前置条件。旧 legacy admission 汇总查询已随分支退休；保留历史窗口算法不代表当前仍支持旧执行。
 
 IAM 当前新会话使用空 BusinessContext，OrgID 为零时 JWT 的 `org_id,omitempty` 不输出组织声明。因此正常 fresh 身份流量可以全部记为 Org missing，无需为观察门禁新增组织 claim。Org missing 只证明已验签后的来源选择被观察到，不证明业务组织授权、权限范围或实际业务流程验收；旧 `Extra.org_id`／`Extra.organization_id` 真实选中仍属于 `active_compatibility`，不计入上述合法 Org 正流量，也不能成为零调用候选。
 

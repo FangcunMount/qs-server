@@ -520,14 +520,11 @@ func TestAssessmentReadinessPreservesOwnershipDenial(t *testing.T) {
 	}
 }
 
-func TestAssessmentReadinessPending(t *testing.T) {
+func TestAssessmentReadinessNotFoundDoesNotInventPending(t *testing.T) {
 	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{err: status.Error(codes.NotFound, "not ready")})
 	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
-	if err != nil {
-		t.Fatalf("GetAssessmentReadiness() error = %v", err)
-	}
-	if got.Status != "pending" || got.AnswerSheetID != "42" || got.NextPollAfterMs != 2000 {
-		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+	if got != nil || status.Code(err) != codes.Unavailable {
+		t.Fatalf("result=%+v err=%v", got, err)
 	}
 }
 
@@ -575,14 +572,21 @@ func TestAssessmentReadinessFailed(t *testing.T) {
 	}
 }
 
-func TestAssessmentReadinessUnknownPhaseKeepsPolling(t *testing.T) {
-	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, readinessPhase: "weird"})
-	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
-	if err != nil {
-		t.Fatalf("GetAssessmentReadiness() error = %v", err)
-	}
-	if got.Status != "pending" || got.NextPollAfterMs != 2000 {
-		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+func TestAssessmentReadinessRejectsMissingOrUnknownPhase(t *testing.T) {
+	for _, tc := range []struct {
+		name, phase string
+		id          uint64
+		err         error
+	}{
+		{name: "missing phase"}, {name: "ID alone is not readiness", id: 99}, {name: "unknown phase", phase: "weird"}, {name: "old NotFound reply", err: status.Error(codes.NotFound, "missing")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, assessmentID: tc.id, readinessPhase: tc.phase, err: tc.err})
+			got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
+			if got != nil || status.Code(err) != codes.Unavailable {
+				t.Fatalf("result=%+v err=%v", got, err)
+			}
+		})
 	}
 }
 

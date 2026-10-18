@@ -10,35 +10,19 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-// PublishedEvaluationModelValidator ensures every new assessment pins the
-// currently active immutable model snapshot. Existing assessments do not pass
-// through this admission boundary and remain executable against archived
-// exact-version snapshots.
-type PublishedEvaluationModelValidator struct {
-	activeReader   port.ActivePublishedModelReader
-	retainedReader port.PublishedModelReader
-}
+// PublishedEvaluationModelValidator validates the exact immutable release frozen
+// at submit time. Current active-release selection belongs to Survey admission.
+type PublishedEvaluationModelValidator struct{ retainedReader port.PublishedModelReader }
 
-func NewPublishedEvaluationModelValidator(
-	activeReader port.ActivePublishedModelReader,
-	retainedReader port.PublishedModelReader,
-) EvaluationModelValidator {
-	return PublishedEvaluationModelValidator{
-		activeReader:   activeReader,
-		retainedReader: retainedReader,
-	}
+func NewPublishedEvaluationModelValidator(reader port.PublishedModelReader) EvaluationModelValidator {
+	return PublishedEvaluationModelValidator{retainedReader: reader}
 }
 
 func (v PublishedEvaluationModelValidator) ValidateEvaluationModel(
 	ctx context.Context,
 	modelRef evalassessment.EvaluationModelRef,
 	questionnaireRef evalassessment.QuestionnaireRef,
-	mode ModelValidationMode,
 ) error {
-	normalizedMode, err := normalizeModelValidationMode(mode)
-	if err != nil {
-		return err
-	}
 	if modelRef.IsEmpty() {
 		return nil
 	}
@@ -52,21 +36,10 @@ func (v PublishedEvaluationModelValidator) ValidateEvaluationModel(
 		Code:      modelRef.Code().String(),
 		Version:   modelRef.Version(),
 	}
-	var snapshot *port.PublishedModel
-	switch normalizedMode {
-	case ModelValidationModeActiveRelease:
-		if v.activeReader == nil {
-			return evalerrors.ModuleNotConfigured("active published model reader is not configured")
-		}
-		snapshot, err = v.activeReader.GetActivePublishedModelByRef(ctx, ref)
-	case ModelValidationModeRetainedExact:
-		if v.retainedReader == nil {
-			return evalerrors.ModuleNotConfigured("retained published model reader is not configured")
-		}
-		snapshot, err = v.retainedReader.GetPublishedModelByRef(ctx, ref)
-	default:
-		return evalerrors.InvalidArgument("invalid evaluation model validation mode: %s", normalizedMode)
+	if v.retainedReader == nil {
+		return evalerrors.ModuleNotConfigured("retained published model reader is not configured")
 	}
+	snapshot, err := v.retainedReader.GetPublishedModelByRef(ctx, ref)
 	if err != nil {
 		if domainmodel.IsNotFound(err) {
 			return fmt.Errorf("%w: %s@%s", evalassessment.ErrEvaluationModelNotPublished, modelRef.Code(), modelRef.Version())

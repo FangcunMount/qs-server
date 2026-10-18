@@ -20,20 +20,19 @@ import (
 
 // BootstrapInput carries container integration inputs for evaluation module bootstrap.
 type BootstrapInput struct {
-	MySQLDB                    *gorm.DB
-	MongoDB                    *mongo.Database
-	InputResolver              evaluationinput.Resolver
-	RedisClient                redis.UniversalClient
-	CacheBuilder               *keyspace.Builder
-	CachePolicies              sharedcache.PolicyProvider
-	Observer                   *observability.ComponentObserver
-	MySQLLimiter               backpressure.Acquirer
-	TesteeAccessChecker        evaluationoperator.AccessChecker
-	ExecutionPaths             []modelcatalog.ExecutionPath
-	RuntimeDescriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
-	PublishedModelReader       rulesetport.PublishedModelReader
-	ActivePublishedModelReader rulesetport.ActivePublishedModelReader
-	OutboxProfile              appEventing.ProfileBinding
+	MySQLDB                   *gorm.DB
+	MongoDB                   *mongo.Database
+	InputResolver             evaluationinput.Resolver
+	RedisClient               redis.UniversalClient
+	CacheBuilder              *keyspace.Builder
+	CachePolicies             sharedcache.PolicyProvider
+	Observer                  *observability.ComponentObserver
+	MySQLLimiter              backpressure.Acquirer
+	TesteeAccessChecker       evaluationoperator.AccessChecker
+	ExecutionPaths            []modelcatalog.ExecutionPath
+	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
+	PublishedModelReader      rulesetport.PublishedModelReader
+	OutboxProfile             appEventing.ProfileBinding
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

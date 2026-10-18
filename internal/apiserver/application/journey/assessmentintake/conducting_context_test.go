@@ -8,7 +8,6 @@ import (
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	sheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"testing"
 	"time"
@@ -49,12 +48,12 @@ func TestConductingContextComesFromPersistedSubmission(t *testing.T) {
 	}
 }
 
-// Existing intake behavior tests explicitly read a legacy persisted answer sheet.
-func newLegacyService(scoring answersheetapp.AnswerSheetScoringService, binding rulesetport.AssessmentBindingResolver, plans planapp.TaskAssessmentResolver, commands planapp.PlanCommandService, intake evaluationintake.Service, _ interface{}) Service {
+// Intake cases provide an explicit persisted submission and frozen command.
+func newIntakeService(scoring answersheetapp.AnswerSheetScoringService, plans planapp.TaskAssessmentResolver, commands planapp.PlanCommandService, intake evaluationintake.Service) Service {
 	c, _ := sheet.NewSubmissionContext(actor.NewFillerRef(8, actor.FillerTypeSelf), actor.NewTesteeRef(meta.FromUint64(7)), meta.FromUint64(9), "")
 	q, _ := sheet.NewQuestionnaireRef("Q", "1", "Q")
 	persisted := sheet.ReconstructWithSubmissionContext(meta.FromUint64(3), q, c, nil, time.Now(), 0)
-	return NewService(scoring, binding, plans, commands, intake, nil, persistedSheet{value: persisted})
+	return NewService(scoring, plans, commands, intake, nil, persistedSheet{value: persisted})
 }
 func TestMissingSubmissionReaderCannotDowngradeToLegacy(t *testing.T) {
 	_, err := (&service{}).loadConductingContext(context.Background(), Command{})

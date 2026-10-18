@@ -13902,7 +13902,8 @@
           "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
           "Maintenance build target source review only: prior verified and top baseline retained as JSON: {\"source_baseline\": {\"sha\": \"7de5adbd31b588450735f11b3501292da89a6ada\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}}. Makefile adds a separate build-maintenance target and phony declaration; existing metadata targets and all metadata source/fixture/workflow bytes remain unchanged. This rebinds only current source references; no prior command/native/CI/production evidence is relabelled.",
-          "Maintenance entrypoint relocation source review only; previous current bindings retained as JSON: {\"source_baseline\": {\"sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Makefile changes only maintenance tool build paths/list/description. Metadata target commands, reader and fixture/workflow bytes remain unchanged; original command/native/production results are not relabelled as current execution."
+          "Maintenance entrypoint relocation source review only; previous current bindings retained as JSON: {\"source_baseline\": {\"sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Makefile changes only maintenance tool build paths/list/description. Metadata target commands, reader and fixture/workflow bytes remain unchanged; original command/native/production results are not relabelled as current execution.",
+          "Normal main integration for maintenance command relocation retains both original parent source baselines as JSON: {\"main\": {\"sha\": \"17a65fd887dbf34e2b3e176906f834eccb126a37\", \"verified_on\": \"2026-10-18\"}, \"maintenance\": {\"sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Incoming canonical identity/frozen-intake source, Docker Hub quota handling and their original verification/production records are preserved. Only current source references will be rebound after the merge source commit; no prior CI/native/production proof is relabelled."
         ]
       },
       "gaps": [],
@@ -14481,7 +14482,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+        "source_sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14515,28 +14516,14 @@
           "kind": "command",
           "command": "bash scripts/cd/test-compatibility-observation.sh",
           "result": "passed",
-          "source_sha": "6ab70c496df64fececffd38438269afde298cd12",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "python3 scripts/cd/test-compatibility-prometheus.py /tmp/qs-cleanup-m6-raw-stable-queries.jsonl",
-          "result": "passed",
-          "source_sha": "6ab70c496df64fececffd38438269afde298cd12",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race ./internal/pkg/middleware",
-          "result": "passed",
-          "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+          "source_sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
           "verified_on": "2026-10-18"
         },
         {
           "kind": "command",
-          "command": "go test ./internal/pkg/configcontract -run=TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed -count=1",
+          "command": "go test -race ./internal/pkg/middleware ./internal/pkg/grpc ./internal/pkg/authobservability",
           "result": "passed",
-          "source_sha": "36b8f98d7c322fad06586f0f40f1e0c36d9beea8",
+          "source_sha": "32975f6bc48957421326b145b6498aab59015dde",
           "verified_on": "2026-10-18"
         }
       ],
@@ -15978,7 +15965,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "DecisionKind-only dispatch and frozen independent Admission are implemented; new independent submissions do not create an unbound Assessment. Legacy classification, client terminal behavior and historical data disposition remain separate verification conditions.",
+            "rationale": "Frozen independent Admission skips Assessment creation; execution requires frozen exact Admission and no longer resolves live bindings. Historical disposition and production client behavior remain separately evidenced in the version ledger.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -15991,10 +15978,10 @@
               {
                 "kind": "source_selector",
                 "path": "internal/apiserver/application/journey/assessmentintake/service.go",
-                "selector": "applyAdmissionOrBinding(ctx context.Context",
+                "selector": "func applyAdmission(command Command",
                 "result": "matched",
-                "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-                "verified_on": "2026-10-07"
+                "source_sha": "57bc466c12cdb785acc253a02d75ee568b27bc0d",
+                "verified_on": "2026-10-18"
               }
             ],
             "gaps": [

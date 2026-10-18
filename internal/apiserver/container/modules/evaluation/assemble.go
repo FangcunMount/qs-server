@@ -63,20 +63,19 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
-	MySQLDB                    *gorm.DB
-	MongoDB                    *mongo.Database
-	InputResolver              evaluationinput.Resolver
-	RedisClient                redis.UniversalClient
-	CacheBuilder               *keyspace.Builder
-	CachePolicies              sharedcache.PolicyProvider
-	Observer                   *observability.ComponentObserver
-	MySQLLimiter               backpressure.Acquirer
-	TesteeAccessChecker        evaluationoperator.AccessChecker
-	ExecutionPaths             []modelcatalog.ExecutionPath
-	RuntimeDescriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
-	PublishedModelReader       rulesetport.PublishedModelReader
-	ActivePublishedModelReader rulesetport.ActivePublishedModelReader
-	OutboxProfile              appEventing.ProfileBinding
+	MySQLDB                   *gorm.DB
+	MongoDB                   *mongo.Database
+	InputResolver             evaluationinput.Resolver
+	RedisClient               redis.UniversalClient
+	CacheBuilder              *keyspace.Builder
+	CachePolicies             sharedcache.PolicyProvider
+	Observer                  *observability.ComponentObserver
+	MySQLLimiter              backpressure.Acquirer
+	TesteeAccessChecker       evaluationoperator.AccessChecker
+	ExecutionPaths            []modelcatalog.ExecutionPath
+	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
+	PublishedModelReader      rulesetport.PublishedModelReader
+	OutboxProfile             appEventing.ProfileBinding
 }
 
 // New assembles the evaluation module.
@@ -200,13 +199,8 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 
 func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationInfra) {
 	var modelValidator evaluationintake.EvaluationModelValidator
-	if normalized.ActivePublishedModelReader != nil || normalized.PublishedModelReader != nil {
-		modelValidator = evaluationintake.NewCompositeEvaluationModelValidator(
-			evaluationintake.NewPublishedEvaluationModelValidator(
-				normalized.ActivePublishedModelReader,
-				normalized.PublishedModelReader,
-			),
-		)
+	if normalized.PublishedModelReader != nil {
+		modelValidator = evaluationintake.NewPublishedEvaluationModelValidator(normalized.PublishedModelReader)
 	}
 	m.IntakeService = evaluationintake.NewService(
 		infra.assessmentRepo,

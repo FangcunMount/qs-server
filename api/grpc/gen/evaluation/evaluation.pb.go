@@ -1094,7 +1094,7 @@ type EnsureAssessmentRequest struct {
 	TaskId               string                 `protobuf:"bytes,7,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
 	OriginType           string                 `protobuf:"bytes,8,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`
 	OriginId             string                 `protobuf:"bytes,9,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`
-	// Submit-time frozen evaluation admission (EV-R001). Empty purpose = legacy.
+	// Submit-time frozen evaluation admission (EV-R001). Required for execution; empty purpose is rejected.
 	Admission     *AssessmentAdmission `protobuf:"bytes,10,opt,name=admission,proto3" json:"admission,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

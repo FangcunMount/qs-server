@@ -62,33 +62,35 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	}
 }
 
-func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
-	result := &auth.VerifyResult{
-		Claims: &auth.TokenClaims{
-			SessionID: "session-2",
-			TokenID:   "token-2",
-			Extra: map[string]interface{}{
-				"user_id":    "4001",
-				"org_id":     "5001",
-				"tenant_id":  "fangcun",
-				"account_id": "6001",
-			},
-		},
-	}
-
-	claims, _ := buildUserClaims(result)
-	if claims == nil {
-		t.Fatal("expected claims")
-		return
-	}
-	if claims.UserID != "4001" {
-		t.Fatalf("unexpected fallback user id: %s", claims.UserID)
-	}
-	if claims.OrgID != "5001" {
-		t.Fatalf("unexpected fallback org id: %s", claims.OrgID)
-	}
-	if claims.AccountID != "6001" {
-		t.Fatalf("unexpected fallback account id: %s", claims.AccountID)
+func TestBuildUserClaimsIgnoresExtraIdentityAliases(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		user, account, org string
+		want               [3]string
+	}{
+		{name: "aliases alone", want: [3]string{}},
+		{name: "canonical fields win", user: "1001", account: "2001", org: "3001", want: [3]string{"1001", "2001", "3001"}},
+		{name: "canonical user with optional scope absent", user: "1001", want: [3]string{"1001", "", ""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := &auth.VerifyResult{Claims: &auth.TokenClaims{UserID: tc.user, LoginIdentityID: tc.account, OrgID: tc.org, SessionID: "sid", TokenID: "jti", Extra: map[string]interface{}{"user_id": "4001", "uid": 4002, "sub": "4003", "account_id": "6001", "accountId": 6002, "aid": "6003", "org_id": "5001", "organization_id": 5002}}}
+			claims, sources := buildUserClaims(result)
+			if got := [3]string{claims.UserID, claims.AccountID, claims.OrgID}; got != tc.want {
+				t.Fatalf("mapped %v want %v", got, tc.want)
+			}
+			for i, v := range tc.want {
+				want := "canonical"
+				if v == "" {
+					want = "missing"
+				}
+				if sources[i] != want {
+					t.Fatalf("source[%d]=%q want %q", i, sources[i], want)
+				}
+			}
+			if claims.SessionID != "sid" || claims.TokenID != "jti" {
+				t.Fatal("session identity changed")
+			}
+		})
 	}
 }
 

@@ -10,10 +10,6 @@ const (
 	intakeLookupNotFound              = "not_found"
 	intakeLookupDependencyError       = "dependency_error"
 	intakeLookupDuplicateHit          = "duplicate_hit"
-	legacyBindingResolved             = "resolved"
-	legacyBindingNotFound             = "not_found"
-	legacyBindingDependencyErr        = "dependency_error"
-	legacyBindingUnavailable          = "unavailable"
 	intakeOutcomeAssessmentCreated    = "assessment_created"
 	intakeOutcomeNoAssessmentRequired = "no_assessment_required"
 )
@@ -21,11 +17,6 @@ const (
 var assessmentIntakeLookupTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "qs_evaluation_assessment_intake_lookup_total",
 	Help: "Assessment intake lookup classifications, including duplicate-then-refind recovery (EV-R006).",
-}, []string{"result"})
-
-var assessmentIntakeLegacyBindingTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "qs_evaluation_assessment_intake_legacy_binding_total",
-	Help: "Legacy AnswerSheet events without frozen admission classified by live-binding fallback result.",
 }, []string{"result"})
 
 var assessmentIntakeOutcomeTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -43,14 +34,6 @@ func init() {
 		assessmentIntakeLookupTotal.WithLabelValues(result)
 	}
 	for _, result := range []string{
-		legacyBindingResolved,
-		legacyBindingNotFound,
-		legacyBindingDependencyErr,
-		legacyBindingUnavailable,
-	} {
-		assessmentIntakeLegacyBindingTotal.WithLabelValues(result)
-	}
-	for _, result := range []string{
 		intakeOutcomeAssessmentCreated,
 		intakeOutcomeNoAssessmentRequired,
 	} {
@@ -60,10 +43,6 @@ func init() {
 
 func observeAssessmentIntakeLookup(result string) {
 	assessmentIntakeLookupTotal.WithLabelValues(result).Inc()
-}
-
-func observeLegacyBinding(result string) {
-	assessmentIntakeLegacyBindingTotal.WithLabelValues(result).Inc()
 }
 
 func observeAssessmentIntakeOutcome(result string) {

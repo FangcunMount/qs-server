@@ -8,13 +8,12 @@ import (
 	sheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 
-	intake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 type proofModelValidator struct{}
 
-func (proofModelValidator) ValidateEvaluationModel(context.Context, domain.EvaluationModelRef, domain.QuestionnaireRef, intake.ModelValidationMode) error {
+func (proofModelValidator) ValidateEvaluationModel(context.Context, domain.EvaluationModelRef, domain.QuestionnaireRef) error {
 	return nil
 }
 

@@ -103,7 +103,7 @@ flowchart TD
 2. 问卷已经绑定一个可执行的已发布 AssessmentModel。
 
 没有绑定模型的独立 Questionnaire 仍然可以收集 AnswerSheet，但其业务链路在 Survey 基础计分后结束，不进入 Evaluation，也不创建 Assessment。新提交通过冻结 Admission 区分独立问卷和完整测评；
-只有无 Admission 的历史事件仍保留 live binding 兼容入口。
+无冻结 Admission 的历史事件已退出执行支持，不读取当前绑定。
 
 ## 4. Evaluation 负责什么
 

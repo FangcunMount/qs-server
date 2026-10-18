@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"google.golang.org/grpc/metadata"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,36 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 )
+
+func TestExtractTokenRequiresBearer(t *testing.T) {
+	interceptor := &IAMAuthInterceptor{}
+	for _, tc := range []struct {
+		header string
+		valid  bool
+	}{
+		{"Bearer token", true}, {"bearer token", true}, {"token", false}, {"Basic token", false}, {"Bearer ", false}, {"Bearer token extra", false},
+	} {
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", tc.header))
+		token, err := interceptor.extractToken(ctx)
+		if (err == nil) != tc.valid || tc.valid && token != "token" {
+			t.Fatalf("header=%q token=%q error=%v", tc.header, token, err)
+		}
+	}
+}
+
+func TestInjectUserContextUsesCanonicalLoginIdentity(t *testing.T) {
+	interceptor := &IAMAuthInterceptor{}
+	for _, canonical := range []string{"2001", ""} {
+		result := &auth.VerifyResult{Claims: &auth.TokenClaims{UserID: "1001", LoginIdentityID: canonical, Extra: map[string]interface{}{"account_id": "9001", "accountId": 9002, "aid": "9003", "username": "alice", "service_id": "qs-collection-server"}}}
+		ctx := interceptor.injectUserContext(context.Background(), result)
+		if got := AccountIDFromContext(ctx); got != canonical {
+			t.Fatalf("account=%q want canonical login identity %q", got, canonical)
+		}
+		if UsernameFromContext(ctx) != "alice" || UserIDFromContext(ctx) != "1001" {
+			t.Fatal("canonical user or optional name changed")
+		}
+	}
+}
 
 func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	interceptor := &IAMAuthInterceptor{}

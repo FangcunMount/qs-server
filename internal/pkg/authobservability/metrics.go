@@ -14,7 +14,7 @@ var authTokenSourceTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 
 var authClaimSourceTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "qs_auth_claim_source_total",
-	Help: "Actually selected identity claim sources after successful REST verification.",
+	Help: "Canonical identity selections from verified SDK claims at the REST boundary.",
 }, []string{"field", "source"})
 
 func init() {
@@ -53,19 +53,12 @@ func RecordTokenVerification(source, result string) {
 }
 
 // RecordVerifiedClaimSources receives selections from the verified REST mapper.
-// Field names and accepted aliases are fixed; arbitrary claims never become labels.
+// Only canonical or missing selections are admitted. Reserved old zero-valued
+// series remain for the historical audit reader until the remaining M6 contracts retire.
 func RecordVerifiedClaimSources(sources [3]string) {
 	for index, field := range []string{"user_id", "account_id", "org_id"} {
 		source := sources[index]
 		valid := source == "canonical" || source == "missing"
-		switch field {
-		case "user_id":
-			valid = valid || source == "extra_user_id" || source == "extra_uid" || source == "extra_sub"
-		case "account_id":
-			valid = valid || source == "extra_account_id" || source == "extra_accountId" || source == "extra_aid"
-		case "org_id":
-			valid = valid || source == "extra_org_id" || source == "extra_organization_id"
-		}
 		if !valid {
 			source = "missing"
 		}

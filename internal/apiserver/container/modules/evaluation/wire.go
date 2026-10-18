@@ -80,26 +80,21 @@ func Wire(in WireInput) (WireResult, error) {
 	if reader, ok := catalog.(rulesetport.PublishedModelReader); ok {
 		publishedModelReader = reader
 	}
-	var activePublishedModelReader rulesetport.ActivePublishedModelReader
-	if reader, ok := catalog.(rulesetport.ActivePublishedModelReader); ok {
-		activePublishedModelReader = reader
-	}
 
 	module, err := Bootstrap(BootstrapInput{
-		MySQLDB:                    in.MySQLDB,
-		MongoDB:                    in.MongoDB,
-		InputResolver:              inputResolver,
-		RedisClient:                in.RedisClient,
-		CacheBuilder:               in.CacheBuilder,
-		CachePolicies:              in.CachePolicies,
-		Observer:                   in.Observer,
-		MySQLLimiter:               in.MySQLLimiter,
-		TesteeAccessChecker:        in.TesteeAccessChecker,
-		ExecutionPaths:             executionPaths,
-		RuntimeDescriptorRegistry:  in.RuntimeDescriptorRegistry,
-		PublishedModelReader:       publishedModelReader,
-		ActivePublishedModelReader: activePublishedModelReader,
-		OutboxProfile:              in.OutboxProfile,
+		MySQLDB:                   in.MySQLDB,
+		MongoDB:                   in.MongoDB,
+		InputResolver:             inputResolver,
+		RedisClient:               in.RedisClient,
+		CacheBuilder:              in.CacheBuilder,
+		CachePolicies:             in.CachePolicies,
+		Observer:                  in.Observer,
+		MySQLLimiter:              in.MySQLLimiter,
+		TesteeAccessChecker:       in.TesteeAccessChecker,
+		ExecutionPaths:            executionPaths,
+		RuntimeDescriptorRegistry: in.RuntimeDescriptorRegistry,
+		PublishedModelReader:      publishedModelReader,
+		OutboxProfile:             in.OutboxProfile,
 	})
 	if err != nil {
 		return WireResult{}, err

@@ -13,30 +13,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-type ModelValidationMode string
-
-const (
-	ModelValidationModeActiveRelease ModelValidationMode = "active_release"
-	ModelValidationModeRetainedExact ModelValidationMode = "retained_exact"
-)
-
-func normalizeModelValidationMode(mode ModelValidationMode) (ModelValidationMode, error) {
-	switch mode {
-	case "", ModelValidationModeActiveRelease:
-		return ModelValidationModeActiveRelease, nil
-	case ModelValidationModeRetainedExact:
-		return ModelValidationModeRetainedExact, nil
-	default:
-		return "", evalerrors.InvalidArgument("invalid evaluation model validation mode: %s", mode)
-	}
-}
-
 type CreateCommand struct {
 	ConductingContext                                                            domainassessment.ConductingContext
 	OrgID, TesteeID, AnswerSheetID                                               uint64
 	QuestionnaireCode, QuestionnaireVersion                                      string
 	ModelKind, ModelSubKind, ModelAlgorithm, ModelCode, ModelVersion, ModelTitle *string
-	ModelValidationMode                                                          ModelValidationMode
 	OriginType                                                                   string
 	OriginID                                                                     *string
 }
@@ -55,7 +36,7 @@ type Service interface {
 }
 
 type EvaluationModelValidator interface {
-	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef, ModelValidationMode) error
+	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error
 }
 type service struct {
 	repo       domainassessment.Repository
@@ -94,14 +75,10 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 		return nil, err
 	}
 	if req.ModelRef != nil {
-		validationMode, err := normalizeModelValidationMode(command.ModelValidationMode)
-		if err != nil {
-			return nil, err
-		}
 		if s.validator == nil {
 			return nil, evalerrors.ModuleNotConfigured("evaluation model validator is not configured")
 		}
-		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef, validationMode); err != nil {
+		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef); err != nil {
 			if evalerrors.IsModuleNotConfigured(err) ||
 				evalerrors.IsInvalidArgument(err) {
 				return nil, err

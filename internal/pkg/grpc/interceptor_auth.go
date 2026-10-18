@@ -89,12 +89,12 @@ func (i *IAMAuthInterceptor) UnaryServerInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Errorf(codes.Unauthenticated, "token verification failed: %v", err)
 		}
 
-		if !result.Valid {
+		if result == nil || !result.Valid {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid token")
 		}
 
 		claims := result.Claims
-		if claims == nil {
+		if claims == nil || strings.TrimSpace(claims.UserID) == "" {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid token claims")
 		}
 
@@ -143,16 +143,11 @@ func (i *IAMAuthInterceptor) extractToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("authorization header not found")
 	}
 
-	authHeader := authHeaders[0]
-
-	// 支持 "Bearer <token>" 格式
-	const bearerPrefix = "Bearer "
-	if strings.HasPrefix(authHeader, bearerPrefix) {
-		return strings.TrimPrefix(authHeader, bearerPrefix), nil
+	parts := strings.Fields(authHeaders[0])
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", fmt.Errorf("bearer authorization is required")
 	}
-
-	// 直接使用 token（向后兼容）
-	return authHeader, nil
+	return parts[1], nil
 }
 
 // verifyIdentityMatch 验证 JWT 声明的身份与 mTLS 证书身份是否一致
@@ -197,7 +192,7 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 
 	// 注入用户信息到 context，供后续业务逻辑使用
 	ctx = context.WithValue(ctx, authContextKeyUserID, claims.UserID)
-	ctx = context.WithValue(ctx, authContextKeyAccountID, resolveAccountID(claims))
+	ctx = context.WithValue(ctx, authContextKeyAccountID, strings.TrimSpace(claims.LoginIdentityID))
 	ctx = context.WithValue(ctx, authContextKeySessionID, claims.SessionID)
 	ctx = context.WithValue(ctx, authContextKeyTokenID, claims.TokenID)
 
@@ -206,9 +201,8 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 		ctx = context.WithValue(ctx, authContextKeyAMR, claims.AMR)
 	}
 
-	// 注入自定义声明（Extra）
+	// Optional display metadata does not supply canonical identity.
 	if claims.Extra != nil {
-		ctx = context.WithValue(ctx, authContextKeyCustomClaims, claims.Extra)
 		// 从 Extra 中提取 username（如果存在）
 		if username, ok := claims.Extra["username"].(string); ok {
 			ctx = context.WithValue(ctx, authContextKeyUsername, username)
@@ -220,35 +214,6 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 	}
 
 	return ctx
-}
-
-func resolveAccountID(claims *auth.TokenClaims) string {
-	if claims == nil {
-		return ""
-	}
-	if len(claims.Extra) > 0 {
-		for _, key := range []string{"account_id", "accountId", "aid"} {
-			if v, ok := claims.Extra[key]; ok {
-				if s := claimValueToString(v); s != "" {
-					return s
-				}
-			}
-		}
-	}
-	return strings.TrimSpace(claims.LoginIdentityID)
-}
-
-func claimValueToString(v interface{}) string {
-	switch x := v.(type) {
-	case string:
-		return strings.TrimSpace(x)
-	case fmt.Stringer:
-		return strings.TrimSpace(x.String())
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-		return strings.TrimSpace(fmt.Sprint(x))
-	default:
-		return ""
-	}
 }
 
 // AddSkipMethod 添加跳过认证的方法

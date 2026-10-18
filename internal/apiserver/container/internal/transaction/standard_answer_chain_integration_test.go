@@ -143,7 +143,7 @@ events:
 	mysqlStager, err := mysqlstandard.NewStager(eventcatalog.NewCatalog(mysqlCatalog), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	assessmentService := appintake.NewService(assessmentcache.NewInvalidatingAssessmentRepository(assessmentmysql.NewAssessmentRepository(mysqlDB), nil), proofModelValidator{}, NewMySQLRunner(mysqlDB), mysqlStager)
-	ensure := journey.NewService(nil, nil, nil, nil, assessmentService, nil, sheetRepo)
+	ensure := journey.NewService(nil, nil, nil, assessmentService, nil, sheetRepo)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	var ensureCalls atomic.Int32
