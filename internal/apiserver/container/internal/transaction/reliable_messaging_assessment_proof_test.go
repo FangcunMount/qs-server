@@ -8,7 +8,6 @@ import (
 	sheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 
-	intake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
