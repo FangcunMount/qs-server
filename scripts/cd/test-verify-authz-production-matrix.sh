@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
@@ -18,7 +18,16 @@ case "${1:-}" in
     fi
     ;;
   exec)
-    if [[ "$*" != *'/app/qs-authz-matrix --config=/app/configs/apiserver.prod.yaml'* ]]; then
+    if [[ "$*" == *"sh -c test -x /app/qs-authz"* ]]; then
+      exit "${FAKE_AUTHZ_PROBE_STATUS:-0}"
+    fi
+    if [ -n "${FAKE_AUTHZ_OPERATIONS:-}" ]; then
+      printf '%s\n' "$*" >>"$FAKE_AUTHZ_OPERATIONS"
+    fi
+    if [ "${FAKE_AUTHZ_COMMAND_STATUS:-0}" -ne 0 ]; then
+      exit "$FAKE_AUTHZ_COMMAND_STATUS"
+    fi
+    if [[ "$*" != *"/app/${FAKE_AUTHZ_COMMAND:-qs-authz verify} --config=/app/configs/apiserver.prod.yaml"* ]]; then
       echo "unexpected matrix command: $*" >&2
       exit 2
     fi
@@ -40,15 +49,35 @@ print(json.dumps({"schema_version":"iam-authz-production-matrix/v3","git_commit"
 PYFIXTURE
 )"
 
-output="$(PRIVILEGE_RUNNER= DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \
+output="$(PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \
+  "$SCRIPT_DIR/verify-authz-production-matrix.sh")"
+printf '%s\n' "$output" | grep -Fq 'Production AuthZ action matrix passed: subjects=4 cases=6 synthetic_subjects=2 policy_version=27'
+
+# Retained rollback images use the original entrypoint only when it is absent.
+output="$(FAKE_AUTHZ_PROBE_STATUS=1 FAKE_AUTHZ_COMMAND=qs-authz-matrix PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \
   "$SCRIPT_DIR/verify-authz-production-matrix.sh")"
 printf '%s\n' "$output" | grep -Fq 'Production AuthZ action matrix passed: subjects=4 cases=6 synthetic_subjects=2 policy_version=27'
 
 bad_evidence="${evidence/\"passed\":true}/\"passed\":false}"
-if PRIVILEGE_RUNNER= DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$bad_evidence" \
+if PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$bad_evidence" \
   "$SCRIPT_DIR/verify-authz-production-matrix.sh" >/dev/null 2>&1; then
   echo "matrix verifier accepted failing evidence" >&2
   exit 1
 fi
+
+if FAKE_AUTHZ_PROBE_STATUS=125 FAKE_AUTHZ_OPERATIONS="$TEST_ROOT/probe-error-operations" PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" \
+  "$SCRIPT_DIR/verify-authz-production-matrix.sh" >/dev/null 2>&1; then
+  echo "AuthZ command probe error was accepted" >&2
+  exit 1
+fi
+
+test ! -e "$TEST_ROOT/probe-error-operations"
+
+# Execution failure is returned directly, without retrying the legacy entrypoint.
+command_status=0
+FAKE_AUTHZ_COMMAND_STATUS=42 FAKE_AUTHZ_OPERATIONS="$TEST_ROOT/failed-operations" PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" \
+  "$SCRIPT_DIR/verify-authz-production-matrix.sh" >/dev/null 2>&1 || command_status=$?
+test "$command_status" -eq 42
+test "$(wc -l <"$TEST_ROOT/failed-operations" | tr -d ' ')" -eq 1
 
 echo "production AuthZ matrix verification contract passed"

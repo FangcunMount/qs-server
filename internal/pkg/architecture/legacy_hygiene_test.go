@@ -11,6 +11,13 @@ func TestRemovedLegacyPathsDoNotReturnToProductionCode(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"cmd/qs-ai-bridge",
+		"cmd/operator-prepare",
+		"cmd/operator-recover",
+		"cmd/operator-retire",
+		"cmd/qs-authz-matrix",
+		"cmd/qs-authz-matrix-provision",
+		"cmd/qs-ai-messaging-audit",
+		"cmd/qs-ai-messaging-control",
 		"internal/apiserver/infra/mysql/plan/Untitled",
 		"internal/pkg/database/tx/runner.go",
 	} {

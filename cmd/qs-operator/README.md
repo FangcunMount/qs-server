@@ -1,6 +1,19 @@
-# 门店运营身份准备
+# 人员维护命令族
 
-`operator-prepare preflight|apply|status` 为已审核的 IAM 用户创建停用、无角色的 QS Operator。它调用 Actor 生命周期应用服务，不创建 IAM 用户，不赋权，不启用，不恢复已退役身份。
+使用 `make build-maintenance` 构建，命令在显式操作完成后退出。
+
+| 命令 | 职责与边界 |
+| --- | --- |
+| `qs-operator prepare preflight|apply|status` | 创建停用、无角色的 QS 身份，不创建或赋权 IAM 用户 |
+| `qs-operator recover preflight|apply|status` | 恢复原 Operator ID，保留恢复归档，不恢复 IAM 角色 |
+| `qs-operator retire selected preflight|apply|verify` | 对明确选定的人员执行受控退出和当前事实复验 |
+| `qs-operator retire orphan preflight|apply|verify` | 清理所有公司均无 Operator 历史的孤立后台授权 |
+
+只在选定操作后加载配置和资源。配置继续使用 QS_APISERVER_ 前缀；各操作原有 OPERATOR_PREPARE_*、OPERATOR_RECOVERY_*、OPERATOR_RETIRE_* 输入、指纹、报告与维护确认保持。历史批次动作在配置读取前拒绝。恢复、退出及孤立授权的详细契约见[迁移维护说明](../../internal/pkg/migration/README.md)。
+
+## 门店运营身份准备
+
+`qs-operator prepare preflight|apply|status` 为已审核的 IAM 用户创建停用、无角色的 QS Operator。它调用 Actor 生命周期应用服务，不创建 IAM 用户，不赋权，不启用，不恢复已退役身份。
 
 输入由 `OPERATOR_PREPARE_INPUT` 指向权限为 `0600` 的 JSON 文件，字段为 `OrgID`、`UserID`、`ActorID`、`Name`、`RequestID`、`Reason`。不接受密码、角色或 Scope 字段。使用正常 QS 配置参数连接服务。
 

@@ -302,8 +302,10 @@ func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T
 		t.Fatal(err)
 	}
 	for _, required := range []string{
-		"for command in audit control preflight; do",
-		"COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging-* /app/",
+		"-o /build/bin/qs-ai-messaging ./cmd/qs-ai-messaging",
+		"-o /build/bin/qs-ai-messaging-preflight ./cmd/qs-ai-messaging-preflight",
+		"COPY --from=builder --chown=www:www /build/bin/qs-authz /app/qs-authz",
+		"COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging* /app/",
 		`ENTRYPOINT ["/app/qs-apiserver"]`,
 	} {
 		if !strings.Contains(string(data), required) {

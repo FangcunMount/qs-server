@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 46,
       "budgeted": false
     }
   },
@@ -8903,11 +8903,11 @@
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-audit/main.go"
+          "path": "cmd/qs-ai-messaging/audit.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-control/main.go"
+          "path": "cmd/qs-ai-messaging/admission.go"
         },
         {
           "kind": "source",
@@ -9007,6 +9007,14 @@
           "severity": "medium",
           "summary": "Current exact-SHA broker provider, retry, settlement, and dead-letter evidence is absent.",
           "exit_criteria": "Attach deployed SHA, effective broker provider and topology, retry and settlement observations, and an observation timestamp."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
+          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "historical_evidence": []
         }
       ]
     },
@@ -11371,7 +11379,7 @@
       "path": "internal/pkg/migration/README.md",
       "class": "sidecar",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
         "verified_on": "2026-10-18"
@@ -11403,7 +11411,7 @@
         },
         {
           "kind": "source",
-          "path": "cmd/operator-retire/*.go"
+          "path": "cmd/qs-operator/*.go"
         },
         {
           "kind": "source",
@@ -11555,13 +11563,6 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
-          "result": "passed",
-          "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
-          "verified_on": "2026-10-14"
-        },
-        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
@@ -11591,13 +11592,6 @@
           "selector": "session.StartTransaction",
           "result": "matched",
           "source_sha": "94d683c12acca78bc2564c810eae767ed7274674",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
-          "result": "passed",
-          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
           "verified_on": "2026-10-14"
         },
         {
@@ -11631,13 +11625,6 @@
           "result": "matched",
           "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
           "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/pkg/configcontract ./scripts/oneoff/mysql_metadata_profile",
-          "result": "passed",
-          "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
-          "verified_on": "2026-10-15"
         },
         {
           "kind": "command",
@@ -11720,20 +11707,6 @@
           "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
         },
         {
@@ -11955,6 +11928,50 @@
           "severity": "medium",
           "summary": "Current C format2/first-runtime database generation is source-prepared only. Fixed C-only table creation/permission/count needs a later explicit production approval; M7 separately retires it after old recovery/approval/tool responsibilities end. New native14 plus original30 actual44 and CI/AI pending; same-committed-intent completion, failed-capture pre-DDL cancel, formal six-instance controller/actual window/RPO remain unqualified; no automatic startup/retry or history re-signing.",
           "exit_criteria": "Qualify exact new source with explicit old30+new14 native gates, then separately close same-intent completion/failed-capture cancellation/formal executor and production object permissions, current-window freeze/custody/runtime/30-60/RPO obligations; retain all original proofs and M7 retirement responsibility."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
+          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+              "result": "passed",
+              "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+              "result": "passed",
+              "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/pkg/configcontract ./scripts/oneoff/mysql_metadata_profile",
+              "result": "passed",
+              "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
+              "verified_on": "2026-10-15"
+            }
+          ]
         }
       ],
       "notes": [
@@ -12622,7 +12639,7 @@
       ]
     },
     {
-      "path": "cmd/operator-prepare/README.md",
+      "path": "cmd/qs-operator/README.md",
       "class": "sidecar",
       "owner": "runtime",
       "doc_status": "needs_review",
@@ -12633,7 +12650,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/operator-prepare/main.go"
+          "path": "cmd/qs-operator/prepare.go"
         },
         {
           "kind": "source",
@@ -12657,6 +12674,14 @@
           "severity": "medium",
           "summary": "Local tests and live preflight passed; production preparation and release remain pending.",
           "exit_criteria": "Verify private execution reports, inactive state, zero grants and coordinated Scope activation."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
+          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "historical_evidence": []
         }
       ]
     },
@@ -13245,7 +13270,7 @@
       "path": "scripts/oneoff/mysql_metadata_profile/README.md",
       "class": "sidecar",
       "owner": "tooling",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
         "verified_on": "2026-10-18"
@@ -13791,7 +13816,15 @@
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
         ]
       },
-      "gaps": [],
+      "gaps": [
+        {
+          "id": "MAINTENANCE-BUILD-TARGET-20261018",
+          "kind": "source_review",
+          "severity": "low",
+          "summary": "Makefile adds an independent maintenance build target; review that metadata build and execution contracts remain unchanged.",
+          "exit_criteria": "Rebind current source after reviewing the Makefile-only addition; historical native and production evidence remain unchanged."
+        }
+      ],
       "notes": [
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
@@ -13833,7 +13866,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-audit/main.go"
+          "path": "cmd/qs-ai-messaging/audit.go"
         },
         {
           "kind": "source",
@@ -13926,6 +13959,14 @@
           "severity": "medium",
           "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
           "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
+          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "historical_evidence": []
         }
       ]
     },
@@ -14113,20 +14154,6 @@
           "verified_on": "2026-10-15"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/pkg/migration/actor_column_recovery_native_integration_test.go",
           "selector": "func TestActorColumnsNativeDirtyObjectBackupRestore",
@@ -14289,6 +14316,29 @@
           "severity": "high",
           "summary": "Production named protection location, responsibility, scope-specific restore and startup/freeze receipts remain unbound.",
           "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, explicit full-database-pair or approved M4 object scope, per-object responsibility, scope-specific restoration within60min, startup reserve and whole writer/TTL freeze before a separately authorized production apply."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families. Original retired package verification objects are retained as historical evidence, not renamed as current runs.",
+          "exit_criteria": "Verify current command routing, original operation contracts and release bindings; keep production verification independent.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
+              "verified_on": "2026-10-15"
+            }
+          ]
         }
       ],
       "notes": [
@@ -14395,6 +14445,100 @@
         ]
       },
       "gaps": []
+    },
+    {
+      "path": "cmd/qs-authz/README.md",
+      "class": "sidecar",
+      "owner": "runtime",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "cmd/qs-authz/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/authzmatrix/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/verify-authz-production-matrix.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/provision-authz-production-matrix-evaluator.sh"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Command-family implementation and local checks do not establish deployment or real operational acceptance."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "QS-AUTHZ-RELEASE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "New command family requires source tests and version-bound release verification.",
+          "exit_criteria": "Verify routing and original safety contracts locally; verify deployed image and actual operations separately."
+        }
+      ]
+    },
+    {
+      "path": "cmd/qs-ai-messaging/README.md",
+      "class": "sidecar",
+      "owner": "runtime",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-messaging/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-messaging-preflight/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/ai-messaging-release.py"
+        },
+        {
+          "kind": "source",
+          "path": "build/docker/Dockerfile.qs-apiserver"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Command-family implementation and local checks do not establish deployment or real operational acceptance."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "QS-AI-MESSAGING-RELEASE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "New command family requires source tests and version-bound release verification.",
+          "exit_criteria": "Verify routing and original safety contracts locally; verify deployed image and actual operations separately."
+        }
+      ]
     }
   ],
   "initial_review_baseline": {

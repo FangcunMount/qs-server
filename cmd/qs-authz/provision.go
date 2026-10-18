@@ -15,18 +15,18 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/version"
 )
 
-func main() {
+func runProvisionCommand() {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp(
 		"Explicitly provision the isolated production IAM AuthZ matrix subjects",
 		"qs-apiserver",
 		app.WithDefaultValidArgs(),
 		app.WithOptions(opts),
-		app.WithRunFunc(run(opts)),
+		app.WithRunFunc(provision(opts)),
 	).Run()
 }
 
-func run(opts *apiserveroptions.Options) app.RunFunc {
+func provision(opts *apiserveroptions.Options) app.RunFunc {
 	return func(_ string) error {
 		log.Init(opts.Log)
 		defer log.Flush()

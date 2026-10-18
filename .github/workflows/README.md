@@ -13,7 +13,7 @@
 | `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验；不输出凭据 |
 | `attention-reconcile-audit.yml` | 受控 Attention reconciliation 审计 | 不得把 dry-run 自动升级为 apply |
 | `compatibility-observation.yml` | 只读观察仍在用的 Evaluation legacy binding 指标 | 无指标、零值、无命中和证据缺失必须区分 |
-| `authz-production-matrix.yml` | 使用生产主体执行只读 IAM AuthZ v3 精确 12 项矩阵 | 覆盖角色与 origin、缺属性、错误属性类型及 force_retry；IAM 快照复核角色，不写角色或业务数据 |
+| `authz-production-matrix.yml` | 通过 qs-authz verify 执行只读 IAM action 六项矩阵 | 覆盖四类主体的 retry 和 admin/operator 的 force_retry；IAM 快照复核角色，不写角色或业务数据 |
 | `authz-production-matrix-provision.yml` | 显式创建隔离的 evaluator 与 plan manager 矩阵主体 | 仅手工触发并要求固定确认词；幂等创建无登录凭据/联系方式/外部身份的 IAM 用户及单一角色 assignment，不修改现有用户 |
 
 R4 源码退出候选移除两个专用退役工作流及其打包、恢复夹具和临时运行观察检查。CI 保留标准事务证据、当前 MQ、退休 ID 防护、迁移与正常启动保护；普通构建和部署保留原交付入口。四对象的实际生产验收和材料零剩余仍需独立回执，见[退役工具退出说明](../../scripts/database/compatibility-retirement.md)。

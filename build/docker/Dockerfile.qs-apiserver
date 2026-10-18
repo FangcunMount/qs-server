@@ -41,27 +41,21 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GIT_COMMIT} \
     -X github.com/FangcunMount/qs-server/pkg/version.GitBranch=${GIT_BRANCH} \
     -X github.com/FangcunMount/qs-server/pkg/version.BuildDate=${BUILD_TIME}" \
-    -o /build/bin/qs-authz-matrix \
-    ./cmd/qs-authz-matrix/
-
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags "-s -w \
-    -X github.com/FangcunMount/qs-server/pkg/version.GitVersion=${VERSION} \
-    -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GIT_COMMIT} \
-    -X github.com/FangcunMount/qs-server/pkg/version.GitBranch=${GIT_BRANCH} \
-    -X github.com/FangcunMount/qs-server/pkg/version.BuildDate=${BUILD_TIME}" \
-    -o /build/bin/qs-authz-matrix-provision \
-    ./cmd/qs-authz-matrix-provision/
+    -o /build/bin/qs-authz \
+    ./cmd/qs-authz/
 
 # ===================================
 # 运行阶段
 # ===================================
 # Explicit, offline/maintenance entrypoints; the normal server entrypoint is unchanged.
-RUN for command in audit control preflight; do \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
     -ldflags "-s -w -X main.sourceSHA=${GIT_COMMIT}" \
-    -o "/build/bin/qs-ai-messaging-${command}" "./cmd/qs-ai-messaging-${command}"; \
-    done
+    -o /build/bin/qs-ai-messaging ./cmd/qs-ai-messaging
+
+# Offline companion retains its own import graph and release entrypoint.
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+    -ldflags "-s -w -X main.sourceSHA=${GIT_COMMIT}" \
+    -o /build/bin/qs-ai-messaging-preflight ./cmd/qs-ai-messaging-preflight
 
 FROM alpine:3.21
 
@@ -82,9 +76,8 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder --chown=www:www /build/bin/qs-apiserver /app/qs-apiserver
-COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging-* /app/
-COPY --from=builder --chown=www:www /build/bin/qs-authz-matrix /app/qs-authz-matrix
-COPY --from=builder --chown=www:www /build/bin/qs-authz-matrix-provision /app/qs-authz-matrix-provision
+COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging* /app/
+COPY --from=builder --chown=www:www /build/bin/qs-authz /app/qs-authz
 
 # 复制配置文件（包含 dev/prod，镜像内默认使用 prod）
 # 注意：证书文件由 docker-compose 从宿主机挂载，不打包到镜像中

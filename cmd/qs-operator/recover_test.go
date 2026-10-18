@@ -19,7 +19,7 @@ func TestRecoveryInputRequiresExactIdentityAndOneObject(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.body), 0600); err != nil {
 				t.Fatal(err)
 			}
-			_, err := readCommand(path)
+			_, err := readRecoveryCommand(path)
 			if (err == nil) != tc.valid {
 				t.Fatal("unexpected validation", err)
 			}

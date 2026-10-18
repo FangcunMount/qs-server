@@ -1,4 +1,4 @@
-// qs-ai-messaging-audit collects a read-only snapshot of the current MQ ledger.
+// audit collects a read-only snapshot of the current MQ ledger.
 // It never starts a relay, reads payload content, installs schema or transfers rows.
 package main
 
@@ -7,16 +7,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"flag"
-	"fmt"
-	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"os"
 	"time"
 
+	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/go-sql-driver/mysql"
 )
-
-var sourceSHA = "development"
 
 var mqTables = []string{"ai_messaging_outbox", "ai_messaging_operations", "ai_messaging_inbox", "ai_messaging_quarantine", "ai_messaging_failures", "ai_messaging_admission", "ai_messaging_observations"}
 
@@ -65,16 +61,7 @@ type snapshot struct {
 	Scope                   string            `json:"scope"`
 }
 
-func main() {
-	limit := flag.Int("limit", 100, "bounded message sample limit, 1..1000")
-	flag.Parse()
-	if err := run(*limit); err != nil {
-		// DSN, database driver errors and payloads never appear in public output.
-		fmt.Fprintln(os.Stderr, "read-only MQ database audit failed")
-		os.Exit(1)
-	}
-}
-func run(limit int) (resultErr error) {
+func runAudit(limit int) (resultErr error) {
 	raw := os.Getenv("QS_AI_MESSAGING_AUDIT_DSN")
 	if raw == "" {
 		return errors.New("explicit database binding required")

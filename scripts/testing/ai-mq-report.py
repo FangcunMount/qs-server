@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMQMaintenanceCommandsRejectBeforeDatabaseSelection",
+    "TestMQMaintenanceRedactsDatabaseBindingErrors",
+    "TestMQMaintenanceArgumentBoundsAndReviewedRevision",
     "TestMQWorkflowCancelRouteRequiresOrgAdminAndGovernanceDependency",
     "TestMQParticipantRetryRoutesRequireCurrentAdminAndTrustedScope",
     "TestMQRetiredResultsRPCNeverPersistsOrAcknowledges",

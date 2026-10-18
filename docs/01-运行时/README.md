@@ -4,6 +4,10 @@
 
 qs-server 是一个以模块化单体为业务核心的三进程事件驱动系统：`qs-apiserver` 持有业务规则和业务事实，`collection-server` 承接小程序 BFF 与入口保护，`qs-worker` 消费事件并驱动异步用例。三个可执行进程不等于三个自治微服务。
 
+## 显式维护命令
+
+常驻进程之外，人员、授权和 AI MQ 维护分别由 [qs-operator](../../cmd/qs-operator/README.md)、[qs-authz](../../cmd/qs-authz/README.md)、[qs-ai-messaging](../../cmd/qs-ai-messaging/README.md) 管理。MQ 的离线 preflight 保留独立进程，迁移执行器也继续独立。`make build-maintenance` 仅构建这些维护入口；默认 build-all/run-all 仍只管理三个服务。
+
 ## 阅读路线
 
 第一次了解运行时，建议按下列顺序阅读：

@@ -17,22 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: operator-retire selected-preflight|selected-apply|selected-verify|orphan-preflight|orphan-apply|orphan-verify [QS config flags]; required environment: OPERATOR_RETIRE_INPUT, OPERATOR_RETIRE_REPORT; apply also requires OPERATOR_RETIRE_FINGERPRINT, OPERATOR_RETIRE_MAINTENANCE=true")
-		os.Exit(1)
-	}
-	action := os.Args[1]
-	switch action {
-	case "preflight", "apply", "status", "verify":
-		fmt.Fprintln(os.Stderr, "historical batch retirement actions are retired; archived tools are restricted to isolated historical databases")
-		os.Exit(1)
-	case "selected-preflight", "selected-apply", "selected-verify", "orphan-preflight", "orphan-apply", "orphan-verify":
-	default:
-		fmt.Fprintln(os.Stderr, "unknown retirement action")
-		os.Exit(1)
-	}
-	os.Args = append(os.Args[:1], os.Args[2:]...)
+func runRetire(action string) {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp("Operator retirement with restricted evidence output", "qs-apiserver", app.WithDefaultValidArgs(), app.WithOptions(opts), app.WithRunFunc(func(_ string) error {
 		log.Init(opts.Log)
