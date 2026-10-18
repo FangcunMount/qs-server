@@ -1077,31 +1077,6 @@ definitions:
       reason:
         type: string
     type: object
-  binding.DecisionKind:
-    enum:
-    - score_range
-    - pole_composition
-    - trait_profile
-    - nearest_pattern
-    - dominant_factor
-    - norm_lookup
-    - ability_level
-    - score_range
-    - pole_composition
-    - trait_profile
-    - nearest_pattern
-    - dominant_factor
-    - norm_lookup
-    - ability_level
-    type: string
-    x-enum-varnames:
-    - DecisionKindScoreRange
-    - DecisionKindPoleComposition
-    - DecisionKindTraitProfile
-    - DecisionKindNearestPattern
-    - DecisionKindDominantFactor
-    - DecisionKindNormLookup
-    - DecisionKindAbilityLevel
   cachemodel.CapabilityPolicyView:
     properties:
       capability:
@@ -1474,69 +1449,6 @@ definitions:
       reference:
         description: Reference 返回参考文档（错误时使用）
         type: string
-    type: object
-  decision.FactorScoreRanges:
-    properties:
-      factorCode:
-        type: string
-      kind:
-        description: risk | norm | ability
-        type: string
-      primary:
-        type: boolean
-      rules:
-        items:
-          $ref: '#/definitions/decision.ScoreRangeRule'
-        type: array
-    type: object
-  decision.OutcomeRef:
-    properties:
-      code:
-        type: string
-    type: object
-  decision.ScoreRangeRule:
-    properties:
-      level:
-        type: string
-      maxInclusive:
-        type: boolean
-      maxScore:
-        type: number
-      minScore:
-        type: number
-      outcomeCode:
-        type: string
-      unboundedMax:
-        type: boolean
-    type: object
-  decision.Spec:
-    properties:
-      outcomeRefs:
-        items:
-          $ref: '#/definitions/decision.OutcomeRef'
-        type: array
-      scoreRanges:
-        items:
-          $ref: '#/definitions/decision.FactorScoreRanges'
-        type: array
-      specialOutcomes:
-        description: special-rule / profile outcome codes referenced by decision
-        items:
-          type: string
-        type: array
-      typeDecision:
-        $ref: '#/definitions/decision.TypeDecisionFact'
-    type: object
-  decision.TypeDecisionFact:
-    properties:
-      fallbackCode:
-        type: string
-      fallbackSimilarityThreshold:
-        type: number
-      kind:
-        $ref: '#/definitions/binding.DecisionKind'
-      topK:
-        type: integer
     type: object
   definition.Brief2Spec:
     properties:
@@ -1931,102 +1843,6 @@ definitions:
       status_url:
         type: string
     type: object
-  interpretationassets.Assets:
-    properties:
-      outcomes:
-        items:
-          $ref: '#/definitions/interpretationassets.OutcomePresentation'
-        type: array
-      profiles:
-        items:
-          $ref: '#/definitions/interpretationassets.TypeProfilePresentation'
-        type: array
-      reportSpec:
-        $ref: '#/definitions/interpretationassets.ReportSpec'
-    type: object
-  interpretationassets.OutcomePresentation:
-    properties:
-      description:
-        type: string
-      outcomeCode:
-        type: string
-      summary:
-        type: string
-      title:
-        type: string
-    type: object
-  interpretationassets.RarityPresentation:
-    properties:
-      label:
-        type: string
-      oneInX:
-        type: integer
-      percent:
-        type: number
-    type: object
-  interpretationassets.ReportSection:
-    properties:
-      adapterKey:
-        type: string
-      categoryLabel:
-        type: string
-      code:
-        type: string
-      kind:
-        type: string
-      sourceRefs:
-        items:
-          type: string
-        type: array
-      templateID:
-        type: string
-      templateVersion:
-        type: string
-      title:
-        type: string
-    type: object
-  interpretationassets.ReportSpec:
-    properties:
-      sections:
-        items:
-          $ref: '#/definitions/interpretationassets.ReportSection'
-        type: array
-    type: object
-  interpretationassets.TypeProfilePresentation:
-    properties:
-      commentary:
-        type: string
-      image:
-        type: string
-      imageURL:
-        type: string
-      isSpecial:
-        type: boolean
-      outcomeCode:
-        type: string
-      pattern:
-        type: string
-      rarity:
-        $ref: '#/definitions/interpretationassets.RarityPresentation'
-      strengths:
-        items:
-          type: string
-        type: array
-      suggestions:
-        items:
-          type: string
-        type: array
-      traits:
-        items:
-          type: string
-        type: array
-      trigger:
-        type: string
-      weaknesses:
-        items:
-          type: string
-        type: array
-    type: object
   meta.ID:
     enum:
     - 0
@@ -2069,10 +1885,6 @@ definitions:
     type: object
   modelcatalog.Definition:
     properties:
-      DecisionSpec:
-        $ref: '#/definitions/decision.Spec'
-      InterpretationAssets:
-        $ref: '#/definitions/interpretationassets.Assets'
       calibration:
         $ref: '#/definitions/definition.Calibration'
       conclusions:

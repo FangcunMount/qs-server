@@ -13694,31 +13694,6 @@ components:
           type: integer
         reason:
           type: string
-    binding.DecisionKind:
-      type: string
-      enum:
-      - score_range
-      - pole_composition
-      - trait_profile
-      - nearest_pattern
-      - dominant_factor
-      - norm_lookup
-      - ability_level
-      - score_range
-      - pole_composition
-      - trait_profile
-      - nearest_pattern
-      - dominant_factor
-      - norm_lookup
-      - ability_level
-      x-enum-varnames:
-      - DecisionKindScoreRange
-      - DecisionKindPoleComposition
-      - DecisionKindTraitProfile
-      - DecisionKindNearestPattern
-      - DecisionKindDominantFactor
-      - DecisionKindNormLookup
-      - DecisionKindAbilityLevel
     cachemodel.CapabilityPolicyView:
       type: object
       properties:
@@ -14092,69 +14067,6 @@ components:
         reference:
           description: Reference 返回参考文档（错误时使用）
           type: string
-    decision.FactorScoreRanges:
-      type: object
-      properties:
-        factorCode:
-          type: string
-        kind:
-          description: risk | norm | ability
-          type: string
-        primary:
-          type: boolean
-        rules:
-          type: array
-          items:
-            $ref: '#/components/schemas/decision.ScoreRangeRule'
-    decision.OutcomeRef:
-      type: object
-      properties:
-        code:
-          type: string
-    decision.ScoreRangeRule:
-      type: object
-      properties:
-        level:
-          type: string
-        maxInclusive:
-          type: boolean
-        maxScore:
-          type: number
-        minScore:
-          type: number
-        outcomeCode:
-          type: string
-        unboundedMax:
-          type: boolean
-    decision.Spec:
-      type: object
-      properties:
-        outcomeRefs:
-          type: array
-          items:
-            $ref: '#/components/schemas/decision.OutcomeRef'
-        scoreRanges:
-          type: array
-          items:
-            $ref: '#/components/schemas/decision.FactorScoreRanges'
-        specialOutcomes:
-          description: special-rule / profile outcome codes referenced by decision
-          type: array
-          items:
-            type: string
-        typeDecision:
-          $ref: '#/components/schemas/decision.TypeDecisionFact'
-    decision.TypeDecisionFact:
-      type: object
-      properties:
-        fallbackCode:
-          type: string
-        fallbackSimilarityThreshold:
-          type: number
-        kind:
-          $ref: '#/components/schemas/binding.DecisionKind'
-        topK:
-          type: integer
     definition.Brief2Spec:
       type: object
       properties:
@@ -14548,102 +14460,6 @@ components:
           type: string
         status_url:
           type: string
-    interpretationassets.Assets:
-      type: object
-      properties:
-        outcomes:
-          type: array
-          items:
-            $ref: '#/components/schemas/interpretationassets.OutcomePresentation'
-        profiles:
-          type: array
-          items:
-            $ref: '#/components/schemas/interpretationassets.TypeProfilePresentation'
-        reportSpec:
-          $ref: '#/components/schemas/interpretationassets.ReportSpec'
-    interpretationassets.OutcomePresentation:
-      type: object
-      properties:
-        description:
-          type: string
-        outcomeCode:
-          type: string
-        summary:
-          type: string
-        title:
-          type: string
-    interpretationassets.RarityPresentation:
-      type: object
-      properties:
-        label:
-          type: string
-        oneInX:
-          type: integer
-        percent:
-          type: number
-    interpretationassets.ReportSection:
-      type: object
-      properties:
-        adapterKey:
-          type: string
-        categoryLabel:
-          type: string
-        code:
-          type: string
-        kind:
-          type: string
-        sourceRefs:
-          type: array
-          items:
-            type: string
-        templateID:
-          type: string
-        templateVersion:
-          type: string
-        title:
-          type: string
-    interpretationassets.ReportSpec:
-      type: object
-      properties:
-        sections:
-          type: array
-          items:
-            $ref: '#/components/schemas/interpretationassets.ReportSection'
-    interpretationassets.TypeProfilePresentation:
-      type: object
-      properties:
-        commentary:
-          type: string
-        image:
-          type: string
-        imageURL:
-          type: string
-        isSpecial:
-          type: boolean
-        outcomeCode:
-          type: string
-        pattern:
-          type: string
-        rarity:
-          $ref: '#/components/schemas/interpretationassets.RarityPresentation'
-        strengths:
-          type: array
-          items:
-            type: string
-        suggestions:
-          type: array
-          items:
-            type: string
-        traits:
-          type: array
-          items:
-            type: string
-        trigger:
-          type: string
-        weaknesses:
-          type: array
-          items:
-            type: string
     meta.ID:
       type: integer
       enum:
@@ -14687,10 +14503,6 @@ components:
     modelcatalog.Definition:
       type: object
       properties:
-        DecisionSpec:
-          $ref: '#/components/schemas/decision.Spec'
-        InterpretationAssets:
-          $ref: '#/components/schemas/interpretationassets.Assets'
         calibration:
           $ref: '#/components/schemas/definition.Calibration'
         conclusions:
