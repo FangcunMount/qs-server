@@ -219,7 +219,8 @@ func cognitiveDefinition(withNorm bool) *modeldefinition.Definition {
 
 func cognitiveSPMModel(normVersion string) *domain.AssessmentModel {
 	return &domain.AssessmentModel{
-		Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM, Code: "COG-SPM-E2E", Version: 1,
+		ReportAssetsProjectionVersion: 2,
+		Kind:                          domain.KindCognitive, Algorithm: domain.AlgorithmSPM, Code: "COG-SPM-E2E", Version: 1,
 		Title: "SPM end-to-end", Status: domain.ModelStatusPublished,
 		Binding: domain.QuestionnaireBinding{QuestionnaireCode: "Q-COG", QuestionnaireVersion: "1"},
 		DefinitionV2: &modeldefinition.Definition{

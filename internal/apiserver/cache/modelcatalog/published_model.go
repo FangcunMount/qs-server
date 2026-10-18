@@ -331,7 +331,7 @@ func publishedModelKindForWarmup(kind cachetarget.WarmupKind) (domain.Kind, bool
 // Payload V3 bypasses preparation entries that may contain unassigned projection
 // versions or incomplete hash metadata. Version tokens and old Redis TTLs remain
 // intact; this cache schema does not activate report asset projection V2.
-const publishedModelPayloadSchemaSuffix = ":payload-v3"
+const publishedModelPayloadSchemaSuffix = ":payload-v4"
 
 func (c *CachedPublishedModelStore) latestByCodeCacheKey(kind domain.Kind, code string) string {
 	return c.keys.BuildPublishedAssessmentModelLatestByCodeKey(string(kind), strings.ToLower(strings.TrimSpace(code))) + publishedModelPayloadSchemaSuffix

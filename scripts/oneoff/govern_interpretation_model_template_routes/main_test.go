@@ -50,7 +50,6 @@ func TestAttachCanonicalHashesUsesDomainDefinitionHash(t *testing.T) {
 		t.Fatal(err)
 	}
 	target.ReportMap.Sections[0].TemplateVersion = targetTemplateVersion
-	modeldefinition.MaterializeLayers(target)
 	wantTargetHash, err := modeldefinition.CanonicalContentHash(target)
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +108,6 @@ func TestAttachCanonicalHashesIncludesMaterializedFactorVisibility(t *testing.T)
 		target.ReportMap.Sections[index].TemplateID = "standard"
 		target.ReportMap.Sections[index].TemplateVersion = targetTemplateVersion
 	}
-	modeldefinition.MaterializeLayers(target)
 	wantTargetHash, err := modeldefinition.CanonicalContentHash(target)
 	if err != nil {
 		t.Fatal(err)

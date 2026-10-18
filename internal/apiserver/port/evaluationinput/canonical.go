@@ -6,23 +6,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
-// AttachCanonicalDefinition materializes canonical DefinitionV2 and presentation
-// assets onto an evaluation input snapshot (MC-R017 batch 4).
-func AttachCanonicalDefinition(snapshot *InputSnapshot, def *modeldefinition.Definition) {
-	if snapshot == nil || def == nil {
-		return
-	}
-	snapshot.DefinitionV2 = def
-	if snapshot.InterpretationAssets != nil && snapshot.InterpretationAssets.IsMaterialized() {
-		return
-	}
-	assets := def.ResolvedInterpretationAssets()
-	if assets.IsMaterialized() {
-		copy := assets
-		snapshot.InterpretationAssets = &copy
-	}
-}
-
 // DefinitionV2FromSnapshot returns canonical Definition when materialized on input.
 func DefinitionV2FromSnapshot(input *InputSnapshot) (*modeldefinition.Definition, bool) {
 	if input == nil || input.DefinitionV2 == nil {
@@ -70,11 +53,7 @@ func InterpretationAssetsFromSnapshot(input *InputSnapshot) (interpretationasset
 	if input.InterpretationAssets != nil && input.InterpretationAssets.IsMaterialized() {
 		return *input.InterpretationAssets, true
 	}
-	if def, ok := DefinitionV2FromSnapshot(input); ok {
-		if assets := def.ResolvedInterpretationAssets(); assets.IsMaterialized() {
-			return assets, true
-		}
-	}
+
 	return interpretationassets.Assets{}, false
 }
 

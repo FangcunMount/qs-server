@@ -18,7 +18,7 @@ import (
 func TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites(t *testing.T) {
 	_, db := mongodbtest.ReplicaSetDatabase(t)
 	repo := NewRepository(db)
-	model := &port.PublishedModel{Kind: domain.KindTypology, Code: "LEGACY", Version: "v1", DefinitionV2: durableProjectionDefinition()}
+	model := &port.PublishedModel{Kind: domain.KindTypology, Code: "LEGACY", Version: "v1", DefinitionV2: durableProjectionDefinition(), ReportAssetsProjectionVersion: 1}
 	legacy := NewMapper().ToPO(model)
 	legacy.BeforeInsert()
 	if _, err := db.Collection(legacy.CollectionName()).InsertOne(t.Context(), legacy); err != nil {
@@ -37,7 +37,7 @@ func TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.ReportAssetsProjectionVersion != 0 {
+	if loaded.ReportAssetsProjectionVersion != 1 {
 		t.Fatal("read silently assigned legacy version")
 	}
 	loaded.ReportAssetsProjectionVersion = 1
@@ -49,18 +49,40 @@ func TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites(t *testing.T)
 	}
 
 	loaded.ReportAssetsProjectionVersion = 2
-	if err := repo.Save(t.Context(), loaded); !errors.Is(err, domain.ErrInvalidArgument) {
-		t.Fatalf("V2 write opened: %v", err)
+	if err := repo.Save(t.Context(), loaded); !errors.Is(err, domain.ErrReleaseVersionConflict) {
+		t.Fatalf("same-version semantic change accepted: %v", err)
 	}
 	if !bytes.Equal(before, readRaw(model.Code)) {
 		t.Fatal("rejected V2 write mutated legacy BSON")
 	}
 	model.Code, model.Version = "NEW", "v2"
+	model.ReportAssetsProjectionVersion = 0
 	if err := repo.Save(t.Context(), model); err != nil {
 		t.Fatal(err)
 	}
-	if got := readRaw(model.Code).Lookup("report_assets_projection_version").Int32(); got != 1 {
+	if got := readRaw(model.Code).Lookup("report_assets_projection_version").Int32(); got != 2 {
 		t.Fatalf("new marker = %d", got)
+	}
+
+	newRaw := readRaw(model.Code)
+	definitionRaw := newRaw.Lookup("definition_v2").Document()
+	if definitionRaw.Lookup("decision_spec").Type != 0 || definitionRaw.Lookup("interpretation_assets").Type != 0 {
+		t.Fatal("new write persisted derived Definition facts")
+	}
+	model.ReportAssetsProjectionVersion = 2
+	if err := repo.Save(t.Context(), model); err != nil {
+		t.Fatal("canonical retry failed", err)
+	}
+	if !bytes.Equal(newRaw, readRaw(model.Code)) {
+		t.Fatal("canonical retry rewrote immutable release")
+	}
+	model.Code = "NEW_LEGACY_WRITE"
+	model.ReportAssetsProjectionVersion = 1
+	if err := repo.Save(t.Context(), model); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("new legacy projection accepted", err)
+	}
+	if !bytes.Equal(newRaw, readRaw("NEW")) {
+		t.Fatal("rejected legacy write archived current release")
 	}
 
 	// Read compatibility remains open for an unknown stored marker; no writes.
@@ -109,7 +131,7 @@ func TestReportAssetsVersionRealMongoHeadEditDoesNotBackfillLegacyReads(t *testi
 		t.Fatal(err)
 	}
 	loaded, err = repo.FindByCode(t.Context(), model.Code)
-	if err != nil || loaded.ReportAssetsProjectionVersion != interpretationassets.ProjectionLegacyV1 {
+	if err != nil || loaded.ReportAssetsProjectionVersion != interpretationassets.ProjectionCanonicalV2 {
 		t.Fatalf("Definition edit = %#v, %v", loaded, err)
 	}
 }

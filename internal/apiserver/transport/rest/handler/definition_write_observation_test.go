@@ -10,7 +10,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -22,7 +21,6 @@ type observingDefinitionService struct {
 
 func (s *observingDefinitionService) SaveDefinition(_ context.Context, _ modelcatalog.ActorContext, _ string, value *domain.Definition) (*domain.Definition, error) {
 	s.called = true
-	modeldefinition.MaterializeLayers(value)
 	return value, s.saveErr
 }
 

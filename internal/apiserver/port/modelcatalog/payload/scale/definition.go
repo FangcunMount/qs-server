@@ -15,7 +15,7 @@ func ScaleSnapshotFromDefinition(env ExecutionEnvelope, def *definition.Definiti
 	}
 	snapshot := buildFromMeasureSpec(env, def.Measure)
 	applyRiskConclusions(snapshot.Factors, def.Conclusions)
-	if assets := def.ResolvedInterpretationAssets(); assets.IsMaterialized() {
+	if assets := definition.InterpretationAssetsFrom(def); assets.IsMaterialized() {
 		cloned := assets
 		snapshot.InterpretationAssets = &cloned
 	}

@@ -45,3 +45,42 @@ func TestDefinitionJSONRejectsUntaggedConclusion(t *testing.T) {
 		t.Fatalf("Unmarshal error = %v, want conclusion kind error", err)
 	}
 }
+
+func TestDefinitionPublicJSONPreservesSixCanonicalBlocksAndHash(t *testing.T) {
+	value := definition.Definition{
+		Execution:   definition.ExecutionSpec{SPM: &definition.SPMSpec{TotalFactorCode: "total", ItemSets: []definition.SPMItemSet{{Code: "A", Items: []definition.SPMItem{{QuestionCode: "q", CorrectOptionCode: "b"}}}}}},
+		Conclusions: []conclusion.Conclusion{conclusion.AbilityConclusion{FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw}},
+	}
+	before, err := definition.CanonicalContentHash(&value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Measure", "Calibration", "Execution", "Conclusions", "Outcomes", "ReportMap"}
+	if len(fields) != len(want) {
+		t.Fatalf("public blocks=%v", fields)
+	}
+	for _, field := range want {
+		if _, ok := fields[field]; !ok {
+			t.Fatal("missing canonical block", field)
+		}
+	}
+	var read definition.Definition
+	if err := json.Unmarshal(raw, &read); err != nil {
+		t.Fatal(err)
+	}
+	if read.Execution.SPM.ItemSets[0].Items[0].CorrectOptionCode != "b" {
+		t.Fatal("frozen answer lost")
+	}
+	after, err := definition.CanonicalContentHash(&read)
+	if err != nil || after != before {
+		t.Fatal("public serialization changed canonical identity", err)
+	}
+}
