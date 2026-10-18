@@ -355,9 +355,21 @@ definitions:
         type: string
       finalization:
         type: object
+      original_reviews:
+        items:
+          type: object
+        type: array
       parallel_call_limit:
         type: integer
       resolutions:
+        items:
+          type: object
+        type: array
+      review_corrections:
+        items:
+          type: object
+        type: array
+      review_fingerprints:
         items:
           type: object
         type: array
@@ -3789,6 +3801,21 @@ definitions:
       task_id:
         type: string
     type: object
+  response.DefinitionBrief2Wire:
+    properties:
+      FormVariant:
+        type: string
+      IndexFactorCodes:
+        items:
+          type: string
+        type: array
+      PrimaryFactorCode:
+        type: string
+      ValidityFactorCodes:
+        items:
+          type: string
+        type: array
+    type: object
   response.DefinitionCalibrationWire:
     properties:
       NormRefs:
@@ -3839,6 +3866,13 @@ definitions:
         items:
           $ref: '#/definitions/response.DefinitionTypeSpecialRuleWire'
         type: array
+    type: object
+  response.DefinitionExecutionWire:
+    properties:
+      Brief2:
+        $ref: '#/definitions/response.DefinitionBrief2Wire'
+      SPM:
+        $ref: '#/definitions/response.DefinitionSPMWire'
     type: object
   response.DefinitionFactorEdgeWire:
     properties:
@@ -3935,6 +3969,33 @@ definitions:
       TemplateID:
         type: string
       Title:
+        type: string
+    type: object
+  response.DefinitionSPMItemSetWire:
+    properties:
+      Code:
+        type: string
+      Items:
+        items:
+          $ref: '#/definitions/response.DefinitionSPMItemWire'
+        type: array
+    type: object
+  response.DefinitionSPMItemWire:
+    properties:
+      CorrectOptionCode:
+        type: string
+      QuestionCode:
+        type: string
+    type: object
+  response.DefinitionSPMWire:
+    properties:
+      ItemSets:
+        items:
+          $ref: '#/definitions/response.DefinitionSPMItemSetWire'
+        type: array
+      TimeLimitSeconds:
+        type: integer
+      TotalFactorCode:
         type: string
     type: object
   response.DefinitionScoreRangeWire:
@@ -4126,6 +4187,8 @@ definitions:
         items:
           $ref: '#/definitions/response.DefinitionConclusionWire'
         type: array
+      Execution:
+        $ref: '#/definitions/response.DefinitionExecutionWire'
       Measure:
         $ref: '#/definitions/response.DefinitionMeasureWire'
       Outcomes:
@@ -7736,6 +7799,8 @@ paths:
     put:
       consumes:
       - application/json
+      description: 完整替换 Measure、Calibration、Execution、Conclusions、Outcomes、ReportMap
+        六区块。DecisionSpec 和 InterpretationAssets 为派生字段，提交时（包括 null 或空对象）返回 400。
       parameters:
       - description: Bearer 用户令牌
         in: header

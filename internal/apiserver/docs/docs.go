@@ -1066,6 +1066,7 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "description": "完整替换 Measure、Calibration、Execution、Conclusions、Outcomes、ReportMap 六区块。DecisionSpec 和 InterpretationAssets 为派生字段，提交时（包括 null 或空对象）返回 400。",
                 "consumes": [
                     "application/json"
                 ],
@@ -14026,10 +14027,28 @@ const docTemplate = `{
                 "finalization": {
                     "type": "object"
                 },
+                "original_reviews": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
                 "parallel_call_limit": {
                     "type": "integer"
                 },
                 "resolutions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "review_corrections": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "review_fingerprints": {
                     "type": "array",
                     "items": {
                         "type": "object"
@@ -19169,6 +19188,29 @@ const docTemplate = `{
                 }
             }
         },
+        "response.DefinitionBrief2Wire": {
+            "type": "object",
+            "properties": {
+                "FormVariant": {
+                    "type": "string"
+                },
+                "IndexFactorCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "PrimaryFactorCode": {
+                    "type": "string"
+                },
+                "ValidityFactorCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "response.DefinitionCalibrationWire": {
             "type": "object",
             "properties": {
@@ -19241,6 +19283,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/response.DefinitionTypeSpecialRuleWire"
                     }
+                }
+            }
+        },
+        "response.DefinitionExecutionWire": {
+            "type": "object",
+            "properties": {
+                "Brief2": {
+                    "$ref": "#/definitions/response.DefinitionBrief2Wire"
+                },
+                "SPM": {
+                    "$ref": "#/definitions/response.DefinitionSPMWire"
                 }
             }
         },
@@ -19386,6 +19439,48 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "Title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionSPMItemSetWire": {
+            "type": "object",
+            "properties": {
+                "Code": {
+                    "type": "string"
+                },
+                "Items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionSPMItemWire"
+                    }
+                }
+            }
+        },
+        "response.DefinitionSPMItemWire": {
+            "type": "object",
+            "properties": {
+                "CorrectOptionCode": {
+                    "type": "string"
+                },
+                "QuestionCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.DefinitionSPMWire": {
+            "type": "object",
+            "properties": {
+                "ItemSets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DefinitionSPMItemSetWire"
+                    }
+                },
+                "TimeLimitSeconds": {
+                    "type": "integer"
+                },
+                "TotalFactorCode": {
                     "type": "string"
                 }
             }
@@ -19673,6 +19768,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/response.DefinitionConclusionWire"
                     }
+                },
+                "Execution": {
+                    "$ref": "#/definitions/response.DefinitionExecutionWire"
                 },
                 "Measure": {
                     "$ref": "#/definitions/response.DefinitionMeasureWire"
