@@ -142,7 +142,7 @@ mongorestore --config=/restricted/mongo-isolated-target.yaml \
 
 ### 7.3 执行、提交与失败边界
 
-使用当前exact-source的 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)。只连接所选双库，固定AutoSeed=false，既有Preflight后按SQL→Mongo→VerifyComplete执行；不走普通数据库初始化/业务Container，不自动reconcile额外索引，不启动任何发布者、消费者或调度。执行器默认只读；apply批准独立绑定source、完整资源digest、初始clean pair、身份、目标以及冻结/具名保护/对应scope恢复/隔离启动/责任证据。对缺失位置、owner、receipt、过期窗口或已启动runtime拒绝，批准一次消费。
+使用当前exact-source的 [`qs-migrate-offline`](../../../scripts/maintenance/qs-migrate-offline/README.md)。只连接所选双库，固定AutoSeed=false，既有Preflight后按SQL→Mongo→VerifyComplete执行；不走普通数据库初始化/业务Container，不自动reconcile额外索引，不启动任何发布者、消费者或调度。执行器默认只读；apply批准独立绑定source、完整资源digest、初始clean pair、身份、目标以及冻结/具名保护/对应scope恢复/隔离启动/责任证据。对缺失位置、owner、receipt、过期窗口或已启动runtime拒绝，批准一次消费。
 
 迁移完成后另行只读检查实际目标对象、完整保留范围和双库身份/版本/dirty，释放执行器连接；全程业务runtime仍停止。正常30分钟包含启动核验，批准预留基于隔离演练的startup时间；到T0+30分钟减预留仍未通过即在提交前作恢复决定，不把DDL用满30分钟后再额外重启。
 

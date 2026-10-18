@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,27 +19,14 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/pkg/app"
 	"gorm.io/gorm"
-	"strconv"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: operator-prepare preflight|apply|status [QS config flags]; OPERATOR_PREPARE_INPUT and OPERATOR_PREPARE_REPORT required; apply also requires OPERATOR_PREPARE_FINGERPRINT")
-		os.Exit(1)
-	}
-	action := os.Args[1]
-	switch action {
-	case "preflight", "apply", "status":
-	default:
-		fmt.Fprintln(os.Stderr, "unknown preparation action")
-		os.Exit(1)
-	}
-	os.Args = append(os.Args[:1], os.Args[2:]...)
+func runPrepare(action string) {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp("Inactive operator identity preparation", "qs-apiserver", app.WithDefaultValidArgs(), app.WithOptions(opts), app.WithRunFunc(func(_ string) error {
 		log.Init(opts.Log)
 		defer log.Flush()
-		cmd, err := readCommand(os.Getenv("OPERATOR_PREPARE_INPUT"))
+		cmd, err := readPrepareCommand(os.Getenv("OPERATOR_PREPARE_INPUT"))
 		if err != nil {
 			return err
 		}
@@ -105,7 +93,7 @@ func main() {
 	})).Run()
 }
 
-func readCommand(path string) (operatorprepare.Command, error) {
+func readPrepareCommand(path string) (operatorprepare.Command, error) {
 	var cmd operatorprepare.Command
 	file, err := os.Open(path)
 	if err != nil {

@@ -92,7 +92,7 @@ COLOR_RED := \033[31m
 # ============================================================================
 
 .PHONY: help version debug
-.PHONY: build build-all build-apiserver build-collection build-worker clean
+.PHONY: build build-all build-apiserver build-collection build-worker build-maintenance clean
 .PHONY: run run-all run-apiserver run-collection run-worker
 .PHONY: stop stop-all stop-apiserver stop-collection stop-worker
 .PHONY: restart restart-all restart-apiserver restart-collection restart-worker
@@ -375,6 +375,13 @@ build-all: ## 构建所有服务
 	@$(MAKE) build-collection
 	@$(MAKE) build-worker
 	@echo "$(COLOR_GREEN)✅ 所有服务构建完成$(COLOR_RESET)"
+
+build-maintenance: ## 构建人员、AuthZ、MQ维护命令及独立离线工具（不启动服务）
+	@$(MAKE) create-dirs
+	@for command in qs-operator qs-authz qs-ai-messaging qs-ai-messaging-preflight qs-migrate-offline; do \
+		$(GO_BUILD) -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(shell git rev-parse HEAD) -X main.sourceSHA=$(shell git rev-parse HEAD)" \
+			-o "$(BIN_DIR)/$$command" "./scripts/maintenance/$$command" || exit 1; \
+	done
 
 build-apiserver: ## 构建 API 服务器
 	@echo "$(COLOR_BLUE)🔨 构建 API 服务器...$(COLOR_RESET)"

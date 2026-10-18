@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func main() {
+func runVerifyCommand() {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp(
 		"Read-only production IAM AuthZ v4 matrix verifier",
@@ -28,11 +28,11 @@ func main() {
 		"qs-apiserver",
 		app.WithDefaultValidArgs(),
 		app.WithOptions(opts),
-		app.WithRunFunc(run(opts)),
+		app.WithRunFunc(verify(opts)),
 	).Run()
 }
 
-func run(opts *apiserveroptions.Options) app.RunFunc {
+func verify(opts *apiserveroptions.Options) app.RunFunc {
 	return func(_ string) error {
 		log.Init(opts.Log)
 		defer log.Flush()

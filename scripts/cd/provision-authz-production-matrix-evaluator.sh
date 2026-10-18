@@ -39,10 +39,22 @@ if [ "${#deployed_sha}" -ne 40 ] || [ -n "${deployed_sha//[0-9a-f]/}" ]; then
   exit 1
 fi
 
+# Select by the running image, so current containers and compatible rollback
+# images remain usable before/after the command-family release. A probe error
+# is not evidence that the old binary should be executed.
+command=(/app/qs-authz provision)
+probe_status=0
+run_privileged "$DOCKER_BIN" exec "$APISERVER_CONTAINER" sh -c 'if test -x /app/qs-authz; then exit 0; else exit 42; fi' >/dev/null 2>&1 || probe_status=$?
+case "$probe_status" in
+  0) ;;
+  42) command=(/app/qs-authz-matrix-provision) ;;
+  *) echo "Cannot inspect AuthZ command availability" >&2; exit "$probe_status" ;;
+esac
+
 set +e
 provision_output="$(run_privileged "$DOCKER_BIN" exec \
   -e QS_AUTHZ_MATRIX_PROVISION_CONFIRM="$CONFIRMATION" \
-  "$APISERVER_CONTAINER" /app/qs-authz-matrix-provision --config="$CONFIG_FILE" 2>&1)"
+  "$APISERVER_CONTAINER" "${command[@]}" --config="$CONFIG_FILE" 2>&1)"
 provision_status=$?
 set -e
 printf '%s\n' "$provision_output"

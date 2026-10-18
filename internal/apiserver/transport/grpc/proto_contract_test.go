@@ -297,13 +297,24 @@ func TestGRPCRegistryImportsTransportOwnedServiceFacade(t *testing.T) {
 
 func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T) {
 	t.Parallel()
+	ignore, err := os.ReadFile("../../../../.dockerignore")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"!scripts/maintenance/\n", "!scripts/maintenance/**\n"} {
+		if !strings.Contains(string(ignore), required) {
+			t.Fatal("maintenance source must be included in the release build context")
+		}
+	}
 	data, err := os.ReadFile("../../../../build/docker/Dockerfile.qs-apiserver")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, required := range []string{
-		"for command in audit control preflight; do",
-		"COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging-* /app/",
+		"-o /build/bin/qs-ai-messaging ./scripts/maintenance/qs-ai-messaging",
+		"-o /build/bin/qs-ai-messaging-preflight ./scripts/maintenance/qs-ai-messaging-preflight",
+		"COPY --from=builder --chown=www:www /build/bin/qs-authz /app/qs-authz",
+		"COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging* /app/",
 		`ENTRYPOINT ["/app/qs-apiserver"]`,
 	} {
 		if !strings.Contains(string(data), required) {

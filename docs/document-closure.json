@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "17a65fd887dbf34e2b3e176906f834eccb126a37",
+    "sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 44,
+      "expected_count": 46,
       "budgeted": false
     }
   },
@@ -8907,15 +8907,15 @@
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-audit/main.go"
+          "path": "scripts/maintenance/qs-ai-messaging/audit.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-control/main.go"
+          "path": "scripts/maintenance/qs-ai-messaging/admission.go"
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-preflight/main.go"
+          "path": "scripts/maintenance/qs-ai-messaging-preflight/main.go"
         },
         {
           "kind": "source",
@@ -9011,6 +9011,22 @@
           "severity": "medium",
           "summary": "Current exact-SHA broker provider, retry, settlement, and dead-letter evidence is absent.",
           "exit_criteria": "Attach deployed SHA, effective broker provider and topology, retry and settlement observations, and an observation timestamp."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
+          "historical_evidence": []
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": []
         }
       ]
     },
@@ -11377,7 +11393,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -11407,7 +11423,7 @@
         },
         {
           "kind": "source",
-          "path": "cmd/operator-retire/*.go"
+          "path": "scripts/maintenance/qs-operator/*.go"
         },
         {
           "kind": "source",
@@ -11463,13 +11479,6 @@
           "verified_on": "2026-10-13"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
-          "verified_on": "2026-10-14"
-        },
-        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
@@ -11508,13 +11517,6 @@
         },
         {
           "kind": "command",
-          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
-          "result": "passed",
-          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
           "command": "go test -p=2 -tags=integration ./internal/pkg/migration -run=^TestOfflineApproval -count=1",
           "result": "passed",
           "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
@@ -11544,26 +11546,12 @@
           "verified_on": "2026-10-14"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
-          "result": "passed",
-          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/pkg/migration/offline.go",
           "selector": "func validOfflineProtectionScope(",
           "result": "matched",
           "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
           "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
-          "result": "passed",
-          "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
-          "verified_on": "2026-10-14"
         },
         {
           "kind": "source_selector",
@@ -11598,13 +11586,6 @@
           "verified_on": "2026-10-14"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
-          "result": "passed",
-          "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
-          "verified_on": "2026-10-14"
-        },
-        {
           "kind": "source_selector",
           "path": ".github/workflows/ci.yml",
           "selector": "go test -race -tags=integration -count=1 -timeout=8m",
@@ -11635,13 +11616,6 @@
           "result": "matched",
           "source_sha": "e249641f14d48499e211677e6867709a98fbb18b",
           "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/pkg/configcontract ./scripts/oneoff/mysql_metadata_profile",
-          "result": "passed",
-          "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
-          "verified_on": "2026-10-15"
         },
         {
           "kind": "command",
@@ -11688,13 +11662,6 @@
           "verified_on": "2026-10-14"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
-          "result": "passed",
-          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 103",
@@ -11724,20 +11691,6 @@
           "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
         },
         {
@@ -11858,6 +11811,20 @@
           "verified_on": "2026-10-18",
           "path": ".github/workflows/ci.yml",
           "selector": "Run Mongo-backed norm calculation regression"
+        },
+        {
+          "kind": "command",
+          "command": "make build-maintenance",
+          "result": "passed",
+          "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -11949,7 +11916,10 @@
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"e19d6bba3fd3d025e896538e2f2ada668241637c\",\"verified_on\":\"2026-10-15\"}",
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\"internal/pkg/configcontract/m4_maintenance_table_workflow_test.go\",\"selector\":\"func TestMaintenanceTableNativeWorkflowRequiresFreshExact53(\",\"result\":\"matched\",\"source_sha\":\"b8e44f2bb1f7778332a667ec9d0cbc063d6070c7\",\"verified_on\":\"2026-10-15\"}",
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
-          "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged."
+          "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged.",
+          "Command-family source review preserves prior verified marker as JSON: {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}. Only maintenance command spellings and source paths changed. New CLI race tests passed; migration SQL, maintenance application implementations and original native proofs remain byte-identical and retain their original sources. No current native or production execution is claimed.",
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
         ]
       },
       "gaps": [
@@ -11959,6 +11929,94 @@
           "severity": "medium",
           "summary": "Current C format2/first-runtime database generation is source-prepared only. Fixed C-only table creation/permission/count needs a later explicit production approval; M7 separately retires it after old recovery/approval/tool responsibilities end. New native14 plus original30 actual44 and CI/AI pending; same-committed-intent completion, failed-capture pre-DDL cancel, formal six-instance controller/actual window/RPO remain unqualified; no automatic startup/retry or history re-signing.",
           "exit_criteria": "Qualify exact new source with explicit old30+new14 native gates, then separately close same-intent completion/failed-capture cancellation/formal executor and production object permissions, current-window freeze/custody/runtime/30-60/RPO obligations; retain all original proofs and M7 retirement responsibility."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+              "result": "passed",
+              "source_sha": "ffee981745e0eaf6b0dc46b0eb4bb9cd589f39b0",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire",
+              "result": "passed",
+              "source_sha": "d1fa6adec3c8d56954fade2895287791a2edd5dd",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/pkg/configcontract ./scripts/oneoff/mysql_metadata_profile",
+              "result": "passed",
+              "source_sha": "e6f1e0e5b83ed41f1dc32788945dfc03cfbf8ab2",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
+              "verified_on": "2026-10-15"
+            }
+          ]
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
+              "result": "passed",
+              "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+              "result": "passed",
+              "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+              "result": "passed",
+              "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+              "result": "passed",
+              "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
         }
       ],
       "notes": [
@@ -12626,32 +12684,62 @@
       ]
     },
     {
-      "path": "cmd/operator-prepare/README.md",
+      "path": "scripts/maintenance/qs-operator/README.md",
       "class": "sidecar",
       "owner": "runtime",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/operator-prepare/main.go"
+          "path": "scripts/maintenance/qs-operator/*.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/maintenance/operatorprepare/tool.go"
+          "path": "internal/apiserver/maintenance/operatorprepare/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorrecovery/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/operatorretire/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make build-maintenance",
+          "result": "passed",
+          "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Live read-only preflight passed; Operator creation and Scope activation are not yet executed."
+          "Live read-only preflight passed; Operator creation and Scope activation are not yet executed.",
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
         ]
       },
       "gaps": [
@@ -12661,6 +12749,30 @@
           "severity": "medium",
           "summary": "Local tests and live preflight passed; production preparation and release remain pending.",
           "exit_criteria": "Verify private execution reports, inactive state, zero grants and coordinated Scope activation."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
+          "historical_evidence": []
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
         }
       ]
     },
@@ -13251,7 +13363,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -13752,6 +13864,22 @@
           "verified_on": "2026-10-18",
           "path": ".github/workflows/ci.yml",
           "selector": "Run Mongo-backed norm calculation regression"
+        },
+        {
+          "kind": "source_selector",
+          "path": "Makefile",
+          "selector": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "matched",
+          "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "Makefile",
+          "selector": "bash scripts/testing/m4-metadata-readiness-native-proof.sh mysql",
+          "result": "matched",
+          "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -13792,7 +13920,10 @@
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
           "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
-          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Maintenance build target source review only: prior verified and top baseline retained as JSON: {\"source_baseline\": {\"sha\": \"7de5adbd31b588450735f11b3501292da89a6ada\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}}. Makefile adds a separate build-maintenance target and phony declaration; existing metadata targets and all metadata source/fixture/workflow bytes remain unchanged. This rebinds only current source references; no prior command/native/CI/production evidence is relabelled.",
+          "Maintenance entrypoint relocation source review only; previous current bindings retained as JSON: {\"source_baseline\": {\"sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Makefile changes only maintenance tool build paths/list/description. Metadata target commands, reader and fixture/workflow bytes remain unchanged; original command/native/production results are not relabelled as current execution.",
+          "Normal main integration for maintenance command relocation retains both original parent source baselines as JSON: {\"main\": {\"sha\": \"17a65fd887dbf34e2b3e176906f834eccb126a37\", \"verified_on\": \"2026-10-18\"}, \"maintenance\": {\"sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Incoming canonical identity/frozen-intake source, Docker Hub quota handling and their original verification/production records are preserved. Only current source references will be rebound after the merge source commit; no prior CI/native/production proof is relabelled."
         ]
       },
       "gaps": [],
@@ -13837,7 +13968,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-ai-messaging-audit/main.go"
+          "path": "scripts/maintenance/qs-ai-messaging/audit.go"
         },
         {
           "kind": "source",
@@ -13930,22 +14061,38 @@
           "severity": "medium",
           "summary": "The owner-authorized direct four-object deletion and final R4 release are complete at deployed source627fefa44c22c36ef722a3d3d82cfd107b5f72b2 (PR346, CD38323013758). Independent readback proves all four absent, MySQL100/MongoDB39clean and six actual programs matching with ready passed. The two batch backups and the exact54 ServerA file scopes are zero (receipt a57dfa0fde8331c68bb438fcd9f6693726b13f2aa39dec53c6158f6da2fe80e1). Historical data migration was cancelled; full restore rehearsal was attempted but not completed and was cancelled as requested; failed old run38316933488-1 is not success evidence. These bounded facts do not sign off every business scenario, all-host material zero. The temporary route/entry variables are absent, original production pause remains true,18 surviving workflows are active and the12 source-removed workflows are not recreated; the declared Mac temporary settings were restored.",
           "exit_criteria": "Retain the real direct-drop, ordinary-CD, six-instance, exact-scope file-exit and original-settings restoration receipts. Any broader business or infrastructure signoff remains independently scoped; do not manufacture old native acceptance, historical backfill or a successful full restore rehearsal."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
+          "historical_evidence": []
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": []
         }
       ]
     },
     {
-      "path": "cmd/qs-migrate-offline/README.md",
+      "path": "scripts/maintenance/qs-migrate-offline/README.md",
       "class": "sidecar",
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "14c72a78bc9489726c05bdda9569241ed47442b2",
+        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
           "kind": "source",
-          "path": "cmd/qs-migrate-offline/*.go"
+          "path": "scripts/maintenance/qs-migrate-offline/*.go"
         },
         {
           "kind": "source",
@@ -13983,13 +14130,6 @@
       "verification": [
         {
           "kind": "command",
-          "command": "go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration",
-          "result": "passed",
-          "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
-          "verified_on": "2026-10-13"
-        },
-        {
-          "kind": "command",
           "command": "go test -race -tags=integration -count=1 -timeout=8m -run=^TestOfflineNative ./internal/pkg/migration",
           "result": "passed",
           "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
@@ -14004,13 +14144,6 @@
           "verified_on": "2026-10-13"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
-          "verified_on": "2026-10-14"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/pkg/migration/offline.go",
           "selector": "func RunOffline(",
@@ -14023,13 +14156,6 @@
           "command": "go test -p=2 -race -tags=integration -count=1 -timeout=8m -v -run=^TestOfflineNative ./internal/pkg/migration",
           "result": "passed",
           "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
-          "verified_on": "2026-10-14"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
-          "result": "passed",
-          "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
           "verified_on": "2026-10-14"
         },
         {
@@ -14063,25 +14189,11 @@
           "verified_on": "2026-10-14"
         },
         {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
-          "result": "passed",
-          "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
-          "verified_on": "2026-10-15"
-        },
-        {
           "kind": "source_selector",
           "path": "internal/pkg/migration/offline.go",
           "selector": "func validOfflineProtectionScope(",
           "result": "matched",
           "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
-          "result": "passed",
-          "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
           "verified_on": "2026-10-15"
         },
         {
@@ -14114,20 +14226,6 @@
           "selector": "func TestActorColumnsNativeUpgradeRestartAndHistoricalArchive(",
           "result": "matched",
           "source_sha": "7f131c9e996d6b5405a28414bee7547fc00cc522",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
-          "result": "passed",
-          "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
           "verified_on": "2026-10-15"
         },
         {
@@ -14227,6 +14325,13 @@
           "verified_on": "2026-10-18",
           "path": ".github/workflows/ci.yml",
           "selector": "Run Mongo-backed norm calculation regression"
+        },
+        {
+          "kind": "command",
+          "command": "make build-maintenance",
+          "result": "passed",
+          "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -14283,7 +14388,8 @@
           "CI-only source51a2d95343c9463a72352d129a633a1acad5dfde changes only metadata-readiness-mongodb-native job timeout45->60minutes. Four sequential metadata/A/B/C test limits and configured readiness sleeps can consume44minutes before setup/proof/cleanup. All inline run bytes,per-stage8min andtool budgets,owned fixture resources,originalA47/B37 andnewC21 required names/proof blocks remain identical. YAML,80 full bash scripts and7 inline Python snippets passed syntax review;actionlint passed with optional ShellCheck unavailable andnot claimed. Source QA7cc3abf260a71833d9c0013da7fead07decc6e258d6900873167c4e9a30b0c8e records the exact one-value diff. No new native/hostedCI/Docker/production run is implied. The finiteCI60min scheduling cap is not proof that external calls orcleanup complete,nor an extension or qualification of production30min maintenance/60min recovery,RPO orbusiness. All historical verification commands/native/prod/signoff records retain original source attribution.",
           "Prior complete verified marker preserved before ordinary-test CI-wrapper source alignment: {\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
           "Current source alignment toad092d50db54caec5b0df1009ebbd95553ab151a reviews only the exact D3e5 hard-anchor ordinary RunTests wrapper and failure-only raw-log upload. This document references the whole workflow; its own tool/SQL/migration/native bytes,all later stages and requiredA47/B37/C21 selectors/proofs remain unchanged. No prior command/native/production/signoff is relabelled or newly qualified; historical verified marker is retained above. Fresh hosted CI/AI remains independent.",
-          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}"
+          "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution."
         ]
       },
       "gaps": [
@@ -14293,6 +14399,73 @@
           "severity": "high",
           "summary": "Production named protection location, responsibility, scope-specific restore and startup/freeze receipts remain unbound.",
           "exit_criteria": "Independently bind actual source/artifact, exact initial pair and identities, explicit full-database-pair or approved M4 object scope, per-object responsibility, scope-specific restoration within60min, startup reserve and whole writer/TTL freeze before a separately authorized production apply."
+        },
+        {
+          "id": "MAINTENANCE-COMMAND-FAMILIES-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "Maintenance entrypoints moved into personnel, AuthZ and MQ command families; local routing regressions passed. Retired package verification objects retain original historical attribution.",
+          "exit_criteria": "Verify exact release images and actual operation contracts independently; historical native or production evidence is not a current command-family run.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "078c14d2b079033954bc8e28e54c98eb74984d81",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./cmd/operator-retire ./internal/apiserver/maintenance/operatorretire",
+              "result": "passed",
+              "source_sha": "0c69cbc243c7231f3c1bdc6ef7050bd4d1dbb4f2",
+              "verified_on": "2026-10-15"
+            }
+          ]
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration",
+              "result": "passed",
+              "source_sha": "95230074c29c703ac4bb75b8d0575870ee0ab708",
+              "verified_on": "2026-10-13"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap ./internal/pkg/configcontract",
+              "result": "passed",
+              "source_sha": "1a4a60886d954a3e6192da853a67c444f70c41fd",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race ./internal/pkg/migration ./cmd/qs-migrate-offline -count=1",
+              "result": "passed",
+              "source_sha": "c334d9b3f2655e7485cc9b817567904c3336dd3d",
+              "verified_on": "2026-10-14"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile",
+              "result": "passed",
+              "source_sha": "25b1dd1a4d1c000f19bd19e0ea0a9b8c2459eaac",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -p=2 -race -count=1 ./internal/pkg/migration ./cmd/qs-migrate-offline ./internal/pkg/configcontract ./internal/pkg/options ./internal/apiserver/bootstrap ./scripts/oneoff/mysql_metadata_profile ./scripts/oneoff/mongodb_metadata_profile",
+              "result": "passed",
+              "source_sha": "0bab734dbc1765d47051da37b0d852d92150339e",
+              "verified_on": "2026-10-15"
+            }
+          ]
         }
       ],
       "notes": [
@@ -14385,6 +14558,199 @@
         ]
       },
       "gaps": []
+    },
+    {
+      "path": "scripts/maintenance/qs-authz/README.md",
+      "class": "sidecar",
+      "owner": "runtime",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+        "verified_on": "2026-10-18"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/maintenance/qs-authz/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/authzmatrix/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/verify-authz-production-matrix.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/provision-authz-production-matrix-evaluator.sh"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": ".dockerignore"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "bash scripts/cd/test-verify-authz-production-matrix.sh",
+          "result": "passed",
+          "source_sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "bash scripts/cd/test-provision-authz-production-matrix-evaluator.sh",
+          "result": "passed",
+          "source_sha": "cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "make build-maintenance",
+          "result": "passed",
+          "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
+          "AuthZ availability-probe followup retains prior current bindings as JSON: {\"source_baseline\": {\"sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Only the explicit missing-entrypoint status42 selects the old-image command. Generic exec/privilege errors, probe125 and command failure42 refuse without a legacy retry; fake-container shell contracts and ShellCheck passed. No real Docker or production operation occurred.",
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "QS-AUTHZ-RELEASE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Local routing, build and safety checks passed; exact-image CI and actual operational acceptance remain independent.",
+          "exit_criteria": "Verify the deployed command family and real operations against its exact release; retain offline/read/write and confirmation boundaries."
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "scripts/maintenance/qs-ai-messaging/README.md",
+      "class": "sidecar",
+      "owner": "runtime",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+        "verified_on": "2026-10-18"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/maintenance/qs-ai-messaging/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/maintenance/qs-ai-messaging-preflight/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/ai-messaging-release.py"
+        },
+        {
+          "kind": "source",
+          "path": "build/docker/Dockerfile.qs-apiserver"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": ".dockerignore"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "make build-maintenance",
+          "result": "passed",
+          "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
+          "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "QS-AI-MESSAGING-RELEASE",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Local routing, build and safety checks passed; exact-image CI and actual operational acceptance remain independent.",
+          "exit_criteria": "Verify the deployed command family and real operations against its exact release; retain offline/read/write and confirmation boundaries."
+        },
+        {
+          "id": "MAINTENANCE-ENTRYPOINT-LOCATION-20261018",
+          "kind": "source_review",
+          "severity": "medium",
+          "summary": "Maintenance Go entrypoints are under scripts/maintenance with unchanged binary interfaces. Local routing/tests/builds and Docker pattern inclusion passed; original verification objects retain historical paths and source attribution.",
+          "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -count=1 -race ./cmd/qs-operator ./cmd/qs-authz ./cmd/qs-ai-messaging",
+              "result": "passed",
+              "source_sha": "713b2651ba5a727f12eba1ec852f4859b9ec18f5",
+              "verified_on": "2026-10-18"
+            }
+          ]
+        }
+      ]
     }
   ],
   "initial_review_baseline": {

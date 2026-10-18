@@ -17,7 +17,15 @@ class FactSourcePathspecTest(unittest.TestCase):
         with mock.patch.object(check_docs_facts, "git_output", return_value="a" * 40) as git_output:
             self.assertEqual(check_docs_facts.current_source_baseline(), "a" * 40)
         args = set(git_output.call_args.args)
-        for required in (".github/workflows", "build/docker", "scripts/cd", "Makefile", "scripts/oneoff"):
+        for required in (
+            ".github/workflows",
+            "build/docker",
+            ".dockerignore",
+            "scripts/cd",
+            "Makefile",
+            "scripts/oneoff",
+            "scripts/maintenance",
+        ):
             self.assertIn(required, args)
 
     def test_double_star_matches_zero_or_more_directories(self) -> None:

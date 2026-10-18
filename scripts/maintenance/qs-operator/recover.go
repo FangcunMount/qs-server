@@ -20,24 +20,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: operator-recover preflight|apply|status [QS config flags]; OPERATOR_RECOVERY_INPUT and OPERATOR_RECOVERY_REPORT required; apply also requires OPERATOR_RECOVERY_FINGERPRINT and OPERATOR_RECOVERY_MAINTENANCE=true")
-		os.Exit(1)
-	}
-	action := os.Args[1]
-	switch action {
-	case "preflight", "apply", "status":
-	default:
-		fmt.Fprintln(os.Stderr, "unknown recovery action")
-		os.Exit(1)
-	}
-	os.Args = append(os.Args[:1], os.Args[2:]...)
+func runRecover(action string) {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp("Audited operator identity recovery", "qs-apiserver", app.WithDefaultValidArgs(), app.WithOptions(opts), app.WithRunFunc(func(_ string) error {
 		log.Init(opts.Log)
 		defer log.Flush()
-		cmd, err := readCommand(os.Getenv("OPERATOR_RECOVERY_INPUT"))
+		cmd, err := readRecoveryCommand(os.Getenv("OPERATOR_RECOVERY_INPUT"))
 		if err != nil {
 			return err
 		}
@@ -96,7 +84,7 @@ func main() {
 	})).Run()
 }
 
-func readCommand(path string) (operatorapp.RecoveryCommand, error) {
+func readRecoveryCommand(path string) (operatorapp.RecoveryCommand, error) {
 	var cmd operatorapp.RecoveryCommand
 	file, err := os.Open(path)
 	if err != nil {

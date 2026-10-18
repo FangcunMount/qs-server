@@ -210,7 +210,7 @@ D 工作完成且恢复责任结清后按 M7 退役专用代码，原材料按�
 
 ## 新空库的批准
 
-现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../cmd/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4历史两列、M4四索引、Actor两列或五张历史维护表；四个对象scope分别只允许 `100/39 → 101/39`、`101/39 → 101/40`、`101/40 → 102/40` 和 `102/40 → 103/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
+现有库的停机DDL使用独立 [`qs-migrate-offline`](../../../scripts/maintenance/qs-migrate-offline/README.md)，默认只读，写执行需要精确绑定source/资源/初始pair/身份/目标和具名保护恢复证据的私有文件批准。`protection_scope` 显式选择完整双库、M4历史两列、M4四索引、Actor两列或五张历史维护表；四个对象scope分别只允许 `100/39 → 101/39`、`101/39 → 101/40`、`101/40 → 102/40` 和 `102/40 → 103/40`，使用 `protection_manifest_sha256` / `protection_location`，旧backup-pair字段拒绝。完整双库scope保留原完整责任，所有scope保留双库身份、冻结、一次消费、恢复/启动回执和预算保护。它不启动业务runtime、不AutoSeed、不自动reconcile索引；与本节的新空库v2批准互不通用。完整维护窗口与提交边界见 [恢复Runbook](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)。
 
 新空双库继续使用 `migration.retirement-bootstrap-authorization-file` 和 `migration.retirement-bootstrap-authorization-sha256`，不新增 CLI。文件须为真实私有绝对路径、`0600` 单链接文件，摘要绑定已批准的原始字节；目录为空不构成批准。
 
@@ -421,7 +421,7 @@ QS_M3_REQUIRE_DATABASE=1 QS_SERVER_TEST_MONGO_DB_PREFIX=qs_m3_test \
 
 ## 已退役运营身份的显式恢复
 
-`cmd/operator-recover` 仅用于经过确认的维护操作，不是后台注册或启用接口。它恢复原 Operator ID，不恢复医生绑定、旧二维码或旧角色。后续角色和 Scope 分配必须独立完成。
+`qs-operator recover` 仅用于经过确认的维护操作，不是后台注册或启用接口。它恢复原 Operator ID，不恢复医生绑定、旧二维码或旧角色。后续角色和 Scope 分配必须独立完成。
 
 - `preflight`：仅在当前cleanSQL103读取身份、退出记录和 IAM 权限，输出确定性事实指纹，不写授权或身份数据。仓库保留的clean78缺归档历史读取边界，不是当前维护工具的执行许可。
 - `apply`：要求当前cleanSQL103、已保留79版恢复归档结构、暂停人员及授权写入，并提交本次预演指纹。事务内保存原退出审计、恢复空角色身份、移除已归档退出的阻断记录。
@@ -433,11 +433,11 @@ Apply 另需 `OPERATOR_RECOVERY_FINGERPRINT` 与 `OPERATOR_RECOVERY_MAINTENANCE=
 
 79 版新增 `operator_recovery_archives`。归档包含恢复记录、原退出任务、退出前身份及恢复前身份的原始值和校验和。归档有数据时向下迁移会拒绝删除，必须先安排保留证据的结构恢复方案；普通回滚不得自动重新授予权限。
 
-历史医生批次 `operator-retire preflight|apply|status|verify` 在 Options/App、配置读取、报告创建及 DB/IAM 连接之前明确拒绝；旧library/manifest/archive消费者已随M4-D退出。旧工具对assessment/testee等整行算摘要，旧schema、原manifest/AfterHash及解释源码仍按具名隔离恢复材料保留，不能在新schema重新签发旧摘要。五表实际退役及定向数据保护仍待独立生产批准，不以本次源码删除代替责任结清。现代任务、恢复归档、门店和受试者历史继续保留。
+历史医生批次 `qs-operator retire preflight|apply|status|verify` 在 Options/App、配置读取、报告创建及 DB/IAM 连接之前明确拒绝；旧library/manifest/archive消费者已随M4-D退出。旧工具对assessment/testee等整行算摘要，旧schema、原manifest/AfterHash及解释源码仍按具名隔离恢复材料保留，不能在新schema重新签发旧摘要。五表实际退役及定向数据保护仍待独立生产批准，不以本次源码删除代替责任结清。现代任务、恢复归档、门店和受试者历史继续保留。
 
-对于已明确选择、与历史医生绑定清单无关的退出人员，使用 `operator-retire selected-preflight|selected-apply|selected-verify`。`OPERATOR_RETIRE_INPUT` 指向包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`RequestID`、`Reason` 的受限 JSON；报告仍使用 `OPERATOR_RETIRE_REPORT`。Apply 要求预演指纹及 `OPERATOR_RETIRE_MAINTENANCE=true`，调用统一退出用例，失败保持停用并按原任务恢复。Verify 同时检查当前 IAM 后台角色已清空、本地身份已停用并软删除，不能仅凭任务历史完成判定通过。每人独立保存退出任务及原始事实，不改写此前医生退役清单，也不修改医生、门店、受试者或二维码。
+对于已明确选择、与历史医生绑定清单无关的退出人员，使用 `qs-operator retire selected preflight|apply|verify`。`OPERATOR_RETIRE_INPUT` 指向包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`RequestID`、`Reason` 的受限 JSON；报告仍使用 `OPERATOR_RETIRE_REPORT`。Apply 要求预演指纹及 `OPERATOR_RETIRE_MAINTENANCE=true`，调用统一退出用例，失败保持停用并按原任务恢复。Verify 同时检查当前 IAM 后台角色已清空、本地身份已停用并软删除，不能仅凭任务历史完成判定通过。每人独立保存退出任务及原始事实，不改写此前医生退役清单，也不修改医生、门店、受试者或二维码。
 
-对于任何公司都没有 Operator 记录、但仍有后台授权的用户，使用 `operator-retire orphan-preflight|orphan-apply|orphan-verify`。输入改为 `OrgID`、`ActorID`、`UserID`、`RequestID`、`Reason`，文件须为私有权限；公司用于校验总部操作人，目标用户必须在所有公司都没有 Operator，包括软删除历史。工具仅允许已确认的运营员、结果评估员和计划管理员标准角色，保留 `user` 自服务角色；发现其他权限或人员关联即停止。
+对于任何公司都没有 Operator 记录、但仍有后台授权的用户，使用 `qs-operator retire orphan preflight|apply|verify`。输入改为 `OrgID`、`ActorID`、`UserID`、`RequestID`、`Reason`，文件须为私有权限；公司用于校验总部操作人，目标用户必须在所有公司都没有 Operator，包括软删除历史。工具仅允许已确认的运营员、结果评估员和计划管理员标准角色，保留 `user` 自服务角色；发现其他权限或人员关联即停止。
 
 孤立授权的 Apply 同样要求真实写入暂停和预演指纹。指纹包含完整角色事实及策略版本，后续重新赋权不能重放旧计划。工具通过 IAM 正常管理接口撤权，不制造 Operator 或退出任务。报告保留撤销前角色及提交的策略版本；`already_unprivileged` 仅说明当前没有后台角色，不能当作历史执行归属或业务验收证明。失败、响应不确定或后续事实变化时，先用只读命令核对，不自动重新授权。
 

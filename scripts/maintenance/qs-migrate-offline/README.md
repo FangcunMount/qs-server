@@ -1,8 +1,10 @@
 # 离线双库迁移执行器
 
+源码位于 `scripts/maintenance/qs-migrate-offline/`，可由 `make build-maintenance` 或下文的独立命令构建。
+
 `qs-migrate-offline` 只拥有两条数据库连接和一次已批准的嵌入式 up 执行。默认只读；不启动 API、Collection、Worker、业务 Container、Scheduler、relay、NSQ、索引自动 reconcile 或种子数据。它不是业务服务、备份工具、恢复工具或全局维护框架。
 
-完整停写、按批准范围的保护与恢复、逐对象责任和首个 runtime 启动边界由 [One-off、恢复与生产证据](../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)维护。本文只定义执行器输入与输出。
+完整停写、按批准范围的保护与恢复、逐对象责任和首个 runtime 启动边界由 [One-off、恢复与生产证据](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)维护。本文只定义执行器输入与输出。
 
 ## 构建与只读检查
 
@@ -10,7 +12,7 @@
 
 ```bash
 go build -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)" \
-  -o /private/task-owned/qs-migrate-offline ./cmd/qs-migrate-offline
+  -o /private/task-owned/qs-migrate-offline ./scripts/maintenance/qs-migrate-offline
 sha256sum /private/task-owned/qs-migrate-offline
 ```
 
@@ -98,7 +100,7 @@ JSON结果报告stage、批准是否已消费、已完成后端的changed值及�
 普通参数/文件批准测试：
 
 ```bash
-go test -count=1 ./cmd/qs-migrate-offline ./internal/pkg/migration
+go test -count=1 ./scripts/maintenance/qs-migrate-offline ./internal/pkg/migration
 ```
 
 真实隔离数据库测试：

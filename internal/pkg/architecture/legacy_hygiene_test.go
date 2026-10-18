@@ -7,10 +7,41 @@ import (
 	"testing"
 )
 
+func TestCmdContainsOnlyRuntimeServices(t *testing.T) {
+	remaining := map[string]bool{
+		"qs-apiserver":      true,
+		"collection-server": true,
+		"qs-worker":         true,
+	}
+	entries, err := os.ReadDir(filepath.Join(repoRoot(t), "cmd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if !remaining[entry.Name()] {
+			t.Errorf("cmd is reserved for runtime services; place maintenance entrypoint %q under scripts/maintenance", entry.Name())
+		}
+		delete(remaining, entry.Name())
+	}
+	for service := range remaining {
+		t.Errorf("runtime service entrypoint is missing: %s", service)
+	}
+}
+
 func TestRemovedLegacyPathsDoNotReturnToProductionCode(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"cmd/qs-ai-bridge",
+		"cmd/operator-prepare",
+		"cmd/operator-recover",
+		"cmd/operator-retire",
+		"cmd/qs-authz-matrix",
+		"cmd/qs-authz-matrix-provision",
+		"cmd/qs-ai-messaging-audit",
+		"cmd/qs-ai-messaging-control",
 		"internal/apiserver/infra/mysql/plan/Untitled",
 		"internal/pkg/database/tx/runner.go",
 	} {
