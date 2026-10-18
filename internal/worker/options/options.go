@@ -55,6 +55,7 @@ type MetricsOptions struct {
 
 // MessagingOptions 消息队列配置
 type MessagingOptions struct {
+	RocketMQ *genericoptions.RocketMQOptions `json:"rocketmq" mapstructure:"rocketmq"`
 	// Provider 消息队列提供者；v1.0 仅支持 NSQ。
 	Provider string `json:"provider" mapstructure:"provider"`
 	// NSQ 配置
@@ -201,6 +202,10 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 
 	// Messaging flags
 	messagingFS := fss.FlagSet("messaging")
+	if o.Messaging.RocketMQ == nil {
+		o.Messaging.RocketMQ = &genericoptions.RocketMQOptions{}
+	}
+	o.Messaging.RocketMQ.AddFlags(messagingFS, "messaging.rocketmq")
 	messagingFS.StringVar(&o.Messaging.Provider, "messaging.provider", o.Messaging.Provider,
 		"Message queue provider (nsq)")
 	messagingFS.StringVar(&o.Messaging.NSQAddr, "messaging.nsq-addr", o.Messaging.NSQAddr,
@@ -319,13 +324,22 @@ func (o *Options) Validate() []error {
 			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and %d", retrygovernance.HardMaxDeliveryAttempts))
 		}
 	}
-	if o.Messaging != nil && o.Messaging.Provider != "nsq" {
-		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq)", o.Messaging.Provider))
+	if o.Messaging != nil && o.Messaging.Provider != "nsq" && o.Messaging.Provider != "rocketmq" {
+		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq, rocketmq)", o.Messaging.Provider))
+	}
+	if o.Messaging != nil && o.Messaging.Provider == "rocketmq" {
+		if err := o.Messaging.RocketMQ.Validate(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if o.Messaging != nil && o.Messaging.Provider == "nsq" {
 		if len(o.Messaging.NSQDHTTPEndpoints) == 0 {
 			errs = append(errs, fmt.Errorf("messaging.nsqd-http-endpoints is required for NSQ channel preparation"))
 		}
+	}
+	// The existing deadline also bounds the RocketMQ handler. Keep it longer
+	// than its downstream RPC so transport redelivery cannot race that call.
+	if o.Messaging != nil {
 		if o.Messaging.NSQMessageTimeout <= 0 {
 			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than 0"))
 		} else if o.GRPC != nil && o.Messaging.NSQMessageTimeout <= o.GRPC.RequestTimeout {

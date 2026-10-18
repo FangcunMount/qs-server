@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "73830ed7bd7310dfc77123c6d61bcfbf1d50ba2a",
+    "sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -78,8 +78,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 103,
-        "version_count": 103
+        "max_version": 104,
+        "version_count": 104
       },
       "mongodb": {
         "max_version": 40,
@@ -8819,8 +8819,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -8934,6 +8934,18 @@
         {
           "kind": "source",
           "path": "build/docker/Dockerfile.qs-apiserver"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/rocketmq_audit.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/rocketmq_audit_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000104_rocketmq_transport_evidence.up.sql"
         }
       ],
       "verification": [
@@ -9030,7 +9042,8 @@
           "exit_criteria": "Verify real release images and database operations against the exact released source; retain offline/read/write boundaries and original historical attribution.",
           "historical_evidence": []
         }
-      ]
+      ],
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
     {
       "path": "docs/03-基础设施/event/50-可观测性与故障恢复.md",
@@ -11395,7 +11408,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -12053,7 +12066,8 @@
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
-      ]
+      ],
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
     {
       "path": "internal/pkg/migration/migrations/mongodb/README.md",
@@ -12814,8 +12828,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
-        "verified_on": "2026-10-13"
+        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -12969,7 +12983,8 @@
           "Production activation requires deployment of the merged workflow."
         ]
       },
-      "gaps": []
+      "gaps": [],
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
     {
       "path": "scripts/testing/reliable-messaging-proof.md",
@@ -13197,8 +13212,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
-        "verified_on": "2026-10-13"
+        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "verified_on": "2026-10-18"
       },
       "fact_sources": [
         {
@@ -13263,7 +13278,8 @@
           "Host tool provisioning is not final source deployment or MQ business acceptance."
         ]
       },
-      "gaps": []
+      "gaps": [],
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
@@ -14088,7 +14104,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14496,7 +14512,8 @@
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
-      ]
+      ],
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
     {
       "path": "scripts/cd/README-COMPATIBILITY-OBSERVATION.md",
@@ -14671,7 +14688,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14752,7 +14769,8 @@
             }
           ]
         }
-      ]
+      ],
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     }
   ],
   "initial_review_baseline": {

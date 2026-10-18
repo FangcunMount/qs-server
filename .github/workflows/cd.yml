@@ -278,6 +278,11 @@ jobs:
 
       - name: Prepare deployment package
         env:
+          MESSAGING_PROVIDER_REQUIRED: 'true'
+          MESSAGING_PROVIDER: ${{ vars.MESSAGING_PROVIDER }}
+          ROCKETMQ_ENDPOINT: ${{ vars.ROCKETMQ_ENDPOINT }}
+          ROCKETMQ_INSTANCE_ID: ${{ vars.ROCKETMQ_INSTANCE_ID }}
+          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'true' }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
@@ -410,6 +415,11 @@ jobs:
 
       - name: Prepare deployment package
         env:
+          MESSAGING_PROVIDER_REQUIRED: 'true'
+          MESSAGING_PROVIDER: ${{ vars.MESSAGING_PROVIDER }}
+          ROCKETMQ_ENDPOINT: ${{ vars.ROCKETMQ_ENDPOINT }}
+          ROCKETMQ_INSTANCE_ID: ${{ vars.ROCKETMQ_INSTANCE_ID }}
+          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'true' }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
           REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
@@ -526,6 +536,11 @@ jobs:
 
       - name: Prepare deployment package
         env:
+          MESSAGING_PROVIDER_REQUIRED: 'true'
+          MESSAGING_PROVIDER: ${{ vars.MESSAGING_PROVIDER }}
+          ROCKETMQ_ENDPOINT: ${{ vars.ROCKETMQ_ENDPOINT }}
+          ROCKETMQ_INSTANCE_ID: ${{ vars.ROCKETMQ_INSTANCE_ID }}
+          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'true' }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}

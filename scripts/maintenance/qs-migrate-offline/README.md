@@ -121,3 +121,5 @@ go test -race -tags=integration -count=1 -timeout=8m -v \
 私有原始JSONL摘要 `ed4cbaf137c82aa96a281bf8ea9e08d34d45a74fba8dfff3ab5dc5db586c4cd8`、receipt摘要 `70a655cc7e05ebbe6ed6924e83e9a1e079fb36373dc03103f1ab9a64296ea78e`，harness摘要 `6268a020d08771ad4a5e56c5d38251b4472525515e48c074cde1a7dfded4ff0b`。这些是当前源码的隔离逻辑验收，不是生产对象恢复、RPO、30/60分钟预算或三个服务完整启动的证明。
 
 测试期间既有nsqd发生重启。原容器IDs/images保留，但原服务runtime元数据并非全部稳定，不能据此宣称所有原服务未变，也不推断重启原因。生产、正式部署和业务验收状态仍未提升。
+
+RocketMQ M1 的完整资源目标为104/40，仅增加MySQL传输审计表；原离线批准、真实库身份、保护范围和维护窗口要求继续生效。非空传输证据不允许通过down删除。

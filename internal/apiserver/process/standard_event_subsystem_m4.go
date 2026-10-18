@@ -18,13 +18,13 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/outbox"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	sdktransport "github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
-	goNSQ "github.com/nsqio/go-nsq"
 )
 
 // standardGovernedStatusReader keeps one selected profile's status and
@@ -86,16 +86,8 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		return nil, err
 	}
 
-	producerConfig := goNSQ.NewConfig()
-	producerConfig.DialTimeout = 5 * time.Second
-	producerConfig.HeartbeatInterval = 5 * time.Second
-	producerConfig.ReadTimeout = 15 * time.Second
-	producerConfig.WriteTimeout = 10 * time.Second
+	publisher, err := messagingruntime.NewPublisher(cfg.MessagingOptions, routes, concurrency)
 
-	publisher, err := sdknsq.NewManagedPublisher(sdknsq.ManagedPublisherConfig{
-		Address: cfg.MessagingOptions.NSQAddr, Driver: producerConfig,
-		Routes: routes, MaxInFlight: concurrency,
-	})
 	if err != nil {
 
 		return nil, fmt.Errorf("create M4 SDK NSQ publisher: %w", err)
@@ -140,11 +132,18 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 		supervisor, err := standardoutbox.NewRelaySupervisor(standardoutbox.SupervisorOptions{
 			Name: name, InitialBackoff: 500 * time.Millisecond, MaxBackoff: 30 * time.Second,
 			NewRelay: func(observe relay.Observer) (standardoutbox.RelayRunner, error) {
-				return relay.New(observedStore, observedPublisher, relay.Config{
+				runner, err := relay.New(observedStore, observedPublisher, relay.Config{
 					Concurrency: profile.PublishWorkers, PollInterval: profile.Interval,
 					Lease: lease, PublishTimeout: publishTimeout, WriteTimeout: writeTimeout,
 					Wake: wake.Wake(), Retry: standardoutbox.SDKRetryPolicy(), Observe: observe,
 				})
+				if err != nil {
+					return nil, err
+				}
+				if cfg.MessagingOptions.Provider == "rocketmq" && !cfg.MessagingOptions.RocketMQ.PublishingEnabled() {
+					return maintenanceMessageRelay{}, nil
+				}
+				return runner, nil
 			},
 		})
 		if err != nil {
@@ -229,7 +228,7 @@ func buildM4StandardEventSubsystem(opts eventsubsystem.Options, cfg *config.Conf
 // Validate configuration and select routes before storage or publisher acquisition.
 func validatedStandardEventRoutes(opts eventsubsystem.Options, cfg *config.Config, selected options.StandardOutboxOptions) (map[string]string, error) {
 	if cfg == nil || cfg.MessagingOptions == nil || !cfg.MessagingOptions.Enabled ||
-		cfg.MessagingOptions.Provider != "nsq" || cfg.MessagingOptions.NSQAddr == "" ||
+		(cfg.MessagingOptions.Provider != "nsq" && cfg.MessagingOptions.Provider != "rocketmq") || (cfg.MessagingOptions.Provider == "nsq" && cfg.MessagingOptions.NSQAddr == "") ||
 		opts.WirePublisher == nil || opts.PublisherMode != eventruntime.PublishModeMQ {
 		return nil, errors.New("M4 standard outbox requires a live NSQ-backed messaging configuration")
 	}
@@ -276,3 +275,8 @@ func standardEventConcurrency(opts eventsubsystem.Options, selected options.Stan
 }
 
 var _ sdktransport.Publisher = (*sdknsq.ManagedPublisher)(nil)
+
+// Maintenance excludes claims instead of converting a paused publisher to a retry.
+type maintenanceMessageRelay struct{}
+
+func (maintenanceMessageRelay) Run(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }

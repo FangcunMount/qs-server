@@ -203,11 +203,14 @@ func TestOptionsRejectsNonPositiveRequestTimeout(t *testing.T) {
 func TestOptionsRejectsNSQMessageTimeoutThatCannotCoverRequest(t *testing.T) {
 	t.Parallel()
 
-	for _, timeout := range []time.Duration{0, NewOptions().GRPC.RequestTimeout} {
-		opts := NewOptions()
-		opts.Messaging.NSQMessageTimeout = timeout
-		if !containsWorkerValidationError(opts.Validate(), "messaging.nsq_message_timeout") {
-			t.Fatalf("Validate() errors = %v for NSQ timeout %s", opts.Validate(), timeout)
+	for _, provider := range []string{"nsq", "rocketmq"} {
+		for _, timeout := range []time.Duration{0, NewOptions().GRPC.RequestTimeout} {
+			opts := NewOptions()
+			opts.Messaging.Provider = provider
+			opts.Messaging.NSQMessageTimeout = timeout
+			if !containsWorkerValidationError(opts.Validate(), "messaging.nsq_message_timeout") {
+				t.Fatalf("Validate() errors = %v for %s handler timeout %s", opts.Validate(), provider, timeout)
+			}
 		}
 	}
 }

@@ -36,6 +36,9 @@ func (o *Options) Validate() []error {
 		errs = append(errs, o.MessagingOptions.Validate()...)
 	}
 	if o.IAMOptions != nil && o.IAMOptions.AuthzSync != nil {
+		if o.IAMOptions.AuthzSync.Provider == "rocketmq" {
+			errs = append(errs, o.IAMOptions.AuthzSync.Validate()...)
+		}
 		errs = append(errs, o.IAMOptions.AuthzSync.Delivery.Validate("iam.authz-sync.delivery")...)
 		if o.IAMOptions.AuthzSync.EphemeralNSQ {
 			if !o.IAMOptions.AuthzSync.Enabled || o.IAMOptions.AuthzSync.Provider != "nsq" || o.IAMOptions.AuthzVersionGuard == nil || !o.IAMOptions.AuthzVersionGuard.Enabled {

@@ -301,6 +301,10 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&o.AuthzSync.Enabled, "iam.authz-sync.enabled", o.AuthzSync.Enabled,
 		"Enable IAM authz version topic subscription for local snapshot invalidation")
+	if o.AuthzSync.RocketMQ == nil {
+		o.AuthzSync.RocketMQ = &RocketMQOptions{}
+	}
+	o.AuthzSync.RocketMQ.AddFlags(fs, "iam.authz-sync.rocketmq")
 	fs.StringVar(&o.AuthzSync.Provider, "iam.authz-sync.provider", o.AuthzSync.Provider,
 		"Message queue provider for IAM authz version sync (nsq)")
 	fs.StringVar(&o.AuthzSync.NSQLookupdAddr, "iam.authz-sync.nsq-lookupd-addr", o.AuthzSync.NSQLookupdAddr,

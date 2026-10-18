@@ -2,6 +2,7 @@ package options
 
 import (
 	"errors"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"net"
 	"net/url"
 	"strconv"
@@ -10,11 +11,13 @@ import (
 
 // Maps are local configuration: no discovery, remote keys, or reference URLs.
 type AIWorkflowMessagingOptions struct {
-	Enabled         bool              `json:"enabled" mapstructure:"enabled"`
-	NSQD            map[string]string `json:"nsqd" mapstructure:"-"`
-	SigningKeyFile  string            `json:"signing_key_file" mapstructure:"signing_key_file"`
-	DecryptKeyFiles map[string]string `json:"decrypt_key_files" mapstructure:"-"`
-	AISignerFiles   map[string]string `json:"ai_signer_files" mapstructure:"-"`
+	Provider        string                          `json:"provider" mapstructure:"provider"`
+	RocketMQ        *genericoptions.RocketMQOptions `json:"rocketmq" mapstructure:"rocketmq"`
+	Enabled         bool                            `json:"enabled" mapstructure:"enabled"`
+	NSQD            map[string]string               `json:"nsqd" mapstructure:"-"`
+	SigningKeyFile  string                          `json:"signing_key_file" mapstructure:"signing_key_file"`
+	DecryptKeyFiles map[string]string               `json:"decrypt_key_files" mapstructure:"-"`
+	AISignerFiles   map[string]string               `json:"ai_signer_files" mapstructure:"-"`
 	// Viper expands dots inside map keys. Decode these three local maps as a
 	// tree, then restore literal endpoint/kid names during the host Complete.
 	// JSON maintenance/probe inputs keep their original map representation.
@@ -28,8 +31,15 @@ func (o AIWorkflowMessagingOptions) Validate() error {
 	if !o.Enabled {
 		return nil
 	}
-	if len(o.NSQD) == 0 || strings.TrimSpace(o.SigningKeyFile) == "" || strings.TrimSpace(o.AIRecipientKeyFile) == "" || len(o.DecryptKeyFiles) == 0 || len(o.AISignerFiles) == 0 {
+	if (o.SelectedProvider() == "nsq" && len(o.NSQD) == 0) || strings.TrimSpace(o.SigningKeyFile) == "" || strings.TrimSpace(o.AIRecipientKeyFile) == "" || len(o.DecryptKeyFiles) == 0 || len(o.AISignerFiles) == 0 {
 		return errors.New("AI MQ requires explicit NSQD and local signing/encryption trust files")
+	}
+	if o.SelectedProvider() == "rocketmq" {
+		if err := o.RocketMQ.Validate(); err != nil {
+			return err
+		}
+	} else if o.SelectedProvider() != "nsq" {
+		return errors.New("unsupported AI messaging provider")
 	}
 	for tcp, http := range o.NSQD {
 		host, port, err := net.SplitHostPort(tcp)
@@ -100,4 +110,11 @@ func (o *AIWorkflowMessagingOptions) Complete() error {
 		*pair.target = restored
 	}
 	return nil
+}
+
+func (o AIWorkflowMessagingOptions) SelectedProvider() string {
+	if o.Provider == "" {
+		return "nsq"
+	}
+	return o.Provider
 }

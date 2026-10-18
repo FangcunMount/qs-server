@@ -116,19 +116,19 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 			}
 			return recorder, nil
 		}
-		if s.config.MessagingOptions.Provider == "nsq" {
+		if s.config.MessagingOptions.Provider == "nsq" || s.config.MessagingOptions.Provider == "rocketmq" {
 			buildSDKSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SDKSubscriberFactory, error) {
 				recorder, err := recorderFor(mysqlDB)
 				if err != nil {
 					return nil, err
 				}
 				config := eventtransport.SubscriberConfig{
-					Provider: "nsq", NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr,
+					RocketMQ: s.config.MessagingOptions.RocketMQ, Provider: s.config.MessagingOptions.Provider, NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr,
 					NSQDHTTPEndpoints: s.config.MessagingOptions.NSQDHTTPEndpoints,
 				}
 				return func() (eventsubsystem.SDKSubscriber, error) {
 					return eventtransport.NewSDKDeliverySubscriber(config, 0,
-						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder))
+						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder, s.config.MessagingOptions.Provider), eventtransport.SDKRocketMQFailureHandler(recorder))
 				}, nil
 			}
 		}
@@ -196,9 +196,9 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 		options := s.config.MessagingOptions
 		deps.enabled = options.Enabled
 		deps.provider = options.Provider
-		if options.Provider == "nsq" {
+		if options.Provider == "nsq" || options.Provider == "rocketmq" {
 			deps.newWirePublisher = func() (wirePublisherResource, error) {
-				return messagingruntime.NewSDKNSQWirePublisher(options.NSQAddr)
+				return messagingruntime.NewSDKWirePublisher(options)
 			}
 		}
 	}
@@ -267,7 +267,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	var closePublisher func() error
 	publishMode := deps.mqPublisher.fallbackMode
 	if deps.mqPublisher.enabled {
-		if deps.mqPublisher.provider != "nsq" || deps.mqPublisher.newWirePublisher == nil {
+		if (deps.mqPublisher.provider != "nsq" && deps.mqPublisher.provider != "rocketmq") || deps.mqPublisher.newWirePublisher == nil {
 			return resourceOutput{}, fmt.Errorf("NSQ wire publisher factory is required when messaging is enabled")
 		}
 		wirePublisher, err = createNSQWirePublisher(deps.mqPublisher)
