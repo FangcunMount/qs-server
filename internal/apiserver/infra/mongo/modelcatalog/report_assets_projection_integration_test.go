@@ -18,7 +18,7 @@ import (
 func TestReportAssetsVersionRealMongoLegacyIdempotenceAndNewWrites(t *testing.T) {
 	_, db := mongodbtest.ReplicaSetDatabase(t)
 	repo := NewRepository(db)
-	model := &port.PublishedModel{Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology, Code: "LEGACY", Version: "v1", DefinitionV2: durableProjectionDefinition(), ReportAssetsProjectionVersion: 1}
+	model := &port.PublishedModel{Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology, ReleaseStatus: domain.ReleaseStatusActive, Code: "LEGACY", Version: "v1", DefinitionV2: durableProjectionDefinition(), ReportAssetsProjectionVersion: 1}
 	legacy := NewMapper().ToPO(model)
 	legacy.BeforeInsert()
 	if _, err := db.Collection(legacy.CollectionName()).InsertOne(t.Context(), legacy); err != nil {
