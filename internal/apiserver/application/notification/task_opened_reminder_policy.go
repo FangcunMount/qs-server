@@ -46,9 +46,11 @@ func EvaluateTaskOpenedReminder(
 	if task.OrgID != intent.OrgID || task.TaskID != intent.TaskID || task.TesteeID != intent.TesteeID {
 		return ReminderTaskDecision{}, fmt.Errorf("current task does not match reminder scope")
 	}
-	// MySQL rounds assessment_task.open_at to DATETIME(3) precision, while the
-	// committed event retains the original nanoseconds.
-	if task.ScheduleRevision != intent.ScheduleRevision || task.OpenAt == nil || !task.OpenAt.Equal(intent.OpenAt.Round(time.Millisecond)) {
+	// MySQL parses nanoseconds at microsecond precision before rounding to
+	// DATETIME(3). Preserve both steps: a value just below a half millisecond
+	// can round up during parsing. The committed event retains nanoseconds.
+	persistedOpenAt := intent.OpenAt.Round(time.Microsecond).Round(time.Millisecond)
+	if task.ScheduleRevision != intent.ScheduleRevision || task.OpenAt == nil || !task.OpenAt.Equal(persistedOpenAt) {
 		return ReminderTaskDecision{SuppressCode: "opening_changed"}, nil
 	}
 	if task.Status != planDomain.TaskStatusOpened {

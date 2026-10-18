@@ -118,6 +118,19 @@ events:
 		return row
 	}
 
+	t.Run("microsecond rounding preserves the original opening", func(t *testing.T) {
+		opened := time.Now().Add(-time.Minute).Truncate(time.Second).Add(29499500 * time.Nanosecond)
+		req := seed(opened, true)
+		var persisted reminderGapTask
+		require.NoError(t, db.Table("assessment_task").Where("id=?", req.TaskID).Take(&persisted).Error)
+		require.NotNil(t, persisted.OpenAt)
+		require.True(t, persisted.OpenAt.Equal(opened.Round(time.Microsecond).Round(time.Millisecond)))
+		result, err := store.AuthorizeReminderGap(t.Context(), 7, 11, req)
+		require.NoError(t, err)
+		require.Equal(t, true, result.Result["authorized"])
+		require.NoError(t, db.Table("rm_outbox").Where("message_id=?", req.OpeningEventID).Update("next_attempt_at", time.Now().Add(4*time.Hour)).Error)
+	})
+
 	t.Run("atomic audit rollback and lost response lookup", func(t *testing.T) {
 		req := seed(time.Now().Add(-time.Minute), true)
 		before := read(req)

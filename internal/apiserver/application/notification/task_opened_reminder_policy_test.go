@@ -80,6 +80,9 @@ func TestTaskOpenedReminderMatchesPersistedMillisecondOpening(t *testing.T) {
 		{name: "round down", nanosecond: 743056448, persisted: time.Date(2026, 10, 1, 8, 46, 3, 743000000, time.FixedZone("UTC+8", 8*3600))},
 		{name: "round up", nanosecond: 236779138, persisted: time.Date(2026, 10, 1, 8, 46, 3, 237000000, time.FixedZone("UTC+8", 8*3600))},
 		{name: "next second", nanosecond: 999779138, persisted: time.Date(2026, 10, 1, 8, 46, 4, 0, time.FixedZone("UTC+8", 8*3600))},
+		{name: "below microsecond half", nanosecond: 29499499, persisted: time.Date(2026, 10, 1, 8, 46, 3, 29000000, time.FixedZone("UTC+8", 8*3600))},
+		{name: "microsecond rounding crosses millisecond half", nanosecond: 29499500, persisted: time.Date(2026, 10, 1, 8, 46, 3, 30000000, time.FixedZone("UTC+8", 8*3600))},
+		{name: "microsecond rounding crosses second", nanosecond: 999499999, persisted: time.Date(2026, 10, 1, 8, 46, 4, 0, time.FixedZone("UTC+8", 8*3600))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			opened := time.Date(2026, 10, 1, 8, 46, 3, tc.nanosecond, time.FixedZone("UTC+8", 8*3600))
