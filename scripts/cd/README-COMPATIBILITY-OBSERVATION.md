@@ -1,15 +1,15 @@
 # 兼容契约退役观测
 
-本工具只读检查调用和采样证据，不删除契约或数据。四项新计量已准备源码；生产部署、连续观察与客户端／数据负责人退出确认仍需分别完成，14 天窗口尚未开始。五个已退役指标退出清单，现用 legacy admission 指标保留为补充证据；该汇总不证明各Worker源码或结清待处理／人工可重放责任。
+用户于2026-10-18取消M6长期观察门槛，改为直接分批退出，见[当前版本台账第9.7节](../../docs/00-总览/09-当前版本定档验收台账.md#97-取消m6长期观察直接分批收口2026-10-18)。每日自动调度已退出，以下window规则仅说明暂留的手工历史审计能力，不再阻塞发布，也不表示曾完成14天生产观察。本工具只读、不删除契约或数据；现用legacy admission汇总不证明各Worker源码或结清待处理／人工可重放责任。
 
 ## 四项计量
 
 | 契约 | 指标 | 计数位置与语义 |
 | --- | --- | --- |
 | 已验签 Claims.Extra 身份别名 | `qs_auth_claim_source_total{field,source}` | REST 验证成功后，只计 UserID、AccountID、OrgID 真正选中的来源；未选中的 Extra 不算依赖。AccountID 继续优先 Extra，UserID／OrgID 继续优先 canonical；OrgID 合法可选，已验签且未选出 Org 的原分支计为 missing。 |
-| Authorization 裸 token | `qs_auth_token_source_total{source,result}` | 区分 bearer、bare、query、cookie、missing、unavailable，accepted 仅表示认证验证成功，rejected 不计已选身份声明；下游授权结果另计。query／cookie 保留原语义。 |
+| Authorization 裸 token | `qs_auth_token_source_total{source,result}` | 区分 bearer、bare、query、cookie、missing、unavailable，accepted 仅表示认证验证成功，rejected 不计已选身份声明；下游授权结果另计。裸header及其他scheme在提取阶段拒绝，不回退query/cookie；无header时query／cookie保留原语义。 |
 | Collection 旧 Task token 路由 | `qs_plan_entry_route_total{route,result}` | 在原 IAM 链之前观察已匹配的两个固定 GET 模板，包含认证拒绝。canonical／legacy_token 均继续执行原鉴权，2xx 为 accepted，其余为 rejected。 |
-| Definition 写入的衍生字段 | `qs_model_definition_write_total{input,result}`、`qs_model_definition_input_field_total{field,presence,result}` | 仅 REST UpdateDefinition 读取原 binder 消费的字节；两个固定字段 DecisionSpec／InterpretationAssets 的 presence 包括 null、空对象和 binder 接受的大小写形式。嵌套同名键不计；canonical 表示两个字段均未提供。MaterializeLayers、共享 domain JSON 解码和 Mongo 读取不产生计数。 |
+| Definition 写入的衍生字段 | `qs_model_definition_write_total{input,result}`、`qs_model_definition_input_field_total{field,presence,result}` | 仅 REST UpdateDefinition 读取原 binder 消费的字节；两个固定字段 DecisionSpec／InterpretationAssets 的 presence 包括 null、空对象和 binder 接受的大小写形式。嵌套同名键不计；canonical 表示两个字段均未提供。两个派生字段在REST写入边界返回400，不进入应用写入。MaterializeLayers、共享domain JSON解码和Mongo读取不产生计数。 |
 
 以上固定组合均注册零样本，标签没有用户、Task、路径、token、claims 或模型正文。三个 `*_compatibility_observation_info` Gauge 绑定 capability=1 和程序的编译 source_sha；仅有源码或零值 series 不证明路径已接收业务流量。
 
@@ -21,7 +21,7 @@
 
 预检查将运行容器的 scrape labels、网络 IP／端口与 Prometheus targets 唯一匹配，要求全部实例 up、样本新鲜、编译 source 能力和所有固定零值组合齐全。成功也只输出 `observation_window=not_started`，不启动计时，不为四项新契约输出零调用候选。
 
-授权部署、正式客户端和完整采样后，登记批准的UTC `OBSERVATION_STARTED_AT`（例如 `2026-11-01T00:00:00Z`，示例不是实际T0）。`WINDOW_DAYS`绑定W=max(14天、相关最长有效token周期、受支持消息重投周期)。`OBSERVATION_MODE=window`要求T0后已完整经过W日；审核逻辑窗口为固定 [T0,E]，E 在本次审计开始时捕获，历史读取耗时不推动 E；不截成最近14或30天。人工可重放责任单独结清。
+如需手工复核一段历史窗口，仍须显式登记UTC `OBSERVATION_STARTED_AT`（例如 `2026-11-01T00:00:00Z`，示例不是实际T0）。`WINDOW_DAYS`绑定W=max(14天、相关最长有效token周期、受支持消息重投周期)。`OBSERVATION_MODE=window`要求T0后已完整经过W日；审核逻辑窗口为固定 [T0,E]，E 在本次审计开始时捕获，历史读取耗时不推动 E；不截成最近14或30天。人工可重放责任单独结清。
 
 预检查也要求Prometheus实际保留时间至少max(30天、W+7天)，但不读取历史range/increase、不启动窗口。窗口审核使用带显式 `time` 的 `/query` 原始 range vector，不使用 `query_range` 的网格重采样或 lookback 填点。每块最多六小时并保留相邻重叠与跨块状态，内存只保留本块与有界接缝证据；历史审计耗时不属于数据库维护窗口。检查要求：
 
@@ -32,11 +32,11 @@
 - 每个实例都有 accepted bearer、UserID 与 AccountID canonical 来源的真实正流量，以及各自服务的 TaskID 路由／无衍生字段 Definition 写入。只接受两个端点均位于 [T0,E] 的 counter 正增量；仅首条窗内抓取相对 T0 前基线的 canonical 增长仍属证据不足，E 后操作不补充窗内流量。OrgID 合法可选：原逻辑已验签选出的 canonical 或 missing 来源可满足正流量。用户或登录身份缺失、Org两者都零、只在基线增长均失败。
 - Extra 真实选中、bare 请求（含拒绝）、旧 Task 路由（含拒绝）、带衍生字段写入（含拒绝）任一出现，保留 `active_compatibility`。Definition 写入或固定字段 presence 的 `unreadable` 增长单独记为 `unknown_input` 并使审核失败：无法证明该请求未携带旧字段，也不能把损坏 JSON 推断成旧客户端命中。四项全零且无上述缺口也只得到候选，仍需客户端、数据负责人和业务退出确认。
 
-`active_compatibility` 表示成功读取到了仍应保留的兼容证据，脚本 exit 0 不代表退役验收通过；只有四项均为 `zero_window_candidate` 才可进入独立退出审批。现用 legacy admission 汇总读取也固定到 E，但仍是补充证据，不能代替 Worker 实例、持续采样或未结责任验收。
+`active_compatibility` 表示成功读取到了仍应保留的兼容证据，脚本 exit 0 不代表退役验收通过；`zero_window_candidate`仅是原窗口算法输出，不再是当前契约退出的前置条件。现用 legacy admission 汇总读取也固定到 E，但仍是补充证据，不能代替 Worker 实例、持续采样或未结责任验收。
 
 IAM 当前新会话使用空 BusinessContext，OrgID 为零时 JWT 的 `org_id,omitempty` 不输出组织声明。因此正常 fresh 身份流量可以全部记为 Org missing，无需为观察门禁新增组织 claim。Org missing 只证明已验签后的来源选择被观察到，不证明业务组织授权、权限范围或实际业务流程验收；旧 `Extra.org_id`／`Extra.organization_id` 真实选中仍属于 `active_compatibility`，不计入上述合法 Org 正流量，也不能成为零调用候选。
 
-工作流沿用现有固定SSH初始化、ServerA身份核对和非交互sudo；密钥与sudo密码不输出。人工调用明确提供mode/source/W/T0。每天北京02:00的调用使用production环境中已批准的 `QS_COMPAT_OBSERVATION_MODE`、`QS_COMPAT_SOURCE_SHA`、`QS_COMPAT_WINDOW_DAYS`、`QS_COMPAT_STARTED_AT`、`QS_COMPAT_APISERVER_CONTAINERS`、`QS_COMPAT_COLLECTION_CONTAINERS`；实例清单也由人工调用沿用这两个配置，缺失时失败。不从观测到的SHA自动批准自身，不更改上述环境变量或保留配置。未批准T0时只允许默认预检查，不能启动观察计时。
+工作流沿用现有固定SSH初始化、ServerA身份核对和非交互sudo；密钥与sudo密码不输出。已无每日自动调用；人工调用明确提供mode/source/W/T0，并可沿用production环境中的 `QS_COMPAT_OBSERVATION_MODE`、`QS_COMPAT_SOURCE_SHA`、`QS_COMPAT_WINDOW_DAYS`、`QS_COMPAT_STARTED_AT`、`QS_COMPAT_APISERVER_CONTAINERS`、`QS_COMPAT_COLLECTION_CONTAINERS`；实例清单也由人工调用沿用这两个配置，缺失时失败。不从观测到的SHA自动批准自身，不更改上述环境变量或保留配置。未批准T0时只允许默认预检查，不能启动观察计时。
 
 ## 验证入口
 
