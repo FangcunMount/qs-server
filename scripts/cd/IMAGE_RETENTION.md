@@ -58,3 +58,9 @@ QS apiserver 的 MQ 发布预检在原共享锁内执行，并将其保留的 MQ
 冻结主配置以只读文件挂回 `/app/configs/apiserver.prod.yaml`，保留缓存策略等相对路径的原配置目录。宿主原配置目录挂载保留；冻结文件只覆盖该容器中的主文件，不改写生产源文件。首次切换中发现的 `/run` 路径启动失败须保留为失败证据，不能计入部署通过。
 
 预检处理部署账号的 0600 上传配置时，只使用字节一致的私有暂存副本，成功后删除副本。原上传权限、冻结配置摘要及既有回退资产保留规则不变。
+
+## 维护窗口前的候选镜像
+
+Production Deploy 手动入口的 `operation=build` 可在 `PRODUCTION_DEPLOY_PAUSED=true` 时构建所选服务镜像，并保存三十天的 Docker archive、源码 SHA、镜像 config digest、registry digest 和文件校验和。三个业务部署 job 均明确排除此操作，Worker 治理验证及成功发布 marker 仍要求实际部署成功。普通 `operation=deploy` 和自动触发继续受原暂停门禁约束。
+
+候选 artifact 的 `built_not_deployed` 仅代表构建完成，不进入成功镜像保留记录。维护窗口仍须核对实际导入镜像、配置、数据库保护材料和进程运行证据，不能把候选 receipt 当作生产发布成功。
