@@ -13,7 +13,7 @@ required = {
     "TestMQCommandsUseUTCWithNonUTCSessions",
     "TestMQRuntimeGatewaysCannotExposeRetiredGRPCWrites",
     "TestMQManagementSubmissionNeverRetriesUncertainCommit",
-    "TestMQRetiredBridgeModesRejectBeforeStorageOrTransport",
+    "TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools",
     "TestMQRetirementNeverStartsLegacyTransportOrExportsResultIngress",
     "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/start/missing_transport",
     "TestMQHTTP202MeansQSCommitAndUsesOriginalCommandIdentity/cancel/missing_transport",

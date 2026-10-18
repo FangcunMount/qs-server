@@ -295,19 +295,24 @@ func TestGRPCRegistryImportsTransportOwnedServiceFacade(t *testing.T) {
 	}
 }
 
-func TestQSBridgeReleaseArtifactKeepsDefaultEntrypoint(t *testing.T) {
+func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T) {
 	t.Parallel()
 	data, err := os.ReadFile("../../../../build/docker/Dockerfile.qs-apiserver")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, required := range []string{
-		"-o /build/bin/qs-ai-bridge ./cmd/qs-ai-bridge",
-		"COPY --from=builder --chown=www:www /build/bin/qs-ai-bridge /app/qs-ai-bridge",
+		"for command in audit control preflight; do",
+		"COPY --from=builder --chown=www:www /build/bin/qs-ai-messaging-* /app/",
 		`ENTRYPOINT ["/app/qs-apiserver"]`,
 	} {
 		if !strings.Contains(string(data), required) {
-			t.Fatalf("release image missing bridge/default entrypoint contract: %s", required)
+			t.Fatalf("release image missing maintenance/default entrypoint contract: %s", required)
+		}
+	}
+	for _, retired := range []string{"./cmd/qs-ai-bridge", "/app/qs-ai-bridge"} {
+		if strings.Contains(string(data), retired) {
+			t.Fatalf("release image must not include retired bridge CLI: %s", retired)
 		}
 	}
 }

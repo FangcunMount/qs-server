@@ -15,7 +15,7 @@
 
 [PR #346](https://github.com/FangcunMount/qs-server/pull/346) 已移除专用 history/retirement/handoff CLI、三个退役 Action、维护包、Python 编排、临时运行观察和仅保护这些实现的测试：449 个文件删除，仓库净减少 178,233 行。共享构建、镜像导出和 CI 撤掉临时分支，继续执行普通交付与长期业务检查；历史迁移文件保留。
 
-现用 MQ 的目录、组织范围与关联检查见[MQ 只读数据库清单](../../cmd/qs-ai-bridge/README.md)。事件出站和业务审计见[标准 Outbox](../../docs/03-基础设施/event/30-Outbox可靠出站链路.md)。迁移及启动缺失保护见[迁移说明](../../internal/pkg/migration/README.md)。历史迁移文件保留原字节，退休 ID 不因旧源恢复而重新可用。
+现用 MQ 的目录、组织范围与关联检查见[MQ 只读数据库清单](../../docs/03-基础设施/event/40-MQ发布消费与结算.md#现用-mq-只读数据库清单)。事件出站和业务审计见[标准 Outbox](../../docs/03-基础设施/event/30-Outbox可靠出站链路.md)。迁移及启动缺失保护见[迁移说明](../../internal/pkg/migration/README.md)。历史迁移文件保留原字节，退休 ID 不因旧源恢复而重新可用。
 
 ## Final historical readback and temporary material cleanup
 
