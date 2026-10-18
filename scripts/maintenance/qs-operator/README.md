@@ -9,7 +9,7 @@
 | `qs-operator retire selected preflight|apply|verify` | 对明确选定的人员执行受控退出和当前事实复验 |
 | `qs-operator retire orphan preflight|apply|verify` | 清理所有公司均无 Operator 历史的孤立后台授权 |
 
-只在选定操作后加载配置和资源。配置继续使用 QS_APISERVER_ 前缀；各操作原有 OPERATOR_PREPARE_*、OPERATOR_RECOVERY_*、OPERATOR_RETIRE_* 输入、指纹、报告与维护确认保持。历史批次动作在配置读取前拒绝。恢复、退出及孤立授权的详细契约见[迁移维护说明](../../../internal/pkg/migration/README.md)。
+只在选定操作后加载配置和资源。候选工具仅接受cleanSQL104，预检指纹为actor_maintenance_sql104；旧未执行计划须重新预检，原归档与checksum不改写。SQL104尚未部署，不提前替换线上维护程序。配置继续使用 QS_APISERVER_ 前缀；各操作原有 OPERATOR_PREPARE_*、OPERATOR_RECOVERY_*、OPERATOR_RETIRE_* 输入、指纹、报告与维护确认保持。历史批次动作在配置读取前拒绝。恢复、退出及孤立授权的详细契约见[迁移维护说明](../../../internal/pkg/migration/README.md)。
 
 ## 门店运营身份准备
 

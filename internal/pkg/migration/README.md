@@ -423,8 +423,8 @@ QS_M3_REQUIRE_DATABASE=1 QS_SERVER_TEST_MONGO_DB_PREFIX=qs_m3_test \
 
 `qs-operator recover` 仅用于经过确认的维护操作，不是后台注册或启用接口。它恢复原 Operator ID，不恢复医生绑定、旧二维码或旧角色。后续角色和 Scope 分配必须独立完成。
 
-- `preflight`：仅在当前cleanSQL103读取身份、退出记录和 IAM 权限，输出确定性事实指纹，不写授权或身份数据。仓库保留的clean78缺归档历史读取边界，不是当前维护工具的执行许可。
-- `apply`：要求当前cleanSQL103、已保留79版恢复归档结构、暂停人员及授权写入，并提交本次预演指纹。事务内保存原退出审计、恢复空角色身份、移除已归档退出的阻断记录。
+- `preflight`：仅在当前cleanSQL104读取身份、退出记录和 IAM 权限，输出确定性事实指纹，不写授权或身份数据。仓库保留的clean78缺归档历史读取边界，不是当前维护工具的执行许可。
+- `apply`：要求当前cleanSQL104、已保留79版恢复归档结构、暂停人员及授权写入，并提交本次预演指纹。事务内保存原退出审计、恢复空角色身份、移除已归档退出的阻断记录。
 - `status`：校验恢复归档并报告 `pending` 或 `historical_completed`，同时输出当前 Operator 事实。历史完成不表示当前事实未变化，也不表示业务验收通过；重复 Apply 不覆盖后续变化。
 
 输入使用 `OPERATOR_RECOVERY_INPUT` 指向受限 JSON 文件，包含 `OrgID`、`ActorID`、`OperatorID`、`ExpectedVersion`、`ExpectedPolicyVersion`、`RequestID`、`Reason`。目标版本是退出完成后的版本；策略版本必须来自当次核实。报告路径由 `OPERATOR_RECOVERY_REPORT` 指定，必须是尚不存在的新文件，工具以 `0600` 创建。输入不接受未知字段或多个 JSON 对象。
@@ -498,6 +498,8 @@ M4-A 先把 `100/39` 升到 `101/39`，独立只读验证后按已批准的 runt
 随后在 checkout `b7e6e5cff5977abc7c7b85d4269fb428e5d34a91` 上，源码任务仍为 `94d683c12acca78bc2564c810eae767ed7274674`、测试文件前后摘要仍为 `c4c40fac1f276ba0cbef1bdd798e573913ef1fa1574c3f2ad775a94c4e95015f`，使用与生产相同补丁版本的 MongoDB 7.0.31 replica-set 及 MySQL 8.0.36 自有隔离夹具执行同四个顶层／三个子场景：七项 RUN／PASS、零 SKIP、exit0。完整原生日志摘要为 `059bad5d06f4a0773369ea607564e2dca91fddc42372166bcb21186de7511968`，`mongo-result.json` 摘要为 `ed5fac1688f7c23e902190adbd37ab83a51848435e81fa9400743a3ccac2e7d1`，最终 fixture 回执摘要为 `cde6a661a8587ca5354a170099f8ab3c3ea61b8cc63c62b534e9b7f8576657f3`。该回执证明两自有容器／网络已精确释放、原 IDs／images 保留；旧容器运行元数据仍有变化，不签全部旧环境稳定。这补齐了同补丁版本上的 synthetic 对象恢复门禁，不是生产连接、生产规模恢复、原镜像三个业务服务完整启动或 30／60 分钟、RPO=0 验收。
 
 ### M6：Task旧token列退出候选
+
+`m6_task_entry_token`只批准103/40→104/40，其他M4范围不能借用。先停止旧API／Collection／Worker及调度写入者，执行离线DDL并回读，再启动新版本；不能滚动混用删除列后的schema与旧持久化映射。
 
 SQL104仅删除 `assessment_task.entry_token`，不改Task身份、状态、`entry_url`、Enrollment或Mongo。明确声明clean104/40；DDL关闭时clean103/40仍是待升级状态，不能进入ready。read-only preflight在104及后续版本要求旧列缺失，down明确拒绝恢复空列。原迁移1..103与Mongo1..40保持字节。
 

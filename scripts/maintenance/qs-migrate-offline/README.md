@@ -77,9 +77,11 @@ sha256sum /private/task-owned/qs-migrate-offline
 | `m4_actor_columns` | 仅 `101/40 → 102/40`；保护 tags/effective_roles 的完整原列定义、主键和值及真实版本表材料，不包含五张历史维护表 |
 | `m4_legacy_maintenance_tables` | 仅 `102/40 → 103/40`；保护五表完整原DDL/值及真实完整原版本表，保留现代任务、恢复归档和业务历史 |
 
-四个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
+| `m6_task_entry_token` | 仅 `103/40 → 104/40`；保护Task旧token列完整定义、主键、原值及真实版本表材料，保留entry_url与现用业务事实 |
 
-该文件格式尚未发布，没有旧格式兼容：旧 `backup_pair_manifest_sha256` / `backup_pair_location` 字段、缺失 scope、未知 scope、对象 scope 的其他版本组合直接拒绝。
+五个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
+
+本入口不提供旧格式兼容：旧 `backup_pair_manifest_sha256` / `backup_pair_location` 字段、缺失 scope、未知 scope、对象 scope 的其他版本组合直接拒绝。
 
 执行器验证绑定、时效和字段完整性，不会自动证实外部存储可恢复或进程已停止。证据摘要、保护位置和负责人由批准者核实；缺失、unknown/pending、零摘要、恢复耗时缺失或超过3600秒、保留不足30天、已启动runtime均拒绝。此前四旧对象的恢复例外不能用于本批准。
 
