@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
+    "sha": "deca89c8059de0ce41eedd6e82abd7cf4a1430b3",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -12828,7 +12828,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
+        "source_sha": "deca89c8059de0ce41eedd6e82abd7cf4a1430b3",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -12851,6 +12851,10 @@
         {
           "kind": "source",
           "path": "scripts/cd/ai-messaging-release.py"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/cd.yml"
         }
       ],
       "verification": [
@@ -12984,7 +12988,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "Reviewed build-only workflow admission, explicit exclusion of all three deployment jobs and candidate-only receipts; production deployment remains independently unverified."
     },
     {
       "path": "scripts/testing/reliable-messaging-proof.md",
