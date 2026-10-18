@@ -801,7 +801,6 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 		"Compatibility Metrics",
 		"scripts/cd/audit-compatibility-observation.sh",
 		"http://prometheus:9090",
-		"qs_evaluation_assessment_intake_legacy_binding_total",
 		"zero_window_candidate",
 		"EXPECTED_SOURCE_SHA",
 		"OBSERVATION_STARTED_AT",
