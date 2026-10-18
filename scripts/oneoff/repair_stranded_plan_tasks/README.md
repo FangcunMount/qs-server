@@ -2,6 +2,8 @@
 
 该工具修复 Plan Task 的调度轮次、稳定 `due_at` 与错过开放窗口的 stranded `pending`。默认 `audit`；`apply`/`rollback` 必须显式 `--confirm`。工具不会发布历史 `task.expired` 通知事件。
 
+当前工具匹配SQL104：Task只保留TaskID与entry_url，不再读取、写入或回退到entry_token。rollback会在任何数据库写入前校验整份任务材料；包含旧entry_token（包括空值）的旧schema材料明确拒绝，只能使用具名隔离恢复材料和匹配旧工具，不覆盖或重写原审计正文。SQL104尚未正式发布前不替换线上旧工具。
+
 本页只保留稳定工具契约。机构、cutoff、候选数、目标 URL、执行人和结果必须写入本次审批/evidence，不能复制旧生产参数。
 
 ## 1. 构建与安全输入

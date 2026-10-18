@@ -46,6 +46,6 @@ IAM 不可用时保留旧投影和 pending 标记；授权链本身仍 fail-clos
 
 本候选必须在已验收的 clean101/40 上，由独立离线执行器完成 SQL102，再启动新业务 runtime。旧 `effective_roles` 为无默认值的 NOT NULL 列，省略该列的新写入不能在旧 schema 上发布；旧镜像也不能接管102/40库。
 
-现代 prepare、selected/orphan exit 和 recovery 预检仅接受单行 cleanSQL102，使用固定现行字段和新摘要格式。旧未执行指纹必须重新预检；已有完成责任的原始 JSON 与 checksum 不重写，恢复只重新开放本地身份，不恢复角色、照护关系或二维码。后续 SQL103 等发布必须在其任务中重新审核并更新该工具的确切 schema 门禁，不能临时放行任意未来版本。
+现代 prepare、selected/orphan exit 和 recovery 预检仅接受单行 cleanSQL104，使用固定现行字段和 `actor_maintenance_sql104` 摘要格式。SQL104只退役Task旧token列，不改人员字段或原归档正文。旧未执行指纹必须重新预检；已有完成责任的原始 JSON 与 checksum 不重写，恢复只重新开放本地身份，不恢复角色、照护关系或二维码。后续 schema 发布必须在其任务中重新审核并更新该工具的确切 schema 门禁，不能临时放行任意未来版本。
 
 本候选源码和普通测试不证明生产两列值分布、具名值备份、完整停写、失败恢复、业务启动或30/60分钟/RPO0；这些仍由现有模块问题清单和版本验收台账记录。
