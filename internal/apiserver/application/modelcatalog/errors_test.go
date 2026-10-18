@@ -1,6 +1,7 @@
 package modelcatalog
 
 import (
+	"encoding/json"
 	"testing"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
@@ -28,10 +29,41 @@ func TestValidationFailedErrorMapsDomainIssues(t *testing.T) {
 	if !ok {
 		t.Fatalf("error = %T, want *ValidationFailedError", err)
 	}
-	if validation.Result.Passed || validation.Result.Valid {
+	if validation.Result.Passed {
 		t.Fatalf("result = %#v, want failed validation", validation.Result)
 	}
 	if got := validation.Result.Issues[0]; got.Field != "definition_v2.measure" || got.Code != "measure.required" || got.Level != "error" {
 		t.Fatalf("issue = %#v", got)
+	}
+}
+
+func TestValidationResponseCanonicalContract(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		issues []ValidationIssue
+		passed bool
+	}{
+		{name: "no issues", passed: true},
+		{name: "warning", issues: []ValidationIssue{{Field: "measure", Message: "review", Level: "warning"}}, passed: true},
+		{name: "error", issues: []ValidationIssue{{Field: "measure", Message: "required", Code: "required", Level: "error"}}},
+		{name: "unspecified severity", issues: []ValidationIssue{{Field: "measure", Message: "required"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := NewValidationResult(tc.issues)
+			if result.Passed != tc.passed || len(result.Issues) != len(tc.issues) {
+				t.Fatalf("validation result = %#v", result)
+			}
+			raw, err := json.Marshal(result)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var response map[string]json.RawMessage
+			if err := json.Unmarshal(raw, &response); err != nil {
+				t.Fatal(err)
+			}
+			if len(response) != 2 || response["passed"] == nil || response["issues"] == nil {
+				t.Fatalf("validation contract = %s; want passed/issues", raw)
+			}
+		})
 	}
 }

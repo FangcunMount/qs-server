@@ -145,7 +145,7 @@ func TestValidateDefinitionReturnsWarningsWithoutFailing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Passed || !result.Valid || len(result.Issues) != 1 || len(result.Errors) != 0 {
+	if !result.Passed || len(result.Issues) != 1 {
 		t.Fatalf("result = %#v, want passed result with warning", result)
 	}
 }

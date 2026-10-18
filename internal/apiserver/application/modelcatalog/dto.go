@@ -187,9 +187,7 @@ type ValidationIssue struct {
 
 type ValidationResult struct {
 	Passed bool              `json:"passed"`
-	Valid  bool              `json:"valid"` // Deprecated: mirror Passed 用于 向后兼容。
 	Issues []ValidationIssue `json:"issues"`
-	Errors []string          `json:"errors"` // Deprecated: 派生 从 Issues 用于 向后兼容。
 }
 
 func NewValidationResult(issues []ValidationIssue) *ValidationResult {
@@ -200,20 +198,10 @@ func NewValidationResult(issues []ValidationIssue) *ValidationResult {
 			break
 		}
 	}
-	result := &ValidationResult{
+	return &ValidationResult{
 		Passed: passed,
-		Valid:  passed,
 		Issues: issues,
 	}
-	if !passed {
-		result.Errors = make([]string, 0, len(issues))
-		for _, issue := range issues {
-			if issue.Level == "" || issue.Level == string(domain.ValidationLevelError) {
-				result.Errors = append(result.Errors, issue.Message)
-			}
-		}
-	}
-	return result
 }
 
 type PreviewOutcome struct {
