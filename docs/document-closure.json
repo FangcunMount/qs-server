@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "188540e6fb00df196d197a8942839e044a206ebe",
+    "sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -11389,7 +11389,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -11814,6 +11814,13 @@
           "result": "passed",
           "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -11907,7 +11914,8 @@
           "Historical source selector retained as complete original JSON; its former metadata cap/D inventory is superseded, not matched elsewhere as current proof: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"selector\":\"timeout-minutes: 60\",\"result\":\"matched\",\"source_sha\":\"51a2d95343c9463a72352d129a633a1acad5dfde\",\"verified_on\":\"2026-10-15\"}",
           "Current D source retains exact same-database durable generation boundary and format3 capture; no reset/regrant or same-committed-intent completion exists. Native65 is bound only to506b, independent inspect9 only toc459 (root closure382a02501e92542f3aa98ee94d6e27dee8c802e4d2464867ce1be2aaea3fc1be); merged-head CI74/AI,production materials/freeze/service window/RPO/business remain pending. c459 local364 ordinary/race and this CI-only100 ordinary/race are distinct source QA. Mongo fixture was unauthenticated; only MySQL SELECT-only privilege denial is demonstrated. Existing production pause/signoffs are unchanged.",
           "Command-family source review preserves prior verified marker as JSON: {\"source_sha\": \"14c72a78bc9489726c05bdda9569241ed47442b2\", \"verified_on\": \"2026-10-18\"}. Only maintenance command spellings and source paths changed. New CLI race tests passed; migration SQL, maintenance application implementations and original native proofs remain byte-identical and retain their original sources. No current native or production execution is claimed.",
-          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution."
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
         ]
       },
       "gaps": [
@@ -12677,7 +12685,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -12709,6 +12717,13 @@
           "result": "passed",
           "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -12719,7 +12734,8 @@
         "limitations": [
           "Live read-only preflight passed; Operator creation and Scope activation are not yet executed.",
           "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
-          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution."
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
         ]
       },
       "gaps": [
@@ -14545,7 +14561,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14595,6 +14611,13 @@
           "result": "passed",
           "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -14606,7 +14629,8 @@
           "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
           "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
           "AuthZ availability-probe followup retains prior current bindings as JSON: {\"source_baseline\": {\"sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Only the explicit missing-entrypoint status42 selects the old-image command. Generic exec/privilege errors, probe125 and command failure42 refuse without a legacy retry; fake-container shell contracts and ShellCheck passed. No real Docker or production operation occurred.",
-          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution."
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
         ]
       },
       "gaps": [
@@ -14641,7 +14665,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
+        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14677,6 +14701,13 @@
           "result": "passed",
           "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 -race ./scripts/maintenance/qs-operator ./scripts/maintenance/qs-authz ./scripts/maintenance/qs-ai-messaging",
+          "result": "passed",
+          "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -14687,7 +14718,8 @@
         "limitations": [
           "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
           "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
-          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution."
+          "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
+          "CLI lint followup preserves prior verified marker and global baseline as JSON: {\"source_baseline\": {\"sha\": \"188540e6fb00df196d197a8942839e044a206ebe\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"741a5cfe45234fb75ac12d54d2ac74887ea39f81\", \"verified_on\": \"2026-10-18\"}}. Missing-command diagnostics are now concise errors pointing to --help; explicit help output, valid commands, configuration, confirmations and resource boundaries are unchanged. Targeted race tests passed at the new source and pinned golangci-lint v2.5.0 reported zero issues on the same code. Earlier f02 CI lint failure remains a failure; original CI/native/production evidence is not rebound, and fresh PR CI is required. No deployment was performed."
         ]
       },
       "gaps": [
