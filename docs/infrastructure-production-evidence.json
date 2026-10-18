@@ -294,6 +294,63 @@
         "Prometheus flags/volume/eight-target cadence are verified; equality of original full runtime Env with the regenerated declaration is not proven and its original negative receipt remains.",
         "Mini formal publication, M5 data/norm/business obligations, token/replay maxima, effective14-day observation, R4 and M8 remain incomplete."
       ]
+    },
+    {
+      "id": "infra-2026-10-18-m5-e86c122c4",
+      "topics": [
+        "deployment_cd_network",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-10-18T12:08:03.861805+08:00",
+      "environment": "production/serverA-serverD; fixed Mongo retirement on serverC",
+      "deployed_sha": "e86c122c4cf6d866e37e8f411b0bc5581c41ebec",
+      "source_baseline_sha": "e86c122c4cf6d866e37e8f411b0bc5581c41ebec",
+      "effective_config_hash": "sha256:63530b49e931d5ce69395b7752cdf6abe3024d83d55883695eff062f476babc3",
+      "effective_config_hash_limitation": null,
+      "command": "Fixed Root -> Mac mini -> serverA/serverD/serverC SSH; maintenance-controller-Mac-v1.py with fixed 105 BSON plan, 104 derived-only updates in one snapshot/majority transaction, exact six image replacement. Private final receipt 84d4701eb285a27c082d02712a510afbfaeb5ca22fe86a4c34cd602beda8c5e6.",
+      "result": {
+        "status": "passed",
+        "summary": "104 derived-field retirements, six canonical backend instances and independent readback completed; normal IAM, canonical response, retired-input rejection and scoped cache warmup passed.",
+        "measurements": {
+          "api_instances": 1,
+          "collection_instances": 2,
+          "worker_instances": 3,
+          "mysql_version": 103,
+          "mongo_version": 40,
+          "fixed_model_records": 105,
+          "derived_field_retirements": 104,
+          "derived_fields_present": 0,
+          "protected_NEO_drafts": 1,
+          "old_exact_CIDs_removed": 6,
+          "cache_warmup_ok": 23,
+          "cache_warmup_errors": 0,
+          "entry_maintenance_upper_bound_seconds": 35.351,
+          "long_observation_waived": true,
+          "effective_observation_started": false
+        }
+      },
+      "owner": "system (10001)",
+      "expires_on": "2026-11-17",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/39094344321"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md"
+        }
+      ],
+      "limitations": [
+        "Dated scoped execution, not global infrastructure or remaining real-business/performance acceptance.",
+        "Effective configuration proof binds actual PID1 inputs and a finite source-matched decoder; full live in-memory Options were not dumped.",
+        "Archive SHA256, Engine config IDs/rootfs and actual ELF were proven; no registry manifest digest is claimed.",
+        "Original image executable-permission failure was fenced by offline version checks before any business stop/start, and corrected images separately qualified.",
+        "Native restore/conflict/replay proof used isolated dependencies, without network unknown-commit fault injection or production restore.",
+        "NEO authoritative definition and mini formal publication remain pending; long observation was waived rather than passed."
+      ]
     }
   ]
 }
