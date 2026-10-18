@@ -39,10 +39,10 @@ fi
 # is not evidence that the old binary should be executed.
 command=(/app/qs-authz verify)
 probe_status=0
-run_privileged "$DOCKER_BIN" exec "$APISERVER_CONTAINER" sh -c 'test -x /app/qs-authz' >/dev/null 2>&1 || probe_status=$?
+run_privileged "$DOCKER_BIN" exec "$APISERVER_CONTAINER" sh -c 'if test -x /app/qs-authz; then exit 0; else exit 42; fi' >/dev/null 2>&1 || probe_status=$?
 case "$probe_status" in
   0) ;;
-  1) command=(/app/qs-authz-matrix) ;;
+  42) command=(/app/qs-authz-matrix) ;;
   *) echo "Cannot inspect AuthZ command availability" >&2; exit "$probe_status" ;;
 esac
 

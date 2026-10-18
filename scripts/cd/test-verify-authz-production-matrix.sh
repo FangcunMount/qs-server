@@ -18,7 +18,7 @@ case "${1:-}" in
     fi
     ;;
   exec)
-    if [[ "$*" == *"sh -c test -x /app/qs-authz"* ]]; then
+    if [[ "$*" == *"sh -c if test -x /app/qs-authz; then exit 0; else exit 42; fi"* ]]; then
       exit "${FAKE_AUTHZ_PROBE_STATUS:-0}"
     fi
     if [ -n "${FAKE_AUTHZ_OPERATIONS:-}" ]; then
@@ -54,7 +54,7 @@ output="$(PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$e
 printf '%s\n' "$output" | grep -Fq 'Production AuthZ action matrix passed: subjects=4 cases=6 synthetic_subjects=2 policy_version=27'
 
 # Retained rollback images use the original entrypoint only when it is absent.
-output="$(FAKE_AUTHZ_PROBE_STATUS=1 FAKE_AUTHZ_COMMAND=qs-authz-matrix PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \
+output="$(FAKE_AUTHZ_PROBE_STATUS=42 FAKE_AUTHZ_COMMAND=qs-authz-matrix PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \
   "$SCRIPT_DIR/verify-authz-production-matrix.sh")"
 printf '%s\n' "$output" | grep -Fq 'Production AuthZ action matrix passed: subjects=4 cases=6 synthetic_subjects=2 policy_version=27'
 
@@ -72,6 +72,13 @@ if FAKE_AUTHZ_PROBE_STATUS=125 FAKE_AUTHZ_OPERATIONS="$TEST_ROOT/probe-error-ope
 fi
 
 test ! -e "$TEST_ROOT/probe-error-operations"
+
+# Generic exec/privilege status 1 is not the explicit missing-entrypoint signal.
+probe_status=0
+FAKE_AUTHZ_PROBE_STATUS=1 FAKE_AUTHZ_OPERATIONS="$TEST_ROOT/generic-probe-error-operations" PRIVILEGE_RUNNER='' DOCKER_BIN="$FAKE_DOCKER" \
+  "$SCRIPT_DIR/verify-authz-production-matrix.sh" >/dev/null 2>&1 || probe_status=$?
+test "$probe_status" -eq 1
+test ! -e "$TEST_ROOT/generic-probe-error-operations"
 
 # Execution failure is returned directly, without retrying the legacy entrypoint.
 command_status=0
