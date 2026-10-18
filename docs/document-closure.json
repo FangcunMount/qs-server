@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e86c122c4cf6d866e37e8f411b0bc5581c41ebec",
+    "sha": "7de5adbd31b588450735f11b3501292da89a6ada",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 45,
+      "expected_count": 44,
       "budgeted": false
     }
   },
@@ -3902,14 +3902,6 @@
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-bridge/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-ai-bridge/main_test.go"
-        },
-        {
-          "kind": "source",
           "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
         },
         {
@@ -3919,6 +3911,18 @@
         {
           "kind": "source",
           "path": ".github/workflows/ai-bridge.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/participant.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/legacy_hygiene_test.go"
         }
       ],
       "verification": [
@@ -3931,23 +3935,8 @@
         },
         {
           "kind": "command",
-          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
-          "result": "passed",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
           "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
           "result": "passed",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-ai-bridge/main.go",
-          "selector": "historical AI runtime index backfill retired",
-          "result": "matched",
           "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
           "verified_on": "2026-10-15"
         },
@@ -3961,13 +3950,6 @@
         },
         {
           "kind": "command",
-          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
-          "result": "passed",
-          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
           "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
           "result": "passed",
           "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
@@ -3979,6 +3961,28 @@
           "result": "passed",
           "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go",
+          "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
+          "result": "matched",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/pkg/configcontract ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -4007,6 +4011,37 @@
           "severity": "high",
           "summary": "The AI explanation backlog records open design gates and is not runtime acceptance evidence.",
           "exit_criteria": "Close AIX-D001 through AIX-D015 with canonical designs and re-review this backlog."
+        },
+        {
+          "id": "AI-BRIDGE-CLI-SOURCE-EXIT-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "The old CLI source and its package/selector evidence are retired. Original verification objects and the former sidecar registration are retained unchanged in the dated archive; current projection reads and MQ runtime remain supported.",
+          "exit_criteria": "Verify the current source and release image independently; historical CLI tests do not prove current production deployment or external caller exit.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+              "result": "passed",
+              "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "source_selector",
+              "path": "cmd/qs-ai-bridge/main.go",
+              "selector": "historical AI runtime index backfill retired",
+              "result": "matched",
+              "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+              "result": "passed",
+              "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+              "verified_on": "2026-10-15"
+            }
+          ]
         }
       ]
     },
@@ -8821,6 +8856,78 @@
         {
           "kind": "source",
           "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/participant.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/legacy_hygiene_test.go"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ai-bridge.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/modules/interpretation/ai_messaging.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging_admission.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aibridge/messaging_observability.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/maintenance/aimessagingbinding/binding.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-messaging-audit/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-messaging-control/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "cmd/qs-ai-messaging-preflight/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/ai-messaging-release.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/remote-deploy.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/ai-mq-report.py"
+        },
+        {
+          "kind": "source",
+          "path": "build/docker/Dockerfile.qs-apiserver"
         }
       ],
       "verification": [
@@ -8851,6 +8958,28 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go",
+          "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
+          "result": "matched",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/pkg/configcontract ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -8860,7 +8989,8 @@
         "observed_at": null,
         "limitations": [
           "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
-          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review.",
+          "AI workflow runtime and maintenance documentation moved from the retired CLI sidecar on 2026-10-18. This source cleanup does not add production deployment, external caller or business acceptance evidence. Original sidecar evidence remains bound to its historical source in the dated archive."
         ]
       },
       "gaps": [
@@ -9464,14 +9594,6 @@
         },
         {
           "kind": "source",
-          "path": "cmd/qs-ai-bridge/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-ai-bridge/main_test.go"
-        },
-        {
-          "kind": "source",
           "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
         },
         {
@@ -9481,6 +9603,18 @@
         {
           "kind": "source",
           "path": ".github/workflows/ai-bridge.yml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/participant.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/legacy_hygiene_test.go"
         }
       ],
       "verification": [
@@ -9524,23 +9658,8 @@
         },
         {
           "kind": "command",
-          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
-          "result": "passed",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
           "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
           "result": "passed",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-ai-bridge/main.go",
-          "selector": "historical AI runtime index backfill retired",
-          "result": "matched",
           "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
           "verified_on": "2026-10-15"
         },
@@ -9550,13 +9669,6 @@
           "selector": "func TestRuntimeHistoricalRowsRemainUndated",
           "result": "matched",
           "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
-          "result": "passed",
-          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
         },
         {
@@ -9572,6 +9684,28 @@
           "result": "passed",
           "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
           "verified_on": "2026-10-15"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/transport/grpc/proto_contract_test.go",
+          "selector": "func TestMQReleaseArtifactKeepsDefaultEntrypointAndMaintenanceTools(t *testing.T)",
+          "result": "matched",
+          "source_sha": "bbbe3f9e51fde1e123725e50ed8ba62f6a2d6551",
+          "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./cmd/... ./internal/pkg/architecture ./internal/pkg/configcontract ./internal/apiserver/application/aibridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/transport/grpc",
+          "result": "passed",
+          "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
+          "verified_on": "2026-10-18"
         }
       ],
       "production_evidence": {
@@ -9598,6 +9732,37 @@
           "severity": "medium",
           "summary": "This new canonical document has not received an accountable semantic signoff.",
           "exit_criteria": "Review every behavioral statement against the declared fact sources, attach strict evidence, and obtain the responsible owner signoff."
+        },
+        {
+          "id": "AI-BRIDGE-CLI-SOURCE-EXIT-20261018",
+          "kind": "retired_source_contract",
+          "severity": "medium",
+          "summary": "The old CLI source and its package/selector evidence are retired. Original verification objects and the former sidecar registration are retained unchanged in the dated archive; current projection reads and MQ runtime remain supported.",
+          "exit_criteria": "Verify the current source and release image independently; historical CLI tests do not prove current production deployment or external caller exit.",
+          "historical_evidence": [
+            {
+              "kind": "command",
+              "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+              "result": "passed",
+              "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "source_selector",
+              "path": "cmd/qs-ai-bridge/main.go",
+              "selector": "historical AI runtime index backfill retired",
+              "result": "matched",
+              "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
+              "verified_on": "2026-10-15"
+            },
+            {
+              "kind": "command",
+              "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
+              "result": "passed",
+              "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
+              "verified_on": "2026-10-15"
+            }
+          ]
         }
       ]
     },
@@ -12449,110 +12614,6 @@
       "gaps": [
         {
           "id": "AI-BRIDGE-DOC-1",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Internal bridge contract and entry are implemented; production integration remains pending.",
-          "exit_criteria": "Review the real authorization and product entry integration before marking production readiness."
-        }
-      ]
-    },
-    {
-      "path": "cmd/qs-ai-bridge/README.md",
-      "class": "sidecar",
-      "owner": "runtime",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": "ca9af3af5dbf402f9a3ab84a08e61983a784a7bd",
-        "verified_on": "2026-10-15"
-      },
-      "fact_sources": [
-        {
-          "kind": "source",
-          "path": "cmd/qs-ai-bridge/main.go"
-        },
-        {
-          "kind": "source",
-          "path": "cmd/qs-ai-bridge/main_test.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/aibridge/runtime.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/ai-bridge.yml"
-        }
-      ],
-      "verification": [
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
-          "result": "passed",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "cmd/qs-ai-bridge/main.go",
-          "selector": "historical AI runtime index backfill retired",
-          "result": "matched",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "source_selector",
-          "path": "internal/apiserver/infra/mysql/aibridge/runtime_test.go",
-          "selector": "func TestRuntimeHistoricalRowsRemainUndated",
-          "result": "matched",
-          "source_sha": "75f4ba4c4d53341a3843145459a9d3765937ebd7",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -race -p=2 -count=1 ./cmd/qs-ai-bridge ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge",
-          "result": "passed",
-          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "go test -p=2 -count=1 ./internal/pkg/configcontract",
-          "result": "passed",
-          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
-          "verified_on": "2026-10-15"
-        },
-        {
-          "kind": "command",
-          "command": "make docs-check",
-          "result": "passed",
-          "source_sha": "a4cc2f4d5ca5209776911fe44dfe696f4dd6421a",
-          "verified_on": "2026-10-15"
-        }
-      ],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton.",
-          "M4-D source mergeca9af3af5dbf402f9a3ab84a08e61983a784a7bd includes actual AI-retirement main4c49e633dd937bbe837afa10b0ef1251efb7d19b. D sources and SQL103 remain unchanged; incoming E four Go sources inherit the actual main bytes. Both parent verification/production evidence remain separately bound, including historical SQL102 selector JSON. a93 CI green is historical, not CI on this merge. Fresh final-head CI remains required; no D production protection/freeze/DDL/RPO or time budget is promoted."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "AI-BRIDGE-DOC-2",
           "kind": "verification",
           "severity": "medium",
           "summary": "Internal bridge contract and entry are implemented; production integration remains pending.",

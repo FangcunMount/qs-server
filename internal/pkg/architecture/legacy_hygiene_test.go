@@ -10,6 +10,7 @@ import (
 func TestRemovedLegacyPathsDoNotReturnToProductionCode(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
+		"cmd/qs-ai-bridge",
 		"internal/apiserver/infra/mysql/plan/Untitled",
 		"internal/pkg/database/tx/runner.go",
 	} {

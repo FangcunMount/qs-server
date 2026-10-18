@@ -2,7 +2,7 @@
 
 Source: `FangcunMount/qs-ai`, commit `b3de5913e70f669873f9f9ea5a04ffe64473f3ea`, path `integrations/workflow/proto/workflow.proto`.
 
-This copy is byte-identical to the pinned source. qs-ai owns this contract; synchronize the source and regenerate both languages when changing it. Go generation uses `scripts/proto/generate.sh`. The runnable integration entry and limitations are documented in `cmd/qs-ai-bridge/README.md`.
+This copy is byte-identical to the pinned source. qs-ai owns this contract; synchronize the source and regenerate both languages when changing it. Go generation uses `scripts/proto/generate.sh`. The current host runtime, maintenance tools and validation limits are documented in [AI workflow messaging](../../../../docs/03-基础设施/event/40-MQ发布消费与结算.md#ai-workflow-消息运行与维护).
 
 EvaluationManagement.Cancel 通过 `POST /internal/v2/interpretation/ai-workflow/evaluations/{run_id}/cancel` 复用 OrgAdmin 和可信组织/操作者。要求 expected_version、reason、confirm 及有存在性检查的 discard；false 不能因零值而遗漏，true 表示废弃待审核任务。AI 决定状态、原调用与派发竞争是否允许取消，QS 只核对传输回执绑定。响应 cancellation 保存原/新版本、发布摘要、原作者及时间；Get 保留旧 AI 无该字段兼容，废弃后的复审历史按原版本校验。RPC 期限 5 秒、完整响应上限 4 MiB，不自动重试；超时先回读原任务核对原操作。治理开关关闭时不注册路由；本批代码与测试不代表真实账号验收或旧入口退役。
 
