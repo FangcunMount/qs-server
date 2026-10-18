@@ -19,7 +19,7 @@ func TestLegacyMaintenanceRetirementResourcesAndClosedProtectionScope(t *testing
 		t.Fatal("down cannot recreate empty tables as historical data recovery")
 	}
 	r := testCurrentResources(t)
-	if r.sql.head != 103 || r.mongo.head != 40 || !r.accepts(102, 40) || !r.accepts(103, 40) || r.accepts(103, 39) || r.accepts(102, 41) {
+	if r.sql.head != 104 || r.mongo.head != 40 || !r.accepts(102, 40) || !r.accepts(103, 40) || r.accepts(103, 39) || r.accepts(102, 41) {
 		t.Fatal("maintenance retirement requires its exact SQL-only release pair")
 	}
 }

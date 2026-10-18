@@ -29,6 +29,7 @@ type DeadLetterRecord struct {
 	Payload            []byte
 	LastError          string
 	FailedAt           time.Time
+	Evidence           *TransportEvidence
 }
 
 type DeadLetterRecorder interface {
@@ -94,13 +95,17 @@ func (r *SQLDeadLetterRecorder) Close() error {
 
 // SDKFailedHandoffHandler persists the SDK terminal handoff before NSQ may
 // acknowledge its failure-channel delivery. A failed write must be returned.
-func SDKFailedHandoffHandler(recorder DeadLetterRecorder) func(context.Context, legacy.FailedHandoff) error {
+func SDKFailedHandoffHandler(recorder DeadLetterRecorder, selectedProvider ...string) func(context.Context, legacy.FailedHandoff) error {
+	provider := "nsq"
+	if len(selectedProvider) > 0 {
+		provider = selectedProvider[0]
+	}
 	return func(ctx context.Context, failed legacy.FailedHandoff) error {
 		if recorder == nil || failed.UUID == "" || failed.Topic == "" || failed.Channel == "" || failed.Attempts < 1 || failed.Cause == "" {
 			return fmt.Errorf("dead-letter audit store is not configured")
 		}
 		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
-			"nsq", failed.Topic, failed.Channel, failed.Attempts,
+			provider, failed.Topic, failed.Channel, failed.Attempts,
 			failed.UUID, failed.TransportMessageID, failed.Payload, failed.Cause,
 		))
 	}
@@ -113,6 +118,13 @@ func NewDeliveryUnknownEventRecorder(provider string, recorder DeadLetterRecorde
 	return func(ctx context.Context, msg rmtransport.Received, eventType string) error {
 		if recorder == nil || msg.ID == "" || provider == "" || eventType == "" {
 			return fmt.Errorf("unknown-event audit store or identity is not configured")
+		}
+		if provider == "rocketmq" {
+			r, err := rocketMQDeadLetterRecord(msg, "unknown event type: "+eventType)
+			if err != nil {
+				return err
+			}
+			return recorder.RecordDeadLetter(ctx, r)
 		}
 		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
 			provider, msg.Topic, msg.Channel, max(int(msg.Attempts), 1), msg.ID, msg.TransportID, msg.Payload,
@@ -140,6 +152,11 @@ func (r *SQLDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record Dea
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if record.Provider == "rocketmq" {
+		if err := recordTransportEvidence(ctx, tx, record); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO event_delivery_dead_letter
   (message_id, transport_message_id, event_id, org_id, provider, topic_name, channel_name, delivery_attempts,

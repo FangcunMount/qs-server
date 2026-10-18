@@ -76,8 +76,11 @@ def key_mounts(binding, root):
     require(isinstance(revision, str) and REVISION.fullmatch(revision))
     require(binding.get('enabled') is True and binding.get('max_in_flight') == 1)
     require(type(binding['max_in_flight']) is int)
-    require(set(binding) == {'binding_revision', 'enabled', 'nsqd', 'signing_key_file',
-                             'decrypt_key_files', 'ai_signer_files', 'ai_recipient_key_file', 'max_in_flight'})
+    base_fields = {'binding_revision', 'enabled', 'nsqd', 'signing_key_file',
+                   'decrypt_key_files', 'ai_signer_files', 'ai_recipient_key_file', 'max_in_flight'}
+    provider = binding.get('provider', 'nsq')
+    expected = base_fields if provider == 'nsq' else ((base_fields - {'nsqd'}) | {'provider', 'rocketmq', 'publish_enabled'})
+    require(provider in {'nsq', 'rocketmq'} and set(binding) == expected)
     entries = [(binding['signing_key_file'], 'qs.sign', None),
                (binding['ai_recipient_key_file'], 'ai.encrypt', None)]
     for field, role in [('decrypt_key_files', 'qs.encrypt'), ('ai_signer_files', 'ai.sign')]:
@@ -98,6 +101,19 @@ def key_mounts(binding, root):
         require(source.stat().st_mode & 0o022 == 0)
         require(not role.startswith('qs.') or source.stat().st_mode & 0o007 == 0)
         mounts.append((source, target, True))
+    if provider == 'rocketmq':
+        config = binding['rocketmq']
+        require(isinstance(config, dict) and set(config) == {'endpoint', 'credentials_file', 'ca_file', 'routes_file'})
+        require(type(binding['publish_enabled']) is bool)
+        for field, name in [('credentials_file', 'credentials.json'), ('ca_file', 'ca.crt'), ('routes_file', 'routes.json')]:
+            target = '/app/configs/rocketmq/' + name
+            require(config[field] == target)
+            source = root / 'versions' / revision / 'rocketmq' / name
+            require(source.resolve() == source.absolute())
+            read(source, 1 << 20)
+            require(source.stat().st_mode & 0o022 == 0)
+            require(name != 'credentials.json' or source.stat().st_mode & 0o007 == 0)
+            mounts.append((source, target, True))
     return mounts
 
 
@@ -155,6 +171,7 @@ def prepare(image, base, uid, gid, binding_root=BINDING_ROOT, release_root=RELEA
                          [(binding_path, '/preflight/binding.json', True)] + mounts))
         require(all(check[k] == metadata[k] for k in
                     ('source_sha', 'binding_revision', 'binding_sha256', 'public_key_fingerprints')))
+        require(check.get('transport_files_sha256') == metadata.get('transport_files_sha256'))
     else:
         with tempfile.TemporaryDirectory(prefix='.mq-preflight-', dir=release_root) as temporary:
             staging = Path(temporary)

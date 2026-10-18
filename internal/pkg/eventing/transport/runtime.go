@@ -2,6 +2,7 @@ package transport
 
 import (
 	"fmt"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"time"
 
 	"github.com/nsqio/go-nsq"
@@ -14,6 +15,7 @@ const (
 )
 
 type SubscriberConfig struct {
+	RocketMQ           *genericoptions.RocketMQOptions
 	Provider           string
 	NSQLookupdAddr     string
 	NSQMessageTimeout  time.Duration

@@ -10,6 +10,7 @@ const (
 
 // IAMAuthzSyncOptions IAM 授权版本同步订阅配置。
 type IAMAuthzSyncOptions struct {
+	RocketMQ       *RocketMQOptions          `json:"rocketmq" mapstructure:"rocketmq"`
 	Enabled        bool                      `json:"enabled" mapstructure:"enabled"`
 	Provider       string                    `json:"provider" mapstructure:"provider"`
 	NSQLookupdAddr string                    `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
@@ -38,8 +39,18 @@ func (o *IAMAuthzSyncOptions) Validate() []error {
 	}
 
 	errs := o.Delivery.Validate("iam.authz-sync.delivery")
-	if o.Provider != "nsq" {
+	if o.Provider != "nsq" && o.Provider != "rocketmq" {
 		errs = append(errs, fmt.Errorf("unsupported iam authz-sync provider: %s (supported: nsq)", o.Provider))
+	}
+	if o.Provider == "rocketmq" {
+		if err := o.RocketMQ.Validate(); err != nil {
+			errs = append(errs, err)
+		} else if o.RocketMQ.InstanceID == "" {
+			errs = append(errs, fmt.Errorf("RocketMQ authz sync requires stable instance_id"))
+		}
+		if o.EphemeralNSQ {
+			errs = append(errs, fmt.Errorf("RocketMQ cannot use ephemeral NSQ subscription"))
+		}
 	}
 	if !o.Enabled {
 		if o.EphemeralNSQ {

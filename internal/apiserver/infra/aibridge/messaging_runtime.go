@@ -14,8 +14,10 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 	opts "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdk "github.com/FangcunMount/reliable-messaging/transport/nsq"
+	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/nsqio/go-nsq"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,6 +26,7 @@ import (
 // MessagingRuntime replaces the old host relay; New creates no clients or work.
 // Start/Stop own only explicitly created NSQ/HTTP resources and one scan loop.
 type MessagingRuntime struct {
+	rocket                     *rocketmq.Subscriber
 	Options                    opts.AIWorkflowMessagingOptions
 	DB                         *sql.DB
 	Store                      *store.MessagingStore
@@ -35,7 +38,7 @@ type MessagingRuntime struct {
 	business, failure          *driver.Consumer
 	binding                    *sdk.Subscription
 	handoff                    *sdk.DirectHandoff
-	publisher                  *sdk.ManagedPublisher
+	publisher                  messagingruntime.Publisher
 	httpTransport              *http.Transport
 	relayCancel, handlerCancel context.CancelFunc
 	relayDone                  chan struct{}
@@ -84,6 +87,9 @@ func (r *MessagingRuntime) Start(ctx context.Context) (resultErr error) {
 	}
 	if err := r.preflightStorage(ctx); err != nil {
 		return err
+	}
+	if r.Options.SelectedProvider() == "rocketmq" {
+		return r.startRocketMQ(ctx)
 	}
 	r.httpTransport = http.DefaultTransport.(*http.Transport).Clone()
 	defer func() {
@@ -260,6 +266,11 @@ func (r *MessagingRuntime) stop(ctx context.Context) error {
 			return err
 		}
 	}
+	if r.rocket != nil {
+		if err := r.rocket.Close(ctx); err != nil {
+			return err
+		}
+	}
 	if r.publisher != nil {
 		if err := r.publisher.Close(ctx); err != nil {
 			r.publisher.Interrupt()
@@ -276,6 +287,7 @@ func (r *MessagingRuntime) stop(ctx context.Context) error {
 		prometheus.DefaultRegisterer.Unregister(r.observations)
 		r.observations = nil
 	}
+	r.rocket = nil
 	r.started = false
 	r.stopping = false
 	r.handlersReady = false

@@ -8,11 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	client "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
 	options "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -22,18 +24,27 @@ import (
 var ErrBinding = errors.New("invalid reviewed MQ binding; contents withheld")
 
 type Binding struct {
-	Revision    string            `json:"binding_revision"`
-	Enabled     bool              `json:"enabled"`
-	NSQD        map[string]string `json:"nsqd"`
-	Signing     string            `json:"signing_key_file"`
-	Decrypt     map[string]string `json:"decrypt_key_files"`
-	Signers     map[string]string `json:"ai_signer_files"`
-	Recipient   string            `json:"ai_recipient_key_file"`
-	MaxInFlight int               `json:"max_in_flight"`
+	Provider       string                          `json:"provider,omitempty"`
+	RocketMQ       *genericoptions.RocketMQOptions `json:"rocketmq,omitempty"`
+	PublishEnabled *bool                           `json:"publish_enabled,omitempty"`
+	Revision       string                          `json:"binding_revision"`
+	Enabled        bool                            `json:"enabled"`
+	NSQD           map[string]string               `json:"nsqd"`
+	Signing        string                          `json:"signing_key_file"`
+	Decrypt        map[string]string               `json:"decrypt_key_files"`
+	Signers        map[string]string               `json:"ai_signer_files"`
+	Recipient      string                          `json:"ai_recipient_key_file"`
+	MaxInFlight    int                             `json:"max_in_flight"`
 }
 
 func (b Binding) Options() options.AIWorkflowMessagingOptions {
-	return options.AIWorkflowMessagingOptions{Enabled: b.Enabled, NSQD: b.NSQD, SigningKeyFile: b.Signing, DecryptKeyFiles: b.Decrypt, AISignerFiles: b.Signers, AIRecipientKeyFile: b.Recipient}
+	var mq *genericoptions.RocketMQOptions
+	if b.RocketMQ != nil {
+		copy := *b.RocketMQ
+		copy.PublishEnabled = b.PublishEnabled
+		mq = &copy
+	}
+	return options.AIWorkflowMessagingOptions{Provider: b.Provider, RocketMQ: mq, Enabled: b.Enabled, NSQD: b.NSQD, SigningKeyFile: b.Signing, DecryptKeyFiles: b.Decrypt, AISignerFiles: b.Signers, AIRecipientKeyFile: b.Recipient}
 }
 
 func (b Binding) SHA256() string {
@@ -58,6 +69,9 @@ func Decode(raw []byte) (Binding, error) {
 	d = json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	if d.Decode(&b) != nil || !b.Enabled || b.MaxInFlight != 1 || !regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`).MatchString(b.Revision) || len(b.NSQD) > 8 || len(b.Decrypt) > 8 || len(b.Signers) > 8 {
+		return b, ErrBinding
+	}
+	if b.Provider == "rocketmq" && (b.PublishEnabled == nil || b.RocketMQ == nil) {
 		return b, ErrBinding
 	}
 	if b.Options().Validate() != nil {
@@ -158,6 +172,14 @@ func ValidateKeys(b Binding) (map[string]string, error) {
 	}
 	for _, file := range files {
 		if validateKeyFile(file) != nil {
+			return nil, ErrBinding
+		}
+	}
+	if b.Provider == "rocketmq" {
+		if _, err := b.TransportFiles(); err != nil {
+			return nil, ErrBinding
+		}
+		if _, err := b.Options().RocketMQ.Load([]string{"qs.ai.commands.v1", "qs.ai.events.v1", "qs.ai.acks.v1"}, 1, 5*time.Second); err != nil {
 			return nil, ErrBinding
 		}
 	}
@@ -262,4 +284,32 @@ func validateKeyFile(file KeyFile) error {
 		}
 	}
 	return nil
+}
+
+// TransportFiles validates bounded local files and returns only content digests.
+// It performs no client construction, broker call or database access.
+func (b Binding) TransportFiles() (map[string]string, error) {
+	if b.Provider != "rocketmq" {
+		return nil, nil
+	}
+	if b.RocketMQ == nil {
+		return nil, ErrBinding
+	}
+	files := map[string]string{}
+	for name, path := range map[string]string{"credentials.json": b.RocketMQ.CredentialsFile, "ca.crt": b.RocketMQ.CAFile, "routes.json": b.RocketMQ.RoutesFile} {
+		if path != "/app/configs/rocketmq/"+name {
+			return nil, ErrBinding
+		}
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > 1<<20 || info.Mode().Perm()&0022 != 0 || (name == "credentials.json" && info.Mode().Perm()&0007 != 0) {
+			return nil, ErrBinding
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return nil, ErrBinding
+		}
+		h := sha256.Sum256(body)
+		files[name] = hex.EncodeToString(h[:])
+	}
+	return files, nil
 }
