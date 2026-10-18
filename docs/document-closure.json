@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+    "sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
     "verified_on": "2026-10-18"
   },
   "status_policy": {
@@ -8819,7 +8819,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -11408,7 +11408,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -12828,7 +12828,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -13212,7 +13212,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14104,7 +14104,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
@@ -14688,7 +14688,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "1261d48851d1ff25b6b7a7545e06ebf13e70f3fe",
+        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
         "verified_on": "2026-10-18"
       },
       "fact_sources": [
