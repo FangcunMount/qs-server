@@ -10,6 +10,7 @@ import (
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
@@ -135,7 +136,8 @@ func (s *RocketMQSubmissionStore) confirmSubmission(ctx context.Context, po Answ
 		return ErrSubmissionUnresolved
 	}
 	frozen, frozenBinding, err := readSubmissionPlan(winner.Execution.Plan)
-	if err != nil || frozen.DomainID != po.DomainID || frozen.ID != po.ID || frozenBinding != binding || !frozen.DurableAcceptance.AcceptedAt.Equal(a.AcceptedAt) || proof.Reference.Fingerprint != hex.EncodeToString(ref.MessageFingerprint[:]) {
+	if err != nil || frozen.DomainID != po.DomainID || frozen.ID != po.ID || frozenBinding != binding || !frozen.DurableAcceptance.AcceptedAt.Equal(a.AcceptedAt) ||
+		proof.Reference != standard.ReferenceFromMessage(winner.Execution.Plan.Input().Branches[0].Message) || !proof.RecordedAt.Equal(a.AcceptedAt) {
 		return ErrSubmissionUnresolved
 	}
 	e, err := s.authority.Evidence(ctx, ref)
@@ -146,6 +148,9 @@ func (s *RocketMQSubmissionStore) confirmSubmission(ctx context.Context, po Answ
 }
 
 func (s *RocketMQSubmissionStore) CreateDurably(ctx context.Context, sheet *domain.AnswerSheet, meta submit.DurableSubmitMeta) (*domain.AnswerSheet, bool, error) {
+	if mongo.SessionFromContext(ctx) != nil {
+		return nil, false, fmt.Errorf("submission half preparation must precede the original Mongo root transaction")
+	}
 	if existing, err := s.FindCompleted(ctx, meta); err != nil || existing != nil {
 		if err != nil {
 			return nil, false, err
