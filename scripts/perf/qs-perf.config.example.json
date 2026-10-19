@@ -1,6 +1,6 @@
 {
-  "collectionBaseUrl": "https://collect.fangcunmount.cn",
-  "apiserverBaseUrl": "https://qs.fangcunmount.cn",
+  "collectionBaseUrl": "http://127.0.0.1:18081",
+  "apiserverBaseUrl": "http://127.0.0.1:18080",
   "tokensFile": "tokens.json",
   "apiserverTokensFile": "apiserver-tokens.json",
   "orgId": "1",
@@ -53,8 +53,8 @@
     "614333603412718126",
     "614187067651404334"
   ],
-  "testeeSource": "daily_simulation",
-  "autoDiscoverSeeddata": true,
+  "testeeSource": "performance_fixture",
+  "autoDiscoverSeeddata": false,
   "autoCreateSubmitTestees": false,
   "discoverAnswers": true,
   "qpsProfile": "smoke_4",
