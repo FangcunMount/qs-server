@@ -11432,7 +11432,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ffdddb36d8d31b8016f974416212a120edc0c940",
+        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -14132,7 +14132,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ffdddb36d8d31b8016f974416212a120edc0c940",
+        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
