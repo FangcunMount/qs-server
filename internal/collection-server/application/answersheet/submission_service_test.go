@@ -373,6 +373,22 @@ func TestAcceptDurablyReturnsReadbackConflictBeforeMutableDependencies(t *testin
 	}
 }
 
+func TestAcceptDurablyDoesNotAcceptAnIDWhenExactWitnessReadIsUnavailable(t *testing.T) {
+	reader := &submissionDurableResultReaderStub{
+		output: &LookupAcceptedSubmissionOutput{Found: true, ID: 42},
+		err:    status.Error(codes.Unavailable, "exact transaction evidence unavailable"),
+	}
+	writer := &submissionWriterStub{output: &SaveAnswerSheetOutput{ID: 99}}
+	service := NewSubmissionService(writer, reader, nil, nil, nil, nil, nil, nil, time.Second)
+	got, err := service.AcceptDurably(t.Context(), "request-unresolved-witness", 11, validSubmitRequest())
+	if got != nil || status.Code(err) != codes.Unavailable {
+		t.Fatalf("unverified ID was accepted: result=%#v error=%v", got, err)
+	}
+	if reader.calls != 1 || writer.calls != 0 {
+		t.Fatalf("readback/writer calls=%d/%d, unresolved proof must not authorize a new write", reader.calls, writer.calls)
+	}
+}
+
 func TestAcceptDurablyReadbackMissRunsFullValidationAndSave(t *testing.T) {
 	reader := &submissionDurableResultReaderStub{
 		output: &LookupAcceptedSubmissionOutput{},
