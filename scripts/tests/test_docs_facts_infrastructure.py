@@ -472,15 +472,15 @@ class InfrastructureParserTest(unittest.TestCase):
             {issue.kind for issue in check_docs_facts.oneoff_safety_contract_issues(mutated)},
         )
 
-        residual_issues = self.issues_after_mutation(
+        readonly_issues = self.issues_after_mutation(
             check_docs_facts.INFRA_MIGRATION_RECOVERY_DOC,
-            "不是二进制 fail-closed",
-            "二进制已经 fail-closed",
+            "源码已移除写入实现与写入参数",
+            "源码仍保留写入实现与写入参数",
             check_docs_facts.oneoff_safety_contract_issues,
         )
         self.assertIn(
-            "oneoff-orphan-cleanup-residual-capability-undisclosed",
-            {issue.kind for issue in residual_issues},
+            "oneoff-orphan-cleanup-readonly-capability-undisclosed",
+            {issue.kind for issue in readonly_issues},
         )
 
 

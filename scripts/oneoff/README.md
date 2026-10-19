@@ -7,7 +7,7 @@
 
 1. 默认使用只读或 dry-run 模式；写入必须有明确的 `--apply`、`--confirm` 等开关。
 2. 生产执行前确认脚本对应的 schema、模型版本和问卷版本仍与目标数据一致。
-3. MySQL 与 MongoDB 共同参与的操作必须成对备份、成对恢复，不能只恢复一侧。
+3. MySQL 与 MongoDB 共同参与的写操作，按本次审定对象范围成对保护、核对恢复；不以单侧恢复覆盖已经产生的新事实。
 4. 禁止把真实 DSN、Token 或密码写入命令历史、文档或提交；统一使用环境变量。
 5. 一次性任务完成后删除专用脚本；需要追溯时从 Git 记录获取，不能直接复制旧脚本到生产。
 
@@ -30,8 +30,8 @@
 
 
 `cleanup_orphaned_assessment_documents` 当前必须保持 blocked。不得使用 `--apply`、
-`--hard-delete` 或 `--skip-backup`；代码中存在这些开关只代表历史实现能力，不代表当前运维授权。
-解除 blocked 至少要同时满足：可靠受理状态机已定义可删除终态；完成 MySQL Assessment、Mongo
+`--hard-delete` 或 `--skip-backup`；源码已移除写入实现与写入参数，旧写入参数会在连接数据库前被拒绝。
+未来若另建专用删除工具，至少要同时满足：可靠受理状态机已定义可删除终态；完成 MySQL Assessment、Mongo
 AnswerSheet、提交幂等/Outbox 以及下游 Outcome/Report 的反向引用审计；形成不可变 ID 清单、
 成对备份和恢复演练；由数据责任人与发布责任人独立批准；并以专用负向测试和人工复核证明不会
 删除仍待异步创建 Assessment 的合法受理事实。任一条件未满足时只能输出 dry-run 审计结果。

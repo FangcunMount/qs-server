@@ -21,10 +21,9 @@ one-off 不是“运行一次的普通脚本”，而是独立变更程序。每
 本次两个精确备份已在删后验收通过后销毁，ServerA 54 个固定材料范围已清零：删除 1,064 个文件、63 个目录，11 个范围原已缺失，最终剩余文件为 0。普通备份、此前清理档案和共享父目录排除。源码删除、CI／CD、六实例健康、数据库回读和材料退出分别绑定实际证据；完整恢复演练未完成，已按用户要求取消，不签发恢复成功证明。失败的旧退役运行 `38316933488-1` 不作为成功证明，也不补造旧原生回执；54 范围文件退出不等于所有主机、容器资源或本地临时材料全局清零。临时入口及路由变量已退出，普通部署暂停变量保持原 true；18 个仍有源码入口的工作流和本次 Mac mini 临时设置已恢复，12 个已无源码入口的旧工作流不重建。证据摘要与确切覆盖范围见[退役工具说明](../../../scripts/database/compatibility-retirement.md)。
 
 `cleanup_orphaned_assessment_documents` 当前必须是 blocked：AnswerSheet 与 `answersheet.submitted` Outbox 在同一 Mongo 事务持久化，Assessment 由 worker 异步确保；
-“暂时没有 MySQL Assessment”不能证明 AnswerSheet 是孤儿。该工具还未把 durable Outbox 纳入候选保护/备份，apply 会制造新的反向不一致。
+“暂时没有 MySQL Assessment”不能证明 AnswerSheet 是孤儿。候选核查未覆盖 durable Outbox 和独立问卷等完整业务终态，不能据此授权删除。
 
-这里的 blocked 目前是文档、变更流程和运维授权层面的阻断，不是二进制 fail-closed：源码仍解析并执行 `--apply`、`--hard-delete` 与 `--skip-backup`。在代码级拒绝开关或移除可执行分发完成前，必须继续限制工具制品/生产凭证访问；
-任何人都不能把本页或门禁通过解读为“写删路径已在技术上禁用”。
+源码已移除写入实现与写入参数，当前二进制只保留 dry-run 只读审计。`--apply`、`--hard-delete`、`--skip-backup` 和备份后缀参数已退出，旧写入参数在连接数据库前即由参数解析拒绝。只读范围仍是指定截止时间、ID窗口内的活动答卷；没有Assessment引用的候选不等于可删除数据。
 
 ## 3. blocked 工具的退出条件
 
