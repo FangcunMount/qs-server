@@ -203,6 +203,7 @@ class SSHProfileTests(unittest.TestCase):
             for option in ('StrictHostKeyChecking=yes', 'BatchMode=yes', 'UserKnownHostsFile=' + str(home / '.ssh/known_hosts'), 'ControlPath=none', 'ClearAllForwardings=yes', 'ForwardAgent=no', 'ForwardX11=no', 'ForwardX11Trusted=no'):
                 self.assertIn(option, args)
             self.assertEqual(args[-5:], ['-l', 'ubuntu', '-p', '22', '154.8.167.1'])
+            self.assertIn(str(home / '.ssh/deploy_key'), args)
             self.assertEqual(calls[1], ['/usr/bin/ssh-keygen', '-F', '154.8.167.1', '-f', str(home / '.ssh/known_hosts')])
             valid = b'user ubuntu\nhostname 154.8.167.1\nport 22\n'
             for config in (valid.replace(b'user ubuntu', b'user wrong'), valid.replace(b'154.8.167.1', b'example.invalid'),
@@ -213,7 +214,7 @@ class SSHProfileTests(unittest.TestCase):
                     ssh.trusted_ssh(profile, home)
                 self.assertEqual(captured.call_count, 1)
 
-    def test_real_offline_direct_target_binds_root_port_and_known_host_identity(self):
+    def test_real_offline_direct_target_binds_ubuntu_port_and_known_host_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             (home / '.ssh').mkdir()
@@ -225,7 +226,7 @@ class SSHProfileTests(unittest.TestCase):
             def offline(args, **kwargs):
                 calls.append(args)
                 if '-G' in args:
-                    # CLI root/22 wins over this owned config; -G never connects.
+                    # CLI ubuntu/22 wins over this owned config; -G never connects.
                     return capture([args[0], '-F', str(config), *args[1:]], **kwargs)
                 self.assertEqual(args, ['/usr/bin/ssh-keygen', '-F', '154.8.167.1', '-f', str(home / '.ssh/known_hosts')])
                 return 0, b'owned fixture key\n'
@@ -233,6 +234,7 @@ class SSHProfileTests(unittest.TestCase):
                 args, _ = ssh.trusted_ssh(profile, home)
             self.assertEqual(len(calls), 2)
             self.assertEqual(args[-5:], ['-l', 'ubuntu', '-p', '22', '154.8.167.1'])
+            self.assertIn(str(home / '.ssh/deploy_key'), args)
 
     def test_real_offline_ssh_config_rejects_hostkeyalias_before_key_or_secret_transport(self):
         with tempfile.TemporaryDirectory() as directory:
