@@ -136,3 +136,30 @@ assert_package_contract collection
 assert_package_contract worker
 MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_INSTANCE_ID=proof ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract apiserver
 MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract worker
+
+# Tencent public Redis must fail closed rather than infer TLS from its port.
+redis_tls_dir="$TEST_ROOT/tencent-redis"
+if env SERVICE=collection DEPLOY_PACKAGE_DIR="$redis_tls_dir" DEPLOY_PACKAGE="$TEST_ROOT/tencent-redis.tar.gz" \
+  REDIS_HOST=bj-crs-3dli07u2.sql.tencentcdb.com REDIS_PORT=23136 REDIS_USE_SSL=false \
+  JWT_SECRET=test DELEGATED_SUBJECT_CURRENT_KEY=test \
+  "$SCRIPT_DIR/prepare-package.sh" >"$TEST_ROOT/tencent-redis-rejected.log" 2>&1; then
+  echo 'Tencent Redis plaintext was unexpectedly accepted' >&2
+  exit 1
+fi
+env SERVICE=collection DEPLOY_PACKAGE_DIR="$redis_tls_dir" DEPLOY_PACKAGE="$TEST_ROOT/tencent-redis.tar.gz" \
+  REDIS_HOST=bj-crs-3dli07u2.sql.tencentcdb.com REDIS_PORT=23136 REDIS_USE_SSL=true \
+  REDIS_PASSWORD='REDIS_APP_PASSWORD@synthetic-secret' JWT_SECRET=test DELEGATED_SUBJECT_CURRENT_KEY=test \
+  "$SCRIPT_DIR/prepare-package.sh" >"$TEST_ROOT/tencent-redis-valid.log"
+assert_line "$redis_tls_dir/configs/env/config.prod.env" 'SSL_CERT_DIR=/etc/ssl/certs:/etc/pki/tls/certs:/etc/qlume/redis'
+assert_line "$redis_tls_dir/configs/env/config.prod.env" 'COLLECTION_SERVER_REDIS_PASSWORD=REDIS_APP_PASSWORD@synthetic-secret'
+if grep -q 'synthetic-secret' "$TEST_ROOT/tencent-redis-valid.log"; then
+  echo 'Redis credential leaked in packaging log' >&2
+  exit 1
+fi
+if env SERVICE=collection DEPLOY_PACKAGE_DIR="$TEST_ROOT/tencent-insecure" DEPLOY_PACKAGE="$TEST_ROOT/tencent-insecure.tar.gz" \
+  REDIS_HOST=bj-crs-3dli07u2.sql.tencentcdb.com REDIS_PORT=23136 REDIS_USE_SSL=true REDIS_SSL_INSECURE_SKIP_VERIFY=true \
+  JWT_SECRET=test DELEGATED_SUBJECT_CURRENT_KEY=test \
+  "$SCRIPT_DIR/prepare-package.sh" >"$TEST_ROOT/tencent-insecure.log" 2>&1; then
+  echo 'Tencent Redis SkipVerify was unexpectedly accepted' >&2
+  exit 1
+fi
