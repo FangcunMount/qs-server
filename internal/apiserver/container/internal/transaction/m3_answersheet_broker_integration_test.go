@@ -260,6 +260,23 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.ErrorIs(t, err, submit.ErrIdempotencyConflict)
 	require.Equal(t, priorRuns, runs.Load())
 	cases["conflicting_input_rejected"] = true
+	// A persisted answer by itself is insufficient for V2 acceptance. Reject a
+	// changed reference even when its fingerprint and committed witness survive.
+	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.transaction_evidence.reference.event_type": "answersheet.changed"}})
+	require.NoError(t, err)
+	_, err = reader.FindCompleted(t.Context(), metaInfo)
+	require.ErrorIs(t, err, answerrepo.ErrSubmissionUnresolved)
+	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.transaction_evidence.reference.event_type": domain.EventTypeSubmitted}})
+	require.NoError(t, err)
+	cases["full_reference_required_for_acceptance"] = true
+	session, err := client.StartSession()
+	require.NoError(t, err)
+	priorRuns = runs.Load()
+	_, _, err = durable.CreateDurably(mongo.NewSessionContext(t.Context(), session), duplicate, metaInfo)
+	require.Error(t, err)
+	require.Equal(t, priorRuns, runs.Load())
+	session.EndSession(t.Context())
+	cases["nested_preparation_rejected"] = true
 	// The host deliberately discards an actual successful root ACK. This is a
 	// named client-level discard proof, not a claim of injected network loss.
 	ackSheet, ackMeta := m3AnswerSheet(t, 104, "commit-ack-discard")
@@ -299,7 +316,7 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	priorCallbacks := callbackAttempts.Load()
 	retryCtx := context.WithValue(t.Context(), hookKey{}, func(stage string) error {
 		if stage == "before_root" {
-			return client.Database("admin").RunCommand(t.Context(), bson.M{"configureFailPoint": "failCommand", "mode": bson.M{"times": 1}, "data": bson.M{"failCommands": bson.A{"insert"}, "appName": "qs-m3-answer-fixture", "errorCode": 112, "errorLabels": bson.A{"TransientTransactionError"}}}).Err()
+			return client.Database("admin").RunCommand(t.Context(), bson.D{{Key: "configureFailPoint", Value: "failCommand"}, {Key: "mode", Value: bson.M{"times": 1}}, {Key: "data", Value: bson.M{"failCommands": bson.A{"insert"}, "appName": "qs-m3-answer-fixture", "errorCode": 112, "errorLabels": bson.A{"TransientTransactionError"}}}}).Err()
 		}
 		return nil
 	})
@@ -321,7 +338,7 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, priorRuns, runs.Load())
 	cases["closed_admission_no_business"] = true
-	require.Len(t, cases, 9)
+	require.Len(t, cases, 11)
 	raw, err := json.Marshal(map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases,
 		"root_ack_discard_is_client_level": true, "mongo_callback_failpoint": true, "pool_slots": 2})
 	require.NoError(t, err)
