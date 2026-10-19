@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -77,7 +79,20 @@ func run() error {
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "MySQL TLS probe failed; no credentials or raw SQL errors emitted")
+		detail := map[string]any{"mysql_tls_probe": "failed", "error_type": fmt.Sprintf("%T", err)}
+		var sqlError *mysql.MySQLError
+		var certError *tls.CertificateVerificationError
+		var unknown x509.UnknownAuthorityError
+		if errors.As(err, &sqlError) {
+			detail["mysql_error_code"] = sqlError.Number
+		}
+		if errors.As(err, &certError) {
+			detail["certificate_error"] = certError.Err.Error()
+		}
+		if errors.As(err, &unknown) {
+			detail["certificate_error"] = "unknown authority"
+		}
+		_ = json.NewEncoder(os.Stderr).Encode(detail)
 		os.Exit(1)
 	}
 }

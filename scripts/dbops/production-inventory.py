@@ -284,6 +284,7 @@ def connection_file(kind, env, database, port):
             payload = "[client]\n" + "".join(key + "=" + mysql_option(value) + "\n" for key, value in values.items())
             payload += "ssl-mode=" + env.get("MYSQL_TLS_MODE", "DISABLED") + "\n"
             if env.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+                payload += "tls-version=TLSv1.2,TLSv1.3\n"
                 payload += "ssl-ca=" + mysql_option(env["MYSQL_TLS_CA_FILE"]) + "\n"
         else:
             values = {key: env[key] for key in ("MONGODB_HOST", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")}
