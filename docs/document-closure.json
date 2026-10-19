@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ad5d001be828797f730dab5a8265a1c2a47d37db",
-    "verified_on": "2026-10-18"
+    "sha": "427e99f3442319dcf179bb3724c2c3a8c435e9d1",
+    "verified_on": "2026-10-19"
   },
   "status_policy": {
     "doc_status": [
@@ -653,8 +653,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "command",
@@ -4210,8 +4210,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -4226,8 +4226,8 @@
           "path": "internal/apiserver/infra/mysql/actor/po.go",
           "selector": "actor_maintenance_sql105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -4402,8 +4402,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -4418,8 +4418,8 @@
           "path": "internal/apiserver/infra/mysql/actor/po.go",
           "selector": "actor_maintenance_sql105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -4697,8 +4697,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -4713,8 +4713,8 @@
           "path": "internal/apiserver/infra/mysql/actor/po.go",
           "selector": "actor_maintenance_sql105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -4774,8 +4774,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "command",
@@ -9674,8 +9674,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "command",
@@ -11258,8 +11258,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -11274,8 +11274,8 @@
           "path": "internal/apiserver/infra/mysql/actor/po.go",
           "selector": "actor_maintenance_sql105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -11408,8 +11408,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad5d001be828797f730dab5a8265a1c2a47d37db",
-        "verified_on": "2026-10-18"
+        "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -11681,8 +11681,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -11697,8 +11697,8 @@
           "path": "internal/apiserver/infra/mysql/actor/po.go",
           "selector": "actor_maintenance_sql105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -11758,8 +11758,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "command",
@@ -12705,8 +12705,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad5d001be828797f730dab5a8265a1c2a47d37db",
-        "verified_on": "2026-10-18"
+        "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -13381,8 +13381,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-        "verified_on": "2026-10-18"
+        "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -14104,8 +14104,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ad5d001be828797f730dab5a8265a1c2a47d37db",
-        "verified_on": "2026-10-18"
+        "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -14219,8 +14219,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -14235,8 +14235,8 @@
           "path": "internal/apiserver/infra/mysql/actor/po.go",
           "selector": "actor_maintenance_sql105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "source_selector",
@@ -14296,8 +14296,8 @@
           "path": "internal/apiserver/infra/mysql/actor/operator_plan.go",
           "selector": "*rows[0].Version != 105",
           "result": "matched",
-          "source_sha": "b2c18af837bbf4520a3fa8797120cc3dd3ac599e",
-          "verified_on": "2026-10-18"
+          "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
+          "verified_on": "2026-10-19"
         },
         {
           "kind": "command",
