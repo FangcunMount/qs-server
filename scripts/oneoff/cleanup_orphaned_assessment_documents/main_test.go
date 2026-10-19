@@ -48,7 +48,7 @@ func TestProcessPageReportsOnlyMissingAssessmentReferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectQuery("SELECT answer_sheet_id FROM assessment").WithArgs(uint64(1), uint64(2)).WillReturnRows(sqlmock.NewRows([]string{"answer_sheet_id"}).AddRow(1))
 	got, err := processPage(t.Context(), db, answerSheetPhase(), []bson.M{{"domain_id": int64(1)}, {"domain_id": int64(2)}})
 	if err != nil || got.scanned != 2 || got.candidates != 1 || got.failed != 0 {
@@ -63,7 +63,7 @@ func TestProcessPageDoesNotReportCandidatesAfterReadFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	failure := errors.New("ownership query interrupted")
 	mock.ExpectQuery("SELECT answer_sheet_id FROM assessment").WithArgs(uint64(1)).WillReturnRows(sqlmock.NewRows([]string{"answer_sheet_id"}).AddRow(1).RowError(0, failure))
 	got, err := processPage(t.Context(), db, answerSheetPhase(), []bson.M{{"domain_id": int64(1)}})
