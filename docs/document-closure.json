@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+    "sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
     "verified_on": "2026-10-19"
   },
   "status_policy": {
@@ -11408,7 +11408,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -12828,7 +12828,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13212,7 +13212,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13287,7 +13287,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13381,7 +13381,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -14104,7 +14104,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -14625,7 +14625,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f90ae71d4705b48b04a9ae2bd5549412bd8af227",
+        "source_sha": "2e55ec1ea8a5b16f62340d334751b5bfabe88da8",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
