@@ -15,3 +15,14 @@ ACR 直拉模式先在服务器拉取本次 SHA 镜像，再执行相同离线�
 上传配置保持部署账号所有的 0600 权限。首次预检把原始字节复制到普通镜像 UID/GID 所有的私有暂存文件，以 0400 只读挂载；验证完成后删除副本，再冻结现有四项发布资产。不得通过放宽上传文件权限解决预检失败，也不得把暂存副本留作另一份生产配置。
 
 RocketMQ 普通消息绑定新增显式 provider、publication gate 与三个只读传输文件（credentials、CA、routes）。离线预检校验完整可信路由、CA、权限与内容摘要，不连接 Broker。固定 root 工具升级仍需安装新摘要文件，保留旧工具；不得以本地修改上传脚本绕过生产门禁。
+
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.1 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.

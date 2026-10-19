@@ -83,3 +83,14 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 独立源码 `abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e` 只改 integration 测试夹具：先断言原Conn/DB/pool释放为true，再在原40秒测试context内、最多原5秒queryLimit只读观察该自有用户的server线程归零。查询错误或到期仍失败，不重跑inventory、不KILL连接、不延长任何生产5/45秒预算；read/open/exec helper显式接收当前子测试。驱动v1.9.3的Close发送COM_QUIT并关闭本地socket，不读取server线程结束ACK，因此即时count不应作为唯一同步假设；这说明修正理由，不证明原CI失败原因。
 
 该冻结文件字节在498工作区实际执行原完整 required race proof，三个top及原子场景24项各一次RUN/PASS、0FAIL/SKIP；本包普通/race各153项通过，tag仅编译、vet及pinned2.5普通/taglint通过。私有 `qs-m4-inventory-close-fixture-v1` 保留原失败、旧8/64与新24分开证据；源码交付 SHA `5fa1491719293fdf98b96001cb091675213a276b661b228b779c7e16207439ba`、实际资源回执 SHA `a1c6710ec44b4693e1239ec96aaf234378c311532ec9bed28e738a4a7ec3b738`。唯一自有MySQL容器/卷/网络均精确ID、删除ACK与缺失核验；旧CID/image/mount保留，nsqd3540→3542及三个Health采样变化不签运行恒定。生产Go、15+3读取/控制界限、工作流和迁移资源逐字保持；原CI仍为失败，新head CI/AI、生产及业务资格继续独立，不重签80f历史24项。
+
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.1 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.
