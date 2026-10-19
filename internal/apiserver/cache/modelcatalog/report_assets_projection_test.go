@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPublishedCacheProjectionVersionSurvivesExactLatestQuestionnaireAndList(t *testing.T) {
@@ -48,6 +49,12 @@ func TestPublishedCacheProjectionVersionSurvivesExactLatestQuestionnaireAndList(
 				list, _, err := cached.ListPublishedModels(context.Background(), port.ListPublishedFilter{})
 				if err != nil || len(list) != 1 || list[0].ReportAssetsProjectionVersion != version {
 					t.Fatalf("list: %#v %v", list, err)
+				}
+				if i == 0 {
+					// Catalogue pages persist asynchronously. A process-shaped second
+					// reader must start after the first writer has reached Redis.
+					key := cached.listCatalogCacheKeyAtVersion(port.ListPublishedFilter{}, 0)
+					require.Eventually(t, func() bool { return mr.Exists(key) }, time.Second, time.Millisecond)
 				}
 				if version.IsKnown() {
 					for _, entry := range []*port.PublishedModel{exact, latest, byQuestionnaire, list[0]} {
