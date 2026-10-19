@@ -277,6 +277,14 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.transaction_evidence.reference.event_type": domain.EventTypeSubmitted}})
 	require.NoError(t, err)
 	cases["full_reference_required_for_acceptance"] = true
+	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.schema_version": 1}})
+	require.NoError(t, err)
+	_, err = reader.FindCompleted(t.Context(), metaInfo)
+	require.ErrorIs(t, err, answerrepo.ErrSubmissionUnresolved)
+	require.Equal(t, 503, collectionReadback(metaInfo.IdempotencyKey, "accepted"))
+	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.schema_version": 2}})
+	require.NoError(t, err)
+	cases["mixed_protocol_marker_rejected"] = true
 	session, err := client.StartSession()
 	require.NoError(t, err)
 	priorRuns = runs.Load()
@@ -423,7 +431,7 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.Equal(t, sheet.ID(), result.ID())
 	require.Zero(t, newExecutions.Load())
 	cases["new_instance_exact_accepted_result"] = true
-	require.Len(t, cases, 15)
+	require.Len(t, cases, 16)
 	raw, err := json.Marshal(map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases,
 		"root_ack_discard_is_client_level": true, "mongo_callback_failpoint": true, "original_transaction_slots": 2,
 		"upstream_rpc": "actual_protobuf_service_over_bufconn", "system_login_not_claimed": true})
