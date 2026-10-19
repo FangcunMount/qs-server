@@ -153,6 +153,7 @@ class Contracts(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(dir=str(Path(tempfile.gettempdir()).resolve()), prefix="cbpt-test-")
         self.root = Path(self.temporary.name)
+        (self.root / "mysql-tls.env").write_text("MYSQL_TLS_MODE=DISABLED\nMYSQL_TLS_CA_FILE=\n")
         self.binary = self.root / "tool"
         self.binary.write_bytes(b"fixture")
         self.binary.chmod(0o700)
@@ -173,7 +174,7 @@ class Contracts(unittest.TestCase):
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
             self.assertNotIn("database=", (root / "mysql.cnf").read_text())
             self.assertIn('password="a\\"b\\\\c\\td"', (root / "mysql.cnf").read_text())
-            self.assertEqual(json.loads((root / "mysql.json").read_text()), values)
+            self.assertEqual(json.loads((root / "mysql.json").read_text()), {k:v for k,v in values.items() if k not in {"tls_mode", "tls_ca_file"}})
         self.assertFalse(root.exists())
 
     def test_environment_controls_and_system_database_fail_closed(self):

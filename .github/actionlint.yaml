@@ -5,6 +5,10 @@ self-hosted-runner:
     - ops
 
 config-variables:
+  - MYSQL_PUBLIC_HOST
+  - MYSQL_PUBLIC_PORT
+  - MYSQL_TLS_MODE
+  - MYSQL_TLS_CA_REF
   - MESSAGING_PROVIDER
   - ROCKETMQ_ENDPOINT
   - ROCKETMQ_INSTANCE_ID

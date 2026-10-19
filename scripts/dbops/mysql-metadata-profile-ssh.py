@@ -66,9 +66,9 @@ def validate_envelope(value):
     if not isinstance(value, dict) or set(value) != {"env", "package_sha256", "package_size"}:
         raise ValueError("envelope_fields")
     env = value["env"]
-    keys = {"MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+    keys = {"MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MYSQL_TLS_MODE", "MYSQL_TLS_CA_FILE", "MYSQL_TLS_CA_REF",
             "PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH"}
-    if not isinstance(env, dict) or set(env) != keys or any(not isinstance(v, str) or len(v) > 4096 for v in env.values()):
+    if not isinstance(env, dict) or set(env) not in (keys, keys - {"MYSQL_TLS_MODE", "MYSQL_TLS_CA_FILE", "MYSQL_TLS_CA_REF"}) or any(not isinstance(v, str) or len(v) > 4096 for v in env.values()):
         raise ValueError("environment_fields")
     import re
     if not isinstance(value["package_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", value["package_sha256"]) or type(value["package_size"]) is not int or not 0 < value["package_size"] <= ARCHIVE_LIMIT:
@@ -137,6 +137,9 @@ def receive(stream, *, readiness=False, inventory=False):
         raise ValueError("envelope_limit")
     envelope = json.loads(line, object_pairs_hook=unique_object)
     env = validate_envelope(envelope)
+    if env.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+        import subprocess
+        subprocess.run(["python3", "/opt/infra/scripts/mysql/ca.py", "verify", "--ref", env["MYSQL_TLS_CA_REF"]], check=True, stdout=subprocess.DEVNULL)
     raw = stream.read(envelope["package_size"] + 1)
     if len(raw) != envelope["package_size"] or hashlib.sha256(raw).hexdigest() != envelope["package_sha256"]:
         raise ValueError("package_checksum")

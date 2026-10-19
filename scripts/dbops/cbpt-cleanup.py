@@ -166,8 +166,11 @@ def mysql_option(value):
 
 def connection_payload(values):
     # database is positional for mysqldump and in the private Go JSON only.
-    return ("[client]\n" + "".join(key + "=" + mysql_option(str(values[key])) + "\n"
-                                    for key in ("host", "port", "user", "password"))).encode()
+    payload = "[client]\n" + "".join(key + "=" + mysql_option(str(values[key])) + "\n" for key in ("host", "port", "user", "password"))
+    payload += "ssl-mode=" + values.get("tls_mode", "DISABLED") + "\n"
+    if values.get("tls_mode") == "VERIFY_IDENTITY":
+        payload += "ssl-ca=" + mysql_option(values["tls_ca_file"]) + "\n"
+    return payload.encode()
 
 
 def validate_source(env):
@@ -187,7 +190,7 @@ def validate_source(env):
     if not re.fullmatch(r"[0-9]{1,5}", port) or not 1 <= int(port) <= 65535:
         fail("database_port_invalid")
     return {"host": env["MYSQL_HOST"], "port": int(port), "user": env["MYSQL_USERNAME"],
-            "password": env["MYSQL_PASSWORD"], "database": database}
+            "password": env["MYSQL_PASSWORD"], "database": database, "tls_mode": env.get("MYSQL_TLS_MODE", "DISABLED"), "tls_ca_file": env.get("MYSQL_TLS_CA_FILE", "")}
 
 
 @contextlib.contextmanager
@@ -195,7 +198,8 @@ def connections(values, *, marker=None):
     with tempfile.TemporaryDirectory(prefix="qs-cbpt-connection-") as temporary:
         root = Path(temporary)
         os.chmod(root, 0o700)
-        json_private(root / "mysql.json", values)
+        json_private(root / "mysql.json", {k:v for k,v in values.items() if k not in {"tls_mode", "tls_ca_file"}})
+        write_private(root / "mysql-tls.env", ("MYSQL_TLS_MODE=" + values.get("tls_mode", "DISABLED") + "\nMYSQL_TLS_CA_FILE=" + values.get("tls_ca_file", "") + "\n").encode())
         write_private(root / "mysql.cnf", connection_payload(values))
         if marker is not None:
             json_private(root / "restore-target.json", marker)
@@ -422,6 +426,13 @@ class Runtime:
                 "--mount", "type=bind,source=" + str(archive) + ",target=/archive/" + operation_id,
                 "--entrypoint", "/cbpt-tool", image, *flags,
             ]
+            connection_values = dict(line.split("=", 1) for line in (connection / "mysql-tls.env").read_text().splitlines())
+            extra = ["--env-file", str(connection / "mysql-tls.env")]
+            if connection_values.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+                ca = connection_values["MYSQL_TLS_CA_FILE"]
+                extra += ["--mount", "type=bind,source=" + ca + ",target=" + ca + ",readonly"]
+            image_index = command.index(image)
+            command[image_index:image_index] = extra
         else:
             command = [*self.docker, "exec", "--user", str(os.getuid()) + ":" + str(os.getgid()),
                        restore_id, "/cbpt-tool", *flags]

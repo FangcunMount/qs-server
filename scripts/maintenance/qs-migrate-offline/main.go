@@ -3,11 +3,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"os"
 	"os/signal"
@@ -78,7 +78,7 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 	// Credentials never become flags/output. Only the host opens/closes pools.
 	dsn.MultiStatements = true
 	dsn.Timeout, dsn.ReadTimeout, dsn.WriteTimeout = 15*time.Second, 15*time.Second, 15*time.Second
-	db, err := sql.Open("mysql", dsn.FormatDSN())
+	db, err := mysqltls.Open(dsn.FormatDSN())
 	if err != nil {
 		return err
 	}

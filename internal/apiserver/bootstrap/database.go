@@ -86,6 +86,7 @@ func (dm *DatabaseManager) Initialize() error {
 // initMySQL 初始化MySQL连接
 func (dm *DatabaseManager) initMySQL(ctx context.Context) error {
 	mysqlConfig := &database.MySQLConfig{
+		TLSMode: dm.config.MySQLOptions.TLSMode, TLSCAFile: dm.config.MySQLOptions.TLSCAFile,
 		Host:                  dm.config.MySQLOptions.Host,
 		Username:              dm.config.MySQLOptions.Username,
 		Password:              dm.config.MySQLOptions.Password,

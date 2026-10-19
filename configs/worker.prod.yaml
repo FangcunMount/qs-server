@@ -84,6 +84,8 @@ grpc:
 # 4.1 MySQL 数据库
 # -------------------------------------------------------
 mysql:
+  tls-mode: "VERIFY_IDENTITY"
+  tls-ca-file: "/etc/qlume/mysql/ca-chain.pem"
   host: "127.0.0.1:3306"
   username: "app_user"
   password: ""

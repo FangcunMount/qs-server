@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"net"
 	"os"
@@ -274,7 +275,7 @@ func readConfig(getenv func(string) string) (config, error) {
 }
 
 func openDatabase(ctx context.Context, cfg mysqldriver.Config) (*sql.DB, error) {
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+	db, err := mysqltls.Open(cfg.FormatDSN())
 	if err != nil {
 		return nil, fmt.Errorf("open MySQL: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"net"
 	"os"
@@ -426,7 +427,7 @@ func run(args []string, get func(string) string, out io.Writer) int {
 	if len(args) == 0 && validBinding(b) {
 		r = baseReceipt(b)
 		if c, ok := envConnection(get); ok {
-			connector, err := mysql.NewConnector(mysqlConfig(c))
+			connector, err := mysqltls.NewConnector(mysqlConfig(c))
 			if err != nil {
 				r.ErrorCategory = "connection_config_failed"
 			} else {
