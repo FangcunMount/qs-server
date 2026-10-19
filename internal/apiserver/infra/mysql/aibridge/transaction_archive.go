@@ -116,7 +116,6 @@ func (s *TransactionArchive) ReadCommitted(ctx context.Context, id string) (a ap
 	if err != nil {
 		return a, false, err
 	}
-	found = true
 	ref, err := transaction.DecodeReference(raw)
 	if err != nil {
 		return a, true, err
