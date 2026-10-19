@@ -189,7 +189,7 @@ def trusted_ssh(profile, home):
     known = home / ".ssh" / "known_hosts"
     if known.is_symlink() or not known.is_file() or known.stat().st_uid != os.getuid() or stat.S_IMODE(known.stat().st_mode) & 0o022:
         raise ValueError("known_hosts_unavailable")
-    options = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+    options = ["-i", str(home / ".ssh" / "deploy_key"), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
                "-o", "UserKnownHostsFile=" + str(known), "-o", "GlobalKnownHostsFile=/dev/null",
                "-o", "ConnectTimeout=10", "-o", "ConnectionAttempts=1", "-o", "PasswordAuthentication=no",
                "-o", "KbdInteractiveAuthentication=no", "-o", "ControlMaster=no", "-o", "ControlPath=none",
