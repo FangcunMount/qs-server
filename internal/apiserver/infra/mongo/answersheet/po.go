@@ -40,7 +40,9 @@ type DurableAcceptancePO struct {
 	EventID       string                    `bson:"event_id" json:"event_id"`
 	AcceptedAt    time.Time                 `bson:"accepted_at" json:"accepted_at"`
 	EventEvidence *evidence.EventEvidenceV1 `bson:"event_evidence,omitempty" json:"event_evidence,omitempty"`
-	RequestID     string                    `bson:"request_id,omitempty" json:"request_id,omitempty"`
+	// V2 is a separate read contract; a historical Outbox reference is never a witness.
+	TransactionEvidence *evidence.EventEvidenceV2 `bson:"transaction_evidence,omitempty" json:"transaction_evidence,omitempty"`
+	RequestID           string                    `bson:"request_id,omitempty" json:"request_id,omitempty"`
 }
 
 // SubmitMetaPO is a technical acceptance fact embedded in the AnswerSheet

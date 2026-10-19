@@ -22,15 +22,27 @@ type Repository struct {
 
 // NewRepository 创建答卷MongoDB存储库
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) (*Repository, error) {
+	repo := NewRepositoryWithoutSchema(db, opts...)
+	if err := repo.InstallSubmissionIndexes(context.Background()); err != nil {
+		return nil, err
+	}
+	return repo, nil
+}
+
+// NewRepositoryWithoutSchema borrows the host database without I/O or DDL.
+// Transaction-mode hosts must explicitly install/verify their schema first.
+func NewRepositoryWithoutSchema(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
 	po := &AnswerSheetPO{}
 	repo := &Repository{
 		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),
 		mapper:         NewAnswerSheetMapper(),
 	}
-	if err := repo.ensureIndexes(context.Background()); err != nil {
-		return nil, err
-	}
-	return repo, nil
+	return repo
+}
+
+// InstallSubmissionIndexes is an explicit host schema installation entrypoint.
+func (r *Repository) InstallSubmissionIndexes(ctx context.Context) error {
+	return r.ensureIndexes(ctx)
 }
 
 // Create 创建答卷
