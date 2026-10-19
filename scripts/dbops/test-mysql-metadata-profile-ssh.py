@@ -24,7 +24,7 @@ SHA, RUN, HASH = 'a' * 40, '123-1', 'b' * 64
 
 
 def environment():
-    return {'MYSQL_HOST': 'mysql.fixture', 'MYSQL_PORT': '3306', 'MYSQL_USERNAME': 'fixture',
+    return {'MYSQL_TLS_MODE':'DISABLED', 'MYSQL_TLS_CA_FILE':'', 'MYSQL_TLS_CA_REF':'', 'MYSQL_HOST': 'mysql.fixture', 'MYSQL_PORT': '3306', 'MYSQL_USERNAME': 'fixture',
             'MYSQL_PASSWORD': SECRET, 'MYSQL_DATABASE': 'fixture_source',
             'PROFILE_SOURCE_SHA': SHA, 'PROFILE_RUN_ID': RUN, 'PROFILE_EXPECTED_TARGET_HASH': HASH,
             'PROFILE_OPERATION': 'metadata-visibility-admin-profile', 'PROFILE_DATABASE': 'mysql', 'PROFILE_ARCHIVE_INPUT': ''}

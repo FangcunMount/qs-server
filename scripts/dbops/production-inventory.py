@@ -282,6 +282,9 @@ def connection_file(kind, env, database, port):
         if kind == "mysql":
             values = {"host": env["MYSQL_HOST"], "port": port, "user": env["MYSQL_USERNAME"], "password": env["MYSQL_PASSWORD"], "database": database}
             payload = "[client]\n" + "".join(key + "=" + mysql_option(value) + "\n" for key, value in values.items())
+            payload += "ssl-mode=" + env.get("MYSQL_TLS_MODE", "DISABLED") + "\n"
+            if env.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+                payload += "ssl-ca=" + mysql_option(env["MYSQL_TLS_CA_FILE"]) + "\n"
         else:
             values = {key: env[key] for key in ("MONGODB_HOST", "MONGODB_USERNAME", "MONGODB_PASSWORD", "MONGODB_DBNAME")}
             values["MONGODB_PORT"] = port
@@ -331,6 +334,9 @@ def collect(kind, env, docker, script_dir, run_id):
         common += ["--label", "com.fangcunmount.qs-server.metadata-inventory-owner=" + owner]
         try:
             if kind == "mysql":
+                if env.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+                    ca = env["MYSQL_TLS_CA_FILE"]
+                    common += ["--mount", "type=bind,source="+ca+",target="+ca+",readonly"]
                 command = [*common, "-i", "--mount", "type=bind,source=" + str(connection_dir) + ",target=/connection,readonly", image, "mysql", "--defaults-file=/connection/mysql.cnf", "--protocol=tcp", "--connect-timeout=5", "--batch", "--skip-column-names"]
                 raw = invoke(command, input_text=(script_dir / "production-inventory.sql").read_text(), timeout=75)
                 return parse_mysql(raw, database)

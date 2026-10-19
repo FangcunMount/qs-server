@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"math"
 	"strconv"
@@ -409,7 +410,7 @@ func runInventory(get func(string) string, out io.Writer) int {
 		cfg, ok := envConnection(get)
 		if !ok || cfg.Database != "qs" {
 			r = invalidateInventory(r, "connection_input_invalid", "input")
-		} else if connector, err := mysql.NewConnector(mysqlConfig(cfg)); err != nil {
+		} else if connector, err := mysqltls.NewConnector(mysqlConfig(cfg)); err != nil {
 			r = invalidateInventory(r, "connection_config_failed", "connect")
 		} else {
 			db := sql.OpenDB(connector)

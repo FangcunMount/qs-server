@@ -115,6 +115,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Set up Go for the cleanup tool
         uses: actions/setup-go@v6
         with:
@@ -182,8 +190,11 @@ jobs:
           CBPT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
           CBPT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -194,8 +205,9 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 80m
-          envs: CBPT_OPERATION_INPUT,CBPT_SOURCE_SHA,CBPT_RUN_ID,CBPT_ARCHIVE_ID,CBPT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          envs: CBPT_OPERATION_INPUT,CBPT_SOURCE_SHA,CBPT_RUN_ID,CBPT_ARCHIVE_ID,CBPT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             umask 077
@@ -260,6 +272,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Set up Go for the read-only diagnostic
         uses: actions/setup-go@v6
         with:
@@ -294,8 +314,11 @@ jobs:
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
           # Exact identity from the verified archive; no UUID/host is published.
           PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
           MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -326,6 +349,14 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
+
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
 
       - name: Set up Go for the read-only readiness reader
         uses: actions/setup-go@v6
@@ -361,8 +392,11 @@ jobs:
           PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
           PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -393,6 +427,14 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
+
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
 
       - name: Set up Go for the read-only inventory reader
         uses: actions/setup-go@v6
@@ -428,8 +470,11 @@ jobs:
           PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
           PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -523,6 +568,14 @@ jobs:
       - name: Checkout inventory source
         uses: actions/checkout@v6
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Package immutable inventory scripts
         id: package
         run: |
@@ -567,8 +620,11 @@ jobs:
           INVENTORY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           INVENTORY_DATABASE: ${{ github.event.inputs.database }}
           INVENTORY_ARCHIVE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -584,8 +640,9 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 5m
-          envs: INVENTORY_SOURCE_SHA,INVENTORY_RUN_ID,INVENTORY_DATABASE,INVENTORY_ARCHIVE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          envs: INVENTORY_SOURCE_SHA,INVENTORY_RUN_ID,INVENTORY_DATABASE,INVENTORY_ARCHIVE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             [[ "$INVENTORY_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1
@@ -765,8 +822,9 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
@@ -1473,7 +1531,8 @@ jobs:
               sudo docker run --rm --interactive --network infra-network \
                 -v "$ATTENTION_GAP_SQL:/audit/attention-gaps.sql:ro" \
                 -e MYSQL_PWD="$MYSQL_PASSWORD" \
-                mysql:8.0 mysql --protocol=tcp \
+                --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
+                mysql:8.0 mysql --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
                   --host="$MYSQL_HOST" \
                   --port="${MYSQL_PORT:-3306}" \
                   --user="$MYSQL_USERNAME" \
@@ -1499,8 +1558,11 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
@@ -2334,8 +2396,9 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
@@ -2365,7 +2428,8 @@ jobs:
             fi
             sudo docker run --rm --network infra-network \
               -e MYSQL_PWD="$MYSQL_PASSWORD" \
-              mysql:8.0 mysql --protocol=tcp \
+              --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
+                mysql:8.0 mysql --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
                 --host="$MYSQL_HOST" \
                 --port="${MYSQL_PORT:-3306}" \
                 --user="$MYSQL_USERNAME" \
@@ -2774,8 +2838,11 @@ jobs:
                 "
             echo "✅ MySQL connection and read-only recovery audit OK"
         env:
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -2792,6 +2859,14 @@ jobs:
     steps:
       - name: Checkout immutable governance tool
         uses: actions/checkout@v6
+
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
 
       - name: Set up Go for EvaluationOutcome governance
         uses: actions/setup-go@v6
@@ -2921,8 +2996,9 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 175m
-          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
@@ -3054,8 +3130,11 @@ jobs:
             fi
             echo "✅ EvaluationOutcome template route governance completed"
         env:
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"net"
 	"strconv"
@@ -657,7 +658,7 @@ func runReadiness(get func(string) string, out io.Writer) int {
 		if !ok || cfg.Database != "qs" {
 			r = invalidateReadiness(r, "connection_input_invalid", "input")
 		} else {
-			connector, err := mysql.NewConnector(mysqlConfig(cfg))
+			connector, err := mysqltls.NewConnector(mysqlConfig(cfg))
 			if err != nil {
 				r = invalidateReadiness(r, "connection_config_failed", "connect")
 			} else {

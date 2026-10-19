@@ -7,13 +7,13 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -71,7 +71,7 @@ func main() {
 	}
 	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
 	db := mongoClient.Database(cfg.mongoDB)
-	my, err := sql.Open("mysql", cfg.mysqlDSN)
+	my, err := mysqltls.Open(cfg.mysqlDSN)
 	if err != nil {
 		log.Fatal(err)
 	}

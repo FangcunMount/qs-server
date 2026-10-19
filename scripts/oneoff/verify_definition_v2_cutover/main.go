@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -188,7 +188,7 @@ func applyModelCatalogIdentity(ctx context.Context, uri, database string) error 
 }
 
 func auditMySQL(ctx context.Context, dsn string) ([]finding, error) {
-	db, err := sql.Open("mysql", dsn)
+	db, err := mysqltls.Open(dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,7 @@ WHERE model_kind = '' OR model_algorithm IS NULL OR model_algorithm = ''
 // DefinitionV2 contract audit. It only judges whether outcome runtime identity
 // can be restored without trusting the retired algorithm_family column.
 func auditModelCatalogIdentityMySQL(ctx context.Context, dsn string) ([]finding, error) {
-	db, err := sql.Open("mysql", dsn)
+	db, err := mysqltls.Open(dsn)
 	if err != nil {
 		return nil, err
 	}

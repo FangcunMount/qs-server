@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"net"
 	"os"
@@ -311,7 +312,7 @@ func connect(ctx context.Context, c connectionConfig) (*sql.DB, *sql.Conn, uint6
 	config.ParseTime = false
 	config.Loc = time.UTC
 	config.Params = map[string]string{"charset": "utf8mb4"}
-	db, err := sql.Open("mysql", config.FormatDSN())
+	db, err := mysqltls.Open(config.FormatDSN())
 	if err != nil {
 		return nil, nil, 0, "", fail("connection_failed")
 	}
