@@ -81,8 +81,12 @@ func TestMetadataProfileInputsExcludeEveryOtherDBOpsJob(t *testing.T) {
 	if err = yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	if len(workflow.Jobs) != 17 {
+	// The retired redis-cli-image job is replaced by the verified host reader.
+	if len(workflow.Jobs) != 16 {
 		t.Fatal("db-ops job inventory changed; review metadata exclusion")
+	}
+	if _, exists := workflow.Jobs["redis-cli-image"]; exists {
+		t.Fatal("retired Redis client image job must not return")
 	}
 	for _, operation := range []string{"metadata-visibility-profile", "metadata-visibility-admin-profile", "metadata-readiness-admin", "retirement-inventory-admin"} {
 		for _, database := range []string{"mysql", "mongodb", "redis", "all"} {
