@@ -17,7 +17,7 @@ import sys
 import tarfile
 import tempfile
 
-MEMBERS = frozenset(("profile-linux-amd64", "profile-linux-arm64", "mysql-metadata-profile.py",
+MEMBERS = frozenset(("profile-linux-amd64", "mysql-metadata-profile.py",
                      "cbpt-cleanup.py", "receipt-transport.py"))
 READINESS_MEMBERS = MEMBERS | {"mysql-metadata-readiness.py"}
 INVENTORY_MEMBERS = MEMBERS | {"mysql-retirement-inventory.py"}
@@ -123,7 +123,7 @@ def remove_owned(directory, *, readiness=False, inventory=False):
 def receiver_arch():
     if os.getuid() != 0 or platform.system() != "Linux" or socket.gethostname().lower() != "servera":
         raise ValueError("receiver_host")
-    arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine())
+    arch = {"x86_64": "amd64"}.get(platform.machine())
     if not arch:
         raise ValueError("receiver_arch")
     return arch

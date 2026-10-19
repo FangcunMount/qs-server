@@ -119,6 +119,9 @@ class SSHProfileTests(unittest.TestCase):
                 ssh.receive(UnreadStream())
         with patch.object(ssh.os, 'getuid', return_value=0), patch.object(ssh.platform, 'system', return_value='Linux'), patch.object(ssh.socket, 'gethostname', return_value='serverA'), patch.object(ssh.platform, 'machine', return_value='x86_64'):
             self.assertEqual(ssh.receiver_arch(), 'amd64')
+        with patch.object(ssh.os, 'getuid', return_value=0), patch.object(ssh.platform, 'system', return_value='Linux'), patch.object(ssh.socket, 'gethostname', return_value='serverA'), patch.object(ssh.platform, 'machine', return_value='aarch64'):
+            with self.assertRaisesRegex(ValueError, '^receiver_arch$'):
+                ssh.receive(UnreadStream())
 
     def test_receiver_cleans_owned_files_before_positive_output(self):
         raw = package()
@@ -167,7 +170,7 @@ class SSHProfileTests(unittest.TestCase):
 
     def test_traversal_symlink_duplicate_and_missing_members_rejected(self):
         normal = [(n, b'fixture', tarfile.REGTYPE) for n in sorted(ssh.MEMBERS)]
-        for members in (normal + [('../escape', b'fixture', tarfile.REGTYPE)], normal + [normal[0]],
+        for members in (normal + [('../escape', b'fixture', tarfile.REGTYPE)], normal + [normal[0]], normal + [('profile-linux-arm64', b'unrelated-architecture', tarfile.REGTYPE)],
                         [('profile-linux-amd64', b'', tarfile.SYMTYPE)], normal[:-1]):
             with self.subTest(members=[m[0] for m in members]), tempfile.TemporaryDirectory() as directory:
                 with self.assertRaises(Exception):
