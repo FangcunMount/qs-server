@@ -96,6 +96,9 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 // Validate 验证配置
 func (o *MessagingOptions) Validate() []error {
 	errs := o.Delivery.Validate("messaging.delivery")
+	if o.Provider != "rocketmq" && o.RocketMQ != nil && len(o.RocketMQ.Transactions) > 0 {
+		errs = append(errs, fmt.Errorf("transactions require explicit RocketMQ provider"))
+	}
 	if o.Provider != "nsq" && o.Provider != "rocketmq" {
 		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq, rocketmq)", o.Provider))
 	}

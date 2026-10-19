@@ -79,6 +79,9 @@ func NewSDKWirePublisher(o *options.MessagingOptions) (*sdkNSQWirePublisher, err
 	if o == nil {
 		return nil, errors.New("messaging options required")
 	}
+	if o.RocketMQ != nil && len(o.RocketMQ.Transactions) > 0 {
+		return nil, errors.New("transaction owners cannot use the legacy Outbox wire publisher")
+	}
 	if o.Provider == "nsq" {
 		return NewSDKNSQWirePublisher(o.NSQAddr)
 	}

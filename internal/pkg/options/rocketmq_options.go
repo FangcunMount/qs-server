@@ -17,17 +17,23 @@ import (
 // RocketMQOptions selects an explicit endpoint. Files belong to QS runtime
 // configuration; the SDK never discovers production credentials or resources.
 type RocketMQOptions struct {
-	Endpoint        string `json:"endpoint" mapstructure:"endpoint"`
-	CredentialsFile string `json:"credentials_file" mapstructure:"credentials_file"`
-	CAFile          string `json:"ca_file" mapstructure:"ca_file"`
-	RoutesFile      string `json:"routes_file" mapstructure:"routes_file"`
-	InstanceID      string `json:"instance_id" mapstructure:"instance_id"`
-	PublishEnabled  *bool  `json:"publish_enabled" mapstructure:"publish_enabled"`
+	Transactions    map[string]TransactionOptions `json:"transactions,omitempty" mapstructure:"transactions"`
+	Endpoint        string                        `json:"endpoint" mapstructure:"endpoint"`
+	CredentialsFile string                        `json:"credentials_file" mapstructure:"credentials_file"`
+	CAFile          string                        `json:"ca_file" mapstructure:"ca_file"`
+	RoutesFile      string                        `json:"routes_file" mapstructure:"routes_file"`
+	InstanceID      string                        `json:"instance_id" mapstructure:"instance_id"`
+	PublishEnabled  *bool                         `json:"publish_enabled" mapstructure:"publish_enabled"`
 }
 
 func (o *RocketMQOptions) Validate() error {
 	if o == nil || o.Endpoint == "" || o.CredentialsFile == "" || o.CAFile == "" || o.RoutesFile == "" {
 		return errors.New("RocketMQ requires endpoint and explicit credential/CA/route files")
+	}
+	for owner, binding := range o.Transactions {
+		if _, err := binding.ProtocolLimits(owner); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -47,23 +53,17 @@ func (o *RocketMQOptions) Load(topics []string, concurrency int, timeout time.Du
 	if json.Unmarshal(body, &credentials) != nil || credentials.Username == "" || credentials.Password == "" {
 		return rocketmq.Config{}, errors.New("invalid RocketMQ credentials")
 	}
-	var manifest struct {
-		Version int                      `json:"version"`
-		Routes  []transport.RouteBinding `json:"routes"`
-	}
 	body, err = os.ReadFile(o.RoutesFile)
 	if err != nil {
 		return rocketmq.Config{}, errors.New("read configured RocketMQ route manifest")
 	}
-	if json.Unmarshal(body, &manifest) != nil || manifest.Version != 1 {
-		return rocketmq.Config{}, errors.New("invalid RocketMQ route manifest version")
-	}
-	if err = transport.ValidateRoutes(manifest.Routes); err != nil {
+	routes, err := decodeRouteManifest(body)
+	if err != nil {
 		return rocketmq.Config{}, err
 	}
 	selected := make([]transport.RouteBinding, 0)
 	seen := map[string]bool{}
-	for _, r := range manifest.Routes {
+	for _, r := range routes {
 		if len(topics) == 0 {
 			selected = append(selected, r)
 			continue
