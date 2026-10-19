@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3f47ff9f458e7b12654328025e9a61cb50cd3dc7",
+    "sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
     "verified_on": "2026-10-19"
   },
   "status_policy": {
@@ -12854,7 +12854,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13010,7 +13010,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
     },
     {
       "path": "scripts/testing/reliable-messaging-proof.md",
@@ -13238,7 +13238,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13305,7 +13305,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
@@ -13313,7 +13313,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "aedda85e1f6f5566c3cf9d9c80ace2b2276763ea",
+        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13399,7 +13399,8 @@
           "M4-D source mergeef293e6af7b6314761a8f390c2b107574244d14e integrates actual main3c2117644628d1ed83e0c96be38b6cbba824d8af. Its28 D component sources/new103 resources remain byte-equal to d253 native proof, and incoming native readers/dbops inherit exact main bytes. Two parents retain their original verification records (including12 obsolete current selectors as complete historical JSON); no prior CI/native run is renamed to this merge. Fresh merged-head CI remains required. Production D-target protection/freeze, full image startup and30/60min/RPO remain unverified."
         ]
       },
-      "gaps": []
+      "gaps": [],
+      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
     },
     {
       "path": "scripts/oneoff/mysql_metadata_profile/README.md",
@@ -13407,7 +13408,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ffdddb36d8d31b8016f974416212a120edc0c940",
+        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -14000,7 +14001,8 @@
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
-      ]
+      ],
+      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
     },
     {
       "path": "scripts/database/compatibility-retirement.md",
