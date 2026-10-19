@@ -3588,11 +3588,11 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     # subscriber/relay/wire and contracts remain unchanged from mq-ai.1
     # (read-only source audit, not original Go business acceptance).
     # The current subscriber and terminal handoff belong to the fixed SDK.
-    # component-base v0.8.0 has no messaging/signaling packages; the old v0.6.11
+    # component-base v0.8.1 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
         re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.4\.0-rocketmq\.1\s*$", go_mod, flags=re.M)
-        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.0\s*$", go_mod, flags=re.M)
+        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.1\s*$", go_mod, flags=re.M)
     ):
         issues.append(
             Issue(
