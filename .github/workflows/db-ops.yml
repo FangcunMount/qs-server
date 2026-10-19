@@ -3152,32 +3152,6 @@ jobs:
           OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT: ${{ github.event.inputs.presentation_require_complete }}
           OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT: ${{ github.event.inputs.governance_confirm }}
 
-  redis-cli-image:
-    name: Prepare Redis CLI Image
-    if: |
-      (github.event.inputs.operation == 'status' && (github.event.inputs.database == 'redis' || github.event.inputs.database == 'all')) ||
-      (github.event.inputs.operation == 'preflight-redis-control' && github.event.inputs.database == 'redis')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Export Redis CLI image archive
-        env:
-          REDIS_CLI_IMAGE_ARCHIVE: redis-cli-image-${{ github.run_id }}.tar.gz
-        run: |
-          set -Eeuo pipefail
-          docker pull redis:7-alpine
-          docker save redis:7-alpine -o "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
-          gzip -f "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
-          test -s "$REDIS_CLI_IMAGE_ARCHIVE"
-
-      - name: Upload Redis CLI image artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: redis-cli-image-${{ github.run_id }}
-          path: redis-cli-image-${{ github.run_id }}.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-
   redis-status:
     name: Redis Keyspace Status
     if: |
@@ -3186,7 +3160,6 @@ jobs:
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
-    needs: redis-cli-image
     timeout-minutes: 30
     environment: production
     steps:
@@ -3202,23 +3175,6 @@ jobs:
           : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
           : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
           : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
-
-      - name: Download Redis CLI image artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: redis-cli-image-${{ github.run_id }}
-          path: .
-
-      - name: Upload Redis CLI image archive to serverA
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          source: redis-cli-image-${{ github.run_id }}.tar.gz
-          target: /tmp
 
       - name: Inventory Redis keyspaces without exposing keys
         uses: appleboy/ssh-action@v1.2.2
@@ -3236,45 +3192,16 @@ jobs:
 
             : "${REDIS_HOST:?REDIS_HOST is empty}"
             REDIS_PORT="${REDIS_PORT:-6379}"
-            REDIS_AUDIT_CONTAINER="qs-server-redis-keyspace-audit"
-            REDIS_CLI_IMAGE_ARCHIVE="/tmp/redis-cli-image-${{ github.run_id }}.tar.gz"
-
-            cleanup_redis_audit() {
-              sudo docker rm -f "$REDIS_AUDIT_CONTAINER" >/dev/null 2>&1 || true
-              rm -f -- "$REDIS_CLI_IMAGE_ARCHIVE"
-            }
-            trap cleanup_redis_audit EXIT
-
-            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
-              echo "❌ infra-network is unavailable" >&2
-              exit 1
+            # Host-side, read-only RESP client verifies both the pinned CA and hostname.
+            # redis-cli --sni alone is not a portable guarantee of hostname verification.
+            test -r /opt/infra/scripts/redis/cli.py
+            if [ "${REDIS_USE_SSL:-false}" = true ]; then
+              python3 /opt/infra/scripts/redis/ca.py verify
             fi
-
-            if ! sudo docker image inspect redis:7-alpine >/dev/null 2>&1; then
-              test -s "$REDIS_CLI_IMAGE_ARCHIVE"
-              sudo docker load -i "$REDIS_CLI_IMAGE_ARCHIVE"
-            fi
-
-            REDIS_CLI_ARGS=(-h "$REDIS_HOST" -p "$REDIS_PORT" --no-auth-warning --raw)
-            if [ -n "${REDIS_USERNAME:-}" ]; then
-              REDIS_CLI_ARGS+=(--user "$REDIS_USERNAME")
-            fi
-            if [ "${REDIS_USE_SSL:-false}" = "true" ]; then
-              REDIS_CLI_ARGS+=(--tls)
-              if [ "${REDIS_SSL_INSECURE_SKIP_VERIFY:-false}" = "true" ]; then
-                REDIS_CLI_ARGS+=(--insecure)
-              fi
-            fi
-
             redis_cli() {
               local database="$1"
               shift
-              sudo docker run --rm --network infra-network \
-                --name "$REDIS_AUDIT_CONTAINER" \
-                --label "com.fangcunmount.qs-server.operation=redis-keyspace-audit" \
-                --label "com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}" \
-                -e REDISCLI_AUTH="${REDIS_PASSWORD:-}" \
-                redis:7-alpine redis-cli "${REDIS_CLI_ARGS[@]}" -n "$database" "$@"
+              python3 /opt/infra/scripts/redis/cli.py --db "$database" "$@"
             }
 
             scan_database() {
@@ -3424,8 +3351,6 @@ jobs:
               echo "✅ Redis control cutover preflight passed; instance heartbeats are informational and may expire naturally"
             fi
 
-            cleanup_redis_audit
-            trap - EXIT
             echo "✅ Redis read-only keyspace audit OK"
         env:
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
@@ -3435,9 +3360,3 @@ jobs:
           REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
           REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
           REDIS_CONTROL_PREFLIGHT: ${{ github.event.inputs.operation == 'preflight-redis-control' && 'true' || 'false' }}
-
-      - name: Cleanup runner Redis CLI image archive
-        if: always()
-        env:
-          REDIS_CLI_IMAGE_ARCHIVE: redis-cli-image-${{ github.run_id }}.tar.gz
-        run: rm -f -- "$REDIS_CLI_IMAGE_ARCHIVE" "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"

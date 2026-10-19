@@ -31,6 +31,7 @@ services:
     env_file:
       - /opt/qs-server/qs-apiserver/configs/env/config.prod.env
     volumes:
+      - /data/infra/ssl/redis/ca-chain.pem:/etc/qlume/redis/ca-chain.pem:ro
       - /data/infra/ssl/mysql/ca-chain.pem:/etc/qlume/mysql/ca-chain.pem:ro
       - /opt/qs-server/qs-apiserver/configs:/app/configs
       - /data/logs/qs-server/qs-apiserver:/data/logs/qs
@@ -79,6 +80,7 @@ services:
     env_file:
       - /opt/qs-server/qs-collection-server/configs/env/config.prod.env
     volumes:
+      - /data/infra/ssl/redis/ca-chain.pem:/etc/qlume/redis/ca-chain.pem:ro
       - /opt/qs-server/qs-collection-server/configs:/app/configs
       # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
@@ -122,6 +124,7 @@ services:
     env_file:
       - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:
+      - /data/infra/ssl/redis/ca-chain.pem:/etc/qlume/redis/ca-chain.pem:ro
       - /opt/qs-server/qs-worker/configs:/app/configs
       - /data/logs/qs-server/qs-worker:/data/logs/qs
       # gRPC mTLS 证书目录（CA + 客户端证书），worker 不需要公网 REST TLS 证书
