@@ -997,7 +997,7 @@ export function discoverSubmitSubjects() {
           name: `K6 Perf Testee ${String(tokenIndex + 1).padStart(3, '0')}`,
           gender: 3,
           relation: 'self',
-          source: TESTEE_SOURCE || 'daily_simulation',
+          source: TESTEE_SOURCE || 'performance_fixture',
           tags: ['k6', 'performance'],
           is_key_focus: false,
         }),

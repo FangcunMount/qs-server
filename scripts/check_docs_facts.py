@@ -3358,44 +3358,16 @@ def oneoff_safety_contract_issues(text: str | None = None) -> list[Issue]:
         if not re.search(pattern, text, flags=re.I)
     ]
     source_text = ONEOFF_CLEANUP_SOURCE.read_text(encoding="utf-8")
-    write_flags = set(re.findall(r'flag\.BoolVar\([^,]+,\s*"([a-z-]+)"', source_text))
-    expected_write_flags = {"apply", "hard-delete", "skip-backup"}
-    if not expected_write_flags.issubset(write_flags):
-        issues.append(
-            Issue(
-                "oneoff-orphan-cleanup-binary-capability-drift",
-                f"source flags={sorted(write_flags)}, expected residual flags={sorted(expected_write_flags)}",
-            )
-        )
-        return issues
-
-    for pattern in (
-        r"代码中存在这些开关[^。\n]*不代表当前运维授权",
-        r"`--apply`",
-        r"`--hard-delete`",
-        r"`--skip-backup`",
-    ):
-        if not re.search(pattern, text, flags=re.I):
-            issues.append(
-                Issue(
-                    "oneoff-orphan-cleanup-residual-capability-undisclosed",
-                    f"{ONEOFF_README.relative_to(ROOT)}: missing /{pattern}/",
-                )
-            )
+    flags = set(re.findall(r'flag\.BoolVar\([^,]+,\s*"([a-z-]+)"', source_text))
+    residual = flags & {"apply", "hard-delete", "skip-backup"}
+    if residual:
+        issues.append(Issue("oneoff-orphan-cleanup-binary-capability-drift", f"retired write flags remain: {sorted(residual)}"))
 
     canonical = INFRA_MIGRATION_RECOVERY_DOC.read_text(encoding="utf-8")
-    for pattern in (
-        r"不是二进制\s*fail-closed",
-        r"源码仍解析并执行[^。\n]*`--apply`[^。\n]*`--hard-delete`[^。\n]*`--skip-backup`",
-        r"不能[^。\n]*解读为[^。\n]*技术上禁用",
-    ):
-        if not re.search(pattern, canonical, flags=re.I):
-            issues.append(
-                Issue(
-                    "oneoff-orphan-cleanup-residual-capability-undisclosed",
-                    f"{INFRA_MIGRATION_RECOVERY_DOC.relative_to(ROOT)}: missing /{pattern}/",
-                )
-            )
+    for path, content in ((ONEOFF_README, text), (INFRA_MIGRATION_RECOVERY_DOC, canonical)):
+        if "源码已移除写入实现与写入参数" not in content:
+            issues.append(Issue("oneoff-orphan-cleanup-readonly-capability-undisclosed", f"{path.relative_to(ROOT)}: read-only binary capability not stated"))
+
     return issues
 
 
