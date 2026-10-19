@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ffdddb36d8d31b8016f974416212a120edc0c940",
+    "sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
     "verified_on": "2026-10-19"
   },
   "status_policy": {
@@ -8819,8 +8819,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
-        "verified_on": "2026-10-18"
+        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -8946,6 +8946,30 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/migrations/mysql/000104_rocketmq_transport_evidence.up.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/transaction_archive.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/transaction_archive_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/transaction_archive.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging_reader.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/transaction_archive_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000106_transaction_messaging.up.sql"
         }
       ],
       "verification": [
