@@ -51,8 +51,8 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
-        self.assertEqual(inventory["mysql"], {"max_version": 105, "version_count": 105})
-        self.assertEqual(inventory["mongodb"], {"max_version": 40, "version_count": 40})
+        self.assertEqual(inventory["mysql"], {"max_version": 106, "version_count": 106})
+        self.assertEqual(inventory["mongodb"], {"max_version": 41, "version_count": 41})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
         text = (

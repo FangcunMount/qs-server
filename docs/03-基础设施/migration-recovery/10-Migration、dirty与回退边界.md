@@ -56,3 +56,9 @@ MongoDB 13 当前迁移不包含 `dropIndexes`，不得保留“force 13 绕过 
 2. 不是所有 down migration 都具备数据可逆性，缺少逐版本恢复等级台账。
 3. 当前 checkout 没有绑定 exact SHA 的目标环境 version/dirty/schema 快照。
 4. 应用启动自动迁移扩大了启动故障域；多副本并发、长迁移和锁等待必须在真实环境评估。
+
+## M3 独立事务证据（源码准备）
+
+新增 MySQL 106 / MongoDB 41，独立安装 SDK schema v1 的 rm_tx_binding/request/execution/witness（Mongo witness 内嵌 execution）及 rm_tx_expiry。身份字段采用二进制/简单排序规则；不改旧 Outbox，不自动生成 owner/store_id/writer_epoch binding。新目标只接受完整106/41，部分106/40、105/41不作为可启动pair。Down拒绝删除协议证据。
+
+这些是宿主显式迁移资源，构造和 Start 不执行 DDL；旧105独立生产上线仍为前置，106/41只在隔离CI验证。当前业务未切换。业务档案及接入进度以 [infra M3总表](https://github.com/FangcunMount/infra/blob/codex/rocketmq-m3/docs/server/rocketmq-m3-execution.md) 为准。
