@@ -94,3 +94,5 @@ budgets, timezone, transactions, schema and existing approval boundaries are pre
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business
 acceptance require separate runtime evidence.
+
+当前接收器固定为已核验的腾讯云 serverA / Linux AMD64。维护包仅携带该目标所需的 AMD64 二进制，保留原 32 MiB 解包上限；不会通过扩大输入上限容纳无关架构。
