@@ -5,18 +5,10 @@
   "apiserverTokensFile": "apiserver-tokens.json",
   "orgId": "1",
   "scaleCodes": [
-    "3adyDE",
-    "zOO4eG",
-    "WFIRSP",
-    "bJFKi3",
-    "mbdoeV",
-    "tuixuu",
-    "sJFa2R",
-    "tssl35"
+    "PERF_SCALE_01"
   ],
   "personalityModelCodes": [
-    "MBTI_OEJTS",
-    "SBTI_FUN"
+    "PERF_TYPOLOGY_01"
   ],
   "modelMix": {
     "medical": 0.8,
@@ -49,10 +41,7 @@
     "headroom": 1.25,
     "startupBuffer": 1
   },
-  "planIds": [
-    "614333603412718126",
-    "614187067651404334"
-  ],
+  "planIds": [],
   "testeeSource": "performance_fixture",
   "autoDiscoverSeeddata": false,
   "autoCreateSubmitTestees": false,
