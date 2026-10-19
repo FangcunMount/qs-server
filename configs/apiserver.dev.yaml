@@ -489,6 +489,10 @@ messaging:
 # hot-rank 与主 worker 共用 Topic、使用独立 channel；Redis 失败只重试本 channel。
 # messaging.enabled=false 时不订阅，status 显示 disabled。
 eventing:
+  # Legacy writers have retired; both business flows use their standard Outbox.
+  standard_outbox:
+    mongo: true
+    assessment: true
   consumers:
     modelcatalog-hot-rank:
       enabled: true
