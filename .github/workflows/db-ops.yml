@@ -1532,7 +1532,7 @@ jobs:
                 -v "$ATTENTION_GAP_SQL:/audit/attention-gaps.sql:ro" \
                 -e MYSQL_PWD="$MYSQL_PASSWORD" \
                 --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
-                mysql:8.0 mysql --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
+                mysql:8.0 mysql --tls-version=TLSv1.2,TLSv1.3 --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
                   --host="$MYSQL_HOST" \
                   --port="${MYSQL_PORT:-3306}" \
                   --user="$MYSQL_USERNAME" \
@@ -2429,7 +2429,7 @@ jobs:
             sudo docker run --rm --network infra-network \
               -e MYSQL_PWD="$MYSQL_PASSWORD" \
               --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
-                mysql:8.0 mysql --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
+                mysql:8.0 mysql --tls-version=TLSv1.2,TLSv1.3 --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
                 --host="$MYSQL_HOST" \
                 --port="${MYSQL_PORT:-3306}" \
                 --user="$MYSQL_USERNAME" \

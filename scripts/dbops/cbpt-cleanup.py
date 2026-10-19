@@ -169,6 +169,7 @@ def connection_payload(values):
     payload = "[client]\n" + "".join(key + "=" + mysql_option(str(values[key])) + "\n" for key in ("host", "port", "user", "password"))
     payload += "ssl-mode=" + values.get("tls_mode", "DISABLED") + "\n"
     if values.get("tls_mode") == "VERIFY_IDENTITY":
+        payload += "tls-version=TLSv1.2,TLSv1.3\n"
         payload += "ssl-ca=" + mysql_option(values["tls_ca_file"]) + "\n"
     return payload.encode()
 
