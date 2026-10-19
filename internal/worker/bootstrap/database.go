@@ -66,6 +66,7 @@ func (m *DatabaseManager) initMySQL() error {
 	}
 	opts := m.config.MySQL
 	mysqlConfig := &database.MySQLConfig{
+		TLSMode: opts.TLSMode, TLSCAFile: opts.TLSCAFile,
 		Host: opts.Host, Username: opts.Username, Password: opts.Password, Database: opts.Database,
 		MaxIdleConnections: opts.MaxIdleConnections, MaxOpenConnections: opts.MaxOpenConnections,
 		MaxConnectionLifeTime: opts.MaxConnectionLifeTime, LogLevel: opts.LogLevel,

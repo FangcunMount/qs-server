@@ -76,8 +76,8 @@ fi
 worker_job="$TEST_ROOT/worker-job.yml"
 sed -n '/^  deploy-worker:/,/^  verify-worker-governance:/p' \
   "$SCRIPT_DIR/../../.github/workflows/cd.yml" >"$worker_job"
-grep -Fq 'MYSQL_HOST: mysql-rds-proxy' "$worker_job"
-grep -Fq 'MYSQL_PORT: 3306' "$worker_job"
+grep -Fq 'MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}' "$worker_job"
+grep -Fq 'MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}' "$worker_job"
 
 worker_deploy="$TEST_ROOT/worker-deploy.sh"
 sed -n '/^deploy_worker()/,/^echo "=========================================="/p' \

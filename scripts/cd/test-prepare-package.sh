@@ -39,7 +39,7 @@ assert_package_contract() {
         DEPLOY_PACKAGE="$package_archive" \
         MONGODB_HOST=mongodb MONGODB_PORT=27017 \
         MONGODB_USERNAME=user MONGODB_PASSWORD=password MONGODB_DBNAME=qs \
-        MYSQL_HOST=mysql MYSQL_PORT=3306 \
+        MYSQL_TLS_MODE=VERIFY_IDENTITY MYSQL_HOST=mysql MYSQL_PORT=3306 \
         MYSQL_USERNAME=user MYSQL_PASSWORD=password MYSQL_DATABASE=qs \
         REDIS_HOST=redis REDIS_PORT=6379 \
         JWT_SECRET=jwt-secret DELEGATED_SUBJECT_CURRENT_KEY=delegated-key \
@@ -63,7 +63,7 @@ assert_package_contract() {
         DEPLOY_PACKAGE="$package_archive" \
         MONGODB_HOST=mongodb MONGODB_PORT=27017 \
         MONGODB_USERNAME=user MONGODB_PASSWORD=password MONGODB_DBNAME=qs \
-        MYSQL_HOST=mysql MYSQL_PORT=3306 \
+        MYSQL_TLS_MODE=VERIFY_IDENTITY MYSQL_HOST=mysql MYSQL_PORT=3306 \
         MYSQL_USERNAME=user MYSQL_PASSWORD=password MYSQL_DATABASE=qs \
         NSQ_NSQD_HOST=nsqd NSQ_NSQD_PORT=4150 \
         NSQ_LOOKUPD_HOST=nsqlookupd NSQ_LOOKUPD_PORT=4161 \

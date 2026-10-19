@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -95,7 +95,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 	defer cancel()
 
-	db, err := sql.Open("mysql", cfg.mysqlDSN)
+	db, err := mysqltls.Open(cfg.mysqlDSN)
 	if err != nil {
 		log.Fatalf("open mysql: %v", err)
 	}

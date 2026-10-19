@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"math"
 	"os"
@@ -22,7 +23,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -79,7 +79,7 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		writeDiagnostic(stderr, "answersheet gap audit: required answersheet audit index is missing or unreadable\n")
 		return 1
 	}
-	db, err := gorm.Open(gormmysql.Open(cfg.mysqlDSN), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	db, err := mysqltls.OpenGORM(cfg.mysqlDSN, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		writeDiagnostic(stderr, "answersheet gap audit: connect MySQL failed; check DSN and server availability\n")
 		return 1

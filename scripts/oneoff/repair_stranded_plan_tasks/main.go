@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"os"
 	"path/filepath"
@@ -132,7 +133,7 @@ func run(args []string, out io.Writer) (runErr error) {
 	if err != nil {
 		return err
 	}
-	db, err := sql.Open("mysql", normalizedDSN)
+	db, err := mysqltls.Open(normalizedDSN)
 	if err != nil {
 		return err
 	}

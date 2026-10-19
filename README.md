@@ -75,3 +75,14 @@ make docs-verify
 ```
 
 完整工程质量门禁见 `Makefile` 中的 `verify` 目标。
+
+## Production MySQL TLS
+
+Production deployment reads organization Variables `MYSQL_PUBLIC_HOST`,
+`MYSQL_PUBLIC_PORT`, `MYSQL_TLS_MODE=VERIFY_IDENTITY` and `MYSQL_TLS_CA_REF`
+(an immutable infra commit). Database credentials remain repository Secrets.
+The CA is provisioned from that commit at `/data/infra/ssl/mysql/ca-chain.pem`
+and mounted read-only at `/etc/qlume/mysql/ca-chain.pem`. Invalid CA, hostname
+or TLS negotiation fails the connection. Local/disposable databases may explicitly
+use `DISABLED`. See the infra `components/mysql-client` runbook for the staged
+cutover, maintenance clients and rollback. Automatic production deployment stays paused.

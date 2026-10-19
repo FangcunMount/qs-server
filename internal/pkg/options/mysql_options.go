@@ -13,6 +13,8 @@ import (
 
 // MySQLOptions defines options for mysql database.
 type MySQLOptions struct {
+	TLSMode               string        `json:"tls-mode" mapstructure:"tls-mode"`
+	TLSCAFile             string        `json:"tls-ca-file" mapstructure:"tls-ca-file"`
 	Host                  string        `json:"host,omitempty"                     mapstructure:"host"`
 	Username              string        `json:"username,omitempty"                 mapstructure:"username"`
 	Password              string        `json:"-"                                  mapstructure:"password"`
@@ -56,6 +58,8 @@ func (o *MySQLOptions) Validate() []error {
 
 // AddFlags adds flags related to mysql storage for a specific APIServer to the specified FlagSet.
 func (o *MySQLOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&o.TLSMode, "mysql.tls-mode", o.TLSMode, "DISABLED or VERIFY_IDENTITY; production uses VERIFY_IDENTITY")
+	fs.StringVar(&o.TLSCAFile, "mysql.tls-ca-file", o.TLSCAFile, "CA PEM file used to verify the MySQL server")
 	fs.StringVar(&o.Host, "mysql.host", o.Host, ""+
 		"MySQL service host address. If left blank, the following related mysql options will be ignored.")
 

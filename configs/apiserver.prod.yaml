@@ -135,7 +135,9 @@ ai_workflow:
 
 
 mysql:
-  host: "127.0.0.1:3306"
+  tls-mode: "VERIFY_IDENTITY"
+  tls-ca-file: "/etc/qlume/mysql/ca-chain.pem"
+  host: ""  # 必须由组织 MYSQL_PUBLIC_HOST / MYSQL_PUBLIC_PORT 注入
   username: "app_user"
   password: ""
   database: "qs"

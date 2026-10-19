@@ -17,6 +17,7 @@ func OpenMySQL(configured *genericoptions.MySQLOptions, purpose string) (*databa
 		return nil, fmt.Errorf("qs MySQL options are required")
 	}
 	connection := database.NewMySQLConnection(&database.MySQLConfig{
+		TLSMode: configured.TLSMode, TLSCAFile: configured.TLSCAFile,
 		Host: configured.Host, Username: configured.Username, Password: configured.Password, Database: configured.Database,
 		MaxIdleConnections: 2, MaxOpenConnections: 10, MaxConnectionLifeTime: configured.MaxConnectionLifeTime,
 		LogLevel: configured.LogLevel, Location: configured.Location, SessionTimeZone: configured.SessionTimeZone,
