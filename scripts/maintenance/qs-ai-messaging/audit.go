@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"os"
 	"time"
 
@@ -71,7 +72,7 @@ func runAudit(limit int) (resultErr error) {
 		return errors.New("explicit database required")
 	}
 	cfg.ParseTime, cfg.Loc = true, time.UTC
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+	db, err := mysqltls.Open(cfg.FormatDSN())
 	if err != nil {
 		return err
 	}

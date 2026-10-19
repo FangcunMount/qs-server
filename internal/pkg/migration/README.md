@@ -510,3 +510,13 @@ SQL104保持main原始传输证据表创建资源；SQL105仅删除assessment_ta
 MySQL104 仅新增 `event_delivery_transport_evidence`，Mongo head 保持40，并显式声明104/40。原始二进制消息、实际物理来源、应用身份和 metadata 与原死信行在同一宿主事务提交。原业务载荷和人工重放合同保持不变。空表可 down；非空表拒绝 down，应用回退须保留审计，不能用删除证据或修改迁移版本代替兼容性判断。真实MySQL测试覆盖空表回退、内容冲突、非法UTF-8原文和同事务失败回滚。
 
 M3的106/41只增加独立事务协议表/集合及rm_tx_expiry，显式binding另行安装。Down拒绝删除证据；旧105独立上线前置不变。当前只完成源码及隔离验证入口，正文档案与业务接入尚待后续批次；生产未执行。
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.1 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.

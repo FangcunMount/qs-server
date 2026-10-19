@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"log"
 	"os"
@@ -132,7 +133,7 @@ func main() {
 	defer cancel()
 
 	prog.Phase("connect databases")
-	mysqlDB, err := sql.Open("mysql", cfg.mysqlDSN)
+	mysqlDB, err := mysqltls.Open(cfg.mysqlDSN)
 	if err != nil {
 		log.Fatalf("open mysql: %v", err)
 	}

@@ -58,3 +58,14 @@ QS apiserver 的 MQ 发布预检在原共享锁内执行，并将其保留的 MQ
 冻结主配置以只读文件挂回 `/app/configs/apiserver.prod.yaml`，保留缓存策略等相对路径的原配置目录。宿主原配置目录挂载保留；冻结文件只覆盖该容器中的主文件，不改写生产源文件。首次切换中发现的 `/run` 路径启动失败须保留为失败证据，不能计入部署通过。
 
 预检处理部署账号的 0600 上传配置时，只使用字节一致的私有暂存副本，成功后删除副本。原上传权限、冻结配置摘要及既有回退资产保留规则不变。
+
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.2 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.

@@ -3561,11 +3561,11 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     # Multi-input route selection changed, not terminal settlement. This audit
     # is not production cutover or original Go business acceptance.
     # The current subscriber and terminal handoff belong to the fixed SDK.
-    # component-base v0.8.0 has no messaging/signaling packages; the old v0.6.11
+    # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
         re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.5\.0-rocketmq-tx\.1\s*$", go_mod, flags=re.M)
-        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.0\s*$", go_mod, flags=re.M)
+        and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(
             Issue(

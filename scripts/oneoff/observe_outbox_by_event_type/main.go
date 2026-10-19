@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"log"
 	"os"
 	"sort"
@@ -182,7 +183,7 @@ func openMySQL(dsn string) (*sql.DB, error) {
 	if c.Collation == "" {
 		c.Collation = "utf8mb4_unicode_ci"
 	}
-	return sql.Open("mysql", c.FormatDSN())
+	return mysqltls.Open(c.FormatDSN())
 }
 
 func queryMySQLUnfinished(ctx context.Context, db *sql.DB) ([]unfinishedRow, error) {

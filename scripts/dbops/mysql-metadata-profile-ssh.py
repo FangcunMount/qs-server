@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One bounded metadata diagnostic over the approved root@47.94.204.124 target."""
+"""One bounded metadata diagnostic over the approved ubuntu@154.8.167.1 target."""
 import argparse
 import base64
 import hashlib
@@ -17,13 +17,13 @@ import sys
 import tarfile
 import tempfile
 
-MEMBERS = frozenset(("profile-linux-amd64", "profile-linux-arm64", "mysql-metadata-profile.py",
+MEMBERS = frozenset(("profile-linux-amd64", "mysql-metadata-profile.py",
                      "cbpt-cleanup.py", "receipt-transport.py"))
 READINESS_MEMBERS = MEMBERS | {"mysql-metadata-readiness.py"}
 INVENTORY_MEMBERS = MEMBERS | {"mysql-retirement-inventory.py"}
 ARCHIVE_LIMIT = 32 * 1024 * 1024
 HEADER_LIMIT = 32768
-SSH_HOST = "47.94.204.124"
+SSH_HOST = "154.8.167.1"
 
 
 def load_profile(directory):
@@ -66,9 +66,9 @@ def validate_envelope(value):
     if not isinstance(value, dict) or set(value) != {"env", "package_sha256", "package_size"}:
         raise ValueError("envelope_fields")
     env = value["env"]
-    keys = {"MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+    keys = {"MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MYSQL_TLS_MODE", "MYSQL_TLS_CA_FILE", "MYSQL_TLS_CA_REF",
             "PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH"}
-    if not isinstance(env, dict) or set(env) != keys or any(not isinstance(v, str) or len(v) > 4096 for v in env.values()):
+    if not isinstance(env, dict) or set(env) not in (keys, keys - {"MYSQL_TLS_MODE", "MYSQL_TLS_CA_FILE", "MYSQL_TLS_CA_REF"}) or any(not isinstance(v, str) or len(v) > 4096 for v in env.values()):
         raise ValueError("environment_fields")
     import re
     if not isinstance(value["package_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", value["package_sha256"]) or type(value["package_size"]) is not int or not 0 < value["package_size"] <= ARCHIVE_LIMIT:
@@ -123,7 +123,7 @@ def remove_owned(directory, *, readiness=False, inventory=False):
 def receiver_arch():
     if os.getuid() != 0 or platform.system() != "Linux" or socket.gethostname().lower() != "servera":
         raise ValueError("receiver_host")
-    arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine())
+    arch = {"x86_64": "amd64"}.get(platform.machine())
     if not arch:
         raise ValueError("receiver_arch")
     return arch
@@ -137,6 +137,9 @@ def receive(stream, *, readiness=False, inventory=False):
         raise ValueError("envelope_limit")
     envelope = json.loads(line, object_pairs_hook=unique_object)
     env = validate_envelope(envelope)
+    if env.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+        import subprocess
+        subprocess.run(["python3", "/opt/infra/scripts/mysql/ca.py", "verify", "--ref", env["MYSQL_TLS_CA_REF"]], check=True, stdout=subprocess.DEVNULL)
     raw = stream.read(envelope["package_size"] + 1)
     if len(raw) != envelope["package_size"] or hashlib.sha256(raw).hexdigest() != envelope["package_sha256"]:
         raise ValueError("package_checksum")
@@ -186,7 +189,7 @@ def trusted_ssh(profile, home):
     known = home / ".ssh" / "known_hosts"
     if known.is_symlink() or not known.is_file() or known.stat().st_uid != os.getuid() or stat.S_IMODE(known.stat().st_mode) & 0o022:
         raise ValueError("known_hosts_unavailable")
-    options = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+    options = ["-i", str(home / ".ssh" / "deploy_key"), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
                "-o", "UserKnownHostsFile=" + str(known), "-o", "GlobalKnownHostsFile=/dev/null",
                "-o", "ConnectTimeout=10", "-o", "ConnectionAttempts=1", "-o", "PasswordAuthentication=no",
                "-o", "KbdInteractiveAuthentication=no", "-o", "ControlMaster=no", "-o", "ControlPath=none",
@@ -199,19 +202,19 @@ def trusted_ssh(profile, home):
         if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
             raise ValueError("ssh_agent_binding")
         local["SSH_AUTH_SOCK"] = agent
-    code, raw = profile.capture_private(["/usr/bin/ssh", "-G", *options, "-l", "root", "-p", "22", SSH_HOST], env=local, timeout=10)
+    code, raw = profile.capture_private(["/usr/bin/ssh", "-G", *options, "-l", "ubuntu", "-p", "22", SSH_HOST], env=local, timeout=10)
     if code != 0:
         raise ValueError("ssh_alias_unavailable")
     config = {}
     for line in raw.decode().splitlines():
         key, _, value = line.partition(" ")
         config.setdefault(key, []).append(value)
-    if config.get("user") != ["root"] or config.get("hostname") != [SSH_HOST] or config.get("port") != ["22"] or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
+    if config.get("user") != ["ubuntu"] or config.get("hostname") != [SSH_HOST] or config.get("port") != ["22"] or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
         raise ValueError("ssh_alias_binding")
     code, raw = profile.capture_private(["/usr/bin/ssh-keygen", "-F", SSH_HOST, "-f", str(known)], env=local, timeout=10)
     if code != 0 or not any(line and not line.startswith(b"#") for line in raw.splitlines()):
         raise ValueError("ssh_host_key_unavailable")
-    return ["/usr/bin/ssh", "-T", *options, "-l", "root", "-p", "22", SSH_HOST], local
+    return ["/usr/bin/ssh", "-T", *options, "-l", "ubuntu", "-p", "22", SSH_HOST], local
 
 
 TRANSPORT_ERRORS = frozenset(("profile_input_preflight_failed", "profile_package_preflight_failed",
@@ -265,7 +268,7 @@ def dispatch(archive, env, profile, home, *, readiness=False, inventory=False):
             raise ValueError("local_package_checksum")
         # Public receiver code only enters argv; package and secrets travel solely over stdin.
         receiver = base64.b64encode(Path(__file__).read_bytes()).decode("ascii")
-        command = "/usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + (" --receive-inventory" if inventory else " --receive-readiness" if readiness else " --receive")
+        command = "sudo -n /usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + (" --receive-inventory" if inventory else " --receive-readiness" if readiness else " --receive")
         payload = json.dumps(envelope, separators=(",", ":"), ensure_ascii=True).encode() + b"\n" + raw
         if len(payload) - len(raw) > HEADER_LIMIT:
             raise ValueError("envelope_limit")

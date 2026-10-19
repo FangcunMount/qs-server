@@ -127,3 +127,14 @@ go test -race -tags=integration -count=1 -timeout=8m -v \
 测试期间既有nsqd发生重启。原容器IDs/images保留，但原服务runtime元数据并非全部稳定，不能据此宣称所有原服务未变，也不推断重启原因。生产、正式部署和业务验收状态仍未提升。
 
 RocketMQ M1 的完整资源目标为104/40，仅增加MySQL传输审计表；原离线批准、真实库身份、保护范围和维护窗口要求继续生效。非空传输证据不允许通过down删除。
+
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.2 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.

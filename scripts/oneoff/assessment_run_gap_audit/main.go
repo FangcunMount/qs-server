@@ -9,13 +9,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"math"
 	"os"
 	"strconv"
 	"time"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 const query = `SELECT a.id, a.status,
@@ -79,7 +78,7 @@ func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stde
 	}
 	ctx, cancel := context.WithTimeout(parent, cfg.timeout)
 	defer cancel()
-	db, err := sql.Open("mysql", cfg.dsn)
+	db, err := mysqltls.Open(cfg.dsn)
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "assessment run gap audit: database open failed")
 		return 1

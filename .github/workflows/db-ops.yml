@@ -115,6 +115,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Set up Go for the cleanup tool
         uses: actions/setup-go@v6
         with:
@@ -144,9 +152,9 @@ jobs:
           CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_HOST: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
           set -Eeuo pipefail
@@ -166,9 +174,9 @@ jobs:
       - name: Upload immutable cleanup tools to ServerA
         uses: appleboy/scp-action@v1.0.0
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           source: qs-cbpt-cleanup-${{ github.run_id }}.tar.gz
@@ -182,20 +190,24 @@ jobs:
           CBPT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           CBPT_ARCHIVE_ID: ${{ github.event.inputs.backup_name }}
           CBPT_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 80m
-          envs: CBPT_OPERATION_INPUT,CBPT_SOURCE_SHA,CBPT_RUN_ID,CBPT_ARCHIVE_ID,CBPT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE
+          envs: CBPT_OPERATION_INPUT,CBPT_SOURCE_SHA,CBPT_RUN_ID,CBPT_ARCHIVE_ID,CBPT_PACKAGE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             umask 077
@@ -260,6 +272,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Set up Go for the read-only diagnostic
         uses: actions/setup-go@v6
         with:
@@ -276,12 +296,11 @@ jobs:
           python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
           python3 -B scripts/dbops/test-receipt-transport.py
           profile_package=$(mktemp -d "$RUNNER_TEMP/qs-metadata-profile-package.XXXXXX")
-          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/profile-linux-arm64" "$profile_package/mysql-metadata-profile.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/mysql-metadata-profile.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-arm64" ./scripts/oneoff/mysql_metadata_profile
           cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
           profile_archive="qs-mysql-metadata-profile-${GITHUB_RUN_ID}.tar.gz"
-          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 profile-linux-arm64 mysql-metadata-profile.py cbpt-cleanup.py receipt-transport.py
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 mysql-metadata-profile.py cbpt-cleanup.py receipt-transport.py
           echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Read current and fixed granted-role metadata permissions over trusted SSH
@@ -293,9 +312,12 @@ jobs:
           PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
           # Exact identity from the verified archive; no UUID/host is published.
-          PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          PROFILE_EXPECTED_TARGET_HASH: '8249a6ecd31f7c85b5efccf757138700a0c0eecc8fe792a77153b6dadf524a16'
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_USERNAME' || 'MYSQL_USERNAME'] }}
           MYSQL_PASSWORD: ${{ secrets[github.event.inputs.operation == 'metadata-visibility-admin-profile' && 'MYSQL_METADATA_ADMIN_PASSWORD' || 'MYSQL_PASSWORD'] }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -327,6 +349,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Set up Go for the read-only readiness reader
         uses: actions/setup-go@v6
         with:
@@ -344,12 +374,11 @@ jobs:
           python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
           python3 -B scripts/dbops/test-receipt-transport.py
           profile_package=$(mktemp -d "$RUNNER_TEMP/qs-metadata-readiness-package.XXXXXX")
-          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/profile-linux-arm64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-metadata-readiness.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-metadata-readiness.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-arm64" ./scripts/oneoff/mysql_metadata_profile
           cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/mysql-metadata-readiness.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
           profile_archive="qs-mysql-metadata-readiness-${GITHUB_RUN_ID}.tar.gz"
-          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 profile-linux-arm64 mysql-metadata-profile.py mysql-metadata-readiness.py cbpt-cleanup.py receipt-transport.py
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 mysql-metadata-profile.py mysql-metadata-readiness.py cbpt-cleanup.py receipt-transport.py
           echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Read fixed MySQL metadata and readiness over trusted SSH
@@ -360,9 +389,12 @@ jobs:
           PROFILE_SOURCE_SHA: ${{ github.sha }}
           PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          PROFILE_EXPECTED_TARGET_HASH: '8249a6ecd31f7c85b5efccf757138700a0c0eecc8fe792a77153b6dadf524a16'
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -394,6 +426,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Set up Go for the read-only inventory reader
         uses: actions/setup-go@v6
         with:
@@ -411,12 +451,11 @@ jobs:
           python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
           python3 -B scripts/dbops/test-receipt-transport.py
           profile_package=$(mktemp -d "$RUNNER_TEMP/qs-retirement-inventory-package.XXXXXX")
-          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/profile-linux-arm64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-retirement-inventory.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-retirement-inventory.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-arm64" ./scripts/oneoff/mysql_metadata_profile
           cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/mysql-retirement-inventory.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
           profile_archive="qs-mysql-retirement-inventory-${GITHUB_RUN_ID}.tar.gz"
-          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 profile-linux-arm64 mysql-metadata-profile.py mysql-retirement-inventory.py cbpt-cleanup.py receipt-transport.py
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 mysql-metadata-profile.py mysql-retirement-inventory.py cbpt-cleanup.py receipt-transport.py
           echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Read fixed MySQL retirement counts over trusted SSH
@@ -427,9 +466,12 @@ jobs:
           PROFILE_SOURCE_SHA: ${{ github.sha }}
           PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
-          PROFILE_EXPECTED_TARGET_HASH: '8764516c9ac46675e1fbd68c395534ac74d8899b4f3fe35854c1988ba337f1a0'
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          PROFILE_EXPECTED_TARGET_HASH: '8249a6ecd31f7c85b5efccf757138700a0c0eecc8fe792a77153b6dadf524a16'
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -523,6 +565,14 @@ jobs:
       - name: Checkout inventory source
         uses: actions/checkout@v6
 
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
       - name: Package immutable inventory scripts
         id: package
         run: |
@@ -534,9 +584,9 @@ jobs:
       - name: Validate production SSH binding
         env:
           INVENTORY_DATABASE: ${{ github.event.inputs.database }}
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_HOST: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
           set -Eeuo pipefail
@@ -552,9 +602,9 @@ jobs:
       - name: Upload metadata inventory scripts to serverA
         uses: appleboy/scp-action@v1.0.0
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           source: qs-production-inventory-${{ github.run_id }}.tar.gz
@@ -567,8 +617,11 @@ jobs:
           INVENTORY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           INVENTORY_DATABASE: ${{ github.event.inputs.database }}
           INVENTORY_ARCHIVE_SHA256: ${{ steps.package.outputs.sha256 }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -578,14 +631,15 @@ jobs:
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 5m
-          envs: INVENTORY_SOURCE_SHA,INVENTORY_RUN_ID,INVENTORY_DATABASE,INVENTORY_ARCHIVE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          envs: INVENTORY_SOURCE_SHA,INVENTORY_RUN_ID,INVENTORY_DATABASE,INVENTORY_ARCHIVE_SHA256,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             [[ "$INVENTORY_RUN_ID" =~ ^[0-9]{1,20}-[0-9]{1,4}$ ]] || exit 1
@@ -746,9 +800,9 @@ jobs:
     steps:
       - name: Validate SSH configuration
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_HOST: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
           set -Eeuo pipefail
@@ -760,13 +814,14 @@ jobs:
       - name: Check MongoDB Status
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
@@ -1473,7 +1528,8 @@ jobs:
               sudo docker run --rm --interactive --network infra-network \
                 -v "$ATTENTION_GAP_SQL:/audit/attention-gaps.sql:ro" \
                 -e MYSQL_PWD="$MYSQL_PASSWORD" \
-                mysql:8.0 mysql --protocol=tcp \
+                --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
+                mysql:8.0 mysql --tls-version=TLSv1.2,TLSv1.3 --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
                   --host="$MYSQL_HOST" \
                   --port="${MYSQL_PORT:-3306}" \
                   --user="$MYSQL_USERNAME" \
@@ -1499,8 +1555,11 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
@@ -2315,9 +2374,9 @@ jobs:
     steps:
       - name: Validate SSH configuration
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_HOST: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
           set -Eeuo pipefail
@@ -2329,13 +2388,14 @@ jobs:
       - name: Check MySQL recovery status
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
@@ -2365,7 +2425,8 @@ jobs:
             fi
             sudo docker run --rm --network infra-network \
               -e MYSQL_PWD="$MYSQL_PASSWORD" \
-              mysql:8.0 mysql --protocol=tcp \
+              --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
+                mysql:8.0 mysql --tls-version=TLSv1.2,TLSv1.3 --ssl-mode="${MYSQL_TLS_MODE}" --ssl-ca="${MYSQL_TLS_CA_FILE}" --protocol=tcp \
                 --host="$MYSQL_HOST" \
                 --port="${MYSQL_PORT:-3306}" \
                 --user="$MYSQL_USERNAME" \
@@ -2774,8 +2835,11 @@ jobs:
                 "
             echo "✅ MySQL connection and read-only recovery audit OK"
         env:
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
@@ -2792,6 +2856,14 @@ jobs:
     steps:
       - name: Checkout immutable governance tool
         uses: actions/checkout@v6
+
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
 
       - name: Set up Go for EvaluationOutcome governance
         uses: actions/setup-go@v6
@@ -2817,9 +2889,9 @@ jobs:
 
       - name: Validate SSH configuration
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_HOST: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
@@ -2835,9 +2907,9 @@ jobs:
 
       - name: Transfer EvaluationOutcome governance tools with pinned host identity
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_HOST: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
           GOVERNANCE_RUN_TOKEN: ${{ github.run_id }}-${{ github.run_attempt }}
@@ -2915,14 +2987,15 @@ jobs:
       - name: Execute manifest-driven EvaluationOutcome template route governance
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ vars.SVRA_HOST }}
+          host: ${{ vars.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 175m
-          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT,MYSQL_TLS_MODE,MYSQL_TLS_CA_FILE,MYSQL_TLS_CA_REF
           script: |
+            python3 /opt/infra/scripts/mysql/ca.py verify --ref "$MYSQL_TLS_CA_REF" || exit 1
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
@@ -3022,6 +3095,9 @@ jobs:
               --label "com.fangcunmount.qs-server.github-run-id=$GITHUB_RUN_ID_INPUT" \
               -v "$TOOL_FILE:/tool/govern:ro" \
               -v "$MANIFEST_MOUNT" \
+              --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
+              -e MYSQL_TLS_MODE="$MYSQL_TLS_MODE" \
+              -e MYSQL_TLS_CA_FILE="$MYSQL_TLS_CA_FILE" \
               -e MYSQL_HOST="$MYSQL_HOST" \
               -e MYSQL_PORT="$MYSQL_PORT" \
               -e MYSQL_USERNAME="$MYSQL_USERNAME" \
@@ -3054,8 +3130,11 @@ jobs:
             fi
             echo "✅ EvaluationOutcome template route governance completed"
         env:
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}

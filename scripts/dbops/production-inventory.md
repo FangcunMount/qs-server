@@ -10,7 +10,7 @@ gh workflow run db-ops.yml --ref <reviewed-ref> -f operation=inventory -f databa
 
 If GitHub rejects a choice absent from the default branch, merge the reviewed workflow through the normal checks before dispatching it. Do not substitute `status`: status runs broader business consistency queries.
 
-The job uses the existing production Environment and serverA SSH host/user/key/fingerprint. It validates the binding before upload, transfers three scripts with an archive SHA256, runs them from a private temporary directory, and removes temporary files on exit. MySQL credentials use a private client defaults file; Mongo credentials use a private Docker env-file and authentication inside mongosh. Files are mode 0600 in mode 0700 directories and are removed after each client. Passwords and usernames are absent from client argv, public output, connection URIs and Docker command output.
+The job uses the existing production Environment and serverA SSH user/fingerprint, the verified public SSH address (with the existing host variable as fallback), and the existing runner deployment key. It validates the binding before upload, transfers three scripts with an archive SHA256, runs them from a private temporary directory, and removes temporary files on exit. MySQL credentials use a private client defaults file; Mongo credentials use a private Docker env-file and authentication inside mongosh. Files are mode 0600 in mode 0700 directories and are removed after each client. Passwords and usernames are absent from client argv, public output, connection URIs and Docker command output.
 
 The JSON between `QS_DB_INVENTORY_BEGIN` and `QS_DB_INVENTORY_END` contains source SHA, UTC observation time, selected scope, completeness and per-database metadata:
 
@@ -36,3 +36,14 @@ bash scripts/dbops/test-production-inventory.sh
 ```
 
 These validate metadata/output/credential/ownership/deadline contracts, not production connectivity, permissions, current data or cleanup eligibility.
+
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.2 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.

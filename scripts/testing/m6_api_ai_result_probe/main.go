@@ -6,10 +6,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -21,7 +24,6 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
-	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
 	_ "github.com/go-sql-driver/mysql"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -69,7 +71,7 @@ func databaseOperation(mode string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if mode == "stage" {
-		return (&app.Service{Store: &store.Store{DB: db}}).Start(ctx, app.Start{
+		return stageLegacyRequest(ctx, db, app.Start{
 			RequestID: requestID, Actor: app.Actor{OrgID: "1", SubjectID: "m6-image-proof"},
 			TesteeID: "7", AssessmentIDs: []string{"42"}, Goal: "Disposable AI result handoff",
 		})
@@ -87,6 +89,35 @@ func databaseOperation(mode string) error {
 	}
 	fmt.Println("one original AI result, one version, unchanged projection")
 	return nil
+}
+
+// stageLegacyRequest seeds the schema-90 fixture consumed by the immutable
+// historical API images above. Main's retired Store.StageStart deliberately
+// rejects new business commands and must not be used to seed this old contract.
+func stageLegacyRequest(ctx context.Context, db *sql.DB, request app.Start) error {
+	raw, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	sum := sha256.Sum256(raw)
+	hash := hex.EncodeToString(sum[:])
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_requests(request_id,request_hash,payload,organization_id,subject_id,testee_id,created_at,updated_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))", request.RequestID, hash, raw, request.Actor.OrgID, request.Actor.SubjectID, request.TesteeID); err != nil {
+		return err
+	}
+	for _, assessmentID := range request.AssessmentIDs {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_request_assessments(request_id,assessment_id) VALUES(?,?)", request.RequestID, assessmentID); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO ai_bridge_commands(command_id,request_id,kind,payload,payload_hash,available_at) VALUES(?,?,?,?,?,UTC_TIMESTAMP(6))", request.RequestID, request.RequestID, "start", raw, hash); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func send(mode, directory string) error {

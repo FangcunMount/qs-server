@@ -65,6 +65,7 @@ channel_clients() {
 start_worker() {
   local image=$1
   docker run -d --name "$worker" --network "$network" \
+    -e QS_WORKER_MYSQL_TLS_MODE=DISABLED \
     -e QS_WORKER_MYSQL_HOST=mysql:3306 \
     -e QS_WORKER_MYSQL_USERNAME=root \
     -e QS_WORKER_MONGODB_URL=mongodb://mongo:27017/questionnaire_scale \

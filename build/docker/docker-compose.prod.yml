@@ -31,6 +31,7 @@ services:
     env_file:
       - /opt/qs-server/qs-apiserver/configs/env/config.prod.env
     volumes:
+      - /data/infra/ssl/mysql/ca-chain.pem:/etc/qlume/mysql/ca-chain.pem:ro
       - /opt/qs-server/qs-apiserver/configs:/app/configs
       - /data/logs/qs-server/qs-apiserver:/data/logs/qs
       # 证书与密钥目录统一挂载（避免单文件挂载在只读目录内创建 mountpoint 失败）

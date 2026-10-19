@@ -35,7 +35,7 @@ RDS 完整 static/dynamic 多行 fixture 依据 [AWS RDS 官方角色模型](htt
 
 离线 sqlmock 测试覆盖未激活固定角色 potential=true/current=false、current 与固定角色 grant 输入互不混用（不证明真实 active role 权限展开）、3530/HY000 与缺失或其它 state、3523/1045严格区分、RDS完整grant语法、合法REVOKE继续潜在诊断、畸形语法/SQL注入后缀拒绝、未知错误私密、session/role变化丢弃正结论、expected target mismatch不读取权限、driver logger/multiStatement边界。通过 Go race/vet 与 Python 传输测试后，workflow 才会运行诊断。运行结果应独立绑定 source/run/target hash。
 
-四个 MySQL metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `root@47.94.204.124:22`。使用已有 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 root、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。除所选入口外，其余 db-ops job 在这四组 MySQL metadata 输入下均不符合执行条件。
+四个 MySQL metadata 工作流入口使用用户已配置的 Mac mini 自托管 runner 直接 SSH 目标 `ubuntu@154.8.167.1:22`。使用已有 `~/.ssh/deploy_key` 和 `~/.ssh/known_hosts`，本地 `ssh -G` 必须精确绑定 ubuntu、该 IP 和 22 端口，并拒绝 ProxyCommand、ProxyJump 或 HostKeyAlias；逐次要求 `StrictHostKeyChecking=yes`、无密码交互、新连接及关闭 agent/X11 转发。远端通过既有无密码 sudo 执行接收器；接收器在读取秘密 envelope 前核实 root、Linux 和 `serverA` 主机名；不下载或修改主机密钥、SSH 配置或权限。缺少已登记 host key、所选管理员 Secret 或完整目标绑定时停止，不回落到其他主机、principal 或应用账号。除所选入口外，其余 db-ops job 在这四组 MySQL metadata 输入下均不符合执行条件。
 
 `mysql-metadata-profile-ssh.py` 将唯一固定文件集的 SHA-256 归档及凭据通过 SSH stdin 传入；密码不进入命令行、日志或 Git。远端只在任务拥有的 0700 临时目录解包，使用 Linux 静态 binary，不创建生产 Docker 容器、不拉取镜像。临时 JSON 环境文件为 0600，固定字段经过验证，不经 shell source/eval，并在建立数据库连接前删除该文件；binary 不继承无关凭据或 LD_* 环境。SSH 输出限 256 KiB/90 秒，binary 输出限 64 KiB/50 秒，stderr 只排空不保留，原始异常不输出。只有 task-owned 文件完整释放后才输出安全密封回执，传输、清理或回执错误均失败关闭。封装失败使用四个固定类别：`profile_input_preflight_failed`（操作、输入与绑定）、`profile_package_preflight_failed`（本地包、checksum 与 envelope）、`profile_trusted_ssh_preflight_failed`（本地可信 SSH 预检）、`profile_remote_or_receipt_failed`（实际 SSH、远端执行、回执与释放后输出）。这些类别只描述本次源码的边界，保留 complete=false、权限 false/nullable 字段，不含异常正文、trace、凭据或远端状态猜测；remote 类别不能单独证明是否连接数据库。原来的 `profile_transport_or_receipt_failed` 继续接受为未定位失败。已通过原验证器的具体 SQL 失败回执沿用原类别，不被封装阶段改名。
 
@@ -83,3 +83,16 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 独立源码 `abea997fe6d27f0cbf7a450ca5f2b979f9ab7d9e` 只改 integration 测试夹具：先断言原Conn/DB/pool释放为true，再在原40秒测试context内、最多原5秒queryLimit只读观察该自有用户的server线程归零。查询错误或到期仍失败，不重跑inventory、不KILL连接、不延长任何生产5/45秒预算；read/open/exec helper显式接收当前子测试。驱动v1.9.3的Close发送COM_QUIT并关闭本地socket，不读取server线程结束ACK，因此即时count不应作为唯一同步假设；这说明修正理由，不证明原CI失败原因。
 
 该冻结文件字节在498工作区实际执行原完整 required race proof，三个top及原子场景24项各一次RUN/PASS、0FAIL/SKIP；本包普通/race各153项通过，tag仅编译、vet及pinned2.5普通/taglint通过。私有 `qs-m4-inventory-close-fixture-v1` 保留原失败、旧8/64与新24分开证据；源码交付 SHA `5fa1491719293fdf98b96001cb091675213a276b661b228b779c7e16207439ba`、实际资源回执 SHA `a1c6710ec44b4693e1239ec96aaf234378c311532ec9bed28e738a4a7ec3b738`。唯一自有MySQL容器/卷/网络均精确ID、删除ACK与缺失核验；旧CID/image/mount保留，nsqd3540→3542及三个Health采样变化不签运行恒定。生产Go、15+3读取/控制界限、工作流和迁移资源逐字保持；原CI仍为失败，新head CI/AI、生产及业务资格继续独立，不重签80f历史24项。
+
+## Public MySQL TLS
+
+Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
+`MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
+the pinned infra CA before deployment or maintenance. Containers receive a read-only
+CA mount; Go clients share component-base v0.8.2 verification. Credentials, query
+budgets, timezone, transactions, schema and existing approval boundaries are preserved.
+This connection change does not authorize a migration or business write. Local and
+disposable test databases retain explicit `DISABLED`. Production cutover and business
+acceptance require separate runtime evidence.
+
+当前接收器固定为已核验的腾讯云 serverA / Linux AMD64。维护包仅携带该目标所需的 AMD64 二进制，保留原 32 MiB 解包上限；不会通过扩大输入上限容纳无关架构。

@@ -118,13 +118,16 @@ def execute(binary, env, module):
         command = [*runtime.docker, "run", "--rm", "--name", name, "--pull=never", "--network", "infra-network", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=0.5", "--memory=256m", "--pids-limit=64", "--user", str(os.getuid()) + ":" + str(os.getgid()), "--label", runtime.label, "--mount", "type=bind,source=" + str(path) + ",target=/metadata-profile,readonly", "--entrypoint", "/metadata-profile"]
         # sudo may reset inherited environment. Pass a private, temporary env file;
         # no credential values enter the command line or diagnostic output.
-        keys = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH")
+        keys = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MYSQL_TLS_MODE", "MYSQL_TLS_CA_FILE", "MYSQL_TLS_CA_REF", "PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH")
         with tempfile.TemporaryDirectory(prefix="qs-mysql-profile-env-") as temporary:
             directory = Path(temporary)
             os.chmod(directory, 0o700)
             env_file = directory / "profile.env"
             payload = "".join(key + "=" + (env.get(key, "") or ("3306" if key == "MYSQL_PORT" else "")) + "\n" for key in keys)
             module.write_private(env_file, payload.encode())
+            if env.get("MYSQL_TLS_MODE") == "VERIFY_IDENTITY":
+                ca_file = env["MYSQL_TLS_CA_FILE"]
+                command += ["--mount", "type=bind,source=" + ca_file + ",target=" + ca_file + ",readonly"]
             command += ["--env-file", str(env_file), image]
             code, raw = module.capture(command, timeout=180)
             value = safe_receipt(module, raw, code, sha, run, expected)
@@ -133,7 +136,7 @@ def execute(binary, env, module):
     return code, value
 
 
-PROFILE_KEYS = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+PROFILE_KEYS = ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_USERNAME", "MYSQL_PASSWORD", "MYSQL_DATABASE", "MYSQL_TLS_MODE", "MYSQL_TLS_CA_FILE", "MYSQL_TLS_CA_REF",
                 "PROFILE_SOURCE_SHA", "PROFILE_RUN_ID", "PROFILE_EXPECTED_TARGET_HASH")
 
 

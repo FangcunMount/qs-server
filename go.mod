@@ -4,7 +4,7 @@ go 1.25.12
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/FangcunMount/component-base v0.8.0
+	github.com/FangcunMount/component-base v0.8.2
 	github.com/FangcunMount/iam/v5 v5.4.0
 	github.com/FangcunMount/reliable-messaging v0.5.0-rocketmq-tx.1
 	github.com/alicebob/miniredis/v2 v2.30.0

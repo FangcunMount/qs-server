@@ -12829,8 +12829,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
-        "verified_on": "2026-10-18"
+        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -13213,8 +13213,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
-        "verified_on": "2026-10-18"
+        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -13288,8 +13288,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ef293e6af7b6314761a8f390c2b107574244d14e",
-        "verified_on": "2026-10-15"
+        "source_sha": "aedda85e1f6f5566c3cf9d9c80ace2b2276763ea",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -14628,8 +14628,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
-        "verified_on": "2026-10-18"
+        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
