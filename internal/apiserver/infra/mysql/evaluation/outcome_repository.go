@@ -11,30 +11,31 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"gorm.io/gorm"
 )
 
 type EvaluationOutcomePO struct {
-	ID                     uint64                         `gorm:"column:id;primaryKey"`
-	OrgID                  int64                          `gorm:"column:org_id;not null;index:idx_evaluation_outcome_org"`
-	AssessmentID           uint64                         `gorm:"column:assessment_id;not null;uniqueIndex:uk_evaluation_outcome_assessment_id"`
-	TesteeID               uint64                         `gorm:"column:testee_id;not null;index:idx_evaluation_outcome_testee"`
-	EvaluationRunID        string                         `gorm:"column:evaluation_run_id;size:128;not null;uniqueIndex:uk_evaluation_outcome_run_id"`
-	ModelKind              string                         `gorm:"column:model_kind;size:50;not null"`
-	ModelSubKind           *string                        `gorm:"column:model_sub_kind;size:50"`
-	ModelAlgorithm         *string                        `gorm:"column:model_algorithm;size:50"`
-	ModelCode              string                         `gorm:"column:model_code;size:100;not null"`
-	ModelVersion           string                         `gorm:"column:model_version;size:50;not null"`
-	ModelTitle             *string                        `gorm:"column:model_title;size:255"`
-	DecisionKind           *string                        `gorm:"column:decision_kind;size:50"`
-	InputSnapshotRef       *string                        `gorm:"column:input_snapshot_ref;size:200"`
-	ReportInputJSON        *string                        `gorm:"column:report_input_json;type:longtext"`
-	PayloadJSON            string                         `gorm:"column:payload_json;type:longtext;not null"`
-	SchemaVersion          uint                           `gorm:"column:schema_version;not null"`
-	EvaluatedAt            time.Time                      `gorm:"column:evaluated_at;not null"`
-	CreatedAt              time.Time                      `gorm:"column:created_at;not null"`
-	CommittedEventID       *string                        `gorm:"column:committed_event_id;type:varbinary(128);uniqueIndex:uq_evaluation_outcome_committed_event_id"`
-	CommittedEventEvidence *eventevidence.EventEvidenceV1 `gorm:"column:committed_event_evidence;type:json;serializer:json"`
+	ID                     uint64                `gorm:"column:id;primaryKey"`
+	OrgID                  int64                 `gorm:"column:org_id;not null;index:idx_evaluation_outcome_org"`
+	AssessmentID           uint64                `gorm:"column:assessment_id;not null;uniqueIndex:uk_evaluation_outcome_assessment_id"`
+	TesteeID               uint64                `gorm:"column:testee_id;not null;index:idx_evaluation_outcome_testee"`
+	EvaluationRunID        string                `gorm:"column:evaluation_run_id;size:128;not null;uniqueIndex:uk_evaluation_outcome_run_id"`
+	ModelKind              string                `gorm:"column:model_kind;size:50;not null"`
+	ModelSubKind           *string               `gorm:"column:model_sub_kind;size:50"`
+	ModelAlgorithm         *string               `gorm:"column:model_algorithm;size:50"`
+	ModelCode              string                `gorm:"column:model_code;size:100;not null"`
+	ModelVersion           string                `gorm:"column:model_version;size:50;not null"`
+	ModelTitle             *string               `gorm:"column:model_title;size:255"`
+	DecisionKind           *string               `gorm:"column:decision_kind;size:50"`
+	InputSnapshotRef       *string               `gorm:"column:input_snapshot_ref;size:200"`
+	ReportInputJSON        *string               `gorm:"column:report_input_json;type:longtext"`
+	PayloadJSON            string                `gorm:"column:payload_json;type:longtext;not null"`
+	SchemaVersion          uint                  `gorm:"column:schema_version;not null"`
+	EvaluatedAt            time.Time             `gorm:"column:evaluated_at;not null"`
+	CreatedAt              time.Time             `gorm:"column:created_at;not null"`
+	CommittedEventID       *string               `gorm:"column:committed_event_id;type:varbinary(128);uniqueIndex:uq_evaluation_outcome_committed_event_id"`
+	CommittedEventEvidence *eventevidence.Record `gorm:"column:committed_event_evidence;type:json;serializer:json"`
 }
 
 func (EvaluationOutcomePO) TableName() string { return "evaluation_outcome" }
@@ -55,6 +56,14 @@ func (r *outcomeRepository) Save(ctx context.Context, record *domainoutcome.Reco
 		return fmt.Errorf("evaluation outcome is required")
 	}
 	po := outcomeToPO(record)
+	if err := validateOutcomeEvidence(po.CommittedEventEvidence); err != nil {
+		return err
+	}
+	if record.CommittedTransactionEvidence() != nil {
+		if _, err := mysql.RequireTx(ctx); err != nil {
+			return err
+		}
+	}
 	return dbWithTransactionContext(ctx, r.db).Create(po).Error
 }
 
@@ -104,7 +113,7 @@ func outcomeToPO(record *domainoutcome.Record) *EvaluationOutcomePO {
 		EvaluatedAt:            record.EvaluatedAt(),
 		CreatedAt:              record.EvaluatedAt(),
 		CommittedEventID:       optionalString(record.CommittedEventID()),
-		CommittedEventEvidence: record.CommittedEventEvidence(),
+		CommittedEventEvidence: record.CommittedEvidence(),
 	}
 }
 
@@ -118,7 +127,15 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("normalize evaluation outcome runtime %d: %w", po.ID, err)
 	}
-	if (po.CommittedEventEvidence == nil && po.CommittedEventID != nil) || (po.CommittedEventEvidence != nil && po.CommittedEventEvidence.EventID != valueOrEmpty(po.CommittedEventID)) {
+	var legacy *eventevidence.EventEvidenceV1
+	var transactional *eventevidence.EventEvidenceV2
+	if proof := po.CommittedEventEvidence; proof != nil {
+		if err := validateOutcomeEvidence(proof); err != nil {
+			return nil, err
+		}
+		legacy, transactional = proof.V1, proof.V2
+	}
+	if (po.CommittedEventEvidence == nil && po.CommittedEventID != nil) || (po.CommittedEventEvidence != nil && po.CommittedEventEvidence.EventID() != valueOrEmpty(po.CommittedEventID)) {
 		return nil, fmt.Errorf("evaluation committed event identity mismatch")
 	}
 	return domainoutcome.NewRecord(domainoutcome.NewRecordInput{
@@ -134,14 +151,31 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 			Version:   po.ModelVersion,
 			Title:     valueOrEmpty(po.ModelTitle),
 		},
-		Runtime:                domainoutcome.RuntimeIdentity{DecisionKind: runtime.DecisionKind},
-		InputSnapshotRef:       valueOrEmpty(po.InputSnapshotRef),
-		ReportInput:            []byte(valueOrEmpty(po.ReportInputJSON)),
-		Payload:                []byte(po.PayloadJSON),
-		SchemaVersion:          po.SchemaVersion,
-		EvaluatedAt:            po.EvaluatedAt,
-		CommittedEventEvidence: po.CommittedEventEvidence,
+		Runtime:                      domainoutcome.RuntimeIdentity{DecisionKind: runtime.DecisionKind},
+		InputSnapshotRef:             valueOrEmpty(po.InputSnapshotRef),
+		ReportInput:                  []byte(valueOrEmpty(po.ReportInputJSON)),
+		Payload:                      []byte(po.PayloadJSON),
+		SchemaVersion:                po.SchemaVersion,
+		EvaluatedAt:                  po.EvaluatedAt,
+		CommittedEventEvidence:       legacy,
+		CommittedTransactionEvidence: transactional,
 	})
+}
+
+func validateOutcomeEvidence(proof *eventevidence.Record) error {
+	if proof == nil {
+		return nil
+	}
+	if err := proof.Validate(); err != nil {
+		return err
+	}
+	if proof.V2 != nil {
+		ref, err := transaction.DecodeReference(proof.V2.TransactionReference)
+		if err != nil || ref.Owner != "qs.mysql" {
+			return fmt.Errorf("outcome transaction owner differs from original MySQL store")
+		}
+	}
+	return nil
 }
 
 func dbWithTransactionContext(ctx context.Context, db *gorm.DB) *gorm.DB {

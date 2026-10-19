@@ -2,15 +2,19 @@ package evaluation
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
+	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"gorm.io/gorm"
 )
 
 type consistencyReadModel struct {
-	db *gorm.DB
+	db                 *gorm.DB
+	transactionChecker transaction.Checker
 }
 
 type outcomeEvidenceRow struct {
@@ -22,6 +26,24 @@ type outcomeEvidenceRow struct {
 
 func NewConsistencyReadModel(db *gorm.DB) evaluationconsistency.Reader {
 	return &consistencyReadModel{db: db}
+}
+
+// NewConsistencyReadModelWithTransactions binds fresh witness reads to the
+// same explicitly supplied host primary. It never takes database routing from
+// a message reference and never installs schema or starts a runtime.
+func NewConsistencyReadModelWithTransactions(db *gorm.DB, binding transaction.Binding) (evaluationconsistency.Reader, error) {
+	if db == nil || binding.Owner != "qs.mysql" {
+		return nil, fmt.Errorf("original QS MySQL primary binding required")
+	}
+	pool, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	store, err := txmysql.New(pool, binding)
+	if err != nil {
+		return nil, err
+	}
+	return &consistencyReadModel{db: db, transactionChecker: transaction.StoreChecker{Store: store}}, nil
 }
 
 func (r *consistencyReadModel) ReadBatch(ctx context.Context, afterID uint64, limit int) (evaluationconsistency.Batch, error) {

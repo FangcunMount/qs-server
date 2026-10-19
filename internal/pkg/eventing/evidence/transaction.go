@@ -72,6 +72,49 @@ type Record struct {
 	V2 *EventEvidenceV2
 }
 
+// MarshalJSON keeps the existing flat, explicitly versioned JSON column shape.
+// The union is a read/write codec, never a committed-transaction decision.
+func (r Record) MarshalJSON() ([]byte, error) {
+	if err := r.Validate(); err != nil {
+		return nil, err
+	}
+	if r.V1 != nil {
+		return json.Marshal(r.V1)
+	}
+	return json.Marshal(r.V2)
+}
+
+func (r Record) Validate() error {
+	if (r.V1 == nil) == (r.V2 == nil) {
+		return fmt.Errorf("exactly one event evidence version required")
+	}
+	if r.V1 != nil {
+		return r.V1.Validate()
+	}
+	return r.V2.Validate()
+}
+
+func (r *Record) UnmarshalJSON(data []byte) error {
+	decoded, err := DecodeRecord(data)
+	if err != nil {
+		return err
+	}
+	*r = decoded
+	return nil
+}
+
+func (r Record) Clone() Record { return Record{V1: r.V1.Clone(), V2: r.V2.Clone()} }
+
+func (r Record) EventID() string {
+	if r.V1 != nil && r.V2 == nil {
+		return r.V1.EventID
+	}
+	if r.V2 != nil && r.V1 == nil {
+		return r.V2.Reference.EventID
+	}
+	return ""
+}
+
 func DecodeRecord(data []byte) (Record, error) {
 	var version struct {
 		Version int `json:"version"`
