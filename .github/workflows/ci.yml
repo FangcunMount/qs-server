@@ -801,6 +801,20 @@ jobs:
             exit 1
           fi
 
+      - name: Verify M3 transaction schema on original paired databases
+        env:
+          QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
+          QS_M3_REQUIRE_DATABASE: '1'
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_m3_tx_ci_test
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=5m -v \
+            -run '^TestM3TransactionSchemaNative$' ./internal/pkg/migration \
+            | tee "${RUNNER_TEMP}/m3-transaction-schema.log"
+          grep -q -- '--- PASS: TestM3TransactionSchemaNative ' "${RUNNER_TEMP}/m3-transaction-schema.log"
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/m3-transaction-schema.log"; then exit 1; fi
+
       - name: Verify SQL105 Task token retirement on real databases
         env:
           QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true

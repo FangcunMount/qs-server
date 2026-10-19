@@ -1,0 +1,33 @@
+[
+  {
+    "create": "rm_tx_binding",
+    "collation": {
+      "locale": "simple"
+    }
+  },
+  {
+    "create": "rm_tx_request",
+    "collation": {
+      "locale": "simple"
+    }
+  },
+  {
+    "create": "rm_tx_execution",
+    "collation": {
+      "locale": "simple"
+    }
+  },
+  {
+    "createIndexes": "rm_tx_execution",
+    "indexes": [
+      {
+        "key": {
+          "owner": 1,
+          "state": 1,
+          "lease_until": 1
+        },
+        "name": "rm_tx_expiry"
+      }
+    ]
+  }
+]

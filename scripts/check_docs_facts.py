@@ -289,7 +289,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 105, "mongodb": 40}
+EXPECTED_MIGRATION_MAX = {"mysql": 106, "mongodb": 41}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
@@ -3556,14 +3556,15 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
                 )
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
-    # mq-ai.2 fixes only the new durable final-ACK failure budget. Legacy
-    # subscriber/relay/wire and contracts remain unchanged from mq-ai.1
-    # (read-only source audit, not original Go business acceptance).
+    # M3 pins the M2 prerelease: the v0.4.0-rocketmq.1 and v0.5.0-rocketmq-tx.1
+    # NSQ/legacy-wire subtrees and RocketMQ handle/Ack/dispatch are byte-identical.
+    # Multi-input route selection changed, not terminal settlement. This audit
+    # is not production cutover or original Go business acceptance.
     # The current subscriber and terminal handoff belong to the fixed SDK.
     # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.4\.0-rocketmq\.1\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.5\.0-rocketmq-tx\.1\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(

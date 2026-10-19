@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "aedda85e1f6f5566c3cf9d9c80ace2b2276763ea",
+    "sha": "3f47ff9f458e7b12654328025e9a61cb50cd3dc7",
     "verified_on": "2026-10-19"
   },
   "status_policy": {
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 105,
-        "version_count": 105
+        "max_version": 106,
+        "version_count": 106
       },
       "mongodb": {
-        "max_version": 40,
-        "version_count": 40
+        "max_version": 41,
+        "version_count": 41
       }
     },
     "events": {
@@ -8819,8 +8819,8 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "669cee2d3b2b777cf431f05e470f6bab4a6138f0",
-        "verified_on": "2026-10-18"
+        "source_sha": "3f47ff9f458e7b12654328025e9a61cb50cd3dc7",
+        "verified_on": "2026-10-19"
       },
       "fact_sources": [
         {
@@ -8946,6 +8946,30 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/migrations/mysql/000104_rocketmq_transport_evidence.up.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/transaction_archive.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/aibridge/transaction_archive_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/transaction_archive.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/aibridge/messaging_reader.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/transaction_archive_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000106_transaction_messaging.up.sql"
         }
       ],
       "verification": [
@@ -11408,7 +11432,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -12065,7 +12089,9 @@
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
-        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
+        "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
+        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
@@ -13381,7 +13407,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "aedda85e1f6f5566c3cf9d9c80ace2b2276763ea",
+        "source_sha": "ffdddb36d8d31b8016f974416212a120edc0c940",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -13971,7 +13997,9 @@
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
-        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
+        "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
+        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
       ]
     },
     {
@@ -14104,7 +14132,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
+        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -14511,7 +14539,9 @@
         "Historical source selector retained as complete original JSON after normal A/main integration: {\"kind\": \"source_selector\", \"path\": \".github/workflows/ci.yml\", \"result\": \"matched\", \"selector\": \"timeout-minutes: 100\", \"source_sha\": \"1b58651863e03ff319623b9b7c47d27fc8f2cefb\", \"verified_on\": \"2026-10-16\"}",
         "Normal merge preserves both complete parent current bindings as original JSON: {\"A_source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"A_verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"main_source_baseline\": {\"sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}, \"main_verified\": {\"source_sha\": \"b4c7c319463a83642b6fdeb5e55d2bda8570329f\", \"verified_on\": \"2026-10-16\"}}. Historical command/native/production/signoff attributions remain unchanged; current source is rebound only after the source task commit.",
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
-        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain."
+        "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
+        "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
+        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
