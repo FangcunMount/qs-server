@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One bounded metadata diagnostic over the approved root@47.94.204.124 target."""
+"""One bounded metadata diagnostic over the approved ubuntu@154.8.167.1 target."""
 import argparse
 import base64
 import hashlib
@@ -23,7 +23,7 @@ READINESS_MEMBERS = MEMBERS | {"mysql-metadata-readiness.py"}
 INVENTORY_MEMBERS = MEMBERS | {"mysql-retirement-inventory.py"}
 ARCHIVE_LIMIT = 32 * 1024 * 1024
 HEADER_LIMIT = 32768
-SSH_HOST = "47.94.204.124"
+SSH_HOST = "154.8.167.1"
 
 
 def load_profile(directory):
@@ -202,19 +202,19 @@ def trusted_ssh(profile, home):
         if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
             raise ValueError("ssh_agent_binding")
         local["SSH_AUTH_SOCK"] = agent
-    code, raw = profile.capture_private(["/usr/bin/ssh", "-G", *options, "-l", "root", "-p", "22", SSH_HOST], env=local, timeout=10)
+    code, raw = profile.capture_private(["/usr/bin/ssh", "-G", *options, "-l", "ubuntu", "-p", "22", SSH_HOST], env=local, timeout=10)
     if code != 0:
         raise ValueError("ssh_alias_unavailable")
     config = {}
     for line in raw.decode().splitlines():
         key, _, value = line.partition(" ")
         config.setdefault(key, []).append(value)
-    if config.get("user") != ["root"] or config.get("hostname") != [SSH_HOST] or config.get("port") != ["22"] or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
+    if config.get("user") != ["ubuntu"] or config.get("hostname") != [SSH_HOST] or config.get("port") != ["22"] or config.get("proxycommand", ["none"]) != ["none"] or config.get("proxyjump", ["none"]) != ["none"] or config.get("hostkeyalias", ["none"]) != ["none"]:
         raise ValueError("ssh_alias_binding")
     code, raw = profile.capture_private(["/usr/bin/ssh-keygen", "-F", SSH_HOST, "-f", str(known)], env=local, timeout=10)
     if code != 0 or not any(line and not line.startswith(b"#") for line in raw.splitlines()):
         raise ValueError("ssh_host_key_unavailable")
-    return ["/usr/bin/ssh", "-T", *options, "-l", "root", "-p", "22", SSH_HOST], local
+    return ["/usr/bin/ssh", "-T", *options, "-l", "ubuntu", "-p", "22", SSH_HOST], local
 
 
 TRANSPORT_ERRORS = frozenset(("profile_input_preflight_failed", "profile_package_preflight_failed",
@@ -268,7 +268,7 @@ def dispatch(archive, env, profile, home, *, readiness=False, inventory=False):
             raise ValueError("local_package_checksum")
         # Public receiver code only enters argv; package and secrets travel solely over stdin.
         receiver = base64.b64encode(Path(__file__).read_bytes()).decode("ascii")
-        command = "/usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + (" --receive-inventory" if inventory else " --receive-readiness" if readiness else " --receive")
+        command = "sudo -n /usr/bin/python3 -B -c " + shlex.quote("import base64;exec(compile(base64.b64decode('" + receiver + "'),'<metadata-receiver>','exec'))") + (" --receive-inventory" if inventory else " --receive-readiness" if readiness else " --receive")
         payload = json.dumps(envelope, separators=(",", ":"), ensure_ascii=True).encode() + b"\n" + raw
         if len(payload) - len(raw) > HEADER_LIMIT:
             raise ValueError("envelope_limit")

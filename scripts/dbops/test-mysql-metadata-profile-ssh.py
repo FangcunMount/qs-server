@@ -74,7 +74,7 @@ class SSHProfileTests(unittest.TestCase):
                 self.assertEqual(kw['timeout'], 90)
                 calls.append(args)
                 return 0, armor.encode_armored_receipt(receipt(), schema=profile.RECEIPT_SCHEMA).encode()
-            with patch.object(ssh, 'trusted_ssh', return_value=(['ssh', '-l', 'root', '-p', '22', '47.94.204.124'], {})), patch.object(profile, 'capture_private', side_effect=capture):
+            with patch.object(ssh, 'trusted_ssh', return_value=(['ssh', '-l', 'ubuntu', '-p', '22', '154.8.167.1'], {})), patch.object(profile, 'capture_private', side_effect=capture):
                 code, sealed = ssh.dispatch(path, env, profile, Path(directory))
             self.assertEqual(code, 0)
             self.assertTrue(json.loads(armor.decode_armored_receipt(sealed))['complete'])
@@ -197,15 +197,15 @@ class SSHProfileTests(unittest.TestCase):
             calls = []
             def capture(args, **kw):
                 calls.append(args)
-                return (0, b'user root\nhostname 47.94.204.124\nport 22\n') if '-G' in args else (0, b'# found\nfixture key\n')
+                return (0, b'user ubuntu\nhostname 154.8.167.1\nport 22\n') if '-G' in args else (0, b'# found\nfixture key\n')
             with patch.object(profile, 'capture_private', side_effect=capture):
                 args, _ = ssh.trusted_ssh(profile, home)
             for option in ('StrictHostKeyChecking=yes', 'BatchMode=yes', 'UserKnownHostsFile=' + str(home / '.ssh/known_hosts'), 'ControlPath=none', 'ClearAllForwardings=yes', 'ForwardAgent=no', 'ForwardX11=no', 'ForwardX11Trusted=no'):
                 self.assertIn(option, args)
-            self.assertEqual(args[-5:], ['-l', 'root', '-p', '22', '47.94.204.124'])
-            self.assertEqual(calls[1], ['/usr/bin/ssh-keygen', '-F', '47.94.204.124', '-f', str(home / '.ssh/known_hosts')])
-            valid = b'user root\nhostname 47.94.204.124\nport 22\n'
-            for config in (valid.replace(b'user root', b'user wrong'), valid.replace(b'47.94.204.124', b'example.invalid'),
+            self.assertEqual(args[-5:], ['-l', 'ubuntu', '-p', '22', '154.8.167.1'])
+            self.assertEqual(calls[1], ['/usr/bin/ssh-keygen', '-F', '154.8.167.1', '-f', str(home / '.ssh/known_hosts')])
+            valid = b'user ubuntu\nhostname 154.8.167.1\nport 22\n'
+            for config in (valid.replace(b'user ubuntu', b'user wrong'), valid.replace(b'154.8.167.1', b'example.invalid'),
                            valid.replace(b'port 22', b'port 2222'), valid.replace(b'port 22\n', b''),
                            valid + b'proxycommand dangerous\n', valid + b'proxyjump dangerous\n', valid + b'hostkeyalias unexpected\n',
                            valid + b'hostname another.invalid\n'):
@@ -219,7 +219,7 @@ class SSHProfileTests(unittest.TestCase):
             (home / '.ssh').mkdir()
             (home / '.ssh/known_hosts').write_text('owned fixture, not a real host key\n')
             config = home / 'owned-ssh-config'
-            config.write_text('Host 47.94.204.124\n  User wrong\n  Port 2222\n')
+            config.write_text('Host 154.8.167.1\n  User wrong\n  Port 2222\n')
             capture = profile.capture_private
             calls = []
             def offline(args, **kwargs):
@@ -227,12 +227,12 @@ class SSHProfileTests(unittest.TestCase):
                 if '-G' in args:
                     # CLI root/22 wins over this owned config; -G never connects.
                     return capture([args[0], '-F', str(config), *args[1:]], **kwargs)
-                self.assertEqual(args, ['/usr/bin/ssh-keygen', '-F', '47.94.204.124', '-f', str(home / '.ssh/known_hosts')])
+                self.assertEqual(args, ['/usr/bin/ssh-keygen', '-F', '154.8.167.1', '-f', str(home / '.ssh/known_hosts')])
                 return 0, b'owned fixture key\n'
             with patch.object(profile, 'capture_private', side_effect=offline):
                 args, _ = ssh.trusted_ssh(profile, home)
             self.assertEqual(len(calls), 2)
-            self.assertEqual(args[-5:], ['-l', 'root', '-p', '22', '47.94.204.124'])
+            self.assertEqual(args[-5:], ['-l', 'ubuntu', '-p', '22', '154.8.167.1'])
 
     def test_real_offline_ssh_config_rejects_hostkeyalias_before_key_or_secret_transport(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -240,7 +240,7 @@ class SSHProfileTests(unittest.TestCase):
             (home / '.ssh').mkdir()
             (home / '.ssh/known_hosts').write_text('owned fixture, not a real host key\n')
             config = home / 'owned-ssh-config'
-            config.write_text('Host 47.94.204.124\n  HostKeyAlias unexpected-key-identity\n')
+            config.write_text('Host 154.8.167.1\n  HostKeyAlias unexpected-key-identity\n')
             capture = profile.capture_private
             calls = []
             def offline(args, **kwargs):
@@ -263,7 +263,7 @@ class SSHProfileTests(unittest.TestCase):
             capture = profile.capture_private
             for override in ('HostName example.invalid', 'ProxyCommand /usr/bin/false', 'ProxyJump example.invalid'):
                 with self.subTest(override=override):
-                    config.write_text('Host 47.94.204.124\n  ' + override + '\n')
+                    config.write_text('Host 154.8.167.1\n  ' + override + '\n')
                     calls = []
                     def offline(args, **kwargs):
                         calls.append(args)
