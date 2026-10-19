@@ -241,6 +241,7 @@ func m3SQLProof(t *testing.T, db *sql.DB, owner string) {
 			t.Fatal("duplicate obtained execution permission", err)
 		}
 	}
+	m3ArchiveSQLProof(t, db, b)
 	if _, err = db.ExecContext(ctx, `UPDATE rm_tx_binding SET schema_version=2 WHERE owner=?`, []byte(owner)); err != nil {
 		t.Fatal(err)
 	}

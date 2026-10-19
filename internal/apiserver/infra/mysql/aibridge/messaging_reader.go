@@ -10,11 +10,18 @@ import (
 // MessagingReader is a host read boundary over a borrowed database pool.
 // No resource is created or closed; the read transaction never writes or commits.
 type MessagingReader struct {
-	DB    *sql.DB
-	Store *MessagingStore
+	DB      *sql.DB
+	Store   *MessagingStore
+	Archive *TransactionArchive
 }
 
 func (s *MessagingReader) ReadMessagePayload(ctx context.Context, ref *pb.MessagePayloadReference, workload string) ([]byte, error) {
+	if s.Archive != nil {
+		body, found, err := s.Archive.Payload(ctx, ref, workload)
+		if err != nil || found {
+			return body, err
+		}
+	}
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, err
