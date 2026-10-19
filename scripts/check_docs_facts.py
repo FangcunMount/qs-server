@@ -3556,15 +3556,16 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
                 )
 
     go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
-    # M3 pins the M2 prerelease: the v0.4.0-rocketmq.1 and v0.5.0-rocketmq-tx.1
-    # NSQ/legacy-wire subtrees and RocketMQ handle/Ack/dispatch are byte-identical.
-    # Multi-input route selection changed, not terminal settlement. This audit
-    # is not production cutover or original Go business acceptance.
+    # M3 re-audited fixed tx.2 against tx.1: the only runtime Go change is
+    # driver/metric.go atomic pointer publication. NSQ/legacy-wire subtrees and
+    # RocketMQ handle/Ack/dispatch are byte-identical. SDK PR46, source8fb6fc57,
+    # source/race/NSQ CI and two31-case MySQL/Mongo recovery profiles passed.
+    # This does not claim QS host, system or production cutover acceptance.
     # The current subscriber and terminal handoff belong to the fixed SDK.
     # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.5\.0-rocketmq-tx\.1\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.5\.0-rocketmq-tx\.2\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(
