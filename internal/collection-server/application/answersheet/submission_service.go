@@ -185,8 +185,8 @@ func questionnaireSubmissionSpec(qnr *collectionquestionnaire.QuestionnaireRespo
 	return surveyvalidation.Spec{QuestionnaireCode: qnr.Code, QuestionnaireVersion: qnr.Version, Questions: questions}
 }
 
-// AcceptDurably returns only after the apiserver has committed the AnswerSheet,
-// idempotency record and outbox event in one transaction.
+// AcceptDurably returns only after the apiserver has proven the original
+// AnswerSheet, idempotency result and publication evidence committed together.
 func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	totalStarted := time.Now()
 	totalOutcome := "rejected"

@@ -2,6 +2,7 @@ package survey
 
 import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
@@ -29,6 +30,7 @@ type BootstrapInput struct {
 	CacheSignalNotifier quesApp.CacheSignalNotifier
 	OutboxProfile       appEventing.ProfileBinding
 	MongoLimiter        backpressure.Acquirer
+	SubmissionStore     asApp.SubmissionDurableStore
 }
 
 // Bootstrap assembles the survey module from container integration inputs.

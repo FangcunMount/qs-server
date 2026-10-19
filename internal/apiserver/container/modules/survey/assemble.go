@@ -58,6 +58,8 @@ type Deps struct {
 	CacheSignalNotifier quesApp.CacheSignalNotifier
 	OutboxProfile       appEventing.ProfileBinding
 	MongoLimiter        backpressure.Acquirer
+	// Selected explicitly by the host; errors never switch this back to Outbox.
+	SubmissionStore asApp.SubmissionDurableStore
 }
 
 // AnswerSheetStore exposes answer-sheet persistence only; Outbox capability is
@@ -120,6 +122,7 @@ func New(deps Deps) (*Module, error) {
 		normalized.AnswerSheetReader,
 		normalized.QuestionnaireRepo,
 		normalized.OutboxProfile,
+		normalized.SubmissionStore,
 	); err != nil {
 		return nil, err
 	}
@@ -186,7 +189,7 @@ func (m *Module) SetAssessmentBindingResolver(binding rulesetport.AssessmentBind
 	}
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter backpressure.Acquirer, mysqlDB *gorm.DB, identitySvc *iam.IdentityService, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter backpressure.Acquirer, mysqlDB *gorm.DB, identitySvc *iam.IdentityService, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding, selectedStore asApp.SubmissionDurableStore) error {
 	sub := m.AnswerSheet
 
 	answerScorer := ruleengineInfra.NewAnswerScorer()
@@ -195,13 +198,20 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter 
 		Boundary: "answersheet_submit",
 		Limiter:  mongoLimiter,
 	})
-	if profile.Stager == nil || profile.PostCommit == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
+	durableStore := selectedStore
+	if durableStore != nil {
+		if _, ok := durableStore.(asApp.SubmissionIdempotencyReader); !ok {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "explicit submission store requires authoritative idempotency reads")
+		}
+	} else {
+		if profile.Stager == nil || profile.PostCommit == nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
+		}
+		if _, ok := profile.Stager.(outboxport.ReferencePreparer); !ok {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain profile requires original event reference preparation")
+		}
+		durableStore = asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, profile.Stager, profile.PostCommit)
 	}
-	if _, ok := profile.Stager.(outboxport.ReferencePreparer); !ok {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain profile requires original event reference preparation")
-	}
-	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, profile.Stager, profile.PostCommit)
 	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, reader)
 	if injector, ok := sub.SubmissionService.(asApp.AttributionResolverInjector); ok && mysqlDB != nil {
 		// Resolver reads authoritative Actor/Plan facts before the Mongo durable transaction.

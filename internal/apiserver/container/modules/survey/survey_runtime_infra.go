@@ -2,6 +2,7 @@ package survey
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
+	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	surveycache "github.com/FangcunMount/qs-server/internal/apiserver/cache/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -23,6 +24,8 @@ type SurveyRuntimeInfra struct {
 	QuestionnaireReader surveyreadmodel.QuestionnaireReader
 	AnswerSheetRepo     *answerSheetMongo.Repository
 	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
+	// The composition root owns Start/Close of a selected transaction store.
+	SubmissionStore asApp.SubmissionDurableStore
 }
 
 // SurveyRuntimeInfraDeps collects infrastructure inputs for EnsureSurveyRuntimeInfra.
