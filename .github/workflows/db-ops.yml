@@ -3098,6 +3098,9 @@ jobs:
               --label "com.fangcunmount.qs-server.github-run-id=$GITHUB_RUN_ID_INPUT" \
               -v "$TOOL_FILE:/tool/govern:ro" \
               -v "$MANIFEST_MOUNT" \
+              --mount "type=bind,source=${MYSQL_TLS_CA_FILE},target=${MYSQL_TLS_CA_FILE},readonly" \
+              -e MYSQL_TLS_MODE="$MYSQL_TLS_MODE" \
+              -e MYSQL_TLS_CA_FILE="$MYSQL_TLS_CA_FILE" \
               -e MYSQL_HOST="$MYSQL_HOST" \
               -e MYSQL_PORT="$MYSQL_PORT" \
               -e MYSQL_USERNAME="$MYSQL_USERNAME" \
