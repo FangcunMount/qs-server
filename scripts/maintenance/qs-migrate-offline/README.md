@@ -65,7 +65,7 @@ sha256sum /private/task-owned/qs-migrate-offline
 }
 ```
 
-两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。本候选资源目标为104/40（Task旧token退出，未部署）；生产实际版本仍须只读核实。SQL-only101/39、Mongo-only101/40、Actor-only102/40及维护表-only103/40分别需要独立迁移资源、已审核初始版本对和各自批准，旧迁移字节保持不变。
+两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。本候选资源目标为105/40（Task旧token退出，未部署）；生产实际版本仍须只读核实。SQL-only101/39、Mongo-only101/40、Actor-only102/40及维护表-only103/40分别需要独立迁移资源、已审核初始版本对和各自批准，旧迁移字节保持不变。
 
 `protection_scope` 必须显式声明，范围与版本转换不可互换：
 
@@ -77,9 +77,11 @@ sha256sum /private/task-owned/qs-migrate-offline
 | `m4_actor_columns` | 仅 `101/40 → 102/40`；保护 tags/effective_roles 的完整原列定义、主键和值及真实版本表材料，不包含五张历史维护表 |
 | `m4_legacy_maintenance_tables` | 仅 `102/40 → 103/40`；保护五表完整原DDL/值及真实完整原版本表，保留现代任务、恢复归档和业务历史 |
 
-| `m6_task_entry_token` | 仅 `103/40 → 104/40`；保护Task旧token列完整定义、主键、原值及真实版本表材料，保留entry_url与现用业务事实 |
+| `m6_task_entry_token` | 仅 `104/40 → 105/40`；保护Task旧token列完整定义、主键、原值及真实版本表材料，保留entry_url与现用业务事实 |
 
-五个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
+| `m6_task_entry_token_with_transport_evidence` | 仅 `103/40 → 105/40`；保护Task旧列，记录传输证据表原先不存在，并执行main原SQL104建表；不切换Broker |
+
+六个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
 
 本入口不提供旧格式兼容：旧 `backup_pair_manifest_sha256` / `backup_pair_location` 字段、缺失 scope、未知 scope、对象 scope 的其他版本组合直接拒绝。
 
@@ -123,3 +125,5 @@ go test -race -tags=integration -count=1 -timeout=8m -v \
 私有原始JSONL摘要 `ed4cbaf137c82aa96a281bf8ea9e08d34d45a74fba8dfff3ab5dc5db586c4cd8`、receipt摘要 `70a655cc7e05ebbe6ed6924e83e9a1e079fb36373dc03103f1ab9a64296ea78e`，harness摘要 `6268a020d08771ad4a5e56c5d38251b4472525515e48c074cde1a7dfded4ff0b`。这些是当前源码的隔离逻辑验收，不是生产对象恢复、RPO、30/60分钟预算或三个服务完整启动的证明。
 
 测试期间既有nsqd发生重启。原容器IDs/images保留，但原服务runtime元数据并非全部稳定，不能据此宣称所有原服务未变，也不推断重启原因。生产、正式部署和业务验收状态仍未提升。
+
+RocketMQ M1 的完整资源目标为104/40，仅增加MySQL传输审计表；原离线批准、真实库身份、保护范围和维护窗口要求继续生效。非空传输证据不允许通过down删除。

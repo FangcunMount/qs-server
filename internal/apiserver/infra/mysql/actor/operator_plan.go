@@ -21,8 +21,8 @@ func RequireCurrentOperatorPlanSchema(ctx context.Context, db *gorm.DB) error {
 	if err := db.WithContext(ctx).Raw("SELECT version,dirty FROM schema_migrations LIMIT 2").Scan(&rows).Error; err != nil {
 		return err
 	}
-	if len(rows) != 1 || rows[0].Version == nil || *rows[0].Version != 104 || rows[0].Dirty == nil || *rows[0].Dirty {
-		return fmt.Errorf("clean SQL104 required; repeat preflight after migration")
+	if len(rows) != 1 || rows[0].Version == nil || *rows[0].Version != 105 || rows[0].Dirty == nil || *rows[0].Dirty {
+		return fmt.Errorf("clean SQL105 required; repeat preflight after migration")
 	}
 	return nil
 }

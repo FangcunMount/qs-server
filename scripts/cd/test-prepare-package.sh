@@ -88,6 +88,18 @@ assert_package_contract() {
   test -x "$package_dir/scripts/cd/wait-worker-readiness.sh"
   test -x "$package_dir/scripts/cd/verify-worker-dependencies.sh"
   assert_absent "$env_file" "_REDIS_DB="
+  if [ "${MESSAGING_PROVIDER:-nsq}" = rocketmq ] && [ "$service" != collection ]; then
+    local prefix=QS_WORKER
+    if [ "$service" = apiserver ]; then prefix=QS_APISERVER; fi
+    assert_line "$env_file" "${prefix}_MESSAGING_PROVIDER=rocketmq"
+    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_ENDPOINT=127.0.0.1:8081"
+    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_CREDENTIALS_FILE=/app/configs/rocketmq/credentials.json"
+    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_PUBLISH_ENABLED=false"
+    if [ "$service" = apiserver ]; then
+      assert_line "$env_file" "QS_APISERVER_IAM_AUTHZ_SYNC_PROVIDER=rocketmq"
+      assert_line "$env_file" "QS_APISERVER_IAM_AUTHZ_SYNC_EPHEMERAL_NSQ=false"
+    fi
+  fi
 
   case "$service" in
     apiserver)
@@ -122,3 +134,5 @@ cd "$REPO_ROOT"
 assert_package_contract apiserver
 assert_package_contract collection
 assert_package_contract worker
+MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_INSTANCE_ID=proof ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract apiserver
+MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract worker

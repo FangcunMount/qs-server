@@ -80,9 +80,9 @@ func RetireMaintenanceTables(t testing.TB, db *gorm.DB, actorUp, up []byte) {
 	}, 103)
 }
 
-// RetireTaskEntryToken executes original SQL104 on a real clean103 disposable
+// RetireTaskEntryToken executes original SQL104/105 on a real clean103 disposable
 // fixture whose Task table includes the original token column.
-func RetireTaskEntryToken(t testing.TB, db *gorm.DB, maintenanceUp, up []byte) {
+func RetireTaskEntryToken(t testing.TB, db *gorm.DB, maintenanceUp, transportUp, up []byte) {
 	t.Helper()
 	var initial []struct {
 		Version uint64
@@ -93,8 +93,9 @@ func RetireTaskEntryToken(t testing.TB, db *gorm.DB, maintenanceUp, up []byte) {
 	}
 	applyFixtureResources(t, db, fstest.MapFS{
 		"000103_retire_legacy_maintenance_tables.up.sql": &fstest.MapFile{Data: maintenanceUp},
-		"000104_retire_task_entry_token.up.sql":          &fstest.MapFile{Data: up},
-	}, 104)
+		"000104_rocketmq_transport_evidence.up.sql":      &fstest.MapFile{Data: transportUp},
+		"000105_retire_task_entry_token.up.sql":          &fstest.MapFile{Data: up},
+	}, 105)
 }
 
 func applyFixtureResources(t testing.TB, db *gorm.DB, files fstest.MapFS, target uint64) {

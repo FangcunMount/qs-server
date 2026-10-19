@@ -20,7 +20,8 @@ var (
 
 // sdkNSQWirePublisher owns the SDK producer without exposing a legacy Message.
 type sdkNSQWirePublisher struct {
-	publisher *rmnsq.ManagedPublisher
+	publisher Publisher
+	provider  string
 	closeOnce sync.Once
 	closed    chan struct{}
 	closeErr  error
@@ -43,7 +44,18 @@ func NewSDKNSQWirePublisher(address string) (*sdkNSQWirePublisher, error) {
 // PublishWire never rebuilds or mutates the caller's envelope. Unknown keeps
 // the original application identity and bytes under the caller's recovery.
 func (p *sdkNSQWirePublisher) PublishWire(ctx context.Context, topic string, body []byte) error {
-	return classifyNSQPublish(topic, p.publisher.PublishRaw(ctx, topic, body))
+	result := p.publisher.PublishRaw(ctx, topic, body)
+	if p.provider == "rocketmq" {
+		switch result.Outcome {
+		case rmtransport.Confirmed:
+			return nil
+		case rmtransport.Rejected:
+			return fmt.Errorf("RocketMQ publish rejected: topic %s", topic)
+		default:
+			return fmt.Errorf("RocketMQ publish outcome unknown: topic %s", topic)
+		}
+	}
+	return classifyNSQPublish(topic, result)
 }
 
 func classifyNSQPublish(topic string, result rmtransport.Result) error {

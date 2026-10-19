@@ -51,7 +51,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	subscriberConfig := s.loadedSubscriberConfig()
 	subscriber, err := eventtransport.NewSDKDeliverySubscriber(
 		subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
-		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder),
+		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder, s.config.Messaging.Provider), eventtransport.SDKRocketMQFailureHandler(deadLetterRecorder),
 	)
 	if err != nil {
 		_ = deadLetterRecorder.Close()
@@ -75,7 +75,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
 		Runtime: containerOutput.container, Subscriber: subscriber,
 		HoldRecorder:    holdStore,
-		UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder("nsq", deadLetterRecorder),
+		UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
 	})
 	if subscribeErr != nil {
 		subscriber.Stop()
@@ -87,7 +87,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		}
 		return runtimeOutput{}, subscribeErr
 	}
-	if s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled {
+	if (s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled) && (s.config.Messaging.Provider != "rocketmq" || s.config.Messaging.RocketMQ.PublishingEnabled()) {
 		var publisher io.Closer
 		var holdReplayer *messagingintegration.RetryEventHoldReplayer
 		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
@@ -115,7 +115,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 
 func (s *server) loadedSubscriberConfig() eventtransport.SubscriberConfig {
 	return eventtransport.SubscriberConfig{
-		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
+		RocketMQ: s.config.Messaging.RocketMQ, Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
 		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout,
 		NSQDHTTPEndpoints: s.config.Messaging.NSQDHTTPEndpoints,
 	}

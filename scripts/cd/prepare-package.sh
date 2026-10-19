@@ -61,6 +61,25 @@ cp \
   "${PACKAGE_DIR}/scripts/cd/"
 cp scripts/dbops/receipt-transport.py "${PACKAGE_DIR}/scripts/dbops/"
 
+if [ "${MESSAGING_PROVIDER_REQUIRED:-false}" = true ] && [ "$SERVICE" != collection ]; then
+  require_env MESSAGING_PROVIDER
+fi
+MESSAGING_PROVIDER="${MESSAGING_PROVIDER:-nsq}"
+case "$MESSAGING_PROVIDER" in nsq|rocketmq) ;; *) echo 'Unsupported broker provider' >&2; exit 1 ;; esac
+ROCKETMQ_PUBLISH_ENABLED="${ROCKETMQ_PUBLISH_ENABLED:-true}"
+case "$ROCKETMQ_PUBLISH_ENABLED" in true|false) ;; *) echo 'Invalid publish gate' >&2; exit 1 ;; esac
+NSQ_NSQD_HOST="${NSQ_NSQD_HOST:-}"
+NSQ_LOOKUPD_HOST="${NSQ_LOOKUPD_HOST:-}"
+if [ "$SERVICE" != collection ]; then
+  if [ "$MESSAGING_PROVIDER" = rocketmq ]; then
+    require_env ROCKETMQ_ENDPOINT
+    if [ "$SERVICE" = apiserver ]; then require_env ROCKETMQ_INSTANCE_ID; fi
+  else
+    require_env NSQ_NSQD_HOST
+    if [ "$SERVICE" = worker ]; then require_env NSQ_LOOKUPD_HOST; fi
+  fi
+fi
+
 case "$SERVICE" in
   apiserver)
     REQUIRED_CACHE_POLICY="${PACKAGE_DIR}/configs/cache/apiserver.prod.yaml"
@@ -91,7 +110,7 @@ case "$SERVICE" in
     require_env \
       MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
       MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
-      REDIS_HOST REDIS_PORT JWT_SECRET NSQ_NSQD_HOST NSQ_NSQD_PORT \
+      REDIS_HOST REDIS_PORT JWT_SECRET \
       OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET DELEGATED_SUBJECT_CURRENT_KEY
 
     cat > "$ENV_FILE" <<EOF
@@ -168,7 +187,6 @@ EOF
     require_env \
       MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
       MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
-      NSQ_NSQD_HOST NSQ_NSQD_PORT NSQ_LOOKUPD_HOST NSQ_LOOKUPD_PORT \
       REDIS_HOST REDIS_PORT
 
     cat > "$ENV_FILE" <<EOF
@@ -188,7 +206,6 @@ QS_WORKER_MYSQL_USERNAME=${MYSQL_USERNAME}
 QS_WORKER_MYSQL_PASSWORD=${MYSQL_PASSWORD}
 QS_WORKER_MYSQL_DATABASE=${MYSQL_DATABASE}
 
-QS_WORKER_MESSAGING_PROVIDER=nsq
 QS_WORKER_MESSAGING_NSQ_ADDR=${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}
 QS_WORKER_MESSAGING_NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}
 
@@ -206,6 +223,28 @@ EOF
     ;;
 esac
 
+if [ "$SERVICE" != collection ]; then
+  case "$SERVICE" in apiserver) mq_prefix=QS_APISERVER ;; worker) mq_prefix=QS_WORKER ;; esac
+  printf '%s_MESSAGING_PROVIDER=%s\n' "$mq_prefix" "$MESSAGING_PROVIDER" >> "$ENV_FILE"
+  if [ "$MESSAGING_PROVIDER" = rocketmq ]; then
+    for mq_entry in \
+      "ENDPOINT=${ROCKETMQ_ENDPOINT}" \
+      "CREDENTIALS_FILE=/app/configs/rocketmq/credentials.json" \
+      "CA_FILE=/app/configs/rocketmq/ca.crt" \
+      "ROUTES_FILE=/app/configs/rocketmq/routes.json" \
+      "INSTANCE_ID=${ROCKETMQ_INSTANCE_ID:-}" \
+      "PUBLISH_ENABLED=${ROCKETMQ_PUBLISH_ENABLED}"; do
+      printf '%s_MESSAGING_ROCKETMQ_%s\n' "$mq_prefix" "$mq_entry" >> "$ENV_FILE"
+      if [ "$SERVICE" = apiserver ]; then
+        printf 'QS_APISERVER_IAM_AUTHZ_SYNC_ROCKETMQ_%s\n' "$mq_entry" >> "$ENV_FILE"
+      fi
+    done
+    if [ "$SERVICE" = apiserver ]; then
+      printf 'QS_APISERVER_IAM_AUTHZ_SYNC_PROVIDER=rocketmq\nQS_APISERVER_IAM_AUTHZ_SYNC_EPHEMERAL_NSQ=false\n' >> "$ENV_FILE"
+    fi
+  fi
+fi
+chmod 0600 "$ENV_FILE"
 echo "Generated config.prod.env for ${SERVICE}:"
 redact_env_file "$ENV_FILE"
 

@@ -1,6 +1,9 @@
 package options
 
-import "github.com/spf13/pflag"
+import (
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/spf13/pflag"
+)
 
 // AIWorkflowOptions configures intake and management communication with qs-ai only.
 type AIWorkflowOptions struct {
@@ -29,6 +32,11 @@ func (o *AIWorkflowOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 	fs.BoolVar(&o.Enabled, "ai_workflow.enabled", o.Enabled, "Enable qs-ai participant intake.")
+	fs.StringVar(&o.Messaging.Provider, "ai_workflow.messaging.provider", o.Messaging.Provider, "Explicit AI broker provider")
+	if o.Messaging.RocketMQ == nil {
+		o.Messaging.RocketMQ = &genericoptions.RocketMQOptions{}
+	}
+	o.Messaging.RocketMQ.AddFlags(fs, "ai_workflow.messaging.rocketmq")
 	fs.BoolVar(&o.Messaging.Enabled, "ai_workflow.messaging.enabled", o.Messaging.Enabled, "Use the reviewed MQ runtime for asynchronous AI messages.")
 	fs.BoolVar(&o.Management.Enabled, "ai_workflow.management.enabled", o.Management.Enabled, "Enable qs-ai management proxy.")
 	fs.StringVar(&o.Management.Address, "ai_workflow.management.address", o.Management.Address, "qs-ai gRPC address.")

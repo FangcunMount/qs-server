@@ -801,7 +801,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify SQL104 Task token retirement on real databases
+      - name: Verify SQL105 Task token retirement on real databases
         env:
           QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           QS_M3_REQUIRE_DATABASE: '1'

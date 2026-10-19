@@ -66,6 +66,10 @@ func run(input, base, out string) (resultErr error) {
 	if err != nil {
 		return err
 	}
+	transportFiles, err := b.TransportFiles()
+	if err != nil {
+		return err
+	}
 	var configHash string
 	if base != "" {
 		original, err := bounded(base, 1<<20)
@@ -91,11 +95,12 @@ func run(input, base, out string) (resultErr error) {
 		configHash = hex.EncodeToString(sum[:])
 	}
 	return json.NewEncoder(os.Stdout).Encode(struct {
-		SourceSHA    string            `json:"source_sha"`
-		Revision     string            `json:"binding_revision"`
-		BindingHash  string            `json:"binding_sha256"`
-		ConfigHash   string            `json:"rendered_config_sha256,omitempty"`
-		Fingerprints map[string]string `json:"public_key_fingerprints"`
-		Offline      bool              `json:"offline"`
-	}{sourceSHA, b.Revision, b.SHA256(), configHash, fingerprints, true})
+		TransportFiles map[string]string `json:"transport_files_sha256,omitempty"`
+		SourceSHA      string            `json:"source_sha"`
+		Revision       string            `json:"binding_revision"`
+		BindingHash    string            `json:"binding_sha256"`
+		ConfigHash     string            `json:"rendered_config_sha256,omitempty"`
+		Fingerprints   map[string]string `json:"public_key_fingerprints"`
+		Offline        bool              `json:"offline"`
+	}{transportFiles, sourceSHA, b.Revision, b.SHA256(), configHash, fingerprints, true})
 }

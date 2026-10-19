@@ -63,7 +63,7 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 const CurrentOperatorColumns = "id,created_at,updated_at,deleted_at,created_by,updated_by,deleted_by,version,org_id,user_id,roles,authz_policy_version,authz_projected_at,authz_projection_pending,name,email,phone,is_active"
 
 // OperatorFingerprintSchema requires a fresh plan after the reviewed schema upgrade.
-const OperatorFingerprintSchema = "actor_maintenance_sql104"
+const OperatorFingerprintSchema = "actor_maintenance_sql105"
 
 // OperatorPO 后台操作者持久化对象
 type OperatorPO struct {

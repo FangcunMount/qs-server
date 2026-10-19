@@ -1,0 +1,33 @@
+name: RocketMQ host failure audit
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mysql-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.0.46
+        env:
+          MYSQL_ROOT_PASSWORD: disposable
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h127.0.0.1 -uroot -pdisposable --silent"
+          --health-interval=3s --health-timeout=5s --health-retries=40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Require original wire, collision protection, atomic commit and rollback preservation
+        env:
+          MYSQL_DSN: root:disposable@tcp(127.0.0.1:3306)/?parseTime=true
+          QS_RMQ_AUDIT_UP: ${{ github.workspace }}/internal/pkg/migration/migrations/mysql/000104_rocketmq_transport_evidence.up.sql
+          QS_RMQ_AUDIT_DOWN: ${{ github.workspace }}/internal/pkg/migration/migrations/mysql/000104_rocketmq_transport_evidence.down.sql
+        run: go test -tags=integration -count=1 -v ./internal/pkg/eventing/transport -run '^TestRocketMQAuditRequiresOriginalEvidenceAndPreservesItOnRollback$'

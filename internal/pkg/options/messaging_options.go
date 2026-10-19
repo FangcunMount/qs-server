@@ -9,10 +9,11 @@ import (
 
 // MessagingOptions 消息队列配置选项
 type MessagingOptions struct {
+	RocketMQ *RocketMQOptions `json:"rocketmq" mapstructure:"rocketmq"`
 	// Enabled 是否启用消息队列
 	Enabled bool `json:"enabled" mapstructure:"enabled"`
 
-	// Provider 消息队列提供者；v1.0 仅支持 NSQ。
+	// Provider 消息队列提供者，支持 NSQ 和 RocketMQ 普通消息。
 	Provider string `json:"provider" mapstructure:"provider"`
 
 	// NSQ 配置
@@ -67,10 +68,14 @@ func NewMessagingOptions() *MessagingOptions {
 
 // AddFlags 添加命令行参数
 func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
+	if o.RocketMQ == nil {
+		o.RocketMQ = &RocketMQOptions{}
+	}
+	o.RocketMQ.AddFlags(fs, "messaging.rocketmq")
 	fs.BoolVar(&o.Enabled, "messaging.enabled", o.Enabled,
 		"Enable message queue for event publishing")
 	fs.StringVar(&o.Provider, "messaging.provider", o.Provider,
-		"Message queue provider (nsq)")
+		"Message queue provider (nsq, rocketmq)")
 	fs.StringVar(&o.NSQAddr, "messaging.nsq-addr", o.NSQAddr,
 		"NSQ daemon address for publishing")
 	fs.StringVar(&o.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.NSQLookupdAddr,
@@ -91,10 +96,15 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 // Validate 验证配置
 func (o *MessagingOptions) Validate() []error {
 	errs := o.Delivery.Validate("messaging.delivery")
-	if o.Provider != "nsq" {
-		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq)", o.Provider))
+	if o.Provider != "nsq" && o.Provider != "rocketmq" {
+		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq, rocketmq)", o.Provider))
 	}
 
+	if o.Provider == "rocketmq" {
+		if err := o.RocketMQ.Validate(); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	if !o.Enabled {
 		return errs
 	}

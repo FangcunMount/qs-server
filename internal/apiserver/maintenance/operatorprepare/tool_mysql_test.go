@@ -96,14 +96,18 @@ func TestPreparationMySQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	actorfixture.RetireMaintenanceTables(t, db, actorUp, maintenanceUp)
-	taskUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000104_retire_task_entry_token.up.sql"))
+	taskUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000105_retire_task_entry_token.up.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Exec("CREATE TABLE assessment_task(id BIGINT PRIMARY KEY, entry_token VARCHAR(255))").Error; err != nil {
 		t.Fatal(err)
 	}
-	actorfixture.RetireTaskEntryToken(t, db, maintenanceUp, taskUp)
+	transportUp, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000104_rocketmq_transport_evidence.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	actorfixture.RetireTaskEntryToken(t, db, maintenanceUp, transportUp, taskUp)
 	raw, err := os.ReadFile(filepath.Join("../../../pkg/migration/migrations/mysql", "000074_operator_retirement_tasks.up.sql"))
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(raw)).Error)

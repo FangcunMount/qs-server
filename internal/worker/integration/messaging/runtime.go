@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 )
 
@@ -30,10 +31,10 @@ type WirePublisherCloser interface {
 }
 
 func CreateSDKWirePublisher(cfg *config.MessagingConfig) (WirePublisherCloser, error) {
-	if cfg == nil || cfg.Provider != "nsq" {
+	if cfg == nil || (cfg.Provider != "nsq" && cfg.Provider != "rocketmq") {
 		return nil, fmt.Errorf("native wire publisher requires NSQ provider")
 	}
-	return messagingruntime.NewSDKNSQWirePublisher(cfg.NSQAddr)
+	return messagingruntime.NewSDKWirePublisher(&genericoptions.MessagingOptions{Provider: cfg.Provider, NSQAddr: cfg.NSQAddr, RocketMQ: cfg.RocketMQ})
 }
 
 func EnsureChannels(ctx context.Context, cfg *config.MessagingConfig, serviceName string, source TopicSubscriptionSource) error {

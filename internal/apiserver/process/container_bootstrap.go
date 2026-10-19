@@ -195,12 +195,16 @@ func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtra
 		channelPrefix = "qs-authz-sync"
 	}
 	channel, handoffGroup := authzVersionSubscriberIdentity(channelPrefix, authzSync.EphemeralNSQ)
+	if authzSync.Provider == "rocketmq" && authzSync.RocketMQ != nil {
+		channel = channelPrefix + "-apiserver-" + authzSync.RocketMQ.InstanceID
+		handoffGroup = ""
+	}
 	subscriberConfig := eventtransport.SubscriberConfig{
-		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr,
+		RocketMQ: authzSync.RocketMQ, Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr,
 		FailedHandoffGroup: handoffGroup,
 	}
 	sdkSubscriber, err := eventtransport.NewSDKDeliverySubscriber(
-		subscriberConfig, 0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder),
+		subscriberConfig, 0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder, authzSync.Provider), eventtransport.SDKRocketMQFailureHandler(recorder),
 	)
 	if err == nil {
 		err = iamauth.SubscribeVersionChangesSDK(context.Background(), sdkSubscriber, authzSync.Topic, channel, loader)
