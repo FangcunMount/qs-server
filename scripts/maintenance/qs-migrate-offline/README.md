@@ -133,7 +133,7 @@ RocketMQ M1 的完整资源目标为104/40，仅增加MySQL传输审计表；原
 Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
 `MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
 the pinned infra CA before deployment or maintenance. Containers receive a read-only
-CA mount; Go clients share component-base v0.8.1 verification. Credentials, query
+CA mount; Go clients share component-base v0.8.2 verification. Credentials, query
 budgets, timezone, transactions, schema and existing approval boundaries are preserved.
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business

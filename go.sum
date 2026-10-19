@@ -821,3 +821,5 @@ k8s.io/klog v1.0.0/go.mod h1:4Bi6QPql/J/LkTDqv7R/cd3hPo4k2DG6Ptcz060Ez5I=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+github.com/FangcunMount/component-base v0.8.2 h1:+kEGlI8cNYartjLUe6rrnWQJyUVyIj7KgobwiP5rKvY=
+github.com/FangcunMount/component-base v0.8.2/go.mod h1:VlabonZfbVBzUuhH7/9DXu0M46G2cwE+YChaToeeOlA=

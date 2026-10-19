@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	mysql "github.com/go-sql-driver/mysql"
 )
@@ -34,12 +35,19 @@ func run() error {
 	cfg.User, cfg.Passwd, cfg.DBName = os.Getenv("MYSQL_USERNAME"), os.Getenv("MYSQL_PASSWORD"), os.Getenv("MYSQL_DATABASE")
 	cfg.Net, cfg.Addr = "tcp", net.JoinHostPort(os.Getenv("MYSQL_HOST"), os.Getenv("MYSQL_PORT"))
 	cfg.Timeout, cfg.ReadTimeout, cfg.WriteTimeout = 8*time.Second, 8*time.Second, 8*time.Second
-	connector, err := mysqltls.NewConnector(cfg)
+	connector, err := database.NewMySQLConnector(&database.MySQLConfig{
+		Host: cfg.Addr, Username: cfg.User, Password: cfg.Passwd, Database: cfg.DBName,
+		TLSMode: os.Getenv("MYSQL_TLS_MODE"), TLSCAFile: os.Getenv("MYSQL_TLS_CA_FILE"),
+		Location: os.Getenv("MYSQL_LOCATION"), SessionTimeZone: os.Getenv("MYSQL_SESSION_TIME_ZONE"),
+	})
+	if os.Getenv("MYSQL_PROBE_MAINTENANCE") == "1" {
+		connector, err = mysqltls.NewConnector(cfg)
+	}
 	if err != nil {
 		return err
 	}
 	pool := sql.OpenDB(connector)
-	defer pool.Close()
+	defer func() { _ = pool.Close() }()
 	pool.SetMaxOpenConns(2)
 	pool.SetMaxIdleConns(0)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

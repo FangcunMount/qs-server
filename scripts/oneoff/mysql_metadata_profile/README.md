@@ -89,7 +89,7 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 Production Actions use organization `MYSQL_PUBLIC_HOST`, `MYSQL_PUBLIC_PORT`,
 `MYSQL_TLS_MODE=VERIFY_IDENTITY` and immutable `MYSQL_TLS_CA_REF`. The host verifies
 the pinned infra CA before deployment or maintenance. Containers receive a read-only
-CA mount; Go clients share component-base v0.8.1 verification. Credentials, query
+CA mount; Go clients share component-base v0.8.2 verification. Credentials, query
 budgets, timezone, transactions, schema and existing approval boundaries are preserved.
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business
