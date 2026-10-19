@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
+    "sha": "f899d5cb4b19ed15e5dbe741fd42b3d804370784",
     "verified_on": "2026-10-19"
   },
   "status_policy": {
@@ -13408,7 +13408,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
+        "source_sha": "f899d5cb4b19ed15e5dbe741fd42b3d804370784",
         "verified_on": "2026-10-19"
       },
       "fact_sources": [
@@ -14002,7 +14002,7 @@
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
       ],
-      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
+      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed."
     },
     {
       "path": "scripts/database/compatibility-retirement.md",
