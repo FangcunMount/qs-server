@@ -2,7 +2,6 @@ package interpretation
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -10,7 +9,9 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	client "github.com/FangcunMount/qs-server/internal/apiserver/infra/aibridge"
 	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	opts "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"gorm.io/gorm"
 )
 
 type messagingLifecycle interface {
@@ -20,9 +21,16 @@ type messagingLifecycle interface {
 
 // Configure selects one host-owned transport before admitting commands. There is
 // no MQ failure fallback to gRPC and no connection or scheduler created here.
-func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, db *sql.DB, c *client.GovernanceClients) error {
-	if m == nil || m.aiBridge == nil || db == nil || c == nil || c.Payloads == nil {
+func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, primary *gorm.DB, c *client.GovernanceClients, shared *mysqlEventTx.Committer) error {
+	if m == nil || m.aiBridge == nil || primary == nil || c == nil || c.Payloads == nil {
 		return errors.New("AI MQ host dependencies unavailable")
+	}
+	db, err := primary.DB()
+	if err != nil {
+		return err
+	}
+	if shared != nil && (o.SelectedProvider() != "rocketmq" || !shared.UsesPrimary(primary) || !shared.HasTopic(app.CommandsTopic)) {
+		return errors.New("AI command transaction owner must share original MySQL and RocketMQ route")
 	}
 	keys, err := client.LoadMessagingKeys(o)
 	if err != nil {
@@ -39,15 +47,25 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, db *sql
 		return store.RecordPayloadObservation(ctx, db, kind)
 	}
 	commands := &store.MessagingCommandStore{Store: &store.Store{DB: db}, Messaging: s, Seal: seal}
+	if shared != nil {
+		commands.Transactions, err = store.NewTransactionCommands(primary, shared, seal)
+		if err != nil {
+			return err
+		}
+	}
 	receiver := &store.MessagingEventReceiver{DB: db, Store: s, Keys: keys.Ring, Bodies: c.Payloads, Seal: seal}
 	runtime, err := client.NewMessagingRuntime(o, db, s, receiver)
 	if err != nil {
 		return err
 	}
+	runtime.CommandTransactions = commands.Transactions
 	m.aiBridge.Store = commands
 	m.aiEligibility = c.Commands
 	m.aiMessagingRuntime = runtime
 	m.aiMessagingReader = &store.MessagingReader{DB: db, Store: s}
+	if commands.Transactions != nil {
+		m.aiMessagingReader.Archive = commands.Transactions.Archive()
+	}
 	m.aiOperations = &app.OperationAdministration{Store: commands}
 	if m.aiManagement != nil {
 		m.aiManagement.Messages = commands

@@ -31,6 +31,7 @@ type MessagingRuntime struct {
 	DB                         *sql.DB
 	Store                      *store.MessagingStore
 	Receiver                   *store.MessagingEventReceiver
+	CommandTransactions        *store.TransactionCommands
 	mu                         sync.Mutex
 	started                    bool
 	stopping                   bool
@@ -299,6 +300,11 @@ func (r *MessagingRuntime) stop(ctx context.Context) error {
 func (r *MessagingRuntime) preflightStorage(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if r.CommandTransactions != nil {
+		if err := r.CommandTransactions.Validate(ctx); err != nil {
+			return err
+		}
+	}
 	tx, err := r.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return errors.New("AI MQ storage unavailable")

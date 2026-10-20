@@ -128,18 +128,23 @@ func requirePredecessorReceipt(ctx context.Context, q commandOrderReader, c app.
 		if r.Decision != pb.MessagingDecision_ACCEPTED {
 			return app.ErrMessagingContract
 		}
-		switch pb.MessagingKind(kind) {
-		case pb.MessagingKind_EVALUATION_START, pb.MessagingKind_EVALUATION_CANCEL:
-			v := r.GetEvaluationReceipt()
-			if v == nil || v.RunId != resource || v.Version < 1 {
-				return app.ErrMessagingContract
-			}
-		case pb.MessagingKind_START, pb.MessagingKind_CHANGE, pb.MessagingKind_PARTICIPANT_RETRY:
-			v := r.GetWorkflowReceipt()
-			if v == nil || !validCommandID(v.SessionId) || v.Version < 1 || v.Status == "" || (pb.MessagingKind(kind) != pb.MessagingKind_START && v.SessionId != resource) {
-				return app.ErrMessagingContract
-			}
-		default:
+		return validateAcceptedCommandReceipt(pb.MessagingKind(kind), resource, r)
+	default:
+		return app.ErrMessagingContract
+	}
+	return nil
+}
+
+func validateAcceptedCommandReceipt(kind pb.MessagingKind, resource string, r *pb.MessagingCommandReceipt) error {
+	switch kind {
+	case pb.MessagingKind_EVALUATION_START, pb.MessagingKind_EVALUATION_CANCEL:
+		v := r.GetEvaluationReceipt()
+		if v == nil || v.RunId != resource || v.Version < 1 {
+			return app.ErrMessagingContract
+		}
+	case pb.MessagingKind_START, pb.MessagingKind_CHANGE, pb.MessagingKind_PARTICIPANT_RETRY:
+		v := r.GetWorkflowReceipt()
+		if v == nil || !validCommandID(v.SessionId) || v.Version < 1 || v.Status == "" || (kind != pb.MessagingKind_START && v.SessionId != resource) {
 			return app.ErrMessagingContract
 		}
 	default:

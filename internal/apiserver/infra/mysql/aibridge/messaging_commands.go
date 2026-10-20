@@ -20,8 +20,9 @@ type MessagingSeal func(kind pb.MessagingKind, id, aggregate, org, originalTime 
 // it creates no legacy command row, fallback delivery or second scheduler.
 type MessagingCommandStore struct {
 	*Store
-	Messaging *MessagingStore
-	Seal      MessagingSeal
+	Messaging    *MessagingStore
+	Seal         MessagingSeal
+	Transactions *TransactionCommands
 }
 
 func (s *MessagingCommandStore) StageStart(ctx context.Context, r app.Start) error {
@@ -41,6 +42,13 @@ func (s *MessagingCommandStore) StageChange(ctx context.Context, requestID strin
 func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.MessagingKind, id, aggregate string, scope app.OperationScope, body *pb.MessagingBody, original func(*sql.Tx) error) error {
 	if s == nil || s.Store == nil || s.DB == nil || s.Messaging == nil || s.Seal == nil {
 		return app.ErrManagementUnavailable
+	}
+	if s.Transactions != nil {
+		command, err := app.NewTransactionCommand(kind, id, aggregate, scope, body)
+		if err != nil {
+			return err
+		}
+		return s.Transactions.Submit(ctx, command)
 	}
 	envelope, raw, err := app.PrepareMessaging(kind, id, aggregate, "", body)
 	if err != nil {
@@ -124,6 +132,12 @@ func (s *MessagingCommandStore) ReadOperation(ctx context.Context, scope app.Ope
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if s.Transactions != nil {
+		operation, found, err := s.Transactions.operation(ctx, scope, "", id)
+		if err != nil || found {
+			return operation, err
+		}
+	}
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return app.MessagingOperation{}, err
@@ -138,6 +152,12 @@ func (s *MessagingCommandStore) ReadRequestOperation(ctx context.Context, scope 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if s.Transactions != nil {
+		operation, found, err := s.Transactions.operation(ctx, scope, requestID, id)
+		if err != nil || found {
+			return operation, err
+		}
+	}
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return app.MessagingOperation{}, err

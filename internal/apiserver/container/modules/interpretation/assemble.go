@@ -6,6 +6,7 @@ import (
 	retrymodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	mongoEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	retrystore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"io"
 	"time"
@@ -106,17 +107,18 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the report module.
 type Deps struct {
-	MySQLDB               *gorm.DB
-	MySQLLimiter          backpressure.Acquirer
-	MongoDB               *mongo.Database
-	MongoLimiter          backpressure.Acquirer
-	OpsHandle             *redisruntime.Handle
-	ReportStatusConfig    reportstatus.Config
-	OutboxProfile         appEventing.ProfileBinding
-	RunLeaseDuration      time.Duration
-	AIWorkflow            *apiserveroptions.AIWorkflowOptions
-	EventTransactionOwner *mongoEventTx.Owner
-	TransactionRoutes     eventcatalog.TopicResolver
+	MySQLDB                 *gorm.DB
+	MySQLLimiter            backpressure.Acquirer
+	MongoDB                 *mongo.Database
+	MongoLimiter            backpressure.Acquirer
+	OpsHandle               *redisruntime.Handle
+	ReportStatusConfig      reportstatus.Config
+	OutboxProfile           appEventing.ProfileBinding
+	RunLeaseDuration        time.Duration
+	AIWorkflow              *apiserveroptions.AIWorkflowOptions
+	EventTransactionOwner   *mongoEventTx.Owner
+	CommandTransactionOwner *mysqlEventTx.Committer
+	TransactionRoutes       eventcatalog.TopicResolver
 }
 
 // New assembles the report module.
@@ -133,6 +135,9 @@ func New(deps Deps) (*Module, error) {
 		return nil, fmt.Errorf("report transaction owner and routes must bind the original database together")
 	}
 
+	if deps.CommandTransactionOwner != nil && (!deps.CommandTransactionOwner.UsesPrimary(deps.MySQLDB) || deps.AIWorkflow == nil || !deps.AIWorkflow.Enabled || !deps.AIWorkflow.Messaging.Enabled || deps.AIWorkflow.Messaging.SelectedProvider() != "rocketmq") {
+		return nil, fmt.Errorf("AI command transaction owner requires enabled RocketMQ and the original MySQL primary")
+	}
 	module := &Module{transactionOwner: deps.EventTransactionOwner}
 	if deps.AIWorkflow != nil {
 		module.aiWorkflowEnabled = deps.AIWorkflow.Enabled
@@ -304,7 +309,7 @@ func New(deps Deps) (*Module, error) {
 			module.aiAssets = &bridge.AssetCatalogAdministration{Gateway: clients.Assets}
 		}
 		if deps.AIWorkflow.Messaging.Enabled {
-			if err := module.configureAIMessaging(deps.AIWorkflow.Messaging, sqlDB, clients); err != nil {
+			if err := module.configureAIMessaging(deps.AIWorkflow.Messaging, deps.MySQLDB, clients, deps.CommandTransactionOwner); err != nil {
 				_ = clients.Connection.Close()
 				return nil, err
 			}

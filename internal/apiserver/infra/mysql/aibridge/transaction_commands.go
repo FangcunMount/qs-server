@@ -45,6 +45,30 @@ func NewTransactionCommands(db *gorm.DB, shared *owner.Committer, seal Messaging
 	return &TransactionCommands{archive: archive, sender: shared.Runtime(), seal: seal}, nil
 }
 
+// Archive provides a read/guard adapter over the same borrowed primary.
+func (s *TransactionCommands) Archive() *TransactionArchive { return s.archive }
+
+// Validate is an explicit startup check, never an installer. The hosting process
+// owns the shared owner's Start/Close and its complete transaction Topic list.
+func (s *TransactionCommands) Validate(ctx context.Context) error {
+	if s == nil || s.archive == nil || s.sender == nil || s.seal == nil {
+		return transaction.ErrBinding
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := s.archive.store.Validate(ctx); err != nil {
+		return err
+	}
+	if err := requireCommandOrderIndex(ctx, s.archive.db); err != nil {
+		return err
+	}
+	rows, err := s.archive.db.QueryContext(ctx, "SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive WHERE FALSE")
+	if err != nil {
+		return err
+	}
+	return rows.Close()
+}
+
 // Submit first reads the exact stable request before clock/Seal/order planning.
 // Only the reservation winner may open a local root, after all half ACKs.
 func (s *TransactionCommands) Submit(ctx context.Context, c app.TransactionCommand) error {
