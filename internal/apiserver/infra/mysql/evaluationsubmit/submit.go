@@ -25,18 +25,21 @@ import (
 type Submitter struct {
 	boundary port.Committer
 	repo     assessment.Repository
+	writer   assessment.PendingSubmissionRepository
 	mapper   *repository.AssessmentMapper
 }
 
 var _ evaluationtransaction.Submitter = (*Submitter)(nil)
 
 // New borrows the already constructed shared owner and its exact primary.
-// It creates neither a second producer nor schema/network/background work.
-func New(db *gorm.DB, owner *boundary.Committer) (*Submitter, error) {
-	if owner == nil || !owner.UsesPrimary(db) {
+// It retains the host write facade (including its invalidations), while
+// recovery reads use the original primary directly. No second producer,
+// schema/network/background work is created.
+func New(db *gorm.DB, owner *boundary.Committer, writer assessment.PendingSubmissionRepository) (*Submitter, error) {
+	if owner == nil || writer == nil || !owner.UsesPrimary(db) {
 		return nil, transaction.ErrBinding
 	}
-	return &Submitter{boundary: owner, repo: repository.NewAssessmentRepository(db), mapper: repository.NewAssessmentMapper()}, nil
+	return &Submitter{boundary: owner, repo: repository.NewAssessmentRepository(db), writer: writer, mapper: repository.NewAssessmentMapper()}, nil
 }
 
 type artifact struct {
@@ -55,11 +58,11 @@ func inputHash(po *repository.AssessmentPO) [32]byte {
 		OrgID                                                                                              int64
 		QuestionnaireCode, QuestionnaireVersion, OriginType                                                string
 		OriginID, Conducting, ModelKind, ModelSubKind, ModelAlgorithm, ModelCode, ModelVersion, ModelTitle *string
-		CreatedAt                                                                                          time.Time
+		CreatedAt                                                                                          string
 	}{ID: po.ID.Uint64(), AnswerSheetID: po.AnswerSheetID, TesteeID: po.TesteeID, OrgID: po.OrgID,
 		QuestionnaireCode: po.QuestionnaireCode, QuestionnaireVersion: po.QuestionnaireVersion, OriginType: po.OriginType,
-		OriginID: po.OriginID, Conducting: po.ConductingContext, ModelKind: po.EvaluationModelKind, ModelSubKind: po.EvaluationModelSubKind, ModelAlgorithm: po.EvaluationModelAlgorithm, ModelCode: po.EvaluationModelCode, ModelVersion: po.EvaluationModelVersion, ModelTitle: po.EvaluationModelTitle, CreatedAt: po.CreatedAt}
-	raw, _ := json.Marshal(input) // Only closed scalar/time fields; no opaque domain values.
+		OriginID: po.OriginID, Conducting: po.ConductingContext, ModelKind: po.EvaluationModelKind, ModelSubKind: po.EvaluationModelSubKind, ModelAlgorithm: po.EvaluationModelAlgorithm, ModelCode: po.EvaluationModelCode, ModelVersion: po.EvaluationModelVersion, ModelTitle: po.EvaluationModelTitle, CreatedAt: po.CreatedAt.UTC().Format(time.RFC3339Nano)}
+	raw, _ := json.Marshal(input) // Closed string/number fields; no fallible MarshalJSON implementations.
 	return sha256.Sum256(raw)
 }
 
@@ -85,6 +88,9 @@ func (s *Submitter) Submit(ctx context.Context, pending *assessment.Assessment, 
 	// Reconstruct an isolated copy. SubmitAt creates the event here, before
 	// reservation, half preparation or any retryable SQL callback.
 	prepared := s.mapper.ToDomain(s.mapper.ToPO(pending))
+	if prepared == nil {
+		return nil, transaction.ErrInvalidPlan
+	}
 	if err := prepared.SubmitAt(at.UTC().Truncate(time.Millisecond)); err != nil {
 		return nil, err
 	}
@@ -112,11 +118,7 @@ func (s *Submitter) Submit(ctx context.Context, pending *assessment.Assessment, 
 	if err != nil || !bytes.Equal(winner, raw) {
 		return nil, transaction.ErrInvalidPlan
 	}
-	writer, ok := s.repo.(assessment.PendingSubmissionRepository)
-	if !ok {
-		return nil, fmt.Errorf("original pending submission CAS repository required")
-	}
-	result, err := s.boundary.Commit(ctx, r.Execution, func(txCtx context.Context) error { return writer.SavePendingSubmission(txCtx, prepared) })
+	result, err := s.boundary.Commit(ctx, r.Execution, func(txCtx context.Context) error { return s.writer.SavePendingSubmission(txCtx, prepared) })
 	if result.Local != transaction.LocalCommitted {
 		if err != nil {
 			return nil, err
@@ -161,7 +163,11 @@ func (s *Submitter) read(execution transaction.Execution) (*repository.Assessmen
 	if json.Unmarshal(envelope.Data, &body) != nil || consumer.EventType != assessment.EventTypeRequested || envelope.AggregateID != po.ID.String() || body.OrgID != po.OrgID || body.AssessmentID != int64(po.ID.Uint64()) || body.TesteeID != po.TesteeID || body.AnswerSheetID != fmt.Sprint(po.AnswerSheetID) || body.QuestionnaireCode != po.QuestionnaireCode || body.QuestionnaireVer != po.QuestionnaireVersion || !body.RequestedAt.Equal(*po.SubmittedAt) || body.ExpectedAttempt != 0 || body.AttemptOrigin != "" || body.ActionRequestID != "" || body.Mode != "" {
 		return nil, transaction.ErrInvalidPlan
 	}
-	if model := s.mapper.ToDomain(po).EvaluationModelRef(); model == nil || body.ModelKind != model.Kind().String() || body.ModelCode != model.Code().String() || body.ModelVersion != model.Version() || body.ModelAlgorithm != string(model.Algorithm()) {
+	decoded := s.mapper.ToDomain(po)
+	if decoded == nil {
+		return nil, transaction.ErrInvalidPlan
+	}
+	if model := decoded.EvaluationModelRef(); model == nil || body.ModelKind != model.Kind().String() || body.ModelCode != model.Code().String() || body.ModelVersion != model.Version() || body.ModelAlgorithm != string(model.Algorithm()) {
 		return nil, transaction.ErrInvalidPlan
 	}
 	return po, nil

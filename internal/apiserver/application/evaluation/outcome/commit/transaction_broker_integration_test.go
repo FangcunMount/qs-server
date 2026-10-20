@@ -116,7 +116,8 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=?", name).Scan(&before))
 	owner, err := boundary.New(db, &producerOptions, routes, []string{topic})
 	require.NoError(t, err)
-	submitter, err := evaluationsubmit.New(db, owner)
+	repo := repository.NewAssessmentRepository(db)
+	submitter, err := evaluationsubmit.New(db, owner, repo.(assessment.PendingSubmissionRepository))
 	require.NoError(t, err)
 	var after int
 	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=?", name).Scan(&after))
@@ -167,7 +168,6 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 			t.Fatal("committed original wire not received")
 		}
 	}
-	repo := repository.NewAssessmentRepository(db)
 	runRepo := checkpoint.NewRunRepository(db)
 	outcomes := repository.NewOutcomeRepository(db)
 	seed := func(id uint64, pending bool) (*assessment.Assessment, *domainoutcome.Execution) {

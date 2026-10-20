@@ -107,10 +107,22 @@ func pendingAssessment(t *testing.T) *assessment.Assessment {
 	assessment.WithConductingContext(c)(a)
 	return a
 }
+
+type submissionWriteFacade struct {
+	delegate *repoStub
+	calls    int
+}
+
+func (f *submissionWriteFacade) SavePendingSubmission(ctx context.Context, a *assessment.Assessment) error {
+	f.calls++
+	return f.delegate.SavePendingSubmission(ctx, a)
+}
+
 func TestSubmitPreservesCASCallerAndFirstWire(t *testing.T) {
 	b := &boundaryStub{t: t, state: transaction.LocalCommitted}
 	repo := &repoStub{}
-	s := &Submitter{boundary: b, repo: repo, mapper: repository.NewAssessmentMapper()}
+	facade := &submissionWriteFacade{delegate: repo}
+	s := &Submitter{boundary: b, repo: repo, writer: facade, mapper: repository.NewAssessmentMapper()}
 	pending := pendingAssessment(t)
 	submitted, err := s.Submit(t.Context(), pending, time.Unix(200, 0))
 	require.NoError(t, err)
@@ -118,6 +130,7 @@ func TestSubmitPreservesCASCallerAndFirstWire(t *testing.T) {
 	require.True(t, pending.Status().IsPending())
 	require.True(t, submitted.ConductingContext().Equal(pending.ConductingContext()))
 	require.Equal(t, 1, repo.writes)
+	require.Equal(t, 1, facade.calls, "original host write facade was bypassed")
 	require.Empty(t, submitted.Events())
 	wire := b.execution.Plan.Input().Branches[0].Wire
 	repeated, err := s.Submit(t.Context(), pending, time.Unix(300, 0))
@@ -136,7 +149,7 @@ func TestSubmitUncertaintyDoesNotMutateOrRetry(t *testing.T) {
 				b.findErr = errors.New("primary unavailable")
 			}
 			repo := &repoStub{}
-			s := &Submitter{boundary: b, repo: repo, mapper: repository.NewAssessmentMapper()}
+			s := &Submitter{boundary: b, repo: repo, writer: repo, mapper: repository.NewAssessmentMapper()}
 			pending := pendingAssessment(t)
 			got, err := s.Submit(t.Context(), pending, time.Unix(200, 0))
 			require.ErrorIs(t, err, port.ErrUnresolved)
@@ -156,7 +169,7 @@ func TestSubmitUncertaintyDoesNotMutateOrRetry(t *testing.T) {
 func TestSubmissionReadRejectsChangedBusinessIdentity(t *testing.T) {
 	b := &boundaryStub{t: t, state: transaction.LocalCommitted}
 	repo := &repoStub{}
-	s := &Submitter{boundary: b, repo: repo, mapper: repository.NewAssessmentMapper()}
+	s := &Submitter{boundary: b, repo: repo, writer: repo, mapper: repository.NewAssessmentMapper()}
 	pending := pendingAssessment(t)
 	_, err := s.Submit(t.Context(), pending, time.Unix(200, 0))
 	require.NoError(t, err)
