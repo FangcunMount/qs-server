@@ -96,3 +96,5 @@ T13到期核心已新增 `application/eventing/retrydispatch`：单次串行有�
 人工/force授权入口在显式事务owner配置下改用未来计划：调用原权限/组织校验后，在根事务外冻结完整授权命令和首次wire；根内先竞争Ready计划，再校验原Run/Generation并提交授权事实。重复同输入读取第一份计划，变更理由/主体/动作产生冲突；根提交回复丢弃后按fresh原库事实恢复，不再次授权或调用旧Stage。授权正文只保存在私有计划，消费者wire不含这些审计字段；自动计划的旧codec字节保持不变。该批源码race7157通过（60既有可选依赖跳过），真实双库人工门禁尚待执行。暂停、中止后新fence授权、旧调度交接/Replay与最终宿主生命周期仍未完成，不能据此切换生产。
 
 T13显式协议恢复入口 `RetryAborted` 先读取原Ready计划和精确Aborted证据，再调用固定SDK的原子Retry申请新fence；沿用原计划、首次selectedAt和wire，旧执行保留。常规扫描/Checker不调用此入口。自动暂停开关在reserve之前拒绝自动计划，也禁止其显式协议恢复；人工/force不受该自动开关影响。新增合同30项race通过，源码全仓7166通过/60既有可选跳过；required真实恢复仍待新候选。人工首轮原库发现初始Assessment夹具未显式插入，已修正并新增初始事实回读；不能以编译通过代替修正后原库验收。
+
+T13新增显式原根 `TransferLegacy` 适配：仅匹配完整原消息、fingerprint、原due以及未尝试pending责任；SQL行锁/Mongo写冲突与原Run授权共同竞争，数据库时钟确认仍为未来后，在同一根内保存未来计划并将原行标为held，错误码绑定完整计划摘要。原wire/身份/due/旧数据不删除，重复只读核对原交接及计划，不重置终态；旧Relay不能领取held，旧Replay明确返回future_schedule_owned。旧MySQL Outbox的UTC字符串微秒截断独立于原Run精度，交接按其真实编码读取。89项合同race、原生标签编译及固定lint通过；真实交接验收待新候选，尚无生产交接工具执行（T25/T30以后）。
