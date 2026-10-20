@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
+	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
@@ -20,6 +21,9 @@ type Request struct {
 	InputHash [32]byte
 	Artifact  []byte
 	Events    []event.DomainEvent
+	// Prepared carries canonical QS domain inputs frozen by a durable business
+	// schedule. It is mutually exclusive with Events; original wire is reused.
+	Prepared []message.Input
 }
 
 // Committer freezes/reserves before Broker I/O, then prepares all halves before

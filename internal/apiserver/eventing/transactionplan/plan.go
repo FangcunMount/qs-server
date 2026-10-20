@@ -22,10 +22,11 @@ type artifact struct {
 }
 
 func Freeze(q port.Request, resolver catalog.TopicResolver, owner, revision string) (transaction.FrozenPlan, error) {
-	if q.Key == "" || len(q.Artifact) == 0 || len(q.Artifact) > 1<<20 || len(q.Events) == 0 || len(q.Events) > transaction.MaxBranches {
+	count := len(q.Events) + len(q.Prepared)
+	if q.Key == "" || len(q.Artifact) == 0 || len(q.Artifact) > 1<<20 || count == 0 || count > transaction.MaxBranches || (len(q.Events) > 0 && len(q.Prepared) > 0) || resolver == nil {
 		return transaction.FrozenPlan{}, transaction.ErrInvalidPlan
 	}
-	intents, err := standard.PrepareIntents(q.Events, resolver, "api-server")
+	intents, err := prepare(q, resolver)
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
@@ -52,6 +53,35 @@ func Freeze(q port.Request, resolver catalog.TopicResolver, owner, revision stri
 		branches = append(branches, transaction.BranchInput{ID: in.ID, Message: msg, Wire: wire, PhysicalTopic: physical, RouteRevision: revision})
 	}
 	return transaction.NewPlan(transaction.PlanInput{Owner: owner, Scope: scope, OperationID: intents[0].Message.Input().ID, IdempotencyKey: q.Key, InputHash: q.InputHash, Branches: branches})
+}
+
+func prepare(q port.Request, resolver catalog.TopicResolver) ([]standard.PreparedIntent, error) {
+	if len(q.Prepared) == 0 {
+		return standard.PrepareIntents(q.Events, resolver, "api-server")
+	}
+	result := make([]standard.PreparedIntent, 0, len(q.Prepared))
+	for _, input := range q.Prepared {
+		topic, ok := resolver.GetTopicForEvent(input.EventType)
+		if !ok || topic != input.Destination {
+			return nil, transaction.ErrBinding
+		}
+		if classes, ok := resolver.(catalog.DeliveryClassResolver); ok {
+			delivery, exists := classes.GetDeliveryClass(input.EventType)
+			if !exists || delivery != catalog.DeliveryClassDurableOutbox {
+				return nil, transaction.ErrBinding
+			}
+		}
+		msg, err := message.New(input)
+		if err != nil {
+			return nil, err
+		}
+		ref := standard.ReferenceFromMessage(msg)
+		if _, err := standard.VerifyReference(msg.Input(), ref.Fingerprint, ref); err != nil {
+			return nil, err
+		}
+		result = append(result, standard.PreparedIntent{Message: msg})
+	}
+	return result, nil
 }
 
 // Artifact reads the reservation winner without re-encoding business JSON.
