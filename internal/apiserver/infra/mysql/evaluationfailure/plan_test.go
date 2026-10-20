@@ -49,9 +49,9 @@ func TestFailurePlanFreezesFutureScheduleWithoutPreparingItAsHalf(t *testing.T) 
 	require.Equal(t, assessment.EventTypeFailed, req.Events[0].EventType())
 	f, err := read(req.Artifact)
 	require.NoError(t, err)
-	require.Equal(t, q.RetryAt, f.Due)
+	require.True(t, q.RetryAt.Equal(f.Due))
 	require.Equal(t, q.FutureRetry.EventID(), f.Future.ID)
-	require.Equal(t, q.Run.RetryDecision(), f.Run.RetryDecision)
+	requireSameRetryDecision(t, q.Run.RetryDecision(), f.Run.RetryDecision)
 	require.Equal(t, q.Run.ClaimToken(), f.Run.ClaimToken)
 	require.True(t, f.Due.After(*f.Assessment.FailedAt))
 	raw := append([]byte(nil), f.Future.Payload...)
@@ -64,7 +64,35 @@ func TestFailurePlanFreezesFutureScheduleWithoutPreparingItAsHalf(t *testing.T) 
 	restored := evalrun.Reconstruct(f.Run)
 	require.Equal(t, q.Run.ID(), restored.ID())
 	require.Equal(t, q.Run.Attempt(), restored.Attempt())
-	require.Equal(t, q.Run.RetryDecision(), restored.RetryDecision())
+	requireSameRetryDecision(t, q.Run.RetryDecision(), restored.RetryDecision())
+}
+
+func requireSameRetryDecision(t *testing.T, want, got *retrygovernance.Decision) {
+	t.Helper()
+	require.NotNil(t, want)
+	require.NotNil(t, got)
+	require.NotNil(t, want.NextAttemptAt)
+	require.NotNil(t, got.NextAttemptAt)
+	require.True(t, want.NextAttemptAt.Equal(*got.NextAttemptAt))
+	first, second := *want, *got
+	first.NextAttemptAt, second.NextAttemptAt = nil, nil
+	require.Equal(t, first, second)
+}
+
+func TestFailurePlanRetainsExactInstantsAcrossTimezoneEncoding(t *testing.T) {
+	for _, location := range []*time.Location{time.UTC, time.FixedZone("east", 8*60*60), time.FixedZone("west", -5*60*60)} {
+		t.Run(location.String(), func(t *testing.T) {
+			q := failureRequest(t, time.Unix(120, 123000000).In(location))
+			request, err := freeze(q, routes{})
+			require.NoError(t, err)
+			f, err := read(request.Artifact)
+			require.NoError(t, err)
+			require.True(t, q.Assessment.FailedAt().Equal(*f.Assessment.FailedAt))
+			require.True(t, q.Run.FinishedAt().Equal(*f.Run.FinishedAt))
+			require.True(t, q.RetryAt.Equal(f.Due))
+			requireSameRetryDecision(t, q.Run.RetryDecision(), f.Run.RetryDecision)
+		})
+	}
 }
 func TestFailureInputExcludesGeneratedClockButBindsBusinessDecision(t *testing.T) {
 	first, err := freeze(failureRequest(t, time.Unix(120, 0)), routes{})

@@ -136,7 +136,7 @@ func TestFailureCommitKeepsTerminalFactsAndReadsExactAttempt(t *testing.T) {
 	repeated := failureRequest(t, time.Unix(125, 0), false)
 	original, oldRun, err := c.CommitFailure(t.Context(), repeated)
 	require.NoError(t, err)
-	require.Equal(t, *q.Assessment.FailedAt(), *original.FailedAt())
+	require.True(t, q.Assessment.FailedAt().Equal(*original.FailedAt()))
 	require.Equal(t, r.ID(), oldRun.ID())
 	require.NotEqual(t, next.ID(), oldRun.ID())
 	require.Equal(t, 1, b.executes)
