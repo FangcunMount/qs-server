@@ -129,7 +129,12 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 	require.NoError(t, err)
 	snapshot, err := statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
 	require.NoError(t, err)
-	require.Empty(t, snapshot.Buckets)
+	require.Len(t, snapshot.Buckets, 4)
+	for _, bucket := range snapshot.Buckets {
+		require.Zero(t, bucket.Count)
+		require.Nil(t, bucket.OldestCreatedAt)
+		require.Zero(t, bucket.OldestAgeSeconds)
+	}
 	_, err = pool.ExecContext(t.Context(), "UPDATE rm_outbox SET last_error_code='invalid-transfer' WHERE message_id=?", f.Message().Input().ID)
 	require.NoError(t, err)
 	_, err = statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
@@ -235,7 +240,12 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 	require.NoError(t, err)
 	snapshot, err := statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
 	require.NoError(t, err)
-	require.Empty(t, snapshot.Buckets)
+	require.Len(t, snapshot.Buckets, 4)
+	for _, bucket := range snapshot.Buckets {
+		require.Zero(t, bucket.Count)
+		require.Nil(t, bucket.OldestCreatedAt)
+		require.Zero(t, bucket.OldestAgeSeconds)
+	}
 	buckets, err := statusReader.OutboxStatusByEventType(t.Context(), time.Now())
 	require.NoError(t, err)
 	require.Empty(t, buckets)
