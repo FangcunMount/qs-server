@@ -1,4 +1,4 @@
-//go:build integration && (m3_evaluation_broker || m3_report_broker)
+//go:build integration && (m3_evaluation_broker || m3_report_integration)
 
 package transaction_test
 
@@ -28,8 +28,7 @@ func (v rejectAfterRealAuthority) ValidateDispatchAuthority(ctx context.Context,
 	return errors.New("fixture refuses dispatch inside the original guarded root")
 }
 
-func recoverAbortedDueDispatch(t *testing.T, store port.DispatchStore, owner events.Committer, authority port.AuthorityValidator, frozen model.Frozen) app.Outcome {
-	t.Helper()
+func recoverAbortedDueDispatch(t *testing.T, store port.DispatchStore, owner events.Committer, authority port.AuthorityValidator, protocol transaction.Store, frozen model.Frozen) app.Outcome {
 	record, err := store.Find(t.Context(), frozen)
 	require.NoError(t, err)
 	before := record.Plan.Bytes()
@@ -49,6 +48,20 @@ func recoverAbortedDueDispatch(t *testing.T, store port.DispatchStore, owner eve
 	require.ErrorIs(t, outcomes[0].Err, events.ErrUnresolved)
 	previous, err := owner.Find(t.Context(), frozen.Message().Input().Scope, model.DispatchKey(frozen))
 	require.NoError(t, err)
+	// A callback error is not durable rollback evidence. Wait for the real
+	// lease, then compete over the SAME execution via the protocol reconciler.
+	// No synthetic exception or altered database clock stands in for this proof.
+	if owner.Confirm(t.Context(), previous.Execution) != transaction.LocalAborted {
+		wait := time.NewTimer(time.Until(previous.Execution.LeaseUntil.Add(2 * time.Millisecond)))
+		select {
+		case <-wait.C:
+		case <-t.Context().Done():
+			wait.Stop()
+			t.Fatal("real protocol lease wait cancelled")
+		}
+		_, err = protocol.ReconcileOnce(t.Context(), 100)
+		require.NoError(t, err)
+	}
 	require.Equal(t, transaction.LocalAborted, owner.Confirm(t.Context(), previous.Execution))
 	exact, err := store.Find(t.Context(), frozen)
 	require.NoError(t, err)
@@ -72,7 +85,9 @@ func recoverAbortedDueDispatch(t *testing.T, store port.DispatchStore, owner eve
 	require.Equal(t, previous.Execution.Fence+1, current.Execution.Fence)
 	require.Equal(t, previous.Execution.Plan.Digest(), current.Execution.Plan.Digest())
 	require.Equal(t, frozen.Message().Input().Payload, current.Execution.Plan.Input().Branches[0].Wire)
-	require.Equal(t, transaction.LocalAborted, owner.Confirm(t.Context(), previous.Execution), "old fence remains retained and Aborted")
+	for _, ref := range previous.Execution.References() {
+		require.Equal(t, transaction.Rollback, (transaction.StoreChecker{Store: protocol}).Check(t.Context(), ref), "old fence remains retained and Aborted")
+	}
 	require.Equal(t, transaction.LocalCommitted, owner.Confirm(t.Context(), current.Execution))
 	return out
 }

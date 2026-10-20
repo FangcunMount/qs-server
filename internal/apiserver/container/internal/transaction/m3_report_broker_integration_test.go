@@ -328,7 +328,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 		timer.Stop()
 		t.Fatal("deadline wait cancelled")
 	}
-	dueDispatch := []dispatchapp.Outcome{recoverAbortedDueDispatch(t, schedules, dispatchBoundary, retryAuthority, frozenSchedule)}
+	dueDispatch := []dispatchapp.Outcome{recoverAbortedDueDispatch(t, schedules, dispatchBoundary, retryAuthority, authority, frozenSchedule)}
 	require.NoError(t, dueDispatch[0].Err)
 	require.Equal(t, tx.LocalCommitted, dueDispatch[0].Transaction.Local)
 	require.Equal(t, schedulemodel.DispatchCommitted, dueDispatch[0].State)
