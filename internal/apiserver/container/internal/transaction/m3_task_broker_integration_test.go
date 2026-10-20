@@ -44,6 +44,15 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+type abortTaskSnapshot struct{ delegate taskopen.SnapshotWriter }
+
+func (w abortTaskSnapshot) SaveOpenedSnapshot(ctx context.Context, p *repository.AssessmentTaskPO, at time.Time, actor uint64) error {
+	if err := w.delegate.SaveOpenedSnapshot(ctx, p, at, actor); err != nil {
+		return err
+	}
+	return errors.New("fixture abort after original task write")
+}
+
 func TestM3TaskBrokerHost(t *testing.T) {
 	require.True(t, strings.HasPrefix(os.Getenv("QS_M3_FIXTURE_PROJECT"), "rocketmq-m2-"))
 	cfg, err := driver.ParseDSN(os.Getenv("QS_M3_TASK_DSN"))
@@ -259,6 +268,29 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	require.True(t, failed.IsPending())
 	require.Empty(t, failed.GetEntryURL())
 	require.NotEqual(t, transaction.LocalCommitted, owner.Confirm(t.Context(), lookup(aborted)))
+	// Fail after the real original task update to prove root rollback, rather
+	// than only rejecting a guard before any business row has been written.
+	rollbackOpener, err := taskopen.New(db, owner, routes, abortTaskSnapshot{repo.(taskopen.SnapshotWriter)})
+	require.NoError(t, err)
+	rolledBack := seed(4)
+	require.NoError(t, domain.NewTaskLifecycle().OpenAt(t.Context(), rolledBack, "https://example.test/private-entry-rollback", at))
+	_, err = rollbackOpener.CommitOpened(t.Context(), port.OpenRequest{Candidate: rolledBack})
+	require.ErrorIs(t, err, eventport.ErrUnresolved)
+	unchanged, err := repo.FindByID(t.Context(), rolledBack.GetID())
+	require.NoError(t, err)
+	require.True(t, unchanged.IsPending())
+	require.Empty(t, unchanged.GetEntryURL())
+	require.NotEqual(t, transaction.LocalCommitted, owner.Confirm(t.Context(), lookup(rolledBack)))
+	stale := seed(5)
+	require.NoError(t, domain.NewTaskLifecycle().OpenAt(t.Context(), stale, "https://example.test/private-entry-stale", at))
+	require.NoError(t, db.Model(&repository.AssessmentTaskPO{}).Where("id = ?", stale.GetID()).Update("schedule_revision", gorm.Expr("schedule_revision + 1")).Error)
+	_, err = opener.CommitOpened(t.Context(), port.OpenRequest{Candidate: stale})
+	require.ErrorIs(t, err, eventport.ErrUnresolved)
+	newer, err := repo.FindByID(t.Context(), stale.GetID())
+	require.NoError(t, err)
+	require.True(t, newer.IsPending())
+	require.Equal(t, stale.GetScheduleRevision()+1, newer.GetScheduleRevision())
+	require.NotEqual(t, transaction.LocalCommitted, owner.Confirm(t.Context(), lookup(stale)))
 	// Fresh owner and adapter recover exact committed evidence without a token.
 	fresh, err := boundary.New(db, &producerOptions, routes, []string{topic})
 	require.NoError(t, err)
@@ -390,7 +422,7 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	}
 	// Same logical topic does not allow durable events through NORMAL.
 	require.Error(t, routed.Publish(t.Context(), domain.NewTaskOpenedReminderRequestedEvent(first.Events()[0].(domain.TaskOpenedEvent), first.GetScheduleRevision())))
-	cases := map[string]bool{"constructor_no_ddl": true, "half_invisible": true, "original_task_witness_wire": true, "first_entry_reused": true, "root_abort_atomic": true, "fresh_owner_recovery": true, "closed_admission_no_business": true, "no_new_publish_outbox": true, "normal_best_effort_fanout": true, "normal_root_commit_boundary": true, "normal_rejects_transaction_event": true, "reminder_precision_compatible": true}
+	cases := map[string]bool{"constructor_no_ddl": true, "half_invisible": true, "original_task_witness_wire": true, "first_entry_reused": true, "root_abort_atomic": true, "fresh_owner_recovery": true, "closed_admission_no_business": true, "no_new_publish_outbox": true, "normal_best_effort_fanout": true, "normal_root_commit_boundary": true, "normal_rejects_transaction_event": true, "reminder_precision_compatible": true, "original_write_abort_atomic": true, "stale_schedule_cannot_commit": true}
 	receipt, err := json.Marshal(map[string]any{"cases": cases, "passed": len(cases), "failed": 0, "skipped": 0, "root": "original_mysql_gorm", "process_exit_not_claimed": true, "system_login_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_TASK_RECEIPT " + string(receipt))
