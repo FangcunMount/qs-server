@@ -179,6 +179,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 		a, result := commitTestOutcome(t)
 		assessment.WithID(meta.FromUint64(id))(a)
 		po := repository.NewAssessmentMapper().ToPO(a)
+		po.AnswerSheetID = 2000 + id // distinct immutable source per owned assessment fixture
 		if pending {
 			po.Status = assessment.StatusPending.String()
 			po.SubmittedAt = nil
