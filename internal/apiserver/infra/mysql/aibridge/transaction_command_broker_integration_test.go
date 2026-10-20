@@ -179,6 +179,21 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	}, 15*time.Second, 20*time.Millisecond)
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_bridge_requests WHERE request_id=?", r.RequestID))
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_archive"))
+	require.ErrorIs(t, store.StageStart(t.Context(), r), ErrCommandUnresolved)
+	require.EqualValues(t, 1, seals.Load(), "in-flight duplicate must not Seal or execute again")
+	pending, err := store.ReadRequestOperation(t.Context(), app.OperationScope{OrganizationID: "7", SubjectID: "9"}, r.RequestID, r.RequestID)
+	require.NoError(t, err)
+	require.Equal(t, "pending", pending.Status)
+	require.Equal(t, "transaction_pending", pending.TransportStatus)
+	pendingCommand, err := app.NewTransactionCommand(pb.MessagingKind_START, r.RequestID, r.RequestID, app.OperationScope{OrganizationID: "7", SubjectID: "9", ResourceID: r.RequestID}, startMessagingBody(r))
+	require.NoError(t, err)
+	pendingWinner, err := commands.archive.store.Lookup(t.Context(), transaction.Request{Owner: "qs.mysql", Scope: "org:7", Key: pendingCommand.Key(), InputHash: pendingCommand.InputHash()})
+	require.NoError(t, err)
+	_, pendingArchive, err := app.ReadTransactionCommand(pendingWinner.Execution.Plan)
+	require.NoError(t, err)
+	_, found, err := commands.archive.Payload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: r.RequestID, OrganizationId: "7", BodySha256: pendingArchive.Envelope.BodySha256, BodyLength: uint64(len(pendingArchive.Body))}, "qs-ai")
+	require.True(t, found)
+	require.ErrorIs(t, err, app.ErrNotFound)
 	select {
 	case <-received:
 		t.Fatal("half message was consumable before original business commit")
@@ -199,7 +214,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	require.EqualValues(t, 1, seals.Load())
 	changed := r
 	changed.Goal = "changed business input"
-	require.Error(t, store.StageStart(t.Context(), changed))
+	require.ErrorIs(t, store.StageStart(t.Context(), changed), app.ErrConflict)
 	require.EqualValues(t, 1, seals.Load())
 	op, err := store.ReadRequestOperation(t.Context(), app.OperationScope{OrganizationID: "7", SubjectID: "9"}, r.RequestID, r.RequestID)
 	require.NoError(t, err)
@@ -273,7 +288,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_bridge_commands"))
 	// A real server-side rejection after original business writes must roll the
 	// whole root back; this is not simulated commit uncertainty.
-	_, err = pool.ExecContext(t.Context(), "CREATE TRIGGER fixture_command_reject BEFORE INSERT ON ai_messaging_operations FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='controlled fixture command rejection'")
+	_, err = pool.ExecContext(t.Context(), "CREATE TRIGGER fixture_command_reject BEFORE UPDATE ON rm_tx_witness FOR EACH ROW BEGIN IF NEW.state='committed' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='controlled fixture witness rejection'; END IF; END")
 	require.NoError(t, err)
 	aborted := r
 	aborted.RequestID = uuid.NewString()
@@ -281,6 +296,8 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	_, err = pool.ExecContext(t.Context(), "DROP TRIGGER fixture_command_reject")
 	require.NoError(t, err)
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_bridge_requests WHERE request_id=?", aborted.RequestID))
+	require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_operations WHERE command_id=?", aborted.RequestID))
+	require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_archive WHERE message_id=?", []byte(aborted.RequestID)))
 	q, err := app.NewTransactionCommand(pb.MessagingKind_START, aborted.RequestID, aborted.RequestID, app.OperationScope{OrganizationID: "7", SubjectID: "9", ResourceID: aborted.RequestID}, startMessagingBody(aborted))
 	require.NoError(t, err)
 	winner, err := commands.archive.store.Lookup(t.Context(), transaction.Request{Owner: "qs.mysql", Scope: "org:7", Key: q.Key(), InputHash: q.InputHash()})
@@ -289,6 +306,16 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	beforeDuplicate := seals.Load()
 	require.ErrorIs(t, store.StageStart(t.Context(), aborted), ErrCommandUnresolved)
 	require.Equal(t, beforeDuplicate, seals.Load())
+	abortDeadline := time.NewTimer(300 * time.Millisecond)
+checkAbortedVisibility:
+	for {
+		select {
+		case message := <-received:
+			require.NotEqual(t, aborted.RequestID, message.ID, "rolled back command became visible")
+		case <-abortDeadline.C:
+			break checkAbortedVisibility
+		}
+	}
 	// Nonempty historical rows remain owned by the original path. Reading or
 	// submitting their duplicate must not fabricate a new transaction witness.
 	legacyStore := &MessagingCommandStore{Store: &Store{DB: pool}, Messaging: NewMessagingStore(), Seal: seal}

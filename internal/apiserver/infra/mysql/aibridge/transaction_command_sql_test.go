@@ -1,16 +1,54 @@
 package aibridge
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/stretchr/testify/require"
 )
+
+type refuseCommandSender struct{ t *testing.T }
+
+func (s refuseCommandSender) Reserve(context.Context, transaction.Request, transaction.FrozenPlan) (transaction.Reservation, error) {
+	s.t.Error("changed input reached a new reservation")
+	return transaction.Reservation{}, transaction.ErrStaleExecution
+}
+func (s refuseCommandSender) Execute(context.Context, transaction.Execution, transaction.LocalExecutor) (transaction.Result, error) {
+	s.t.Error("changed input reached local business")
+	return transaction.Result{}, transaction.ErrStaleExecution
+}
+
+func TestTransactionCommandChangedInputRetainsOriginalBusinessConflictContract(t *testing.T) {
+	a, mock, e := commandArchiveFixture(t)
+	c := orderCommandFixture(t)
+	body, err := c.Body()
+	require.NoError(t, err)
+	body.GetChange().ExpectedVersion++
+	changed, err := app.NewTransactionCommand(c.Kind(), c.ID(), c.Aggregate(), c.Scope(), body)
+	require.NoError(t, err)
+	require.NotEqual(t, c.InputHash(), changed.InputHash())
+	q := transaction.Request{Owner: "qs.mysql", Scope: "org:7", Key: c.Key(), InputHash: c.InputHash()}
+	key := q.KeyDigest()
+	mock.ExpectBegin()
+	expectCommandBinding(mock, e)
+	mock.ExpectQuery("SELECT owner,scope,idempotency_key,input_hash,active_execution FROM rm_tx_request").WithArgs(key[:]).WillReturnRows(sqlmock.NewRows([]string{"owner", "scope", "key", "hash", "active"}).AddRow(q.Owner, q.Scope, q.Key, q.InputHash[:], []byte("unused-on-input-conflict")))
+	mock.ExpectRollback()
+	seal := func(_ pb.MessagingKind, _, _, _, _ string, _ *pb.MessagingBody) (*app.PreparedMessaging, error) {
+		t.Error("changed input reached Seal")
+		return nil, app.ErrMessagingContract
+	}
+	s := &MessagingCommandStore{Store: &Store{DB: a.db}, Messaging: NewMessagingStore(), Seal: seal, Transactions: &TransactionCommands{archive: a, sender: refuseCommandSender{t}, seal: seal}}
+	err = s.stageCommand(t.Context(), changed.Kind(), changed.ID(), changed.Aggregate(), changed.Scope(), body, nil)
+	require.ErrorIs(t, err, app.ErrConflict)
+	require.ErrorIs(t, err, transaction.ErrInputConflict)
+}
 
 func commandArchiveFixture(t *testing.T) (*TransactionArchive, sqlmock.Sqlmock, transaction.Execution) {
 	t.Helper()

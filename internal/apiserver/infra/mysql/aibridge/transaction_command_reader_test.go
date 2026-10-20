@@ -141,3 +141,56 @@ func TestTransactionOperationAbsenceAloneAllowsLegacyFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, found)
 }
+
+func TestPreparedCommandRequestCannotExposeHistoricalPayloadWithTheSameID(t *testing.T) {
+	a, mock, e := commandArchiveFixture(t)
+	q := transaction.RequestFor(e.Plan)
+	key := q.KeyDigest()
+	mock.ExpectQuery("SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request").WithArgs(key[:]).WillReturnRows(sqlmock.NewRows([]string{"owner", "scope", "key", "hash"}).AddRow([]byte(q.Owner), []byte(q.Scope), []byte(q.Key), q.InputHash[:]))
+	reader := &MessagingReader{DB: a.db, Store: NewMessagingStore(), Archive: a}
+	_, archive, err := app.ReadTransactionCommand(e.Plan)
+	require.NoError(t, err)
+	_, err = reader.ReadMessagePayload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: orderCommand, OrganizationId: "7", BodySha256: archive.Envelope.BodySha256, BodyLength: uint64(len(archive.Body))}, "qs-ai")
+	require.ErrorIs(t, err, app.ErrNotFound)
+	// No legacy Begin/Outbox query is allowed even if a historical row would
+	// match the requested ID/hash. Prepared planning is not public business data.
+}
+
+func TestTransactionPayloadFallsBackOnlyWhenBothNewRecordsAreAbsent(t *testing.T) {
+	for _, name := range []string{"absent", "database-error", "corrupt-request"} {
+		t.Run(name, func(t *testing.T) {
+			a, mock, e := commandArchiveFixture(t)
+			q := transaction.RequestFor(e.Plan)
+			key := q.KeyDigest()
+			_, archive, err := app.ReadTransactionCommand(e.Plan)
+			require.NoError(t, err)
+			mock.ExpectQuery("SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive").WillReturnError(sql.ErrNoRows)
+			request := mock.ExpectQuery("SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request").WithArgs(key[:])
+			switch name {
+			case "absent":
+				request.WillReturnError(sql.ErrNoRows)
+				mock.ExpectBegin()
+				mock.ExpectQuery("SELECT body FROM ai_messaging_outbox").WithArgs("qs-server", "qs-ai", orderCommand, uint64(7), archive.Envelope.BodySha256).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(archive.Body))
+				mock.ExpectRollback()
+			case "database-error":
+				request.WillReturnError(sql.ErrConnDone)
+			case "corrupt-request":
+				request.WillReturnRows(sqlmock.NewRows([]string{"owner", "scope", "key", "hash"}).AddRow("other-owner", q.Scope, q.Key, q.InputHash[:]))
+			}
+			reader := &MessagingReader{DB: a.db, Store: NewMessagingStore(), Archive: a}
+			body, err := reader.ReadMessagePayload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: orderCommand, OrganizationId: "7", BodySha256: archive.Envelope.BodySha256, BodyLength: uint64(len(archive.Body))}, "qs-ai")
+			switch name {
+			case "absent":
+				require.NoError(t, err)
+				require.Equal(t, archive.Body, body)
+			case "database-error":
+				require.ErrorIs(t, err, sql.ErrConnDone)
+				require.Empty(t, body)
+			case "corrupt-request":
+				require.ErrorIs(t, err, app.ErrMessagingContract)
+				require.Empty(t, body)
+			}
+		})
+	}
+}

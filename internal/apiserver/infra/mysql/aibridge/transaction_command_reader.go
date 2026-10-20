@@ -93,21 +93,10 @@ func operationVisible(want app.OperationScope, requestID string, actual app.Oper
 }
 
 func (s *TransactionCommands) pendingOperation(ctx context.Context, scope app.OperationScope, requestID, id string) (result app.MessagingOperation, found bool, err error) {
-	q := transaction.Request{Owner: "qs.mysql", Scope: "org:" + scope.OrganizationID, Key: "ai-command/" + id}
-	key := q.KeyDigest()
-	var owner, storedScope, storedKey string
-	var hash []byte
-	err = s.archive.db.QueryRowContext(ctx, `SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request WHERE request_key=?`, key[:]).Scan(&owner, &storedScope, &storedKey, &hash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return result, false, nil
+	q, found, err := s.archive.commandRequest(ctx, scope.OrganizationID, id)
+	if err != nil || !found {
+		return result, found, err
 	}
-	if err != nil {
-		return result, true, err
-	}
-	if owner != q.Owner || storedScope != q.Scope || storedKey != q.Key || len(hash) != len(q.InputHash) {
-		return result, true, app.ErrMessagingContract
-	}
-	copy(q.InputHash[:], hash)
 	winner, err := s.archive.store.Lookup(ctx, q)
 	if err != nil {
 		return result, true, err
@@ -129,4 +118,29 @@ func (s *TransactionCommands) pendingOperation(ctx context.Context, scope app.Op
 		result.Status, result.TransportStatus = "aborted", "transaction_aborted"
 	}
 	return result, true, nil
+}
+
+// Presence alone blocks historical payload fallback. This also covers a
+// Prepared/Aborted plan whose business archive has never been committed.
+func (s *TransactionArchive) commandRequest(ctx context.Context, organization, id string) (q transaction.Request, found bool, err error) {
+	org, parseErr := strconv.ParseUint(organization, 10, 64)
+	if parseErr != nil || org == 0 || strconv.FormatUint(org, 10) != organization || !validCommandID(id) {
+		return q, true, app.ErrInvalid
+	}
+	q = transaction.Request{Owner: "qs.mysql", Scope: "org:" + organization, Key: "ai-command/" + id}
+	key := q.KeyDigest()
+	var owner, storedScope, storedKey string
+	var hash []byte
+	err = s.db.QueryRowContext(ctx, `SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request WHERE request_key=?`, key[:]).Scan(&owner, &storedScope, &storedKey, &hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return q, false, nil
+	}
+	if err != nil {
+		return q, true, err
+	}
+	if owner != q.Owner || storedScope != q.Scope || storedKey != q.Key || len(hash) != len(q.InputHash) {
+		return q, true, app.ErrMessagingContract
+	}
+	copy(q.InputHash[:], hash)
+	return q, true, nil
 }

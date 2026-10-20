@@ -9,6 +9,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 // MessagingSeal is a pure, locally configured callback. It is invoked once for a
@@ -48,7 +49,11 @@ func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.Messag
 		if err != nil {
 			return err
 		}
-		return s.Transactions.Submit(ctx, command)
+		err = s.Transactions.Submit(ctx, command)
+		if errors.Is(err, transaction.ErrInputConflict) {
+			return errors.Join(app.ErrConflict, err)
+		}
+		return err
 	}
 	envelope, raw, err := app.PrepareMessaging(kind, id, aggregate, "", body)
 	if err != nil {
