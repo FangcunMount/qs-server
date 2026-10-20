@@ -39,29 +39,41 @@ type governedRetryService struct {
 	events      interface {
 		Stage(context.Context, ...event.DomainEvent) error
 	}
-	now func() time.Time
+	now    func() time.Time
+	future *futureRetrySchedules
 }
 
 func NewGovernedRetryService(generations domaingeneration.Repository, runs interpretationrun.Repository, outcomes evaluationfact.Repository, tx apptransaction.Runner, events interface {
 	Stage(context.Context, ...event.DomainEvent) error
-}) GovernedRetryService {
-	return &governedRetryService{generations: generations, runs: runs, outcomes: outcomes, tx: tx, events: events, now: time.Now}
+}, opts ...GovernedRetryOption) GovernedRetryService {
+	service := &governedRetryService{generations: generations, runs: runs, outcomes: outcomes, tx: tx, events: events, now: time.Now}
+	for _, option := range opts {
+		if option != nil {
+			option(service)
+		}
+	}
+	return service
 }
 
 func (s *governedRetryService) Authorize(ctx context.Context, command GovernedRetryCommand) (*interpretationrun.InterpretationRun, error) {
-	if s == nil || s.generations == nil || s.runs == nil || s.outcomes == nil || s.tx == nil || s.events == nil {
+	if s == nil || s.generations == nil || s.runs == nil || s.outcomes == nil || s.tx == nil || (s.events == nil && s.future == nil) {
 		return nil, fmt.Errorf("interpretation retry governance is not configured")
 	}
 	if command.OrgID == 0 || command.GenerationID.IsZero() || command.ExpectedAttempt < 1 || command.RequestID == "" || command.Reason == "" {
 		return nil, fmt.Errorf("interpretation retry governance input is invalid")
 	}
-	preparer, ok := s.events.(outboxport.ReferencePreparer)
-	if !ok {
-		return nil, fmt.Errorf("interpretation retry requires original event reference preparation")
-	}
-	scheduled, ok := s.events.(outboxport.ScheduledStager)
-	if !ok {
-		return nil, fmt.Errorf("interpretation retry requires scheduled staging")
+	var preparer outboxport.ReferencePreparer
+	var scheduled outboxport.ScheduledStager
+	if s.future == nil {
+		var ok bool
+		preparer, ok = s.events.(outboxport.ReferencePreparer)
+		if !ok {
+			return nil, fmt.Errorf("interpretation retry requires original event reference preparation")
+		}
+		scheduled, ok = s.events.(outboxport.ScheduledStager)
+		if !ok {
+			return nil, fmt.Errorf("interpretation retry requires scheduled staging")
+		}
 	}
 	generationRecord, err := s.generations.FindByID(ctx, command.GenerationID)
 	if err != nil {
@@ -76,6 +88,9 @@ func (s *governedRetryService) Authorize(ctx context.Context, command GovernedRe
 	}
 	if outcome == nil || outcome.OrgID() != command.OrgID {
 		return nil, fmt.Errorf("interpretation retry organization mismatch")
+	}
+	if s.future != nil {
+		return s.authorizeScheduled(ctx, command, generationRecord, outcome)
 	}
 	at := s.now()
 	retryEvent := domaininterpretation.NewInterpretationRetryRequestedEvent(domaininterpretation.RetryRequestedEventInput{

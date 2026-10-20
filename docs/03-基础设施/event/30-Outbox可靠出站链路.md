@@ -82,3 +82,27 @@ EventSubsystem 启动附加消费者和标准 Profile Supervisor；退出时先�
 - 原评估/报告效果：`maintenance/originaleffect`
 
 以上路径均以 `internal/apiserver/` 为前缀。普通合同及实库/故障验证入口见[扩展与验收](./70-扩展与验收.md)。SDK claim/时钟机制以[当前依赖版本的源码合同](./10-架构与责任边界.md#sdk-版本与参考文档)为准；本页不把单元测试、代码存在或 published 计数当作现场效果验收。
+
+### M3 T13：未来业务调度的冻结计划（实现中）
+
+`eventing/retryschedule` 已新增独立冻结模型：保存原失败 Run、业务授权、到期时间和首次消息/wire，不包含发布 attempt、delivered 或消费完成状态。评分仅绑定 qs.mysql，报告仅绑定 qs.mongo；重复同输入复用第一份计划，授权或业务输入变化必须冲突，不用新时钟/事件ID覆盖赢家。存储索引时间按数据库精度向上取整，原始 deadline 和 wire 保持不变，避免提前到期。
+
+已新增借用原 GORM 根事务或活跃 Mongo session 的存储适配；构造不执行DDL，显式安装107/42，版本及绑定不符拒绝。事务计划的 Prepared 入口复用首次wire，不重新构造消息。合同测试及原生用例编译通过；真实双库原子性、到期 Sender、旧调度交接及恢复治理仍待 T13 后续验收。既有调度、Outbox与生产消息责任尚未切换。进度及证据统一维护在 [infra M3 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)。
+
+T13到期核心已新增 `application/eventing/retrydispatch`：单次串行有界扫描最多100条，在SDK准备半消息后取得原根调度guard，锁定/条件写入当前Run授权，并将dispatch事实与witness共同提交。冻结首次selectedAt，重复/Unknown只读恢复，不自动新建fence或再次调用业务；FinalUnknown保留本地已提交。原根密封上下文校验精确引用和计划，失效callback拒绝使用。该入口尚未接管活动调度：真实到期Broker、显式中止重试、自动/人工授权写入口、暂停/交接与旧Replay责任仍待验收。当前普通源码回归7144通过、60既有可选依赖跳过；required真实依赖门禁仍待新候选，不表示T13或生产已完成。
+
+评分失败和报告失败的新私有计划采用V2：在原根内写Run/失败事实、未来调度及本次失败事件的witness，未来事件不进入发布型Outbox，也不提前准备未来半消息。V1赢家按其冻结版本继续原Outbox责任；新旧版本稳定业务input hash相同，重复请求读取原赢家，不能以版本升级覆盖旧wire/责任。恢复V2还核对精确未来计划。自动入口及原生用例源码已通过7147项全仓race（60既有可选跳过），真实到期Broker门禁待执行；人工/force、暂停、显式中止重试与旧计划交接尚未完成，不能激活生产切换。
+
+人工/force授权入口在显式事务owner配置下改用未来计划：调用原权限/组织校验后，在根事务外冻结完整授权命令和首次wire；根内先竞争Ready计划，再校验原Run/Generation并提交授权事实。重复同输入读取第一份计划，变更理由/主体/动作产生冲突；根提交回复丢弃后按fresh原库事实恢复，不再次授权或调用旧Stage。授权正文只保存在私有计划，消费者wire不含这些审计字段；自动计划的旧codec字节保持不变。该批源码race7157通过（60既有可选依赖跳过），真实双库人工门禁尚待执行。暂停、中止后新fence授权、旧调度交接/Replay与最终宿主生命周期仍未完成，不能据此切换生产。
+
+T13显式协议恢复入口 `RetryAborted` 先读取原Ready计划和精确Aborted证据，再调用固定SDK的原子Retry申请新fence；沿用原计划、首次selectedAt和wire，旧执行保留。常规扫描/Checker不调用此入口。自动暂停开关在reserve之前拒绝自动计划，也禁止其显式协议恢复；人工/force不受该自动开关影响。新增合同30项race通过，源码全仓7166通过/60既有可选跳过；required真实恢复仍待新候选。人工首轮原库发现初始Assessment夹具未显式插入，已修正并新增初始事实回读；不能以编译通过代替修正后原库验收。
+
+T13新增显式原根 `TransferLegacy` 适配：仅匹配完整原消息、fingerprint、原due以及未尝试pending责任；SQL行锁/Mongo写冲突与原Run授权共同竞争，数据库时钟确认仍为未来后，在同一根内保存未来计划并将原行标为held，错误码绑定完整计划摘要。原wire/身份/due/旧数据不删除，重复只读核对原交接及计划，不重置终态；旧Relay不能领取held，旧Replay明确返回future_schedule_owned。旧MySQL Outbox的UTC字符串微秒截断独立于原Run精度，交接按其真实编码读取。89项合同race、原生标签编译及固定lint通过；真实交接验收待新候选，尚无生产交接工具执行（T25/T30以后）。
+
+显式恢复验收首轮三档在新增helper内失败，保留脱敏报告和完整清理回执。原宿主把本地回调错误保守地视作Unknown是正确行为：测试现在等待实际lease并调用原库ReconcileOnce，取得持久化Aborted后再申请新fence；旧fence由精确StoreChecker读取，不拿“当前活动执行”查询替代历史证据。实际SQL与Mongo标签分别编译和固定lint通过，修正后的真实Broker门禁待重跑；前次使用了不存在的report标签，未覆盖该helper的报告独立构建，已校正为m3_report_integration。
+
+旧Outbox状态读取已排除held且标记为完整小写计划摘要的交接行，不再把其算作旧链路未完成发布；畸形held标记和其他未知状态仍失败。该筛选只用于责任分类，不替代计划/原行一致性或witness审计。真实双库交接初版f5084f77三档各42项零失败/跳过，全仓7197 race通过/60既有可选依赖跳过；增加状态兼容原生用例后的候选待重验。宿主调度循环、启动schema就绪和已经消费的RocketMQ暂停任务恢复仍按T22完成，共享逻辑消费预算，不向事务Topic发送普通重发消息。
+
+5582e030真实lease/显式恢复三档各41项零失败/跳过且清理完整；2cc8fdf90完整源码race7197通过/60既有可选跳过，全仓固定lint零问题。状态兼容首轮在新增原生断言失败：标准SDK始终返回四个状态桶，现按四桶计数/增龄清零验证，保留其原接口；修正5ed29545原生编译与固定lint通过，44项真实依赖矩阵待重验。前次native lint与独立冻结工作区的全仓lint争用全局锁，退出3，顺序重跑已通过；不记作代码通过或忽略门禁。
+
+大小门禁在提交授权前验证完整嵌套dispatch artifact，并预留最长合法selectedAt/revision编码；超出宿主1MiB私有artifact限制即拒绝，不能先持久化无法dispatch的授权。600KB私有授权红绿回归证明此前可落入此边界，100KB对照在最长时间/版本下仍能经正式transactionplan冻结；有效计划原编码不变。修正7e8aba25目标race239项通过/5既有可选Mongo跳过，固定lint零问题；最终候选重新绑定完整门禁，早期通过仍归其原SHA。

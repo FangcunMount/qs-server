@@ -13,6 +13,7 @@ import (
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	run "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+	schedule "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -175,6 +176,7 @@ func freezeReportFailure(q app.CommitFailureRequest, resolver catalog.TopicResol
 	if err != nil {
 		return port.Request{}, err
 	}
+	f.Version = 2
 	f.At, f.Association, f.Body, f.Future, f.Due = q.FailedAt, q.Association, body, future, due
 	return f.request(evt)
 }
@@ -226,7 +228,7 @@ func (f frozenReportCommit) validate() error {
 	if err != nil {
 		return err
 	}
-	if f.Version != 1 || f.At.IsZero() || f.Association.OrgID <= 0 || f.Association.AssessmentID.IsZero() || f.Association.TesteeID == 0 ||
+	if (f.Version != 1 && f.Version != 2) || f.At.IsZero() || f.Association.OrgID <= 0 || f.Association.AssessmentID.IsZero() || f.Association.TesteeID == 0 ||
 		g.Status() != generation.StatusGenerating || g.LatestRunID() != original.ID() || g.ID() != original.GenerationID() ||
 		original.Status() != run.StatusRunning || original.ID() != terminal.ID() || original.GenerationID() != terminal.GenerationID() || original.Attempt() != terminal.Attempt() ||
 		terminal.FinishedAt() == nil || !sameMongoTime(*terminal.FinishedAt(), f.At) || g.GeneratedTransactionEvidence() != nil || terminal.FailedTransactionEvidence() != nil {
@@ -336,4 +338,19 @@ func reportFailedPayload(q app.CommitFailureRequest, terminal *run.Interpretatio
 		Attempt: uint(terminal.Attempt()), ReportType: k.ReportType.String(), TemplateVersion: k.TemplateVersion.String(), FailureKind: string(q.Failure.Kind), FailureCode: q.Failure.Code,
 		Retryable: q.Failure.Retryable, SafeReason: q.Failure.SafeMessage, FailedAt: q.FailedAt, RetryDecision: retry,
 	}
+}
+
+func (f frozenReportCommit) retryPlan() (schedule.Frozen, error) {
+	if f.Version != 2 || f.Future == nil {
+		return schedule.Frozen{}, transaction.ErrInvalidPlan
+	}
+	g, _, terminal, _, err := f.records()
+	if err != nil {
+		return schedule.Frozen{}, err
+	}
+	digest, err := schedule.DecisionDigest(terminal.RetryDecision())
+	if err != nil {
+		return schedule.Frozen{}, err
+	}
+	return schedule.New(schedule.Authority{Owner: "qs.mongo", OrgID: f.Association.OrgID, Kind: schedule.Interpretation, SubjectID: g.ID().String(), RunID: terminal.ID().String(), AssessmentID: f.Association.AssessmentID.Uint64(), OutcomeID: g.Key().OutcomeID.Uint64(), TesteeID: f.Association.TesteeID, ExpectedAttempt: terminal.Attempt(), Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: digest}, *f.Future, f.Due)
 }

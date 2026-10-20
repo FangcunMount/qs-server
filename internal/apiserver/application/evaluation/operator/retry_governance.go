@@ -53,14 +53,21 @@ type governedRetryService struct {
 	events      EventStager
 	authorizer  authorizer
 	now         func() time.Time
+	future      *futureRetrySchedules
 }
 
-func NewGovernedRetryService(assessments domainassessment.Repository, runs evaluationrun.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker) GovernedRetryService {
-	return &governedRetryService{assessments: assessments, runs: runs, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}, now: time.Now}
+func NewGovernedRetryService(assessments domainassessment.Repository, runs evaluationrun.Repository, tx apptransaction.Runner, events EventStager, access AccessChecker, opts ...GovernedRetryOption) GovernedRetryService {
+	service := &governedRetryService{assessments: assessments, runs: runs, tx: tx, events: events, authorizer: authorizer{assessments: assessments, access: access}, now: time.Now}
+	for _, option := range opts {
+		if option != nil {
+			option(service)
+		}
+	}
+	return service
 }
 
 func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, command GovernedRetryCommand) (*evalrun.EvaluationRun, error) {
-	if s == nil || s.assessments == nil || s.runs == nil || s.tx == nil || s.events == nil {
+	if s == nil || s.assessments == nil || s.runs == nil || s.tx == nil || (s.events == nil && s.future == nil) {
 		return nil, fmt.Errorf("evaluation retry governance is not configured")
 	}
 	if command.AssessmentID == 0 || command.ExpectedAttempt < 0 || command.RequestID == "" || command.Reason == "" ||
@@ -78,6 +85,10 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 	if !assessmentRecord.Status().IsFailed() {
 		return nil, fmt.Errorf("%w: evaluation retry requires a failed assessment", ErrRetryStateConflict)
 	}
+	if s.future != nil {
+		return s.authorizeScheduled(ctx, assessmentRecord, command)
+	}
+
 	expectedAttempt := command.ExpectedAttempt
 	if expectedAttempt == 0 {
 		latest, latestErr := s.runs.FindLatestByAssessmentID(ctx, command.AssessmentID)

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	request "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 )
 
@@ -207,6 +208,8 @@ func authorizeOne(ctx context.Context, tx *sql.Tx, input request.ReplayRequest, 
 	switch {
 	case row.scope != fmt.Sprintf("org:%d", input.OrgID):
 		result.Reason = "organization_mismatch"
+	case schedulemodel.IsHandoffMarker(row.code):
+		result.Reason = "future_schedule_owned"
 	case row.state != "quarantined" || row.code != "publish_unknown":
 		result.Reason = "not_manual_required"
 	case row.failures != target.ExpectedFailureCount:

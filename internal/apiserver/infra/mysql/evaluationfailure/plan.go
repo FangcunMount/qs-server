@@ -9,6 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	schedule "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
@@ -37,7 +38,7 @@ func freeze(q port.FailureRequest, resolver catalog.TopicResolver) (eventport.Re
 	if q.Assessment == nil || q.Assessment.ID().IsZero() || !q.Assessment.Status().IsFailed() || q.Assessment.FailedAt() == nil || q.Run.Attempt().Status != evalrun.StatusFailed || q.Run.AssessmentID() != q.Assessment.ID().Uint64() || q.Run.FinishedAt() == nil || !q.Run.FinishedAt().Equal(*q.Assessment.FailedAt()) || len(q.Immediate) != 1 || q.Immediate[0].EventType() != assessment.EventTypeFailed {
 		return eventport.Request{}, transaction.ErrInvalidPlan
 	}
-	f := frozenFailure{Version: 1, Assessment: repository.NewAssessmentMapper().ToPO(q.Assessment), Run: snapshot(q.Run)}
+	f := frozenFailure{Version: 2, Assessment: repository.NewAssessmentMapper().ToPO(q.Assessment), Run: snapshot(q.Run)}
 	if q.FutureRetry != nil {
 		prepared, err := standard.PrepareIntents([]assessment.DomainEvent{q.FutureRetry}, resolver, "api-server")
 		if err != nil {
@@ -62,6 +63,9 @@ func freeze(q port.FailureRequest, resolver catalog.TopicResolver) (eventport.Re
 }
 
 func (f frozenFailure) inputHash() ([32]byte, error) {
+	// Keep the original stable input identity so an old winner is recovered,
+	// never superseded by the new schedule ownership version.
+	f.Version = 1
 	po := *f.Assessment
 	po.FailedAt = nil
 	f.Assessment = &po
@@ -86,7 +90,7 @@ func (f frozenFailure) inputHash() ([32]byte, error) {
 
 func (f frozenFailure) validate() error {
 	a, r := f.Assessment, f.Run
-	if f.Version != 1 || a == nil || a.ID.IsZero() || a.Status != assessment.StatusFailed.String() || a.FailedAt == nil || a.FailureReason == nil || r.RunID == "" || r.Attempt.Number < 1 || r.RunID != evalrun.NewEvaluationRunWithAttempt(r.AssessmentID, r.Attempt.Number).ID() || r.AssessmentID != a.ID.Uint64() || r.Attempt.Status != evalrun.StatusFailed || r.Failure == nil || r.FinishedAt == nil || !r.FinishedAt.Equal(*a.FailedAt) || r.RetryDecision == nil || repository.NewAssessmentMapper().ToDomain(a) == nil {
+	if (f.Version != 1 && f.Version != 2) || a == nil || a.ID.IsZero() || a.Status != assessment.StatusFailed.String() || a.FailedAt == nil || a.FailureReason == nil || r.RunID == "" || r.Attempt.Number < 1 || r.RunID != evalrun.NewEvaluationRunWithAttempt(r.AssessmentID, r.Attempt.Number).ID() || r.AssessmentID != a.ID.Uint64() || r.Attempt.Status != evalrun.StatusFailed || r.Failure == nil || r.FinishedAt == nil || !r.FinishedAt.Equal(*a.FailedAt) || r.RetryDecision == nil || repository.NewAssessmentMapper().ToDomain(a) == nil {
 		return transaction.ErrInvalidPlan
 	}
 	d := r.RetryDecision
@@ -125,4 +129,18 @@ func read(raw []byte) (frozenFailure, error) {
 		return f, transaction.ErrInvalidPlan
 	}
 	return f, f.validate()
+}
+
+// retryPlan is materialized from the winning failure artifact before the root.
+// V1 keeps its original Outbox obligation; only V2 creates a new business plan.
+func (f frozenFailure) retryPlan() (schedule.Frozen, error) {
+	if f.Version != 2 || f.Future == nil {
+		return schedule.Frozen{}, transaction.ErrInvalidPlan
+	}
+	digest, err := schedule.DecisionDigest(f.Run.RetryDecision)
+	if err != nil {
+		return schedule.Frozen{}, err
+	}
+	a := f.Assessment
+	return schedule.New(schedule.Authority{Owner: "qs.mysql", OrgID: a.OrgID, Kind: schedule.Evaluation, SubjectID: a.ID.String(), RunID: f.Run.RunID.String(), AssessmentID: a.ID.Uint64(), TesteeID: a.TesteeID, ExpectedAttempt: f.Run.Attempt.Number, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: digest}, *f.Future, f.Due)
 }

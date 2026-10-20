@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "8d6c05bb6fb4ec738abea25ed1b2d38425761574",
-    "verified_on": "2026-10-20"
+    "sha": "7e8aba2534352f159d715676446a7cc8a5959e93",
+    "verified_on": "2026-10-21"
   },
   "status_policy": {
     "doc_status": [
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 106,
-        "version_count": 106
+        "max_version": 107,
+        "version_count": 107
       },
       "mongodb": {
-        "max_version": 41,
-        "version_count": 41
+        "max_version": 42,
+        "version_count": 42
       }
     },
     "events": {
@@ -11432,8 +11432,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
-        "verified_on": "2026-10-19"
+        "source_sha": "d789337e42ee4cdc6ca6311202abec29f1ccff80",
+        "verified_on": "2026-10-21"
       },
       "fact_sources": [
         {
@@ -14134,8 +14134,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f008cc73212d7798623b1b3f4dbbc8f8d980d5be",
-        "verified_on": "2026-10-19"
+        "source_sha": "d789337e42ee4cdc6ca6311202abec29f1ccff80",
+        "verified_on": "2026-10-21"
       },
       "fact_sources": [
         {

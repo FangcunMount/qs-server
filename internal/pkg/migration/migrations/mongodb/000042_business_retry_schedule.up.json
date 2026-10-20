@@ -1,0 +1,10 @@
+[
+  {"create":"qs_retry_schedule","collation":{"locale":"simple"}},
+  {"create":"qs_retry_schedule_schema","collation":{"locale":"simple"}},
+  {"createIndexes":"qs_retry_schedule","indexes":[
+    {"name":"qs_retry_due","key":{"owner":1,"state":1,"due_index_at":1,"_id":1}},
+    {"name":"qs_retry_message","key":{"owner":1,"scope":1,"message_id":1},"unique":true},
+    {"name":"qs_retry_run","key":{"owner":1,"scope":1,"kind":1,"run_id":1,"state":1}}
+  ]},
+  {"insert":"qs_retry_schedule_schema","documents":[{"_id":"v1","version":1}]}
+]

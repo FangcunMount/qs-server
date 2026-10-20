@@ -1,5 +1,5 @@
 // Package evaluationfailure publishes immediate failure by transaction while
-// preserving the original future business retry schedule until T13 handoff.
+// persisting new future retry authorizations separately from publish Outbox.
 package evaluationfailure
 
 import (
@@ -12,10 +12,12 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	schedulestore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/retryschedule"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
 	eventport "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
@@ -35,6 +37,7 @@ type Committer struct {
 	primary   assessment.Repository
 	runs      evaluationrun.ExactReader
 	latest    evaluationrun.Repository
+	schedules *schedulestore.Store
 }
 
 var _ port.FailureCommitter = (*Committer)(nil)
@@ -43,7 +46,11 @@ func New(db *gorm.DB, owner *boundary.Committer, resolver catalog.TopicResolver,
 	if owner == nil || !owner.UsesPrimary(db) || resolver == nil || writer == nil || runWriter == nil {
 		return nil, transaction.ErrBinding
 	}
-	return &Committer{boundary: owner, resolver: resolver, writer: writer, runWriter: runWriter, primary: repository.NewAssessmentRepository(db), runs: checkpoint.NewExactRunReader(db), latest: checkpoint.NewRunRepository(db)}, nil
+	schedules, err := schedulestore.New(db, owner.Binding())
+	if err != nil {
+		return nil, err
+	}
+	return &Committer{schedules: schedules, boundary: owner, resolver: resolver, writer: writer, runWriter: runWriter, primary: repository.NewAssessmentRepository(db), runs: checkpoint.NewExactRunReader(db), latest: checkpoint.NewRunRepository(db)}, nil
 }
 
 func (c *Committer) CommitFailure(ctx context.Context, q port.FailureRequest) (a *assessment.Assessment, r *evalrun.EvaluationRun, commitErr error) {
@@ -76,24 +83,39 @@ func (c *Committer) CommitFailure(ctx context.Context, q port.FailureRequest) (a
 	}
 	prepared := repository.NewAssessmentMapper().ToDomain(f.Assessment)
 	run := evalrun.Reconstruct(f.Run)
-	// Future wire is constructed before this root and never included in the
-	// half branches. Append retains its exact due/identity and original retry
-	// responsibility; no evaluator, policy recalculation or network in here.
+	// Future authorization is frozen before the root and is not a half branch.
+	// Old winning V1 artifacts retain their original Outbox responsibility.
 	var future message.Message
-	if f.Future != nil {
+	var retryPlan schedulemodel.Frozen
+	if f.Future != nil && f.Version == 2 {
+		retryPlan, err = f.retryPlan()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	if f.Future != nil && f.Version == 1 {
 		future, err = message.New(*f.Future)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 	result, err := c.boundary.Commit(ctx, reservation.Execution, func(txCtx context.Context) error {
+		if retryPlan.Valid() {
+			winner, err := c.schedules.SaveFrozen(txCtx, retryPlan)
+			if err != nil {
+				return err
+			}
+			if winner.Digest() != retryPlan.Digest() {
+				return schedulemodel.ErrConflict
+			}
+		}
 		if err := c.writer.Save(txCtx, prepared); err != nil {
 			return err
 		}
 		if err := c.runWriter.SaveClaimed(txCtx, run); err != nil {
 			return err
 		}
-		if f.Future != nil {
+		if f.Future != nil && f.Version == 1 {
 			tx, err := hostmysql.RequireTx(txCtx)
 			if err != nil {
 				return err
@@ -154,6 +176,16 @@ func (c *Committer) recover(ctx context.Context, e transaction.Execution, f froz
 	defer cancel()
 	if c.boundary.Confirm(ctx, e) != transaction.LocalCommitted {
 		return nil, nil, eventport.ErrUnresolved
+	}
+	if f.Future != nil && f.Version == 2 {
+		plan, err := f.retryPlan()
+		if err != nil {
+			return nil, nil, eventport.ErrUnresolved
+		}
+		record, err := c.schedules.Find(ctx, plan)
+		if err != nil || record.Validate() != nil || record.Plan.Digest() != plan.Digest() {
+			return nil, nil, errors.Join(eventport.ErrUnresolved, err)
+		}
 	}
 	a, err := c.primary.FindByID(ctx, f.Assessment.ID)
 	if err != nil {

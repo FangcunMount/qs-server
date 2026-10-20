@@ -13,9 +13,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	run "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
+	schedulestore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -40,6 +42,7 @@ type TransactionCommitter struct {
 	reports    *ReportRepository
 	catalog    *ReportCatalogProjector
 	future     *mongo.Collection
+	schedules  *schedulestore.Store
 }
 
 var _ app.InterpretationCommitter = (*TransactionCommitter)(nil)
@@ -56,7 +59,11 @@ func NewTransactionCommitter(db *mongo.Database, owner *guarded.Owner, runner gu
 		}
 	}
 	primary := db.Client().Database(db.Name(), options.Database().SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority()))
-	return &TransactionCommitter{boundary: boundary, resolver: resolver, generation: NewGenerationRepositoryWithoutSchema(primary, opts...), runs: NewRunRepositoryWithoutSchema(primary, opts...),
+	schedules, err := schedulestore.New(db, owner.Binding(), opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &TransactionCommitter{schedules: schedules, boundary: boundary, resolver: resolver, generation: NewGenerationRepositoryWithoutSchema(primary, opts...), runs: NewRunRepositoryWithoutSchema(primary, opts...),
 		reports: NewReportRepositoryWithoutSchema(primary, opts...), catalog: NewReportCatalogProjectorWithoutSchema(primary, opts...), future: db.Collection("rm_outbox")}, nil
 }
 
@@ -197,7 +204,14 @@ func (c *TransactionCommitter) commit(ctx context.Context, request port.Request)
 		return nil, errors.Join(port.ErrUnresolved, err)
 	}
 	var future message.Message
-	if f.Future != nil {
+	var retryPlan schedulemodel.Frozen
+	if f.Future != nil && f.Version == 2 {
+		retryPlan, err = f.retryPlan()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if f.Future != nil && f.Version == 1 {
 		future, err = message.New(*f.Future)
 		if err != nil {
 			return nil, err
@@ -206,6 +220,15 @@ func (c *TransactionCommitter) commit(ctx context.Context, request port.Request)
 	result, err := c.boundary.Commit(ctx, e, func(tx context.Context) error {
 		// The SDK has prepared all halves and bound the original guard before
 		// entering this callback. Only deterministic database operations follow.
+		if retryPlan.Valid() {
+			winner, err := c.schedules.SaveFrozen(tx, retryPlan)
+			if err != nil {
+				return err
+			}
+			if winner.Digest() != retryPlan.Digest() {
+				return schedulemodel.ErrConflict
+			}
+		}
 		if err := runWrite.Write(tx, c.runs); err != nil {
 			return err
 		}
@@ -220,9 +243,9 @@ func (c *TransactionCommitter) commit(ctx context.Context, request port.Request)
 				return err
 			}
 		}
-		if f.Future != nil {
-			// T13 owns the explicit future-dispatch handoff. Retain the first
-			// complete wire/due in the original schedule, never a delayed half.
+		if f.Future != nil && f.Version == 1 {
+			// Recover the exact pre-T13 artifact's original responsibility. New V2
+			// plans never append a future event to the legacy publishing Outbox.
 			appender, err := sdkmongo.Bind(mongo.NewSessionContext(tx, mongo.SessionFromContext(tx)), c.future)
 			if err != nil {
 				return err
@@ -244,6 +267,16 @@ func (c *TransactionCommitter) recover(ctx context.Context, e transaction.Execut
 	defer cancel()
 	if c.boundary.Confirm(ctx, e) != transaction.LocalCommitted {
 		return nil, port.ErrUnresolved
+	}
+	if f.Future != nil && f.Version == 2 {
+		plan, err := f.retryPlan()
+		if err != nil {
+			return nil, port.ErrUnresolved
+		}
+		record, err := c.schedules.Find(ctx, plan)
+		if err != nil || record.Validate() != nil || record.Plan.Digest() != plan.Digest() {
+			return nil, errors.Join(port.ErrUnresolved, err)
+		}
 	}
 	expected, _, err := materializeReportCommit(f, e)
 	if err != nil {

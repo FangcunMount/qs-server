@@ -29,7 +29,10 @@ func (r *StatusReader) OutboxStatusSnapshot(ctx context.Context, now time.Time) 
 		return outboxport.StatusSnapshot{}, fmt.Errorf("standard Mongo status reader is not configured")
 	}
 	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: bson.D{{Key: "state", Value: bson.D{{Key: "$ne", Value: "published"}}}}}},
+		{{Key: "$match", Value: bson.D{
+			{Key: "state", Value: bson.D{{Key: "$ne", Value: "published"}}},
+			{Key: "$nor", Value: bson.A{bson.D{{Key: "state", Value: "held"}, {Key: "last_error_code", Value: bson.M{"$regex": "^m3_future_owner:[0-9a-f]{64}$"}}}}},
+		}}},
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$state"},
 			{Key: "n", Value: bson.D{{Key: "$sum", Value: 1}}},
@@ -74,7 +77,10 @@ func (r *StatusReader) OutboxStatusByEventType(ctx context.Context, _ time.Time)
 		return nil, fmt.Errorf("standard Mongo status reader is not configured")
 	}
 	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: bson.D{{Key: "state", Value: bson.D{{Key: "$ne", Value: "published"}}}}}},
+		{{Key: "$match", Value: bson.D{
+			{Key: "state", Value: bson.D{{Key: "$ne", Value: "published"}}},
+			{Key: "$nor", Value: bson.A{bson.D{{Key: "state", Value: "held"}, {Key: "last_error_code", Value: bson.M{"$regex": "^m3_future_owner:[0-9a-f]{64}$"}}}}},
+		}}},
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: bson.D{{Key: "event_type", Value: "$event_type"}, {Key: "state", Value: "$state"}}},
 			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},

@@ -8,9 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	dispatchapp "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing/retrydispatch"
+	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	schedulestore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -140,6 +144,16 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, repository.InstallLifecycleSchema(t.Context(), db))
 	require.NoError(t, txmongo.InstallSchema(t.Context(), db))
 	require.NoError(t, db.CreateCollection(t.Context(), "rm_outbox"))
+	retrySchema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mongodb", "000042_business_retry_schedule.up.json"))
+	require.NoError(t, err)
+	var retryCommands []json.RawMessage
+	require.NoError(t, json.Unmarshal(retrySchema, &retryCommands))
+	for _, raw := range retryCommands {
+		var command bson.D
+		require.NoError(t, bson.UnmarshalExtJSON(raw, true, &command))
+		require.NoError(t, db.RunCommand(t.Context(), command).Err())
+	}
+
 	bound := producer.RocketMQ.Transactions["qs.mongo"]
 	binding := tx.Binding{Owner: "qs.mongo", StoreID: bound.StoreID, WriterEpoch: bound.WriterEpoch}
 	_, err = db.Collection("rm_tx_binding").InsertOne(t.Context(), bson.M{"_id": binding.Owner, "store_id": binding.StoreID, "writer_epoch": binding.WriterEpoch, "schema_version": 1})
@@ -277,18 +291,80 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, f.Run.FailedTransactionEvidence().Validate())
 	waitMessage(failure)
 	cases["original_failure_witness"] = true
-	var schedule struct {
-		Payload     []byte    `bson:"payload"`
-		Due         time.Time `bson:"next_attempt_at"`
-		Fingerprint []byte    `bson:"fingerprint"`
+	var futureRecord struct {
+		Raw []byte `bson:"frozen_plan"`
 	}
-	err = db.Collection("rm_outbox").FindOne(t.Context(), bson.M{"message_id": f.Run.RetryDecision().RetryEventID}).Decode(&schedule)
+	err = db.Collection("qs_retry_schedule").FindOne(t.Context(), bson.M{"message_id": f.Run.RetryDecision().RetryEventID}).Decode(&futureRecord)
 	require.NoError(t, err)
-	require.True(t, f.Run.RetryDecision().NextAttemptAt.Equal(schedule.Due))
-	require.NotEmpty(t, schedule.Payload)
-	require.NotEmpty(t, schedule.Fingerprint)
+	frozenSchedule, err := schedulemodel.Decode(futureRecord.Raw)
+	require.NoError(t, err)
+	require.True(t, f.Run.RetryDecision().NextAttemptAt.Equal(frozenSchedule.DueAt().Truncate(time.Millisecond)))
+	require.NoError(t, frozenSchedule.MatchDecision(f.Run.RetryDecision(), *f.Run.RetryDecision().NextAttemptAt))
+	futureOutbox, err := db.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{"message_id": f.Run.RetryDecision().RetryEventID})
+	require.NoError(t, err)
+	require.Zero(t, futureOutbox)
 	require.Equal(t, 1, f.Run.Attempt())
 	cases["future_retry_preserved"] = true
+	schedules, err := schedulestore.New(db, binding)
+	require.NoError(t, err)
+	retryAuthority, err := repository.NewRetryDispatchAuthority(db)
+	require.NoError(t, err)
+	dispatchBoundary, err := guarded.NewCommitter(db, owner, runner, routes)
+	require.NoError(t, err)
+	dispatcher, err := dispatchapp.New(schedules, dispatchBoundary, retryAuthority)
+	require.NoError(t, err)
+	realBefore := time.Now().UTC()
+	require.True(t, realBefore.Before(frozenSchedule.DueAt()))
+	earlyDispatch, err := dispatcher.Once(t.Context(), realBefore, 10)
+	require.NoError(t, err)
+	require.Empty(t, earlyDispatch)
+	early, err := db.Collection("rm_tx_request").CountDocuments(t.Context(), bson.M{"idempotency_key": schedulemodel.DispatchKey(frozenSchedule)})
+	require.NoError(t, err)
+	require.Zero(t, early)
+	timer := time.NewTimer(time.Until(frozenSchedule.DueAt().Add(2 * time.Millisecond)))
+	select {
+	case <-timer.C:
+	case <-t.Context().Done():
+		timer.Stop()
+		t.Fatal("deadline wait cancelled")
+	}
+	dueDispatch := []dispatchapp.Outcome{recoverAbortedDueDispatch(t, schedules, dispatchBoundary, retryAuthority, authority, frozenSchedule)}
+	require.NoError(t, dueDispatch[0].Err)
+	require.Equal(t, tx.LocalCommitted, dueDispatch[0].Transaction.Local)
+	require.Equal(t, schedulemodel.DispatchCommitted, dueDispatch[0].State)
+	retryWait := time.NewTimer(45 * time.Second)
+	foundRetry := false
+	for !foundRetry {
+		select {
+		case m := <-received:
+			if m.ID == frozenSchedule.Message().Input().ID {
+				require.Equal(t, frozenSchedule.Message().Input().Payload, m.Wire)
+				foundRetry = true
+			}
+		case <-retryWait.C:
+			t.Fatal("committed report retry missing")
+		}
+	}
+	retryWait.Stop()
+	storedSchedule, err := schedules.Find(t.Context(), frozenSchedule)
+	require.NoError(t, err)
+	require.NoError(t, storedSchedule.Validate())
+	ref, err := tx.DecodeReference(storedSchedule.Proof.TransactionReference)
+	require.NoError(t, err)
+	exact, err := authority.Evidence(t.Context(), ref)
+	require.NoError(t, err)
+	require.Equal(t, tx.Commit, tx.Resolve(ref, exact))
+	repeatedDue, err := dispatcher.Once(t.Context(), time.Now().UTC(), 10)
+	require.NoError(t, err)
+	require.Empty(t, repeatedDue)
+	stillFailed, err := runs.FindByID(t.Context(), f.Run.ID())
+	require.NoError(t, err)
+	require.Equal(t, 1, stillFailed.Attempt())
+	require.Equal(t, run.StatusFailed, stillFailed.Status())
+	dispatchReceipt, err := json.Marshal(map[string]any{"owner": "qs.mongo", "passed": 9, "failed": 0, "skipped": 0, "cases": map[string]bool{"no_half_before_real_due": true, "first_wire_and_dispatch_witness": true, "no_business_attempt_or_input_repeat": true, "repeat_dispatch_is_empty": true, "automatic_pause_before_reservation": true, "real_root_abort_witness": true, "scan_does_not_retry_aborted": true, "explicit_retry_same_plan_new_fence": true, "old_aborted_evidence_retained": true}, "system_login_not_claimed": true, "business_consumer_not_claimed": true})
+	require.NoError(t, err)
+	t.Log("M3_QS_RETRY_DISPATCH_RECEIPT " + string(dispatchReceipt))
+
 	abort := request(3001)
 	_, err = committer.CommitSuccess(context.WithValue(t.Context(), hookKey{}, func(stage string) error {
 		if stage == "before_commit" {

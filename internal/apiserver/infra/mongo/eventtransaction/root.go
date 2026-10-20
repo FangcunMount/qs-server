@@ -87,3 +87,12 @@ func matchReference(e transaction.Execution, proof *evidence.EventEvidenceV2) er
 	}
 	return transaction.ErrBinding
 }
+
+// OriginalPlan exposes the guarded immutable plan only inside the exact active
+// original root. It transfers no execution permission or database ownership.
+func OriginalPlan(ctx context.Context, db *mongo.Database, proof *evidence.EventEvidenceV2) (transaction.FrozenPlan, error) {
+	if err := RequireOriginal(ctx, db, proof); err != nil {
+		return transaction.FrozenPlan{}, err
+	}
+	return ctx.Value(rootKey{}).(*originalRoot).execution.Plan, nil
+}
