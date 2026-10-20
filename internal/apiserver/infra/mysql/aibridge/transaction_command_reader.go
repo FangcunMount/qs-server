@@ -14,6 +14,46 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var _ app.PlannedStartReader = (*MessagingCommandStore)(nil)
+
+// ReadPlannedStart is an internal application port, not a public body read. It
+// keeps uncommitted planning separate from the original business request table.
+func (s *MessagingCommandStore) ReadPlannedStart(ctx context.Context, actor app.Actor, id string) (*app.Start, bool, error) {
+	if s == nil {
+		return nil, true, app.ErrManagementUnavailable
+	}
+	if s.Transactions == nil {
+		return nil, false, nil
+	}
+	return s.Transactions.plannedStart(ctx, actor, id)
+}
+
+func (s *TransactionCommands) plannedStart(ctx context.Context, actor app.Actor, id string) (*app.Start, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	q, found, err := s.archive.commandRequest(ctx, actor.OrgID, id)
+	if err != nil || !found {
+		return nil, found, err
+	}
+	winner, err := s.archive.store.Lookup(ctx, q)
+	if err != nil {
+		return nil, true, err
+	}
+	c, a, err := app.ReadTransactionCommand(winner.Execution.Plan)
+	if err != nil {
+		return nil, true, err
+	}
+	if c.ID() != id || c.Aggregate() != id || c.Kind() != pb.MessagingKind_START || c.Scope().OrganizationID != actor.OrgID || c.Scope().SubjectID != actor.SubjectID {
+		return nil, true, app.ErrNotFound
+	}
+	body, err := app.ParseMessagingBody(a.Envelope, a.Body)
+	if err != nil {
+		return nil, true, err
+	}
+	request := originalStart(body.GetStart())
+	return &request, true, nil // this says nothing about business root commitment
+}
+
 // operation distinguishes absence from a damaged/uncommitted new identity.
 // Only true absence permits the caller to consult the historical Outbox reader.
 // No wire, token, private plan or body is returned through this public boundary.

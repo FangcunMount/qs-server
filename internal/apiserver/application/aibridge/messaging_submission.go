@@ -8,7 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// RuntimeCommandSubmitter commits a host operation and Outbox before returning.
+// RuntimeCommandSubmitter commits the original host operation and reliable
+// publication evidence before returning success (legacy Outbox or witness).
 // It cannot return an AI decision or authorize execution by Broker confirmation.
 type RuntimeCommandSubmitter interface {
 	SubmitParticipantRetry(context.Context, DraftScope, string, ParticipantRetry) error

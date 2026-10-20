@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -40,6 +41,15 @@ import (
 type commandNativeRoutes struct{}
 
 func (commandNativeRoutes) GetTopicForEvent(string) (string, bool) { return app.CommandsTopic, true }
+
+type commandNativeAccess struct{}
+
+func (commandNativeAccess) AuthorizeOwnAssessment(_ context.Context, testee, assessment uint64) error {
+	if testee != 19 || assessment != 21 {
+		return app.ErrNotFound
+	}
+	return nil
+}
 
 func TestM3AICommandBrokerHost(t *testing.T) {
 	require.True(t, strings.HasPrefix(os.Getenv("QS_M3_FIXTURE_PROJECT"), "rocketmq-m2-"))
@@ -162,7 +172,8 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 		}
 	}
 	store := &MessagingCommandStore{Store: &Store{DB: pool}, Messaging: NewMessagingStore(), Seal: seal, Transactions: commands}
-	r := app.Start{RequestID: uuid.NewString(), Actor: app.Actor{OrgID: "7", SubjectID: "9"}, TesteeID: "19", AssessmentIDs: []string{"21"}, Goal: "冻结输入：中文🙂"}
+	r := app.Start{RequestID: uuid.NewString(), Actor: app.Actor{OrgID: "7", SubjectID: "9"}, TesteeID: "19", AssessmentIDs: []string{"21"}, Goal: "冻结输入：中文🙂", Evidence: []app.EvidenceItem{{AssessmentID: "21", TesteeID: "19", ReportID: "31", SourceVersion: "frozen-v1", Facts: []app.Fact{{Ref: "standard-report", Value: "first frozen report"}}}}}
+	participant := &app.Participant{IntakeClosed: true, Access: commandNativeAccess{}, Bridge: &app.Service{Store: store}}
 	_, err = pool.ExecContext(t.Context(), "UPDATE ai_messaging_admission SET closed=FALSE WHERE singleton=1")
 	require.NoError(t, err)
 	_, err = pool.ExecContext(t.Context(), "INSERT INTO ai_messaging_aggregates VALUES(?,1)", r.RequestID)
@@ -185,6 +196,13 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "pending", pending.Status)
 	require.Equal(t, "transaction_pending", pending.TransportStatus)
+	publicPending, err := participant.ReadOperation(t.Context(), r.Actor, 19, 21, r.RequestID, r.RequestID)
+	require.NoError(t, err)
+	require.Equal(t, "pending", publicPending.Status)
+	require.ErrorIs(t, participant.Request(t.Context(), r.Actor, 19, 21, 31, r.RequestID), ErrCommandUnresolved)
+	require.EqualValues(t, 1, seals.Load())
+	_, err = participant.Read(t.Context(), r.Actor, 19, 21, r.RequestID)
+	require.ErrorIs(t, err, app.ErrNotFound, "Prepared planning must not become an accepted business request")
 	pendingCommand, err := app.NewTransactionCommand(pb.MessagingKind_START, r.RequestID, r.RequestID, app.OperationScope{OrganizationID: "7", SubjectID: "9", ResourceID: r.RequestID}, startMessagingBody(r))
 	require.NoError(t, err)
 	pendingWinner, err := commands.archive.store.Lookup(t.Context(), transaction.Request{Owner: "qs.mysql", Scope: "org:7", Key: pendingCommand.Key(), InputHash: pendingCommand.InputHash()})
@@ -205,7 +223,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	a, found, err := commands.Archive().ReadCommitted(t.Context(), r.RequestID)
 	require.NoError(t, err)
 	require.True(t, found)
-	require.Equal(t, first.Wire, a.Wire)
+	require.Equal(t, sha256.Sum256(first.Wire), sha256.Sum256(a.Wire))
 	require.EqualValues(t, 1, a.Sequence)
 	header, err := app.AuthenticateMessaging(first.Wire, app.CommandsTopic, protected.Keyring{Decrypt: map[string]jose.JSONWebKey{recipient.KeyID: recipient}, Signers: map[string]protected.TrustedSigner{signing.KeyID: {Producer: "qs-server", Key: signing.Public()}}})
 	require.NoError(t, err)
@@ -225,7 +243,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	payload, found, err := commands.Archive().Payload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: r.RequestID, OrganizationId: "7", BodySha256: a.Envelope.BodySha256, BodyLength: uint64(len(a.Body))}, "qs-ai")
 	require.NoError(t, err)
 	require.True(t, found)
-	require.Equal(t, a.Body, payload)
+	require.Equal(t, sha256.Sum256(a.Body), sha256.Sum256(payload))
 	fresh, err := NewTransactionArchive(pool, commands.archive.store.Binding())
 	require.NoError(t, err)
 	_, found, err = fresh.ReadCommitted(t.Context(), r.RequestID)
