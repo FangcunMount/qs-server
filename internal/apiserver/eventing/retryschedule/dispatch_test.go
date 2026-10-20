@@ -37,6 +37,11 @@ func TestDueDispatchFreezesSelectionSeparatelyFromBusinessAuthorization(t *testi
 	proof, err := DispatchProof(r, transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1"})
 	require.NoError(t, err)
 	require.True(t, proof.RecordedAt.Equal(at))
+	require.NoError(t, MatchDispatchProof(r, p, proof))
+	changedTime := *proof
+	changedTime.RecordedAt = changedTime.RecordedAt.Add(time.Nanosecond)
+	require.ErrorIs(t, MatchDispatchProof(r, p, &changedTime), ErrInvalid)
+
 	require.NoError(t, f.ValidateDispatchProof(proof))
 	for _, mode := range []string{"early", "schedule", "revision", "wire", "key", "hash", "route"} {
 		t.Run(mode, func(t *testing.T) {

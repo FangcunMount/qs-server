@@ -31,7 +31,7 @@ func (s *Store) GuardDispatch(ctx context.Context, r model.Record, proof *eviden
 	if err != nil {
 		return nil, err
 	}
-	if _, err := model.ReadDispatch(r, plan); err != nil {
+	if err := model.MatchDispatchProof(r, plan, proof); err != nil {
 		return nil, err
 	}
 	tx, err := s.root(ctx)

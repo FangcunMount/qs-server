@@ -3,7 +3,9 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	retrymodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	mongoEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
+	retrystore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"io"
 	"time"
@@ -91,6 +93,7 @@ type Module struct {
 	catalogReconcile       interpretationcatalog.Service
 	catalogAudit           interpretationcatalog.RunnerService
 	governedRetryService   interpretationautomation.GovernedRetryService
+	governedRetryOptions   []interpretationautomation.GovernedRetryOption
 	readmissionService     interpretationreadmission.Service
 	leaseRecoverer         interpretationautomation.LeaseRecoverer
 
@@ -145,6 +148,18 @@ func New(deps Deps) (*Module, error) {
 	}
 	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
+	if selected {
+		store, err := retrystore.New(deps.MongoDB, deps.EventTransactionOwner.Binding(), mongoOptions)
+		if err != nil {
+			return nil, err
+		}
+		guard, err := mongoEval.NewRetryAuthorizationGuard(deps.MongoDB, mongoOptions)
+		if err != nil {
+			return nil, err
+		}
+		module.governedRetryOptions = []interpretationautomation.GovernedRetryOption{interpretationautomation.WithRetrySchedules(store, retrymodel.Builder{Resolver: deps.TransactionRoutes}, guard)}
+	}
+
 	reportReadModel := mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
 	module.reader = reportReadModel
 	module.reportCatalog = reportReadModel
@@ -319,7 +334,7 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		operationsAccessAdapter{},
 		m.admissionRepo,
 	)
-	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager)
+	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager, m.governedRetryOptions...)
 	m.leaseRecoverer = interpretationautomation.NewLeaseRecoverer(m.runRepo, m.generationRepo, m.automationService)
 	m.aiOutcomeRepo = repo
 	m.bindParticipantRuntime()

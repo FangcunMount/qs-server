@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"sync/atomic"
 	"time"
 
@@ -92,7 +93,7 @@ func (d *Dispatcher) dispatch(ctx context.Context, r model.Record, at time.Time)
 		// Explicit aborted-dispatch retry authorization is a separate host action.
 		out.Transaction = transaction.InitialResult(execution)
 		out.Transaction.Local = d.owner.Confirm(ctx, execution)
-		return d.recover(ctx, r, proof.TransactionReference, out)
+		return d.recover(ctx, r, proof, out)
 	}
 	out.Transaction, err = d.owner.Commit(ctx, execution, func(root context.Context) error {
 		guarded, err := d.store.GuardDispatch(root, r, proof)
@@ -108,10 +109,10 @@ func (d *Dispatcher) dispatch(ctx context.Context, r model.Record, at time.Time)
 		out.Err = errors.Join(events.ErrUnresolved, err)
 		return out
 	}
-	return d.recover(ctx, r, proof.TransactionReference, out)
+	return d.recover(ctx, r, proof, out)
 }
 
-func (d *Dispatcher) recover(ctx context.Context, r model.Record, reference []byte, out Outcome) Outcome {
+func (d *Dispatcher) recover(ctx context.Context, r model.Record, proof *evidence.EventEvidenceV2, out Outcome) Outcome {
 	if out.Transaction.Local != transaction.LocalCommitted {
 		out.Err = events.ErrUnresolved
 		return out
@@ -123,7 +124,7 @@ func (d *Dispatcher) recover(ctx context.Context, r model.Record, reference []by
 		out.Err = errors.Join(events.ErrUnresolved, err)
 		return out
 	}
-	if actual.Validate() != nil || actual.Plan.Digest() != r.Plan.Digest() || actual.Version != r.Version+1 || actual.State != model.DispatchCommitted || actual.Proof == nil || !bytes.Equal(actual.Proof.TransactionReference, reference) {
+	if actual.Validate() != nil || actual.Plan.Digest() != r.Plan.Digest() || actual.Version != r.Version+1 || actual.State != model.DispatchCommitted || actual.Proof == nil || !bytes.Equal(actual.Proof.TransactionReference, proof.TransactionReference) || !actual.Proof.RecordedAt.Equal(proof.RecordedAt) {
 		out.Err = events.ErrUnresolved
 		return out
 	}

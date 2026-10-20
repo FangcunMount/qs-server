@@ -31,3 +31,13 @@ func (f Frozen) MatchDecision(d *retrygovernance.Decision, persistedDue time.Tim
 	}
 	return nil
 }
+
+// BusinessDue is the m3-1 original Run storage boundary, independent of the
+// schedule's upward-rounded due index. MySQL migration49 uses datetime(3),
+// through the pinned driver's microsecond serialization; Mongo BSON truncates.
+func (f Frozen) BusinessDue() time.Time {
+	if f.Authority().Owner == "qs.mysql" {
+		return f.DueAt().Round(time.Microsecond).Round(time.Millisecond)
+	}
+	return f.DueAt().Truncate(time.Millisecond)
+}

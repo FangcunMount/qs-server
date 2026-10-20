@@ -164,6 +164,9 @@ func (s *Store) SaveFrozen(ctx context.Context, candidate model.Frozen) (model.F
 	if err := record.Plan.MatchInput(candidate); err != nil {
 		return model.Frozen{}, err
 	}
+	if record.State != model.Ready {
+		return model.Frozen{}, transaction.ErrStaleExecution
+	}
 	return record.Plan, nil
 }
 

@@ -181,6 +181,19 @@ func (s *Store) SaveFrozen(ctx context.Context, candidate model.Frozen) (model.F
 		if err := r.Plan.MatchInput(candidate); err != nil {
 			return model.Frozen{}, err
 		}
+		if r.State != model.Ready || existing.GuardVersion == int64(1<<63-1) {
+			return model.Frozen{}, transaction.ErrStaleExecution
+		}
+		// A duplicate authorization must still compete with dispatch/governance,
+		// rather than trusting a read-only snapshot before writing the original Run.
+		digest := r.Plan.Digest()
+		changed, err := s.db.Collection(collection).UpdateOne(ctx, bson.M{"_id": key[:], "plan_hash": digest[:], "state": model.Ready, "revision": r.Version, "guard_version": existing.GuardVersion}, bson.M{"$inc": bson.M{"guard_version": int64(1)}})
+		if err != nil {
+			return model.Frozen{}, err
+		}
+		if changed.MatchedCount != 1 {
+			return model.Frozen{}, transaction.ErrStaleExecution
+		}
 		return r.Plan, nil
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {

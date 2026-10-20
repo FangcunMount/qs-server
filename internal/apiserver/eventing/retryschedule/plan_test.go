@@ -2,6 +2,7 @@ package retryschedule
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -26,6 +27,11 @@ func (routes) GetTopicForEvent(string) (string, bool) { return LifecycleTopic, t
 func fixture(t *testing.T, kind string, origin retrygovernance.AttemptOrigin, request, id string, at time.Time) (Authority, message.Input) {
 	t.Helper()
 	a := Authority{Owner: "qs.mysql", OrgID: 7, Kind: kind, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: origin, RequestID: request, DecisionHash: [32]byte{1}}
+	if origin != retrygovernance.AttemptOriginAutomatic {
+		a.Authorization = []byte(`{"subject":"user:9","reason":"controlled fixture"}`)
+		digest := sha256.Sum256(a.Authorization)
+		a.AuthorizationSHA256 = fmt.Sprintf("%x", digest)
+	}
 	base := event.BaseEvent{ID: id, EventTypeValue: catalog.EvaluationRetryRequested, OccurredAtValue: at, AggregateTypeValue: "Evaluation", AggregateIDValue: a.SubjectID}
 	var value event.DomainEvent
 	if kind == Evaluation {

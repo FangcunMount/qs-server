@@ -198,7 +198,11 @@ func TestM3RetryMySQLStore(t *testing.T) {
 	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM rm_tx_request").Scan(&requests))
 	require.Zero(t, requests)
 	require.False(t, db.Migrator().HasTable("rm_outbox"))
-	retryStoreReceipt(t, "mysql", map[string]bool{"constructor_no_ddl": true, "schema_missing_rejected": true, "original_root_rollback_atomic": true, "original_root_commit_atomic": true, "duplicate_first_wire_deadline": true, "due_index_not_early": true, "future_authorization_no_half_or_outbox": true})
+	cases := map[string]bool{"constructor_no_ddl": true, "schema_missing_rejected": true, "original_root_rollback_atomic": true, "original_root_commit_atomic": true, "duplicate_first_wire_deadline": true, "due_index_not_early": true, "future_authorization_no_half_or_outbox": true}
+	for name, passed := range verifyGovernedMySQL(t, db, store) {
+		cases[name] = passed
+	}
+	retryStoreReceipt(t, "mysql", cases)
 }
 
 func TestM3RetryMongoStore(t *testing.T) {
@@ -319,5 +323,9 @@ func TestM3RetryMongoStore(t *testing.T) {
 	require.NoError(t, root.WithinTransaction(t.Context(), func(ctx context.Context) error { expired = ctx; return nil }))
 	_, err = store.SaveFrozen(expired, frozen)
 	require.ErrorIs(t, err, transaction.ErrTransactionRequired)
-	retryStoreReceipt(t, "mongo", map[string]bool{"constructor_no_ddl": true, "schema_missing_rejected": true, "original_root_rollback_atomic": true, "original_root_commit_atomic": true, "due_index_not_early": true, "future_authorization_no_half_or_outbox": true, "expired_session_rejected": true})
+	cases := map[string]bool{"constructor_no_ddl": true, "schema_missing_rejected": true, "original_root_rollback_atomic": true, "original_root_commit_atomic": true, "due_index_not_early": true, "future_authorization_no_half_or_outbox": true, "expired_session_rejected": true}
+	for name, passed := range verifyGovernedMongo(t, db, store) {
+		cases[name] = passed
+	}
+	retryStoreReceipt(t, "mongo", cases)
 }

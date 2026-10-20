@@ -5,7 +5,9 @@ package retryschedule
 import (
 	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
@@ -17,8 +19,8 @@ import (
 var ErrReservationRace = errors.New("retry schedule reservation raced; roll back the original root before recovery")
 
 // Store borrows the host primary and root transaction. SaveFrozen performs
-// database operations only, returning the immutable first winner on duplicate
-// input. It must never commit the host root or regenerate IDs, clocks or wire.
+// database operations only, returning the immutable Ready first winner on duplicate
+// input while competing with dispatch/governance; terminal plans are read with Find. It must never commit the host root or regenerate IDs, clocks or wire.
 type Store interface {
 	Validate(context.Context) error
 	SaveFrozen(context.Context, model.Frozen) (model.Frozen, error)
@@ -38,4 +40,15 @@ type DispatchStore interface {
 // database root after the schedule guard. It never executes business work.
 type AuthorityValidator interface {
 	ValidateDispatchAuthority(context.Context, model.Frozen) error
+}
+
+// PlanBuilder freezes a complete first message before the original root.
+type PlanBuilder interface {
+	Freeze(model.Authority, event.DomainEvent, *retrygovernance.Decision, any) (model.Frozen, error)
+}
+
+// AuthorizationGuard rechecks the original aggregate in the already-active
+// business root and competes with a new business attempt. It performs DB I/O only.
+type AuthorizationGuard interface {
+	GuardAuthorization(context.Context, model.Frozen) error
 }

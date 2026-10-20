@@ -99,3 +99,19 @@ func DispatchProof(r Record, e transaction.Execution) (*evidence.EventEvidenceV2
 	}
 	return proof, r.Plan.ValidateDispatchProof(proof)
 }
+
+// MatchDispatchProof also binds the recorded business timestamp to the exact
+// frozen dispatch selection. Reference shape alone cannot establish this fact.
+func MatchDispatchProof(r Record, p transaction.FrozenPlan, proof *evidence.EventEvidenceV2) error {
+	if err := r.Plan.ValidateDispatchProof(proof); err != nil {
+		return err
+	}
+	selected, err := ReadDispatch(r, p)
+	if err != nil {
+		return err
+	}
+	if !proof.RecordedAt.Equal(selected.SelectedAt) {
+		return ErrInvalid
+	}
+	return nil
+}

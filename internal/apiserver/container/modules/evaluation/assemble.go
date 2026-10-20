@@ -1,8 +1,10 @@
 package evaluation
 
 import (
+	retrymodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	mysqlFailure "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluationfailure"
 	mysqlSubmit "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluationsubmit"
+	retrystore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/retryschedule"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
 
 	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
@@ -111,6 +113,7 @@ func New(deps Deps) (*Module, error) {
 type evaluationInfra struct {
 	transactionSubmitter  evaluationtransaction.Submitter
 	transactionFailure    evaluationtransaction.FailureCommitter
+	retrySchedules        *retrystore.Store
 	assessmentRepo        assessment.Repository
 	runRepo               evaluationrun.Repository
 	outcomeRepo           domainoutcome.Repository
@@ -167,6 +170,10 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "original pending submission writer required")
 		}
 		var err error
+		infra.retrySchedules, err = retrystore.New(normalized.MySQLDB, owner.Binding(), mysqlOptions)
+		if err != nil {
+			return nil, err
+		}
 		infra.transactionSubmitter, err = mysqlSubmit.New(normalized.MySQLDB, owner, submitter)
 		if err != nil {
 			return nil, err
@@ -259,7 +266,11 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	m.TesteeService = evaluationtestee.NewServiceWithCaches(infra.assessmentRepo, infra.assessmentReader, scoreFacts, infra.assessmentAccessCache, infra.assessmentDetailCache)
 	m.RuntimeStatusReader = evaluationtestee.NewRuntimeStatusReader(m.TesteeService, infra.runRepo)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
-	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
+	var retryOptions []evaluationoperator.GovernedRetryOption
+	if infra.retrySchedules != nil {
+		retryOptions = append(retryOptions, evaluationoperator.WithRetrySchedules(infra.retrySchedules, retrymodel.Builder{Resolver: normalized.TransactionRoutes}))
+	}
+	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker, retryOptions...)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.workbenchLatestRiskReader = infra.latestRiskReader
 }

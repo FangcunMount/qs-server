@@ -37,18 +37,20 @@ const (
 // decision. DecisionHash binds policy/input or operator permission/reason;
 // generated event clocks and wire bytes belong to the reservation winner.
 type Authority struct {
-	Owner           string
-	OrgID           int64
-	Kind            string
-	SubjectID       string
-	RunID           string
-	AssessmentID    uint64
-	OutcomeID       uint64
-	TesteeID        uint64
-	ExpectedAttempt int
-	Origin          retrygovernance.AttemptOrigin
-	RequestID       string
-	DecisionHash    [32]byte
+	Owner               string
+	OrgID               int64
+	Kind                string
+	SubjectID           string
+	RunID               string
+	AssessmentID        uint64
+	OutcomeID           uint64
+	TesteeID            uint64
+	ExpectedAttempt     int
+	Origin              retrygovernance.AttemptOrigin
+	RequestID           string
+	DecisionHash        [32]byte
+	AuthorizationSHA256 string `json:",omitempty"`
+	Authorization       []byte `json:",omitempty"`
 }
 
 type document struct {
@@ -70,6 +72,7 @@ func New(a Authority, in message.Input, due time.Time) (Frozen, error) {
 	if err != nil {
 		return Frozen{}, ErrInvalid
 	}
+	a.Authorization = bytes.Clone(a.Authorization)
 	d := document{Version: 1, Authority: a, DueAt: due.UTC(), Message: m.Input()}
 	if err := validate(d); err != nil {
 		return Frozen{}, err
@@ -96,9 +99,13 @@ func Decode(raw []byte) (Frozen, error) {
 	return f, nil
 }
 
-func (f Frozen) Valid() bool              { return len(f.raw) > 0 }
-func (f Frozen) Bytes() []byte            { return bytes.Clone(f.raw) }
-func (f Frozen) Authority() Authority     { return f.value.Authority }
+func (f Frozen) Valid() bool   { return len(f.raw) > 0 }
+func (f Frozen) Bytes() []byte { return bytes.Clone(f.raw) }
+func (f Frozen) Authority() Authority {
+	a := f.value.Authority
+	a.Authorization = bytes.Clone(a.Authorization)
+	return a
+}
 func (f Frozen) DueAt() time.Time         { return f.value.DueAt }
 func (f Frozen) Message() message.Message { m, _ := message.New(f.value.Message); return m }
 func (f Frozen) Digest() [32]byte         { return sha256.Sum256(f.raw) }
@@ -157,11 +164,19 @@ func validate(d document) error {
 	}
 	switch a.Origin {
 	case retrygovernance.AttemptOriginAutomatic:
-		if a.RequestID != "" {
+		if a.RequestID != "" || a.AuthorizationSHA256 != "" || len(a.Authorization) > 0 {
 			return ErrInvalid
 		}
 	case retrygovernance.AttemptOriginManual, retrygovernance.AttemptOriginForce:
 		if !bounded(a.RequestID, 255) {
+			return ErrInvalid
+		}
+		decoded, err := hex.DecodeString(a.AuthorizationSHA256)
+		if err != nil || len(decoded) != 32 || a.AuthorizationSHA256 != hex.EncodeToString(decoded) || bytes.Equal(decoded, make([]byte, 32)) {
+			return ErrInvalid
+		}
+		digest := sha256.Sum256(a.Authorization)
+		if len(a.Authorization) == 0 || !json.Valid(a.Authorization) || bytes.Equal(a.Authorization, []byte("null")) || !bytes.Equal(decoded, digest[:]) {
 			return ErrInvalid
 		}
 	default:
