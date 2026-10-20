@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	eventtransaction "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 )
@@ -67,6 +68,9 @@ func (e *executor) Execute(ctx context.Context, input interpinput.Interpretation
 	if input.OutcomeID.IsZero() || input.Report.ReportType.IsEmpty() || input.Report.TemplateVersion.IsEmpty() {
 		return nil, fmt.Errorf("interpretation input outcome, report type and template version are required")
 	}
+	if result, handled, err := e.recoverPending(ctx, input); handled || err != nil {
+		return result, err
+	}
 	logger.L(ctx).Infow("开始生成报告",
 		"action", "generate_interpretation_report",
 		"outcome_id", input.OutcomeID.String(),
@@ -102,10 +106,40 @@ func (e *executor) Execute(ctx context.Context, input interpinput.Interpretation
 	case StartStatusBlocked:
 		return &ExecuteResult{Status: ExecuteStatusBlocked, Generation: start.Generation, Run: start.Run}, nil
 	case StartStatusStarted:
+		// Recheck after the original claim, before external builder work. A
+		// concurrent first plan must be recovered rather than replaced.
+		if result, handled, err := e.recoverPending(ctx, input); handled || err != nil {
+			return result, err
+		}
 		return e.buildAndCommit(ctx, input, start.Generation, start.Run)
 	default:
 		return nil, fmt.Errorf("unsupported generation start status %s", start.Status)
 	}
+}
+
+func (e *executor) recoverPending(ctx context.Context, input interpinput.InterpretationInput) (*ExecuteResult, bool, error) {
+	recovery, ok := e.committer.(PendingCommitRecovery)
+	if !ok {
+		return nil, false, nil
+	}
+	key := domaingeneration.Key{OutcomeID: input.OutcomeID, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion}
+	result, handled, err := recovery.RecoverPending(ctx, key, input.Association.OrgID)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	if result == nil || result.Generation == nil || result.Run == nil || result.Generation.Key() != key || result.Generation.LatestRunID() != result.Run.ID() || result.Run.GenerationID() != result.Generation.ID() {
+		return nil, true, eventtransaction.ErrUnresolved
+	}
+	if result.Generation.Status() == domaingeneration.StatusGenerated && result.Run.Status() == interpretationrun.StatusSucceeded && result.InterpretReport != nil && result.Generation.ReportID() == result.InterpretReport.ID() && result.InterpretReport.Association() == input.Association {
+		return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: result.Generation, Run: result.Run, InterpretReport: result.InterpretReport}, true, nil
+	}
+	if result.Generation.Status() == domaingeneration.StatusFailed && result.Run.Status() == interpretationrun.StatusFailed && result.Run.Failure() != nil {
+		return nil, true, &FailedError{GenerationID: result.Generation.ID(), RunID: result.Run.ID(), Failure: *result.Run.Failure(), Origin: result.Run.Origin(), Decision: result.Run.RetryDecision()}
+	}
+	return nil, true, eventtransaction.ErrUnresolved
 }
 
 func (e *executor) buildAndCommit(ctx context.Context, input interpinput.InterpretationInput, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun) (result *ExecuteResult, resultErr error) {

@@ -1,6 +1,8 @@
 package interpretation
 
 import (
+	mongoEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -14,15 +16,17 @@ import (
 
 // WireInput carries composition-root inputs for report module installation.
 type WireInput struct {
-	MySQLDB            *gorm.DB
-	MySQLLimiter       backpressure.Acquirer
-	MongoDB            *mongo.Database
-	MongoLimiter       backpressure.Acquirer
-	OpsHandle          *redisruntime.Handle
-	ReportStatusConfig reportstatus.Config
-	OutboxProfile      appEventing.ProfileBinding
-	RunLeaseDuration   time.Duration
-	AIWorkflow         *apiserveroptions.AIWorkflowOptions
+	MySQLDB               *gorm.DB
+	MySQLLimiter          backpressure.Acquirer
+	MongoDB               *mongo.Database
+	MongoLimiter          backpressure.Acquirer
+	OpsHandle             *redisruntime.Handle
+	ReportStatusConfig    reportstatus.Config
+	OutboxProfile         appEventing.ProfileBinding
+	RunLeaseDuration      time.Duration
+	AIWorkflow            *apiserveroptions.AIWorkflowOptions
+	EventTransactionOwner *mongoEventTx.Owner
+	TransactionRoutes     eventcatalog.TopicResolver
 }
 
 // Wire builds and bootstraps the report module from composition inputs.

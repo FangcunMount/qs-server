@@ -37,6 +37,13 @@ type InterpretationCommitter interface {
 	CommitFailure(ctx context.Context, request CommitFailureRequest) (*CommitResult, error)
 }
 
+// PendingCommitRecovery resolves the first frozen terminal operation before
+// Start may reclaim a lease or the executor may invoke a builder. Unknown or
+// Aborted protocol executions do not authorize another business execution.
+type PendingCommitRecovery interface {
+	RecoverPending(context.Context, domaingeneration.Key, int64) (*CommitResult, bool, error)
+}
+
 type CommitSuccessRequest struct {
 	Generation           *domaingeneration.ReportGeneration
 	Run                  *interpretationrun.InterpretationRun
