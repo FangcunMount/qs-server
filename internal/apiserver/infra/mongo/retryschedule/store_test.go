@@ -74,7 +74,7 @@ func TestScheduleConstructorAndInvalidRootNeverConnectOrInstallSchema(t *testing
 }
 
 func TestScheduleReaderRejectsCorruptOriginalIdentityAndPrematureDueIndex(t *testing.T) {
-	for _, mode := range []string{"ready", "key", "scope", "hash", "early_index", "committed_without_proof"} {
+	for _, mode := range []string{"ready", "key", "scope", "hash", "early_index", "committed_without_proof", "negative_guard"} {
 		t.Run(mode, func(t *testing.T) {
 			s, err := New(inertClient(t).Database("original"), transaction.Binding{Owner: "qs.mongo", StoreID: "primary", WriterEpoch: "m3-1"})
 			require.NoError(t, err)
@@ -93,6 +93,8 @@ func TestScheduleReaderRejectsCorruptOriginalIdentityAndPrematureDueIndex(t *tes
 				d.Input[0] ^= 1
 			case "early_index":
 				d.Due = d.Due.Add(-time.Millisecond)
+			case "negative_guard":
+				d.GuardVersion = -1
 			case "committed_without_proof":
 				d.State = model.DispatchCommitted
 			}

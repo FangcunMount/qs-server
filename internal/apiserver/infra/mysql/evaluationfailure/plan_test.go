@@ -1,6 +1,8 @@
 package evaluationfailure
 
 import (
+	"encoding/json"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"testing"
 	"time"
 
@@ -148,4 +150,32 @@ func TestFailureFreezeDoesNotMutateOriginalRetryAuthorization(t *testing.T) {
 	require.Equal(t, decision, q.Run.RetryDecision())
 	po := repository.NewAssessmentMapper().ToPO(q.Assessment)
 	require.Equal(t, *q.Assessment.FailedAt(), *po.FailedAt)
+}
+
+func TestFailureFutureOwnershipVersionRecoversLegacyWinnerWithoutReplacingInput(t *testing.T) {
+	q := failureRequest(t, time.Unix(120, 123499999))
+	request, err := freeze(q, routes{})
+	require.NoError(t, err)
+	current, err := read(request.Artifact)
+	require.NoError(t, err)
+	require.Equal(t, 2, current.Version)
+	plan, err := current.retryPlan()
+	require.NoError(t, err)
+	require.Equal(t, current.Future.Payload, plan.Message().Input().Payload)
+	require.NoError(t, plan.MatchDecision(current.Run.RetryDecision, current.Due))
+	legacy := current
+	legacy.Version = 1
+	raw, err := json.Marshal(legacy)
+	require.NoError(t, err)
+	old, err := read(raw)
+	require.NoError(t, err)
+	require.Equal(t, 1, old.Version)
+	before, err := old.inputHash()
+	require.NoError(t, err)
+	after, err := current.inputHash()
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+	_, err = old.retryPlan()
+	require.ErrorIs(t, err, transaction.ErrInvalidPlan, "a legacy artifact cannot silently acquire new schedule ownership")
+	require.Equal(t, current.Future.Payload, old.Future.Payload)
 }

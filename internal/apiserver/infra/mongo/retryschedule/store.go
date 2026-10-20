@@ -139,7 +139,7 @@ func (s *Store) decode(d document) (*model.Record, error) {
 	a, in := f.Authority(), f.Message().Input()
 	key, input, digest := f.Key(), f.InputHash(), f.Digest()
 	due, err := f.IndexDue(time.Millisecond)
-	if err != nil || d.Owner != s.binding.Owner || d.Owner != a.Owner || d.Scope != in.Scope || d.Kind != a.Kind || d.Subject != a.SubjectID || d.Run != a.RunID || d.Message != in.ID || !d.Due.Equal(due) || !bytes.Equal(d.ID, key[:]) || !bytes.Equal(d.Identity, f.KeyIdentity()) || !bytes.Equal(d.Input, input[:]) || !bytes.Equal(d.Digest, digest[:]) {
+	if err != nil || d.GuardVersion < 0 || d.Owner != s.binding.Owner || d.Owner != a.Owner || d.Scope != in.Scope || d.Kind != a.Kind || d.Subject != a.SubjectID || d.Run != a.RunID || d.Message != in.ID || !d.Due.Equal(due) || !bytes.Equal(d.ID, key[:]) || !bytes.Equal(d.Identity, f.KeyIdentity()) || !bytes.Equal(d.Input, input[:]) || !bytes.Equal(d.Digest, digest[:]) {
 		return nil, model.ErrInvalid
 	}
 	r := &model.Record{Plan: f, State: d.State, Version: d.Version}

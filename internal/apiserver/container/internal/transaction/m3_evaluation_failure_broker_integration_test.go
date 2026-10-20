@@ -8,6 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	dispatchapp "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing/retrydispatch"
+	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	schedulestore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/retryschedule"
 	"net"
 	"os"
 	"path/filepath"
@@ -91,6 +94,10 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	_, err = pool.ExecContext(t.Context(), string(schema))
 	require.NoError(t, err)
+	retrySchema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mysql", "000107_business_retry_schedule.up.sql"))
+	require.NoError(t, err)
+	_, err = pool.ExecContext(t.Context(), string(retrySchema))
+	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&repository.AssessmentPO{}, &repository.EvaluationOutcomePO{}, &repository.AssessmentScorePO{}, &checkpoint.RuntimeCheckpointPO{}))
 	legacySchema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mysql", "000084_standard_reliable_outbox.up.sql"))
 	require.NoError(t, err)
@@ -145,6 +152,7 @@ func TestM3FailureBrokerHost(t *testing.T) {
 		require.NoError(t, consumer.Close(ctx))
 	})
 	received := make(chan transport.Received, 16)
+	retryReceived := make(chan transport.Received, 16)
 	var mu sync.Mutex
 	seen := map[string]bool{}
 	require.NoError(t, consumer.Subscribe(t.Context(), topic, "qs-m3-failure-observer", func(_ context.Context, d transport.Delivery) error {
@@ -152,6 +160,17 @@ func TestM3FailureBrokerHost(t *testing.T) {
 		envelope, err := domainwire.DecodeEnvelope(m.Payload)
 		if err != nil {
 			return err
+		}
+		if envelope.EventType == assessment.EventTypeRetryRequested && envelope.AggregateID == "5003" {
+			if err := d.Ack(); err != nil {
+				return err
+			}
+			select {
+			case retryReceived <- m:
+				return nil
+			default:
+				return errors.New("retry observer queue full")
+			}
 		}
 		// Independent fanout subscriptions also receive earlier fixture facts.
 		// Apply the failure handler's event/aggregate filter before checking its wire.
@@ -224,15 +243,17 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	require.NotNil(t, decision)
 	require.NotNil(t, decision.NextAttemptAt)
 	require.NotEmpty(t, decision.RetryEventID)
-	var futureID string
-	var futureWire []byte
-	var due time.Time
-	var attempts, failures int
-	require.NoError(t, pool.QueryRowContext(t.Context(), `SELECT message_id,payload,next_attempt_at,attempt_count,failure_count FROM rm_outbox WHERE message_id=?`, decision.RetryEventID).Scan(&futureID, &futureWire, &due, &attempts, &failures))
+	var frozenRaw []byte
+	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT frozen_plan FROM qs_retry_schedule WHERE message_id=?", []byte(decision.RetryEventID)).Scan(&frozenRaw))
+	frozenSchedule, err := schedulemodel.Decode(frozenRaw)
+	require.NoError(t, err)
+	futureID, futureWire, due := frozenSchedule.Message().Input().ID, frozenSchedule.Message().Input().Payload, frozenSchedule.DueAt()
 	require.Equal(t, decision.RetryEventID, futureID)
-	require.Equal(t, *decision.NextAttemptAt, due)
-	require.Zero(t, attempts)
-	require.Zero(t, failures)
+	require.True(t, decision.NextAttemptAt.Equal(due.Round(time.Microsecond).Round(time.Millisecond)))
+	require.NoError(t, frozenSchedule.MatchDecision(decision, *decision.NextAttemptAt))
+	var futureOutbox int
+	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM rm_outbox WHERE message_id=?", futureID).Scan(&futureOutbox))
+	require.Zero(t, futureOutbox)
 	outer, recognized, err := legacy.Decode(futureWire)
 	require.NoError(t, err)
 	require.True(t, recognized)
@@ -260,6 +281,59 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, failedRun.ID(), historical.ID())
 	cases["failure_redelivery_no_extra_attempt_or_input_call"] = true
+
+	// The observer ACKs only; it never starts the next business attempt.
+	// Wait for the real deadline instead of advancing a fixture clock.
+	schedules, err := schedulestore.New(db, binding)
+	require.NoError(t, err)
+	dispatcher, err := dispatchapp.New(schedules, owner, checkpoint.NewRepository(db))
+	require.NoError(t, err)
+	beforeDue := time.Now().UTC()
+	require.True(t, beforeDue.Before(due))
+	dispatched, err := dispatcher.Once(t.Context(), beforeDue, 10)
+	require.NoError(t, err)
+	require.Empty(t, dispatched)
+	var early int
+	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM rm_tx_request WHERE idempotency_key=?", []byte(schedulemodel.DispatchKey(frozenSchedule))).Scan(&early))
+	require.Zero(t, early)
+	timer := time.NewTimer(time.Until(due.Add(2 * time.Millisecond)))
+	select {
+	case <-timer.C:
+	case <-t.Context().Done():
+		timer.Stop()
+		t.Fatal("deadline wait cancelled")
+	}
+	dispatched, err = dispatcher.Once(t.Context(), time.Now().UTC(), 10)
+	require.NoError(t, err)
+	require.Len(t, dispatched, 1)
+	require.NoError(t, dispatched[0].Err)
+	require.Equal(t, transaction.LocalCommitted, dispatched[0].Transaction.Local)
+	require.Equal(t, schedulemodel.DispatchCommitted, dispatched[0].State)
+	select {
+	case received := <-retryReceived:
+		require.Equal(t, futureID, received.ID)
+		require.Equal(t, futureWire, received.Wire)
+	case <-time.After(45 * time.Second):
+		t.Fatal("committed due retry missing")
+	}
+	storedSchedule, err := schedules.Find(t.Context(), frozenSchedule)
+	require.NoError(t, err)
+	require.NoError(t, storedSchedule.Validate())
+	require.NotNil(t, storedSchedule.Proof)
+	ref, err := transaction.DecodeReference(storedSchedule.Proof.TransactionReference)
+	require.NoError(t, err)
+	require.Equal(t, transaction.Commit, (transaction.StoreChecker{Store: authority}).Check(t.Context(), ref))
+	repeatedDispatch, err := dispatcher.Once(t.Context(), time.Now().UTC(), 10)
+	require.NoError(t, err)
+	require.Empty(t, repeatedDispatch)
+	afterDispatch, err := runRepo.FindLatestByAssessmentID(t.Context(), failing.ID().Uint64())
+	require.NoError(t, err)
+	require.Equal(t, failedRun.ID(), afterDispatch.ID())
+	require.Equal(t, failedRun.Attempt().Number, afterDispatch.Attempt().Number)
+	require.Equal(t, int32(1), dependency.calls.Load())
+	dispatchReceipt, err := json.Marshal(map[string]any{"owner": "qs.mysql", "passed": 4, "failed": 0, "skipped": 0, "cases": map[string]bool{"no_half_before_real_due": true, "first_wire_and_dispatch_witness": true, "no_business_attempt_or_input_repeat": true, "repeat_dispatch_is_empty": true}, "system_login_not_claimed": true, "business_consumer_not_claimed": true})
+	require.NoError(t, err)
+	t.Log("M3_QS_RETRY_DISPATCH_RECEIPT " + string(dispatchReceipt))
 
 	proofReceipt := map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "root": "original_mysql_gorm", "source_input": "controlled_input_failure_no_provider", "process_exit_not_claimed": true}
 	raw, err := json.Marshal(proofReceipt)

@@ -23,7 +23,7 @@ import (
 
 type reportRoutes struct{}
 
-func (reportRoutes) GetTopicForEvent(string) (string, bool) { return "qs.reports.lifecycle", true }
+func (reportRoutes) GetTopicForEvent(string) (string, bool) { return "qs.evaluation.lifecycle", true }
 
 func reportTransactionRequest(t *testing.T) app.CommitSuccessRequest {
 	t.Helper()
@@ -221,4 +221,33 @@ func TestReportReadOnlyRecoveryDoesNotRequireOrRecreateWinnerCapability(t *testi
 	require.Equal(t, generation.StatusGenerated, prepared.Generation.Status())
 	require.Zero(t, b.commitCalls)
 	require.Equal(t, [32]byte{}, readOnly.Token)
+}
+
+func TestReportFutureOwnershipVersionKeepsLegacyRequestAndOriginalWire(t *testing.T) {
+	q := reportTransactionRequest(t)
+	request, err := freezeReportFailure(app.CommitFailureRequest{Generation: q.Generation, Run: q.Run, OutcomeID: q.Generation.Key().OutcomeID, Association: q.InterpretReport.Association(), Failure: run.Failure{Kind: run.FailureKindBuild, Code: "build_failed", SafeMessage: "controlled", Retryable: true}, FailedAt: q.CompletedAt}, reportRoutes{})
+	require.NoError(t, err)
+	current, err := readReportPlan(request.Artifact)
+	require.NoError(t, err)
+	require.Equal(t, 2, current.Version)
+	plan, err := current.retryPlan()
+	require.NoError(t, err)
+	require.Equal(t, current.Future.Payload, plan.Message().Input().Payload)
+	_, _, terminal, _, err := current.records()
+	require.NoError(t, err)
+	require.NoError(t, plan.MatchDecision(terminal.RetryDecision(), current.Due.Truncate(time.Millisecond)))
+	legacy := current
+	legacy.Version = 1
+	raw, err := json.Marshal(legacy)
+	require.NoError(t, err)
+	old, err := readReportPlan(raw)
+	require.NoError(t, err)
+	first, err := old.inputHash()
+	require.NoError(t, err)
+	latest, err := current.inputHash()
+	require.NoError(t, err)
+	require.Equal(t, first, latest)
+	_, err = old.retryPlan()
+	require.ErrorIs(t, err, transaction.ErrInvalidPlan)
+	require.Equal(t, current.Future.Payload, old.Future.Payload)
 }

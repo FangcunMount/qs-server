@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -56,7 +57,7 @@ func (a *retryDispatchAuthority) ValidateDispatchAuthority(ctx context.Context, 
 	if err := a.generations.FindOne(ctx, bson.M{"domain_id": generationID}, &g); err != nil {
 		return err
 	}
-	if g.LatestRunID != runID || g.OutcomeID != f.Authority().OutcomeID {
+	if g.LatestRunID != runID || g.OutcomeID != f.Authority().OutcomeID || g.Status != string(generation.StatusFailed) {
 		return transaction.ErrStaleExecution
 	}
 	var po InterpretationRunPO
