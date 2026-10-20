@@ -81,7 +81,14 @@ func New(a Authority, in message.Input, due time.Time) (Frozen, error) {
 	if err != nil || len(raw) > 1<<20 {
 		return Frozen{}, ErrInvalid
 	}
-	return Frozen{value: d, raw: raw}, nil
+	f := Frozen{value: d, raw: raw}
+	// Reserve room for the complete nested dispatch artifact, its longest
+	// timestamp and any admissible revision. Reject before authorization is
+	// committed, rather than persist a future plan the host cannot send.
+	if _, err := FreezeDispatch(Record{Plan: f, State: Ready, Version: math.MaxInt64 - 1}, time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC)); err != nil {
+		return Frozen{}, ErrInvalid
+	}
+	return f, nil
 }
 
 func Decode(raw []byte) (Frozen, error) {

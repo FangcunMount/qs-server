@@ -11,6 +11,7 @@ import (
 	"time"
 
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	outcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
@@ -154,4 +155,28 @@ func TestScheduleAcceptsTheActualEvaluationDomainRetryConstructor(t *testing.T) 
 	frozen, err := New(authority, prepared[0].Message.Input(), at)
 	require.NoError(t, err)
 	require.Equal(t, evt.EventID(), frozen.Message().Input().ID)
+}
+
+func TestScheduleRejectsAuthorizationWhoseDispatchCannotFitBeforeBusinessRoot(t *testing.T) {
+	at := time.Date(2026, 10, 21, 2, 0, 0, 0, time.UTC)
+	a, in := fixture(t, Evaluation, retrygovernance.AttemptOriginManual, "request-large", "first", at)
+	a.Authorization = append([]byte(`{"reason":"`), bytes.Repeat([]byte("x"), 600000)...)
+	a.Authorization = append(a.Authorization, []byte(`"}`)...)
+	digest := sha256.Sum256(a.Authorization)
+	a.AuthorizationSHA256 = fmt.Sprintf("%x", digest)
+	_, err := New(a, in, at)
+	require.ErrorIs(t, err, ErrInvalid, "a plan must fit its complete future dispatch before any business write")
+	// A bounded authorization remains dispatchable even at the longest allowed
+	// timestamp/revision; ordinary frozen bytes are not re-encoded on recovery.
+	a.Authorization = append([]byte(`{"reason":"`), bytes.Repeat([]byte("x"), 100000)...)
+	a.Authorization = append(a.Authorization, []byte(`"}`)...)
+	digest = sha256.Sum256(a.Authorization)
+	a.AuthorizationSHA256 = fmt.Sprintf("%x", digest)
+	f, err := New(a, in, at)
+	require.NoError(t, err)
+	q, err := FreezeDispatch(Record{Plan: f, State: Ready, Version: int64(1<<63 - 2)}, time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC))
+	require.NoError(t, err)
+	_, err = shared.Freeze(q, routes{}, a.Owner, "m3-1")
+	require.NoError(t, err)
+
 }

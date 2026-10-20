@@ -43,6 +43,10 @@ func FreezeDispatch(r Record, at time.Time) (port.Request, error) {
 	if err != nil {
 		return port.Request{}, err
 	}
+	// Keep the same private artifact bound required by transactionplan.Freeze.
+	if len(raw) > 1<<20 {
+		return port.Request{}, ErrInvalid
+	}
 	return port.Request{Key: DispatchKey(r.Plan), InputHash: dispatchHash(r.Plan, r.Version), Artifact: raw, Prepared: []message.Input{r.Plan.Message().Input()}}, nil
 }
 
