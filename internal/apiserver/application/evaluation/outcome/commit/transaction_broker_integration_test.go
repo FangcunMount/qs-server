@@ -35,6 +35,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 	gormmysql "gorm.io/driver/mysql"
@@ -163,7 +164,11 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 		select {
 		case m := <-received:
 			require.Equal(t, e.References()[0].MessageID, m.ID)
-			require.Equal(t, e.Plan.Input().Branches[0].Wire, m.Payload)
+			require.Equal(t, e.Plan.Input().Branches[0].Wire, m.Wire)
+			envelope, recognized, err := legacy.Decode(m.Wire)
+			require.NoError(t, err)
+			require.True(t, recognized)
+			require.Equal(t, envelope.Payload, m.Payload, "normalized payload must retain the original domain envelope")
 		case <-time.After(15 * time.Second):
 			t.Fatal("committed original wire not received")
 		}
