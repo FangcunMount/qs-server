@@ -19,7 +19,10 @@ import (
 
 // MessagingStore borrows host transactions. Constructors perform no I/O and
 // methods never commit, schedule delivery or close a database connection.
-type MessagingStore struct{ Outbox *durable.Outbox }
+type MessagingStore struct {
+	Outbox  *durable.Outbox
+	Archive *TransactionArchive
+}
 
 func NewMessagingStore() *MessagingStore {
 	outbox, _ := durable.New("ai_messaging_outbox") // fixed host-owned table
@@ -381,6 +384,12 @@ func (s *MessagingStore) applyReceipt(ctx context.Context, tx *sql.Tx, e *pb.Mes
 	_, err = tx.ExecContext(ctx, "UPDATE ai_messaging_operations SET decision=?,code=?,receipt_id=?,receipt=?,decided_at=UTC_TIMESTAMP(6) WHERE command_id=?", decision, r.Code, e.MessageId, raw, r.CommandId)
 	if err != nil {
 		return "", err
+	}
+	if s.Archive != nil {
+		modern, err := s.transactionCommandReceipt(ctx, tx, r.CommandId, org, resource, aggregate, pb.MessagingKind(kind), hash.String)
+		if err != nil || modern {
+			return org, err
+		}
 	}
 	id := durable.Identity{Producer: "qs-server", Destination: "qs-ai", MessageID: r.CommandId}
 	if decision == "held" {

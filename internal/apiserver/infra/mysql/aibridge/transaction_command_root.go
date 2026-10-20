@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -19,47 +18,18 @@ func (s *TransactionArchive) commandRoot(ctx context.Context, e transaction.Exec
 	if err != nil || !e.Valid() {
 		return transaction.LocalUnknown, errors.Join(app.ErrMessagingContract, err)
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return transaction.LocalUnknown, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	guard, err := s.Bind(ctx, tx, e) // first operation: fences the same SDK aborter
-	if err == nil {
-		err = guardCommandSequence(ctx, tx, c, a.Sequence)
-	}
-	if err == nil {
-		err = writeCommandFacts(ctx, tx, c)
-	}
-	if err == nil {
-		err = insertCommandOperation(ctx, tx, c, a)
-	}
-	if err == nil {
-		err = guard.Put(ctx, c.ID())
-	}
-	if err == nil {
-		err = guard.CommitWitness(ctx)
-	}
-	if err != nil {
-		// A callback error alone proves nothing. First finish the actual root
-		// rollback, then compete for and persist the exact execution abortion.
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			return transaction.LocalUnknown, errors.Join(err, rollbackErr)
+	return s.originalMessagingRoot(ctx, e, func(tx *sql.Tx, guard *ArchiveGuard) error {
+		if err := guardCommandSequence(ctx, tx, c, a.Sequence); err != nil {
+			return err
 		}
-		abortCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
-		defer cancel()
-		aborted, abortErr := s.store.Abort(abortCtx, e)
-		if abortErr == nil && aborted {
-			return transaction.LocalAborted, err
+		if err := writeCommandFacts(ctx, tx, c); err != nil {
+			return err
 		}
-		return transaction.LocalUnknown, errors.Join(err, abortErr)
-	}
-	if err = tx.Commit(); err != nil {
-		// The server may have committed. Only a fresh exact witness can resolve
-		// this; neither cancellation nor a failed second Rollback can.
-		return transaction.LocalUnknown, err
-	}
-	return transaction.LocalCommitted, nil
+		if err := insertCommandOperation(ctx, tx, c, a); err != nil {
+			return err
+		}
+		return guard.Put(ctx, c.ID())
+	})
 }
 
 func insertCommandOperation(ctx context.Context, tx *sql.Tx, c app.TransactionCommand, a app.FrozenMessagingArchive) error {

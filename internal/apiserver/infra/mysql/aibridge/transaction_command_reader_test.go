@@ -170,6 +170,7 @@ func TestTransactionPayloadFallsBackOnlyWhenBothNewRecordsAreAbsent(t *testing.T
 			switch name {
 			case "absent":
 				request.WillReturnError(sql.ErrNoRows)
+				mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME\\(1000\\) \\*/ w.reference FROM rm_tx_witness").WillReturnError(sql.ErrNoRows)
 				mock.ExpectBegin()
 				mock.ExpectQuery("SELECT body FROM ai_messaging_outbox").WithArgs("qs-server", "qs-ai", orderCommand, uint64(7), archive.Envelope.BodySha256).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(archive.Body))
 				mock.ExpectRollback()

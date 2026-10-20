@@ -16,10 +16,21 @@ func (s *MessagingStore) FailureAttempts(ctx context.Context, tx *sql.Tx, e *pb.
 	if tx == nil || e == nil || app.ValidateMessagingHeader(e, app.EventsTopic) != nil {
 		return 0, app.ErrMessagingContract
 	}
+	return readTechnicalAttempts(ctx, tx, e, true)
+}
+
+func readTechnicalAttempts(ctx context.Context, reader archiveReadConnection, e *pb.MessagingEnvelope, locked bool) (uint64, error) {
+	if e == nil || app.ValidateMessagingHeader(e, app.EventsTopic) != nil {
+		return 0, app.ErrMessagingContract
+	}
+	suffix := ""
+	if locked {
+		suffix = " FOR UPDATE"
+	}
 	var hash, aggregate string
 	var kind int32
 	var attempts uint64
-	err := tx.QueryRowContext(ctx, "SELECT body_sha256,kind,aggregate_key,attempts FROM ai_messaging_failures WHERE producer=? AND message_id=? FOR UPDATE", e.Producer, e.MessageId).Scan(&hash, &kind, &aggregate, &attempts)
+	err := reader.QueryRowContext(ctx, "SELECT body_sha256,kind,aggregate_key,attempts FROM ai_messaging_failures WHERE producer=? AND message_id=?"+suffix, e.Producer, e.MessageId).Scan(&hash, &kind, &aggregate, &attempts)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
@@ -62,6 +73,19 @@ func (s *MessagingStore) ReceiveHeldEvent(ctx context.Context, tx *sql.Tx, e *pb
 }
 
 func (s *MessagingStore) heldEventOrganization(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, b *pb.MessagingBody) (string, error) {
+	return readEventOrganization(ctx, tx, e, b, true)
+}
+
+// Planning never holds a business lock across half-message preparation. The
+// original root repeats these checks under its original row locks.
+func readEventOrganization(ctx context.Context, reader archiveReadConnection, e *pb.MessagingEnvelope, b *pb.MessagingBody, locked bool) (string, error) {
+	if e == nil || b == nil {
+		return "", app.ErrMessagingContract
+	}
+	suffix := ""
+	if locked {
+		suffix = " FOR UPDATE"
+	}
 	var org string
 	switch e.Kind {
 	case pb.MessagingKind_COMMAND_RECEIPT:
@@ -69,7 +93,7 @@ func (s *MessagingStore) heldEventOrganization(ctx context.Context, tx *sql.Tx, 
 		var hash sql.NullString
 		var aggregate string
 		var retired bool
-		err := tx.QueryRowContext(ctx, "SELECT retired,CAST(organization_id AS CHAR),body_sha256,aggregate_key FROM ai_messaging_operations WHERE command_id=? FOR UPDATE", receipt.CommandId).Scan(&retired, &org, &hash, &aggregate)
+		err := reader.QueryRowContext(ctx, "SELECT retired,CAST(organization_id AS CHAR),body_sha256,aggregate_key FROM ai_messaging_operations WHERE command_id=?"+suffix, receipt.CommandId).Scan(&retired, &org, &hash, &aggregate)
 		if err != nil {
 			return "", err
 		}
@@ -79,7 +103,7 @@ func (s *MessagingStore) heldEventOrganization(ctx context.Context, tx *sql.Tx, 
 	case pb.MessagingKind_INTERPRETATION_STATE:
 		event := b.GetInterpretationState()
 		var subject, testee string
-		err := tx.QueryRowContext(ctx, "SELECT CAST(organization_id AS CHAR),subject_id,CAST(testee_id AS CHAR) FROM ai_bridge_requests WHERE request_id=? FOR UPDATE", event.RequestId).Scan(&org, &subject, &testee)
+		err := reader.QueryRowContext(ctx, "SELECT CAST(organization_id AS CHAR),subject_id,CAST(testee_id AS CHAR) FROM ai_bridge_requests WHERE request_id=?"+suffix, event.RequestId).Scan(&org, &subject, &testee)
 		if err != nil {
 			return "", err
 		}

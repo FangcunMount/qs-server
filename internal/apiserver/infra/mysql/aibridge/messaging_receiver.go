@@ -8,6 +8,8 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/wire/protected"
 )
 
@@ -18,14 +20,18 @@ type MessagingBodyReader interface {
 // MessagingEventReceiver is inert until the host calls Receive. It borrows the
 // pool, keyring and body client. Only a committed transaction permits NSQ FIN.
 type MessagingEventReceiver struct {
-	DB     *sql.DB
-	Store  *MessagingStore
-	Keys   protected.Keyring
-	Bodies MessagingBodyReader
-	Seal   MessagingSeal
+	DB           *sql.DB
+	Store        *MessagingStore
+	Keys         protected.Keyring
+	Bodies       MessagingBodyReader
+	Seal         MessagingSeal
+	Transactions *TransactionEvents
 }
 
 func (r *MessagingEventReceiver) transaction(ctx context.Context, f func(context.Context, *sql.Tx) error) error {
+	if _, nested := hostmysql.TxFromContext(ctx); nested && r.Transactions != nil {
+		return transaction.ErrTransactionRequired
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	tx, err := r.DB.BeginTx(ctx, nil)
@@ -42,6 +48,9 @@ func (r *MessagingEventReceiver) Isolate(ctx context.Context, wire []byte, code 
 	return r.transaction(ctx, func(ctx context.Context, tx *sql.Tx) error { return r.Store.Quarantine(ctx, tx, wire, code) })
 }
 func (r *MessagingEventReceiver) settle(ctx context.Context, e *pb.MessagingEnvelope, raw, wire []byte, held bool) error {
+	if r.Transactions != nil {
+		return r.Transactions.Settle(ctx, e, raw, wire, held)
+	}
 	return r.transaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		seal := func(id, org string) (*app.PreparedMessaging, error) {
 			outcome := pb.MessagingEventAcknowledgement_STORED
@@ -77,6 +86,9 @@ func (r *MessagingEventReceiver) failure(ctx context.Context, e *pb.MessagingEnv
 }
 
 func (r *MessagingEventReceiver) Receive(ctx context.Context, wire []byte) error {
+	if _, nested := hostmysql.TxFromContext(ctx); nested && r.Transactions != nil {
+		return transaction.ErrTransactionRequired
+	}
 	e, err := app.AuthenticateMessaging(wire, app.EventsTopic, r.Keys)
 	if err != nil {
 		return r.Isolate(ctx, wire, "authentication_failed")
@@ -94,7 +106,10 @@ func (r *MessagingEventReceiver) Receive(ctx context.Context, wire []byte) error
 	if ctx.Err() != nil {
 		return ctx.Err()
 	} // cancellation is unknown, not a new failure budget
-	if errors.Is(err, app.ErrConflict) || errors.Is(err, app.ErrMessagingContract) || errors.Is(err, app.ErrInvalid) {
+	if errors.Is(err, ErrLegacyEventResponsibility) {
+		return err
+	}
+	if errors.Is(err, app.ErrConflict) || errors.Is(err, transaction.ErrInputConflict) || errors.Is(err, app.ErrMessagingContract) || errors.Is(err, app.ErrInvalid) {
 		return r.Isolate(ctx, wire, "identity_conflict")
 	}
 	attempts, storageErr := r.failure(ctx, e, wire)

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
+	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -107,9 +108,43 @@ func (g *ArchiveGuard) CommitWitness(ctx context.Context) error {
 // MUST NOT fall back to legacy Outbox when found=true. Evidence is freshly read
 // from the same configured primary; neither a wire ACK nor a business row proves commit.
 func (s *TransactionArchive) ReadCommitted(ctx context.Context, id string) (a app.FrozenMessagingArchive, found bool, err error) {
+	return s.readCommitted(ctx, s.db, id, s.store.Evidence)
+}
+
+type archiveReadConnection interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+// Receipt settlement already owns its original root. Read the immutable command
+// proof on that same connection; never borrow a second pool slot while holding
+// business locks. This is NOT the Checker/Payload fresh read boundary above.
+func (s *TransactionArchive) readCommittedInRoot(ctx context.Context, tx *sql.Tx, id string) (app.FrozenMessagingArchive, bool, error) {
+	if tx == nil {
+		return app.FrozenMessagingArchive{}, true, transaction.ErrTransactionRequired
+	}
+	return s.readCommitted(ctx, tx, id, func(ctx context.Context, ref transaction.Reference) (*transaction.Evidence, error) {
+		if !ref.Valid() || ref.Owner != s.store.Binding().Owner {
+			return nil, transaction.ErrBinding
+		}
+		ek, bk := transaction.ExecutionKey(ref.Owner, ref.OperationID, ref.WriterEpoch, ref.Fence), transaction.BranchKey(ref.BranchID)
+		var raw []byte
+		var fact transaction.Evidence
+		err := tx.QueryRowContext(ctx, `SELECT w.reference,e.state,w.state FROM rm_tx_execution e JOIN rm_tx_witness w ON w.execution_key=e.execution_key JOIN rm_tx_binding b ON b.owner=e.owner WHERE e.execution_key=? AND w.branch_key=? AND b.store_id=? AND b.schema_version=?`, ek[:], bk[:], []byte(s.store.Binding().StoreID), txmysql.SchemaVersion).Scan(&raw, &fact.ExecutionState, &fact.BranchState)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		fact.Reference, err = transaction.DecodeReference(raw)
+		return &fact, err
+	})
+}
+
+func (s *TransactionArchive) readCommitted(ctx context.Context, q archiveReadConnection, id string, readEvidence func(context.Context, transaction.Reference) (*transaction.Evidence, error)) (a app.FrozenMessagingArchive, found bool, err error) {
 	var org uint64
 	var payload, wire, execution, branch, raw []byte
-	err = s.db.QueryRowContext(ctx, `SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive WHERE producer=? AND destination=? AND message_id=?`, []byte("qs-server"), []byte("qs-ai"), []byte(id)).Scan(&org, &payload, &wire, &execution, &branch, &raw)
+	err = q.QueryRowContext(ctx, `SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive WHERE producer=? AND destination=? AND message_id=?`, []byte("qs-server"), []byte("qs-ai"), []byte(id)).Scan(&org, &payload, &wire, &execution, &branch, &raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return a, false, nil
 	}
@@ -132,7 +167,7 @@ func (s *TransactionArchive) ReadCommitted(ctx context.Context, id string) (a ap
 	if ref.Owner != s.store.Binding().Owner || ref.RouteRevision != "m3-1" || ref.Scope != m.Input().Scope || ref.LogicalTopic != m.Input().Destination || ref.MessageID != id || ref.MessageFingerprint != m.Fingerprint() || ref.WireHash != sha256.Sum256(wire) || a.Envelope.MessageId != id || a.Envelope.Producer != "qs-server" || a.Envelope.Destination != "qs-ai" || org != a.OrganizationID || !bytes.Equal(execution, ek[:]) || !bytes.Equal(branch, bk[:]) {
 		return a, true, app.ErrMessagingContract
 	}
-	evidence, err := s.store.Evidence(ctx, ref)
+	evidence, err := readEvidence(ctx, ref)
 	if err != nil {
 		return a, true, err
 	}
@@ -160,10 +195,41 @@ func (s *TransactionArchive) Payload(ctx context.Context, ref *pb.MessagePayload
 		if planned {
 			return nil, true, app.ErrNotFound
 		}
+		// ACK requests are keyed by the incoming event, not the outgoing ACK ID.
+		// Any exact new branch footprint also forbids historical body fallback.
+		planned, lookupErr = s.hasPlannedBranch(ctx, ref.MessageId)
+		if lookupErr != nil {
+			return nil, true, lookupErr
+		}
+		if planned {
+			return nil, true, app.ErrNotFound
+		}
 		return nil, false, nil
 	}
 	if ref.OrganizationId != strconv.FormatUint(a.OrganizationID, 10) || ref.BodySha256 != a.Envelope.BodySha256 || ref.BodyLength != uint64(len(a.Body)) {
 		return nil, true, app.ErrMessagingContract
 	}
 	return bytes.Clone(a.Body), true, nil
+}
+
+func (s *TransactionArchive) hasPlannedBranch(ctx context.Context, id string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	bk := transaction.BranchKey(id)
+	var raw []byte
+	// Only the rare absent-archive/absent-command fallback scans this immutable
+	// protocol footprint. Bound both server work and client wait; errors fail
+	// closed rather than expose a historical row under a new ACK identity.
+	err := s.db.QueryRowContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */ w.reference FROM rm_tx_witness w JOIN rm_tx_execution e ON e.execution_key=w.execution_key WHERE e.owner=? AND w.branch_key=? LIMIT 1`, []byte(s.store.Binding().Owner), bk[:]).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return true, err
+	}
+	ref, err := transaction.DecodeReference(raw)
+	if err != nil || ref.Owner != s.store.Binding().Owner || ref.BranchID != id || ref.MessageID != id {
+		return true, app.ErrMessagingContract
+	}
+	return true, nil
 }

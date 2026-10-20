@@ -163,6 +163,10 @@ func (s *TransactionCommands) pendingOperation(ctx context.Context, scope app.Op
 // Presence alone blocks historical payload fallback. This also covers a
 // Prepared/Aborted plan whose business archive has never been committed.
 func (s *TransactionArchive) commandRequest(ctx context.Context, organization, id string) (q transaction.Request, found bool, err error) {
+	return s.commandRequestIn(ctx, s.db, organization, id)
+}
+
+func (s *TransactionArchive) commandRequestIn(ctx context.Context, reader archiveReadConnection, organization, id string) (q transaction.Request, found bool, err error) {
 	org, parseErr := strconv.ParseUint(organization, 10, 64)
 	if parseErr != nil || org == 0 || strconv.FormatUint(org, 10) != organization || !validCommandID(id) {
 		return q, true, app.ErrInvalid
@@ -171,7 +175,7 @@ func (s *TransactionArchive) commandRequest(ctx context.Context, organization, i
 	key := q.KeyDigest()
 	var owner, storedScope, storedKey string
 	var hash []byte
-	err = s.db.QueryRowContext(ctx, `SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request WHERE request_key=?`, key[:]).Scan(&owner, &storedScope, &storedKey, &hash)
+	err = reader.QueryRowContext(ctx, `SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request WHERE request_key=?`, key[:]).Scan(&owner, &storedScope, &storedKey, &hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return q, false, nil
 	}
