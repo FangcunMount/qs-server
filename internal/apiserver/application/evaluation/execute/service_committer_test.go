@@ -12,6 +12,7 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 )
 
 type evaluationCommitterStub struct {
@@ -21,6 +22,26 @@ type evaluationCommitterStub struct {
 
 type failingEvaluationCommitter struct {
 	err error
+}
+
+func TestEvaluateUnknownTransactionDoesNotAuthorizeCalculationRetry(t *testing.T) {
+	a := splitPhaseAssessment(t)
+	a.ClearEvents()
+	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: executionForAssessment(a, "ok")}
+	runs := &stubRunRepo{}
+	stager := &engineRecordingEventStager{}
+	svc := NewEngine(&fakeAssessmentRepo{assessment: a}, stubInputResolver{}, withTestEvaluator(evaluator), WithRunRepository(runs), WithEvaluationCommitter(failingEvaluationCommitter{err: eventtransaction.ErrUnresolved}), WithTransactionalOutbox(&engineRecordingTxRunner{}, stager))
+	if err := svc.Evaluate(t.Context(), a.ID().Uint64()); !errors.Is(err, eventtransaction.ErrUnresolved) {
+		t.Fatalf("unresolved commit became a different result: %v", err)
+	}
+	if !a.Status().IsSubmitted() || len(stager.eventTypes) != 0 || evaluator.calls != 1 {
+		t.Fatal("unresolved message commit changed business status, staged failure or invoked evaluator again")
+	}
+	for _, run := range runs.saved {
+		if run.Attempt().Status != evalrun.StatusRunning || run.RetryDecision() != nil {
+			t.Fatal("message uncertainty created terminal failure or new retry authorization")
+		}
+	}
 }
 
 func (c failingEvaluationCommitter) Commit(context.Context, outcomecommit.CommitRequest) (*domainoutcome.Record, error) {

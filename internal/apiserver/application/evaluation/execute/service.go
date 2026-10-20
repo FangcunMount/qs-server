@@ -2,6 +2,7 @@ package execute
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
@@ -283,6 +285,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		EvaluatedAt:   evaluatedAt,
 	})
 	if err != nil {
+		// An unconfirmed publication boundary is not a calculation failure or
+		// authorization for another attempt. Preserve this Run and its frozen
+		// operation for exact recovery; never stage evaluation.failed here.
+		if errors.Is(err, eventtransaction.ErrUnresolved) {
+			return err
+		}
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
 			"model_key", resolved.ExecutionIdentity.String(),

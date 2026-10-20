@@ -1,0 +1,52 @@
+name: RocketMQ evaluation original MySQL root
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-mysql-root:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql: ['8.0.36', '8.0.44', '8.4.11']
+    services:
+      mysql:
+        image: mysql:${{ matrix.mysql }}
+        env:
+          MYSQL_ROOT_PASSWORD: disposable
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h127.0.0.1 -uroot -pdisposable --silent"
+          --health-interval=3s --health-timeout=5s --health-retries=40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Require real original-root atomicity and versioned JSON evidence
+        env:
+          QS_M3_EVALUATION_DSN: root:disposable@tcp(127.0.0.1:3306)/?parseTime=true
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -race -json -count=1 -tags='integration m3_evaluation_integration' ./internal/apiserver/infra/mysql/eventtransaction -run '^TestM3MySQLOriginalEventRoot$' > evaluation-root.jsonl
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          events = [json.loads(line) for line in Path('evaluation-root.jsonl').read_text().splitlines()]
+          tests = [e for e in events if e.get('Test') and e.get('Action') == 'pass']
+          assert len(tests) == 5, f'expected 4 native cases and parent, got {len(tests)}'
+          assert not any(e.get('Action') in ('fail', 'skip') for e in events)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-original-root-${{ matrix.mysql }}-${{ github.sha }}
+          path: evaluation-root.jsonl
+          if-no-files-found: error

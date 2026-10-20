@@ -17,6 +17,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -45,6 +46,7 @@ type Committer interface {
 }
 
 type committer struct {
+	transaction    eventtransaction.Committer
 	txRunner       apptransaction.Runner
 	assessmentRepo assessment.Repository
 	outcomeRepo    domainoutcome.Repository
@@ -136,6 +138,9 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		EvaluatedAt:      request.EvaluatedAt,
 	}
 	completedEvent := assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, outcomeID, runToCommit.ID())
+	if c.transaction != nil {
+		return c.commitTransactional(ctx, request, recordInput, assessmentToCommit, runToCommit, completedEvent)
+	}
 	preparer := c.eventStager.(outboxport.ReferencePreparer)
 	reference, err := preparer.PrepareReference(completedEvent)
 	if err != nil {
@@ -191,11 +196,16 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 }
 
 func (c *committer) validate(request CommitRequest) error {
-	if c == nil || c.txRunner == nil || c.assessmentRepo == nil || c.outcomeRepo == nil || c.runRepo == nil || c.eventStager == nil {
+	if c == nil || c.assessmentRepo == nil || c.outcomeRepo == nil || c.runRepo == nil {
 		return evalerrors.ModuleNotConfigured("evaluation committer requires transaction, assessment, outcome, run and outbox dependencies")
 	}
-	if _, ok := c.eventStager.(outboxport.ReferencePreparer); !ok {
-		return evalerrors.ModuleNotConfigured("evaluation committer requires standard event reference preparation")
+	if c.transaction == nil {
+		if c.txRunner == nil || c.eventStager == nil {
+			return evalerrors.ModuleNotConfigured("evaluation committer requires transaction runner and event stager")
+		}
+		if _, ok := c.eventStager.(outboxport.ReferencePreparer); !ok {
+			return evalerrors.ModuleNotConfigured("evaluation committer requires standard event reference preparation")
+		}
 	}
 	if request.Assessment == nil {
 		return fmt.Errorf("assessment is required")
