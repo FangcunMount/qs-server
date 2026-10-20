@@ -90,3 +90,5 @@ EventSubsystem 启动附加消费者和标准 Profile Supervisor；退出时先�
 已新增借用原 GORM 根事务或活跃 Mongo session 的存储适配；构造不执行DDL，显式安装107/42，版本及绑定不符拒绝。事务计划的 Prepared 入口复用首次wire，不重新构造消息。合同测试及原生用例编译通过；真实双库原子性、到期 Sender、旧调度交接及恢复治理仍待 T13 后续验收。既有调度、Outbox与生产消息责任尚未切换。进度及证据统一维护在 [infra M3 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)。
 
 T13到期核心已新增 `application/eventing/retrydispatch`：单次串行有界扫描最多100条，在SDK准备半消息后取得原根调度guard，锁定/条件写入当前Run授权，并将dispatch事实与witness共同提交。冻结首次selectedAt，重复/Unknown只读恢复，不自动新建fence或再次调用业务；FinalUnknown保留本地已提交。原根密封上下文校验精确引用和计划，失效callback拒绝使用。该入口尚未接管活动调度：真实到期Broker、显式中止重试、自动/人工授权写入口、暂停/交接与旧Replay责任仍待验收。当前普通源码回归7144通过、60既有可选依赖跳过；required真实依赖门禁仍待新候选，不表示T13或生产已完成。
+
+评分失败和报告失败的新私有计划采用V2：在原根内写Run/失败事实、未来调度及本次失败事件的witness，未来事件不进入发布型Outbox，也不提前准备未来半消息。V1赢家按其冻结版本继续原Outbox责任；新旧版本稳定业务input hash相同，重复请求读取原赢家，不能以版本升级覆盖旧wire/责任。恢复V2还核对精确未来计划。自动入口及原生用例源码已通过7147项全仓race（60既有可选跳过），真实到期Broker门禁待执行；人工/force、暂停、显式中止重试与旧计划交接尚未完成，不能激活生产切换。
