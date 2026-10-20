@@ -29,7 +29,7 @@ import (
 )
 
 func handoffCases() map[string]bool {
-	return map[string]bool{"legacy_transfer_root_rollback_atomic": true, "legacy_transfer_exact_first_wire_and_due": true, "legacy_transfer_repeat_keeps_single_owner": true, "legacy_transfer_attempted_or_due_refused": true, "legacy_replay_cannot_reauthorize_transferred": true, "legacy_old_relay_cannot_claim_transferred": true}
+	return map[string]bool{"legacy_transfer_root_rollback_atomic": true, "legacy_transfer_exact_first_wire_and_due": true, "legacy_transfer_repeat_keeps_single_owner": true, "legacy_transfer_attempted_or_due_refused": true, "legacy_replay_cannot_reauthorize_transferred": true, "legacy_old_relay_cannot_claim_transferred": true, "legacy_transferred_status_not_pending": true}
 }
 func handoffReplay(f model.Frozen) request.ReplayRequest {
 	return request.ReplayRequest{OrgID: f.Authority().OrgID, RequestID: "native-handoff-replay", Store: "native-handoff", Reason: "verify retired responsibility is refused", Targets: []request.ReplayTarget{{EventID: f.Message().Input().ID, ExpectedFailureCount: 1}}}
@@ -125,6 +125,17 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 	require.Len(t, results, 1)
 	require.False(t, results[0].Authorized)
 	require.Equal(t, "future_schedule_owned", results[0].Reason)
+	statusReader, err := mysqlreplay.NewStatusReader(pool)
+	require.NoError(t, err)
+	snapshot, err := statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
+	require.NoError(t, err)
+	require.Empty(t, snapshot.Buckets)
+	_, err = pool.ExecContext(t.Context(), "UPDATE rm_outbox SET last_error_code='invalid-transfer' WHERE message_id=?", f.Message().Input().ID)
+	require.NoError(t, err)
+	_, err = statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
+	require.Error(t, err, "malformed held state cannot be hidden")
+	_, err = pool.ExecContext(t.Context(), "UPDATE rm_outbox SET last_error_code=? WHERE message_id=?", model.HandoffMarker(f), f.Message().Input().ID)
+	require.NoError(t, err)
 	waitHandoffDue(t, f)
 	old, err := sdkmysql.New(pool)
 	require.NoError(t, err)
@@ -220,6 +231,22 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 	require.Len(t, results, 1)
 	require.False(t, results[0].Authorized)
 	require.Equal(t, "future_schedule_owned", results[0].Reason)
+	statusReader, err := mongoreplay.NewStatusReader(db.Collection("rm_outbox"))
+	require.NoError(t, err)
+	snapshot, err := statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
+	require.NoError(t, err)
+	require.Empty(t, snapshot.Buckets)
+	buckets, err := statusReader.OutboxStatusByEventType(t.Context(), time.Now())
+	require.NoError(t, err)
+	require.Empty(t, buckets)
+	_, err = db.Collection("rm_outbox").UpdateOne(t.Context(), filter, bson.M{"$set": bson.M{"last_error_code": "invalid-transfer"}})
+	require.NoError(t, err)
+	_, err = statusReader.OutboxStatusSnapshot(t.Context(), time.Now())
+	require.Error(t, err, "malformed held state cannot be hidden")
+	_, err = statusReader.OutboxStatusByEventType(t.Context(), time.Now())
+	require.Error(t, err)
+	_, err = db.Collection("rm_outbox").UpdateOne(t.Context(), filter, bson.M{"$set": bson.M{"last_error_code": model.HandoffMarker(f)}})
+	require.NoError(t, err)
 	waitHandoffDue(t, f)
 	old, err := sdkmongo.New(db.Collection("rm_outbox"))
 	require.NoError(t, err)
