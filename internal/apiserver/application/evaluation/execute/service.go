@@ -18,6 +18,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -29,6 +30,7 @@ const defaultEvaluationRunLease = 2 * time.Minute
 
 // service 评估引擎服务实现
 type service struct {
+	failureCommitter evaluationtransaction.FailureCommitter
 	// 仓储依赖
 	assessmentRepo assessment.Repository
 	inputResolver  evaluationinput.Resolver
@@ -52,6 +54,10 @@ type EventStager interface {
 
 // EngineOption configures the concrete Evaluation engine.
 type EngineOption func(*service)
+
+func WithFailureTransactionCommitter(v evaluationtransaction.FailureCommitter) EngineOption {
+	return func(s *service) { s.failureCommitter = v }
+}
 
 func WithPostCommitDispatcher(dispatcher appEventing.PostCommitDispatcher) EngineOption {
 	return func(s *service) {
@@ -329,10 +335,15 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 func (s *service) recoverPendingOutcome(ctx context.Context, a *assessment.Assessment) (bool, error) {
 	recovery, ok := s.evaluationCommitter.(outcomecommit.PendingRecoverer)
-	if !ok {
-		return false, nil
+	if ok {
+		if handled, err := recovery.RecoverPending(ctx, a); handled || err != nil {
+			return handled, err
+		}
 	}
-	return recovery.RecoverPending(ctx, a)
+	if s.failureCommitter != nil {
+		return s.failureCommitter.RecoverPending(ctx, a)
+	}
+	return false, nil
 }
 
 func (s *service) persistEvaluationOutcome(
@@ -411,10 +422,11 @@ func (s *service) assessmentLoader() assessmentLoader {
 // failureFinalizer 评估失败标记器
 func (s *service) failureFinalizer() evaluationFailureFinalizer {
 	return evaluationFailureFinalizer{
-		repo:        s.assessmentRepo,
-		runRepo:     s.runRepo,
-		txRunner:    s.txRunner,
-		eventStager: s.eventStager,
-		postCommit:  s.postCommit,
+		failureCommitter: s.failureCommitter,
+		repo:             s.assessmentRepo,
+		runRepo:          s.runRepo,
+		txRunner:         s.txRunner,
+		eventStager:      s.eventStager,
+		postCommit:       s.postCommit,
 	}
 }
