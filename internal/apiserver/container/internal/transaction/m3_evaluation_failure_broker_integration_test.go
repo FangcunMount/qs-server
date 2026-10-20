@@ -17,14 +17,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	evaluationmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluationfailure"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	legacyStager "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	qsoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -40,6 +44,12 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+type failureLegacyPost struct{ calls atomic.Int32 }
+
+func (p *failureLegacyPost) AfterCommit(context.Context, []event.DomainEvent, time.Time) {
+	p.calls.Add(1)
+}
 
 type failureInputFixture struct{ calls atomic.Int32 }
 type failureInputError struct{}
@@ -139,6 +149,15 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	seen := map[string]bool{}
 	require.NoError(t, consumer.Subscribe(t.Context(), topic, "qs-m3-failure-observer", func(_ context.Context, d transport.Delivery) error {
 		m := d.Message()
+		envelope, err := domainwire.DecodeEnvelope(m.Payload)
+		if err != nil {
+			return err
+		}
+		// Independent fanout subscriptions also receive earlier fixture facts.
+		// Apply the failure handler's event/aggregate filter before checking its wire.
+		if envelope.EventType != assessment.EventTypeFailed || envelope.AggregateID != "5003" {
+			return d.Ack()
+		}
 		if err := d.Ack(); err != nil {
 			return err
 		}
@@ -179,11 +198,16 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	failing, err = repo.FindByID(t.Context(), failing.ID())
 	require.NoError(t, err)
 	cases := map[string]bool{}
-	failureWriter, err := evaluationfailure.New(db, owner, routes, repo, runRepo)
-	require.NoError(t, err)
 	dependency := &failureInputFixture{}
-	engine := execute.NewEngine(repo, dependency, execute.WithRunRepository(runRepo), execute.WithFailureTransactionCommitter(failureWriter))
-	require.Error(t, engine.Evaluate(t.Context(), failing.ID().Uint64()))
+	oldStager, err := legacyStager.NewStager(routes, "fixture")
+	require.NoError(t, err)
+	oldPost := &failureLegacyPost{}
+	module, err := evaluationmod.New(evaluationmod.Deps{MySQLDB: db, InputResolver: dependency, ExecutionPaths: []modelcatalog.ExecutionPath{modelcatalog.ExecutionPathScaleDescriptor}, OutboxProfile: appEventing.ProfileBinding{Stager: oldStager, PostCommit: oldPost}, EventTransactionOwner: owner, TransactionRoutes: routes})
+	require.NoError(t, err)
+	receipt, err := module.WorkerService.Execute(t.Context(), evaluationworker.Command{AssessmentID: failing.ID().Uint64()})
+	require.NoError(t, err)
+	require.Equal(t, "failed", receipt.Status)
+	require.True(t, receipt.Retryable)
 	failedRun, err := runRepo.FindLatestByAssessmentID(t.Context(), failing.ID().Uint64())
 	require.NoError(t, err)
 	require.NotNil(t, failedRun)
@@ -223,7 +247,10 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	require.NoError(t, pool.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM rm_outbox WHERE event_type IN (?,?,?)`, assessment.EventTypeRequested, assessment.EventTypeOutcomeCommitted, assessment.EventTypeFailed).Scan(&immediateRows))
 	require.Zero(t, immediateRows)
 	cases["future_retry_retains_due_authorization_and_wire"] = true
-	require.NoError(t, engine.Evaluate(t.Context(), failing.ID().Uint64()))
+	repeated, err := module.WorkerService.Execute(t.Context(), evaluationworker.Command{AssessmentID: failing.ID().Uint64()})
+	require.NoError(t, err)
+	require.Equal(t, receipt.RunID, repeated.RunID)
+	require.Zero(t, oldPost.calls.Load(), "transaction facts used old immediate Outbox wake")
 	require.Equal(t, int32(1), dependency.calls.Load())
 	sameAttempt, err := runRepo.FindLatestByAssessmentID(t.Context(), failing.ID().Uint64())
 	require.NoError(t, err)
@@ -234,8 +261,8 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	require.Equal(t, failedRun.ID(), historical.ID())
 	cases["failure_redelivery_no_extra_attempt_or_input_call"] = true
 
-	receipt := map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "root": "original_mysql_gorm", "source_input": "controlled_input_failure_no_provider", "process_exit_not_claimed": true}
-	raw, err := json.Marshal(receipt)
+	proofReceipt := map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "root": "original_mysql_gorm", "source_input": "controlled_input_failure_no_provider", "process_exit_not_claimed": true}
+	raw, err := json.Marshal(proofReceipt)
 	require.NoError(t, err)
 	fmt.Println("M3_QS_FAILURE_RECEIPT " + string(raw))
 }

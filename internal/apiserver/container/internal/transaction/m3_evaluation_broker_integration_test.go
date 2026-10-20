@@ -36,6 +36,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
@@ -145,6 +146,13 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	seen := map[string]bool{}
 	require.NoError(t, consumer.Subscribe(t.Context(), topic, "qs-m3-evaluation-observer", func(_ context.Context, d transport.Delivery) error {
 		m := d.Message()
+		envelope, err := domainwire.DecodeEnvelope(m.Payload)
+		if err != nil {
+			return err
+		}
+		if envelope.AggregateID != "5000" && envelope.AggregateID != "5001" {
+			return d.Ack()
+		}
 		if err := d.Ack(); err != nil {
 			return err
 		}
