@@ -1,6 +1,6 @@
 //go:build integration && m3_answersheet_integration
 
-package transaction
+package transaction_test
 
 import (
 	"bytes"
@@ -19,6 +19,7 @@ import (
 
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	questionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -42,7 +43,9 @@ func m3AnswerSheet(t *testing.T, id uint64, value string) (*domain.AnswerSheet, 
 	t.Helper()
 	ref, err := domain.NewQuestionnaireRef("M3-NATIVE", "1.0.0", "M3 native fixture")
 	require.NoError(t, err)
-	submission, err := domain.NewSubmissionContext(actor.NewFillerRef(301, actor.FillerTypeSelf), actor.NewTesteeRef(meta.FromUint64(401)), meta.FromUint64(501), "")
+	attribution, err := domain.NewAttributionSnapshot(domain.OriginRef{Type: domain.OriginTypeSelfService}, "", "", "", "", "", time.Now())
+	require.NoError(t, err)
+	submission, err := domain.NewSubmissionContextWithAttribution(actor.NewFillerRef(301, actor.FillerTypeSelf), actor.NewTesteeRef(meta.FromUint64(401)), meta.FromUint64(501), "", attribution)
 	require.NoError(t, err)
 	answer, err := domain.NewAnswer(meta.NewCode("Q1"), questionnaire.TypeText, domain.NewStringValue(value), 0)
 	require.NoError(t, err)
@@ -101,7 +104,7 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	authority, err := txmongo.New(db, binding)
 	require.NoError(t, err)
 	limiter := backpressure.NewLimiter(2, time.Second)
-	rootRunner := NewMongoRunner(db, MongoRunnerOptions{Boundary: "answersheet_submit", Limiter: limiter})
+	rootRunner := modtx.NewMongoRunner(db, modtx.MongoRunnerOptions{Boundary: "answersheet_submit", Limiter: limiter})
 	var runs, callbackAttempts atomic.Int32
 	type hookKey struct{}
 	runner := apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
@@ -132,6 +135,7 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	var durable appanswersheet.SubmissionDurableStore = store
 	var reader appanswersheet.SubmissionIdempotencyReader = store
+	collectionReadback := newM3CollectionReadback(t, db, repo, store, limiter)
 	require.NoError(t, store.Runtime().Start(t.Context()))
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -254,6 +258,8 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.Equal(t, sheet.ID(), result.ID())
 	require.Equal(t, priorRuns, runs.Load())
 	cases["duplicate_does_not_execute"] = true
+	require.Equal(t, 202, collectionReadback(metaInfo.IdempotencyKey, "accepted"))
+	cases["collection_202_exact_root"] = true
 	changed, changedMeta := m3AnswerSheet(t, 103, "changed")
 	changedMeta.IdempotencyKey = metaInfo.IdempotencyKey
 	_, _, err = durable.CreateDurably(t.Context(), changed, changedMeta)
@@ -266,9 +272,19 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	_, err = reader.FindCompleted(t.Context(), metaInfo)
 	require.ErrorIs(t, err, answerrepo.ErrSubmissionUnresolved)
+	require.Equal(t, 503, collectionReadback(metaInfo.IdempotencyKey, "accepted"))
+	cases["collection_unknown_witness_no202"] = true
 	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.transaction_evidence.reference.event_type": domain.EventTypeSubmitted}})
 	require.NoError(t, err)
 	cases["full_reference_required_for_acceptance"] = true
+	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.schema_version": 1}})
+	require.NoError(t, err)
+	_, err = reader.FindCompleted(t.Context(), metaInfo)
+	require.ErrorIs(t, err, answerrepo.ErrSubmissionUnresolved)
+	require.Equal(t, 503, collectionReadback(metaInfo.IdempotencyKey, "accepted"))
+	_, err = db.Collection("answersheets").UpdateOne(t.Context(), bson.M{"domain_id": uint64(101)}, bson.M{"$set": bson.M{"durable_acceptance.schema_version": 2}})
+	require.NoError(t, err)
+	cases["mixed_protocol_marker_rejected"] = true
 	session, err := client.StartSession()
 	require.NoError(t, err)
 	priorRuns = runs.Load()
@@ -325,6 +341,52 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.GreaterOrEqual(t, callbackAttempts.Load()-priorCallbacks, int32(2))
 	waitMessage(retryMeta)
 	cases["native_callback_reentry"] = true
+	concurrentSheet, concurrentMeta := m3AnswerSheet(t, 201, "concurrent-input")
+	priorRuns = runs.Load()
+	concurrentEntered, concurrentRelease := make(chan struct{}), make(chan struct{})
+	var enteredOnce sync.Once
+	concurrentCtx := context.WithValue(t.Context(), hookKey{}, func(stage string) error {
+		if stage == "before_root" {
+			enteredOnce.Do(func() { close(concurrentEntered) })
+			select {
+			case <-concurrentRelease:
+			case <-t.Context().Done():
+				return t.Context().Err()
+			}
+		}
+		return nil
+	})
+	concurrentFinished := make(chan error, 1)
+	go func() {
+		_, _, err := durable.CreateDurably(concurrentCtx, concurrentSheet, concurrentMeta)
+		concurrentFinished <- err
+	}()
+	select {
+	case <-concurrentEntered:
+	case <-time.After(30 * time.Second):
+		t.Fatal("concurrent winner not prepared")
+	}
+	contenders := make(chan error, 7)
+	for id := uint64(202); id < 209; id++ {
+		candidate, _ := m3AnswerSheet(t, id, "concurrent-input")
+		go func() { _, _, err := durable.CreateDurably(t.Context(), candidate, concurrentMeta); contenders <- err }()
+	}
+	for i := 0; i < 7; i++ {
+		require.Error(t, <-contenders, "contender accepted before original root commit")
+	}
+	require.Equal(t, priorRuns+1, runs.Load(), "reservation losers executed business")
+	close(concurrentRelease)
+	require.NoError(t, <-concurrentFinished)
+	waitMessage(concurrentMeta)
+	for id := uint64(202); id < 209; id++ {
+		candidate, _ := m3AnswerSheet(t, id, "concurrent-input")
+		result, existed, err := durable.CreateDurably(t.Context(), candidate, concurrentMeta)
+		require.NoError(t, err)
+		require.True(t, existed)
+		require.Equal(t, concurrentSheet.ID(), result.ID())
+	}
+	require.Equal(t, priorRuns+1, runs.Load())
+	cases["concurrent_reservation_one_execution"] = true
 	for _, name := range []string{"rm_outbox", "domain_event_outbox"} {
 		count, err := db.Collection(name).CountDocuments(t.Context(), bson.M{})
 		require.NoError(t, err)
@@ -338,9 +400,41 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, priorRuns, runs.Load())
 	cases["closed_admission_no_business"] = true
-	require.Len(t, cases, 11)
+	closeCtx, cancelClose := context.WithTimeout(t.Context(), 20*time.Second)
+	require.NoError(t, store.Runtime().Close(closeCtx))
+	cancelClose()
+	// A new host client/runtime must obtain the same accepted result from a
+	// fresh authority boundary without executing business again. Actual process
+	// SIGKILL and packet-loss recovery remain separately named T22/T23 gates.
+	newClient, err := mongo.Connect(t.Context(), options.Client().ApplyURI(uri.String()))
+	require.NoError(t, err)
+	newDB := newClient.Database(db.Name())
+	newRepo := answerrepo.NewRepositoryWithoutSchema(newDB)
+	var newExecutions atomic.Int32
+	newRunner := apptransaction.RunnerFunc(func(context.Context, func(context.Context) error) error {
+		newExecutions.Add(1)
+		return errors.New("duplicate must not execute in a new instance")
+	})
+	newStore, err := answerrepo.NewRocketMQSubmissionStore(newRepo, newRunner, &producerOptions, catalog)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		require.NoError(t, newStore.Runtime().Close(ctx))
+		require.NoError(t, newClient.Disconnect(ctx))
+	})
+	require.NoError(t, newStore.Runtime().Start(t.Context()))
+	newCandidate, _ := m3AnswerSheet(t, 209, "accepted")
+	result, existed, err = newStore.CreateDurably(t.Context(), newCandidate, metaInfo)
+	require.NoError(t, err)
+	require.True(t, existed)
+	require.Equal(t, sheet.ID(), result.ID())
+	require.Zero(t, newExecutions.Load())
+	cases["new_instance_exact_accepted_result"] = true
+	require.Len(t, cases, 16)
 	raw, err := json.Marshal(map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases,
-		"root_ack_discard_is_client_level": true, "mongo_callback_failpoint": true, "pool_slots": 2})
+		"root_ack_discard_is_client_level": true, "mongo_callback_failpoint": true, "original_transaction_slots": 2,
+		"upstream_rpc": "actual_protobuf_service_over_bufconn", "system_login_not_claimed": true})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_ANSWER_RECEIPT " + string(raw))
 }

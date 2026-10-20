@@ -43,6 +43,7 @@ func Wire(in WireInput) (*Module, error) {
 		bootstrap.QuestionnaireReader = infra.QuestionnaireReader
 		bootstrap.AnswerSheetRepo = infra.AnswerSheetRepo
 		bootstrap.AnswerSheetReader = infra.AnswerSheetReader
+		bootstrap.SubmissionStore = infra.SubmissionStore
 	}
 	return Bootstrap(bootstrap)
 }

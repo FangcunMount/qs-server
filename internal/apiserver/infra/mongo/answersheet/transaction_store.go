@@ -83,7 +83,11 @@ func (s *RocketMQSubmissionStore) findCompleted(ctx context.Context, filter bson
 		}
 		return nil, err
 	}
-	if a := po.DurableAcceptance; a != nil && a.SchemaVersion != 1 {
+	usesTransaction, err := submissionProtocol(po.DurableAcceptance)
+	if err != nil {
+		return nil, err
+	}
+	if usesTransaction {
 		if err := s.confirmSubmission(ctx, po); err != nil {
 			return nil, err
 		}
@@ -93,6 +97,28 @@ func (s *RocketMQSubmissionStore) findCompleted(ctx context.Context, filter bson
 		stored = po.SubmitMeta.Fingerprint
 	}
 	return completedSubmission(s.repo.mapper.ToBO(&po), stored, fingerprint)
+}
+
+// Explicit versions select a read contract. A mixed marker must never fall
+// through to the historical existence-only acceptance path.
+func submissionProtocol(a *DurableAcceptancePO) (bool, error) {
+	if a == nil {
+		return false, nil
+	}
+	switch a.SchemaVersion {
+	case 1:
+		if a.TransactionEvidence != nil {
+			return false, ErrSubmissionUnresolved
+		}
+		return false, nil
+	case 2:
+		if a.EventEvidence != nil || a.TransactionEvidence == nil {
+			return false, ErrSubmissionUnresolved
+		}
+		return true, nil
+	default:
+		return false, ErrSubmissionUnresolved
+	}
 }
 
 func (s *RocketMQSubmissionStore) confirmSubmission(ctx context.Context, po AnswerSheetPO) error {
