@@ -29,6 +29,9 @@ type MessagingEventReceiver struct {
 }
 
 func (r *MessagingEventReceiver) transaction(ctx context.Context, f func(context.Context, *sql.Tx) error) error {
+	if _, nested := hostmysql.TxFromContext(ctx); nested && r.Transactions != nil {
+		return transaction.ErrTransactionRequired
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	tx, err := r.DB.BeginTx(ctx, nil)

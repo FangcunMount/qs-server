@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
+	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -194,10 +195,41 @@ func (s *TransactionArchive) Payload(ctx context.Context, ref *pb.MessagePayload
 		if planned {
 			return nil, true, app.ErrNotFound
 		}
+		// ACK requests are keyed by the incoming event, not the outgoing ACK ID.
+		// Any exact new branch footprint also forbids historical body fallback.
+		planned, lookupErr = s.hasPlannedBranch(ctx, ref.MessageId)
+		if lookupErr != nil {
+			return nil, true, lookupErr
+		}
+		if planned {
+			return nil, true, app.ErrNotFound
+		}
 		return nil, false, nil
 	}
 	if ref.OrganizationId != strconv.FormatUint(a.OrganizationID, 10) || ref.BodySha256 != a.Envelope.BodySha256 || ref.BodyLength != uint64(len(a.Body)) {
 		return nil, true, app.ErrMessagingContract
 	}
 	return bytes.Clone(a.Body), true, nil
+}
+
+func (s *TransactionArchive) hasPlannedBranch(ctx context.Context, id string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	bk := transaction.BranchKey(id)
+	var raw []byte
+	// Only the rare absent-archive/absent-command fallback scans this immutable
+	// protocol footprint. Bound both server work and client wait; errors fail
+	// closed rather than expose a historical row under a new ACK identity.
+	err := s.db.QueryRowContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */ w.reference FROM rm_tx_witness w JOIN rm_tx_execution e ON e.execution_key=w.execution_key WHERE e.owner=? AND w.branch_key=? LIMIT 1`, []byte(s.store.Binding().Owner), bk[:]).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return true, err
+	}
+	ref, err := transaction.DecodeReference(raw)
+	if err != nil || ref.Owner != s.store.Binding().Owner || ref.BranchID != id || ref.MessageID != id {
+		return true, app.ErrMessagingContract
+	}
+	return true, nil
 }

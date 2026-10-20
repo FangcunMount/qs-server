@@ -10,12 +10,23 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	"github.com/FangcunMount/reliable-messaging/wire/protected"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
+
+func TestEventReceiverRefusesCallerRootBeforeAuthenticationOrFailureStorage(t *testing.T) {
+	a, _, _ := commandArchiveFixture(t)
+	r := &MessagingEventReceiver{DB: a.db, Transactions: &TransactionEvents{}}
+	ctx := hostmysql.WithTx(t.Context(), &gorm.DB{})
+	require.ErrorIs(t, r.Receive(ctx, []byte("invalid")), transaction.ErrTransactionRequired)
+	require.ErrorIs(t, r.Failed(ctx, []byte("invalid")), transaction.ErrTransactionRequired)
+	require.ErrorIs(t, r.Isolate(ctx, []byte("invalid"), "authentication_failed"), transaction.ErrTransactionRequired)
+}
 
 func eventExecutionFixture(t *testing.T, held bool) (app.FrozenIncomingEvent, transaction.Execution, app.FrozenMessagingArchive) {
 	t.Helper()
