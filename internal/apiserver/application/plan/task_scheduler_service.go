@@ -154,7 +154,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 			continue
 		}
 
-		if s.persistence.transactionalOpening() {
+		if s.persistence.transactionOwnerSelected() {
 			original, handled, err := s.persistence.openingOptions.Transaction.RecoverOpened(ctx, task)
 			if err != nil {
 				failedCount++

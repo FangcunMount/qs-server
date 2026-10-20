@@ -27,7 +27,7 @@ func (s *commandService) OpenTaskWithGuard(ctx context.Context, orgID int64, id 
 }
 
 func (s *taskManagementService) TransactionalTaskOpening() bool {
-	return s.persistence.transactionalOpening()
+	return s.persistence.transactionOwnerSelected()
 }
 func (s *taskManagementService) OpenTaskWithGuard(ctx context.Context, orgID int64, id string, guard port.LocalGuard) (*TaskResult, error) {
 	if !s.TransactionalTaskOpening() {

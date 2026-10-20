@@ -174,3 +174,65 @@ func TestTransactionOpeningRepeatsOwnershipGuardOnlyAfterHalfPreparation(t *test
 		})
 	}
 }
+
+func TestDisablingNewRemindersRetainsOriginalTransactionRecovery(t *testing.T) {
+	for _, unknown := range []bool{false, true} {
+		t.Run(map[bool]string{false: "committed", true: "unknown"}[unknown], func(t *testing.T) {
+			task := transactionOpeningTask(t)
+			opener := &transactionOpeningStub{recovered: task, handled: true}
+			if unknown {
+				opener.recovered = nil
+				opener.recoveryErr = eventport.ErrUnresolved
+			}
+			entry := &entryGeneratorStub{}
+			service := &taskManagementService{taskRepo: openingLookupRepo{task: task}, planRepo: &schedulerPlanRepoByIDStub{}, entryGenerator: entry, persistence: taskPersistence{openingOptions: TaskOpeningOptions{ReminderEnabled: false, Transaction: opener}}}
+			result, err := service.OpenTask(t.Context(), task.GetOrgID(), task.GetID().String())
+			if unknown {
+				require.ErrorIs(t, err, eventport.ErrUnresolved)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+			}
+			require.Zero(t, entry.calls)
+			require.Zero(t, opener.calls, "switching new reminders off cannot create another execution")
+		})
+	}
+}
+
+func TestDisabledNewReminderKeepsOwnershipGuardInOriginalRootWithoutMQOrOutbox(t *testing.T) {
+	for _, deny := range []bool{false, true} {
+		t.Run(map[bool]string{false: "allowed", true: "transferred"}[deny], func(t *testing.T) {
+			tasks := &schedulerTaskRepoStub{}
+			opener := &transactionOpeningStub{}
+			legacy := &openingStagerSpy{}
+			runner := transaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+				return fn(context.WithValue(ctx, ownershipTxKey{}, true))
+			})
+			persistence := taskPersistence{tasks: tasks, tx: runner, openingOptions: TaskOpeningOptions{Transaction: opener, ReminderEnabled: false, ReminderOutbox: appeventing.ProfileBinding{Stager: legacy}}}
+			task := transactionOpeningTask(t)
+			blocked := errors.New("current ownership rejected")
+			guards := 0
+			staged, err := persistence.saveOpenedWithGuard(t.Context(), task, func(root context.Context, _ *domain.AssessmentTask) error {
+				require.Equal(t, true, root.Value(ownershipTxKey{}))
+				guards++
+				if deny {
+					return blocked
+				}
+				return nil
+			})
+			require.False(t, staged)
+			require.Equal(t, 1, guards)
+			if deny {
+				require.ErrorIs(t, err, blocked)
+				require.Empty(t, tasks.savedTasks)
+			} else {
+				require.NoError(t, err)
+				require.Len(t, tasks.savedTasks, 1)
+			}
+			require.Zero(t, opener.calls)
+			require.Zero(t, legacy.calls)
+			require.Len(t, task.Events(), 1, "best-effort notification retains original event")
+		})
+	}
+}

@@ -28,12 +28,30 @@ func (p taskPersistence) saveOpened(ctx context.Context, task *domainplan.Assess
 	return p.saveOpenedWithGuard(ctx, task, nil)
 }
 
+// Recovery follows the configured protocol even when new reminder intents
+// are disabled. A producer flag cannot discard an existing execution.
+func (p taskPersistence) transactionOwnerSelected() bool {
+	return p.openingOptions.Transaction != nil
+}
+
 func (p taskPersistence) transactionalOpening() bool {
 	return p.openingOptions.ReminderEnabled && p.openingOptions.Transaction != nil
 }
 
 func (p taskPersistence) saveOpenedWithGuard(ctx context.Context, task *domainplan.AssessmentTask, guard tasktransaction.LocalGuard) (bool, error) {
 	if !p.openingOptions.ReminderEnabled {
+		if p.transactionOwnerSelected() {
+			// The operator no longer supplies an outer root for a selected owner.
+			// Preserve its ownership/admission guard for new best-effort openings too.
+			return false, p.withinTransaction(ctx, func(root context.Context) error {
+				if guard != nil {
+					if err := guard(root, task); err != nil {
+						return err
+					}
+				}
+				return p.tasks.Save(root, task)
+			})
+		}
 		return false, p.save(ctx, task, false)
 	}
 	if err := p.openingOptions.validate(); err != nil {

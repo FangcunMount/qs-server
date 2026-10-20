@@ -18,6 +18,7 @@ import (
 
 	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
@@ -300,6 +301,20 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, handled)
 	require.Equal(t, first.GetEntryURL(), recovered.GetEntryURL())
+	// Disabling future reminders preserves the existing protocol: use the
+	// actual application entrypoint with an inert fresh owner and no Plan or
+	// Enrollment fixture tables. Recovery must precede fresh business planning.
+	manager, err := appplan.NewTaskManagementService(repo, repository.NewPlanRepository(db), repository.NewEnrollmentRepository(db), modtx.NewMySQLRunner(db), planinfra.NewEntryGenerator("https://example.test"), event.NewNopEventPublisher(), appplan.TaskOpeningOptions{ReminderEnabled: false, Transaction: recovery})
+	require.NoError(t, err)
+	existing, err := manager.OpenTask(t.Context(), 1, saved.GetID().String())
+	require.NoError(t, err)
+	require.NotNil(t, existing)
+	_, err = manager.OpenTask(t.Context(), 1, aborted.GetID().String())
+	require.ErrorIs(t, err, eventport.ErrUnresolved)
+	stillPending, err := repo.FindByID(t.Context(), aborted.GetID())
+	require.NoError(t, err)
+	require.True(t, stillPending.IsPending())
+	require.Empty(t, stillPending.GetEntryURL())
 	require.NoError(t, owner.Runtime().SetAdmission(false))
 	paused := seed(3)
 	require.NoError(t, domain.NewTaskLifecycle().OpenAt(t.Context(), paused, "https://example.test/private-entry-paused", at))
@@ -422,7 +437,7 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	}
 	// Same logical topic does not allow durable events through NORMAL.
 	require.Error(t, routed.Publish(t.Context(), domain.NewTaskOpenedReminderRequestedEvent(first.Events()[0].(domain.TaskOpenedEvent), first.GetScheduleRevision())))
-	cases := map[string]bool{"constructor_no_ddl": true, "half_invisible": true, "original_task_witness_wire": true, "first_entry_reused": true, "root_abort_atomic": true, "fresh_owner_recovery": true, "closed_admission_no_business": true, "no_new_publish_outbox": true, "normal_best_effort_fanout": true, "normal_root_commit_boundary": true, "normal_rejects_transaction_event": true, "reminder_precision_compatible": true, "original_write_abort_atomic": true, "stale_schedule_cannot_commit": true}
+	cases := map[string]bool{"constructor_no_ddl": true, "half_invisible": true, "original_task_witness_wire": true, "first_entry_reused": true, "root_abort_atomic": true, "fresh_owner_recovery": true, "closed_admission_no_business": true, "no_new_publish_outbox": true, "normal_best_effort_fanout": true, "normal_root_commit_boundary": true, "normal_rejects_transaction_event": true, "reminder_precision_compatible": true, "original_write_abort_atomic": true, "stale_schedule_cannot_commit": true, "flag_off_retains_original_execution": true}
 	receipt, err := json.Marshal(map[string]any{"cases": cases, "passed": len(cases), "failed": 0, "skipped": 0, "root": "original_mysql_gorm", "process_exit_not_claimed": true, "system_login_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_TASK_RECEIPT " + string(receipt))

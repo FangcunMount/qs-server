@@ -11,7 +11,9 @@ type TaskOpeningOptions struct {
 	ReminderEnabled bool
 	ReminderOutbox  eventing.ProfileBinding
 	// Explicit selection replaces immediate reminder staging. Failure never
-	// falls back to the available legacy Outbox profile.
+	// falls back to the available legacy Outbox profile. Recovery remains
+	// selected when ReminderEnabled is false, so an existing execution cannot
+	// be bypassed by disabling new reminder intents.
 	Transaction tasktransaction.Opener
 }
 
