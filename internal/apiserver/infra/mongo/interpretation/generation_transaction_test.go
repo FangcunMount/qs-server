@@ -15,18 +15,25 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func transactionGeneration(t *testing.T) *generation.ReportGeneration {
+func transactionLifecycleProof(t *testing.T, kind string) *evidence.EventEvidenceV2 {
 	t.Helper()
 	at := time.Date(2026, 10, 20, 1, 2, 3, 123456789, time.UTC)
-	m, err := message.New(message.Input{ID: "generated-transaction", Producer: "qs-server", Destination: "report.lifecycle", EventType: catalog.InterpretationReportGenerated, SchemaVersion: "v1", Scope: "org:1", ContentType: "application/json", OccurredAt: at.Format(time.RFC3339Nano), Payload: []byte(`{}`)})
+	m, err := message.New(message.Input{ID: "generated-transaction", Producer: "qs-server", Destination: "report.lifecycle", EventType: kind, SchemaVersion: "v1", Scope: "org:1", ContentType: "application/json", OccurredAt: at.Format(time.RFC3339Nano), Payload: []byte(`{}`)})
 	require.NoError(t, err)
 	plan, err := transaction.NewPlan(transaction.PlanInput{Owner: "qs.mongo", Scope: "org:1", OperationID: "generation-operation", IdempotencyKey: "report/1", Branches: []transaction.BranchInput{{ID: "generated", Message: m, Wire: m.Input().Payload, PhysicalTopic: "fixture-transaction-topic", RouteRevision: "m3-1"}}})
 	require.NoError(t, err)
 	ref, err := plan.Reference("generated", 1, "m3-1")
 	require.NoError(t, err)
-	legacy := fixtureProof(t, catalog.InterpretationReportGenerated, "fixture-business-binding")
+	legacy := fixtureProof(t, kind, "fixture-business-binding")
 	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(m), ref, legacy.BusinessBindingSHA256, at)
 	require.NoError(t, err)
+	return proof
+}
+
+func transactionGeneration(t *testing.T) *generation.ReportGeneration {
+	t.Helper()
+	proof := transactionLifecycleProof(t, catalog.InterpretationReportGenerated)
+	at := proof.RecordedAt
 	g, err := generation.New(1, generation.Key{OutcomeID: 9, ReportType: policy.ReportTypeStandard, TemplateVersion: "v1"}, at.Add(-time.Minute))
 	require.NoError(t, err)
 	require.NoError(t, g.Begin(2, at.Add(-time.Second)))

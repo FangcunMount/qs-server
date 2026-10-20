@@ -73,18 +73,19 @@ func (m *LifecycleMapper) RunToPO(domain *interpretationrun.InterpretationRun) *
 		return nil
 	}
 	po := &InterpretationRunPO{
-		BaseDocument:       base.BaseDocument{DomainID: domain.ID()},
-		GenerationID:       domain.GenerationID().Uint64(),
-		Attempt:            domain.Attempt(),
-		Status:             string(domain.Status()),
-		TraceID:            domain.TraceID(),
-		StartedAt:          domain.StartedAt(),
-		LeaseExpiresAt:     domain.LeaseExpiresAt(),
-		FinishedAt:         domain.FinishedAt(),
-		AttemptOrigin:      string(domain.Origin()),
-		RecoveryCount:      domain.RecoveryCount(),
-		LastReclaimedAt:    domain.LastReclaimedAt(),
-		RetryEventEvidence: domain.RetryEventEvidence(),
+		BaseDocument:              base.BaseDocument{DomainID: domain.ID()},
+		GenerationID:              domain.GenerationID().Uint64(),
+		Attempt:                   domain.Attempt(),
+		Status:                    string(domain.Status()),
+		TraceID:                   domain.TraceID(),
+		StartedAt:                 domain.StartedAt(),
+		LeaseExpiresAt:            domain.LeaseExpiresAt(),
+		FinishedAt:                domain.FinishedAt(),
+		AttemptOrigin:             string(domain.Origin()),
+		RecoveryCount:             domain.RecoveryCount(),
+		LastReclaimedAt:           domain.LastReclaimedAt(),
+		RetryEventEvidence:        domain.RetryEventEvidence(),
+		FailedTransactionEvidence: domain.FailedTransactionEvidence(),
 	}
 	if history := domain.ClaimHistory(); len(history) > 0 {
 		po.ClaimHistory = make([]ClaimHistoryPO, len(history))
@@ -110,24 +111,31 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 	if po == nil {
 		return nil, nil
 	}
+	if proof := po.FailedTransactionEvidence; proof != nil {
+		ref, err := transaction.DecodeReference(proof.TransactionReference)
+		if err != nil || ref.Owner != "qs.mongo" {
+			return nil, transaction.ErrBinding
+		}
+	}
 	var failure *interpretationrun.Failure
 	if po.Failure != nil {
 		failure = &interpretationrun.Failure{Kind: interpretationrun.FailureKind(po.Failure.Kind), Code: po.Failure.Code, SafeMessage: po.Failure.SafeMessage, Retryable: po.Failure.Retryable}
 	}
 	restore := interpretationrun.RestoreInput{
-		ID:                 po.DomainID,
-		GenerationID:       meta.FromUint64(po.GenerationID),
-		Attempt:            po.Attempt,
-		Status:             interpretationrun.Status(po.Status),
-		Failure:            failure,
-		TraceID:            po.TraceID,
-		StartedAt:          po.StartedAt,
-		LeaseExpiresAt:     po.LeaseExpiresAt,
-		FinishedAt:         po.FinishedAt,
-		Origin:             retrygovernance.AttemptOrigin(po.AttemptOrigin),
-		RecoveryCount:      po.RecoveryCount,
-		LastReclaimedAt:    po.LastReclaimedAt,
-		RetryEventEvidence: po.RetryEventEvidence,
+		ID:                        po.DomainID,
+		GenerationID:              meta.FromUint64(po.GenerationID),
+		Attempt:                   po.Attempt,
+		Status:                    interpretationrun.Status(po.Status),
+		Failure:                   failure,
+		TraceID:                   po.TraceID,
+		StartedAt:                 po.StartedAt,
+		LeaseExpiresAt:            po.LeaseExpiresAt,
+		FinishedAt:                po.FinishedAt,
+		Origin:                    retrygovernance.AttemptOrigin(po.AttemptOrigin),
+		RecoveryCount:             po.RecoveryCount,
+		LastReclaimedAt:           po.LastReclaimedAt,
+		RetryEventEvidence:        po.RetryEventEvidence,
+		FailedTransactionEvidence: po.FailedTransactionEvidence,
 	}
 	if len(po.ClaimHistory) > 0 {
 		restore.ClaimHistory = make([]interpretationrun.ClaimRecord, len(po.ClaimHistory))

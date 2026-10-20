@@ -18,7 +18,7 @@ type ReportCatalogProjector struct {
 }
 
 func NewReportCatalogProjector(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*ReportCatalogProjector, error) {
-	p := &ReportCatalogProjector{BaseRepository: base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
+	p := NewReportCatalogProjectorWithoutSchema(db, opts...)
 	if _, err := p.Collection().Indexes().CreateMany(context.Background(), reportCatalogIndexModels()); err != nil {
 		return nil, fmt.Errorf("create report catalog indexes: %w", err)
 	}

@@ -319,7 +319,9 @@ func cloneRun(source *interpretationrun.InterpretationRun) (*interpretationrun.I
 		ID: source.ID(), GenerationID: source.GenerationID(), Attempt: source.Attempt(), Status: source.Status(), Failure: source.Failure(), TraceID: source.TraceID(),
 		StartedAt: source.StartedAt(), LeaseExpiresAt: source.LeaseExpiresAt(), FinishedAt: source.FinishedAt(),
 		Origin: source.Origin(), RetryDecision: source.RetryDecision(),
-		RetryEventEvidence: source.RetryEventEvidence(),
+		RetryEventEvidence:        source.RetryEventEvidence(),
+		FailedTransactionEvidence: source.FailedTransactionEvidence(),
+		ClaimHistory:              source.ClaimHistory(), RecoveryCount: source.RecoveryCount(), LastReclaimedAt: source.LastReclaimedAt(),
 	})
 }
 
