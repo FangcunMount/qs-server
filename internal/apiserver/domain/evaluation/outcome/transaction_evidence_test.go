@@ -64,7 +64,7 @@ func TestOutcomeTransactionEvidencePreservesIdentityAndOriginalPayload(t *testin
 }
 
 func TestOutcomeTransactionEvidenceRejectsConflictsAndMixedProtocols(t *testing.T) {
-	for _, kind := range []string{"payload", "tenant", "event", "mixed"} {
+	for _, kind := range []string{"payload", "tenant", "event", "mixed", "missing-runtime"} {
 		t.Run(kind, func(t *testing.T) {
 			in := outcomeTransactionInput(t)
 			switch kind {
@@ -74,6 +74,9 @@ func TestOutcomeTransactionEvidenceRejectsConflictsAndMixedProtocols(t *testing.
 				in.OrgID++
 			case "event":
 				in.CommittedTransactionEvidence.Reference.EventType = "evaluation.failed"
+			case "missing-runtime":
+				in.Runtime.DecisionKind = ""
+				in.CommittedTransactionEvidence.BusinessBindingSHA256 = BusinessBindingSHA256(in)
 			case "mixed":
 				var err error
 				in.CommittedEventEvidence, err = evidence.NewStandard(in.CommittedTransactionEvidence.Reference, BusinessBindingSHA256(in))

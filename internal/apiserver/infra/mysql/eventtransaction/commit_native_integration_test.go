@@ -141,7 +141,7 @@ func TestM3MySQLOriginalEventRoot(t *testing.T) {
 	}
 	t.Run("actual-json-column-and-original-witness", func(t *testing.T) {
 		sender.halfUnknown = false
-		input := domainoutcome.NewRecordInput{ID: meta.FromUint64(901), OrgID: 7, AssessmentID: meta.FromUint64(42), TesteeID: 8, RunID: "original-run", Model: domainoutcome.ModelIdentity{Kind: modelcatalog.KindScale, Code: "fixture"}, SchemaVersion: 2, EvaluatedAt: time.Now().UTC().Truncate(time.Millisecond), Payload: []byte("{ \"result\": \"<>&\", \"n\":1.00 }\n"), ReportInput: []byte("{\n \"frozen\":true\n}\n")}
+		input := domainoutcome.NewRecordInput{ID: meta.FromUint64(901), OrgID: 7, AssessmentID: meta.FromUint64(42), TesteeID: 8, RunID: "original-run", Model: domainoutcome.ModelIdentity{Kind: modelcatalog.KindScale, Code: "fixture"}, Runtime: domainoutcome.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindScoreRange}, SchemaVersion: 2, EvaluatedAt: time.Now().UTC().Truncate(time.Millisecond), Payload: []byte("{ \"result\": \"<>&\", \"n\":1.00 }\n"), ReportInput: []byte("{\n \"frozen\":true\n}\n")}
 		q := fixtureRequest("json-column")
 		frozen := input
 		frozen.Payload, frozen.ReportInput = nil, nil

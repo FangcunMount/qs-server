@@ -106,6 +106,9 @@ func NewRecord(input NewRecordInput) (*Record, error) {
 		}
 	}
 	if proof := input.CommittedTransactionEvidence; proof != nil {
+		if input.Runtime.DecisionKind == "" {
+			return nil, fmt.Errorf("transaction outcome requires an explicit frozen runtime decision kind")
+		}
 		if err := proof.Validate(); err != nil {
 			return nil, err
 		}
