@@ -11,11 +11,11 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
-	txmongo "github.com/FangcunMount/reliable-messaging/storage/transaction/mongo"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,12 +28,18 @@ type submissionSender interface {
 	transaction.Sender
 }
 
+type submissionAuthority interface {
+	Lookup(context.Context, transaction.Request) (transaction.Reservation, error)
+	Evidence(context.Context, transaction.Reference) (*transaction.Evidence, error)
+}
+
 // RocketMQSubmissionStore uses the repository's original Mongo database for
 // both the business document and protocol witnesses. It never stages Outbox
 // rows. The host owns runner admission and the returned runtime lifecycle.
 type RocketMQSubmissionStore struct {
 	repo      *Repository
-	authority *txmongo.Store
+	authority submissionAuthority
+	owner     *guarded.Owner
 	runner    apptransaction.Runner
 	sender    submissionSender
 	runtime   *messagingruntime.TransactionRuntime
@@ -51,19 +57,25 @@ func NewRocketMQSubmissionStore(repo *Repository, runner apptransaction.Runner, 
 	if !found || topic == "" {
 		return nil, fmt.Errorf("submission route absent")
 	}
-	config, found := o.RocketMQ.Transactions[submissionOwner]
-	if !found {
+	owner, err := guarded.New(repo.DB(), o, []string{topic})
+	if err != nil {
+		return nil, err
+	}
+	return NewRocketMQSubmissionStoreWithOwner(repo, runner, resolver, owner)
+}
+
+// NewRocketMQSubmissionStoreWithOwner borrows the same host runtime used by
+// report transactions. It does not start or close that shared runtime.
+func NewRocketMQSubmissionStoreWithOwner(repo *Repository, runner apptransaction.Runner, resolver eventcatalog.TopicResolver, owner *guarded.Owner) (*RocketMQSubmissionStore, error) {
+	if repo == nil || runner == nil || resolver == nil || !owner.UsesDatabase(repo.DB()) {
 		return nil, transaction.ErrBinding
 	}
-	store, err := txmongo.New(repo.DB(), transaction.Binding{Owner: submissionOwner, StoreID: config.StoreID, WriterEpoch: config.WriterEpoch})
-	if err != nil {
-		return nil, err
+	topic, found := resolver.GetTopicForEvent(domain.EventTypeSubmitted)
+	if !found || !owner.HasTopic(topic) {
+		return nil, transaction.ErrBinding
 	}
-	runtime, err := messagingruntime.NewTransactionalSender(o, submissionOwner, store, []string{topic})
-	if err != nil {
-		return nil, err
-	}
-	return &RocketMQSubmissionStore{repo: repo, authority: store, runner: runner, sender: runtime, runtime: runtime, topic: topic}, nil
+	runtime := owner.Runtime()
+	return &RocketMQSubmissionStore{repo: repo, authority: owner, owner: owner, runner: runner, sender: runtime, runtime: runtime, topic: topic}, nil
 }
 
 func (s *RocketMQSubmissionStore) Runtime() *messagingruntime.TransactionRuntime { return s.runtime }
@@ -209,21 +221,15 @@ func (s *RocketMQSubmissionStore) CreateDurably(ctx context.Context, sheet *doma
 	}
 	_, executeErr := s.sender.Execute(ctx, reservation.Execution, func(localCtx context.Context, execution transaction.Execution) (transaction.LocalOutcome, error) {
 		err := s.runner.WithinTransaction(localCtx, func(txCtx context.Context) error {
-			session := mongo.SessionFromContext(txCtx)
-			if session == nil {
-				return transaction.ErrTransactionRequired
-			}
-			guard, err := s.authority.Bind(mongo.NewSessionContext(txCtx, session), execution)
-			if err != nil {
-				return err
-			}
-			if _, err := s.repo.InsertOne(txCtx, raw); err != nil {
-				if mongo.IsDuplicateKeyError(err) && strings.Contains(err.Error(), "uk_answersheet_answering_start") {
-					return submit.ErrIdempotencyConflict
+			return s.owner.WithinOriginal(txCtx, execution, func(bound context.Context) error {
+				if _, err := s.repo.InsertOne(bound, raw); err != nil {
+					if mongo.IsDuplicateKeyError(err) && strings.Contains(err.Error(), "uk_answersheet_answering_start") {
+						return submit.ErrIdempotencyConflict
+					}
+					return err
 				}
-				return err
-			}
-			return guard.CommitWitness(txCtx)
+				return nil
+			})
 		})
 		if err != nil {
 			return transaction.LocalUnknown, err

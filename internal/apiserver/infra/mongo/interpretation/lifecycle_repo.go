@@ -15,6 +15,7 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -161,17 +162,10 @@ func (r *GenerationRepository) requireOriginalTransaction(ctx context.Context, p
 	if err != nil || ref.Owner != "qs.mongo" {
 		return transaction.ErrBinding
 	}
-	session := mongo.SessionFromContext(ctx)
-	if r == nil || r.DB() == nil || session == nil || session.Client() != r.DB().Client() {
+	if r == nil {
 		return transaction.ErrTransactionRequired
 	}
-	// Match the SDK's pinned v1.17.6 bridge: an ordinary/ended session must
-	// never turn a transaction-evidence write into an autocommit operation.
-	x, ok := session.(mongo.XSession) //nolint:staticcheck // Pinned driver active-transaction bridge.
-	if !ok || x.ClientSession() == nil || !x.ClientSession().TransactionRunning() {
-		return transaction.ErrTransactionRequired
-	}
-	return nil
+	return guarded.RequireOriginal(ctx, r.DB(), proof)
 }
 
 type RunRepository struct {
