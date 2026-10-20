@@ -82,3 +82,9 @@ EventSubsystem 启动附加消费者和标准 Profile Supervisor；退出时先�
 - 原评估/报告效果：`maintenance/originaleffect`
 
 以上路径均以 `internal/apiserver/` 为前缀。普通合同及实库/故障验证入口见[扩展与验收](./70-扩展与验收.md)。SDK claim/时钟机制以[当前依赖版本的源码合同](./10-架构与责任边界.md#sdk-版本与参考文档)为准；本页不把单元测试、代码存在或 published 计数当作现场效果验收。
+
+### M3 T13：未来业务调度的冻结计划（实现中）
+
+`eventing/retryschedule` 已新增独立冻结模型：保存原失败 Run、业务授权、到期时间和首次消息/wire，不包含发布 attempt、delivered 或消费完成状态。评分仅绑定 qs.mysql，报告仅绑定 qs.mongo；重复同输入复用第一份计划，授权或业务输入变化必须冲突，不用新时钟/事件ID覆盖赢家。存储索引时间按数据库精度向上取整，原始 deadline 和 wire 保持不变，避免提前到期。
+
+目前仅完成纯模型、codec和目标测试；原事务存储、到期 Sender、旧调度交接及恢复治理仍待 T13 后续实现。既有调度、Outbox与生产消息责任尚未切换。进度及证据统一维护在 [infra M3 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)。
