@@ -19,6 +19,19 @@ import (
 	"gorm.io/gorm"
 )
 
+// UsesPrimary validates adapters sharing this owner without transferring DB
+// ownership or constructing another producer.
+func (c *Committer) UsesPrimary(db *gorm.DB) bool {
+	if db == nil || db.Statement == nil {
+		return false
+	}
+	if _, nested := db.Statement.ConnPool.(gorm.TxCommitter); nested {
+		return false
+	}
+	pool, err := db.DB()
+	return err == nil && pool == c.primary
+}
+
 type sender interface {
 	transaction.Sender
 	Reserve(context.Context, transaction.Request, transaction.FrozenPlan) (transaction.Reservation, error)
