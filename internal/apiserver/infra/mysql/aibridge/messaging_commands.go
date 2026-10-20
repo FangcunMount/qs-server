@@ -9,6 +9,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
@@ -102,6 +103,11 @@ func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.Messag
 func (s *MessagingCommandStore) SubmitParticipantRetry(ctx context.Context, scope app.DraftScope, sessionID string, command app.ParticipantRetry) error {
 	if s == nil || s.Store == nil || s.DB == nil {
 		return app.ErrManagementUnavailable
+	}
+	if s.Transactions != nil {
+		if _, nested := hostmysql.TxFromContext(ctx); nested {
+			return transaction.ErrTransactionRequired
+		}
 	}
 	var requestID string
 	err := s.DB.QueryRowContext(ctx, "SELECT request_id FROM ai_bridge_requests WHERE session_id=? AND organization_id=?", sessionID, scope.OrganizationID).Scan(&requestID)

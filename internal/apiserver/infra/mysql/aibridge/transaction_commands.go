@@ -9,6 +9,7 @@ import (
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	owner "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"gorm.io/gorm"
 )
@@ -72,6 +73,9 @@ func (s *TransactionCommands) Validate(ctx context.Context) error {
 // Submit first reads the exact stable request before clock/Seal/order planning.
 // Only the reservation winner may open a local root, after all half ACKs.
 func (s *TransactionCommands) Submit(ctx context.Context, c app.TransactionCommand) error {
+	if _, nested := hostmysql.TxFromContext(ctx); nested {
+		return transaction.ErrTransactionRequired // never open a second root around a caller's business
+	}
 	if s == nil || s.archive == nil || s.sender == nil || s.seal == nil || c.ID() == "" {
 		return app.ErrManagementUnavailable
 	}

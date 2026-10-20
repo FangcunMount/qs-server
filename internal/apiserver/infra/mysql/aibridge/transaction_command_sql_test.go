@@ -10,11 +10,29 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type refuseCommandSender struct{ t *testing.T }
+
+func TestTransactionCommandRefusesCallerRootBeforeAnyProtocolReadOrSeal(t *testing.T) {
+	a, _, _ := commandArchiveFixture(t)
+	seal := func(_ pb.MessagingKind, _, _, _, _ string, _ *pb.MessagingBody) (*app.PreparedMessaging, error) {
+		t.Error("nested command reached Seal")
+		return nil, app.ErrMessagingContract
+	}
+	s := &TransactionCommands{archive: a, sender: refuseCommandSender{t}, seal: seal}
+	// WithTx is the host's explicit root-ownership marker. Reject it before any
+	// access to the marked handle; this unit does not claim ORM atomicity proof.
+	ctx := hostmysql.WithTx(t.Context(), &gorm.DB{})
+	require.ErrorIs(t, s.Submit(ctx, orderCommandFixture(t)), transaction.ErrTransactionRequired)
+	store := &MessagingCommandStore{Store: &Store{DB: a.db}, Messaging: NewMessagingStore(), Seal: seal, Transactions: s}
+	require.ErrorIs(t, store.SubmitParticipantRetry(ctx, app.DraftScope{OrganizationID: 7, OperatorUserID: 9}, orderSession, app.ParticipantRetry{CommandID: orderCommand}), transaction.ErrTransactionRequired)
+	// No Begin/Query/Exec expectation: no second root or protocol reservation.
+}
 
 func (s refuseCommandSender) Reserve(context.Context, transaction.Request, transaction.FrozenPlan) (transaction.Reservation, error) {
 	s.t.Error("changed input reached a new reservation")
