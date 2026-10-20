@@ -1,6 +1,7 @@
 package run
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -70,21 +71,22 @@ type ClaimRecord struct {
 // InterpretationRun is one attempt under a ReportGeneration. It never owns
 // report content and it cannot modify Evaluation facts.
 type InterpretationRun struct {
-	id                 ID
-	generationID       meta.ID
-	attempt            int
-	status             Status
-	failure            *Failure
-	traceID            string
-	startedAt          *time.Time
-	leaseExpiresAt     *time.Time
-	finishedAt         *time.Time
-	origin             retrygovernance.AttemptOrigin
-	retryDecision      *retrygovernance.Decision
-	retryEventEvidence *evidence.EventEvidenceV1
-	claimHistory       []ClaimRecord
-	recoveryCount      int
-	lastReclaimedAt    *time.Time
+	id                        ID
+	generationID              meta.ID
+	attempt                   int
+	status                    Status
+	failure                   *Failure
+	traceID                   string
+	startedAt                 *time.Time
+	leaseExpiresAt            *time.Time
+	finishedAt                *time.Time
+	origin                    retrygovernance.AttemptOrigin
+	retryDecision             *retrygovernance.Decision
+	retryEventEvidence        *evidence.EventEvidenceV1
+	failedTransactionEvidence *evidence.EventEvidenceV2
+	claimHistory              []ClaimRecord
+	recoveryCount             int
+	lastReclaimedAt           *time.Time
 }
 
 func NewPending(id, generationID meta.ID, attempt int) (*InterpretationRun, error) {
@@ -141,21 +143,30 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 			return nil, fmt.Errorf("retry event evidence type mismatch")
 		}
 	}
+	if proof := input.FailedTransactionEvidence; proof != nil {
+		if input.Status != StatusFailed || input.FinishedAt == nil {
+			return nil, fmt.Errorf("failed transaction evidence requires a terminal failed run")
+		}
+		if err := validateFailureTransaction(proof, *input.FinishedAt); err != nil {
+			return nil, err
+		}
+	}
 	r := &InterpretationRun{
-		id:                 input.ID,
-		generationID:       input.GenerationID,
-		attempt:            input.Attempt,
-		status:             input.Status,
-		traceID:            input.TraceID,
-		startedAt:          copyTimePtr(input.StartedAt),
-		leaseExpiresAt:     copyTimePtr(input.LeaseExpiresAt),
-		finishedAt:         copyTimePtr(input.FinishedAt),
-		origin:             input.Origin,
-		retryDecision:      copyRetryDecision(input.RetryDecision),
-		retryEventEvidence: cloneEventEvidence(input.RetryEventEvidence),
-		claimHistory:       copyClaimHistory(input.ClaimHistory),
-		recoveryCount:      input.RecoveryCount,
-		lastReclaimedAt:    copyTimePtr(input.LastReclaimedAt),
+		id:                        input.ID,
+		generationID:              input.GenerationID,
+		attempt:                   input.Attempt,
+		status:                    input.Status,
+		traceID:                   input.TraceID,
+		startedAt:                 copyTimePtr(input.StartedAt),
+		leaseExpiresAt:            copyTimePtr(input.LeaseExpiresAt),
+		finishedAt:                copyTimePtr(input.FinishedAt),
+		origin:                    input.Origin,
+		retryDecision:             copyRetryDecision(input.RetryDecision),
+		retryEventEvidence:        cloneEventEvidence(input.RetryEventEvidence),
+		failedTransactionEvidence: input.FailedTransactionEvidence.Clone(),
+		claimHistory:              copyClaimHistory(input.ClaimHistory),
+		recoveryCount:             input.RecoveryCount,
+		lastReclaimedAt:           copyTimePtr(input.LastReclaimedAt),
 	}
 	if input.Failure != nil {
 		failure := *input.Failure
@@ -165,21 +176,22 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 }
 
 type RestoreInput struct {
-	ID                 ID
-	GenerationID       meta.ID
-	Attempt            int
-	Status             Status
-	Failure            *Failure
-	TraceID            string
-	StartedAt          *time.Time
-	LeaseExpiresAt     *time.Time
-	FinishedAt         *time.Time
-	Origin             retrygovernance.AttemptOrigin
-	RetryDecision      *retrygovernance.Decision
-	RetryEventEvidence *evidence.EventEvidenceV1
-	ClaimHistory       []ClaimRecord
-	RecoveryCount      int
-	LastReclaimedAt    *time.Time
+	ID                        ID
+	GenerationID              meta.ID
+	Attempt                   int
+	Status                    Status
+	Failure                   *Failure
+	TraceID                   string
+	StartedAt                 *time.Time
+	LeaseExpiresAt            *time.Time
+	FinishedAt                *time.Time
+	Origin                    retrygovernance.AttemptOrigin
+	RetryDecision             *retrygovernance.Decision
+	RetryEventEvidence        *evidence.EventEvidenceV1
+	FailedTransactionEvidence *evidence.EventEvidenceV2
+	ClaimHistory              []ClaimRecord
+	RecoveryCount             int
+	LastReclaimedAt           *time.Time
 }
 
 func Next(id meta.ID, latest *InterpretationRun) (*InterpretationRun, error) {
@@ -404,6 +416,36 @@ func cloneEventEvidence(value *evidence.EventEvidenceV1) *evidence.EventEvidence
 }
 func (r *InterpretationRun) RetryEventEvidence() *evidence.EventEvidenceV1 {
 	return cloneEventEvidence(r.retryEventEvidence)
+}
+
+// Failure evidence belongs to this attempt. Future retry authorization remains
+// separate and may change without rewriting the original failed event.
+func (r *InterpretationRun) FailedTransactionEvidence() *evidence.EventEvidenceV2 {
+	return r.failedTransactionEvidence.Clone()
+}
+
+func (r *InterpretationRun) AttachFailureTransactionEvidence(proof *evidence.EventEvidenceV2) error {
+	if r == nil || r.status != StatusFailed || r.finishedAt == nil {
+		return fmt.Errorf("failure evidence requires a terminal failed run")
+	}
+	if err := validateFailureTransaction(proof, *r.finishedAt); err != nil {
+		return err
+	}
+	if previous := r.failedTransactionEvidence; previous != nil && (!bytes.Equal(previous.TransactionReference, proof.TransactionReference) || previous.Reference != proof.Reference || previous.BusinessBindingSHA256 != proof.BusinessBindingSHA256) {
+		return fmt.Errorf("failed event transaction evidence is immutable")
+	}
+	r.failedTransactionEvidence = proof.Clone()
+	return nil
+}
+
+func validateFailureTransaction(proof *evidence.EventEvidenceV2, at time.Time) error {
+	if err := proof.Validate(); err != nil {
+		return err
+	}
+	if proof.Reference.EventType != eventcatalog.InterpretationReportFailed || !proof.RecordedAt.Equal(at) {
+		return fmt.Errorf("failed transaction evidence type or completion time mismatch")
+	}
+	return nil
 }
 
 func (r *InterpretationRun) AuthorizeOneRetry(origin retrygovernance.AttemptOrigin, requestID, eventID string, at time.Time) error {

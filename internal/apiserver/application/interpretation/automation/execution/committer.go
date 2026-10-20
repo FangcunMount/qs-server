@@ -37,6 +37,13 @@ type InterpretationCommitter interface {
 	CommitFailure(ctx context.Context, request CommitFailureRequest) (*CommitResult, error)
 }
 
+// PendingCommitRecovery resolves the first frozen terminal operation before
+// Start may reclaim a lease or the executor may invoke a builder. Unknown or
+// Aborted protocol executions do not authorize another business execution.
+type PendingCommitRecovery interface {
+	RecoverPending(context.Context, domaingeneration.Key, int64) (*CommitResult, bool, error)
+}
+
 type CommitSuccessRequest struct {
 	Generation           *domaingeneration.ReportGeneration
 	Run                  *interpretationrun.InterpretationRun
@@ -307,6 +314,7 @@ func cloneGeneration(source *domaingeneration.ReportGeneration) (*domaingenerati
 		ID: source.ID(), Key: source.Key(), Status: source.Status(), LatestRunID: source.LatestRunID(), ReportID: source.ReportID(),
 		Version: source.Version(), CreatedAt: source.CreatedAt(), UpdatedAt: source.UpdatedAt(),
 		GeneratedEventID: source.GeneratedEventID(), GeneratedEventEvidence: source.GeneratedEventEvidence(),
+		GeneratedTransactionEvidence: source.GeneratedTransactionEvidence(),
 	})
 }
 
@@ -318,7 +326,9 @@ func cloneRun(source *interpretationrun.InterpretationRun) (*interpretationrun.I
 		ID: source.ID(), GenerationID: source.GenerationID(), Attempt: source.Attempt(), Status: source.Status(), Failure: source.Failure(), TraceID: source.TraceID(),
 		StartedAt: source.StartedAt(), LeaseExpiresAt: source.LeaseExpiresAt(), FinishedAt: source.FinishedAt(),
 		Origin: source.Origin(), RetryDecision: source.RetryDecision(),
-		RetryEventEvidence: source.RetryEventEvidence(),
+		RetryEventEvidence:        source.RetryEventEvidence(),
+		FailedTransactionEvidence: source.FailedTransactionEvidence(),
+		ClaimHistory:              source.ClaimHistory(), RecoveryCount: source.RecoveryCount(), LastReclaimedAt: source.LastReclaimedAt(),
 	})
 }
 

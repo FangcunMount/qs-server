@@ -15,7 +15,10 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 type GenerationRepository struct {
@@ -26,7 +29,7 @@ type GenerationRepository struct {
 const generationTransactionSchemaVersion uint32 = 1
 
 func NewGenerationRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*GenerationRepository, error) {
-	repo := &GenerationRepository{BaseRepository: base.NewBaseRepository(db, (ReportGenerationPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
+	repo := NewGenerationRepositoryWithoutSchema(db, opts...)
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), generationIndexModels()); err != nil {
 		return nil, fmt.Errorf("create report generation indexes: %w", err)
 	}
@@ -49,6 +52,11 @@ func (r *GenerationRepository) Create(ctx context.Context, domain *generation.Re
 	po := r.mapper.GenerationToPO(domain)
 	if po == nil {
 		return fmt.Errorf("report generation is required")
+	}
+	if proof := domain.GeneratedTransactionEvidence(); proof != nil {
+		if err := r.requireOriginalTransaction(ctx, proof); err != nil {
+			return err
+		}
 	}
 	po.TransactionSchemaVersion = generationTransactionSchemaVersion
 	if _, err := r.InsertOne(ctx, po); err != nil {
@@ -108,8 +116,13 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 		return generation.ErrVersionConflict
 	}
 	po := r.mapper.GenerationToPO(domain)
-	if domain.Status() == generation.StatusGenerated && (domain.GeneratedEventEvidence() == nil || domain.GeneratedEventID() == "") {
+	if domain.Status() == generation.StatusGenerated && ((domain.GeneratedEventEvidence() == nil && domain.GeneratedTransactionEvidence() == nil) || domain.GeneratedEventID() == "") {
 		return fmt.Errorf("generated event reference is required for native save")
+	}
+	if proof := domain.GeneratedTransactionEvidence(); proof != nil {
+		if err := r.requireOriginalTransaction(ctx, proof); err != nil {
+			return err
+		}
 	}
 	set := bson.M{
 		"status":                     po.Status,
@@ -127,6 +140,9 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 	if po.GeneratedEventEvidence != nil {
 		set["generated_event_evidence"] = po.GeneratedEventEvidence
 	}
+	if po.GeneratedTransactionEvidence != nil {
+		set["generated_transaction_evidence"] = po.GeneratedTransactionEvidence
+	}
 	update := bson.M{"$set": set}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64(), "version": expectedVersion}, update)
 	if err != nil {
@@ -138,13 +154,27 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 	return nil
 }
 
+func (r *GenerationRepository) requireOriginalTransaction(ctx context.Context, proof *evidence.EventEvidenceV2) error {
+	if err := proof.Validate(); err != nil {
+		return err
+	}
+	ref, err := transaction.DecodeReference(proof.TransactionReference)
+	if err != nil || ref.Owner != "qs.mongo" {
+		return transaction.ErrBinding
+	}
+	if r == nil {
+		return transaction.ErrTransactionRequired
+	}
+	return guarded.RequireOriginal(ctx, r.DB(), proof)
+}
+
 type RunRepository struct {
 	base.BaseRepository
 	mapper *LifecycleMapper
 }
 
 func NewRunRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*RunRepository, error) {
-	repo := &RunRepository{BaseRepository: base.NewBaseRepository(db, (InterpretationRunPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
+	repo := NewRunRepositoryWithoutSchema(db, opts...)
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), runIndexModels()); err != nil {
 		return nil, fmt.Errorf("create interpretation run indexes: %w", err)
 	}
@@ -304,6 +334,11 @@ func (r *RunRepository) Create(ctx context.Context, domain *interpretationrun.In
 	if po == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
+	if proof := domain.FailedTransactionEvidence(); proof != nil {
+		if err := guarded.RequireOriginal(ctx, r.DB(), proof); err != nil {
+			return err
+		}
+	}
 	now := time.Now()
 	po.CreatedAt = now
 	po.UpdatedAt = now
@@ -351,6 +386,11 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 	if po == nil {
 		return fmt.Errorf("interpretation run is required")
 	}
+	if proof := domain.FailedTransactionEvidence(); proof != nil {
+		if err := guarded.RequireOriginal(ctx, r.DB(), proof); err != nil {
+			return err
+		}
+	}
 	if po.RetryEventID != "" && po.RetryEventEvidence == nil {
 		return fmt.Errorf("retry original event evidence is required for native save")
 	}
@@ -368,8 +408,9 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 		"attempt_origin": po.AttemptOrigin, "retry_disposition": po.RetryDisposition,
 		"next_attempt_at": po.NextAttemptAt, "policy_max_attempts": po.PolicyMaxAttempts,
 		"retry_policy_version": po.RetryPolicyVersion, "retry_event_id": po.RetryEventID,
-		"retry_event_evidence": po.RetryEventEvidence,
-		"action_request_id":    po.ActionRequestID, "recovery_count": po.RecoveryCount,
+		"retry_event_evidence":        po.RetryEventEvidence,
+		"failed_transaction_evidence": po.FailedTransactionEvidence,
+		"action_request_id":           po.ActionRequestID, "recovery_count": po.RecoveryCount,
 		"last_reclaimed_at": po.LastReclaimedAt, "claim_history": po.ClaimHistory,
 		"updated_at": time.Now(),
 	}}
@@ -389,7 +430,7 @@ type ReportRepository struct {
 }
 
 func NewReportRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*ReportRepository, error) {
-	repo := &ReportRepository{BaseRepository: base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
+	repo := NewReportRepositoryWithoutSchema(db, opts...)
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), reportIndexModels()); err != nil {
 		return nil, fmt.Errorf("create interpretation report indexes: %w", err)
 	}

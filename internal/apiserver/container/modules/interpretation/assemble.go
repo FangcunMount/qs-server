@@ -3,6 +3,8 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	mongoEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"io"
 	"time"
 
@@ -49,6 +51,7 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
+	transactionOwner       *mongoEventTx.Owner
 	aiMessagingRuntime     messagingLifecycle
 	aiMessagingReader      *bridgeStore.MessagingReader
 	aiOperations           *bridge.OperationAdministration
@@ -100,15 +103,17 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the report module.
 type Deps struct {
-	MySQLDB            *gorm.DB
-	MySQLLimiter       backpressure.Acquirer
-	MongoDB            *mongo.Database
-	MongoLimiter       backpressure.Acquirer
-	OpsHandle          *redisruntime.Handle
-	ReportStatusConfig reportstatus.Config
-	OutboxProfile      appEventing.ProfileBinding
-	RunLeaseDuration   time.Duration
-	AIWorkflow         *apiserveroptions.AIWorkflowOptions
+	MySQLDB               *gorm.DB
+	MySQLLimiter          backpressure.Acquirer
+	MongoDB               *mongo.Database
+	MongoLimiter          backpressure.Acquirer
+	OpsHandle             *redisruntime.Handle
+	ReportStatusConfig    reportstatus.Config
+	OutboxProfile         appEventing.ProfileBinding
+	RunLeaseDuration      time.Duration
+	AIWorkflow            *apiserveroptions.AIWorkflowOptions
+	EventTransactionOwner *mongoEventTx.Owner
+	TransactionRoutes     eventcatalog.TopicResolver
 }
 
 // New assembles the report module.
@@ -120,7 +125,12 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
 	}
 
-	module := &Module{}
+	selected := deps.EventTransactionOwner != nil
+	if selected && (!deps.EventTransactionOwner.UsesDatabase(deps.MongoDB) || deps.TransactionRoutes == nil) || !selected && deps.TransactionRoutes != nil {
+		return nil, fmt.Errorf("report transaction owner and routes must bind the original database together")
+	}
+
+	module := &Module{transactionOwner: deps.EventTransactionOwner}
 	if deps.AIWorkflow != nil {
 		module.aiWorkflowEnabled = deps.AIWorkflow.Enabled
 	}
@@ -138,7 +148,12 @@ func New(deps Deps) (*Module, error) {
 	reportReadModel := mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
 	module.reader = reportReadModel
 	module.reportCatalog = reportReadModel
-	catalogReconcileStore, err := mongoEval.NewCatalogReconcileStore(deps.MongoDB, mongoOptions)
+	var catalogReconcileStore *mongoEval.CatalogReconcileStore
+	if selected {
+		catalogReconcileStore = mongoEval.NewCatalogReconcileStoreWithoutSchema(deps.MongoDB, mongoOptions)
+	} else {
+		catalogReconcileStore, err = mongoEval.NewCatalogReconcileStore(deps.MongoDB, mongoOptions)
+	}
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog reconcile store: %v", err)
 	}
@@ -147,17 +162,32 @@ func New(deps Deps) (*Module, error) {
 	catalogService := interpretationcatalog.NewService(catalogStoreAdapter, catalogStoreAdapter)
 	module.catalogReconcile = catalogService
 	module.catalogAudit = catalogService
-	generationRepo, err := mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
+	var generationRepo *mongoEval.GenerationRepository
+	if selected {
+		generationRepo = mongoEval.NewGenerationRepositoryWithoutSchema(deps.MongoDB, mongoOptions)
+	} else {
+		generationRepo, err = mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
+	}
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation repository: %v", err)
 	}
 	module.generationRepo = generationRepo
-	runRepo, err := mongoEval.NewRunRepository(deps.MongoDB, mongoOptions)
+	var runRepo *mongoEval.RunRepository
+	if selected {
+		runRepo = mongoEval.NewRunRepositoryWithoutSchema(deps.MongoDB, mongoOptions)
+	} else {
+		runRepo, err = mongoEval.NewRunRepository(deps.MongoDB, mongoOptions)
+	}
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation run repository: %v", err)
 	}
 	module.runRepo = runRepo
-	reportRepo, err := mongoEval.NewReportRepository(deps.MongoDB, mongoOptions)
+	var reportRepo *mongoEval.ReportRepository
+	if selected {
+		reportRepo = mongoEval.NewReportRepositoryWithoutSchema(deps.MongoDB, mongoOptions)
+	} else {
+		reportRepo, err = mongoEval.NewReportRepository(deps.MongoDB, mongoOptions)
+	}
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation report repository: %v", err)
 	}
@@ -168,13 +198,23 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report template manifest catalog: %v", err)
 	}
-	reportTemplateRepo, err := mongoEval.NewReportTemplateRepository(deps.MongoDB, reportTemplateManifests, mongoOptions)
+	var reportTemplateRepo *mongoEval.ReportTemplateRepository
+	if selected {
+		reportTemplateRepo, err = mongoEval.NewReportTemplateRepositoryWithoutSchema(deps.MongoDB, reportTemplateManifests, mongoOptions)
+	} else {
+		reportTemplateRepo, err = mongoEval.NewReportTemplateRepository(deps.MongoDB, reportTemplateManifests, mongoOptions)
+	}
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report template repository: %v", err)
 	}
 	module.reportTemplateRepo = reportTemplateRepo
 	module.reportTemplateService = appreporttemplate.NewService(reportTemplateRepo, reportTemplateManifests)
-	catalogProjector, err := mongoEval.NewReportCatalogProjector(deps.MongoDB, mongoOptions)
+	var catalogProjector *mongoEval.ReportCatalogProjector
+	if selected {
+		catalogProjector = mongoEval.NewReportCatalogProjectorWithoutSchema(deps.MongoDB, mongoOptions)
+	} else {
+		catalogProjector, err = mongoEval.NewReportCatalogProjector(deps.MongoDB, mongoOptions)
+	}
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)
 	}
@@ -205,7 +245,12 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationexecution.NewInterpretationCommitter(commitTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit, catalogProjector)
+		var committer interpretationexecution.InterpretationCommitter
+		if selected {
+			committer, err = mongoEval.NewTransactionCommitter(deps.MongoDB, deps.EventTransactionOwner, commitTxRunner, deps.TransactionRoutes, mongoOptions)
+		} else {
+			committer, err = interpretationexecution.NewInterpretationCommitter(commitTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit, catalogProjector)
+		}
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}

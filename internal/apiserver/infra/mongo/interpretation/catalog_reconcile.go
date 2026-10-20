@@ -241,19 +241,20 @@ type CatalogReconcileStore struct {
 }
 
 func NewCatalogReconcileStore(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*CatalogReconcileStore, error) {
-	store := &CatalogReconcileStore{db: db}
+	store := NewCatalogReconcileStoreWithoutSchema(db, opts...)
 	if db != nil {
-		store.repairPlans = base.NewBaseRepository(db, catalogRepairPlanCollection, opts...)
-		store.catalog = base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...)
-		store.reports = base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...)
-		if _, err := db.Collection(catalogRepairPlanCollection).Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-			{Keys: bson.D{{Key: "dry_run_id", Value: 1}}, Options: options.Index().SetName("uk_catalog_repair_dry_run").SetUnique(true)},
-			{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetName("ttl_catalog_repair_plan").SetExpireAfterSeconds(0)},
-		}); err != nil {
+		if _, err := db.Collection(catalogRepairPlanCollection).Indexes().CreateMany(context.Background(), catalogRepairIndexModels()); err != nil {
 			return nil, fmt.Errorf("ensure catalog repair plan indexes: %w", err)
 		}
 	}
 	return store, nil
+}
+
+func catalogRepairIndexModels() []mongo.IndexModel {
+	return []mongo.IndexModel{
+		{Keys: bson.D{{Key: "dry_run_id", Value: 1}}, Options: options.Index().SetName("uk_catalog_repair_dry_run").SetUnique(true)},
+		{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetName("ttl_catalog_repair_plan").SetExpireAfterSeconds(0)},
+	}
 }
 
 func (s *CatalogReconcileStore) loadCatalogSourceAssociations(

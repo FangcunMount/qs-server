@@ -54,16 +54,17 @@ func (s Status) IsValid() bool {
 // ReportGeneration is the aggregate root for a requested report. It tracks
 // only intent, current attempt and successful report reference.
 type ReportGeneration struct {
-	id                     ID
-	key                    Key
-	status                 Status
-	latestRunID            meta.ID
-	reportID               meta.ID
-	generatedEventID       string
-	generatedEventEvidence *evidence.EventEvidenceV1
-	version                uint64
-	createdAt              time.Time
-	updatedAt              time.Time
+	id                           ID
+	key                          Key
+	status                       Status
+	latestRunID                  meta.ID
+	reportID                     meta.ID
+	generatedEventID             string
+	generatedEventEvidence       *evidence.EventEvidenceV1
+	generatedTransactionEvidence *evidence.EventEvidenceV2
+	version                      uint64
+	createdAt                    time.Time
+	updatedAt                    time.Time
 }
 
 func New(id ID, key Key, at time.Time) (*ReportGeneration, error) {
@@ -101,7 +102,17 @@ func Restore(input RestoreInput) (*ReportGeneration, error) {
 	if input.UpdatedAt.Before(input.CreatedAt) {
 		return nil, fmt.Errorf("report generation updated at precedes created at")
 	}
-	if input.GeneratedEventEvidence != nil {
+	if input.GeneratedEventEvidence != nil && input.GeneratedTransactionEvidence != nil {
+		return nil, fmt.Errorf("report generation cannot mix event evidence protocols")
+	}
+	if proof := input.GeneratedTransactionEvidence; proof != nil {
+		if err := validateTransactionEvidence(proof, input.GeneratedEventID, input.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if input.Status != StatusGenerated {
+			return nil, fmt.Errorf("transaction generated evidence requires generated state")
+		}
+	} else if input.GeneratedEventEvidence != nil {
 		if err := input.GeneratedEventEvidence.Validate(); err != nil {
 			return nil, err
 		}
@@ -129,30 +140,32 @@ func Restore(input RestoreInput) (*ReportGeneration, error) {
 		}
 	}
 	return &ReportGeneration{
-		id:                     input.ID,
-		key:                    input.Key,
-		status:                 input.Status,
-		latestRunID:            input.LatestRunID,
-		reportID:               input.ReportID,
-		generatedEventID:       input.GeneratedEventID,
-		generatedEventEvidence: cloneEvidence(input.GeneratedEventEvidence),
-		version:                input.Version,
-		createdAt:              input.CreatedAt,
-		updatedAt:              input.UpdatedAt,
+		id:                           input.ID,
+		key:                          input.Key,
+		status:                       input.Status,
+		latestRunID:                  input.LatestRunID,
+		reportID:                     input.ReportID,
+		generatedEventID:             input.GeneratedEventID,
+		generatedEventEvidence:       cloneEvidence(input.GeneratedEventEvidence),
+		generatedTransactionEvidence: input.GeneratedTransactionEvidence.Clone(),
+		version:                      input.Version,
+		createdAt:                    input.CreatedAt,
+		updatedAt:                    input.UpdatedAt,
 	}, nil
 }
 
 type RestoreInput struct {
-	ID                     ID
-	Key                    Key
-	Status                 Status
-	LatestRunID            meta.ID
-	ReportID               meta.ID
-	GeneratedEventID       string
-	GeneratedEventEvidence *evidence.EventEvidenceV1
-	Version                uint64
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                           ID
+	Key                          Key
+	Status                       Status
+	LatestRunID                  meta.ID
+	ReportID                     meta.ID
+	GeneratedEventID             string
+	GeneratedEventEvidence       *evidence.EventEvidenceV1
+	GeneratedTransactionEvidence *evidence.EventEvidenceV2
+	Version                      uint64
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
 }
 
 // Begin associates a newly created InterpretationRun with this Generation.
@@ -213,6 +226,33 @@ func (g *ReportGeneration) SucceedWithEvidence(runID, reportID meta.ID, at time.
 	return nil
 }
 
+// SucceedWithTransactionEvidence retains a reference to the original reserved
+// branch. The reference is not proof of a committed witness or consumer effect.
+func (g *ReportGeneration) SucceedWithTransactionEvidence(runID, reportID meta.ID, at time.Time, proof *evidence.EventEvidenceV2) error {
+	if proof == nil {
+		return fmt.Errorf("transaction generated evidence is required")
+	}
+	if err := validateTransactionEvidence(proof, proof.Reference.EventID, at); err != nil {
+		return err
+	}
+	if err := g.Succeed(runID, reportID, at); err != nil {
+		return err
+	}
+	g.generatedEventID = proof.Reference.EventID
+	g.generatedTransactionEvidence = proof.Clone()
+	return nil
+}
+
+func validateTransactionEvidence(proof *evidence.EventEvidenceV2, eventID string, at time.Time) error {
+	if err := proof.Validate(); err != nil {
+		return err
+	}
+	if proof.Reference.EventID != eventID || proof.Reference.EventType != eventcatalog.InterpretationReportGenerated || !proof.RecordedAt.Equal(at) {
+		return fmt.Errorf("generated transaction evidence identity or completion time mismatch")
+	}
+	return nil
+}
+
 func cloneEvidence(value *evidence.EventEvidenceV1) *evidence.EventEvidenceV1 {
 	if value == nil {
 		return nil
@@ -223,6 +263,10 @@ func cloneEvidence(value *evidence.EventEvidenceV1) *evidence.EventEvidenceV1 {
 func (g *ReportGeneration) GeneratedEventID() string { return g.generatedEventID }
 func (g *ReportGeneration) GeneratedEventEvidence() *evidence.EventEvidenceV1 {
 	return cloneEvidence(g.generatedEventEvidence)
+}
+
+func (g *ReportGeneration) GeneratedTransactionEvidence() *evidence.EventEvidenceV2 {
+	return g.generatedTransactionEvidence.Clone()
 }
 
 func (g *ReportGeneration) Fail(runID meta.ID, at time.Time) error {

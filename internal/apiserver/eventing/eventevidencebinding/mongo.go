@@ -81,6 +81,27 @@ func Retry(value eventoutcome.InterpretationRetryRequestedPayload) (string, erro
 	return evidence.BindingDigest(eventcatalog.InterpretationRetryRequested, fields...), nil
 }
 
+// Failed binds the immutable failure decision, independently of any later
+// explicit business retry authorization on the same Run.
+func Failed(value eventoutcome.ReportFailedPayload) (string, error) {
+	if value.OrgID <= 0 || value.GenerationID == "" || value.RunID == "" || value.AssessmentID == "" || value.OutcomeID == "" || value.TesteeID == 0 || value.Attempt < 1 || value.FailedAt.IsZero() || value.FailureKind == "" || value.FailureCode == "" {
+		return "", fmt.Errorf("failed evidence business identity is incomplete")
+	}
+	fields := []*string{signed(value.OrgID), text(value.GenerationID), text(value.RunID), text(value.AssessmentID), text(value.OutcomeID), integer(value.TesteeID), integer(uint64(value.Attempt)), text(value.ReportType), text(value.TemplateVersion),
+		text(value.FailureKind), text(value.FailureCode), text(strconv.FormatBool(value.Retryable)), text(value.SafeReason), clock(value.FailedAt)}
+	if d := value.RetryDecision; d == nil {
+		fields = append(fields, nil)
+	} else {
+		fields = append(fields, text(d.Disposition), text(strconv.FormatBool(d.Retryable)), signed(int64(d.Attempt)), signed(int64(d.MaxAutomaticAttempts)), signed(int64(d.RemainingAutomaticAttempts)), text(d.RetryEventID), text(d.ActionRequestID), text(d.PolicyVersion))
+		if d.NextAttemptAt == nil {
+			fields = append(fields, nil)
+		} else {
+			fields = append(fields, clock(*d.NextAttemptAt))
+		}
+	}
+	return evidence.BindingDigest(eventcatalog.InterpretationReportFailed, fields...), nil
+}
+
 func number(value float64) (*string, error) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return nil, fmt.Errorf("non-finite evidence score")

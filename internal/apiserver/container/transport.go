@@ -578,6 +578,9 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	}
 	if c.mongoDB != nil && c.mysqlDB != nil {
 		scanner := mongomongoconsistency.NewScanner(c.mongoDB, c.MongoLimiter())
+		if c.ReportModule != nil && c.ReportModule.TransactionOwner() != nil {
+			scanner.WithTransactionOwner(c.ReportModule.TransactionOwner())
+		}
 		if c.EvaluationModule != nil {
 			scanner.WithOutcomeFacts(c.EvaluationModule.OutcomeRepository())
 		}

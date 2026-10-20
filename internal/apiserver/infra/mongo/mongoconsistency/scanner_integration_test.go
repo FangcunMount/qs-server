@@ -426,17 +426,29 @@ func insertAuditDriftFixtures(t *testing.T, ctx context.Context, db *mongo.Datab
 	mustInsertMany(t, ctx, db.Collection("answersheets"), []any{
 		bson.M{"domain_id": uint64(101), "durable_acceptance": bson.M{"schema_version": 1, "event_id": "evt-sheet-missing"}},
 	})
+	// V2 defects retain their own diagnostic classes, rather than being
+	// relabeled missing Outbox. These deliberately malformed fixtures do not
+	// need a running producer/authority to prove fail-closed classification.
+	brokenV2, _ := newSheetFixture(t, 105)
+	brokenV2.DurableAcceptance.SchemaVersion = 2
+	brokenV2.DurableAcceptance.EventEvidence = nil
+	brokenV2.DurableAcceptance.TransactionEvidence = &evidence.EventEvidenceV2{Version: 2}
+	mustInsertMany(t, ctx, db.Collection("answersheets"), []any{brokenV2})
 	_, row := newSheetFixture(t, 102)
 	mustInsertMany(t, ctx, db.Collection("rm_outbox"), []any{row})
 	mustInsertMany(t, ctx, db.Collection("report_generations"), []any{
 		bson.M{"domain_id": uint64(201), "transaction_schema_version": 1, "status": "generating", "latest_run_id": uint64(0)},
 		bson.M{"domain_id": uint64(202), "transaction_schema_version": 1, "status": "generating", "latest_run_id": uint64(302)},
 		bson.M{"domain_id": uint64(203), "transaction_schema_version": 1, "status": "generated", "latest_run_id": uint64(303), "report_id": uint64(403)},
+		bson.M{"domain_id": uint64(205), "transaction_schema_version": 1, "status": "generated", "latest_run_id": uint64(305), "report_id": uint64(405), "generated_transaction_evidence": evidence.EventEvidenceV2{Version: 2}},
+		bson.M{"domain_id": uint64(206), "transaction_schema_version": 1, "status": "failed", "latest_run_id": uint64(306)},
 	})
 	mustInsertMany(t, ctx, db.Collection("interpretation_runs"), []any{
 		bson.M{"domain_id": uint64(302), "generation_id": uint64(999), "status": "failed"},
 		bson.M{"domain_id": uint64(303), "generation_id": uint64(203), "status": "succeeded"},
 		bson.M{"domain_id": uint64(304), "generation_id": uint64(204), "status": "failed", "retry_event_id": "evt-retry-missing"},
+		bson.M{"domain_id": uint64(305), "generation_id": uint64(205), "status": "succeeded"},
+		bson.M{"domain_id": uint64(306), "generation_id": uint64(206), "status": "failed", "failure": bson.M{}, "finished_at": time.Now(), "failed_transaction_evidence": evidence.EventEvidenceV2{Version: 2}},
 	})
 	mustInsertMany(t, ctx, db.Collection("assessment_models"), []any{
 		bson.M{"domain_id": uint64(801), "record_role": "head", "status": "published", "code": "missing-active", "kind": "scale", "algorithm": "scale_default", "questionnaire_code": "q1", "questionnaire_version": "v1"},
