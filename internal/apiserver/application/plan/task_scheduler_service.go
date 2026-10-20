@@ -154,6 +154,20 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 			continue
 		}
 
+		if s.persistence.transactionalOpening() {
+			original, handled, err := s.persistence.openingOptions.Transaction.RecoverOpened(ctx, task)
+			if err != nil {
+				failedCount++
+				continue
+			}
+			if handled {
+				if original != nil && original.GetStatus() == plan.TaskStatusOpened {
+					openedTasks = append(openedTasks, original)
+				}
+				continue
+			}
+		}
+
 		// 生成入口
 		url, err := s.entryGenerator.GenerateEntry(ctx, task)
 		if err != nil {
@@ -179,7 +193,16 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 持久化任务
-		staged, err := s.persistence.saveOpened(ctx, task)
+		staged, err := s.persistence.saveOpenedWithGuard(ctx, task, func(root context.Context, candidate *plan.AssessmentTask) error {
+			current, err := s.taskRepo.FindByID(root, candidate.GetID())
+			if err != nil {
+				return err
+			}
+			if current == nil || current.GetOrgID() != candidate.GetOrgID() || current.GetScheduleRevision() != candidate.GetScheduleRevision() || current.GetTesteeID() != candidate.GetTesteeID() {
+				return errors.WithCode(errorCode.ErrConflict, "task opening schedule changed")
+			}
+			return validateTaskOpenAdmission(root, current, openedAt, s.planRepo, s.enrollmentRepo)
+		})
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to save opened task",
 				"action", "schedule_pending_tasks",

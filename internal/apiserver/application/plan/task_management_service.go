@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
+	tasktransaction "github.com/FangcunMount/qs-server/internal/apiserver/port/tasktransaction"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
@@ -52,6 +53,10 @@ func NewTaskManagementService(
 
 // OpenTask 开放任务
 func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
+	return s.openTask(ctx, orgID, taskID, nil)
+}
+
+func (s *taskManagementService) openTask(ctx context.Context, orgID int64, taskID string, authority tasktransaction.LocalGuard) (*TaskResult, error) {
 	logger.L(ctx).Infow("Opening task",
 		"action", "open_task",
 		"org_id", orgID,
@@ -62,6 +67,18 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	task, err := s.loadTaskForTransition(ctx, orgID, taskID, "open_task")
 	if err != nil {
 		return nil, err
+	}
+	if s.persistence.transactionalOpening() {
+		original, handled, err := s.persistence.openingOptions.Transaction.RecoverOpened(ctx, task)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			if original == nil {
+				return nil, errors.WithCode(errorCode.ErrDatabase, "original opening is unresolved")
+			}
+			return toTaskResult(original), nil
+		}
 	}
 	openedAt := time.Now()
 	if err := s.validateOpenAdmission(ctx, task, openedAt); err != nil {
@@ -90,7 +107,21 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 4. 持久化
-	staged, err := s.persistence.saveOpened(ctx, task)
+	staged, err := s.persistence.saveOpenedWithGuard(ctx, task, func(root context.Context, candidate *plan.AssessmentTask) error {
+		if authority != nil {
+			if err := authority(root, candidate); err != nil {
+				return err
+			}
+		}
+		current, err := s.loadTaskForTransition(root, orgID, taskID, "open_task")
+		if err != nil {
+			return err
+		}
+		if current.GetScheduleRevision() != candidate.GetScheduleRevision() || current.GetTesteeID() != candidate.GetTesteeID() {
+			return errors.WithCode(errorCode.ErrConflict, "task opening schedule changed")
+		}
+		return s.validateOpenAdmission(root, current, openedAt)
+	})
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to save opened task",
 			"action", "open_task",
@@ -121,17 +152,21 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 }
 
 func (s *taskManagementService) validateOpenAdmission(ctx context.Context, task *plan.AssessmentTask, actionAt time.Time) error {
+	return validateTaskOpenAdmission(ctx, task, actionAt, s.planRepo, s.enrollmentRepo)
+}
+
+func validateTaskOpenAdmission(ctx context.Context, task *plan.AssessmentTask, actionAt time.Time, plans plan.AssessmentPlanRepository, enrollments plan.EnrollmentRepository) error {
 	if actionAt.Before(task.GetPlannedAt()) || !actionAt.Before(plan.TaskOpenWindowEndsAt(task.GetPlannedAt())) {
 		return errors.WithCode(errorCode.ErrInvalidArgument, "任务不在开放窗口内")
 	}
-	parent, err := s.planRepo.FindByID(ctx, task.GetPlanID())
+	parent, err := plans.FindByID(ctx, task.GetPlanID())
 	if err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询任务计划失败")
 	}
 	if parent == nil || parent.GetOrgID() != task.GetOrgID() || !parent.IsActive() {
 		return errors.WithCode(errorCode.ErrInvalidArgument, "任务计划未处于 active 状态")
 	}
-	enrollment, err := s.enrollmentRepo.FindByID(ctx, task.GetEnrollmentID())
+	enrollment, err := enrollments.FindByID(ctx, task.GetEnrollmentID())
 	if err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询任务参与轮次失败")
 	}

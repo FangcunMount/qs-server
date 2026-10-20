@@ -1,6 +1,8 @@
 package plan
 
 import (
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
@@ -29,6 +31,8 @@ type BootstrapInput struct {
 	TesteeAccess              actorAccessApp.TesteeAccessService
 	OpenedOutbox              appEventing.ProfileBinding
 	TaskOpenedReminderEnabled bool
+	EventTransactionOwner     *mysqlEventTx.Committer
+	TransactionRoutes         eventcatalog.TopicResolver
 }
 
 // Bootstrap assembles the plan module from container integration inputs.
