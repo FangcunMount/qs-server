@@ -3,6 +3,7 @@ package eventtransaction
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"sync"
@@ -24,6 +25,7 @@ type sender interface {
 }
 
 type Committer struct {
+	primary  *sql.DB
 	store    *txmysql.Store
 	uow      *hostmysql.UnitOfWork
 	sender   sender
@@ -67,11 +69,48 @@ func New(db *gorm.DB, o *options.MessagingOptions, resolver catalog.TopicResolve
 	for _, topic := range topics {
 		allowed[topic] = true
 	}
-	return &Committer{store: store, uow: hostmysql.NewUnitOfWork(db), sender: runtime, runtime: runtime, resolver: resolver, topics: allowed}, nil
+	return &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), sender: runtime, runtime: runtime, resolver: resolver, topics: allowed}, nil
 }
 
 func (c *Committer) Runtime() *messagingruntime.TransactionRuntime     { return c.runtime }
 func (c *Committer) Artifact(p transaction.FrozenPlan) ([]byte, error) { return Artifact(p) }
+
+func (c *Committer) Find(ctx context.Context, scope, key string) (transaction.Reservation, error) {
+	if _, nested := hostmysql.TxFromContext(ctx); nested {
+		return transaction.Reservation{}, transaction.ErrTransactionRequired
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	q := transaction.Request{Owner: owner, Scope: scope, Key: key}
+	if !q.Valid() {
+		return transaction.Reservation{}, transaction.ErrRequestIdentity
+	}
+	digest := q.KeyDigest()
+	var actualOwner, actualScope, actualKey string
+	var input []byte
+	// The SDK requires the original input hash even for Lookup. Recover that
+	// immutable hash from the fixed host primary, then let SDK Lookup validate
+	// binding, raw identity, plan and active execution at its fresh boundary.
+	err := c.primary.QueryRowContext(ctx, `SELECT owner,scope,idempotency_key,input_hash FROM rm_tx_request WHERE request_key=?`, digest[:]).Scan(&actualOwner, &actualScope, &actualKey, &input)
+	if errors.Is(err, sql.ErrNoRows) {
+		return transaction.Reservation{}, transaction.ErrNotFound
+	}
+	if err != nil {
+		return transaction.Reservation{}, err
+	}
+	if actualOwner != owner || actualScope != scope || actualKey != key || len(input) != len(q.InputHash) {
+		return transaction.Reservation{}, transaction.ErrRequestIdentity
+	}
+	copy(q.InputHash[:], input)
+	r, err := c.store.Lookup(ctx, q)
+	if err != nil {
+		return transaction.Reservation{}, err
+	}
+	if err := c.validatePlan(r.Execution.Plan); err != nil {
+		return transaction.Reservation{}, err
+	}
+	return r, nil
+}
 
 func (c *Committer) validatePlan(p transaction.FrozenPlan) error {
 	if _, err := Artifact(p); err != nil {

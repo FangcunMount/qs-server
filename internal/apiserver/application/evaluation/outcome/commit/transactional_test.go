@@ -9,6 +9,7 @@ import (
 	"time"
 
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -36,6 +37,18 @@ type outcomeBoundaryStub struct {
 	executes    int
 	request     port.Request
 	beforeWrite func()
+	execution   transaction.Execution
+	findErr     error
+}
+
+func (s *outcomeBoundaryStub) Find(context.Context, string, string) (transaction.Reservation, error) {
+	if s.findErr != nil {
+		return transaction.Reservation{}, s.findErr
+	}
+	if !s.execution.Plan.Valid() {
+		return transaction.Reservation{}, transaction.ErrNotFound
+	}
+	return transaction.Reservation{Execution: s.execution}, nil
 }
 
 func (s *outcomeBoundaryStub) Reserve(_ context.Context, q port.Request) (transaction.Reservation, error) {
@@ -59,7 +72,8 @@ func (s *outcomeBoundaryStub) Reserve(_ context.Context, q port.Request) (transa
 	}
 	p, err := transaction.NewPlan(transaction.PlanInput{Owner: "qs.mysql", Scope: intents[0].Message.Input().Scope, OperationID: q.Events[0].EventID(), IdempotencyKey: q.Key, InputHash: q.InputHash, Branches: branches})
 	require.NoError(s.t, err)
-	return transaction.Reservation{Acquired: s.acquired, State: transaction.Prepared, Execution: transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1", Token: [32]byte{1}, LeaseUntil: time.Now().Add(time.Minute)}}, nil
+	s.execution = transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1", Token: [32]byte{1}, LeaseUntil: time.Now().Add(time.Minute)}
+	return transaction.Reservation{Acquired: s.acquired, State: transaction.Prepared, Execution: s.execution}, nil
 }
 func (s *outcomeBoundaryStub) Artifact(p transaction.FrozenPlan) ([]byte, error) {
 	return p.Input().Branches[0].Message.Input().Payload, nil
@@ -167,4 +181,69 @@ func TestOutcomeArtifactKeepsOriginalBytesAndStableInput(t *testing.T) {
 	different, err := outcomeRequest(in, nil)
 	require.NoError(t, err)
 	require.NotEqual(t, a.InputHash, different.InputHash)
+}
+
+type recoveryRunRepo struct {
+	*commitRunRepoStub
+	latest *evalrun.EvaluationRun
+}
+
+func (r recoveryRunRepo) FindLatestByAssessmentID(context.Context, uint64) (*evalrun.EvaluationRun, error) {
+	return r.latest, nil
+}
+
+type recoveryOutcomeRepo struct{ *commitOutcomeRepoStub }
+
+func (r recoveryOutcomeRepo) FindByID(context.Context, domainoutcome.ID) (*domainoutcome.Record, error) {
+	return r.record, nil
+}
+
+type recoveryAssessmentRepo struct {
+	commitAssessmentRepoStub
+	stored *assessment.Assessment
+}
+
+func (r recoveryAssessmentRepo) FindByID(context.Context, assessment.ID) (*assessment.Assessment, error) {
+	return r.stored, nil
+}
+
+func TestPendingOutcomeRecoveryNeverReexecutesBusiness(t *testing.T) {
+	var order []string
+	boundary := &outcomeBoundaryStub{t: t, order: &order, acquired: true, local: transaction.LocalCommitted}
+	c, q, repo := transactionCommitFixture(t, boundary)
+	stale := *q.Assessment
+	record, err := c.Commit(t.Context(), q)
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	recovered, err := NewTransactionalCommitter(boundary, recoveryAssessmentRepo{commitAssessmentRepoStub{order: &order}, q.Assessment}, recoveryOutcomeRepo{repo}, recoveryRunRepo{&commitRunRepoStub{order: &order}, q.Run}, nil)
+	require.NoError(t, err)
+	checker := recovered.(PendingRecoverer)
+	for _, tc := range []struct {
+		name       string
+		state      transaction.LocalOutcome
+		findErr    error
+		successful bool
+	}{
+		{"prepared-blocks-expired-lease", transaction.LocalUnknown, nil, false},
+		{"aborted-requires-explicit-host-decision", transaction.LocalAborted, nil, false},
+		{"database-error-is-not-not-found", transaction.LocalCommitted, errors.New("database unavailable"), false},
+		{"committed-recovers-original-result", transaction.LocalCommitted, nil, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			boundary.local, boundary.findErr = tc.state, tc.findErr
+			candidate := stale
+			before := len(order)
+			handled, err := checker.RecoverPending(t.Context(), &candidate)
+			require.True(t, handled)
+			if tc.successful {
+				require.NoError(t, err)
+				require.True(t, candidate.Status().IsEvaluated())
+			} else {
+				require.Error(t, err)
+				require.True(t, candidate.Status().IsSubmitted())
+			}
+			require.Equal(t, before, len(order), "recovery wrote business facts or sent messages")
+			require.Equal(t, 1, boundary.executes)
+		})
+	}
 }

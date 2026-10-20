@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,6 +22,44 @@ import (
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 )
+
+// PendingRecoverer is consulted before claim/reclaim and before model input
+// resolution. A persisted result plan owns finalization even after its lease
+// expires; it cannot authorize another calculation.
+type PendingRecoverer interface {
+	RecoverPending(context.Context, *assessment.Assessment) (bool, error)
+}
+
+func (c *committer) RecoverPending(ctx context.Context, a *assessment.Assessment) (bool, error) {
+	if c.transaction == nil {
+		return false, nil
+	}
+	if a == nil || a.ID().IsZero() {
+		return true, port.ErrUnresolved
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	run, err := c.runRepo.FindLatestByAssessmentID(ctx, a.ID().Uint64())
+	if err != nil {
+		return true, fmt.Errorf("%w: %w", port.ErrUnresolved, err)
+	}
+	if run == nil {
+		return false, nil
+	}
+	r, err := c.transaction.Find(ctx, fmt.Sprintf("org:%d", a.OrgID()), "evaluation-outcome/"+run.ID().String())
+	if errors.Is(err, transaction.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return true, fmt.Errorf("%w: %w", port.ErrUnresolved, err)
+	}
+	record, _, err := c.recordForExecution(r.Execution)
+	if err != nil || record.RunID() != run.ID().String() || record.AssessmentID() != a.ID() || record.OrgID() != a.OrgID() {
+		return true, port.ErrUnresolved
+	}
+	_, err = c.recoverOutcome(ctx, CommitRequest{Assessment: a, Run: run}, record, r.Execution)
+	return true, err
+}
 
 // NewTransactionalCommitter explicitly selects the final transaction protocol.
 // No old stager, fallback provider or Relay wake is part of this boundary.
@@ -90,48 +129,17 @@ func (c *committer) commitTransactional(ctx context.Context, request CommitReque
 	if err != nil {
 		return nil, err
 	}
-	raw, err := c.transaction.Artifact(r.Execution.Plan)
+	record, raw, err := c.recordForExecution(r.Execution)
 	if err != nil {
 		return nil, err
 	}
-	in, err := readOutcomeArtifact(raw)
-	if err != nil {
+	if err := r.Execution.Plan.MatchRequest("qs.mysql", fmt.Sprintf("org:%d", candidate.OrgID), q.Key, q.InputHash); err != nil {
 		return nil, err
 	}
-	winnerRequest, err := outcomeRequest(in, nil)
-	if err != nil || winnerRequest.InputHash != q.InputHash || r.Execution.Plan.Input().IdempotencyKey != q.Key || r.Execution.Plan.Input().InputHash != q.InputHash || in.RunID != run.ID().String() || in.AssessmentID != prepared.ID() || in.OrgID != prepared.OrgID() {
+	if record.RunID() != run.ID().String() || record.AssessmentID() != prepared.ID() || record.OrgID() != prepared.OrgID() {
 		return nil, transaction.ErrInputConflict
 	}
-	branches, refs := r.Execution.Plan.Input().Branches, r.Execution.References()
-	if len(branches) != 1 || len(refs) != 1 || refs[0].Owner != "qs.mysql" || refs[0].Scope != fmt.Sprintf("org:%d", in.OrgID) {
-		return nil, transaction.ErrInvalidPlan
-	}
-	// The private artifact fingerprint and the consumer wire are independent.
-	// Bind the latter's typed business payload to the frozen outcome as well.
-	consumer := branches[0].Message.Input()
-	consumer.Payload = bytes.Clone(branches[0].Wire)
-	original, err := message.New(consumer)
-	if err != nil {
-		return nil, err
-	}
-	ref := standard.ReferenceFromMessage(original)
-	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
-	if err != nil {
-		return nil, err
-	}
-	var body assessment.EvaluationOutcomeCommittedData
-	if json.Unmarshal(envelope.Data, &body) != nil || envelope.AggregateID != in.AssessmentID.String() || body.OrgID != in.OrgID || body.AssessmentID != int64(in.AssessmentID.Uint64()) || body.TesteeID != in.TesteeID || body.OutcomeID != in.ID.String() || body.EvaluationRunID != in.RunID || !body.CommittedAt.Equal(in.EvaluatedAt) {
-		return nil, transaction.ErrInvalidPlan
-	}
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(branches[0].Message), refs[0], domainoutcome.BusinessBindingSHA256(in), in.EvaluatedAt)
-	if err != nil {
-		return nil, err
-	}
-	in.CommittedTransactionEvidence = proof
-	record, err := domainoutcome.NewRecord(in)
-	if err != nil {
-		return nil, err
-	}
+	refs := r.Execution.References()
 	if !r.Acquired {
 		return c.recoverOutcome(ctx, request, record, r.Execution)
 	}
@@ -140,7 +148,7 @@ func (c *committer) commitTransactional(ctx context.Context, request CommitReque
 	if !bytes.Equal(raw, q.Artifact) || refs[0].MessageID != completed.EventID() {
 		return nil, transaction.ErrInvalidPlan
 	}
-	if err := run.Succeed(in.EvaluatedAt); err != nil {
+	if err := run.Succeed(record.EvaluatedAt()); err != nil {
 		return nil, err
 	}
 	result, err := c.transaction.Commit(ctx, r.Execution, func(txCtx context.Context) error {
@@ -196,4 +204,50 @@ func (c *committer) recoverOutcome(ctx context.Context, request CommitRequest, f
 	a.ClearEvents()
 	*request.Assessment, *request.Run = *a, *run
 	return stored, nil
+}
+
+func (c *committer) recordForExecution(execution transaction.Execution) (*domainoutcome.Record, []byte, error) {
+	raw, err := c.transaction.Artifact(execution.Plan)
+	if err != nil {
+		return nil, nil, err
+	}
+	in, err := readOutcomeArtifact(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	winnerRequest, err := outcomeRequest(in, nil)
+	if err != nil || execution.Plan.Input().Owner != "qs.mysql" || execution.Plan.Input().IdempotencyKey != winnerRequest.Key || execution.Plan.Input().InputHash != winnerRequest.InputHash {
+		return nil, nil, transaction.ErrInputConflict
+	}
+	branches, refs := execution.Plan.Input().Branches, execution.References()
+	if len(branches) != 1 || len(refs) != 1 || refs[0].Owner != "qs.mysql" || refs[0].Scope != fmt.Sprintf("org:%d", in.OrgID) {
+		return nil, nil, transaction.ErrInvalidPlan
+	}
+	// The private artifact fingerprint and the consumer wire are independent.
+	// Bind the latter's typed business payload to the frozen outcome as well.
+	consumer := branches[0].Message.Input()
+	consumer.Payload = bytes.Clone(branches[0].Wire)
+	original, err := message.New(consumer)
+	if err != nil {
+		return nil, nil, err
+	}
+	ref := standard.ReferenceFromMessage(original)
+	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	var body assessment.EvaluationOutcomeCommittedData
+	if json.Unmarshal(envelope.Data, &body) != nil || envelope.AggregateID != in.AssessmentID.String() || body.OrgID != in.OrgID || body.AssessmentID != int64(in.AssessmentID.Uint64()) || body.TesteeID != in.TesteeID || body.OutcomeID != in.ID.String() || body.EvaluationRunID != in.RunID || !body.CommittedAt.Equal(in.EvaluatedAt) {
+		return nil, nil, transaction.ErrInvalidPlan
+	}
+	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(branches[0].Message), refs[0], domainoutcome.BusinessBindingSHA256(in), in.EvaluatedAt)
+	if err != nil {
+		return nil, nil, err
+	}
+	in.CommittedTransactionEvidence = proof
+	record, err := domainoutcome.NewRecord(in)
+	if err != nil {
+		return nil, nil, err
+	}
+	return record, raw, nil
 }

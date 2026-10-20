@@ -41,10 +41,10 @@ jobs:
           from pathlib import Path
           events = [json.loads(line) for line in Path('evaluation-root.jsonl').read_text().splitlines()]
           tests = [e for e in events if e.get('Test') and e.get('Action') == 'pass']
-          assert len(tests) == 5, f'expected 4 native cases and parent, got {len(tests)}'
+          assert len(tests) == 6, f'expected 5 native cases and parent, got {len(tests)}'
           assert not any(e.get('Action') in ('fail', 'skip') for e in events)
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: evaluation-original-root-${{ matrix.mysql }}-${{ github.sha }}

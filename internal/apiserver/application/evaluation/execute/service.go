@@ -135,6 +135,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	a := loaded.assessment
+	if handled, err := s.recoverPendingOutcome(ctx, a); handled || err != nil {
+		return err
+	}
 	claimAt := time.Now()
 	var previousInputSnapshotRef string
 	if a.Status().IsFailed() {
@@ -173,6 +176,11 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	evaluationRun := claim.Run
+	// Recheck after claim: a result plan visible at this boundary owns its
+	// finalization and must not become permission to evaluate again.
+	if handled, err := s.recoverPendingOutcome(ctx, a); handled || err != nil {
+		return err
+	}
 	// EV-R010: observe wall time only for claimed attempts (not skips/duplicates).
 	algorithmFamily := "unknown"
 	runResult := "failed"
@@ -317,6 +325,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 	runResult = "success"
 	return nil
+}
+
+func (s *service) recoverPendingOutcome(ctx context.Context, a *assessment.Assessment) (bool, error) {
+	recovery, ok := s.evaluationCommitter.(outcomecommit.PendingRecoverer)
+	if !ok {
+		return false, nil
+	}
+	return recovery.RecoverPending(ctx, a)
 }
 
 func (s *service) persistEvaluationOutcome(

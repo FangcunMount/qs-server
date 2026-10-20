@@ -92,9 +92,27 @@ func TestM3MySQLOriginalEventRoot(t *testing.T) {
 	require.NoError(t, err)
 	store, err := txmysql.New(pool, binding)
 	require.NoError(t, err)
-	c := &Committer{store: store, uow: hostmysql.NewUnitOfWork(db), resolver: fixtureResolver{}, topics: map[string]bool{"qs.evaluation.lifecycle": true}}
+	c := &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), resolver: fixtureResolver{}, topics: map[string]bool{"qs.evaluation.lifecycle": true}}
 	sender := &nativeSender{store: store}
 	c.sender = sender
+	t.Run("lookup-without-inventing-input-hash", func(t *testing.T) {
+		q := fixtureRequest("lookup-original")
+		r, err := c.Reserve(t.Context(), q)
+		require.NoError(t, err)
+		found, err := c.Find(t.Context(), r.Execution.Plan.Input().Scope, q.Key)
+		require.NoError(t, err)
+		require.False(t, found.Acquired)
+		require.Equal(t, r.Execution.Plan.Digest(), found.Execution.Plan.Digest())
+		require.Equal(t, r.Execution.References(), found.Execution.References())
+		_, err = c.Find(t.Context(), "org:8", q.Key)
+		require.ErrorIs(t, err, transaction.ErrNotFound)
+		request := transaction.RequestFor(r.Execution.Plan)
+		key := request.KeyDigest()
+		_, err = pool.ExecContext(t.Context(), `UPDATE rm_tx_request SET idempotency_key=? WHERE request_key=?`, []byte("different-original-key"), key[:])
+		require.NoError(t, err)
+		_, err = c.Find(t.Context(), request.Scope, request.Key)
+		require.ErrorIs(t, err, transaction.ErrRequestIdentity)
+	})
 	for _, tc := range []struct {
 		name           string
 		abort, unknown bool

@@ -27,6 +27,9 @@ type Request struct {
 // called for a reservation loser, for recovery, or by a Checker.
 type Committer interface {
 	Reserve(context.Context, Request) (transaction.Reservation, error)
+	// Find reads an existing plan by exact host scope/key, without creating an
+	// execution or accepting a caller's invented hash for an unknown result.
+	Find(context.Context, string, string) (transaction.Reservation, error)
 	Artifact(transaction.FrozenPlan) ([]byte, error)
 	Commit(context.Context, transaction.Execution, func(context.Context) error) (transaction.Result, error)
 	Confirm(context.Context, transaction.Execution) transaction.LocalOutcome

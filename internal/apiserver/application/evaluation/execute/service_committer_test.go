@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -285,5 +286,43 @@ func TestFailedAssessmentReclaimsExpiredRunningAttempt(t *testing.T) {
 	}
 	if assessmentRepo.assessment == nil || !assessmentRepo.assessment.Status().IsEvaluated() {
 		t.Fatalf("assessment after reclaim = %#v", assessmentRepo.assessment)
+	}
+}
+
+type pendingEvaluationCommitter struct{ calls, blockAt int }
+
+func (*pendingEvaluationCommitter) Commit(context.Context, outcomecommit.CommitRequest) (*domainoutcome.Record, error) {
+	return nil, errors.New("must not invoke outcome writer during preflight recovery")
+}
+func (p *pendingEvaluationCommitter) RecoverPending(context.Context, *domainAssessment.Assessment) (bool, error) {
+	p.calls++
+	if p.calls >= p.blockAt {
+		return true, eventtransaction.ErrUnresolved
+	}
+	return false, nil
+}
+func TestEvaluatePendingResultStopsBeforeCalculationAndRetryAuthorization(t *testing.T) {
+	for _, blockAt := range []int{1, 2} {
+		t.Run(fmt.Sprintf("boundary-%d", blockAt), func(t *testing.T) {
+			a := splitPhaseAssessment(t)
+			a.ClearEvents()
+			evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault, outcome: executionForAssessment(a, "ok")}
+			runs := &stubRunRepo{}
+			stager := &engineRecordingEventStager{}
+			pending := &pendingEvaluationCommitter{blockAt: blockAt}
+			svc := NewEngine(&fakeAssessmentRepo{assessment: a}, stubInputResolver{}, withTestEvaluator(evaluator), WithRunRepository(runs), WithEvaluationCommitter(pending), WithTransactionalOutbox(&engineRecordingTxRunner{}, stager))
+			if err := svc.Evaluate(t.Context(), a.ID().Uint64()); !errors.Is(err, eventtransaction.ErrUnresolved) {
+				t.Fatal(err)
+			}
+			if evaluator.calls != 0 || len(stager.eventTypes) != 0 || len(runs.saved) != 0 || !a.Status().IsSubmitted() {
+				t.Fatal("pending plan authorized a calculation, failure or new business fact")
+			}
+			if pending.calls != blockAt {
+				t.Fatalf("recovery calls=%d", pending.calls)
+			}
+			if blockAt == 1 && runs.latest != nil {
+				t.Fatal("preflight recovery acquired another claim")
+			}
+		})
 	}
 }
