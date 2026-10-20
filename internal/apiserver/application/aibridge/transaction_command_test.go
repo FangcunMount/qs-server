@@ -86,6 +86,30 @@ func TestTransactionCommandOwnsBodyAndBindsOriginalScopeBeforeSeal(t *testing.T)
 	}
 }
 
+func TestTransactionCancelKeepsExplicitDiscardPresenceAndValue(t *testing.T) {
+	id := "b1941896-e7df-4b9d-9417-b80bd05276b9"
+	run := "c1941896-e7df-4b9d-9417-b80bd05276b9"
+	scope := OperationScope{OrganizationID: "7", SubjectID: "9", ResourceID: run}
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_EvaluationCancel{EvaluationCancel: &pb.EvaluationCancelCommand{Scope: &pb.EvaluationQuery{OrganizationId: 7, OperatorUserId: 9, RunId: run}, ExpectedVersion: 1, Confirm: true}}}
+	_, err := NewTransactionCommand(pb.MessagingKind_EVALUATION_CANCEL, id, run, scope, body)
+	require.ErrorIs(t, err, ErrMessagingContract)
+	discard := false
+	body.GetEvaluationCancel().Discard = &discard
+	keep, err := NewTransactionCommand(pb.MessagingKind_EVALUATION_CANCEL, id, run, scope, body)
+	require.NoError(t, err)
+	stored, err := keep.Body()
+	require.NoError(t, err)
+	require.NotNil(t, stored.GetEvaluationCancel().Discard)
+	require.False(t, *stored.GetEvaluationCancel().Discard)
+	discard = true
+	drop, err := NewTransactionCommand(pb.MessagingKind_EVALUATION_CANCEL, id, run, scope, body)
+	require.NoError(t, err)
+	require.NotEqual(t, keep.InputHash(), drop.InputHash())
+	stored, err = keep.Body()
+	require.NoError(t, err)
+	require.False(t, *stored.GetEvaluationCancel().Discard, "the first immutable intent owns its explicit false")
+}
+
 func TestTransactionCommandRejectsAlteredOwnerRouteHashScopeAndArchiveFlags(t *testing.T) {
 	for _, name := range []string{"owner", "route", "hash", "scope", "key", "operation", "branch-id", "unordered", "receipt-free", "correlation"} {
 		t.Run(name, func(t *testing.T) {

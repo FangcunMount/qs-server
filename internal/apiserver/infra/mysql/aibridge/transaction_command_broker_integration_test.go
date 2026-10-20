@@ -274,7 +274,8 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	await(startID)
 	// Evaluation CANCEL must also preserve the run's real admission ordering.
 	cancelID := uuid.NewString()
-	require.ErrorIs(t, store.SubmitEvaluationCancel(t.Context(), run, cancelID, app.EvaluationCancel{ExpectedVersion: 1, Confirm: true}), ErrCommandPredecessorPending)
+	discard := false
+	require.ErrorIs(t, store.SubmitEvaluationCancel(t.Context(), run, cancelID, app.EvaluationCancel{ExpectedVersion: 1, Confirm: true, Discard: &discard}), ErrCommandPredecessorPending)
 	evaluationArchive, found, err := commands.Archive().ReadCommitted(t.Context(), startID)
 	require.NoError(t, err)
 	require.True(t, found)
@@ -282,7 +283,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	_, err = pool.ExecContext(t.Context(), "UPDATE ai_messaging_operations SET decision='accepted',receipt_id=?,receipt=?,decided_at=UTC_TIMESTAMP(6) WHERE command_id=?", uuid.NewString(), evaluationReceipt, startID)
 	require.NoError(t, err)
-	require.NoError(t, store.SubmitEvaluationCancel(t.Context(), run, cancelID, app.EvaluationCancel{ExpectedVersion: 1, Confirm: true}))
+	require.NoError(t, store.SubmitEvaluationCancel(t.Context(), run, cancelID, app.EvaluationCancel{ExpectedVersion: 1, Confirm: true, Discard: &discard}))
 	await(cancelID)
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_outbox"))
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_bridge_commands"))
