@@ -18,6 +18,7 @@ import (
 
 	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
@@ -303,7 +304,7 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	// Disabling future reminders preserves the existing protocol: use the
 	// actual application entrypoint with an inert fresh owner and no Plan or
 	// Enrollment fixture tables. Recovery must precede fresh business planning.
-	manager, err := appplan.NewTaskManagementService(repo, repository.NewPlanRepository(db), repository.NewEnrollmentRepository(db), hostmysql.NewUnitOfWork(db), planinfra.NewEntryGenerator("https://example.test"), event.NewNopEventPublisher(), appplan.TaskOpeningOptions{ReminderEnabled: false, Transaction: recovery})
+	manager, err := appplan.NewTaskManagementService(repo, repository.NewPlanRepository(db), repository.NewEnrollmentRepository(db), modtx.NewMySQLRunner(db), planinfra.NewEntryGenerator("https://example.test"), event.NewNopEventPublisher(), appplan.TaskOpeningOptions{ReminderEnabled: false, Transaction: recovery})
 	require.NoError(t, err)
 	existing, err := manager.OpenTask(t.Context(), 1, saved.GetID().String())
 	require.NoError(t, err)
