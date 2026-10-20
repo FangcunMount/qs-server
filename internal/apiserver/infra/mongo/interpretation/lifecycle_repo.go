@@ -15,7 +15,9 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 type GenerationRepository struct {
@@ -49,6 +51,11 @@ func (r *GenerationRepository) Create(ctx context.Context, domain *generation.Re
 	po := r.mapper.GenerationToPO(domain)
 	if po == nil {
 		return fmt.Errorf("report generation is required")
+	}
+	if proof := domain.GeneratedTransactionEvidence(); proof != nil {
+		if err := r.requireOriginalTransaction(ctx, proof); err != nil {
+			return err
+		}
 	}
 	po.TransactionSchemaVersion = generationTransactionSchemaVersion
 	if _, err := r.InsertOne(ctx, po); err != nil {
@@ -108,8 +115,13 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 		return generation.ErrVersionConflict
 	}
 	po := r.mapper.GenerationToPO(domain)
-	if domain.Status() == generation.StatusGenerated && (domain.GeneratedEventEvidence() == nil || domain.GeneratedEventID() == "") {
+	if domain.Status() == generation.StatusGenerated && ((domain.GeneratedEventEvidence() == nil && domain.GeneratedTransactionEvidence() == nil) || domain.GeneratedEventID() == "") {
 		return fmt.Errorf("generated event reference is required for native save")
+	}
+	if proof := domain.GeneratedTransactionEvidence(); proof != nil {
+		if err := r.requireOriginalTransaction(ctx, proof); err != nil {
+			return err
+		}
 	}
 	set := bson.M{
 		"status":                     po.Status,
@@ -127,6 +139,9 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 	if po.GeneratedEventEvidence != nil {
 		set["generated_event_evidence"] = po.GeneratedEventEvidence
 	}
+	if po.GeneratedTransactionEvidence != nil {
+		set["generated_transaction_evidence"] = po.GeneratedTransactionEvidence
+	}
 	update := bson.M{"$set": set}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64(), "version": expectedVersion}, update)
 	if err != nil {
@@ -134,6 +149,27 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 	}
 	if result.MatchedCount != 1 {
 		return generation.ErrVersionConflict
+	}
+	return nil
+}
+
+func (r *GenerationRepository) requireOriginalTransaction(ctx context.Context, proof *evidence.EventEvidenceV2) error {
+	if err := proof.Validate(); err != nil {
+		return err
+	}
+	ref, err := transaction.DecodeReference(proof.TransactionReference)
+	if err != nil || ref.Owner != "qs.mongo" {
+		return transaction.ErrBinding
+	}
+	session := mongo.SessionFromContext(ctx)
+	if r == nil || r.DB() == nil || session == nil || session.Client() != r.DB().Client() {
+		return transaction.ErrTransactionRequired
+	}
+	// Match the SDK's pinned v1.17.6 bridge: an ordinary/ended session must
+	// never turn a transaction-evidence write into an autocommit operation.
+	x, ok := session.(mongo.XSession) //nolint:staticcheck // Pinned driver active-transaction bridge.
+	if !ok || x.ClientSession() == nil || !x.ClientSession().TransactionRunning() {
+		return transaction.ErrTransactionRequired
 	}
 	return nil
 }

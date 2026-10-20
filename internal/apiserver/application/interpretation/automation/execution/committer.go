@@ -307,6 +307,7 @@ func cloneGeneration(source *domaingeneration.ReportGeneration) (*domaingenerati
 		ID: source.ID(), Key: source.Key(), Status: source.Status(), LatestRunID: source.LatestRunID(), ReportID: source.ReportID(),
 		Version: source.Version(), CreatedAt: source.CreatedAt(), UpdatedAt: source.UpdatedAt(),
 		GeneratedEventID: source.GeneratedEventID(), GeneratedEventEvidence: source.GeneratedEventEvidence(),
+		GeneratedTransactionEvidence: source.GeneratedTransactionEvidence(),
 	})
 }
 

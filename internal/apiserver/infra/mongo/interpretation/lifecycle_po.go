@@ -11,15 +11,16 @@ import (
 type ReportGenerationPO struct {
 	base.BaseDocument `bson:",inline"`
 
-	OutcomeID              uint64                    `bson:"outcome_id"`
-	ReportType             string                    `bson:"report_type"`
-	TemplateVersion        string                    `bson:"template_version"`
-	Status                 string                    `bson:"status"`
-	LatestRunID            uint64                    `bson:"latest_run_id,omitempty"`
-	ReportID               uint64                    `bson:"report_id,omitempty"`
-	Version                uint64                    `bson:"version"`
-	GeneratedEventID       string                    `bson:"generated_event_id,omitempty"`
-	GeneratedEventEvidence *evidence.EventEvidenceV1 `bson:"generated_event_evidence,omitempty"`
+	OutcomeID                    uint64                    `bson:"outcome_id"`
+	ReportType                   string                    `bson:"report_type"`
+	TemplateVersion              string                    `bson:"template_version"`
+	Status                       string                    `bson:"status"`
+	LatestRunID                  uint64                    `bson:"latest_run_id,omitempty"`
+	ReportID                     uint64                    `bson:"report_id,omitempty"`
+	Version                      uint64                    `bson:"version"`
+	GeneratedEventID             string                    `bson:"generated_event_id,omitempty"`
+	GeneratedEventEvidence       *evidence.EventEvidenceV1 `bson:"generated_event_evidence,omitempty"`
+	GeneratedTransactionEvidence *evidence.EventEvidenceV2 `bson:"generated_transaction_evidence,omitempty"`
 	// TransactionSchemaVersion distinguishes the current atomic lifecycle
 	// contract from historical generations that predate cross-collection audit.
 	TransactionSchemaVersion uint32 `bson:"transaction_schema_version,omitempty"`

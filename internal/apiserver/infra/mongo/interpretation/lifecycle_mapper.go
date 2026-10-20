@@ -10,6 +10,7 @@ import (
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 type LifecycleMapper struct{}
@@ -20,35 +21,50 @@ func (m *LifecycleMapper) GenerationToPO(domain *generation.ReportGeneration) *R
 	if domain == nil {
 		return nil
 	}
-	return &ReportGenerationPO{
-		BaseDocument:           base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.CreatedAt(), UpdatedAt: domain.UpdatedAt()},
-		OutcomeID:              domain.Key().OutcomeID.Uint64(),
-		ReportType:             domain.Key().ReportType.String(),
-		TemplateVersion:        domain.Key().TemplateVersion.String(),
-		Status:                 string(domain.Status()),
-		LatestRunID:            domain.LatestRunID().Uint64(),
-		ReportID:               domain.ReportID().Uint64(),
-		Version:                domain.Version(),
-		GeneratedEventID:       domain.GeneratedEventID(),
-		GeneratedEventEvidence: domain.GeneratedEventEvidence(),
+	po := &ReportGenerationPO{
+		BaseDocument:                 base.BaseDocument{DomainID: domain.ID(), CreatedAt: domain.CreatedAt(), UpdatedAt: domain.UpdatedAt()},
+		OutcomeID:                    domain.Key().OutcomeID.Uint64(),
+		ReportType:                   domain.Key().ReportType.String(),
+		TemplateVersion:              domain.Key().TemplateVersion.String(),
+		Status:                       string(domain.Status()),
+		LatestRunID:                  domain.LatestRunID().Uint64(),
+		ReportID:                     domain.ReportID().Uint64(),
+		Version:                      domain.Version(),
+		GeneratedEventID:             domain.GeneratedEventID(),
+		GeneratedEventEvidence:       domain.GeneratedEventEvidence(),
+		GeneratedTransactionEvidence: domain.GeneratedTransactionEvidence(),
 	}
+	if po.GeneratedTransactionEvidence != nil {
+		po.TransactionSchemaVersion = generationTransactionSchemaVersion
+	}
+	return po
 }
 
 func (m *LifecycleMapper) GenerationToDomain(po *ReportGenerationPO) (*generation.ReportGeneration, error) {
 	if po == nil {
 		return nil, nil
 	}
+	if po.GeneratedTransactionEvidence != nil {
+		if po.TransactionSchemaVersion != generationTransactionSchemaVersion {
+			return nil, transaction.ErrInvalidPlan
+		}
+		ref, err := transaction.DecodeReference(po.GeneratedTransactionEvidence.TransactionReference)
+		if err != nil || ref.Owner != "qs.mongo" {
+			return nil, transaction.ErrBinding
+		}
+	}
 	return generation.Restore(generation.RestoreInput{
-		ID:                     po.DomainID,
-		Key:                    generation.Key{OutcomeID: meta.FromUint64(po.OutcomeID), ReportType: policy.ReportType(po.ReportType), TemplateVersion: policy.TemplateVersion(po.TemplateVersion)},
-		Status:                 generation.Status(po.Status),
-		LatestRunID:            meta.FromUint64(po.LatestRunID),
-		ReportID:               meta.FromUint64(po.ReportID),
-		Version:                po.Version,
-		GeneratedEventID:       po.GeneratedEventID,
-		GeneratedEventEvidence: po.GeneratedEventEvidence,
-		CreatedAt:              po.CreatedAt,
-		UpdatedAt:              po.UpdatedAt,
+		ID:                           po.DomainID,
+		Key:                          generation.Key{OutcomeID: meta.FromUint64(po.OutcomeID), ReportType: policy.ReportType(po.ReportType), TemplateVersion: policy.TemplateVersion(po.TemplateVersion)},
+		Status:                       generation.Status(po.Status),
+		LatestRunID:                  meta.FromUint64(po.LatestRunID),
+		ReportID:                     meta.FromUint64(po.ReportID),
+		Version:                      po.Version,
+		GeneratedEventID:             po.GeneratedEventID,
+		GeneratedEventEvidence:       po.GeneratedEventEvidence,
+		GeneratedTransactionEvidence: po.GeneratedTransactionEvidence,
+		CreatedAt:                    po.CreatedAt,
+		UpdatedAt:                    po.UpdatedAt,
 	})
 }
 
