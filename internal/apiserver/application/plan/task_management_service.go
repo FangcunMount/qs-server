@@ -68,7 +68,7 @@ func (s *taskManagementService) openTask(ctx context.Context, orgID int64, taskI
 	if err != nil {
 		return nil, err
 	}
-	if s.persistence.transactionalOpening() {
+	if s.persistence.transactionOwnerSelected() {
 		original, handled, err := s.persistence.openingOptions.Transaction.RecoverOpened(ctx, task)
 		if err != nil {
 			return nil, err
