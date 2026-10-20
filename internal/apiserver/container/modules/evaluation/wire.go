@@ -1,6 +1,9 @@
 package evaluation
 
 import (
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+
 	"fmt"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -40,6 +43,8 @@ type WireInput struct {
 	PublishedModelCatalog     rulesetport.Catalog
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 	OutboxProfile             appEventing.ProfileBinding
+	EventTransactionOwner     *mysqlEventTx.Committer
+	TransactionRoutes         eventcatalog.TopicResolver
 }
 
 // WireResult carries evaluation module and shared catalog side effects.
@@ -95,6 +100,8 @@ func Wire(in WireInput) (WireResult, error) {
 		RuntimeDescriptorRegistry: in.RuntimeDescriptorRegistry,
 		PublishedModelReader:      publishedModelReader,
 		OutboxProfile:             in.OutboxProfile,
+		EventTransactionOwner:     in.EventTransactionOwner,
+		TransactionRoutes:         in.TransactionRoutes,
 	})
 	if err != nil {
 		return WireResult{}, err

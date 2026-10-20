@@ -1,6 +1,9 @@
 package evaluation
 
 import (
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -33,6 +36,8 @@ type BootstrapInput struct {
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 	PublishedModelReader      rulesetport.PublishedModelReader
 	OutboxProfile             appEventing.ProfileBinding
+	EventTransactionOwner     *mysqlEventTx.Committer
+	TransactionRoutes         eventcatalog.TopicResolver
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

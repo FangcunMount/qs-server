@@ -1,6 +1,13 @@
 package evaluation
 
 import (
+	mysqlFailure "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluationfailure"
+	mysqlSubmit "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluationsubmit"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
+
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
@@ -76,6 +83,8 @@ type Deps struct {
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 	PublishedModelReader      rulesetport.PublishedModelReader
 	OutboxProfile             appEventing.ProfileBinding
+	EventTransactionOwner     *mysqlEventTx.Committer
+	TransactionRoutes         eventcatalog.TopicResolver
 }
 
 // New assembles the evaluation module.
@@ -100,6 +109,8 @@ func New(deps Deps) (*Module, error) {
 }
 
 type evaluationInfra struct {
+	transactionSubmitter  evaluationtransaction.Submitter
+	transactionFailure    evaluationtransaction.FailureCommitter
 	assessmentRepo        assessment.Repository
 	runRepo               evaluationrun.Repository
 	outcomeRepo           domainoutcome.Repository
@@ -150,6 +161,26 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.assessmentOutboxStore = normalized.OutboxProfile.Stager
 	infra.postCommit = normalized.OutboxProfile.PostCommit
 
+	if owner := normalized.EventTransactionOwner; owner != nil {
+		submitter, ok := infra.assessmentRepo.(assessment.PendingSubmissionRepository)
+		if !ok {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "original pending submission writer required")
+		}
+		var err error
+		infra.transactionSubmitter, err = mysqlSubmit.New(normalized.MySQLDB, owner, submitter)
+		if err != nil {
+			return nil, err
+		}
+		infra.transactionFailure, err = mysqlFailure.New(normalized.MySQLDB, owner, normalized.TransactionRoutes, infra.assessmentRepo, infra.runRepo)
+		if err != nil {
+			return nil, err
+		}
+		infra.consistencyReader, err = mysqlEval.NewConsistencyReadModelWithTransactions(normalized.MySQLDB, owner.Binding())
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return infra, nil
 }
 
@@ -176,12 +207,23 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			infra.assessmentOutboxStore,
 			infra.postCommit,
 		)
+
+		if owner := normalized.EventTransactionOwner; owner != nil {
+			var err error
+			evaluationCommitter, err = outcomecommit.NewTransactionalCommitter(owner, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo, scoreProjector)
+			if err != nil {
+				return err
+			}
+		}
 		engineOptions := []execute.EngineOption{
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			execute.WithPostCommitDispatcher(infra.postCommit),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithEvaluationCommitter(evaluationCommitter),
+		}
+		if infra.transactionFailure != nil {
+			engineOptions = append(engineOptions, execute.WithFailureTransactionCommitter(infra.transactionFailure))
 		}
 		engine := execute.NewEngine(
 			infra.assessmentRepo,
@@ -202,12 +244,16 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	if normalized.PublishedModelReader != nil {
 		modelValidator = evaluationintake.NewPublishedEvaluationModelValidator(normalized.PublishedModelReader)
 	}
+	intakeOptions := []evaluationintake.Option{evaluationintake.WithPostCommitDispatcher(infra.postCommit)}
+	if infra.transactionSubmitter != nil {
+		intakeOptions = append(intakeOptions, evaluationintake.WithTransactionSubmitter(infra.transactionSubmitter))
+	}
 	m.IntakeService = evaluationintake.NewService(
 		infra.assessmentRepo,
 		modelValidator,
 		infra.txRunner,
 		infra.assessmentOutboxStore,
-		evaluationintake.WithPostCommitDispatcher(infra.postCommit),
+		intakeOptions...,
 	)
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)
 	m.TesteeService = evaluationtestee.NewServiceWithCaches(infra.assessmentRepo, infra.assessmentReader, scoreFacts, infra.assessmentAccessCache, infra.assessmentDetailCache)
@@ -231,6 +277,13 @@ func (m *Module) wireScheduler(infra *evaluationInfra) {
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {
+	if (deps.EventTransactionOwner == nil) != (deps.TransactionRoutes == nil) {
+		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "transaction owner and explicit routes must be configured together")
+	}
+	if deps.EventTransactionOwner != nil && !deps.EventTransactionOwner.UsesPrimary(deps.MySQLDB) {
+		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation transactions require the original host primary")
+	}
+
 	if deps.MySQLDB == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
 	}
