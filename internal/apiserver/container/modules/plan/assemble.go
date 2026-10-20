@@ -2,6 +2,9 @@ package plan
 
 import (
 	"context"
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	taskopen "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/taskopen"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"strings"
 
 	"gorm.io/gorm"
@@ -60,6 +63,8 @@ type Deps struct {
 	TesteeAccess              actorAccessApp.TesteeAccessService
 	OpenedOutbox              appEventing.ProfileBinding
 	TaskOpenedReminderEnabled bool
+	EventTransactionOwner     *mysqlEventTx.Committer
+	TransactionRoutes         eventcatalog.TopicResolver
 }
 
 // New assembles the plan module.
@@ -84,6 +89,22 @@ func New(deps Deps) (*Module, error) {
 	enrollmentRepo := planInfra.NewEnrollmentRepository(normalized.MySQLDB, mysqlOptions)
 	txRunner := modtx.NewMySQLRunner(normalized.MySQLDB)
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
+	openingOptions := planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox}
+	taskPlanRepo := planRepo
+	if normalized.EventTransactionOwner != nil {
+		writer, ok := taskRepo.(taskopen.SnapshotWriter)
+		if !ok {
+			return nil, missingModuleDependency("original task snapshot writer")
+		}
+		opener, err := taskopen.New(normalized.MySQLDB, normalized.EventTransactionOwner, normalized.TransactionRoutes, writer, mysqlOptions)
+		if err != nil {
+			return nil, err
+		}
+		openingOptions.Transaction = opener
+		// Admission inside the original root reads the primary, never Redis.
+		taskPlanRepo = basePlanRepo
+	}
+
 	scaleCatalog := planApp.NewPublishedScaleCatalog(normalized.PublishedModels)
 	planReadModel := planInfra.NewReadModel(normalized.MySQLDB)
 	module.FollowUpQueueReader = planReadModel
@@ -97,11 +118,11 @@ func New(deps Deps) (*Module, error) {
 		return nil, err
 	}
 	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
-	taskSchedulerService, err := planApp.NewTaskSchedulerService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox})
+	taskSchedulerService, err := planApp.NewTaskSchedulerService(taskRepo, taskPlanRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, openingOptions)
 	if err != nil {
 		return nil, err
 	}
-	taskManagementService, err := planApp.NewTaskManagementService(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, planApp.TaskOpeningOptions{ReminderEnabled: normalized.TaskOpenedReminderEnabled, ReminderOutbox: normalized.OpenedOutbox})
+	taskManagementService, err := planApp.NewTaskManagementService(taskRepo, taskPlanRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher, openingOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +153,12 @@ func New(deps Deps) (*Module, error) {
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
 		return Deps{}, missingModuleDependency("MySQL database")
+	}
+	if (deps.EventTransactionOwner == nil) != (deps.TransactionRoutes == nil) {
+		return Deps{}, missingModuleDependency("paired task transaction owner and routes")
+	}
+	if deps.EventTransactionOwner != nil && !deps.EventTransactionOwner.UsesPrimary(deps.MySQLDB) {
+		return Deps{}, missingModuleDependency("original task transaction primary")
 	}
 	if deps.PublishedModels == nil {
 		return Deps{}, missingModuleDependency("published model catalog")

@@ -7,6 +7,7 @@ import (
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	tasktransaction "github.com/FangcunMount/qs-server/internal/apiserver/port/tasktransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"math"
 )
@@ -130,22 +131,35 @@ func (s *operatorCommands) withTesteeMutation(ctx context.Context, orgID int64, 
 	return s.withOwnershipMutation(ctx, orgID, rawID, appauthz.EvaluationPlanResource, action, write)
 }
 func (s *operatorCommands) withOwnershipMutation(ctx context.Context, orgID int64, rawID, resource, action string, write func(context.Context) error) error {
-	user, err := s.authorize(ctx, orgID, resource, action)
+	guard, err := s.ownershipGuard(ctx, orgID, rawID, resource, action)
 	if err != nil {
 		return err
 	}
+	return s.mutation.Transaction.WithinTransaction(ctx, func(root context.Context) error {
+		if err := guard(root); err != nil {
+			return err
+		}
+		return write(root)
+	})
+}
+
+func (s *operatorCommands) ownershipGuard(ctx context.Context, orgID int64, rawID, resource, action string) (func(context.Context) error, error) {
+	user, err := s.authorize(ctx, orgID, resource, action)
+	if err != nil {
+		return nil, err
+	}
 	if s.mutation.Transaction == nil || s.mutation.Ownership == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "ownership transaction required")
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "ownership transaction required")
 	}
 	id, err := toTesteeID(rawID)
 	if err != nil {
-		return errors.WithCode(code.ErrInvalidArgument, "invalid testee ID")
+		return nil, errors.WithCode(code.ErrInvalidArgument, "invalid testee ID")
 	}
 	stores, err := s.access.ResolveStoreRange(ctx, orgID, user, resource, action)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return s.mutation.Transaction.WithinTransaction(ctx, func(tx context.Context) error {
+	return func(tx context.Context) error {
 		storeID, err := s.mutation.Ownership.LockTesteeStore(tx, orgID, id.Uint64())
 		if err != nil {
 			return err
@@ -153,8 +167,8 @@ func (s *operatorCommands) withOwnershipMutation(ctx context.Context, orgID int6
 		if !stores.Contains(storeID) {
 			return errors.WithCode(code.ErrPermissionDenied, "testee outside current store range")
 		}
-		return write(tx)
-	})
+		return nil
+	}, nil
 }
 
 func (s *operatorCommands) SchedulePendingTasks(ctx context.Context, orgID int64, before string) (*TaskScheduleResult, error) {
@@ -165,6 +179,34 @@ func (s *operatorCommands) SchedulePendingTasks(ctx context.Context, orgID int64
 }
 
 func (s *operatorCommands) OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
+	if opener, ok := s.commands.(transactionalTaskOpening); ok && opener.TransactionalTaskOpening() {
+		if _, err := s.authorize(ctx, orgID, appauthz.EvaluationPlanTaskResource, "open"); err != nil {
+			return nil, err
+		}
+		if s.tasks == nil {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "task repository required")
+		}
+		task, err := loadTaskInOrg(ctx, s.tasks, orgID, taskID, "open")
+		if err != nil {
+			return nil, err
+		}
+		guard, err := s.ownershipGuard(ctx, orgID, task.GetTesteeID().String(), appauthz.EvaluationPlanTaskResource, "open")
+		if err != nil {
+			return nil, err
+		}
+		// A short read-only ownership check protects duplicate-result reads.
+		// No MQ or task mutation happens in this root. The same locking check
+		// is repeated after half preparation in the original business root.
+		if err := s.mutation.Transaction.WithinTransaction(ctx, guard); err != nil {
+			return nil, err
+		}
+		return opener.OpenTaskWithGuard(ctx, orgID, taskID, tasktransaction.LocalGuard(func(root context.Context, candidate *domainplan.AssessmentTask) error {
+			if candidate.GetID() != task.GetID() || candidate.GetOrgID() != orgID || candidate.GetTesteeID() != task.GetTesteeID() {
+				return errors.WithCode(code.ErrPermissionDenied, "task opening ownership identity changed")
+			}
+			return guard(root)
+		}))
+	}
 	var result *TaskResult
 	err := s.withTaskMutation(ctx, orgID, taskID, "open", func(ctx context.Context) error {
 		var err error

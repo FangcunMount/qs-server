@@ -22,6 +22,8 @@ import (
 // Binding returns protocol identity only; it transfers no database ownership.
 func (c *Committer) Binding() transaction.Binding { return c.store.Binding() }
 
+func (c *Committer) HasTopic(topic string) bool { return c != nil && c.topics[topic] }
+
 // UsesPrimary validates adapters sharing this owner without transferring DB
 // ownership or constructing another producer.
 func (c *Committer) UsesPrimary(db *gorm.DB) bool {

@@ -7,6 +7,7 @@ import (
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/tasktransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
@@ -24,11 +25,34 @@ type taskPersistence struct {
 // intent in the same MySQL transaction. An outer caller-owned transaction keeps
 // both writes together; its normal Relay scan recovers if no wake is registered.
 func (p taskPersistence) saveOpened(ctx context.Context, task *domainplan.AssessmentTask) (bool, error) {
+	return p.saveOpenedWithGuard(ctx, task, nil)
+}
+
+func (p taskPersistence) transactionalOpening() bool {
+	return p.openingOptions.ReminderEnabled && p.openingOptions.Transaction != nil
+}
+
+func (p taskPersistence) saveOpenedWithGuard(ctx context.Context, task *domainplan.AssessmentTask, guard tasktransaction.LocalGuard) (bool, error) {
 	if !p.openingOptions.ReminderEnabled {
 		return false, p.save(ctx, task, false)
 	}
 	if err := p.openingOptions.validate(); err != nil {
 		return false, err
+	}
+	if p.transactionalOpening() {
+		if _, active := mysql.TxFromContext(ctx); active {
+			return false, fmt.Errorf("task half preparation must precede the original business transaction")
+		}
+		committed, err := p.openingOptions.Transaction.CommitOpened(ctx, tasktransaction.OpenRequest{Candidate: task, Guard: guard})
+		if err != nil {
+			return false, err
+		}
+		if committed == nil || task == nil || committed.GetID() != task.GetID() || committed.GetOrgID() != task.GetOrgID() || committed.GetScheduleRevision() != task.GetScheduleRevision() {
+			return false, fmt.Errorf("task transaction returned a different opening")
+		}
+		*task = *committed
+		task.ClearEvents()
+		return true, nil
 	}
 	if _, active := mysql.TxFromContext(ctx); !active && p.tx == nil {
 		return false, fmt.Errorf("task opened outbox requires a MySQL transaction runner")
