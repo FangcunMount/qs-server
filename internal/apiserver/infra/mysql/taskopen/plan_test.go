@@ -3,6 +3,9 @@ package taskopen
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"testing"
 	"time"
 
@@ -112,4 +115,21 @@ func TestOpeningPlanRejectsCrossScopeBodyAndNoncanonicalArtifact(t *testing.T) {
 	require.ErrorIs(t, err, transaction.ErrInvalidPlan)
 	_, err = freeze(nil, 0)
 	require.Error(t, err)
+}
+
+func TestFrozenOpeningRetainsExistingReminderEligibilityAtMySQLRoundingBoundaries(t *testing.T) {
+	for _, nanos := range []int{123499499, 123499501, 123500000, 999499501, 999999999} {
+		t.Run(fmt.Sprint(nanos), func(t *testing.T) {
+			at := time.Date(2026, 10, 20, 14, 0, 0, nanos, time.UTC)
+			task := domain.NewAssessmentTaskAt(domain.NewAssessmentPlanID(), 1, 7, testee.NewID(9), "scale", at.Add(-time.Minute), at.Add(-time.Hour))
+			require.NoError(t, domain.NewTaskLifecycle().OpenAt(t.Context(), task, "https://example.test/first", at))
+			request, err := freeze(task, 1)
+			require.NoError(t, err)
+			frozen, err := read(request.Artifact)
+			require.NoError(t, err)
+			decision, err := notification.EvaluateTaskOpenedReminder(notification.TaskOpenedReminderIntent{OrgID: 7, TaskID: task.GetID().String(), TesteeID: task.GetTesteeID().String(), ScheduleRevision: task.GetScheduleRevision(), OpenAt: at}, &appplan.TaskReminderState{OrgID: 7, TaskID: task.GetID().String(), TesteeID: task.GetTesteeID().String(), ScheduleRevision: task.GetScheduleRevision(), Status: domain.TaskStatusOpened, OpenAt: frozen.Task.OpenAt, ExpireAt: frozen.Task.ExpireAt, EntryURL: frozen.Task.EntryURL}, at.Add(time.Second))
+			require.NoError(t, err)
+			require.Empty(t, decision.SuppressCode, "frozen business clocks must match the unchanged reminder eligibility policy")
+		})
+	}
 }

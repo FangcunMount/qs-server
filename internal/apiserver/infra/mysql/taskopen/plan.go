@@ -46,8 +46,8 @@ func freeze(task *domain.AssessmentTask, actor uint64) (eventport.Request, error
 	po := repository.NewTaskMapper().ToPO(task)
 	// MySQL's task business clocks are DATETIME(3). Keep full wire precision
 	// independently, while freezing the exact values used by the database CAS.
-	po.OpenAt = millisecondPtr(po.OpenAt)
-	po.ExpireAt = millisecondPtr(po.ExpireAt)
+	po.OpenAt = mysqlClockPtr(po.OpenAt)
+	po.ExpireAt = mysqlClockPtr(po.ExpireAt)
 	f := frozenOpening{Version: 1, Task: *po, Reminder: body, UpdatedAt: *po.OpenAt, UpdatedBy: actor}
 	if err := f.validate(); err != nil {
 		return eventport.Request{}, err
@@ -63,11 +63,11 @@ func freeze(task *domain.AssessmentTask, actor uint64) (eventport.Request, error
 	return eventport.Request{Key: openingKey(po.ID.Uint64(), po.ScheduleRevision), InputHash: hash, Artifact: raw, Events: []event.DomainEvent{reminder}}, nil
 }
 
-func millisecondPtr(at *time.Time) *time.Time {
+func mysqlClockPtr(at *time.Time) *time.Time {
 	if at == nil {
 		return nil
 	}
-	copy := at.UTC().Truncate(time.Millisecond)
+	copy := at.UTC().Round(time.Microsecond).Round(time.Millisecond)
 	return &copy
 }
 
@@ -82,7 +82,7 @@ func (f frozenOpening) inputHash() ([32]byte, error) {
 		Scale                        string
 		Planned                      time.Time
 		Due, Defined                 *time.Time
-	}{f.Task.ID.Uint64(), f.Task.PlanID, f.Task.EnrollmentID, f.Task.TesteeID, f.Task.OrgID, f.Task.Seq, f.Task.ScheduleRevision, f.Task.ScaleCode, f.Task.PlannedAt.UTC().Truncate(time.Millisecond), millisecondPtr(f.Task.DueAt), millisecondPtr(f.Task.ScheduleDefinedAt)}
+	}{f.Task.ID.Uint64(), f.Task.PlanID, f.Task.EnrollmentID, f.Task.TesteeID, f.Task.OrgID, f.Task.Seq, f.Task.ScheduleRevision, f.Task.ScaleCode, f.Task.PlannedAt.UTC().Round(time.Microsecond).Round(time.Millisecond), mysqlClockPtr(f.Task.DueAt), mysqlClockPtr(f.Task.ScheduleDefinedAt)}
 	raw, err := json.Marshal(stable)
 	return sha256.Sum256(raw), err
 }
@@ -95,7 +95,7 @@ func (f frozenOpening) validate() error {
 	}
 	var body eventpayload.TaskOpenedReminderRequestedData
 	if json.Unmarshal(f.Reminder, &body) != nil || body.TaskID != p.ID.String() || body.PlanID != fmt.Sprint(p.PlanID) || body.OrgID != p.OrgID || body.TesteeID != fmt.Sprint(p.TesteeID) || body.ScheduleRevision != p.ScheduleRevision ||
-		!body.OpenAt.UTC().Truncate(time.Millisecond).Equal(*p.OpenAt) {
+		!body.OpenAt.UTC().Round(time.Microsecond).Round(time.Millisecond).Equal(*p.OpenAt) {
 		return transaction.ErrBinding
 	}
 	return nil

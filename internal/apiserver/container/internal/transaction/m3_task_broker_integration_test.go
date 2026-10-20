@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	appplan "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
@@ -144,7 +146,7 @@ func TestM3TaskBrokerHost(t *testing.T) {
 		}
 		return nil
 	}, func(context.Context, transport.Failure) error { return errors.New("fixture delivery failed") }))
-	at := time.Now().UTC().Truncate(time.Millisecond)
+	at := time.Now().UTC().Truncate(time.Second).Add(123499501 * time.Nanosecond)
 	seed := func(seq int) *domain.AssessmentTask {
 		task := domain.NewAssessmentTaskAt(domain.NewAssessmentPlanID(), seq, 1, testee.NewID(3), "TASK-SCALE", at.Add(-time.Minute), at.Add(-time.Hour))
 		po := repository.NewTaskMapper().ToPO(task)
@@ -233,7 +235,12 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	saved, err := repo.FindByID(t.Context(), first.GetID())
 	require.NoError(t, err)
 	require.Equal(t, first.GetEntryURL(), saved.GetEntryURL())
-	require.True(t, saved.GetOpenAt().Equal(at))
+	require.True(t, saved.GetOpenAt().Equal(at.Round(time.Microsecond).Round(time.Millisecond)))
+	state, err := appplan.NewTaskReminderStateReader(repo).GetTaskReminderState(t.Context(), 1, saved.GetID().String())
+	require.NoError(t, err)
+	decision, err := notification.EvaluateTaskOpenedReminder(notification.TaskOpenedReminderIntent{OrgID: 1, TaskID: saved.GetID().String(), TesteeID: saved.GetTesteeID().String(), ScheduleRevision: saved.GetScheduleRevision(), OpenAt: at}, state, at.Add(time.Second))
+	require.NoError(t, err)
+	require.Empty(t, decision.SuppressCode)
 	// Losing candidates reuse the first artifact rather than writing a new entry.
 	require.NoError(t, domain.NewTaskLifecycle().OpenAt(t.Context(), original, "https://example.test/private-entry-competing", at.Add(time.Second)))
 	duplicate, err := opener.CommitOpened(t.Context(), port.OpenRequest{Candidate: original, Guard: func(context.Context, *domain.AssessmentTask) error {
@@ -383,7 +390,7 @@ func TestM3TaskBrokerHost(t *testing.T) {
 	}
 	// Same logical topic does not allow durable events through NORMAL.
 	require.Error(t, routed.Publish(t.Context(), domain.NewTaskOpenedReminderRequestedEvent(first.Events()[0].(domain.TaskOpenedEvent), first.GetScheduleRevision())))
-	cases := map[string]bool{"constructor_no_ddl": true, "half_invisible": true, "original_task_witness_wire": true, "first_entry_reused": true, "root_abort_atomic": true, "fresh_owner_recovery": true, "closed_admission_no_business": true, "no_new_publish_outbox": true, "normal_best_effort_fanout": true, "normal_root_commit_boundary": true, "normal_rejects_transaction_event": true}
+	cases := map[string]bool{"constructor_no_ddl": true, "half_invisible": true, "original_task_witness_wire": true, "first_entry_reused": true, "root_abort_atomic": true, "fresh_owner_recovery": true, "closed_admission_no_business": true, "no_new_publish_outbox": true, "normal_best_effort_fanout": true, "normal_root_commit_boundary": true, "normal_rejects_transaction_event": true, "reminder_precision_compatible": true}
 	receipt, err := json.Marshal(map[string]any{"cases": cases, "passed": len(cases), "failed": 0, "skipped": 0, "root": "original_mysql_gorm", "process_exit_not_claimed": true, "system_login_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_TASK_RECEIPT " + string(receipt))
