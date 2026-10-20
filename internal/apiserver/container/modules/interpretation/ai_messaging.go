@@ -29,7 +29,7 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, primary
 	if err != nil {
 		return err
 	}
-	if shared != nil && (o.SelectedProvider() != "rocketmq" || !shared.UsesPrimary(primary) || !shared.HasTopic(app.CommandsTopic)) {
+	if shared != nil && (o.SelectedProvider() != "rocketmq" || !shared.UsesPrimary(primary) || !shared.HasTopic(app.CommandsTopic) || !shared.HasTopic(app.AcksTopic)) {
 		return errors.New("AI command transaction owner must share original MySQL and RocketMQ route")
 	}
 	keys, err := client.LoadMessagingKeys(o)
@@ -54,6 +54,16 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, primary
 		}
 	}
 	receiver := &store.MessagingEventReceiver{DB: db, Store: s, Keys: keys.Ring, Bodies: c.Payloads, Seal: seal}
+	if shared != nil {
+		if o.RocketMQ == nil {
+			return errors.New("AI event transaction configuration unavailable")
+		}
+		receiver.Transactions, err = store.NewTransactionEvents(primary, shared, s, seal, o.RocketMQ.Transactions["qs.mysql"])
+		if err != nil {
+			return err
+		}
+		s.Archive = commands.Transactions.Archive()
+	}
 	runtime, err := client.NewMessagingRuntime(o, db, s, receiver)
 	if err != nil {
 		return err

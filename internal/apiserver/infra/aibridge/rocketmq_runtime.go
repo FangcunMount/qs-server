@@ -28,6 +28,13 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 	if err != nil {
 		return err
 	}
+	physical := transport.PhysicalTopic(app.EventsTopic)
+	if r.Receiver.Transactions != nil {
+		config.Routes, physical, err = transactionalEventRoutes(config.Routes)
+		if err != nil {
+			return err
+		}
+	}
 	handlerCtx, cancel := context.WithCancel(context.Background())
 	r.handlerCancel = cancel
 	r.rocket, err = rocketmq.NewSubscriber(rocketmq.SubscriberConfig{Config: config, MaxAttempts: 8, InvisibleDuration: 60 * time.Second, HandlerTimeout: 30 * time.Second, RetryDelay: 30 * time.Second, DeliveryContext: handlerCtx})
@@ -45,7 +52,7 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 		if err != nil {
 			return err
 		}
-		if f.Provider != "rocketmq" || f.Message.Topic != app.EventsTopic || f.Message.PhysicalTopic != transport.PhysicalTopic(app.EventsTopic) {
+		if f.Provider != "rocketmq" || f.Message.Topic != app.EventsTopic || f.Message.PhysicalTopic != physical {
 			return r.Receiver.Isolate(ctx, audit, "authentication_failed")
 		}
 		if _, err = app.AuthenticateMessaging(f.Message.Wire, app.EventsTopic, r.Receiver.Keys); err != nil {
@@ -56,6 +63,17 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 		return err
 	}
 	r.handlersReady = true
+	if r.Receiver.Transactions != nil {
+		// The shared qs.mysql owner sends commands and ACKs transactionally.
+		// New events never enter the historical Outbox/Relay scan.
+		observations := newMessagingCollector(r.DB)
+		if err = prometheus.DefaultRegisterer.Register(observations); err != nil {
+			return errors.New("AI MQ observation registration unavailable")
+		}
+		r.observations = observations
+		r.started = true
+		return nil
+	}
 	r.publisher, err = messagingruntime.NewPublisher(&genericoptions.MessagingOptions{Provider: "rocketmq", RocketMQ: r.Options.RocketMQ}, map[string]string{app.CommandsTopic: app.CommandsTopic, app.AcksTopic: app.AcksTopic}, 1)
 	if err != nil {
 		return err
@@ -91,4 +109,19 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 	}()
 	r.started = true
 	return nil
+}
+
+func transactionalEventRoutes(routes []transport.RouteBinding) ([]transport.RouteBinding, string, error) {
+	physical, err := transport.PhysicalTopicV2(app.EventsTopic, transport.TransactionMessageType, "ai.mysql", "m3-1")
+	if err != nil {
+		return nil, "", err
+	}
+	if len(routes) != 1 {
+		return nil, "", errors.New("one exact AI transaction event input required")
+	}
+	r := routes[0]
+	if r.Topic != app.EventsTopic || r.PhysicalTopic != physical || r.MessageType != transport.TransactionMessageType || r.Owner != "ai.mysql" || r.RouteRevision != "m3-1" || r.Subscription != "qs-server.ai-events.v1" {
+		return nil, "", errors.New("AI transaction event binding mismatch")
+	}
+	return append([]transport.RouteBinding(nil), routes...), physical, nil
 }
