@@ -1,6 +1,6 @@
 //go:build integration && m3_evaluation_broker
 
-package commit
+package transaction_test
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	outcomecommit "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/commit"
 	outcomescoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/scoring"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -85,7 +86,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	pool, err := db.DB()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, pool.Close()) })
-	schema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mysql", "000106_transaction_messaging.up.sql"))
+	schema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mysql", "000106_transaction_messaging.up.sql"))
 	require.NoError(t, err)
 	_, err = pool.ExecContext(t.Context(), string(schema))
 	require.NoError(t, err)
@@ -108,7 +109,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	authority, err := txmysql.New(pool, binding)
 	require.NoError(t, err)
-	source, err := catalog.Load("../../../../../../configs/events.yaml")
+	source, err := catalog.Load("../../../../../configs/events.yaml")
 	require.NoError(t, err)
 	routes := catalog.NewCatalog(source)
 	topic, ok := routes.GetTopicForEvent(assessment.EventTypeRequested)
@@ -176,7 +177,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	runRepo := checkpoint.NewRunRepository(db)
 	outcomes := repository.NewOutcomeRepository(db)
 	seed := func(id uint64, pending bool) (*assessment.Assessment, *domainoutcome.Execution) {
-		a, result := commitTestOutcome(t)
+		a, result := m3EvaluationFixture(t)
 		assessment.WithID(meta.FromUint64(id))(a)
 		po := repository.NewAssessmentMapper().ToPO(a)
 		po.AnswerSheetID = 2000 + id // distinct immutable source per owned assessment fixture
@@ -204,7 +205,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, *submitted.SubmittedAt(), *repeated.SubmittedAt())
 	cases["request_duplicate_first_wire"] = true
-	makeRequest := func(id uint64) (CommitRequest, *assessment.Assessment) {
+	makeRequest := func(id uint64) (outcomecommit.CommitRequest, *assessment.Assessment) {
 		a, result := seed(id, false)
 		claim, err := runRepo.Claim(t.Context(), evaluationrun.ClaimRequest{AssessmentID: id, Token: fmt.Sprintf("original-%d", id), ClaimedAt: time.Now(), LeaseUntil: time.Now().Add(time.Minute)})
 		require.NoError(t, err)
@@ -212,14 +213,14 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 		run := claim.Run
 		require.NoError(t, run.AttachInputSnapshot("isn:v2:"+strings.Repeat("a", 64)))
 		require.NoError(t, runRepo.SaveClaimed(t.Context(), run))
-		return CommitRequest{Assessment: a, Execution: result, Input: commitTestInput(), Run: &run, EvaluatedAt: time.Now(), DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange}, OutcomePolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange)}, a
+		return outcomecommit.CommitRequest{Assessment: a, Execution: result, Input: m3EvaluationInput(), Run: &run, EvaluatedAt: time.Now(), DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange}, OutcomePolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange)}, a
 	}
 	projector := outcomescoring.NewAssessmentScoreProjector(repository.NewScoreRepository(db))
 	entered, release := make(chan struct{}), make(chan struct{})
 	var releaseOnce sync.Once
 	releaseRoot := func() { releaseOnce.Do(func() { close(release) }) }
 	t.Cleanup(releaseRoot)
-	committer, err := NewTransactionalCommitter(owner, repo, outcomes, runRepo, rootBarrierProjector{entered, release, projector})
+	committer, err := outcomecommit.NewTransactionalCommitter(owner, repo, outcomes, runRepo, rootBarrierProjector{entered, release, projector})
 	require.NoError(t, err)
 	q, a := makeRequest(5001)
 	stale := *a
@@ -256,7 +257,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	cases["half_hidden_until_original_outcome_root"] = true
 	require.NoError(t, owner.Runtime().SetAdmission(false))
 	closed, _ := makeRequest(5002)
-	simple, err := NewTransactionalCommitter(owner, repo, outcomes, runRepo, projector)
+	simple, err := outcomecommit.NewTransactionalCommitter(owner, repo, outcomes, runRepo, projector)
 	require.NoError(t, err)
 	_, err = simple.Commit(t.Context(), closed)
 	require.ErrorIs(t, err, port.ErrUnresolved)
@@ -267,7 +268,7 @@ func TestM3EvaluationBrokerHost(t *testing.T) {
 	require.Nil(t, absent)
 	require.NoError(t, owner.Runtime().SetAdmission(true))
 	cases["closed_admission_no_business"] = true
-	handled, err := simple.(PendingRecoverer).RecoverPending(t.Context(), &stale)
+	handled, err := simple.(outcomecommit.PendingRecoverer).RecoverPending(t.Context(), &stale)
 	require.NoError(t, err)
 	require.True(t, handled)
 	require.True(t, stale.Status().IsEvaluated())

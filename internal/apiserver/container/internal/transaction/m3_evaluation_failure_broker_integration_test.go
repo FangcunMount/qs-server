@@ -1,6 +1,6 @@
 //go:build integration && m3_evaluation_broker
 
-package execute
+package transaction_test
 
 import (
 	"context"
@@ -8,6 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
@@ -29,14 +39,6 @@ import (
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"net"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 type failureInputFixture struct{ calls atomic.Int32 }
@@ -170,7 +172,7 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	// Exercise the actual engine's input-failure finalizer. No scoring/provider
 	// call is made by this dependency fixture; future wake responsibility stays
 	// in the original scheduled row until the separate T13 handoff.
-	failing := splitPhaseAssessment(t)
+	failing, _ := m3EvaluationFixture(t)
 	failing.ClearEvents()
 	assessment.WithID(meta.FromUint64(5003))(failing)
 	require.NoError(t, db.Create(repository.NewAssessmentMapper().ToPO(failing)).Error)
@@ -180,7 +182,7 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	failureWriter, err := evaluationfailure.New(db, owner, routes, repo, runRepo)
 	require.NoError(t, err)
 	dependency := &failureInputFixture{}
-	engine := NewEngine(repo, dependency, WithRunRepository(runRepo), WithFailureTransactionCommitter(failureWriter))
+	engine := execute.NewEngine(repo, dependency, execute.WithRunRepository(runRepo), execute.WithFailureTransactionCommitter(failureWriter))
 	require.Error(t, engine.Evaluate(t.Context(), failing.ID().Uint64()))
 	failedRun, err := runRepo.FindLatestByAssessmentID(t.Context(), failing.ID().Uint64())
 	require.NoError(t, err)
