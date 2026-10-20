@@ -9,6 +9,7 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -39,13 +40,18 @@ type EvaluationModelValidator interface {
 	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error
 }
 type service struct {
-	repo       domainassessment.Repository
-	validator  EvaluationModelValidator
-	tx         apptransaction.Runner
-	events     EventStager
-	postCommit appEventing.PostCommitDispatcher
+	transactionSubmitter evaluationtransaction.Submitter
+	repo                 domainassessment.Repository
+	validator            EvaluationModelValidator
+	tx                   apptransaction.Runner
+	events               EventStager
+	postCommit           appEventing.PostCommitDispatcher
 }
 type Option func(*service)
+
+func WithTransactionSubmitter(v evaluationtransaction.Submitter) Option {
+	return func(s *service) { s.transactionSubmitter = v }
+}
 
 func WithPostCommitDispatcher(v appEventing.PostCommitDispatcher) Option {
 	return func(s *service) { s.postCommit = v }
@@ -105,6 +111,13 @@ func (s *service) SubmitForEvaluation(ctx context.Context, id uint64) (*Assessme
 	a, err := s.repo.FindByID(ctx, meta.FromUint64(id))
 	if err != nil {
 		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
+	}
+	if s.transactionSubmitter != nil {
+		committed, err := s.transactionSubmitter.Submit(ctx, a, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		return resultFromDomain(committed)
 	}
 	if err := a.SubmitAt(time.Now()); err != nil {
 		return nil, evalerrors.AssessmentSubmitFailed(err, "提交测评失败")

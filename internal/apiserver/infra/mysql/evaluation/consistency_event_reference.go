@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	evalevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -15,6 +16,7 @@ import (
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 type committedStandardRow struct {
@@ -100,6 +102,16 @@ func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, 
 			e.InvalidReason = err.Error()
 			continue
 		}
+		if proof := record.CommittedTransactionEvidence(); proof != nil {
+			e.Class = eventevidence.TransactionReferenceClass
+			e.Status = string(transaction.Unknown)
+			if len(rowsByID[record.CommittedEventID()]) != 0 {
+				e.InvalidReason = "transaction event also resolves to historical Outbox rows"
+				continue
+			}
+			r.verifyCommittedTransaction(ctx, record, e)
+			continue
+		}
 		proof := record.CommittedEventEvidence()
 		if proof == nil {
 			e.InvalidReason = canonicalMissingClassificationReason
@@ -124,6 +136,26 @@ func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, 
 		}
 	}
 	return result, nil
+}
+
+func (r *consistencyReadModel) verifyCommittedTransaction(ctx context.Context, record *domainoutcome.Record, result *evaluationconsistency.CommittedOutboxEvidence) {
+	proof := record.CommittedTransactionEvidence()
+	if proof == nil || r.transactionChecker == nil {
+		result.InvalidReason = "exact primary transaction authority is not configured"
+		return
+	}
+	ref, err := transaction.DecodeReference(proof.TransactionReference)
+	if err != nil || ref.Owner != "qs.mysql" {
+		result.InvalidReason = "transaction outcome reference owner conflicts with MySQL"
+		return
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	decision := r.transactionChecker.Check(checkCtx, ref)
+	cancel()
+	result.Status = string(decision)
+	if decision != transaction.Commit {
+		result.InvalidReason = "canonical outcome lacks exact committed transaction witness"
+	}
 }
 func (r *consistencyReadModel) BusinessUpperBound(ctx context.Context) (uint64, error) {
 	var upper uint64

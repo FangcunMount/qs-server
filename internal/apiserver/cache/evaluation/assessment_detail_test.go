@@ -2,22 +2,81 @@ package evaluationcache
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
+	driver "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 type deletingAssessmentRepo struct{ assessment.Repository }
 
 func (deletingAssessmentRepo) Delete(context.Context, assessment.ID) error { return nil }
+
+func TestAssessmentInvalidationWaitsForOriginalRootCommit(t *testing.T) {
+	for _, outcome := range []string{"commit", "rollback", "commit-unknown"} {
+		t.Run(outcome, func(t *testing.T) {
+			mr := miniredis.RunT(t)
+			client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+			t.Cleanup(func() { require.NoError(t, client.Close()) })
+			keys := keyspace.NewBuilderWithNamespace("cache:object")
+			caches := NewAssessmentCaches(client, keys, nil, nil)
+			cacheKeys := []string{keys.BuildAssessmentAccessKey(42), keys.BuildAssessmentOutcomeDetailKey(42)}
+			for _, key := range cacheKeys {
+				require.NoError(t, mr.Set(key, "original-cache-entry"))
+			}
+			pool, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				mock.ExpectClose()
+				require.NoError(t, pool.Close())
+				require.NoError(t, mock.ExpectationsWereMet())
+			})
+			db, err := gorm.Open(driver.New(driver.Config{Conn: pool, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true})
+			require.NoError(t, err)
+			mock.ExpectBegin()
+			switch outcome {
+			case "commit":
+				mock.ExpectCommit()
+			case "rollback":
+				mock.ExpectRollback()
+			case "commit-unknown":
+				mock.ExpectCommit().WillReturnError(errors.New("commit reply lost"))
+			}
+			repo := NewInvalidatingAssessmentRepository(deletingAssessmentRepo{}, caches)
+			err = hostmysql.NewUnitOfWork(db).WithinTransaction(t.Context(), func(ctx context.Context) error {
+				require.NoError(t, repo.Delete(ctx, assessment.NewID(42)))
+				for _, key := range cacheKeys {
+					require.True(t, mr.Exists(key), "Redis invalidation ran before root commit")
+				}
+				if outcome == "rollback" {
+					return errors.New("business write rejected")
+				}
+				return nil
+			})
+			if outcome == "commit" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+			for _, key := range cacheKeys {
+				require.Equal(t, outcome != "commit", mr.Exists(key), "unconfirmed commit must not run hooks")
+			}
+		})
+	}
+}
 
 func TestAssessmentCachesUseIndependentVersionedKeys(t *testing.T) {
 	builder := keyspace.NewBuilderWithNamespace("prod:cache:object")

@@ -33,35 +33,37 @@ type RuntimeIdentity struct {
 // Payload keeps the versioned Execution JSON without forcing storage
 // adapters to understand mechanism-specific detail DTOs.
 type Record struct {
-	id                     ID
-	orgID                  int64
-	assessmentID           meta.ID
-	testeeID               uint64
-	runID                  string
-	model                  ModelIdentity
-	runtime                RuntimeIdentity
-	inputSnapshotRef       string
-	reportInput            json.RawMessage
-	payload                json.RawMessage
-	schemaVersion          uint
-	evaluatedAt            time.Time
-	committedEventEvidence *eventevidence.EventEvidenceV1
+	id                           ID
+	orgID                        int64
+	assessmentID                 meta.ID
+	testeeID                     uint64
+	runID                        string
+	model                        ModelIdentity
+	runtime                      RuntimeIdentity
+	inputSnapshotRef             string
+	reportInput                  json.RawMessage
+	payload                      json.RawMessage
+	schemaVersion                uint
+	evaluatedAt                  time.Time
+	committedEventEvidence       *eventevidence.EventEvidenceV1
+	committedTransactionEvidence *eventevidence.EventEvidenceV2
 }
 
 type NewRecordInput struct {
-	ID                     ID
-	OrgID                  int64
-	AssessmentID           meta.ID
-	TesteeID               uint64
-	RunID                  string
-	Model                  ModelIdentity
-	Runtime                RuntimeIdentity
-	InputSnapshotRef       string
-	ReportInput            json.RawMessage
-	Payload                json.RawMessage
-	SchemaVersion          uint
-	EvaluatedAt            time.Time
-	CommittedEventEvidence *eventevidence.EventEvidenceV1
+	ID                           ID
+	OrgID                        int64
+	AssessmentID                 meta.ID
+	TesteeID                     uint64
+	RunID                        string
+	Model                        ModelIdentity
+	Runtime                      RuntimeIdentity
+	InputSnapshotRef             string
+	ReportInput                  json.RawMessage
+	Payload                      json.RawMessage
+	SchemaVersion                uint
+	EvaluatedAt                  time.Time
+	CommittedEventEvidence       *eventevidence.EventEvidenceV1
+	CommittedTransactionEvidence *eventevidence.EventEvidenceV2
 }
 
 func NewRecord(input NewRecordInput) (*Record, error) {
@@ -89,6 +91,9 @@ func NewRecord(input NewRecordInput) (*Record, error) {
 	if input.EvaluatedAt.IsZero() {
 		return nil, fmt.Errorf("evaluated at is required")
 	}
+	if input.CommittedEventEvidence != nil && input.CommittedTransactionEvidence != nil {
+		return nil, fmt.Errorf("evaluation outcome cannot mix event evidence protocols")
+	}
 	if input.CommittedEventEvidence != nil {
 		if err := input.CommittedEventEvidence.Validate(); err != nil {
 			return nil, err
@@ -100,21 +105,33 @@ func NewRecord(input NewRecordInput) (*Record, error) {
 			return nil, fmt.Errorf("evaluation outcome event evidence identity conflict")
 		}
 	}
+	if proof := input.CommittedTransactionEvidence; proof != nil {
+		if input.Runtime.DecisionKind == "" {
+			return nil, fmt.Errorf("transaction outcome requires an explicit frozen runtime decision kind")
+		}
+		if err := proof.Validate(); err != nil {
+			return nil, err
+		}
+		if proof.BusinessBindingSHA256 != BusinessBindingSHA256(input) || proof.Reference.EventType != eventcatalog.EvaluationOutcomeCommitted || proof.Reference.Scope != fmt.Sprintf("org:%d", input.OrgID) {
+			return nil, fmt.Errorf("evaluation outcome transaction evidence business identity conflict")
+		}
+	}
 	input.EvaluatedAt = input.EvaluatedAt.UTC().Truncate(time.Millisecond)
 	return &Record{
-		id:                     input.ID,
-		orgID:                  input.OrgID,
-		assessmentID:           input.AssessmentID,
-		testeeID:               input.TesteeID,
-		runID:                  input.RunID,
-		model:                  input.Model,
-		runtime:                input.Runtime,
-		inputSnapshotRef:       input.InputSnapshotRef,
-		reportInput:            append(json.RawMessage(nil), input.ReportInput...),
-		payload:                append(json.RawMessage(nil), input.Payload...),
-		schemaVersion:          input.SchemaVersion,
-		evaluatedAt:            input.EvaluatedAt,
-		committedEventEvidence: input.CommittedEventEvidence.Clone(),
+		id:                           input.ID,
+		orgID:                        input.OrgID,
+		assessmentID:                 input.AssessmentID,
+		testeeID:                     input.TesteeID,
+		runID:                        input.RunID,
+		model:                        input.Model,
+		runtime:                      input.Runtime,
+		inputSnapshotRef:             input.InputSnapshotRef,
+		reportInput:                  append(json.RawMessage(nil), input.ReportInput...),
+		payload:                      append(json.RawMessage(nil), input.Payload...),
+		schemaVersion:                input.SchemaVersion,
+		evaluatedAt:                  input.EvaluatedAt,
+		committedEventEvidence:       input.CommittedEventEvidence.Clone(),
+		committedTransactionEvidence: input.CommittedTransactionEvidence.Clone(),
 	}, nil
 }
 
@@ -149,7 +166,22 @@ func (r *Record) EvaluatedAt() time.Time { return r.evaluatedAt }
 func (r *Record) CommittedEventEvidence() *eventevidence.EventEvidenceV1 {
 	return r.committedEventEvidence.Clone()
 }
+func (r *Record) CommittedTransactionEvidence() *eventevidence.EventEvidenceV2 {
+	return r.committedTransactionEvidence.Clone()
+}
+func (r *Record) CommittedEvidence() *eventevidence.Record {
+	if r.committedEventEvidence != nil {
+		return &eventevidence.Record{V1: r.committedEventEvidence.Clone()}
+	}
+	if r.committedTransactionEvidence != nil {
+		return &eventevidence.Record{V2: r.committedTransactionEvidence.Clone()}
+	}
+	return nil
+}
 func (r *Record) CommittedEventID() string {
+	if r.committedTransactionEvidence != nil {
+		return r.committedTransactionEvidence.Reference.EventID
+	}
 	if r.committedEventEvidence == nil {
 		return ""
 	}

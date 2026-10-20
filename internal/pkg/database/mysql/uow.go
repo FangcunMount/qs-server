@@ -30,3 +30,9 @@ func TxFromContext(ctx context.Context) (*gorm.DB, bool) {
 func RequireTx(ctx context.Context) (*gorm.DB, error) {
 	return gormuow.RequireTx(ctx)
 }
+
+// AfterCommit registers work owned by the original UnitOfWork. It must not be
+// used with a manually borrowed transaction whose owner does not drain hooks.
+func AfterCommit(ctx context.Context, hook func(context.Context) error) error {
+	return gormuow.AfterCommit(ctx, hook)
+}

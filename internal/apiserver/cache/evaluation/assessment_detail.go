@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/internal/adapterkit"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	redis "github.com/redis/go-redis/v9"
@@ -136,7 +137,7 @@ func (r *InvalidatingAssessmentRepository) Save(ctx context.Context, value *asse
 		return err
 	}
 	if value != nil {
-		r.caches.Evict(ctx, value.ID().Uint64())
+		return r.evictAfterCommit(ctx, value.ID().Uint64())
 	}
 	return nil
 }
@@ -145,7 +146,17 @@ func (r *InvalidatingAssessmentRepository) Delete(ctx context.Context, id assess
 	if err := r.repo.Delete(ctx, id); err != nil {
 		return err
 	}
-	r.caches.Evict(ctx, id.Uint64())
+	return r.evictAfterCommit(ctx, id.Uint64())
+}
+
+func (r *InvalidatingAssessmentRepository) evictAfterCommit(ctx context.Context, id uint64) error {
+	if _, active := hostmysql.TxFromContext(ctx); active {
+		return hostmysql.AfterCommit(ctx, func(committed context.Context) error {
+			r.caches.Evict(committed, id)
+			return nil
+		})
+	}
+	r.caches.Evict(ctx, id)
 	return nil
 }
 
@@ -162,7 +173,7 @@ func (r *InvalidatingAssessmentRepository) SavePendingSubmission(ctx context.Con
 		return err
 	}
 	if value != nil {
-		r.caches.Evict(ctx, value.ID().Uint64())
+		return r.evictAfterCommit(ctx, value.ID().Uint64())
 	}
 	return nil
 }

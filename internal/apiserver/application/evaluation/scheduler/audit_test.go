@@ -234,6 +234,28 @@ func TestHistoricalEventProvenanceIsNotCurrentMessageVerification(t *testing.T) 
 	}
 }
 
+func TestCommittedTransactionWitnessIsDistinctFromOutboxAndConsumerCompletion(t *testing.T) {
+	outcome := testOutcome(modelcatalog.KindTypology, "run-transaction")
+	publication := &evaluationconsistency.CommittedOutboxEvidence{Class: eventevidence.TransactionReferenceClass,
+		OutcomeID: outcome.ID, RunID: outcome.RunID, Status: "commit"}
+	state := consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome,
+		run: &evaluationconsistency.RunEvidence{ID: outcome.RunID, Status: string(evalrun.StatusSucceeded)}, outbox: publication}
+	if got := classifyDrifts(state, time.Now()); len(got) != 0 {
+		t.Fatalf("committed transaction required a fictitious Outbox row: %#v", got)
+	}
+	for _, status := range []string{"unknown", "rollback", "published", "delivered"} {
+		publication.Status = status
+		if got := classifyDrifts(state, time.Now()); !containsMismatch(got, mismatchCommittedOutboxMismatch) {
+			t.Fatal("non-witness state used as committed producer proof")
+		}
+	}
+	publication.Status = "commit"
+	publication.RowCount = 1
+	if got := classifyDrifts(state, time.Now()); !containsMismatch(got, mismatchCommittedOutboxMismatch) {
+		t.Fatal("mixed publishing Outbox/transaction responsibility accepted")
+	}
+}
+
 func TestMissingOriginalRunIsNeverHiddenByUnclassifiedEventHistory(t *testing.T) {
 	outcome := testOutcome(modelcatalog.KindScale, "original-run")
 	for _, test := range []struct {

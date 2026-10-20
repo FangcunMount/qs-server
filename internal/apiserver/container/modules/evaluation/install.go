@@ -4,6 +4,7 @@ import (
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -15,6 +16,13 @@ type InstallHost interface {
 	SurveyRuntimeInfra() *surveymod.SurveyRuntimeInfra
 	SetEvaluationModule(*Module)
 	SetWorkbenchLatestRiskReader(workbenchreadmodel.LatestRiskReader)
+}
+
+// TransactionInstallHost supplies one host-owned qs.mysql runtime. The host
+// retains Start/admission/drain/Close responsibilities for all sharing modules.
+type TransactionInstallHost interface {
+	EvaluationTransactionOwner() *mysqlEventTx.Committer
+	EvaluationTransactionRoutes() eventcatalog.TopicResolver
 }
 
 // InstallFrom wires and registers the evaluation module using composition-root host inputs.
@@ -29,6 +37,12 @@ func InstallFrom(host InstallHost) error {
 	objectRedis := host.CacheClient(redisruntime.FamilyObject)
 	if !detail.Enabled && !access.Enabled {
 		objectRedis = nil
+	}
+	var owner *mysqlEventTx.Committer
+	var routes eventcatalog.TopicResolver
+	if transactions, ok := host.(TransactionInstallHost); ok {
+		owner = transactions.EvaluationTransactionOwner()
+		routes = transactions.EvaluationTransactionRoutes()
 	}
 	result, err := Wire(WireInput{
 		MySQLDB:                   host.MySQLDB(),
@@ -45,6 +59,8 @@ func InstallFrom(host InstallHost) error {
 		PublishedModelCatalog:     host.PublishedModelCatalog(),
 		RuntimeDescriptorRegistry: catalog.RuntimeDescriptorRegistry,
 		OutboxProfile:             host.EventProfile(eventcatalog.OutboxProfileAssessmentMySQL),
+		EventTransactionOwner:     owner,
+		TransactionRoutes:         routes,
 	})
 	if err != nil {
 		return err

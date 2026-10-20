@@ -267,6 +267,12 @@ func classifyCommittedEventDrifts(evidence consistencyEvidence, add func(mismatc
 		add(mismatchHistoricalEventGap, severityLow, "retain the terminal historical gap; original message verification is unavailable")
 	case evidence.outbox != nil && evidence.outbox.Class == eventevidence.RetiredVerified:
 		// Verified retirement is recorded as historical provenance, not a live message match.
+	case evidence.outbox != nil && evidence.outbox.Class == eventevidence.TransactionReferenceClass:
+		// RowCount remains the number of historical Outbox rows. A witness is
+		// never relabelled as an Outbox row or a consumer/business receipt.
+		if evidence.outbox.Status != "commit" || evidence.outbox.RowCount != 0 || evidence.outbox.OutcomeID != outcomeID || evidence.outbox.RunID != evidence.outcome.RunID {
+			add(mismatchCommittedOutboxMismatch, severityHigh, "verify the exact original MySQL transaction witness; do not replay or synthesize a publishing Outbox row")
+		}
 	case evidence.outbox == nil || evidence.outbox.RowCount == 0:
 		add(mismatchCommittedOutboxMissing, severityHigh, "investigate missing canonical event evidence; preserve unknown execution state")
 	case evidence.outbox.RowCount != 1 ||

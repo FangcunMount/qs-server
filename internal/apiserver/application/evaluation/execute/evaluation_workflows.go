@@ -14,6 +14,8 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -215,11 +217,12 @@ func runFailureFromNormError(err error) (evalrun.Failure, bool) {
 
 // evaluationFailureFinalizer 评估失败标记器
 type evaluationFailureFinalizer struct {
-	repo        assessment.Repository
-	runRepo     evaluationrun.Repository
-	txRunner    apptransaction.Runner
-	eventStager EventStager
-	postCommit  appEventing.PostCommitDispatcher
+	failureCommitter evaluationtransaction.FailureCommitter
+	repo             assessment.Repository
+	runRepo          evaluationrun.Repository
+	txRunner         apptransaction.Runner
+	eventStager      EventStager
+	postCommit       appEventing.PostCommitDispatcher
 }
 
 // Finalize atomically persists the Assessment failure, terminal Run and failure event.
@@ -230,7 +233,7 @@ func (f evaluationFailureFinalizer) Finalize(
 	reason string,
 	failure evalrun.Failure,
 ) error {
-	if f.repo == nil || f.runRepo == nil || f.txRunner == nil || f.eventStager == nil {
+	if f.failureCommitter == nil && (f.repo == nil || f.runRepo == nil || f.txRunner == nil || f.eventStager == nil) {
 		return evalerrors.ModuleNotConfigured("evaluation failure finalizer requires transaction, assessment, run and outbox dependencies")
 	}
 	if a == nil || run == nil {
@@ -248,6 +251,9 @@ func (f evaluationFailureFinalizer) Finalize(
 	)
 
 	failedAt := time.Now()
+	if f.failureCommitter != nil {
+		failedAt = failedAt.UTC().Truncate(time.Millisecond)
+	}
 	assessmentToCommit, err := a.PrepareFailure(reason, failedAt)
 	if err != nil {
 		log.Warnw("failed to transition assessment to failed",
@@ -270,6 +276,19 @@ func (f evaluationFailureFinalizer) Finalize(
 			return err
 		}
 		retryEvent = retry
+	}
+	if f.failureCommitter != nil {
+		committed, committedRun, err := f.failureCommitter.CommitFailure(ctx, evaluationtransaction.FailureRequest{Assessment: assessmentToCommit, Run: runToCommit, Immediate: eventsToStage, FutureRetry: retryEvent, RetryAt: retryAt})
+		if err != nil {
+			return err
+		}
+		if committed == nil || committedRun == nil || committed.ID() != a.ID() || committed.OrgID() != a.OrgID() || !committed.Status().IsFailed() || committedRun.ID() != run.ID() || committedRun.Attempt().Status != evalrun.StatusFailed {
+			return eventtransaction.ErrUnresolved
+		}
+		committed.ClearEvents()
+		*a = *committed
+		*run = *committedRun
+		return nil
 	}
 	if err := f.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := f.repo.Save(txCtx, assessmentToCommit); err != nil {

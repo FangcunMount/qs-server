@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 )
 
@@ -149,5 +151,36 @@ func TestSubmissionRejectsRepositoryWithoutAtomicCapability(t *testing.T) {
 	}
 	if repo.saves != 1 || tx.calls != 1 || len(stager.types) != beforeEvents {
 		t.Fatal("unsupported submission fell back to ordinary Save")
+	}
+}
+
+type transactionSubmitStub struct {
+	called bool
+	err    error
+}
+
+func (s *transactionSubmitStub) Submit(_ context.Context, a *domainassessment.Assessment, _ time.Time) (*domainassessment.Assessment, error) {
+	s.called = true
+	if !a.Status().IsPending() {
+		return nil, errors.New("caller mutated before transaction submission")
+	}
+	return nil, s.err
+}
+func TestServiceUsesExplicitTransactionSubmitterWithoutLegacyFallback(t *testing.T) {
+	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
+	unknown := eventtransaction.ErrUnresolved
+	submit := &transactionSubmitStub{err: unknown}
+	svc := NewService(repo, validatorStub{}, tx, stager, WithTransactionSubmitter(submit))
+	kind, code, version := "scale", "MODEL-1", "1.0.0"
+	created, err := svc.CreateForAnswerSheet(t.Context(), CreateCommand{OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q", QuestionnaireVersion: "1", AnswerSheetID: 3, OriginType: "adhoc", ModelKind: &kind, ModelCode: &code, ModelVersion: &version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := svc.SubmitForEvaluation(t.Context(), created.ID)
+	if !errors.Is(err, unknown) || result != nil || !submit.called {
+		t.Fatalf("result=%v error=%v called=%v", result, err, submit.called)
+	}
+	if repo.saves != 1 || tx.calls != 1 || len(stager.types) != 0 || !repo.aggregate.Status().IsPending() {
+		t.Fatal("transaction unknown fell back to legacy staging or mutated caller")
 	}
 }
