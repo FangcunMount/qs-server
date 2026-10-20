@@ -2,6 +2,7 @@ package aibridge
 
 import (
 	"crypto/sha256"
+	"strings"
 	"testing"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
@@ -10,6 +11,26 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+func TestIncomingReceiptRequiresOriginalCommandCorrelationAndFreezesACK(t *testing.T) {
+	id, command, run := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	body := &pb.MessagingBody{Value: &pb.MessagingBody_CommandReceipt{CommandReceipt: &pb.MessagingCommandReceipt{CommandId: command, CommandBodySha256: strings.Repeat("a", 64), Decision: pb.MessagingDecision_ACCEPTED, OriginalReceipt: &pb.MessagingCommandReceipt_EvaluationReceipt{EvaluationReceipt: &pb.EvaluationState{RunId: run, Version: 1}}}}}
+	for _, wrong := range []string{"", uuid.NewString()} {
+		_, _, err := PrepareMessaging(pb.MessagingKind_COMMAND_RECEIPT, id, run, wrong, body)
+		require.ErrorIs(t, err, ErrMessagingContract)
+	}
+	header, raw, err := PrepareMessaging(pb.MessagingKind_COMMAND_RECEIPT, id, run, command, body)
+	require.NoError(t, err)
+	header.OriginalOccurredAt = "2026-10-21T05:00:00+08:00"
+	wire, err := legacy.Encode(legacy.Envelope{UUID: id, Metadata: messagingMetadata(), Payload: []byte("opaque-correlated-receipt-unit-wire")}, legacy.Revision2)
+	require.NoError(t, err)
+	incoming, err := FreezeIncomingEvent(header, raw, wire, "7")
+	require.NoError(t, err)
+	plan, err := incoming.FreezeACK(eventACKFixture(t, incoming, false), uuid.NewString())
+	require.NoError(t, err)
+	_, err = incoming.ReadACK(plan)
+	require.NoError(t, err)
+}
 
 func incomingEventFixture(t *testing.T) FrozenIncomingEvent {
 	t.Helper()

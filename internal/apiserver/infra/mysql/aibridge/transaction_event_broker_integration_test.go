@@ -169,7 +169,11 @@ func TestM3AIEventBrokerHost(t *testing.T) {
 	ring := protected.Keyring{Decrypt: map[string]jose.JSONWebKey{qsCrypt.KeyID: qsCrypt}, Signers: map[string]protected.TrustedSigner{aiSign.KeyID: {Producer: "qs-ai", Key: aiSign.Public()}}}
 	receiver := &MessagingEventReceiver{DB: pool, Store: legacyStore, Bodies: &localEventBody{}, Seal: seal, Keys: ring, Transactions: events}
 	ai := func(kind pb.MessagingKind, id, aggregate string, body *pb.MessagingBody) *app.PreparedMessaging {
-		m, err := app.ProtectMessaging(kind, id, aggregate, "", "7", time.Now().Format(time.RFC3339Nano), body, aiSign, qsCrypt.Public())
+		correlation := ""
+		if kind == pb.MessagingKind_COMMAND_RECEIPT {
+			correlation = body.GetCommandReceipt().GetCommandId()
+		}
+		m, err := app.ProtectMessaging(kind, id, aggregate, correlation, "7", time.Now().Format(time.RFC3339Nano), body, aiSign, qsCrypt.Public())
 		require.NoError(t, err)
 		return m
 	}
