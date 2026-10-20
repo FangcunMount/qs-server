@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "199ef22def9b248fe2c8e01f0737373bf55d2267",
+    "sha": "b1776025fe5d4448469f2d9b33f4f0eff78bf72d",
     "verified_on": "2026-10-21"
   },
   "status_policy": {
@@ -318,7 +318,7 @@
       }
     }
   },
-  "initialization_note": "The exact document inventory remains explicit until each file receives sources and verification. initial_review_baseline preserves the unsigned starting state; module_signoff retains strict source review while test and production dimensions without reproducible current evidence remain unsigned. infrastructure_signoff is a separate ten-topic 7x7 matrix; historical production records never upgrade the current checkout. The 2026-10-07 audit corrects current statements and records local regression evidence at the new source baseline. Partial review does not promote every document to aligned or add an accountable signoff; CI, deployment, real dependencies and business acceptance remain separate.",
+  "initialization_note": "The exact document inventory remains explicit until each file receives sources and verification. initial_review_baseline preserves the unsigned starting state; module_signoff retains strict source review while test and production dimensions without reproducible current evidence remain unsigned. infrastructure_signoff is a separate ten-topic 7x7 matrix; historical production records never upgrade the current checkout. The 2026-10-07 audit corrects current statements and records local regression evidence at the new source baseline. Partial review does not promote every document to aligned or add an accountable signoff; CI, deployment, real dependencies and business acceptance remain separate. M3 T15 source inventory baseline advanced to b1776025fe5d4448469f2d9b33f4f0eff78bf72d; previous binding retained as {\"sha\": \"199ef22def9b248fe2c8e01f0737373bf55d2267\", \"verified_on\": \"2026-10-21\"}. Inbound event/ACK source and isolated proof candidates only; runtime and production evidence unchanged.",
   "documents": [
     {
       "path": ".github/workflows/README.md",
