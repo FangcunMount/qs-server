@@ -19,6 +19,15 @@ func TestTransactionLifecycleConstructorsBorrowDisconnectedDatabaseWithoutDDL(t 
 	require.Same(t, db, run.DB())
 	require.Same(t, db, report.DB())
 	require.Same(t, db, catalog.DB())
+	reconcile := NewCatalogReconcileStoreWithoutSchema(db)
+	require.Same(t, db, reconcile.db)
+	templates, err := NewReportTemplateRepositoryWithoutSchema(db, reportTemplateManifestCatalogStub{})
+	require.NoError(t, err)
+	require.Same(t, db, templates.DB())
+	_, err = NewReportTemplateRepositoryWithoutSchema(nil, reportTemplateManifestCatalogStub{})
+	require.Error(t, err)
+	_, err = NewReportTemplateRepositoryWithoutSchema(db, nil)
+	require.Error(t, err)
 	// Only the explicitly requested installer tries database work.
 	require.Error(t, InstallLifecycleSchema(t.Context(), db))
 }

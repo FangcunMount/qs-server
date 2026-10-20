@@ -45,12 +45,9 @@ type ReportTemplateRepository struct {
 }
 
 func NewReportTemplateRepository(db *mongo.Database, manifests domainreporttemplate.ManifestCatalog, opts ...base.BaseRepositoryOptions) (*ReportTemplateRepository, error) {
-	if manifests == nil {
-		return nil, fmt.Errorf("interpretation report template manifest catalog is required")
-	}
-	repo := &ReportTemplateRepository{
-		BaseRepository: base.NewBaseRepository(db, reportTemplateCollection, opts...),
-		manifests:      manifests,
+	repo, err := NewReportTemplateRepositoryWithoutSchema(db, manifests, opts...)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), reportTemplateIndexModels()); err != nil {
 		return nil, fmt.Errorf("create interpretation report template indexes: %w", err)
