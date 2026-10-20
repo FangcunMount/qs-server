@@ -108,11 +108,12 @@ func CommandScope(e *pb.MessagingEnvelope, b *pb.MessagingBody) (OperationScope,
 	return s, nil
 }
 
-func (c TransactionCommand) ID() string            { return c.id }
-func (c TransactionCommand) Aggregate() string     { return c.aggregate }
-func (c TransactionCommand) Scope() OperationScope { return c.scope }
-func (c TransactionCommand) InputHash() [32]byte   { return c.hash }
-func (c TransactionCommand) Key() string           { return "ai-command/" + c.id }
+func (c TransactionCommand) Kind() pb.MessagingKind { return c.kind }
+func (c TransactionCommand) ID() string             { return c.id }
+func (c TransactionCommand) Aggregate() string      { return c.aggregate }
+func (c TransactionCommand) Scope() OperationScope  { return c.scope }
+func (c TransactionCommand) InputHash() [32]byte    { return c.hash }
+func (c TransactionCommand) Key() string            { return "ai-command/" + c.id }
 func (c TransactionCommand) Body() (*pb.MessagingBody, error) {
 	if c.id == "" || len(c.body) == 0 {
 		return nil, ErrMessagingContract
