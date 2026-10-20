@@ -93,6 +93,8 @@ func TestSharedOwnerConstructorIsInertAndKeepsOriginalDatabaseIdentity(t *testin
 	require.ErrorIs(t, err, messagingruntime.ErrTransactionAdmissionClosed)
 	_, err = New(db, cfg, []string{"reports.lifecycle", "reports.lifecycle"})
 	require.ErrorIs(t, err, transaction.ErrBinding)
+	_, err = New(db, cfg, []string{"unregistered.topic"})
+	require.Error(t, err, "configured topics must resolve through the fixed v2 route manifest")
 	_, err = New(nil, cfg, []string{"reports.lifecycle"})
 	require.ErrorIs(t, err, transaction.ErrBinding)
 	_, err = New(&mongo.Database{}, cfg, []string{"reports.lifecycle"})

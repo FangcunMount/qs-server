@@ -17,6 +17,7 @@ import (
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
+	appaudit "github.com/FangcunMount/qs-server/internal/apiserver/application/mongoconsistency"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
@@ -25,6 +26,8 @@ import (
 	run "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	audit "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/mongoconsistency"
+	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -39,6 +42,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+type m3ReportAuditFacts map[meta.ID]*evaluationfact.Record
+
+func (f m3ReportAuditFacts) FindByID(_ context.Context, id meta.ID) (*evaluationfact.Record, error) {
+	r := f[id]
+	if r == nil {
+		return nil, evaluationfact.ErrNotFound
+	}
+	return r, nil
+}
+func (f m3ReportAuditFacts) FindByAssessmentID(context.Context, meta.ID) (*evaluationfact.Record, error) {
+	return nil, evaluationfact.ErrNotFound
+}
 
 func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.True(t, strings.HasPrefix(os.Getenv("QS_M3_FIXTURE_PROJECT"), "rocketmq-m2-"))
@@ -120,6 +136,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, collections)
 	cases := map[string]bool{"constructor_no_ddl": true}
+	facts := m3ReportAuditFacts{}
 	require.NoError(t, repository.InstallLifecycleSchema(t.Context(), db))
 	require.NoError(t, txmongo.InstallSchema(t.Context(), db))
 	require.NoError(t, db.CreateCollection(t.Context(), "rm_outbox"))
@@ -179,7 +196,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 		}
 	}
 	request := func(id uint64) app.CommitSuccessRequest {
-		at := time.Now().UTC().Truncate(time.Millisecond)
+		at := time.Now().UTC()
 		g, err := generation.New(meta.FromUint64(id), generation.Key{OutcomeID: meta.FromUint64(id + 9), ReportType: policy.ReportTypeStandard, TemplateVersion: "v1"}, at.Add(-time.Minute))
 		require.NoError(t, err)
 		r, err := run.NewPending(meta.FromUint64(id+1), g.ID(), 1)
@@ -195,6 +212,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 		a, err := report.NewInterpretReport(report.InterpretReportInput{ID: meta.FromUint64(id + 2), GenerationID: g.ID(), OutcomeID: g.Key().OutcomeID, InterpretationRunID: r.ID(), Association: report.Association{OrgID: 7, AssessmentID: meta.FromUint64(id + 8), TesteeID: 9}, ReportType: g.Key().ReportType, TemplateVersion: g.Key().TemplateVersion,
 			BuilderIdentity: report.BuilderIdentityFactorScoring, ContentSchemaVersion: report.ContentSchemaVersionV1, GeneratedAt: at, Content: report.Content{Model: report.ModelIdentity{Kind: "scale", Code: "SDS", Version: "v1", Title: "fixture"}, PrimaryScore: report.NewRawTotalScore(42, nil), Level: report.LevelFromRisk(report.RiskLevelLow), Conclusion: "first report", Dimensions: []report.DimensionInterpret{report.NewDimensionInterpret(report.NewFactorCode("TOTAL"), "total", 42, nil, report.RiskLevelLow, "fixture", "fixture")}}})
 		require.NoError(t, err)
+		facts[g.Key().OutcomeID] = evaluationfact.NewRecord(evaluationfact.NewRecordInput{ID: g.Key().OutcomeID, OrgID: a.Association().OrgID, AssessmentID: a.Association().AssessmentID, TesteeID: a.Association().TesteeID})
 		return app.CommitSuccessRequest{Generation: g, Run: r, InterpretReport: a, BuilderIdentity: a.BuilderIdentity(), ContentSchemaVersion: a.ContentSchemaVersion(), CompletedAt: at}
 	}
 	assertNotCommitted := func(q app.CommitSuccessRequest) {
@@ -318,6 +336,21 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, count)
 	cases["no_new_publish_outbox"] = true
+	scanner := audit.NewScanner(db, limiter).WithOutcomeFacts(facts).WithTransactionOwner(owner)
+	upper, err := scanner.UpperBound(t.Context(), appaudit.PhaseGeneratedTerminal, 2*time.Second)
+	require.NoError(t, err)
+	batch, err := scanner.ScanBatch(t.Context(), appaudit.BatchRequest{Phase: appaudit.PhaseGeneratedTerminal, UpperBound: upper, Limit: 100, MaxTime: 2 * time.Second})
+	require.NoError(t, err)
+	require.Empty(t, batch.Findings)
+	require.Equal(t, 3, batch.Scanned)
+	require.Equal(t, int64(3), batch.EvidenceClasses["transaction_reference"])
+	upper, err = scanner.UpperBound(t.Context(), appaudit.PhaseGenerationRun, 2*time.Second)
+	require.NoError(t, err)
+	batch, err = scanner.ScanBatch(t.Context(), appaudit.BatchRequest{Phase: appaudit.PhaseGenerationRun, UpperBound: upper, Limit: 100, MaxTime: 2 * time.Second})
+	require.NoError(t, err)
+	require.Empty(t, batch.Findings)
+	require.Equal(t, int64(1), batch.EvidenceClasses["transaction_reference"])
+	cases["v2_authority_audit"] = true
 	closed := request(7001)
 	owner.Runtime().StopAdmission()
 	prior = roots.Load()
@@ -353,7 +386,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.Equal(t, first.InterpretReport.ID(), recovered.InterpretReport.ID())
 	require.Zero(t, newExecutions.Load())
 	cases["new_instance_exact_recovery"] = true
-	require.Len(t, cases, 13)
+	require.Len(t, cases, 14)
 	raw, err := json.Marshal(map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "root_ack_discard_is_client_level": true, "mongo_callback_failpoint": true, "host_entry": "interpretation_original_root_committer", "system_login_not_claimed": true})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_REPORT_RECEIPT " + string(raw))

@@ -109,10 +109,10 @@ func (s *Scanner) OutboxUpperBound(ctx context.Context, maxTime time.Duration) (
 	return append([]byte(nil), row.ID...), nil
 }
 func answerSheetAuditFilter() bson.M {
-	return bson.M{"deleted_at": nil, "$or": bson.A{bson.M{"durable_acceptance.schema_version": 1}, bson.M{"durable_acceptance.event_evidence": bson.M{"$exists": true}}}}
+	return bson.M{"deleted_at": nil, "$or": bson.A{bson.M{"durable_acceptance.schema_version": bson.M{"$in": bson.A{1, 2}}}, bson.M{"durable_acceptance.event_evidence": bson.M{"$exists": true}}, bson.M{"durable_acceptance.transaction_evidence": bson.M{"$exists": true}}}}
 }
 func generatedAuditFilter() bson.M {
-	return bson.M{"deleted_at": nil, "status": "generated", "$or": bson.A{bson.M{"transaction_schema_version": 1}, bson.M{"generated_event_evidence": bson.M{"$exists": true}}}}
+	return bson.M{"deleted_at": nil, "status": "generated", "$or": bson.A{bson.M{"transaction_schema_version": 1}, bson.M{"generated_event_evidence": bson.M{"$exists": true}}, bson.M{"generated_transaction_evidence": bson.M{"$exists": true}}}}
 }
 
 func retryAuditFilter() bson.M {
@@ -120,7 +120,7 @@ func retryAuditFilter() bson.M {
 }
 
 var sheetAuditProjection = bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1, "filler_id": 1, "filler_type": 1, "questionnaire_code": 1, "questionnaire_version": 1, "task_id": 1, "admission": 1, "attribution": 1, "filled_at": 1, "submit_meta.request_id": 1, "durable_acceptance": 1}
-var generationAuditProjection = bson.M{"domain_id": 1, "outcome_id": 1, "report_type": 1, "template_version": 1, "status": 1, "latest_run_id": 1, "report_id": 1, "version": 1, "transaction_schema_version": 1, "generated_event_id": 1, "generated_event_evidence": 1}
+var generationAuditProjection = bson.M{"domain_id": 1, "outcome_id": 1, "report_type": 1, "template_version": 1, "status": 1, "latest_run_id": 1, "report_id": 1, "version": 1, "transaction_schema_version": 1, "generated_event_id": 1, "generated_event_evidence": 1, "generated_transaction_evidence": 1, "updated_at": 1}
 var runAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "attempt": 1, "status": 1, "retry_disposition": 1, "next_attempt_at": 1, "retry_event_id": 1, "retry_event_evidence": 1, "action_request_id": 1}
 var artifactAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "outcome_id": 1, "interpretation_run_id": 1, "org_id": 1, "assessment_id": 1, "testee_id": 1, "report_type": 1, "template_version": 1, "builder_identity": 1, "content_schema_version": 1, "generated_at": 1, "model": 1, "primary_score": 1, "level": 1}
 
@@ -225,13 +225,21 @@ func (s *Scanner) checkSheet(ctx context.Context, row sheetmongo.AnswerSheetPO) 
 	if err != nil {
 		return conflict(err)
 	}
-	return s.checkEvidence(ctx, row.DurableAcceptance.EventEvidence, row.DurableAcceptance.EventID, eventcatalog.AnswerSheetSubmitted, answersheetdomain.AggregateType, row.DomainID.String(), binding, func(raw []byte) (string, error) {
+	typed := func(raw []byte) (string, error) {
 		var p eventpayload.AnswerSheetSubmittedData
 		if err := json.Unmarshal(raw, &p); err != nil {
 			return "", err
 		}
 		return eventevidencebinding.AnswerSheet(p)
-	})
+	}
+	acceptance := row.DurableAcceptance
+	if acceptance.SchemaVersion == 2 || acceptance.TransactionEvidence != nil {
+		if acceptance.SchemaVersion != 2 || acceptance.EventEvidence != nil || acceptance.TransactionEvidence == nil || !acceptance.AcceptedAt.Equal(acceptance.TransactionEvidence.RecordedAt) {
+			return driftf("mixed or incomplete submission transaction protocol")
+		}
+		return s.checkTransactionEvidence(ctx, acceptance.TransactionEvidence, acceptance.EventID, eventcatalog.AnswerSheetSubmitted, answersheetdomain.AggregateType, row.DomainID.String(), fmt.Sprintf("org:%d", data.OrgID), binding, typed)
+	}
+	return s.checkEvidence(ctx, acceptance.EventEvidence, acceptance.EventID, eventcatalog.AnswerSheetSubmitted, answersheetdomain.AggregateType, row.DomainID.String(), binding, typed)
 }
 func (s *Scanner) scanAnswerSheetOutbox(ctx context.Context, request appaudit.BatchRequest) (appaudit.BatchResult, error) {
 	var rows []sheetmongo.AnswerSheetPO
@@ -245,7 +253,13 @@ func (s *Scanner) scanAnswerSheetOutbox(ctx context.Context, request appaudit.Ba
 			if !isEvidenceDrift(err) {
 				return result, err
 			}
-			result.Findings = append(result.Findings, finding(appaudit.DriftAnswerSheetMissingOutbox, result.NextID))
+			kind := appaudit.DriftAnswerSheetMissingOutbox
+			if row.DurableAcceptance != nil && (row.DurableAcceptance.SchemaVersion == 2 || row.DurableAcceptance.TransactionEvidence != nil) {
+				kind = appaudit.DriftAnswerSheetTransactionEvidence
+			}
+			result.Findings = append(result.Findings, finding(kind, result.NextID))
+		} else if row.DurableAcceptance.TransactionEvidence != nil {
+			countTransactionEvidence(&result)
 		} else {
 			countEvidence(&result, row.DurableAcceptance.EventEvidence)
 		}
@@ -320,13 +334,20 @@ func (s *Scanner) checkGenerated(ctx context.Context, g interpretmongo.ReportGen
 	if err != nil {
 		return conflict(err)
 	}
-	return s.checkEvidence(ctx, g.GeneratedEventEvidence, g.GeneratedEventID, eventcatalog.InterpretationReportGenerated, domaininterpretation.AggregateType, g.DomainID.String(), binding, func(raw []byte) (string, error) {
+	typed := func(raw []byte) (string, error) {
 		var p eventoutcome.ReportGeneratedPayload
 		if err := json.Unmarshal(raw, &p); err != nil {
 			return "", err
 		}
 		return eventevidencebinding.Generated(p)
-	})
+	}
+	if proof := g.GeneratedTransactionEvidence; proof != nil {
+		if g.GeneratedEventEvidence != nil || g.TransactionSchemaVersion != 1 || !g.UpdatedAt.Equal(proof.RecordedAt) {
+			return driftf("mixed or incomplete generated transaction protocol")
+		}
+		return s.checkTransactionEvidence(ctx, proof, g.GeneratedEventID, eventcatalog.InterpretationReportGenerated, domaininterpretation.AggregateType, g.DomainID.String(), fmt.Sprintf("org:%d", data.OrgID), binding, typed)
+	}
+	return s.checkEvidence(ctx, g.GeneratedEventEvidence, g.GeneratedEventID, eventcatalog.InterpretationReportGenerated, domaininterpretation.AggregateType, g.DomainID.String(), binding, typed)
 }
 func (s *Scanner) scanGeneratedTerminal(ctx context.Context, request appaudit.BatchRequest) (appaudit.BatchResult, error) {
 	if s.outcomes == nil {
@@ -353,7 +374,13 @@ func (s *Scanner) scanGeneratedTerminal(ctx context.Context, request appaudit.Ba
 			if !isEvidenceDrift(err) {
 				return result, err
 			}
-			result.Findings = append(result.Findings, finding(appaudit.DriftGeneratedMissingTerminalOutbox, result.NextID))
+			kind := appaudit.DriftGeneratedMissingTerminalOutbox
+			if g.GeneratedTransactionEvidence != nil {
+				kind = appaudit.DriftGeneratedTransactionEvidence
+			}
+			result.Findings = append(result.Findings, finding(kind, result.NextID))
+		} else if g.GeneratedTransactionEvidence != nil {
+			countTransactionEvidence(&result)
 		} else {
 			countEvidence(&result, g.GeneratedEventEvidence)
 		}

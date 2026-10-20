@@ -48,6 +48,9 @@ const (
 
 const (
 	DriftAnswerSheetMissingOutbox       = "answersheet_missing_outbox"
+	DriftAnswerSheetTransactionEvidence = "answersheet_transaction_evidence_conflict"
+	DriftGeneratedTransactionEvidence   = "generated_transaction_evidence_conflict"
+	DriftFailedTransactionEvidence      = "failed_transaction_evidence_conflict"
 	DriftOutboxBusinessMismatch         = "standard_outbox_business_mismatch"
 	DriftGenerationMissingRun           = "generation_missing_run"
 	DriftGenerationRunStateMismatch     = "generation_run_state_mismatch"
@@ -64,6 +67,9 @@ const (
 
 var DriftSeverities = map[string]Severity{
 	DriftAnswerSheetMissingOutbox:       SeverityHigh,
+	DriftAnswerSheetTransactionEvidence: SeverityHigh,
+	DriftGeneratedTransactionEvidence:   SeverityHigh,
+	DriftFailedTransactionEvidence:      SeverityHigh,
 	DriftOutboxBusinessMismatch:         SeverityHigh,
 	DriftGenerationMissingRun:           SeverityHigh,
 	DriftGenerationRunStateMismatch:     SeverityHigh,

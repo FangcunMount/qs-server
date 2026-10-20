@@ -22,9 +22,10 @@ import (
 )
 
 type Scanner struct {
-	db       *mongo.Database
-	limiter  backpressure.Acquirer
-	outcomes evaluationfact.Repository
+	db               *mongo.Database
+	limiter          backpressure.Acquirer
+	outcomes         evaluationfact.Repository
+	transactionOwner transactionAuditOwner
 }
 
 func NewScanner(db *mongo.Database, limiter backpressure.Acquirer) *Scanner {
@@ -208,6 +209,18 @@ func (s *Scanner) scanGenerationRun(ctx context.Context, request appaudit.BatchR
 		wantStatus := map[string]string{"generating": "running", "generated": "succeeded", "failed": "failed"}[generation.Status]
 		if run.GenerationID != generation.DomainID || wantStatus == "" || run.Status != wantStatus {
 			result.Findings = append(result.Findings, finding(appaudit.DriftGenerationRunStateMismatch, generation.DomainID))
+			continue
+		}
+		if run.Status == "failed" {
+			hasV2, err := s.checkFailedTransaction(ctx, generation.DomainID, run.DomainID)
+			if err != nil {
+				if !isEvidenceDrift(err) {
+					return result, err
+				}
+				result.Findings = append(result.Findings, finding(appaudit.DriftFailedTransactionEvidence, generation.DomainID))
+			} else if hasV2 {
+				countTransactionEvidence(&result)
+			}
 		}
 	}
 	result.Exhausted = batchDone(result.Scanned, result.NextID, request)

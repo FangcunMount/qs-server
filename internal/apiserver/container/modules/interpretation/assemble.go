@@ -51,6 +51,7 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
+	transactionOwner       *mongoEventTx.Owner
 	aiMessagingRuntime     messagingLifecycle
 	aiMessagingReader      *bridgeStore.MessagingReader
 	aiOperations           *bridge.OperationAdministration
@@ -129,7 +130,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, fmt.Errorf("report transaction owner and routes must bind the original database together")
 	}
 
-	module := &Module{}
+	module := &Module{transactionOwner: deps.EventTransactionOwner}
 	if deps.AIWorkflow != nil {
 		module.aiWorkflowEnabled = deps.AIWorkflow.Enabled
 	}
