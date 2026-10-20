@@ -202,10 +202,15 @@ func (c *Committer) Commit(ctx context.Context, e transaction.Execution, write f
 			if err != nil {
 				return err
 			}
-			if err := write(txCtx); err != nil {
+			bound, closeRoot, err := bindOriginal(txCtx, c.primary, e)
+			if err != nil {
 				return err
 			}
-			return guard.CommitWitness(txCtx)
+			defer closeRoot()
+			if err := write(bound); err != nil {
+				return err
+			}
+			return guard.CommitWitness(bound)
 		})
 		if err != nil {
 			return transaction.LocalUnknown, err

@@ -3,6 +3,9 @@ package retryschedule
 import (
 	"bytes"
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"testing"
 	"time"
 
@@ -23,7 +26,7 @@ func (routes) GetTopicForEvent(string) (string, bool) { return LifecycleTopic, t
 func fixture(t *testing.T, kind string, origin retrygovernance.AttemptOrigin, request, id string, at time.Time) (Authority, message.Input) {
 	t.Helper()
 	a := Authority{Owner: "qs.mysql", OrgID: 7, Kind: kind, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: origin, RequestID: request, DecisionHash: [32]byte{1}}
-	base := event.BaseEvent{ID: id, EventTypeValue: catalog.EvaluationRetryRequested, OccurredAtValue: at, AggregateTypeValue: "Assessment", AggregateIDValue: a.SubjectID}
+	base := event.BaseEvent{ID: id, EventTypeValue: catalog.EvaluationRetryRequested, OccurredAtValue: at, AggregateTypeValue: "Evaluation", AggregateIDValue: a.SubjectID}
 	var value event.DomainEvent
 	if kind == Evaluation {
 		value = event.Event[payload.EvaluationRequestedData]{BaseEvent: base, Data: payload.EvaluationRequestedData{OrgID: a.OrgID, AssessmentID: 41, TesteeID: a.TesteeID, ExpectedAttempt: a.ExpectedAttempt, AttemptOrigin: string(origin), ActionRequestID: request, Mode: "next_attempt", RequestedAt: at}}
@@ -132,4 +135,17 @@ func TestScheduleRejectsCrossOwnerScopeRunAndEarlyDispatchIndex(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestScheduleAcceptsTheActualEvaluationDomainRetryConstructor(t *testing.T) {
+	at := time.Date(2026, 10, 21, 0, 0, 0, 123499999, time.UTC)
+	a, err := assessment.NewAssessment(7, testee.NewID(9), assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-RETRY"), "v1"), assessment.NewAnswerSheetRef(meta.FromUint64(6001)), assessment.NewAdhocOrigin(), assessment.WithID(meta.FromUint64(41)))
+	require.NoError(t, err)
+	evt := assessment.NewEvaluationRetryRequestedEvent(a, 1, retrygovernance.AttemptOriginAutomatic, "", at)
+	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, routes{}, "api-server")
+	require.NoError(t, err)
+	authority := Authority{Owner: "qs.mysql", OrgID: 7, Kind: Evaluation, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: [32]byte{1}}
+	frozen, err := New(authority, prepared[0].Message.Input(), at)
+	require.NoError(t, err)
+	require.Equal(t, evt.EventID(), frozen.Message().Input().ID)
 }

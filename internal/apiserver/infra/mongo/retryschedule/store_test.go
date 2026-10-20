@@ -1,6 +1,8 @@
 package retryschedule
 
 import (
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"testing"
 	"time"
 
@@ -103,4 +105,25 @@ func TestScheduleReaderRejectsCorruptOriginalIdentityAndPrematureDueIndex(t *tes
 			}
 		})
 	}
+}
+
+func TestDispatchCannotForgeOriginalRootFromProofShape(t *testing.T) {
+	client := inertClient(t)
+	s, err := New(client.Database("original"), transaction.Binding{Owner: "qs.mongo", StoreID: "primary", WriterEpoch: "m3-1"})
+	require.NoError(t, err)
+	f := plan(t)
+	r := model.Record{Plan: f, State: model.Ready, Version: 1}
+	q, err := model.FreezeDispatch(r, f.DueAt())
+	require.NoError(t, err)
+	p, err := shared.Freeze(q, testRoutes{}, f.Authority().Owner, "m3-1")
+	require.NoError(t, err)
+	e := transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1"}
+	proof, err := model.DispatchProof(r, e)
+	require.NoError(t, err)
+	_, err = s.GuardDispatch(t.Context(), r, proof)
+	require.ErrorIs(t, err, transaction.ErrTransactionRequired)
+	require.ErrorIs(t, s.MarkDispatched(t.Context(), r, proof), transaction.ErrTransactionRequired)
+	var missing *evidence.EventEvidenceV2
+	_, err = s.GuardDispatch(t.Context(), r, missing)
+	require.ErrorIs(t, err, model.ErrInvalid)
 }

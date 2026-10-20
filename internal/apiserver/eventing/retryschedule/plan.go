@@ -184,7 +184,7 @@ func validate(d document) error {
 	}
 	switch a.Kind {
 	case Evaluation:
-		if a.Owner != "qs.mysql" || a.SubjectID != strconv.FormatUint(a.AssessmentID, 10) || a.RunID != fmt.Sprintf("%s:%d", a.SubjectID, a.ExpectedAttempt) || a.OutcomeID != 0 || in.EventType != catalog.EvaluationRetryRequested || envelope.AggregateType != "Assessment" {
+		if a.Owner != "qs.mysql" || a.SubjectID != strconv.FormatUint(a.AssessmentID, 10) || a.RunID != fmt.Sprintf("%s:%d", a.SubjectID, a.ExpectedAttempt) || a.OutcomeID != 0 || in.EventType != catalog.EvaluationRetryRequested || envelope.AggregateType != "Evaluation" {
 			return ErrInvalid
 		}
 		var body payload.EvaluationRequestedData

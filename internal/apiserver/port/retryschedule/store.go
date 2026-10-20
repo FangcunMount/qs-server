@@ -5,6 +5,7 @@ package retryschedule
 import (
 	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
@@ -23,4 +24,18 @@ type Store interface {
 	SaveFrozen(context.Context, model.Frozen) (model.Frozen, error)
 	Find(context.Context, model.Frozen) (*model.Record, error)
 	Due(context.Context, time.Time, int) ([]model.Record, error)
+}
+
+// DispatchStore competes with governance over the same schedule inside the
+// SDK-guarded original root. The returned context cannot escape that callback.
+type DispatchStore interface {
+	Store
+	GuardDispatch(context.Context, model.Record, *evidence.EventEvidenceV2) (context.Context, error)
+	MarkDispatched(context.Context, model.Record, *evidence.EventEvidenceV2) error
+}
+
+// AuthorityValidator rechecks the original Run's current decision in the same
+// database root after the schedule guard. It never executes business work.
+type AuthorityValidator interface {
+	ValidateDispatchAuthority(context.Context, model.Frozen) error
 }
