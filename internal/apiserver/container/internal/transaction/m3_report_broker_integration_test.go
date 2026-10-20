@@ -350,6 +350,19 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, batch.Findings)
 	require.Equal(t, int64(1), batch.EvidenceClasses["transaction_reference"])
+	// Persist a deliberately inconsistent business clock in this disposable
+	// fixture. Exact committed protocol evidence must not hide graph drift.
+	originalFinished := *r.FinishedAt()
+	_, err = db.Collection("interpretation_runs").UpdateOne(t.Context(), bson.M{"domain_id": first.Run.ID().Uint64()}, bson.M{"$set": bson.M{"finished_at": originalFinished.Add(time.Millisecond)}})
+	require.NoError(t, err)
+	generatedUpper, err := scanner.UpperBound(t.Context(), appaudit.PhaseGeneratedTerminal, 2*time.Second)
+	require.NoError(t, err)
+	corrupt, err := scanner.ScanBatch(t.Context(), appaudit.BatchRequest{Phase: appaudit.PhaseGeneratedTerminal, UpperBound: generatedUpper, Limit: 100, MaxTime: 2 * time.Second})
+	require.NoError(t, err)
+	require.Len(t, corrupt.Findings, 1)
+	require.Equal(t, appaudit.DriftGeneratedTransactionEvidence, corrupt.Findings[0].Kind)
+	_, err = db.Collection("interpretation_runs").UpdateOne(t.Context(), bson.M{"domain_id": first.Run.ID().Uint64()}, bson.M{"$set": bson.M{"finished_at": originalFinished}})
+	require.NoError(t, err)
 	cases["v2_authority_audit"] = true
 	closed := request(7001)
 	owner.Runtime().StopAdmission()

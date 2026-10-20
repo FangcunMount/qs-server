@@ -199,3 +199,26 @@ func TestReportSenderKeepsLocalCommitSeparateFromFinalConfirmation(t *testing.T)
 		})
 	}
 }
+
+func TestReportReadOnlyRecoveryDoesNotRequireOrRecreateWinnerCapability(t *testing.T) {
+	request, err := freezeReportSuccess(reportTransactionRequest(t))
+	require.NoError(t, err)
+	b := &reportBoundaryStub{}
+	r, err := b.Reserve(t.Context(), request)
+	require.NoError(t, err)
+	f, err := (&TransactionCommitter{boundary: b}).readExecution(r.Execution)
+	require.NoError(t, err)
+	winner, err := reportPlanProof(f, r.Execution)
+	require.NoError(t, err)
+	readOnly := r.Execution
+	readOnly.Token = [32]byte{}
+	require.False(t, readOnly.Valid(), "read-only lookup must not acquire an execution capability")
+	proof, err := reportPlanProof(f, readOnly)
+	require.NoError(t, err)
+	require.True(t, sameTransactionProof(winner, proof))
+	prepared, _, err := materializeReportCommit(f, readOnly)
+	require.NoError(t, err)
+	require.Equal(t, generation.StatusGenerated, prepared.Generation.Status())
+	require.Zero(t, b.commitCalls)
+	require.Equal(t, [32]byte{}, readOnly.Token)
+}

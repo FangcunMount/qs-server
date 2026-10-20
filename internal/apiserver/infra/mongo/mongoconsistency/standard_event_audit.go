@@ -121,7 +121,7 @@ func retryAuditFilter() bson.M {
 
 var sheetAuditProjection = bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1, "filler_id": 1, "filler_type": 1, "questionnaire_code": 1, "questionnaire_version": 1, "task_id": 1, "admission": 1, "attribution": 1, "filled_at": 1, "submit_meta.request_id": 1, "durable_acceptance": 1}
 var generationAuditProjection = bson.M{"domain_id": 1, "outcome_id": 1, "report_type": 1, "template_version": 1, "status": 1, "latest_run_id": 1, "report_id": 1, "version": 1, "transaction_schema_version": 1, "generated_event_id": 1, "generated_event_evidence": 1, "generated_transaction_evidence": 1, "updated_at": 1}
-var runAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "attempt": 1, "status": 1, "retry_disposition": 1, "next_attempt_at": 1, "retry_event_id": 1, "retry_event_evidence": 1, "action_request_id": 1}
+var runAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "attempt": 1, "status": 1, "finished_at": 1, "retry_disposition": 1, "next_attempt_at": 1, "retry_event_id": 1, "retry_event_evidence": 1, "action_request_id": 1}
 var artifactAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "outcome_id": 1, "interpretation_run_id": 1, "org_id": 1, "assessment_id": 1, "testee_id": 1, "report_type": 1, "template_version": 1, "builder_identity": 1, "content_schema_version": 1, "generated_at": 1, "model": 1, "primary_score": 1, "level": 1}
 
 func (s *Scanner) standardRow(ctx context.Context, ref evidence.StandardReference) (standardEventRow, error) {
@@ -313,6 +313,9 @@ func (s *Scanner) generatedPayload(ctx context.Context, g interpretmongo.ReportG
 	}
 	if g.Status != "generated" || g.DomainID.IsZero() || a.GenerationID != g.DomainID.Uint64() || a.OutcomeID != g.OutcomeID || a.InterpretationRunID != g.LatestRunID || r.GenerationID != g.DomainID.Uint64() || r.Status != "succeeded" || a.OrgID != fact.OrgID() || a.AssessmentID != fact.AssessmentID().Uint64() || a.TesteeID != fact.TesteeID() || a.ReportType != g.ReportType || a.TemplateVersion != g.TemplateVersion || a.Model == nil {
 		return eventoutcome.ReportGeneratedPayload{}, driftf("generated business graph conflict")
+	}
+	if g.GeneratedTransactionEvidence != nil && (r.FinishedAt == nil || !g.UpdatedAt.Equal(*r.FinishedAt) || !g.UpdatedAt.Equal(a.GeneratedAt)) {
+		return eventoutcome.ReportGeneratedPayload{}, driftf("generated transaction completion clocks conflict")
 	}
 	p := eventoutcome.ReportGeneratedPayload{OrgID: a.OrgID, GenerationID: g.DomainID.String(), RunID: strconv.FormatUint(a.InterpretationRunID, 10), ReportID: a.DomainID.String(), AssessmentID: strconv.FormatUint(a.AssessmentID, 10), OutcomeID: strconv.FormatUint(a.OutcomeID, 10), TesteeID: a.TesteeID, Attempt: uint(r.Attempt), ReportType: a.ReportType, TemplateVersion: a.TemplateVersion, BuilderIdentity: a.BuilderIdentity, ContentSchemaVersion: a.ContentSchemaVersion, GeneratedAt: a.GeneratedAt, Model: eventoutcome.ModelIdentity{Kind: a.Model.Kind, Algorithm: a.Model.Algorithm, Code: a.Model.Code, Version: a.Model.Version, Title: a.Model.Title}}
 	if a.PrimaryScore != nil {

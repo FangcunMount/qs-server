@@ -118,7 +118,9 @@ func (c *TransactionCommitter) readExecution(e transaction.Execution) (frozenRep
 }
 
 func reportPlanProof(f frozenReportCommit, e transaction.Execution) (*evidence.EventEvidenceV2, error) {
-	if !e.Valid() || len(e.Plan.Input().Branches) != 1 {
+	// Lookup intentionally redacts the winner's execution token. Recovery
+	// needs the exact immutable reference, never permission to execute again.
+	if !e.Plan.Valid() || len(e.References()) != 1 {
 		return nil, transaction.ErrInvalidPlan
 	}
 	b := e.Plan.Input().Branches[0]
@@ -269,18 +271,18 @@ func (c *TransactionCommitter) recover(ctx context.Context, e transaction.Execut
 	if !sameTransactionProof(g.GeneratedTransactionEvidence(), expected.Generation.GeneratedTransactionEvidence()) || g.ReportID() != expected.InterpretReport.ID() {
 		return nil, port.ErrUnresolved
 	}
-	var actual InterpretReportPO
-	if err := c.reports.FindOne(ctx, bson.M{"domain_id": g.ReportID().Uint64()}, &actual); err != nil {
+	var original bson.Raw
+	if err := c.reports.FindOne(ctx, bson.M{"domain_id": g.ReportID().Uint64()}, &original); err != nil {
 		return nil, errors.Join(port.ErrUnresolved, err)
 	}
-	var frozen InterpretReportPO
-	if bson.Unmarshal(f.Report, &frozen) != nil {
-		return nil, transaction.ErrInvalidPlan
-	}
-	a, err := bson.Marshal(actual)
-	b, other := bson.Marshal(frozen)
-	if err != nil || other != nil || !bytes.Equal(a, b) {
+	// Compare the first persisted BSON directly. Rebuilding a document can
+	// reorder nested map fields and is not proof that frozen bytes changed.
+	if !bytes.Equal(original, f.Report) {
 		return nil, port.ErrUnresolved
+	}
+	var actual InterpretReportPO
+	if err := bson.Unmarshal(original, &actual); err != nil {
+		return nil, err
 	}
 	artifact, err := c.reports.mapper.ReportToDomain(&actual)
 	if err != nil {

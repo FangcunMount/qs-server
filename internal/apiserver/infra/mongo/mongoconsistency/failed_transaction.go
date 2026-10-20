@@ -30,7 +30,7 @@ func (s *Scanner) checkFailedTransaction(ctx context.Context, generationID, runI
 	if err := s.db.Collection("report_generations").FindOne(ctx, bson.M{"domain_id": generationID, "deleted_at": nil}).Decode(&g); err != nil {
 		return true, err
 	}
-	if g.Status != "failed" || g.LatestRunID != runID || g.TransactionSchemaVersion != 1 || r.GenerationID != generationID || r.Status != "failed" || r.Failure == nil || r.FinishedAt == nil || !r.FinishedAt.Equal(proof.RecordedAt) {
+	if g.Status != "failed" || g.LatestRunID != runID || g.TransactionSchemaVersion != 1 || r.GenerationID != generationID || r.Status != "failed" || r.Failure == nil || r.FinishedAt == nil || !r.FinishedAt.Equal(proof.RecordedAt) || !g.UpdatedAt.Equal(*r.FinishedAt) {
 		return true, driftf("failed transaction business graph conflict")
 	}
 	fact, err := s.outcome(ctx, g.OutcomeID)
