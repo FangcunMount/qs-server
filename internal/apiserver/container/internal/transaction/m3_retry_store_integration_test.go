@@ -4,7 +4,6 @@ package transaction_test
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -75,7 +74,7 @@ func retryFrozen(t *testing.T, a model.Authority, evt event.DomainEvent, due tim
 
 func retryStoreReceipt(t *testing.T, backend string, cases map[string]bool) {
 	t.Helper()
-	raw, err := json.Marshal(map[string]any{"backend": backend, "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "original_run_and_future_plan_storage_only", "broker_dispatch_not_claimed": true, "system_login_not_claimed": true})
+	raw, err := json.Marshal(map[string]any{"backend": backend, "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "original_authorization_and_explicit_future_ownership_handoff", "broker_dispatch_not_claimed": true, "system_login_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_RETRY_STORE_RECEIPT " + string(raw))
 }
@@ -136,9 +135,9 @@ func TestM3RetryMySQLStore(t *testing.T) {
 	require.NotNil(t, decision.NextAttemptAt)
 	evt := assessment.NewEvaluationRetryRequestedEvent(a, failed.Attempt().Number, retrygovernance.AttemptOriginAutomatic, "", *decision.NextAttemptAt)
 	require.NoError(t, failed.AttachRetryEvent(evt.EventID()))
-	digest, err := json.Marshal(failed.RetryDecision())
+	digest, err := model.DecisionDigest(failed.RetryDecision())
 	require.NoError(t, err)
-	authority := model.Authority{Owner: binding.Owner, OrgID: 1, Kind: model.Evaluation, SubjectID: a.ID().String(), RunID: failed.ID().String(), AssessmentID: a.ID().Uint64(), TesteeID: 9, ExpectedAttempt: failed.Attempt().Number, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: sha256.Sum256(digest)}
+	authority := model.Authority{Owner: binding.Owner, OrgID: 1, Kind: model.Evaluation, SubjectID: a.ID().String(), RunID: failed.ID().String(), AssessmentID: a.ID().Uint64(), TesteeID: 9, ExpectedAttempt: failed.Attempt().Number, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: digest}
 	frozen := retryFrozen(t, authority, evt, *decision.NextAttemptAt)
 	root := modtx.NewMySQLRunner(db)
 	abort := errors.New("fixture abort after both original writes")
@@ -200,6 +199,9 @@ func TestM3RetryMySQLStore(t *testing.T) {
 	require.False(t, db.Migrator().HasTable("rm_outbox"))
 	cases := map[string]bool{"constructor_no_ddl": true, "schema_missing_rejected": true, "original_root_rollback_atomic": true, "original_root_commit_atomic": true, "duplicate_first_wire_deadline": true, "due_index_not_early": true, "future_authorization_no_half_or_outbox": true}
 	for name, passed := range verifyGovernedMySQL(t, db, store) {
+		cases[name] = passed
+	}
+	for name, passed := range verifyLegacyHandoffMySQL(t, db, store, frozen) {
 		cases[name] = passed
 	}
 	retryStoreReceipt(t, "mysql", cases)
@@ -269,10 +271,11 @@ func TestM3RetryMongoStore(t *testing.T) {
 	reference, err := evidence.NewStandard(standard.ReferenceFromMessage(prepared[0].Message), business)
 	require.NoError(t, err)
 	require.NoError(t, run.AttachRetryEventEvidence(reference))
-	digest, err := json.Marshal(run.RetryDecision())
+	digest, err := model.DecisionDigest(run.RetryDecision())
 	require.NoError(t, err)
-	authority := model.Authority{Owner: binding.Owner, OrgID: 7, Kind: model.Interpretation, SubjectID: g.ID().String(), RunID: run.ID().String(), AssessmentID: 41, OutcomeID: 71, TesteeID: 9, ExpectedAttempt: run.Attempt(), Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: sha256.Sum256(digest)}
+	authority := model.Authority{Owner: binding.Owner, OrgID: 7, Kind: model.Interpretation, SubjectID: g.ID().String(), RunID: run.ID().String(), AssessmentID: 41, OutcomeID: 71, TesteeID: 9, ExpectedAttempt: run.Attempt(), Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: digest}
 	frozen := retryFrozen(t, authority, evt, *decision.NextAttemptAt)
+	require.NoError(t, g.Fail(run.ID(), at))
 	abort := errors.New("fixture abort after both original writes")
 	write := func(ctx context.Context) error {
 		winner, err := store.SaveFrozen(ctx, frozen)
@@ -281,6 +284,9 @@ func TestM3RetryMongoStore(t *testing.T) {
 		}
 		if winner.Digest() != frozen.Digest() {
 			return model.ErrConflict
+		}
+		if err := generations.Save(ctx, g, g.Version()-1); err != nil {
+			return err
 		}
 		return runs.Save(ctx, run)
 	}
@@ -325,6 +331,9 @@ func TestM3RetryMongoStore(t *testing.T) {
 	require.ErrorIs(t, err, transaction.ErrTransactionRequired)
 	cases := map[string]bool{"constructor_no_ddl": true, "schema_missing_rejected": true, "original_root_rollback_atomic": true, "original_root_commit_atomic": true, "due_index_not_early": true, "future_authorization_no_half_or_outbox": true, "expired_session_rejected": true}
 	for name, passed := range verifyGovernedMongo(t, db, store) {
+		cases[name] = passed
+	}
+	for name, passed := range verifyLegacyHandoffMongo(t, db, store, frozen) {
 		cases[name] = passed
 	}
 	retryStoreReceipt(t, "mongo", cases)

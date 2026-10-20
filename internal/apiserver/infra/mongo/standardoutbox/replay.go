@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
 	request "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"go.mongodb.org/mongo-driver/bson"
 	driver "go.mongodb.org/mongo-driver/mongo"
@@ -207,6 +208,8 @@ func (l *ReplayLedger) authorizeOne(sc driver.SessionContext, orgID int64, reque
 	switch {
 	case row.Scope != fmt.Sprintf("org:%d", orgID):
 		result.Reason = "organization_mismatch"
+	case schedulemodel.IsHandoffMarker(row.Code):
+		result.Reason = "future_schedule_owned"
 	case row.State != "quarantined" || row.Code != "publish_unknown":
 		result.Reason = "not_manual_required"
 	case row.FailureCount != target.ExpectedFailureCount:

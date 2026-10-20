@@ -52,3 +52,12 @@ type PlanBuilder interface {
 type AuthorizationGuard interface {
 	GuardAuthorization(context.Context, model.Frozen) error
 }
+
+// HandoffStore borrows an explicitly opened host root during a controlled
+// offline handoff. It neither commits nor prepares messages. Any error requires
+// the caller to roll back the whole root. Already-transferred calls only verify
+// the original source and exact stored plan; they never reset terminal state.
+type HandoffStore interface {
+	Store
+	TransferLegacy(context.Context, model.Frozen, AuthorityValidator) (alreadyTransferred bool, err error)
+}
