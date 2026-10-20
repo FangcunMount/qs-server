@@ -21,6 +21,13 @@ type Participant struct {
 	Eligibility EligibilityReader
 }
 
+// PlannedStartReader exposes private frozen input for authorization/idempotency
+// only. A plan is not an accepted request and must never replace Store.Original
+// for normal business reads. The host still verifies current participant access.
+type PlannedStartReader interface {
+	ReadPlannedStart(context.Context, Actor, string) (*Start, bool, error)
+}
+
 // Read checks current participant access even when the result was generated earlier.
 // A nil projection means the durable request exists but no AI state has arrived yet.
 func (p *Participant) Read(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID string) (*Event, error) {
@@ -50,13 +57,27 @@ func (p *Participant) Request(ctx context.Context, actor Actor, testeeID, assess
 	}
 	previous, err := p.Bridge.Store.Original(ctx, requestID)
 	if err == nil {
-		if previous.Actor != actor || previous.TesteeID != strconv.FormatUint(testeeID, 10) || len(previous.AssessmentIDs) != 1 || previous.AssessmentIDs[0] != strconv.FormatUint(assessmentID, 10) || len(previous.Evidence) != 1 || previous.Evidence[0].ReportID != strconv.FormatUint(reportID, 10) {
+		if !requestMatches(previous, actor, testeeID, assessmentID, requestID) || len(previous.Evidence) != 1 || previous.Evidence[0].ReportID != strconv.FormatUint(reportID, 10) {
 			return ErrConflict
 		}
 		return nil
 	}
 	if !errors.Is(err, ErrNotFound) {
 		return err
+	}
+	if reader, ok := p.Bridge.Store.(PlannedStartReader); ok {
+		planned, found, err := reader.ReadPlannedStart(ctx, actor, requestID)
+		if err != nil {
+			return err
+		}
+		if found {
+			if !requestMatches(planned, actor, testeeID, assessmentID, requestID) || len(planned.Evidence) != 1 || planned.Evidence[0].ReportID != strconv.FormatUint(reportID, 10) {
+				return ErrConflict
+			}
+			// The store must read the original SDK outcome, never authorize a
+			// repeated executor. Do not refresh the source or rebuild its body.
+			return p.Bridge.Start(ctx, *planned)
+		}
 	}
 	if p.IntakeClosed {
 		return ErrManagementUnavailable
@@ -91,20 +112,28 @@ func (p *Participant) Request(ctx context.Context, actor Actor, testeeID, assess
 }
 
 func (p *Participant) ownedRequest(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID string) (*Start, error) {
-	if p == nil || !validID(requestID) || !validNumber(actor.OrgID) || actor.SubjectID == "" || len(actor.SubjectID) > 128 || testeeID == 0 || assessmentID == 0 || p.Access == nil || p.Bridge == nil || p.Bridge.Store == nil {
-		return nil, ErrInvalid
-	}
-	if err := p.Access.AuthorizeOwnAssessment(ctx, testeeID, assessmentID); err != nil {
+	if err := p.authorizeRequestLookup(ctx, actor, testeeID, assessmentID, requestID); err != nil {
 		return nil, err
 	}
 	request, err := p.Bridge.Store.Original(ctx, requestID)
 	if err != nil {
 		return nil, err
 	}
-	if request == nil || request.RequestID != requestID || request.Actor != actor || request.TesteeID != strconv.FormatUint(testeeID, 10) || len(request.AssessmentIDs) != 1 || request.AssessmentIDs[0] != strconv.FormatUint(assessmentID, 10) {
+	if !requestMatches(request, actor, testeeID, assessmentID, requestID) {
 		return nil, ErrNotFound
 	}
 	return request, nil
+}
+
+func (p *Participant) authorizeRequestLookup(ctx context.Context, actor Actor, testeeID, assessmentID uint64, requestID string) error {
+	if p == nil || !validID(requestID) || !validNumber(actor.OrgID) || actor.SubjectID == "" || len(actor.SubjectID) > 128 || testeeID == 0 || assessmentID == 0 || p.Access == nil || p.Bridge == nil || p.Bridge.Store == nil {
+		return ErrInvalid
+	}
+	return p.Access.AuthorizeOwnAssessment(ctx, testeeID, assessmentID)
+}
+
+func requestMatches(request *Start, actor Actor, testeeID, assessmentID uint64, requestID string) bool {
+	return request != nil && request.RequestID == requestID && request.Actor == actor && request.TesteeID == strconv.FormatUint(testeeID, 10) && len(request.AssessmentIDs) == 1 && request.AssessmentIDs[0] == strconv.FormatUint(assessmentID, 10)
 }
 
 // ReadOperation checks current access and the original frozen request before any
@@ -113,8 +142,26 @@ func (p *Participant) ReadOperation(ctx context.Context, actor Actor, testeeID, 
 	if !validID(commandID) {
 		return MessagingOperation{}, ErrInvalid
 	}
-	if _, err := p.ownedRequest(ctx, actor, testeeID, assessmentID, requestID); err != nil {
+	if err := p.authorizeRequestLookup(ctx, actor, testeeID, assessmentID, requestID); err != nil {
 		return MessagingOperation{}, err
+	}
+	request, err := p.Bridge.Store.Original(ctx, requestID)
+	if errors.Is(err, ErrNotFound) {
+		planned, ok := p.Bridge.Store.(PlannedStartReader)
+		if !ok {
+			return MessagingOperation{}, err
+		}
+		var found bool
+		request, found, err = planned.ReadPlannedStart(ctx, actor, requestID)
+		if err == nil && !found {
+			err = ErrNotFound
+		}
+	}
+	if err != nil {
+		return MessagingOperation{}, err
+	}
+	if !requestMatches(request, actor, testeeID, assessmentID, requestID) {
+		return MessagingOperation{}, ErrNotFound
 	}
 	reader, ok := p.Bridge.Store.(interface {
 		ReadRequestOperation(context.Context, OperationScope, string, string) (MessagingOperation, error)

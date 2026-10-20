@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7e8aba2534352f159d715676446a7cc8a5959e93",
+    "sha": "199ef22def9b248fe2c8e01f0737373bf55d2267",
     "verified_on": "2026-10-21"
   },
   "status_policy": {
@@ -78,8 +78,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 107,
-        "version_count": 107
+        "max_version": 108,
+        "version_count": 108
       },
       "mongodb": {
         "max_version": 42,
@@ -11432,7 +11432,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d789337e42ee4cdc6ca6311202abec29f1ccff80",
+        "source_sha": "840961581eb318e63830db16004cade57d87cd13",
         "verified_on": "2026-10-21"
       },
       "fact_sources": [
@@ -11864,6 +11864,13 @@
           "result": "passed",
           "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge ./internal/apiserver/container/modules/interpretation ./internal/apiserver/infra/aibridge ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "840961581eb318e63830db16004cade57d87cd13",
+          "verified_on": "2026-10-21"
         }
       ],
       "production_evidence": {
@@ -12091,7 +12098,8 @@
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
-        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
+        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
+        "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
@@ -14134,7 +14142,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d789337e42ee4cdc6ca6311202abec29f1ccff80",
+        "source_sha": "840961581eb318e63830db16004cade57d87cd13",
         "verified_on": "2026-10-21"
       },
       "fact_sources": [
@@ -14380,6 +14388,13 @@
           "result": "passed",
           "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/apiserver/infra/mysql/aibridge ./internal/apiserver/application/aibridge ./internal/apiserver/container/modules/interpretation ./internal/apiserver/infra/aibridge ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "840961581eb318e63830db16004cade57d87cd13",
+          "verified_on": "2026-10-21"
         }
       ],
       "production_evidence": {
@@ -14543,7 +14558,8 @@
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
-        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
+        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
+        "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },

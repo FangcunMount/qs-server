@@ -149,8 +149,18 @@ func (s *TransactionArchive) Payload(ctx context.Context, ref *pb.MessagePayload
 		return nil, true, app.ErrMessagingContract
 	}
 	a, found, err := s.ReadCommitted(ctx, ref.MessageId)
-	if err != nil || !found {
+	if err != nil {
 		return nil, found, err
+	}
+	if !found {
+		_, planned, lookupErr := s.commandRequest(ctx, ref.OrganizationId, ref.MessageId)
+		if lookupErr != nil {
+			return nil, true, lookupErr
+		}
+		if planned {
+			return nil, true, app.ErrNotFound
+		}
+		return nil, false, nil
 	}
 	if ref.OrganizationId != strconv.FormatUint(a.OrganizationID, 10) || ref.BodySha256 != a.Envelope.BodySha256 || ref.BodyLength != uint64(len(a.Body)) {
 		return nil, true, app.ErrMessagingContract
