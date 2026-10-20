@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/stretchr/testify/require"
@@ -201,4 +202,119 @@ func TestScanAdmissionIsSerialBoundedAndDoesNotSpawnRejectedWork(t *testing.T) {
 	require.ErrorIs(t, err, ErrBusy)
 	close(s.block)
 	require.NoError(t, <-done)
+}
+
+// A protocol retry may advance only an already Aborted execution. This fake
+// deliberately exposes a separate method so an ordinary scan cannot call it.
+type retryOwnerFixture struct {
+	*ownerFixture
+	retries  int
+	acquired bool
+	corrupt  bool
+}
+
+func (o *retryOwnerFixture) RetryAborted(_ context.Context, previous transaction.Execution, options transaction.ReserveOptions) (transaction.Reservation, error) {
+	o.retries++
+	next := previous
+	next.Fence++
+	next.Token = [32]byte{9}
+	next.LeaseUntil = time.Now().Add(options.Lease)
+	if o.corrupt {
+		next.Fence++
+	}
+	o.execution = next
+	return transaction.Reservation{Execution: next, Acquired: o.acquired}, nil
+}
+
+func TestExplicitAbortedRetryPreservesFrozenPlanAndOriginalWire(t *testing.T) {
+	d, s, o, a, at := fixture(t)
+	q, err := model.FreezeDispatch(s.record, at)
+	require.NoError(t, err)
+	previous, err := o.Reserve(t.Context(), q)
+	require.NoError(t, err)
+	// A fresh instance's readonly execution has no winner capability.
+	require.False(t, previous.Execution.Valid())
+	o.local = transaction.LocalAborted
+	retry := &retryOwnerFixture{ownerFixture: o, acquired: true}
+	d.owner = retry
+	record := s.record
+	original := previous.Execution.Plan.Digest()
+	out := d.RetryAborted(t.Context(), record, previous.Execution, time.Minute)
+	require.NoError(t, out.Err)
+	require.Equal(t, model.DispatchCommitted, out.State)
+	require.Equal(t, transaction.LocalCommitted, out.Transaction.Local)
+	require.Equal(t, uint64(2), o.execution.Fence)
+	require.Equal(t, original, o.execution.Plan.Digest())
+	require.Equal(t, record.Plan.Message().Input().Payload, o.execution.Plan.Input().Branches[0].Wire)
+	require.Equal(t, 1, retry.retries)
+	require.Equal(t, 1, o.commitCalls)
+	require.Equal(t, 1, a.calls)
+	// A caller holding the old Ready snapshot cannot create another execution.
+	out = d.RetryAborted(t.Context(), record, previous.Execution, time.Minute)
+	require.ErrorIs(t, out.Err, transaction.ErrStaleExecution)
+	require.Equal(t, 1, retry.retries)
+}
+
+func TestExplicitRetryRejectsUnprovedOrChangedExecution(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*storeFixture, *ownerFixture, *retryOwnerFixture)
+	}{
+		{"unknown", func(_ *storeFixture, o *ownerFixture, _ *retryOwnerFixture) { o.local = transaction.LocalUnknown }},
+		{"committed", func(_ *storeFixture, o *ownerFixture, _ *retryOwnerFixture) { o.local = transaction.LocalCommitted }},
+		{"held", func(s *storeFixture, _ *ownerFixture, _ *retryOwnerFixture) { s.record.State = model.Held }},
+		{"stale-revision", func(s *storeFixture, _ *ownerFixture, _ *retryOwnerFixture) { s.record.Version++ }},
+		{"lost-new-fence", func(_ *storeFixture, _ *ownerFixture, r *retryOwnerFixture) { r.acquired = false }},
+		{"wrong-new-fence", func(_ *storeFixture, _ *ownerFixture, r *retryOwnerFixture) { r.corrupt = true }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, s, o, a, at := fixture(t)
+			record := s.record
+			q, err := model.FreezeDispatch(record, at)
+			require.NoError(t, err)
+			previous, err := o.Reserve(t.Context(), q)
+			require.NoError(t, err)
+			o.local = transaction.LocalAborted
+			retry := &retryOwnerFixture{ownerFixture: o, acquired: true}
+			d.owner = retry
+			tc.change(s, o, retry)
+			out := d.RetryAborted(t.Context(), record, previous.Execution, time.Minute)
+			require.Error(t, out.Err)
+			require.Zero(t, o.commitCalls)
+			require.Zero(t, s.guards)
+			require.Zero(t, s.marks)
+			require.Zero(t, a.calls)
+		})
+	}
+}
+
+func TestAutomaticPausePreventsReserveAndExplicitProtocolRetry(t *testing.T) {
+	d, s, o, _, at := fixture(t)
+	q, err := model.FreezeDispatch(s.record, at)
+	require.NoError(t, err)
+	previous, err := o.Reserve(t.Context(), q)
+	require.NoError(t, err)
+	o.reserveCalls = 0
+	o.local = transaction.LocalAborted
+	retry := &retryOwnerFixture{ownerFixture: o, acquired: true}
+	d.owner = retry
+	WithAutomaticRetrySwitch(func() bool { return true })(d)
+	outcomes, err := d.Once(t.Context(), at, 1)
+	require.NoError(t, err)
+	require.Len(t, outcomes, 1)
+	require.ErrorIs(t, outcomes[0].Err, eventruntime.ErrAutomaticRetryPaused)
+	out := d.RetryAborted(t.Context(), s.record, previous.Execution, time.Minute)
+	require.ErrorIs(t, out.Err, eventruntime.ErrAutomaticRetryPaused)
+	require.Zero(t, o.reserveCalls)
+	require.Zero(t, retry.retries)
+	require.Zero(t, o.commitCalls)
+	require.Equal(t, model.Ready, s.record.State)
+	// Resuming the switch preserves the old plan. A scan still cannot retry an
+	// Aborted execution; the host must explicitly authorize that protocol action.
+	WithAutomaticRetrySwitch(func() bool { return false })(d)
+	outcomes, err = d.Once(t.Context(), at, 1)
+	require.NoError(t, err)
+	require.ErrorIs(t, outcomes[0].Err, events.ErrUnresolved)
+	require.Zero(t, retry.retries)
+	require.Zero(t, o.commitCalls)
 }

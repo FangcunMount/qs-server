@@ -303,9 +303,7 @@ func TestM3FailureBrokerHost(t *testing.T) {
 		timer.Stop()
 		t.Fatal("deadline wait cancelled")
 	}
-	dispatched, err = dispatcher.Once(t.Context(), time.Now().UTC(), 10)
-	require.NoError(t, err)
-	require.Len(t, dispatched, 1)
+	dispatched = []dispatchapp.Outcome{recoverAbortedDueDispatch(t, schedules, owner, checkpoint.NewRepository(db), frozenSchedule)}
 	require.NoError(t, dispatched[0].Err)
 	require.Equal(t, transaction.LocalCommitted, dispatched[0].Transaction.Local)
 	require.Equal(t, schedulemodel.DispatchCommitted, dispatched[0].State)
@@ -331,7 +329,7 @@ func TestM3FailureBrokerHost(t *testing.T) {
 	require.Equal(t, failedRun.ID(), afterDispatch.ID())
 	require.Equal(t, failedRun.Attempt().Number, afterDispatch.Attempt().Number)
 	require.Equal(t, int32(1), dependency.calls.Load())
-	dispatchReceipt, err := json.Marshal(map[string]any{"owner": "qs.mysql", "passed": 4, "failed": 0, "skipped": 0, "cases": map[string]bool{"no_half_before_real_due": true, "first_wire_and_dispatch_witness": true, "no_business_attempt_or_input_repeat": true, "repeat_dispatch_is_empty": true}, "system_login_not_claimed": true, "business_consumer_not_claimed": true})
+	dispatchReceipt, err := json.Marshal(map[string]any{"owner": "qs.mysql", "passed": 9, "failed": 0, "skipped": 0, "cases": map[string]bool{"no_half_before_real_due": true, "first_wire_and_dispatch_witness": true, "no_business_attempt_or_input_repeat": true, "repeat_dispatch_is_empty": true, "automatic_pause_before_reservation": true, "real_root_abort_witness": true, "scan_does_not_retry_aborted": true, "explicit_retry_same_plan_new_fence": true, "old_aborted_evidence_retained": true}, "system_login_not_claimed": true, "business_consumer_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_RETRY_DISPATCH_RECEIPT " + string(dispatchReceipt))
 

@@ -55,7 +55,6 @@ func governedNativeCases() map[string]bool {
 }
 
 func verifyGovernedMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store) map[string]bool {
-	t.Helper()
 	// These are controlled pre-existing failed facts, not an upstream execution
 	// or model-acceptance claim. All new authorizations use the actual host service.
 	require.NoError(t, db.AutoMigrate(&evaluationrepo.AssessmentPO{}))
@@ -79,15 +78,20 @@ func verifyGovernedMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store) map
 		status, kind, reason, policyVersion, maxAttempts := string(disposition), string(evalrun.FailureKindCalculation), "controlled original failure", "business-retry/v1", uint(3)
 		po := checkpoint.RuntimeCheckpointPO{Scope: "evaluation_run", ResourceID: fmt.Sprintf("%d:%d", id, attempt), AssessmentID: &id, AttemptNo: uint(attempt), Status: evalrun.StatusFailed.String(), StartedAt: at.Add(-time.Second), FinishedAt: &at, ErrorCode: &kind, ErrorMessage: &reason, Retryable: retryable, RetryDisposition: &status, PolicyMaxAttempts: &maxAttempts, RetryPolicyVersion: &policyVersion}
 		require.NoError(t, root.WithinTransaction(t.Context(), func(ctx context.Context) error {
-			if err := assessments.Save(ctx, failed); err != nil {
-				return err
-			}
+			// This is a controlled pre-existing fact with an assigned ID. Save
+			// intentionally updates such aggregates; seed it with explicit Create.
 			tx, err := hostmysql.RequireTx(ctx)
 			if err != nil {
 				return err
 			}
+			if err := tx.Create(evaluationrepo.NewAssessmentMapper().ToPO(failed)).Error; err != nil {
+				return err
+			}
 			return tx.Create(&po).Error
 		}))
+		stored, err := assessments.FindByID(t.Context(), failed.ID())
+		require.NoError(t, err)
+		require.True(t, stored.Status().IsFailed(), "initial aggregate must exist before authorization")
 		before, err := runs.FindLatestByAssessmentID(t.Context(), id)
 		require.NoError(t, err)
 		require.Equal(t, disposition, before.RetryDecision().Disposition)
@@ -165,7 +169,6 @@ func (r retryGovFacts) FindByAssessmentID(context.Context, meta.ID) (*evaluation
 }
 
 func verifyGovernedMongo(t *testing.T, db *mongo.Database, store *mongostore.Store) map[string]bool {
-	t.Helper()
 	root := modtx.NewMongoRunner(db, modtx.MongoRunnerOptions{Boundary: "interpretation_commit", Limiter: backpressure.NewLimiter(2, time.Second)})
 	generations := mongorepo.NewGenerationRepositoryWithoutSchema(db)
 	runs := mongorepo.NewRunRepositoryWithoutSchema(db)

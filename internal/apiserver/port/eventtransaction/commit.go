@@ -38,3 +38,10 @@ type Committer interface {
 	Commit(context.Context, transaction.Execution, func(context.Context) error) (transaction.Result, error)
 	Confirm(context.Context, transaction.Execution) transaction.LocalOutcome
 }
+
+// RetryCommitter advances an exact Aborted protocol execution only at the
+// host's explicit request. It never replans wire or grants a business retry.
+type RetryCommitter interface {
+	Committer
+	RetryAborted(context.Context, transaction.Execution, transaction.ReserveOptions) (transaction.Reservation, error)
+}

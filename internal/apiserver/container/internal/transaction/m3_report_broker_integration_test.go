@@ -328,9 +328,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 		timer.Stop()
 		t.Fatal("deadline wait cancelled")
 	}
-	dueDispatch, err := dispatcher.Once(t.Context(), time.Now().UTC(), 10)
-	require.NoError(t, err)
-	require.Len(t, dueDispatch, 1)
+	dueDispatch := []dispatchapp.Outcome{recoverAbortedDueDispatch(t, schedules, dispatchBoundary, retryAuthority, frozenSchedule)}
 	require.NoError(t, dueDispatch[0].Err)
 	require.Equal(t, tx.LocalCommitted, dueDispatch[0].Transaction.Local)
 	require.Equal(t, schedulemodel.DispatchCommitted, dueDispatch[0].State)
@@ -363,7 +361,7 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, stillFailed.Attempt())
 	require.Equal(t, run.StatusFailed, stillFailed.Status())
-	dispatchReceipt, err := json.Marshal(map[string]any{"owner": "qs.mongo", "passed": 4, "failed": 0, "skipped": 0, "cases": map[string]bool{"no_half_before_real_due": true, "first_wire_and_dispatch_witness": true, "no_business_attempt_or_input_repeat": true, "repeat_dispatch_is_empty": true}, "system_login_not_claimed": true, "business_consumer_not_claimed": true})
+	dispatchReceipt, err := json.Marshal(map[string]any{"owner": "qs.mongo", "passed": 9, "failed": 0, "skipped": 0, "cases": map[string]bool{"no_half_before_real_due": true, "first_wire_and_dispatch_witness": true, "no_business_attempt_or_input_repeat": true, "repeat_dispatch_is_empty": true, "automatic_pause_before_reservation": true, "real_root_abort_witness": true, "scan_does_not_retry_aborted": true, "explicit_retry_same_plan_new_fence": true, "old_aborted_evidence_retained": true}, "system_login_not_claimed": true, "business_consumer_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_RETRY_DISPATCH_RECEIPT " + string(dispatchReceipt))
 
