@@ -88,3 +88,5 @@ EventSubsystem 启动附加消费者和标准 Profile Supervisor；退出时先�
 `eventing/retryschedule` 已新增独立冻结模型：保存原失败 Run、业务授权、到期时间和首次消息/wire，不包含发布 attempt、delivered 或消费完成状态。评分仅绑定 qs.mysql，报告仅绑定 qs.mongo；重复同输入复用第一份计划，授权或业务输入变化必须冲突，不用新时钟/事件ID覆盖赢家。存储索引时间按数据库精度向上取整，原始 deadline 和 wire 保持不变，避免提前到期。
 
 已新增借用原 GORM 根事务或活跃 Mongo session 的存储适配；构造不执行DDL，显式安装107/42，版本及绑定不符拒绝。事务计划的 Prepared 入口复用首次wire，不重新构造消息。合同测试及原生用例编译通过；真实双库原子性、到期 Sender、旧调度交接及恢复治理仍待 T13 后续验收。既有调度、Outbox与生产消息责任尚未切换。进度及证据统一维护在 [infra M3 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)。
+
+T13到期核心已新增 `application/eventing/retrydispatch`：单次串行有界扫描最多100条，在SDK准备半消息后取得原根调度guard，锁定/条件写入当前Run授权，并将dispatch事实与witness共同提交。冻结首次selectedAt，重复/Unknown只读恢复，不自动新建fence或再次调用业务；FinalUnknown保留本地已提交。原根密封上下文校验精确引用和计划，失效callback拒绝使用。该入口尚未接管活动调度：真实到期Broker、显式中止重试、自动/人工授权写入口、暂停/交接与旧Replay责任仍待验收。当前普通源码回归7144通过、60既有可选依赖跳过；required真实依赖门禁仍待新候选，不表示T13或生产已完成。
