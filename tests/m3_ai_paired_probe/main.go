@@ -36,6 +36,7 @@ import (
 	driver "github.com/go-sql-driver/mysql"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/proto"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -47,12 +48,16 @@ type config struct {
 }
 
 type command struct {
-	Mode      string     `json:"mode"`
-	RequestID string     `json:"request_id"`
-	CommandID string     `json:"command_id"`
-	Actor     app.Actor  `json:"actor"`
-	Start     app.Start  `json:"start"`
-	Change    app.Change `json:"change"`
+	Mode             string               `json:"mode"`
+	RequestID        string               `json:"request_id"`
+	CommandID        string               `json:"command_id"`
+	Actor            app.Actor            `json:"actor"`
+	Start            app.Start            `json:"start"`
+	Change           app.Change           `json:"change"`
+	Wire             []byte               `json:"wire"`
+	EvaluationScope  app.EvaluationScope  `json:"evaluation_scope"`
+	EvaluationStart  app.EvaluationStart  `json:"evaluation_start"`
+	EvaluationCancel app.EvaluationCancel `json:"evaluation_cancel"`
 }
 
 type routes struct{}
@@ -175,6 +180,7 @@ func run() (result map[string]any) {
 		return fail("local_workload_keys", err)
 	}
 	var seals atomic.Int64
+	var payloadCalls atomic.Int64
 	seal := func(kind pb.MessagingKind, id, aggregate, org, at string, body *pb.MessagingBody) (*app.PreparedMessaging, error) {
 		seals.Add(1)
 		if at == "" {
@@ -263,7 +269,13 @@ func run() (result map[string]any) {
 	if err != nil {
 		return fail("payload_listener", err)
 	}
-	server = grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{certificate}, ClientCAs: roots, ClientAuth: tls.RequireAndVerifyClientCert})))
+	server = grpc.NewServer(
+		grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{certificate}, ClientCAs: roots, ClientAuth: tls.RequireAndVerifyClientCert})),
+		grpc.UnaryInterceptor(func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+			payloadCalls.Add(1)
+			return next(ctx, req)
+		}),
+	)
 	(&payload.MessagePayloads{Reader: &store.MessagingReader{DB: pool, Store: legacy, Archive: commands.Archive()}}).RegisterService(server)
 	serveDone = make(chan error, 1)
 	go func() { serveDone <- server.Serve(listener) }()
@@ -293,13 +305,42 @@ func run() (result map[string]any) {
 			err = service.Start(ctx, c.Start)
 		case "change":
 			err = service.Change(ctx, c.RequestID, c.Change)
-		case "facts":
+		case "replay_event":
+			err = receiver.Receive(ctx, c.Wire)
+		case "evaluation_start":
+			err = commandStore.SubmitEvaluationStart(ctx, c.EvaluationScope, c.CommandID, c.EvaluationStart)
+		case "evaluation_cancel":
+			err = commandStore.SubmitEvaluationCancel(ctx, c.EvaluationScope, c.CommandID, c.EvaluationCancel)
+		case "facts", "evaluation_facts":
 			var op app.MessagingOperation
-			op, err = commandStore.ReadRequestOperation(ctx, app.OperationScope{OrganizationID: c.Actor.OrgID, SubjectID: c.Actor.SubjectID}, c.RequestID, c.CommandID)
+			scope := app.OperationScope{OrganizationID: c.Actor.OrgID, SubjectID: c.Actor.SubjectID, ResourceID: c.EvaluationScope.RunID}
+			if c.Mode == "evaluation_facts" {
+				op, err = commandStore.ReadOperation(ctx, scope, c.CommandID)
+			} else {
+				op, err = commandStore.ReadRequestOperation(ctx, scope, c.RequestID, c.CommandID)
+			}
 			if err == nil {
 				response["operation"] = op
 			}
-			if err == nil {
+			if err == nil && c.Mode == "evaluation_facts" {
+				var raw []byte
+				e := pool.QueryRowContext(ctx, "SELECT state FROM ai_messaging_evaluation_states WHERE run_id=?", c.EvaluationScope.RunID).Scan(&raw)
+				if e != nil && !errors.Is(e, sql.ErrNoRows) {
+					err = e
+				}
+				if e == nil {
+					body := new(pb.MessagingBody)
+					err = proto.Unmarshal(raw, body)
+					if err == nil && body.GetEvaluationState() == nil {
+						err = app.ErrMessagingContract
+					}
+					if err == nil {
+						v := body.GetEvaluationState()
+						response["evaluation_projection"] = map[string]any{"run_id": v.RunId, "version": v.Version, "status": v.Status, "event_sequence": v.EventSequence}
+					}
+				}
+			}
+			if err == nil && c.Mode == "facts" {
 				var projection *app.Event
 				projection, err = commandStore.Projection(ctx, c.RequestID)
 				if err == nil && projection != nil {
@@ -359,6 +400,7 @@ func run() (result map[string]any) {
 				}
 				response["counts"] = counts
 				response["seals"] = seals.Load()
+				response["payload_calls"] = payloadCalls.Load()
 			}
 		default:
 			err = app.ErrInvalid
