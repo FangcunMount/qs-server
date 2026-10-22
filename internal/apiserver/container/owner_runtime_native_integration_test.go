@@ -431,7 +431,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 							return e
 						}
 						b.phase.Store(3)
-						if e = original.Exec("INSERT INTO m3_owner_runtime_facts VALUES(?,?)", []byte(input.Message.Input().ID), hash[:]).Error; e != nil {
+						if e = original.Exec("INSERT INTO m3_owner_runtime_facts(id,wire_hash) VALUES(?,?)", input.Message.Input().ID, hash[:]).Error; e != nil {
 							return e
 						}
 						b.phase.Store(4)
