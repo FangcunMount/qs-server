@@ -167,9 +167,10 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	unblock1 := func() { release1.Do(func() { close(rpc.release[1]) }) }
 	unblock2 := func() { release2.Do(func() { close(rpc.release[2]) }) }
 	type instance struct {
-		runtime  runtimeOutput
-		shutdown *workerShutdown
-		manager  *grpcclient.Manager
+		runtime   runtimeOutput
+		shutdown  *workerShutdown
+		manager   *grpcclient.Manager
+		container *container.Container
 	}
 	start := func(automatic bool) (*instance, error) {
 		o := workeroptions.NewOptions()
@@ -205,7 +206,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 			defer cancel()
 			require.NoError(t, shutdown.Close(ctx))
 		})
-		return &instance{runtime: runtime, shutdown: shutdown, manager: manager}, e
+		return &instance{runtime: runtime, shutdown: shutdown, manager: manager, container: c}, e
 	}
 	cases := map[string]bool{}
 	missing, err := start(false)
@@ -255,10 +256,14 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		t.Fatal("held delivery did not resume through original gRPC handler")
 	}
 	second := send(2)
+	nativeWorkerWait(t, func() bool {
+		stats := active.container.DispatchBudgetSnapshot()
+		return stats.Limit == 1 && stats.Active == 1 && stats.Waiting == 1
+	})
 	select {
 	case <-rpc.entered:
 		t.Fatal("physical input exceeded original shared execution budget")
-	case <-time.After(1500 * time.Millisecond):
+	default:
 	}
 	unblock1()
 	select {

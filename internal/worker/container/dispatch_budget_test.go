@@ -15,6 +15,7 @@ import (
 
 func TestWorkerPhysicalAndDeferredExecutionsShareOriginalBudget(t *testing.T) {
 	b := newDispatchBudget(2)
+	c := &Container{dispatchBudget: b}
 	entered := make(chan struct{}, 2)
 	release := make(chan struct{})
 	done := make(chan error, 2)
@@ -63,6 +64,7 @@ func TestWorkerPhysicalAndDeferredExecutionsShareOriginalBudget(t *testing.T) {
 		})
 		queued <- err
 	}()
+	require.Eventually(t, func() bool { return c.DispatchBudgetSnapshot().Waiting == 1 }, time.Second, time.Millisecond)
 	cancelWait()
 	select {
 	case err := <-queued:
@@ -71,6 +73,7 @@ func TestWorkerPhysicalAndDeferredExecutionsShareOriginalBudget(t *testing.T) {
 		t.Fatal("queued cancellation did not return")
 	}
 	require.EqualValues(t, 2, active.Load())
+	require.Equal(t, DispatchBudgetSnapshot{Limit: 2, Active: 2, Waiting: 0}, c.DispatchBudgetSnapshot())
 }
 
 func TestWorkerConstructsBudgetWithoutChangingConfiguredConcurrency(t *testing.T) {
