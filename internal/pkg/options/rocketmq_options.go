@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -30,9 +31,17 @@ func (o *RocketMQOptions) Validate() error {
 	if o == nil || o.Endpoint == "" || o.CredentialsFile == "" || o.CAFile == "" || o.RoutesFile == "" {
 		return errors.New("RocketMQ requires endpoint and explicit credential/CA/route files")
 	}
+	files := map[string]bool{}
 	for owner, binding := range o.Transactions {
 		if _, err := binding.ProtocolLimits(owner); err != nil {
 			return err
+		}
+		if len(o.Transactions) > 1 {
+			path := filepath.Clean(binding.CredentialsFile)
+			if binding.CredentialsFile == "" || files[path] {
+				return errors.New("distinct explicit credential files required for multiple transaction owners")
+			}
+			files[path] = true
 		}
 	}
 	return nil
@@ -45,15 +54,25 @@ func (o *RocketMQOptions) Load(topics []string, concurrency int, timeout time.Du
 	if err := o.Validate(); err != nil {
 		return rocketmq.Config{}, err
 	}
-	var credentials struct{ Username, Password string }
-	body, err := os.ReadFile(o.CredentialsFile)
+	credentials, err := readRocketMQCredentials(o.CredentialsFile)
 	if err != nil {
-		return rocketmq.Config{}, errors.New("read configured RocketMQ credentials")
+		return rocketmq.Config{}, err
 	}
-	if json.Unmarshal(body, &credentials) != nil || credentials.Username == "" || credentials.Password == "" {
-		return rocketmq.Config{}, errors.New("invalid RocketMQ credentials")
+	// Distinct filenames alone do not prove distinct Broker principals.
+	principals := map[string]bool{}
+	if len(o.Transactions) > 1 {
+		for _, binding := range o.Transactions {
+			ownerCredentials, err := readRocketMQCredentials(binding.CredentialsFile)
+			if err != nil {
+				return rocketmq.Config{}, err
+			}
+			if principals[ownerCredentials.Username] {
+				return rocketmq.Config{}, errors.New("transaction owners cannot share a Broker principal")
+			}
+			principals[ownerCredentials.Username] = true
+		}
 	}
-	body, err = os.ReadFile(o.RoutesFile)
+	body, err := os.ReadFile(o.RoutesFile)
 	if err != nil {
 		return rocketmq.Config{}, errors.New("read configured RocketMQ route manifest")
 	}
@@ -90,6 +109,20 @@ func (o *RocketMQOptions) Load(topics []string, concurrency int, timeout time.Du
 		return rocketmq.Config{}, errors.New("invalid RocketMQ CA")
 	}
 	return rocketmq.Config{Endpoint: o.Endpoint, AccessKey: credentials.Username, SecretKey: credentials.Password, Routes: selected, MaxInFlight: concurrency, RequestTimeout: timeout, TLS: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}}, nil
+}
+
+type rocketMQCredentials struct{ Username, Password string }
+
+func readRocketMQCredentials(path string) (rocketMQCredentials, error) {
+	var credentials rocketMQCredentials
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return credentials, errors.New("read configured RocketMQ credentials")
+	}
+	if json.Unmarshal(body, &credentials) != nil || credentials.Username == "" || credentials.Password == "" {
+		return rocketMQCredentials{}, errors.New("invalid RocketMQ credentials")
+	}
+	return credentials, nil
 }
 
 func (o *RocketMQOptions) AddFlags(fs *pflag.FlagSet, prefix string) {

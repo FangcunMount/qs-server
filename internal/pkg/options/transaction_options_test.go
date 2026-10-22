@@ -1,11 +1,94 @@
 package options
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/reliable-messaging/transport"
 )
+
+func TestTransactionOwnerCredentialsAreExplicitDistinctAndDoNotMutateBase(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, raw []byte) string {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert := &x509.Certificate{SerialNumber: big.NewInt(1), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	der, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseFile := write("base.json", []byte(`{"username":"base-reader","password":"fixture-only"}`))
+	mysqlFile := write("mysql.json", []byte(`{"username":"mysql-writer","password":"mysql-fixture-only"}`))
+	mongoFile := write("mongo.json", []byte(`{"username":"mongo-writer","password":"mongo-fixture-only"}`))
+	ca := write("ca.crt", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	const topic = "qs.evaluation.lifecycle"
+	routes := []transport.RouteBinding{}
+	bindings := map[string]TransactionOptions{}
+	for owner, file := range map[string]string{"qs.mysql": mysqlFile, "qs.mongo": mongoFile} {
+		physical, _ := transport.PhysicalTopicV2(topic, "TRANSACTION", owner, "m3-1")
+		routes = append(routes, transport.RouteBinding{Topic: topic, PhysicalTopic: physical, MessageType: "TRANSACTION", Owner: owner, RouteRevision: "m3-1"})
+		bindings[owner] = TransactionOptions{StoreID: owner + "-primary", WriterEpoch: "m3-1", RouteRevision: "m3-1", CredentialsFile: file}
+	}
+	raw, err := json.Marshal(map[string]any{"version": 2, "routes": routes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	o := &RocketMQOptions{Endpoint: "127.0.0.1:1", CredentialsFile: baseFile, CAFile: ca, RoutesFile: write("routes.json", raw), Transactions: bindings}
+	for owner, expected := range map[string]string{"qs.mysql": "mysql-writer", "qs.mongo": "mongo-writer"} {
+		config, err := o.TransactionConfig(owner, []string{topic})
+		if err != nil || config.AccessKey != expected || config.Owner != owner || len(config.Routes) != 1 {
+			t.Fatalf("owner credential binding failed for %s: %v", owner, err)
+		}
+	}
+	base, err := o.Load([]string{topic}, 1, time.Second)
+	if err != nil || base.AccessKey != "base-reader" || o.CredentialsFile != baseFile {
+		t.Fatal("base reader credentials changed", err)
+	}
+	mongoBinding := bindings["qs.mongo"]
+	for _, file := range []string{"", mysqlFile, filepath.Join(dir, ".", "mysql.json")} {
+		mongoBinding.CredentialsFile = file
+		bindings["qs.mongo"] = mongoBinding
+		if o.Validate() == nil {
+			t.Fatal("shared/implicit multi-owner credentials accepted")
+		}
+	}
+	mongoBinding.CredentialsFile = write("alias.json", []byte(`{"username":"mysql-writer","password":"other-fixture-only"}`))
+	bindings["qs.mongo"] = mongoBinding
+	if _, err := o.TransactionConfig("qs.mysql", []string{topic}); err == nil {
+		t.Fatal("same principal through different files accepted")
+	}
+	mongoBinding.CredentialsFile = filepath.Join(dir, "missing.json")
+	bindings["qs.mongo"] = mongoBinding
+	if _, err := o.TransactionConfig("qs.mysql", []string{topic}); err == nil {
+		t.Fatal("missing peer-owner credential file accepted")
+	}
+	delete(bindings, "qs.mongo")
+	mysqlBinding := bindings["qs.mysql"]
+	mysqlBinding.CredentialsFile = ""
+	bindings["qs.mysql"] = mysqlBinding
+	single, err := o.TransactionConfig("qs.mysql", []string{topic})
+	if err != nil || single.AccessKey != "base-reader" {
+		t.Fatal("existing explicit single-owner base binding regressed", err)
+	}
+}
 
 func TestRouteManifestVersionAndTypeCannotBeMixed(t *testing.T) {
 	const topic = "iam.authz.version.v2"
