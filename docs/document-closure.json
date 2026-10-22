@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ce9445c049b381c787eb3915b58764589b7c3aa3",
+    "sha": "61dd0ac48a9595c850978f430b5421495db88947",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -10208,7 +10208,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "ce9445c049b381c787eb3915b58764589b7c3aa3",
+        "source_sha": "61dd0ac48a9595c850978f430b5421495db88947",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10423,6 +10423,13 @@
           "result": "passed",
           "source_sha": "ce9445c049b381c787eb3915b58764589b7c3aa3",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -tags=integration,m3_host_runtime -run=^DO_NOT_RUN_NATIVE_TESTS ./internal/apiserver/container",
+          "result": "passed",
+          "source_sha": "61dd0ac48a9595c850978f430b5421495db88947",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -10459,7 +10466,8 @@
         "Frozen worker source 93968428287c2980c4d73743112bf3bbcad0f6e1 verified by39853362567 onMySQL8.0.36/8.0.44/8.4.11,each11 actual cases (4 workerContainer/runtime/Broker +7 originalMySQL/lease/SIGKILL),0failed/skipped,exact SDK tx.2/no replace,sourceclean andallownedcleanup. Paused observations7504/29776/29804ms; not a production SLA. Original20s andone60s failed observations retained; no claim all earlier scheduling causes resolved. Source/fixture scope is actual worker with owned loopback business RPC,not complete apiserver/provider/system. Prior binding retained {\"baseline\": {\"sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}}. Current73 targetedrace/88docs/lint passed; fullcurrentheadCI/merge still required.",
         "T22 exact registered owner identity guard after disconnected real-constructor regression: both MySQL and Mongo duplicate runtimes reproduced as expected failures before fix;127 targeted race passed, ordinary full-repository and native container tagged lint zero issues, native compile passed. First native factory9 case success belongs to947c1ebe3 only; new identity guard native verification pending. No complete host or production claim. Prior current binding retained as JSON {\"source_baseline\": {\"sha\": \"93968428287c2980c4d73743112bf3bbcad0f6e1\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"93968428287c2980c4d73743112bf3bbcad0f6e1\", \"verified_on\": \"2026-10-23\"}}. Historical commands/native/production/signoff evidence unchanged.",
         "T22 default dual-owner native runtime proof preparation: actual default subsystem, original SQL/Mongo protocol fact+witness roots, paused next instance and real owned Broker kill/restart. Thirteen required cases; compilation and native container tagged lint passed, real CI pending. Fixture controls only the owned compose Broker after checking project label and restart=no; no local Docker execution, domain API/provider/system or producer-process-exit claim. First compile used a nonexistent receive health method; corrected to actual fixed SDK Ready API before success. Prior current binding preserved {\"source_baseline\": {\"sha\": \"5811955e2f06392012dbc4cf3d344b3d289acf2a\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5811955e2f06392012dbc4cf3d344b3d289acf2a\", \"verified_on\": \"2026-10-23\"}}. Historical verification/production/signoffs retain their original sources.",
-        "First default dual-owner native run39868563639 failed before owner startup at missing domain-consumer binding; no execution or Broker fault occurred,owned cleanup and original parameters restored. Protocol fixture now explicitly disables catalog projections outside its scope,while retaining actual consume-only SDK observer. Existing fail-closed startup unit boundary,tag compile and tagged lint passed; corrected native gate pending. No production/domain API/provider/system/process-exit claim. Prior current binding retained {\"source_baseline\": {\"sha\": \"cc7609ad6dd78b8250437a36f777c98da8b22a24\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"cc7609ad6dd78b8250437a36f777c98da8b22a24\", \"verified_on\": \"2026-10-23\"}}."
+        "First default dual-owner native run39868563639 failed before owner startup at missing domain-consumer binding; no execution or Broker fault occurred,owned cleanup and original parameters restored. Protocol fixture now explicitly disables catalog projections outside its scope,while retaining actual consume-only SDK observer. Existing fail-closed startup unit boundary,tag compile and tagged lint passed; corrected native gate pending. No production/domain API/provider/system/process-exit claim. Prior current binding retained {\"source_baseline\": {\"sha\": \"cc7609ad6dd78b8250437a36f777c98da8b22a24\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"cc7609ad6dd78b8250437a36f777c98da8b22a24\", \"verified_on\": \"2026-10-23\"}}.",
+        "Second native run39869534165 passed startup/half preparation/inflight close but failed at original-root committed barrier before any Broker kill. Cause not established;no timeout/race,all owned cleanup and parameters restored. This source adds only fixed numeric/enum diagnostics for phase,lease and error class;no changed lease,domain code or weakened assertions. Compilation/tagged lint passed; diagnostic native rerun pending. Prior binding retained {\"source_baseline\": {\"sha\": \"ce9445c049b381c787eb3915b58764589b7c3aa3\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"ce9445c049b381c787eb3915b58764589b7c3aa3\", \"verified_on\": \"2026-10-23\"}}."
       ]
     },
     {
