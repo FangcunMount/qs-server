@@ -24,6 +24,7 @@ type containerLifecycleDeps struct {
 }
 
 type transportLifecycleDeps struct {
+	drainHTTP func() error
 	closeHTTP func()
 	closeGRPC func()
 }
@@ -88,7 +89,11 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 		}
 	}
 	if transportOutput.httpServer != nil {
-		deps.transport.closeHTTP = transportOutput.httpServer.Close
+		if containerOutput.container != nil && containerOutput.container.HasTransactionOwners() {
+			deps.transport.drainHTTP = func() error { return transportOutput.httpServer.CloseContext(context.Background()) }
+		} else {
+			deps.transport.closeHTTP = transportOutput.httpServer.Close
+		}
 	}
 	if transportOutput.grpcServer != nil {
 		deps.transport.closeGRPC = transportOutput.grpcServer.Close
@@ -115,7 +120,12 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	// the database or Provider/container resources they still need to persist a
 	// terminal result. In particular, gRPC GracefulStop must complete before the
 	// AI Prompt evaluation commit path loses its dependencies.
-	if deps.transport.closeHTTP != nil {
+	if deps.transport.drainHTTP != nil {
+		log.Info("Draining API server HTTP transports...")
+		if err := deps.transport.drainHTTP(); err != nil {
+			return err
+		}
+	} else if deps.transport.closeHTTP != nil {
 		log.Info("Draining API server HTTP transports...")
 		deps.transport.closeHTTP()
 	}

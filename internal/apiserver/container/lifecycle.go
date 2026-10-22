@@ -261,3 +261,7 @@ func (c *Container) StopEventAdmission() {
 		c.eventSubsystem.StopAdmission()
 	}
 }
+
+func (c *Container) HasTransactionOwners() bool {
+	return c != nil && c.transactions != nil && c.eventSubsystem.HasTransactionOwners()
+}

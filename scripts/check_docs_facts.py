@@ -2933,6 +2933,7 @@ def process_lifecycle_contract_issues() -> list[Issue]:
     lifecycle_source_tokens = {
         "apiserver": [
             "runPrepareRunShutdownHooks",
+            "drainHTTP",
             "closeHTTP",
             "closeGRPC",
             "stopAuthzSync",

@@ -268,3 +268,15 @@ func TestDatabaseCloseFailureIsReturned(t *testing.T) {
 		t.Fatal("database close error hidden")
 	}
 }
+
+func TestTransactionHTTPDrainFailureRetainsOriginalDependencies(t *testing.T) {
+	want := errors.New("accepted HTTP handler remains active")
+	closed := false
+	err := runProcessLifecycleDeps(processLifecycleDeps{
+		transport: transportLifecycleDeps{drainHTTP: func() error { return want }},
+		resource:  resourceLifecycleDeps{closeDatabase: func() error { closed = true; return nil }},
+	})
+	if !errors.Is(err, want) || closed {
+		t.Fatal("HTTP timeout released original database", err)
+	}
+}
