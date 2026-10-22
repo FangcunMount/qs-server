@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5504b042eacd6f17cdc5c2df94b39b2621165767",
+    "sha": "a1c877b2573be7b7d694e32025e8a5943d8c354b",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -10111,7 +10111,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5504b042eacd6f17cdc5c2df94b39b2621165767",
+        "source_sha": "a1c877b2573be7b7d694e32025e8a5943d8c354b",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10170,6 +10170,18 @@
         {
           "kind": "source",
           "path": "configs/worker.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/shutdown_context.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/shutdown_context_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/shutdown_signal_test.go"
         }
       ],
       "verification": [
@@ -10179,6 +10191,13 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/worker/process ./internal/worker/container ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "a1c877b2573be7b7d694e32025e8a5943d8c354b",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -10201,7 +10220,8 @@
       ],
       "notes": [
         "T22 current source review 31c96a29edd9920fd6068db3a78ee5a68bf72f60; previous verified binding {\"source_sha\": \"6e0bef988054da0d834f25f7371e771e90ac8830\", \"verified_on\": \"2026-10-07\"}. Targeted regression only; runtime/deployment/business statuses unchanged.",
-        "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced."
+        "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced.",
+        "T22 worker owned signal/main barrier source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}}. Three-package race45 passed,0 failures/skips,including actual SIGTERM child with test subscriber/dependency; pinned lint2.5.0 passed. First child-harness development failure was a marker-stat/exit observation race after the failure child correctly exited1; fixed by retaining the exit result after verifying the marker. No test case removed. Full current worker with real Broker/DB and deferred delivery remain pending. Historical native/production/signoff attributions unchanged."
       ]
     },
     {
