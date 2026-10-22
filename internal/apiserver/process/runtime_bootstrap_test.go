@@ -2,8 +2,48 @@ package process
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
+
+func TestRuntimeStartsDueDispatchAfterOwnersAndStopsOnPreflightFailure(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		var calls []string
+		wantErr := errors.New("retry schedule binding unavailable")
+		err := runRuntimeStage(runtimeStageDeps{
+			startEvents: func() error { calls = append(calls, "owners"); return nil },
+			startRetryDispatch: func(*runtimeOutput) error {
+				calls = append(calls, "due")
+				if fail {
+					return wantErr
+				}
+				return nil
+			},
+			startCache:           func() { calls = append(calls, "cache") },
+			startAIWorkflowRelay: func() error { calls = append(calls, "ai"); return nil },
+			startSchedulers:      func(*runtimeOutput) { calls = append(calls, "other_schedulers") },
+		}, &runtimeOutput{})
+		want := []string{"owners", "due", "cache", "ai", "other_schedulers"}
+		if fail {
+			want = want[:2]
+			if !errors.Is(err, wantErr) {
+				t.Fatal("preflight failure lost", err)
+			}
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(calls, want) {
+			t.Fatalf("runtime order %v, want %v", calls, want)
+		}
+	}
+}
+
+func TestLegacyRuntimeDoesNotBuildTransactionDispatch(t *testing.T) {
+	var s *server
+	if s.buildRetryDispatchStart(containerOutput{}) != nil {
+		t.Fatal("legacy runtime acquired transaction work")
+	}
+}
 
 func TestRunRuntimeStageInvokesCacheEventsAndSchedulers(t *testing.T) {
 	t.Parallel()

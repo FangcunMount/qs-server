@@ -11,11 +11,13 @@ type SystemGovernanceOptions struct {
 }
 
 type RetryGovernanceOptions struct {
-	ManualActionsEnabled bool                                  `json:"manual_actions_enabled" mapstructure:"manual_actions_enabled"`
-	GapRecoveryEnabled   bool                                  `json:"gap_recovery_enabled" mapstructure:"gap_recovery_enabled"`
-	Lease                *InterpretationLeaseGovernanceOptions `json:"lease" mapstructure:"lease"`
-	Business             *RetryPolicyOptions                   `json:"business" mapstructure:"business"`
-	Outbox               *RetryPolicyOptions                   `json:"outbox" mapstructure:"outbox"`
+	AutomaticRetryEnabled *bool                                 `json:"automatic_retry_enabled" mapstructure:"automatic_retry_enabled"`
+	Dispatch              *RetryDispatchOptions                 `json:"dispatch" mapstructure:"dispatch"`
+	ManualActionsEnabled  bool                                  `json:"manual_actions_enabled" mapstructure:"manual_actions_enabled"`
+	GapRecoveryEnabled    bool                                  `json:"gap_recovery_enabled" mapstructure:"gap_recovery_enabled"`
+	Lease                 *InterpretationLeaseGovernanceOptions `json:"lease" mapstructure:"lease"`
+	Business              *RetryPolicyOptions                   `json:"business" mapstructure:"business"`
+	Outbox                *RetryPolicyOptions                   `json:"outbox" mapstructure:"outbox"`
 }
 
 // InterpretationLeaseGovernanceOptions owns the Interpretation Run lease

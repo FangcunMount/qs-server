@@ -10,6 +10,7 @@ import (
 )
 
 type runtimeStageDeps struct {
+	startRetryDispatch   func(*runtimeOutput) error
 	hasMongo             bool
 	startCache           func()
 	startEvents          func() error
@@ -49,6 +50,7 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 		}
 	}
 
+	deps.startRetryDispatch = s.buildRetryDispatchStart(containerOutput)
 	serverDeps := buildServerRuntimeDeps(containerOutput)
 	if manager := buildSchedulerManager(s.config, serverDeps); manager != nil {
 		deps.startSchedulers = func(runtimeOutput *runtimeOutput) {
@@ -62,6 +64,11 @@ func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) error 
 	logInitialization(deps.hasMongo)
 	if deps.startEvents != nil {
 		if err := deps.startEvents(); err != nil {
+			return err
+		}
+	}
+	if deps.startRetryDispatch != nil {
+		if err := deps.startRetryDispatch(runtimeOutput); err != nil {
 			return err
 		}
 	}
