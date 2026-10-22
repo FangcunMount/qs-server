@@ -16,6 +16,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -269,7 +271,16 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		defer cancelDiagnostic()
 		holdErr := pool.QueryRowContext(diagnosticContext, "SELECT COUNT(*) FROM retry_event_hold").Scan(&holds)
 		evidenceErr := pool.QueryRowContext(diagnosticContext, "SELECT COUNT(*) FROM event_delivery_transport_evidence").Scan(&evidence)
-		raw, _ := json.Marshal(map[string]any{"phase": "paused_delivery", "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters, "transport_errors": func() map[string]int {
+		stackBytes := make([]byte, 1<<20)
+		stackSize := runtime.Stack(stackBytes, true)
+		sites := map[string]int{}
+		for _, frame := range regexp.MustCompile(`transport/rocketmq/(?:internal/driver/)?(subscriber|simple_consumer)\.go:([0-9]+)`).FindAllSubmatch(stackBytes[:stackSize], 128) {
+			key := string(frame[1]) + ":" + string(frame[2])
+			if sites[key] < 32 {
+				sites[key]++
+			}
+		}
+		raw, _ := json.Marshal(map[string]any{"sdk_stack_sites": sites, "sdk_stack_truncated": stackSize == len(stackBytes), "phase": "paused_delivery", "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters, "transport_errors": func() map[string]int {
 			result := map[string]int{}
 			sub, ok := paused.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
 			if !ok {
