@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,13 +27,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	generic "github.com/FangcunMount/qs-server/internal/pkg/options"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	grpcclient "github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/go-sql-driver/mysql"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -229,7 +234,52 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		require.Equal(t, transaction.LocalCommitted, result.Local)
 		return r.Execution
 	}
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		stats := paused.container.DispatchBudgetSnapshot()
+		counters := map[string]float64{}
+		families, gatherErr := prometheus.DefaultGatherer.Gather()
+		if gatherErr == nil {
+			for _, family := range families {
+				if family.GetName() != "qs_event_consume_total" {
+					continue
+				}
+				for _, metric := range family.Metric {
+					labels := map[string]string{}
+					for _, label := range metric.Label {
+						labels[label.GetName()] = label.GetValue()
+					}
+					if labels["service"] == "qs-worker" && labels["topic"] == "qs.evaluation.lifecycle" {
+						switch labels["outcome"] {
+						case "held", "hold_failed", "dispatch_failed", "decode_failed", "acked", "unknown_acked", "unknown_persist_failed":
+							counters[labels["outcome"]] += metric.GetCounter().GetValue()
+						}
+					}
+				}
+			}
+		}
+		var holds, evidence int
+		diagnosticContext, cancelDiagnostic := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancelDiagnostic()
+		holdErr := pool.QueryRowContext(diagnosticContext, "SELECT COUNT(*) FROM retry_event_hold").Scan(&holds)
+		evidenceErr := pool.QueryRowContext(diagnosticContext, "SELECT COUNT(*) FROM event_delivery_transport_evidence").Scan(&evidence)
+		raw, _ := json.Marshal(map[string]any{"phase": "paused_delivery", "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters})
+		fmt.Println("M3_WORKER_DIAGNOSTIC " + string(raw))
+	})
+	// New groups must complete real receives before the fixture publishes. This
+	// barrier has no message side effects and does not weaken the hold assertion.
+	pausedSubscriber, ok := paused.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
+	require.True(t, ok)
+	require.Eventually(t, func() bool { return pausedSubscriber.RocketMQReady(time.Minute) }, 45*time.Second, 50*time.Millisecond)
 	first := send(1)
+	envelope, recognized, decodeErr := legacy.Decode(first.Plan.Input().Branches[0].Wire)
+	require.NoError(t, decodeErr)
+	require.True(t, recognized)
+	require.Equal(t, first.References()[0].MessageID, envelope.UUID)
+	_, pauseErr := paused.container.DispatchEvent(t.Context(), envelope.Metadata["event_type"], envelope.Payload)
+	require.True(t, errors.Is(pauseErr, eventruntime.ErrAutomaticRetryPaused), "frozen input must retain its original automatic authorization")
 	nativeWorkerWait(t, func() bool {
 		var n int
 		return pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM retry_event_hold WHERE event_id=? AND protocol_version=2 AND status='blocked'", first.References()[0].MessageID).Scan(&n) == nil && n == 1
