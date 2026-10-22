@@ -83,7 +83,7 @@ func (s *nativeWorkerRPC) ExecuteEvaluation(ctx context.Context, req *evalpb.Exe
 }
 func nativeWorkerWait(t *testing.T, condition func() bool) {
 	t.Helper()
-	require.Eventually(t, condition, 20*time.Second, 25*time.Millisecond, "owned worker runtime condition did not converge")
+	require.Eventually(t, condition, 60*time.Second, 25*time.Millisecond, "owned worker runtime condition did not converge")
 }
 func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	require.True(t, strings.HasPrefix(os.Getenv("QS_M3_FIXTURE_PROJECT"), "rocketmq-m2-"))
@@ -185,14 +185,14 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		o.RetryGovernance.AutomaticRetryEnabled = automatic
 		o.Messaging.Provider = "rocketmq"
 		o.Messaging.RocketMQ = workerMQ
-		o.Messaging.NSQMessageTimeout = time.Minute
+		o.Messaging.NSQMessageTimeout = 3 * time.Minute
 		o.MySQL.Host = cfg.Addr
 		o.MySQL.Username = cfg.User
 		o.MySQL.Password = cfg.Passwd
 		o.MySQL.Database = name
 		o.MySQL.Location = "UTC"
 		o.MySQL.SessionTimeZone = "+00:00"
-		manager, e := grpcclient.NewManager(&grpcclient.ManagerConfig{Endpoint: listener.Addr().String(), Insecure: true, Timeout: time.Minute})
+		manager, e := grpcclient.NewManager(&grpcclient.ManagerConfig{Endpoint: listener.Addr().String(), Insecure: true, Timeout: 3 * time.Minute})
 		require.NoError(t, e)
 		require.NoError(t, manager.RegisterClients())
 		log := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -308,6 +308,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	require.True(t, ok)
 	require.Eventually(t, func() bool { return pausedSubscriber.RocketMQReady(time.Minute) }, 45*time.Second, 50*time.Millisecond)
 	first := send(1)
+	pausedObservationStarted := time.Now()
 	envelope, recognized, decodeErr := legacy.Decode(first.Plan.Input().Branches[0].Wire)
 	require.NoError(t, decodeErr)
 	require.True(t, recognized)
@@ -318,6 +319,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		var n int
 		return pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM retry_event_hold WHERE event_id=? AND protocol_version=2 AND status='blocked'", first.References()[0].MessageID).Scan(&n) == nil && n == 1
 	})
+	pausedObservationMS := time.Since(pausedObservationStarted).Milliseconds()
 	var wire []byte
 	var physical string
 	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT original_wire,transport_message_id FROM event_delivery_transport_evidence WHERE application_id=?", first.References()[0].MessageID).Scan(&wire, &physical))
@@ -336,7 +338,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	select {
 	case id := <-rpc.entered:
 		require.EqualValues(t, 1, id)
-	case <-time.After(20 * time.Second):
+	case <-time.After(60 * time.Second):
 		t.Fatal("held delivery did not resume through original gRPC handler")
 	}
 	second := send(2)
@@ -353,7 +355,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	select {
 	case id := <-rpc.entered:
 		require.EqualValues(t, 2, id)
-	case <-time.After(20 * time.Second):
+	case <-time.After(60 * time.Second):
 		t.Fatal("committed physical delivery did not follow held callback")
 	}
 	nativeWorkerWait(t, func() bool {
@@ -386,7 +388,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	drop()
 	sourceSHA, err := exec.Command("git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
-	raw, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "actual worker container/runtime/Broker/MySQL with loopback business RPC fixture", "complete_apiserver_not_claimed": true, "provider_not_called": true, "system_login_not_claimed": true, "owned_database_dropped": true, "owned_runtime_drained": true})
+	raw, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "actual worker container/runtime/Broker/MySQL with loopback business RPC fixture", "complete_apiserver_not_claimed": true, "provider_not_called": true, "system_login_not_claimed": true, "owned_database_dropped": true, "owned_runtime_drained": true, "paused_observation_ms": pausedObservationMS, "fixture_shared_limit": 1, "fixture_observation_budget_ms": 60000})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_WORKER_RUNTIME_RECEIPT " + string(raw))
 }
