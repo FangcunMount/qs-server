@@ -101,7 +101,8 @@ func run() (result map[string]any) {
 	var cfg config
 	if json.Unmarshal(data, &cfg) != nil || !strings.HasPrefix(cfg.Project, "rocketmq-m2-") ||
 		!regexp.MustCompile(`^qs_m3_paired_[a-z0-9_]{8,64}$`).MatchString(cfg.Schema) ||
-		!filepath.IsAbs(cfg.Source) || !filepath.IsAbs(cfg.TLSDirectory) || !loopback(cfg.AIPayloadEndpoint) {
+		!filepath.IsAbs(cfg.Source) || !filepath.IsAbs(cfg.TLSDirectory) || !loopback(cfg.AIPayloadEndpoint) ||
+		cfg.Options.RocketMQ == nil || !loopback(cfg.Options.RocketMQ.Endpoint) {
 		return result
 	}
 	// An isolated process must never send standard/SDK logs through the control pipe.
