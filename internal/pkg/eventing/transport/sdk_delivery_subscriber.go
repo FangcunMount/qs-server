@@ -141,3 +141,12 @@ func (s *SDKDeliverySubscriber) closeInner(ctx context.Context) error {
 func (s *SDKDeliverySubscriber) RocketMQReady(maxAge time.Duration) bool {
 	return s != nil && s.rocket != nil && s.rocket.Ready(maxAge)
 }
+
+// RocketMQErrors is the existing bounded SDK supervision stream. Reading it
+// creates no worker or retry and carries no business recovery authorization.
+func (s *SDKDeliverySubscriber) RocketMQErrors() <-chan error {
+	if s == nil || s.rocket == nil {
+		return nil
+	}
+	return s.rocket.Errors()
+}

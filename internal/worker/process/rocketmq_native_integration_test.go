@@ -232,6 +232,10 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		result, er := owner.Commit(t.Context(), r.Execution, func(context.Context) error { return nil })
 		require.NoError(t, er)
 		require.Equal(t, transaction.LocalCommitted, result.Local)
+		for _, branch := range result.Branches {
+			require.Equal(t, transaction.HalfPrepared, branch.Half)
+			require.Equal(t, transaction.FinalCommitConfirmed, branch.Final, "healthy transport fixture must confirm its seed, independently of business success")
+		}
 		return r.Execution
 	}
 	t.Cleanup(func() {
@@ -265,7 +269,37 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		defer cancelDiagnostic()
 		holdErr := pool.QueryRowContext(diagnosticContext, "SELECT COUNT(*) FROM retry_event_hold").Scan(&holds)
 		evidenceErr := pool.QueryRowContext(diagnosticContext, "SELECT COUNT(*) FROM event_delivery_transport_evidence").Scan(&evidence)
-		raw, _ := json.Marshal(map[string]any{"phase": "paused_delivery", "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters})
+		raw, _ := json.Marshal(map[string]any{"phase": "paused_delivery", "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters, "transport_errors": func() map[string]int {
+			result := map[string]int{}
+			sub, ok := paused.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
+			if !ok {
+				return result
+			}
+			for i := 0; i < 8; i++ {
+				select {
+				case err := <-sub.RocketMQErrors():
+					if err == nil {
+						return result
+					}
+					label := "other"
+					raw := strings.ToLower(err.Error())
+					switch {
+					case strings.Contains(raw, "40100"):
+						label = "auth_or_acl"
+					case strings.Contains(raw, "deadline"):
+						label = "deadline"
+					case strings.Contains(raw, "tls") || strings.Contains(raw, "x509"):
+						label = "tls"
+					case strings.Contains(raw, "unavailable") || strings.Contains(raw, "connection"):
+						label = "connection"
+					}
+					result[label]++
+				default:
+					return result
+				}
+			}
+			return result
+		}()})
 		fmt.Println("M3_WORKER_DIAGNOSTIC " + string(raw))
 	})
 	// New groups must complete real receives before the fixture publishes. This
