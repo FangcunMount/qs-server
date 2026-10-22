@@ -48,6 +48,14 @@ type standardGovernedEventTypeStatusReader struct {
 // must not silently recreate legacy writers; rollback uses a retained image.
 
 func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+	if cfg != nil && cfg.Options != nil && cfg.MessagingOptions != nil && cfg.MessagingOptions.RocketMQ != nil && len(cfg.MessagingOptions.RocketMQ.Transactions) > 0 {
+		return func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
+			if cfg.Eventing != nil && cfg.Eventing.StandardOutbox != nil && (cfg.Eventing.StandardOutbox.Mongo || cfg.Eventing.StandardOutbox.Assessment) {
+				return nil, errors.New("transaction owners cannot also select standard Outbox profiles")
+			}
+			return eventsubsystem.NewWithTransactionOwners(opts, cfg.MessagingOptions)
+		}
+	}
 	if cfg == nil || cfg.Options == nil || cfg.Eventing == nil || cfg.Eventing.StandardOutbox == nil ||
 		(!cfg.Eventing.StandardOutbox.Mongo && !cfg.Eventing.StandardOutbox.Assessment) {
 		return func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {

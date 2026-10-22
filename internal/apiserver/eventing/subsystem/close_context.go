@@ -28,6 +28,7 @@ func (s *Subsystem) CloseContext(ctx context.Context) error {
 		s.closeDone = make(chan struct{})
 	}
 	s.closed = true
+	s.pauseTransactionAdmission()
 	s.mu.Unlock()
 	s.closeAsyncOnce.Do(func() { go func() { _ = s.Close() }() })
 	return s.Wait(ctx)

@@ -278,6 +278,12 @@ func (c *Container) initEventSubsystem() error {
 	if c.eventSubsystem == nil {
 		return fmt.Errorf("event subsystem is required")
 	}
+	if c.eventSubsystem.HasTransactionOwners() != (c.transactions != nil) {
+		return fmt.Errorf("transaction module bindings must belong to the selected event subsystem")
+	}
+	if c.transactions != nil && (c.transactions.MySQL != c.eventSubsystem.MySQLTransactionOwner() || c.transactions.Mongo != c.eventSubsystem.MongoTransactionOwner() || c.transactions.Routes != c.eventSubsystem.Catalog()) {
+		return fmt.Errorf("transaction module bindings cannot replace process owners or routes")
+	}
 	c.eventPublisher = c.eventSubsystem.Publisher()
 	return nil
 }

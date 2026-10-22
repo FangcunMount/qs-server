@@ -6,6 +6,7 @@ import (
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	mongoTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	mysqlTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"gorm.io/gorm"
 )
@@ -14,7 +15,7 @@ func TestContainerBorrowsOneOwnerAcrossAllModulePorts(t *testing.T) {
 	mysqlOwner, mongoOwner := &mysqlTx.Committer{}, &mongoTx.Owner{}
 	routes := eventcatalog.NewCatalog(nil)
 	input := EventTransactionBindings{MySQL: mysqlOwner, Mongo: mongoOwner, Routes: routes}
-	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Transactions: &input, Silent: true})
+	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Transactions: &input, Silent: true, AIWorkflow: &apiserveroptions.AIWorkflowOptions{Enabled: true, Messaging: apiserveroptions.AIWorkflowMessagingOptions{Enabled: true}}})
 	input.MySQL, input.Mongo, input.Routes = nil, nil, nil
 	if c.EvaluationTransactionOwner() != mysqlOwner || c.PlanTransactionOwner() != mysqlOwner || c.AICommandTransactionOwner() != mysqlOwner {
 		t.Fatal("module ports did not retain the single borrowed MySQL owner")
@@ -64,5 +65,18 @@ func TestContainerDoesNotExposeRoutesWithoutTheirOwner(t *testing.T) {
 	c.transactions.Mongo = &mongoTx.Owner{}
 	if c.EvaluationTransactionRoutes() != nil || c.PlanTransactionRoutes() != nil {
 		t.Fatal("MySQL routes selected without MySQL owner")
+	}
+}
+
+func TestContainerDisabledAILeavesItsCommandPortUnselected(t *testing.T) {
+	for _, ai := range []*apiserveroptions.AIWorkflowOptions{nil, {}, {Enabled: true}, {Messaging: apiserveroptions.AIWorkflowMessagingOptions{Enabled: true}}} {
+		owner := &mysqlTx.Committer{}
+		c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Silent: true, Transactions: &EventTransactionBindings{MySQL: owner}, AIWorkflow: ai})
+		if c.AICommandTransactionOwner() != nil {
+			t.Fatal("disabled AI feature selected command owner")
+		}
+		if c.EvaluationTransactionOwner() != owner || c.PlanTransactionOwner() != owner {
+			t.Fatal("AI feature flag disabled unrelated domain owners")
+		}
 	}
 }

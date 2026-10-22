@@ -33,12 +33,17 @@ type containerOptionsInput struct {
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
+	var transactions *container.EventTransactionBindings
+	if input.eventSubsystem.HasTransactionOwners() {
+		transactions = &container.EventTransactionBindings{MySQL: input.eventSubsystem.MySQLTransactionOwner(), Mongo: input.eventSubsystem.MongoTransactionOwner(), Routes: input.eventSubsystem.Catalog()}
+	}
 	resilience := input.resilience
 	var locks *locksubsystem.Subsystem
 	if resilience != nil {
 		locks = resilience.Locks()
 	}
 	return container.ContainerOptions{
+		Transactions:               transactions,
 		EventSubsystem:             input.eventSubsystem,
 		TaskOpenedReminderEnabled:  s.config.Eventing != nil && s.config.Eventing.TaskOpenedReminder,
 		Cache:                      s.buildContainerCacheOptions(),

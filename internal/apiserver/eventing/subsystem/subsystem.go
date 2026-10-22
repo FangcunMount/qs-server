@@ -103,6 +103,7 @@ type Subsystem struct {
 	closeErr             error
 	startDone            chan struct{}
 	closeAsyncOnce       sync.Once
+	transactions         *transactionState
 }
 
 var profileStartOrder = []eventcatalog.OutboxProfile{
@@ -227,6 +228,9 @@ func (s *Subsystem) Start(parent context.Context) (startErr error) {
 			startErr = errors.Join(startErr, s.Close())
 		}
 	}()
+	if err := s.startTransactionOwners(ctx); err != nil {
+		return err
+	}
 
 	if s.publisher.IsMQBacked() {
 		if err := s.startConsumers(ctx); err != nil {
@@ -384,6 +388,7 @@ func (s *Subsystem) Close() error {
 	}
 	s.closeStarted = true
 	s.closed = true
+	s.pauseTransactionAdmission()
 	cancel := s.cancel
 	startDone := s.startDone
 	s.mu.Unlock()
@@ -421,6 +426,9 @@ func (s *Subsystem) Close() error {
 				closeErrors = append(closeErrors, fmt.Errorf("close event consumer %s: %w", consumer.spec.ID, err))
 			}
 		}
+	}
+	if err := s.closeTransactionOwners(); err != nil {
+		closeErrors = append(closeErrors, err)
 	}
 	closeErr := errors.Join(closeErrors...)
 	s.mu.Lock()

@@ -43,6 +43,9 @@ func (c *Container) EvaluationTransactionOwner() *mysqlTx.Committer {
 
 func (c *Container) PlanTransactionOwner() *mysqlTx.Committer { return c.EvaluationTransactionOwner() }
 func (c *Container) AICommandTransactionOwner() *mysqlTx.Committer {
+	if c.aiWorkflowOptions == nil || !c.aiWorkflowOptions.Enabled || !c.aiWorkflowOptions.Messaging.Enabled {
+		return nil
+	}
 	return c.EvaluationTransactionOwner()
 }
 
