@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "8e52d8de7a6bec278a581475211345e4b73ecea4",
+    "sha": "9b78c5403f16e77f9a84ba6222e1c572d65d3898",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -8819,7 +8819,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "8e52d8de7a6bec278a581475211345e4b73ecea4",
+        "source_sha": "9b78c5403f16e77f9a84ba6222e1c572d65d3898",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -9189,7 +9189,8 @@
         "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged.",
         "Current V2 deferred consumer source9304ba3d97c269f546f2749296574e06f7709d12. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}}. Six-package race79 passed,0 failures/skips; targeted ordinary and native-tag lint2.5.0 passed. Native MySQL/child-kill entrypoint compiled only; no native or full-worker claim. SQL109 is an explicit host migration candidate and is not installed. Doc test first failed twice on the old expected108 pin; checker/test/manifest now all track actual109 without changing past receipts. Staticcheck nil-context test and tagged-switch recommendations fixed. Historical source/production/signoff evidence unchanged.",
         "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
-        "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged."
+        "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged.",
+        "Integrated worker source 9b78c5403f16e77f9a84ba6222e1c572d65d3898. Preserve previous binding {\"source_baseline\": {\"sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}}. Source8fb35d344 complete MySQL matrix39846389533:3x7,0failure/skip,exact receipts/cleanup verified. First real runtime run39846170583 failed initial paused-delivery observation at1ae0ebd; no race/timeout,all owned cleanup true,root cause remains unknown. New9b78 requires actual per-group receive readiness and safe bounded diagnostics; current development run39848361009 pending,not passed. No production or final T22 assertion."
       ]
     },
     {
@@ -10201,7 +10202,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "8e52d8de7a6bec278a581475211345e4b73ecea4",
+        "source_sha": "9b78c5403f16e77f9a84ba6222e1c572d65d3898",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10421,7 +10422,8 @@
         "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged.",
         "Current V2 deferred consumer source9304ba3d97c269f546f2749296574e06f7709d12. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}}. Six-package race79 passed,0 failures/skips; targeted ordinary and native-tag lint2.5.0 passed. Native MySQL/child-kill entrypoint compiled only; no native or full-worker claim. SQL109 is an explicit host migration candidate and is not installed. Doc test first failed twice on the old expected108 pin; checker/test/manifest now all track actual109 without changing past receipts. Staticcheck nil-context test and tagged-switch recommendations fixed. Historical source/production/signoff evidence unchanged.",
         "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
-        "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged."
+        "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged.",
+        "Integrated worker source 9b78c5403f16e77f9a84ba6222e1c572d65d3898. Preserve previous binding {\"source_baseline\": {\"sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}}. Source8fb35d344 complete MySQL matrix39846389533:3x7,0failure/skip,exact receipts/cleanup verified. First real runtime run39846170583 failed initial paused-delivery observation at1ae0ebd; no race/timeout,all owned cleanup true,root cause remains unknown. New9b78 requires actual per-group receive readiness and safe bounded diagnostics; current development run39848361009 pending,not passed. No production or final T22 assertion."
       ]
     },
     {
