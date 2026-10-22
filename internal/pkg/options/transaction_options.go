@@ -13,10 +13,12 @@ import (
 // TransactionOptions is an explicit host/database binding, never message metadata.
 // Presence in the owner's map opts into the separate transaction entrypoint.
 type TransactionOptions struct {
-	StoreID       string             `json:"store_id" mapstructure:"store_id"`
-	WriterEpoch   string             `json:"writer_epoch" mapstructure:"writer_epoch"`
-	RouteRevision string             `json:"route_revision" mapstructure:"route_revision"`
-	Limits        *TransactionLimits `json:"limits,omitempty" mapstructure:"limits"`
+	// Optional for a single owner; required per owner when a host binds both stores.
+	CredentialsFile string             `json:"credentials_file,omitempty" mapstructure:"credentials_file"`
+	StoreID         string             `json:"store_id" mapstructure:"store_id"`
+	WriterEpoch     string             `json:"writer_epoch" mapstructure:"writer_epoch"`
+	RouteRevision   string             `json:"route_revision" mapstructure:"route_revision"`
+	Limits          *TransactionLimits `json:"limits,omitempty" mapstructure:"limits"`
 }
 
 // A nonnil override is complete; zero/negative budgets are not silently defaulted.
@@ -122,7 +124,11 @@ func (o *RocketMQOptions) TransactionConfig(owner string, topics []string) (rock
 	if err != nil {
 		return rocketmq.TransactionConfig{}, err
 	}
-	base, err := o.Load(topics, limits.Sends, limits.RPCTimeout)
+	ownerOptions := *o
+	if binding.CredentialsFile != "" {
+		ownerOptions.CredentialsFile = binding.CredentialsFile
+	}
+	base, err := ownerOptions.Load(topics, limits.Sends, limits.RPCTimeout)
 	if err != nil {
 		return rocketmq.TransactionConfig{}, err
 	}
