@@ -98,5 +98,15 @@ func TestTransactionModuleConstructsAllPortsWithoutIOOrOwnerLifecycle(t *testing
 	require.NoError(t, module.Cleanup())
 	require.NoError(t, owner.Runtime().SetAdmission(false), "module cleanup must not close the host owner")
 	require.False(t, owner.Runtime().Stats().Ready, "module construction/cleanup must not manage the shared runtime")
+
+	// The default final host constructs no publication Outbox at all. Existing
+	// fixture-supplied legacy ports above must not be required or retained.
+	require.Nil(t, infra.assessmentOutboxStore)
+	require.Nil(t, infra.postCommit)
+	deps.OutboxProfile = appEventing.ProfileBinding{}
+	finalModule, err := New(deps)
+	require.NoError(t, err, "final transaction host still required legacy Outbox wiring")
+	require.NotNil(t, finalModule.IntakeService)
+	require.NoError(t, finalModule.Cleanup())
 	require.NoError(t, mock.ExpectationsWereMet(), "constructor or cleanup performed database IO")
 }

@@ -239,7 +239,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)
 	}
 
-	if deps.OutboxProfile.Stager == nil || deps.OutboxProfile.PostCommit == nil {
+	if !selected && (deps.OutboxProfile.Stager == nil || deps.OutboxProfile.PostCommit == nil) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
 	startTxRunner := modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{
@@ -255,7 +255,9 @@ func New(deps Deps) (*Module, error) {
 		Limiter:  deps.MongoLimiter,
 	})
 	module.txRunner = retryTxRunner
-	module.eventStager = deps.OutboxProfile.Stager
+	if !selected {
+		module.eventStager = deps.OutboxProfile.Stager
+	}
 	{
 		registry, err := buildReportBuilderRegistry()
 		if err != nil {
