@@ -117,6 +117,10 @@ func run() (result map[string]any) {
 	}
 	defer sink.Close()
 	log.SetOutput(sink)
+	phase := func(value string) {
+		_ = os.WriteFile(filepath.Join(cfg.TLSDirectory, "go-control-phase"), []byte(value), 0600)
+	}
+	phase("control_ready")
 	root, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	mysql, err := driver.ParseDSN(cfg.DSN)
@@ -288,6 +292,7 @@ func run() (result map[string]any) {
 	input := bufio.NewScanner(os.Stdin)
 	input.Buffer(make([]byte, 4096), 3<<20)
 	for input.Scan() {
+		phase("control_received")
 		var c command
 		if json.Unmarshal(input.Bytes(), &c) != nil {
 			if err = output.Encode(map[string]any{"ok": false, "code": "invalid_control"}); err != nil {
@@ -312,6 +317,7 @@ func run() (result map[string]any) {
 		case "evaluation_cancel":
 			err = commandStore.SubmitEvaluationCancel(ctx, c.EvaluationScope, c.CommandID, c.EvaluationCancel)
 		case "facts", "evaluation_facts":
+			phase("facts_operation")
 			var op app.MessagingOperation
 			scope := app.OperationScope{OrganizationID: c.Actor.OrgID, SubjectID: c.Actor.SubjectID, ResourceID: c.EvaluationScope.RunID}
 			if c.Mode == "evaluation_facts" {
@@ -322,6 +328,7 @@ func run() (result map[string]any) {
 			if err == nil {
 				response["operation"] = op
 			}
+			phase("facts_evaluation_projection")
 			if err == nil && c.Mode == "evaluation_facts" {
 				var raw []byte
 				e := pool.QueryRowContext(ctx, "SELECT state FROM ai_messaging_evaluation_states WHERE run_id=?", c.EvaluationScope.RunID).Scan(&raw)
@@ -340,6 +347,7 @@ func run() (result map[string]any) {
 					}
 				}
 			}
+			phase("facts_projection")
 			if err == nil && c.Mode == "facts" {
 				var projection *app.Event
 				projection, err = commandStore.Projection(ctx, c.RequestID)
@@ -348,6 +356,7 @@ func run() (result map[string]any) {
 				}
 			}
 			if err == nil {
+				phase("facts_command_archive")
 				var archive app.FrozenMessagingArchive
 				var found bool
 				archive, found, err = commands.Archive().ReadCommitted(ctx, c.CommandID)
@@ -356,6 +365,7 @@ func run() (result map[string]any) {
 				}
 			}
 			if err == nil {
+				phase("facts_archive_identities")
 				var rows *sql.Rows
 				rows, err = pool.QueryContext(ctx, "SELECT message_id FROM ai_messaging_archive ORDER BY message_id")
 				ids := []string{}
@@ -372,6 +382,7 @@ func run() (result map[string]any) {
 					}
 					_ = rows.Close()
 				}
+				phase("facts_archive_evidence")
 				values := []map[string]any{}
 				for _, id := range ids {
 					if err != nil {
@@ -390,6 +401,7 @@ func run() (result map[string]any) {
 				response["archives"] = values
 			}
 			if err == nil {
+				phase("facts_counts")
 				counts := map[string]int{}
 				for _, table := range []string{"ai_messaging_operations", "ai_messaging_inbox", "ai_messaging_outbox", "ai_messaging_archive", "rm_tx_execution", "rm_tx_witness"} {
 					var n int
@@ -409,9 +421,11 @@ func run() (result map[string]any) {
 		if err != nil {
 			response = fail(c.Mode, err)
 		}
+		phase("control_output")
 		if err = output.Encode(response); err != nil {
 			return fail("control_write", err)
 		}
+		phase("control_waiting")
 	}
 	if err = input.Err(); err != nil {
 		return fail("control_read", err)
