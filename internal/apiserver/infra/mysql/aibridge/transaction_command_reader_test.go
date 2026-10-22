@@ -98,7 +98,7 @@ func TestTransactionCommandReaderNeverFallsBackForPreparedArchive(t *testing.T) 
 }
 
 func TestTransactionPayloadRequiresExactCommittedWitnessTenantRecipientAndHash(t *testing.T) {
-	for _, name := range []string{"committed", "prepared", "wrong-org", "wrong-hash", "wrong-workload"} {
+	for _, name := range []string{"committed", "prepared", "wrong-org", "wrong-hash", "wrong-length", "wrong-workload"} {
 		t.Run(name, func(t *testing.T) {
 			a, mock, e := commandArchiveFixture(t)
 			_, archive, err := app.ReadTransactionCommand(e.Plan)
@@ -120,13 +120,20 @@ func TestTransactionPayloadRequiresExactCommittedWitnessTenantRecipientAndHash(t
 			if name == "wrong-hash" {
 				ref.BodySha256 = strings.Repeat("f", 64)
 			}
+			if name == "wrong-length" {
+				ref.BodyLength++
+			}
 			body, found, err := a.Payload(t.Context(), ref, workload)
 			require.True(t, found)
 			if name == "committed" {
 				require.NoError(t, err)
 				require.Equal(t, archive.Body, body)
 			} else {
-				require.Error(t, err)
+				if name == "wrong-org" || name == "wrong-hash" || name == "wrong-length" {
+					require.ErrorIs(t, err, app.ErrConflict)
+				} else {
+					require.ErrorIs(t, err, app.ErrMessagingContract)
+				}
 				require.Empty(t, body)
 			}
 		})

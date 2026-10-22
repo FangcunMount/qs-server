@@ -207,7 +207,9 @@ func (s *TransactionArchive) Payload(ctx context.Context, ref *pb.MessagePayload
 		return nil, false, nil
 	}
 	if ref.OrganizationId != strconv.FormatUint(a.OrganizationID, 10) || ref.BodySha256 != a.Envelope.BodySha256 || ref.BodyLength != uint64(len(a.Body)) {
-		return nil, true, app.ErrMessagingContract
+		// A caller reference mismatch keeps the established sanitized NotFound
+		// RPC result. Internal proof/binding errors above remain unavailable.
+		return nil, true, app.ErrConflict
 	}
 	return bytes.Clone(a.Body), true, nil
 }
