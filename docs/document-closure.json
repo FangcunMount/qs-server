@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "9b192baaeb07105f4696a2fce0b3147be87474d3",
+    "sha": "31c96a29edd9920fd6068db3a78ee5a68bf72f60",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -318,7 +318,7 @@
       }
     }
   },
-  "initialization_note": "The exact document inventory remains explicit until each file receives sources and verification. initial_review_baseline preserves the unsigned starting state; module_signoff retains strict source review while test and production dimensions without reproducible current evidence remain unsigned. infrastructure_signoff is a separate ten-topic 7x7 matrix; historical production records never upgrade the current checkout. The 2026-10-07 audit corrects current statements and records local regression evidence at the new source baseline. Partial review does not promote every document to aligned or add an accountable signoff; CI, deployment, real dependencies and business acceptance remain separate. M3 T15 source inventory baseline advanced to b1776025fe5d4448469f2d9b33f4f0eff78bf72d; previous binding retained as {\"sha\": \"199ef22def9b248fe2c8e01f0737373bf55d2267\", \"verified_on\": \"2026-10-21\"}. Inbound event/ACK source and isolated proof candidates only; runtime and production evidence unchanged. T15 fixture-only receipt correlation correction and unit contract coverage; previous source binding {\"sha\": \"b1776025fe5d4448469f2d9b33f4f0eff78bf72d\", \"verified_on\": \"2026-10-21\"}. Product code remains byte-identical to b1776025fe5d4448469f2d9b33f4f0eff78bf72d. First native 8.0.44 failure remains bound to4fed2b588; no runtime evidence rebound. M3 T21 credential binding source f04c328c1ef0b37da9a07eef6d23ad909fcdee39: multi-owner hosts explicitly configure distinct credential files and Broker usernames; single-owner base binding remains valid. Previous baseline retained as {\"sha\":\"19387732e7475891dffdaed894500ecacb57668e\",\"verified_on\":\"2026-10-22\"}. No migration, dependency, production or runtime attribution changed. M3 T22 QS host source 71246d4cc51a9b92bf67421a3b86fe103902e77e: shared original-store owners, final NORMAL factory and honest bounded drain/partial-start cleanup; previous baseline {\"sha\": \"f04c328c1ef0b37da9a07eef6d23ad909fcdee39\", \"verified_on\": \"2026-10-23\"}. Targeted source regression only; no native host, production or business attribution advanced. Source regression assertion-only followup; pinned golangci-lint2.5.0 reports0 issues. No implementation or native evidence changed. Assertion followup source baseline 961e3dad16cf1c67d851e20f18ee8ec78b4b5a10; prior binding {\"sha\": \"71246d4cc51a9b92bf67421a3b86fe103902e77e\", \"verified_on\": \"2026-10-23\"}. Documentation checker baseline policy unchanged. T22 process bounded-wait source 9b192baaeb07105f4696a2fce0b3147be87474d3; previous baseline {\"sha\": \"961e3dad16cf1c67d851e20f18ee8ec78b4b5a10\", \"verified_on\": \"2026-10-23\"}. Eight-package race297 passed0 failed/skip and pinned lint2.5.0 reports0; no native host or production evidence advanced.",
+  "initialization_note": "The exact document inventory remains explicit until each file receives sources and verification. initial_review_baseline preserves the unsigned starting state; module_signoff retains strict source review while test and production dimensions without reproducible current evidence remain unsigned. infrastructure_signoff is a separate ten-topic 7x7 matrix; historical production records never upgrade the current checkout. The 2026-10-07 audit corrects current statements and records local regression evidence at the new source baseline. Partial review does not promote every document to aligned or add an accountable signoff; CI, deployment, real dependencies and business acceptance remain separate. M3 T15 source inventory baseline advanced to b1776025fe5d4448469f2d9b33f4f0eff78bf72d; previous binding retained as {\"sha\": \"199ef22def9b248fe2c8e01f0737373bf55d2267\", \"verified_on\": \"2026-10-21\"}. Inbound event/ACK source and isolated proof candidates only; runtime and production evidence unchanged. T15 fixture-only receipt correlation correction and unit contract coverage; previous source binding {\"sha\": \"b1776025fe5d4448469f2d9b33f4f0eff78bf72d\", \"verified_on\": \"2026-10-21\"}. Product code remains byte-identical to b1776025fe5d4448469f2d9b33f4f0eff78bf72d. First native 8.0.44 failure remains bound to4fed2b588; no runtime evidence rebound. M3 T21 credential binding source f04c328c1ef0b37da9a07eef6d23ad909fcdee39: multi-owner hosts explicitly configure distinct credential files and Broker usernames; single-owner base binding remains valid. Previous baseline retained as {\"sha\":\"19387732e7475891dffdaed894500ecacb57668e\",\"verified_on\":\"2026-10-22\"}. No migration, dependency, production or runtime attribution changed. M3 T22 QS host source 71246d4cc51a9b92bf67421a3b86fe103902e77e: shared original-store owners, final NORMAL factory and honest bounded drain/partial-start cleanup; previous baseline {\"sha\": \"f04c328c1ef0b37da9a07eef6d23ad909fcdee39\", \"verified_on\": \"2026-10-23\"}. Targeted source regression only; no native host, production or business attribution advanced. Source regression assertion-only followup; pinned golangci-lint2.5.0 reports0 issues. No implementation or native evidence changed. Assertion followup source baseline 961e3dad16cf1c67d851e20f18ee8ec78b4b5a10; prior binding {\"sha\": \"71246d4cc51a9b92bf67421a3b86fe103902e77e\", \"verified_on\": \"2026-10-23\"}. Documentation checker baseline policy unchanged. T22 process bounded-wait source 9b192baaeb07105f4696a2fce0b3147be87474d3; previous baseline {\"sha\": \"961e3dad16cf1c67d851e20f18ee8ec78b4b5a10\", \"verified_on\": \"2026-10-23\"}. Eight-package race297 passed0 failed/skip and pinned lint2.5.0 reports0; no native host or production evidence advanced. T22 main completion barrier and failed transaction drain exit source 31c96a29edd9920fd6068db3a78ee5a68bf72f60; prior baseline {\"sha\": \"9b192baaeb07105f4696a2fce0b3147be87474d3\", \"verified_on\": \"2026-10-23\"}. Eight-package race299 passed0 failed/skip; pinned lint2.5.0 reports0. Real process signal/DB/Broker acceptance remains pending.",
   "documents": [
     {
       "path": ".github/workflows/README.md",
@@ -8819,7 +8819,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "71246d4cc51a9b92bf67421a3b86fe103902e77e",
+        "source_sha": "31c96a29edd9920fd6068db3a78ee5a68bf72f60",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -9097,7 +9097,8 @@
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified.",
       "notes": [
-        "T22 source only 71246d4cc51a9b92bf67421a3b86fe103902e77e; previous per-document binding {\"source_sha\": \"3f47ff9f458e7b12654328025e9a61cb50cd3dc7\", \"verified_on\": \"2026-10-19\"}. Eight-package race294 passed,0 failed/skip. Real host/cross-instance/production acceptance remains pending in infra."
+        "T22 source only 71246d4cc51a9b92bf67421a3b86fe103902e77e; previous per-document binding {\"source_sha\": \"3f47ff9f458e7b12654328025e9a61cb50cd3dc7\", \"verified_on\": \"2026-10-19\"}. Eight-package race294 passed,0 failed/skip. Real host/cross-instance/production acceptance remains pending in infra.",
+        "T22 current source review 31c96a29edd9920fd6068db3a78ee5a68bf72f60; previous verified binding {\"source_sha\": \"71246d4cc51a9b92bf67421a3b86fe103902e77e\", \"verified_on\": \"2026-10-23\"}. Targeted regression only; runtime/deployment/business statuses unchanged."
       ]
     },
     {
@@ -10109,8 +10110,8 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
-        "verified_on": "2026-10-07"
+        "source_sha": "31c96a29edd9920fd6068db3a78ee5a68bf72f60",
+        "verified_on": "2026-10-23"
       },
       "fact_sources": [
         {
@@ -10196,6 +10197,9 @@
           "summary": "This new canonical document has not received an accountable semantic signoff.",
           "exit_criteria": "Review every behavioral statement against the declared fact sources, attach strict evidence, and obtain the responsible owner signoff."
         }
+      ],
+      "notes": [
+        "T22 current source review 31c96a29edd9920fd6068db3a78ee5a68bf72f60; previous verified binding {\"source_sha\": \"6e0bef988054da0d834f25f7371e771e90ac8830\", \"verified_on\": \"2026-10-07\"}. Targeted regression only; runtime/deployment/business statuses unchanged."
       ]
     },
     {
