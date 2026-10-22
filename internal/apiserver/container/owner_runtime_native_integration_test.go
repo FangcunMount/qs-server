@@ -170,6 +170,18 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	source, err := catalog.Load("../../../configs/events.yaml")
 	require.NoError(t, err)
 	routes := catalog.NewCatalog(source)
+	// This protocol fixture has no domain projections. Explicitly disable
+	// their catalog consumers instead of silently starting an unbound handler;
+	// the real SDK observer below remains enabled with consume-only credentials.
+	registry, err := catalog.NewEffectiveRegistry(routes, catalog.DefaultSpecs())
+	require.NoError(t, err)
+	consumers := map[string]eventsubsystem.ConsumerOptions{}
+	for _, spec := range registry.Snapshot() {
+		for _, consumer := range spec.AdditionalConsumers {
+			consumers[consumer.ID] = eventsubsystem.ConsumerOptions{Enabled: false}
+		}
+	}
+	require.NotEmpty(t, consumers)
 	cases := map[string]bool{}
 	// Construction is inert; the fixture installs schema explicitly afterward.
 	type instance struct {
@@ -186,7 +198,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 		options.RocketMQ = &mq
 		normal, e := messagingruntime.NewNormalWirePublisher(&options, []string{"qs.survey.lifecycle", "qs.plan.task"}, 4)
 		require.NoError(t, e)
-		events, e := eventsubsystem.NewWithTransactionOwners(eventsubsystem.Options{MySQLDB: data.sql, MongoDB: data.documents, Catalog: routes, WirePublisher: normal, PublisherMode: eventruntime.PublishModeMQ}, &options)
+		events, e := eventsubsystem.NewWithTransactionOwners(eventsubsystem.Options{MySQLDB: data.sql, MongoDB: data.documents, Catalog: routes, WirePublisher: normal, PublisherMode: eventruntime.PublishModeMQ, Consumers: consumers}, &options)
 		require.NoError(t, e)
 		host := NewContainerWithOptions(data.sql, data.documents, nil, ContainerOptions{EventSubsystem: events, Transactions: &EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, Silent: true})
 		result := &instance{events, normal, host}
@@ -585,7 +597,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	cases["actual_shutdown_and_owned_cleanup"] = true
 	sourceSHA, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
-	receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "default QS dual-owner lifecycle, actual Broker restart and next-instance Checker; protocol fixture facts", "domain_api_provider_system_not_claimed": true, "producer_process_exit_not_claimed": true, "owned_databases_dropped": true, "owned_runtimes_drained": true, "same_broker_container_restarted": true, "local_executor_calls": []int32{branches[0].calls.Load(), branches[1].calls.Load()}, "mongo_database_callbacks": mongoCallbacks.Load(), "new_checker_commits": []int64{mysqlNext.Stats().CheckCommit, mongoNext.Stats().CheckCommit}, "observed_callbacks": maxima, "duplicate_deliveries": duplicateDeliveries.Load(), "close_wait_ms": closeWait.Milliseconds(), "new_half_prepared_results": []int64{mysqlNext.Stats().HalfPreparedResults, mongoNext.Stats().HalfPreparedResults}})
+	receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "default QS dual-owner lifecycle, actual Broker restart and next-instance Checker; protocol fixture facts", "domain_api_provider_system_not_claimed": true, "domain_consumers_explicitly_disabled": true, "producer_process_exit_not_claimed": true, "owned_databases_dropped": true, "owned_runtimes_drained": true, "same_broker_container_restarted": true, "local_executor_calls": []int32{branches[0].calls.Load(), branches[1].calls.Load()}, "mongo_database_callbacks": mongoCallbacks.Load(), "new_checker_commits": []int64{mysqlNext.Stats().CheckCommit, mongoNext.Stats().CheckCommit}, "observed_callbacks": maxima, "duplicate_deliveries": duplicateDeliveries.Load(), "close_wait_ms": closeWait.Milliseconds(), "new_half_prepared_results": []int64{mysqlNext.Stats().HalfPreparedResults, mongoNext.Stats().HalfPreparedResults}})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_DEFAULT_OWNER_RECEIPT " + string(receipt))
 }
