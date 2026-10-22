@@ -184,3 +184,30 @@ func TestServiceUsesExplicitTransactionSubmitterWithoutLegacyFallback(t *testing
 		t.Fatal("transaction unknown fell back to legacy staging or mutated caller")
 	}
 }
+
+func TestFinalTransactionModeCreatesEventlessPendingWithoutLegacyStager(t *testing.T) {
+	repo, tx := &intakeRepoStub{}, &txStub{}
+	submit := &transactionSubmitStub{err: eventtransaction.ErrUnresolved}
+	svc := NewService(repo, validatorStub{}, tx, nil, WithTransactionSubmitter(submit))
+	kind, code, version := "scale", "MODEL-1", "1.0.0"
+	pending, err := svc.CreateForAnswerSheet(t.Context(), CreateCommand{OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q", QuestionnaireVersion: "1", AnswerSheetID: 3, OriginType: "adhoc", ModelKind: &kind, ModelCode: &code, ModelVersion: &version})
+	if err != nil || pending == nil || pending.Status != "pending" {
+		t.Fatal("final host required publication Outbox for an eventless draft", err)
+	}
+	if tx.calls != 1 || repo.saves != 1 || submit.called || len(repo.aggregate.Events()) != 0 {
+		t.Fatal("pending creation sent messages or lost original local transaction")
+	}
+	// Event-bearing submission must still go exclusively through the explicit
+	// sender and retain Unknown; it must never use the eventless write path.
+	result, err := svc.SubmitForEvaluation(t.Context(), pending.ID)
+	if !errors.Is(err, eventtransaction.ErrUnresolved) || result != nil || !submit.called || repo.saves != 1 {
+		t.Fatal("submission fell back to a local draft write", err)
+	}
+	if err := repo.aggregate.SubmitAt(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	before := tx.calls
+	if err := (assessmentCreateFinalizer{repo: repo, txRunner: tx}).SavePending(t.Context(), repo.aggregate); err == nil || tx.calls != before {
+		t.Fatal("event-bearing fact passed through eventless draft path")
+	}
+}
