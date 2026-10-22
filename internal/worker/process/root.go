@@ -68,6 +68,7 @@ type messagingRuntimeOutput struct {
 	subscriber         workerSubscriber
 	publisher          io.Closer
 	holdReplayer       *messagingintegration.RetryEventHoldReplayer
+	deferredConsumer   *messagingintegration.DeferredConsumer
 	deadLetterRecorder *eventtransport.SQLDeadLetterRecorder
 	holdStore          io.Closer
 }

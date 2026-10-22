@@ -291,7 +291,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 108, "mongodb": 42}
+EXPECTED_MIGRATION_MAX = {"mysql": 109, "mongodb": 42}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
@@ -2951,6 +2951,7 @@ def process_lifecycle_contract_issues() -> list[Issue]:
         "worker": [
             "subscriber.Stop()",
             "holdReplayer.Stop()",
+            "deferredConsumer.Close(context.Background())",
             "subscriber.Close()",
             "publisher.Close()",
             "deadLetterRecorder.Close()",
@@ -2968,6 +2969,7 @@ def process_lifecycle_contract_issues() -> list[Issue]:
         "worker": [
             "subscriber.Stop",
             "hold replayer",
+            "deferred consumer",
             "subscriber.Close",
             "publisher",
             "dead-letter",

@@ -214,7 +214,7 @@ func (r *Reader) appendHoldCandidates(ctx context.Context, orgID int64, limit in
 	}
 	if err := r.mysql.WithContext(ctx).Raw(`SELECT event_id, replay_attempt_count, retry_disposition,
 next_attempt_at, last_error, updated_at FROM retry_event_hold
-WHERE org_id=? AND status IN ('blocked','failed','replaying')
+WHERE org_id=? AND status IN ('blocked','failed','replaying','consuming')
   AND retry_disposition IN ('automatic','manual_required')
 ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
 		return err

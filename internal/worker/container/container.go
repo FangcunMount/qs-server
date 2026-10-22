@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -32,6 +33,7 @@ import (
 // Container 主容器，负责管理所有组件
 type Container struct {
 	initialized             bool
+	closed                  atomic.Bool
 	opts                    *options.Options
 	logger                  *slog.Logger
 	locks                   *locksubsystem.Subsystem
@@ -56,6 +58,7 @@ type Container struct {
 
 	// 事件分发器
 	eventDispatcher *workereventing.Dispatcher
+	dispatchBudget  *dispatchBudget
 }
 
 // ClientBundle is the worker runtime client graph produced by the gRPC
@@ -93,6 +96,11 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 		resilience:   resilienceSubsystem,
 	}
 	c.reportStatus = c.buildReportStatusReporter()
+	limit := 1
+	if opts != nil && opts.Worker != nil && opts.Worker.Concurrency > 0 {
+		limit = opts.Worker.Concurrency
+	}
+	c.dispatchBudget = newDispatchBudget(limit)
 	return c, nil
 }
 
@@ -189,6 +197,9 @@ func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
 
 // Initialize 初始化容器中的所有组件
 func (c *Container) Initialize() error {
+	if c.closed.Load() {
+		return fmt.Errorf("worker container has been closed")
+	}
 	if c.initialized {
 		return nil
 	}
@@ -295,6 +306,7 @@ func (c *Container) buildNotifier() port.TaskNotifier {
 
 // Cleanup 清理资源
 func (c *Container) Cleanup() {
+	c.closed.Store(true)
 	log.Info("🧹 Cleaning up container resources...")
 	if c.attentionReconciler != nil {
 		c.attentionReconciler.Close()
@@ -304,6 +316,7 @@ func (c *Container) Cleanup() {
 	}
 	if c.resilienceCancel != nil {
 		c.resilienceCancel()
+		_ = c.resilience.Wait(context.Background())
 		c.resilienceCancel = nil
 	}
 	c.initialized = false
@@ -344,7 +357,9 @@ func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload
 	if c.eventDispatcher == nil {
 		return eventruntime.DispatchResult{Outcome: eventruntime.DispatchUnknown}, nil
 	}
-	return c.eventDispatcher.DispatchEvent(ctx, eventType, payload)
+	return c.dispatchBudget.run(ctx, func() (eventruntime.DispatchResult, error) {
+		return c.eventDispatcher.DispatchEvent(ctx, eventType, payload)
+	})
 }
 
 // ResilienceSnapshot returns the worker's current resilience capability summary.
