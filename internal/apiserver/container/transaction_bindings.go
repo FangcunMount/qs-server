@@ -25,6 +25,12 @@ func (c *Container) validateTransactionBindings() error {
 		(c.mongoDB != nil && b.Mongo == nil) || (b.MySQL == nil && b.Mongo == nil) {
 		return errors.New("complete transaction owners and routes required for host databases")
 	}
+	// Database identity alone does not share the subsystem's admission,
+	// execution budget or shutdown responsibility. Borrow its exact owners.
+	if c.eventSubsystem.HasTransactionOwners() &&
+		(b.MySQL != c.eventSubsystem.MySQLTransactionOwner() || b.Mongo != c.eventSubsystem.MongoTransactionOwner()) {
+		return errors.New("transaction owners must reuse the registered event subsystem runtimes")
+	}
 	if b.MySQL != nil && !b.MySQL.UsesPrimary(c.mysqlDB) {
 		return errors.New("transaction MySQL owner does not borrow the host primary")
 	}
