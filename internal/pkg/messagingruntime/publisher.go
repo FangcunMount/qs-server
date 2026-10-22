@@ -85,6 +85,17 @@ func NewSDKWirePublisher(o *options.MessagingOptions) (*sdkNSQWirePublisher, err
 	if o.Provider == "nsq" {
 		return NewSDKNSQWirePublisher(o.NSQAddr)
 	}
+	if o.Provider == "rocketmq" {
+		config, err := o.RocketMQ.Load(nil, 1, 5*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		for _, route := range config.Routes {
+			if route.MessageType == transport.TransactionMessageType {
+				return nil, errors.New("transaction routes cannot use the legacy Outbox wire publisher")
+			}
+		}
+	}
 	p, err := NewPublisher(o, nil, 64)
 	if err != nil {
 		return nil, err

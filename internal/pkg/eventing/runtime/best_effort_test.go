@@ -25,3 +25,13 @@ func TestBestEffortPublisherRejectsDurableEventsSharingTheSameLogicalTopic(t *te
 	_, err = NewBestEffortPublisher(loadEventCatalog(t), nil)
 	require.Error(t, err)
 }
+
+func TestBestEffortTopicsComeFromTheActualCatalogAndExcludeTransactionOnlyTopics(t *testing.T) {
+	topics, err := BestEffortTopics(loadEventCatalog(t))
+	require.NoError(t, err)
+	require.Equal(t, []string{"qs.plan.task", "qs.survey.lifecycle"}, topics)
+	_, err = BestEffortTopics(nil)
+	require.Error(t, err)
+	_, err = BestEffortTopics(eventcatalog.NewCatalog(nil))
+	require.Error(t, err)
+}
