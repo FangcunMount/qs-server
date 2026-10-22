@@ -36,6 +36,7 @@ PRODUCTION_CONFIG = ROOT / "configs/apiserver.prod.yaml"
 DEVELOPMENT_CONFIG = ROOT / "configs/apiserver.dev.yaml"
 SCHEDULER_BOOTSTRAP = ROOT / "internal/apiserver/process/runtime_bootstrap.go"
 APISERVER_SHUTDOWN_COORDINATOR = ROOT / "internal/apiserver/process/shutdown_context.go"
+WORKER_SHUTDOWN_COORDINATOR = ROOT / "internal/worker/process/shutdown_context.go"
 PERF_PLAN_SOURCE = ROOT / "scripts/perf/perfctl/plan.go"
 PERF_RUNNER_SOURCE = ROOT / "scripts/perf/perfctl/runner.go"
 PERF_CONFIG = ROOT / "scripts/perf/qs-perf.config.example.json"
@@ -2948,33 +2949,34 @@ def process_lifecycle_contract_issues() -> list[Issue]:
             'AddShutdownHook("cleanup container"',
         ],
         "worker": [
-            "holdReplayer.Stop()",
             "subscriber.Stop()",
+            "holdReplayer.Stop()",
             "subscriber.Close()",
             "publisher.Close()",
             "deadLetterRecorder.Close()",
             "holdStore.Close()",
-            'AddShutdownHook("stop subscriber"',
-            'AddShutdownHook("close grpc manager"',
-            'AddShutdownHook("close database"',
-            'AddShutdownHook("shutdown metrics"',
-            'AddShutdownHook("cleanup container"',
+            '{"stop subscriber", deps.stopSubscriber}',
+            '{"cleanup container", deps.cleanupContainer}',
+            '{"close grpc manager", deps.closeGRPCManager}',
+            '{"close database", deps.closeDatabase}',
+            '{"shutdown metrics", deps.shutdownMetrics}',
         ],
     }
     doc_tokens = {
         "apiserver": ["runtime shutdown hooks", "HTTP", "gRPC", "authz subscriber", "Container.Cleanup", "DatabaseManager"],
         "collection-server": ["HTTP shutdown", "gRPC manager", "DatabaseManager", "IAM", "cleanup container"],
         "worker": [
+            "subscriber.Stop",
             "hold replayer",
-            "subscriber",
+            "subscriber.Close",
             "publisher",
             "dead-letter",
             "hold store",
+            "cleanup container",
             "gRPC manager",
             "DatabaseManager",
             "5 秒",
             "metrics server",
-            "cleanup container",
         ],
     }
     for process, (_, lifecycle_path) in PROCESS_SOURCES.items():
@@ -2990,6 +2992,15 @@ def process_lifecycle_contract_issues() -> list[Issue]:
         elif process == "collection-server":
             source_contract = go_function_body(lifecycle_text, "runCollectionLifecycle")
         else:
+            registration = go_function_body(lifecycle_text, "registerShutdownCallback")
+            coordinator = WORKER_SHUTDOWN_COORDINATOR.read_text(encoding="utf-8")
+            close_body = go_function_body(coordinator, "Close")
+            main_body = go_function_body(lifecycle_text, "Run")
+            if (not ordered_tokens(registration, ["newWorkerShutdown", "s.shutdown.Close(ctx)"])
+                or not ordered_tokens(close_body, ["close(s.requested)", "runWorkerLifecycle(s.deps)"])
+                or not ordered_tokens(main_body, ["s.startShutdown()", "<-s.shutdown.requested", "s.shutdown.Wait(ctx)"])
+                or "signal.Notify" in main_body):
+                issues.append(Issue("process-shutdown-source-drift", "worker owned coordinator or main completion barrier changed"))
             source_contract = (
                 go_function_body(lifecycle_text, "buildLifecycleDeps")
                 + go_function_body(lifecycle_text, "runWorkerLifecycle")

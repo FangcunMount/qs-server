@@ -1,6 +1,7 @@
 package process
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -8,8 +9,27 @@ import (
 	observability "github.com/FangcunMount/qs-server/internal/worker/observability"
 )
 
+type workerFakeCloser struct{ closed bool }
+
+func (c *workerFakeCloser) Close() error { c.closed = true; return nil }
+
+func TestSubscriberFailureDoesNotCloseItsHeldEvidenceStore(t *testing.T) {
+	want := errors.New("subscriber not drained")
+	store, publisher := &workerFakeCloser{}, &workerFakeCloser{}
+	deps := buildLifecycleDeps(resourceOutput{}, containerOutput{}, integrationOutput{}, runtimeOutput{messaging: messagingRuntimeOutput{
+		subscriber: &workerFakeSubscriber{err: want}, holdStore: store, publisher: publisher,
+	}})
+	if err := deps.stopSubscriber(); !errors.Is(err, want) {
+		t.Fatal("subscriber error lost", err)
+	}
+	if store.closed || publisher.closed {
+		t.Fatal("dependencies closed before subscriber drained")
+	}
+}
+
 type workerFakeSubscriber struct {
 	order *[]string
+	err   error
 }
 
 func (s *workerFakeSubscriber) Stop() {
@@ -22,14 +42,14 @@ func (s *workerFakeSubscriber) Close() error {
 	if s.order != nil {
 		*s.order = append(*s.order, "subscriber-close")
 	}
-	return nil
+	return s.err
 }
 
 func TestRunWorkerLifecycleRunsInExpectedOrder(t *testing.T) {
 	t.Parallel()
 
 	var order []string
-	runWorkerLifecycle(lifecycleDeps{
+	err := runWorkerLifecycle(lifecycleDeps{
 		stopSubscriber: func() error {
 			order = append(order, "subscriber")
 			return nil
@@ -51,8 +71,11 @@ func TestRunWorkerLifecycleRunsInExpectedOrder(t *testing.T) {
 			return nil
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	want := []string{"subscriber", "grpc", "database", "metrics", "container"}
+	want := []string{"subscriber", "container", "grpc", "database", "metrics"}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("lifecycle order = %#v, want %#v", order, want)
 	}

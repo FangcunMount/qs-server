@@ -2,13 +2,12 @@ package process
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 )
 
@@ -21,9 +20,18 @@ type lifecycleDeps struct {
 }
 
 func (s *server) registerShutdownCallback(deps lifecycleDeps) {
+	s.shutdown = newWorkerShutdown(deps)
+	s.gs.SetErrorHandler(shutdown.ErrorFunc(func(error) {
+		log.Error("worker shutdown incomplete or failed")
+		log.Flush()
+		os.Exit(1)
+	}))
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-
-		runWorkerLifecycle(deps)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.shutdown.Close(ctx); err != nil {
+			return err
+		}
 		log.Info("🏗️  Worker Server shutdown complete")
 		return nil
 	}))
@@ -33,27 +41,29 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	var deps lifecycleDeps
 	if runtimeOutput.messaging.subscriber != nil {
 		deps.stopSubscriber = func() error {
+			runtimeOutput.messaging.subscriber.Stop()
 			if runtimeOutput.messaging.holdReplayer != nil {
 				runtimeOutput.messaging.holdReplayer.Stop()
 			}
-			runtimeOutput.messaging.subscriber.Stop()
-			err := runtimeOutput.messaging.subscriber.Close()
+			if err := runtimeOutput.messaging.subscriber.Close(); err != nil {
+				return err
+			}
 			if runtimeOutput.messaging.publisher != nil {
-				if closeErr := runtimeOutput.messaging.publisher.Close(); err == nil {
-					err = closeErr
+				if err := runtimeOutput.messaging.publisher.Close(); err != nil {
+					return err
 				}
 			}
 			if runtimeOutput.messaging.deadLetterRecorder != nil {
-				if closeErr := runtimeOutput.messaging.deadLetterRecorder.Close(); err == nil {
-					err = closeErr
+				if err := runtimeOutput.messaging.deadLetterRecorder.Close(); err != nil {
+					return err
 				}
 			}
 			if runtimeOutput.messaging.holdStore != nil {
-				if closeErr := runtimeOutput.messaging.holdStore.Close(); err == nil {
-					err = closeErr
+				if err := runtimeOutput.messaging.holdStore.Close(); err != nil {
+					return err
 				}
 			}
-			return err
+			return nil
 		}
 	}
 	if integrationOutput.grpcClients.grpcManager != nil {
@@ -78,34 +88,47 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	return deps
 }
 
-func runWorkerLifecycle(deps lifecycleDeps) {
+func runWorkerLifecycle(deps lifecycleDeps) error {
 	log.Info("Draining worker subscribers before closing gRPC and database dependencies...")
-	lifecycle := processruntime.Lifecycle{}
-	lifecycle.AddShutdownHook("stop subscriber", deps.stopSubscriber)
-	lifecycle.AddShutdownHook("close grpc manager", deps.closeGRPCManager)
-	lifecycle.AddShutdownHook("close database", deps.closeDatabase)
-	lifecycle.AddShutdownHook("shutdown metrics", deps.shutdownMetrics)
-	lifecycle.AddShutdownHook("cleanup container", deps.cleanupContainer)
-	lifecycle.Run(func(name string, err error) {
-		log.Warnf("%s failed: %v", name, err)
-	})
+	for _, step := range []struct {
+		name string
+		run  func() error
+	}{
+		{"stop subscriber", deps.stopSubscriber},
+		{"cleanup container", deps.cleanupContainer},
+		{"close grpc manager", deps.closeGRPCManager},
+		{"close database", deps.closeDatabase},
+		{"shutdown metrics", deps.shutdownMetrics},
+	} {
+		if step.run != nil {
+			if err := step.run(); err != nil {
+				return fmt.Errorf("worker shutdown %s: %w", step.name, err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s preparedServer) Run() error {
+	if s.shutdown == nil || s.startShutdown == nil {
+		return errors.New("worker requires its owned shutdown coordinator")
+	}
 
 	if s.startShutdown != nil {
 		if err := s.startShutdown(); err != nil {
-			log.Fatalf("start shutdown manager failed: %s", err.Error())
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			return errors.Join(err, s.shutdown.Close(ctx))
 		}
 	}
 
 	log.Info("🚦 Shutdown manager started, worker coming online")
 	log.Info("🚀 Worker started, waiting for events...")
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-
-	log.Info("Shutdown signal received, stopping workers...")
-	return nil
+	// The existing POSIX manager owns signal handling. Main joins the same drain
+	// that its callback starts; it cannot return when a handler is still running.
+	<-s.shutdown.requested
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return s.shutdown.Wait(ctx)
 }

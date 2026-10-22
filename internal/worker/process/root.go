@@ -20,13 +20,15 @@ import (
 )
 
 type server struct {
-	gs     *shutdown.GracefulShutdown
-	config *config.Config
-	logger *slog.Logger
+	gs       *shutdown.GracefulShutdown
+	config   *config.Config
+	logger   *slog.Logger
+	shutdown *workerShutdown
 }
 
 type preparedServer struct {
 	startShutdown func() error
+	shutdown      *workerShutdown
 }
 
 type resourceHandles struct {
