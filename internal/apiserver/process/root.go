@@ -22,11 +22,13 @@ type server struct {
 	// 优雅关闭管理器
 	gs *shutdown.GracefulShutdown
 	// 配置
-	config *config.Config
+	config   *config.Config
+	shutdown *processShutdown
 }
 
 // preparedServer 定义了准备运行的 API 服务器
 type preparedServer struct {
+	shutdown      *processShutdown
 	startShutdown func() error
 	httpServer    *genericapiserver.GenericAPIServer
 	grpcServer    *grpcpkg.Server
@@ -88,6 +90,9 @@ func createServer(cfg *config.Config) (*server, error) {
 	// 创建一个 GracefulShutdown 实例
 	gs := shutdown.New()
 	gs.AddShutdownManager(posixsignal.NewPosixSignalManager())
+	if cfg != nil && cfg.MessagingOptions != nil && cfg.MessagingOptions.Provider == "rocketmq" && cfg.MessagingOptions.RocketMQ != nil && len(cfg.MessagingOptions.RocketMQ.Transactions) > 0 {
+		configureTransactionShutdownFailure(gs)
+	}
 
 	return &server{
 		gs:     gs,

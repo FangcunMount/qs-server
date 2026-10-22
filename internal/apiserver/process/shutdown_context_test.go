@@ -59,3 +59,42 @@ func TestProcessWaitDoesNotStartShutdown(t *testing.T) {
 		t.Fatal("Wait manufactured shutdown work", err)
 	}
 }
+
+func TestPreparedServerDoesNotReturnBeforeCallbackReleasesOriginalResources(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	closer := newProcessShutdown(processLifecycleDeps{resource: resourceLifecycleDeps{closeDatabase: func() error { close(entered); <-release; return nil }}})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_ = closer.Close(ctx)
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("resource close absent")
+	}
+	returned := make(chan error, 1)
+	go func() {
+		returned <- runPreparedServer(preparedServerRunDeps{shutdown: closer, transports: preparedServerTransports{runGRPC: func() error { return nil }}})
+	}()
+	select {
+	case err := <-returned:
+		t.Fatal("main bypassed shutdown callback", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case err := <-returned:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("prepared server did not finish")
+	}
+}
+
+func TestTransactionShutdownFailureReportsNonzeroTermination(t *testing.T) {
+	code := 0
+	transactionShutdownFailure(func(value int) { code = value }).OnError(errors.New("owned drain still pending"))
+	if code != 1 {
+		t.Fatal("failed transaction drain looked like successful exit")
+	}
+}

@@ -29,11 +29,14 @@ func TestCreateAPIServerKeepsOnlyRootState(t *testing.T) {
 	}
 
 	typ := reflect.TypeOf(*server)
-	if typ.NumField() != 2 {
-		t.Fatalf("server field count = %d, want 2", typ.NumField())
+	if typ.NumField() != 3 {
+		t.Fatalf("server field count = %d, want 3", typ.NumField())
 	}
 	if got := typ.Field(0).Name; got != "gs" {
 		t.Fatalf("field[0] = %q, want gs", got)
+	}
+	if server.shutdown != nil || typ.Field(2).Name != "shutdown" {
+		t.Fatal("process completion ownership must be inert root state")
 	}
 	if got := typ.Field(1).Name; got != "config" {
 		t.Fatalf("field[1] = %q, want config", got)

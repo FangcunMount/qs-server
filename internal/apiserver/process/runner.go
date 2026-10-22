@@ -132,6 +132,7 @@ func (r *prepareRunner) run() (preparedServer, string, error) {
 		Stages: r.stages,
 		BuildPrepared: func(state *prepareState) preparedServer {
 			return preparedServer{
+				shutdown:      r.server.shutdown,
 				startShutdown: r.server.gs.Start,
 				httpServer:    state.transport.httpServer,
 				grpcServer:    state.transport.grpcServer,

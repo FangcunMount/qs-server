@@ -45,6 +45,7 @@ type preparedServerTransports struct {
 }
 
 type preparedServerRunDeps struct {
+	shutdown      *processShutdown
 	startShutdown func() error
 
 	transports preparedServerTransports
@@ -52,6 +53,7 @@ type preparedServerRunDeps struct {
 
 func (s *server) registerShutdownCallback(deps processLifecycleDeps) {
 	closer := newProcessShutdown(deps)
+	s.shutdown = closer
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -168,6 +170,7 @@ func (s *server) fatalPrepareRun(action string, err error) {
 
 func (s preparedServer) buildPreparedServerRunDeps() preparedServerRunDeps {
 	var deps preparedServerRunDeps
+	deps.shutdown = s.shutdown
 	if s.startShutdown != nil {
 		deps.startShutdown = s.startShutdown
 	}
@@ -195,7 +198,7 @@ func runPreparedServer(deps preparedServerRunDeps) error {
 	if deps.transports.runGRPC != nil {
 		log.Info("🚀 Starting Hexagonal Architecture GRPC server...")
 	}
-	if err := (processruntime.RunGroup{
+	runErr := (processruntime.RunGroup{
 		Services: []processruntime.ServiceRunner{
 			{
 				Name: "http",
@@ -206,11 +209,19 @@ func runPreparedServer(deps preparedServerRunDeps) error {
 				Run:  deps.transports.runGRPC,
 			},
 		},
-	}).Run(); err != nil {
-		log.Errorf("Failed to run prepared server: %v", err)
-		return err
+	}).Run()
+	if deps.shutdown != nil {
+		if !deps.shutdown.requested.Load() && runErr == nil {
+			runErr = errors.New("required transport exited before shutdown")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		runErr = errors.Join(runErr, deps.shutdown.Close(ctx))
 	}
-	return nil
+	if runErr != nil {
+		log.Errorf("Failed to run prepared server: %v", runErr)
+	}
+	return runErr
 }
 
 // Run 运行 API 服务器
