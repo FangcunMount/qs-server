@@ -2,6 +2,7 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
+	mongoEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	mysqlEventTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -21,13 +22,26 @@ type CommandTransactionInstallHost interface {
 	AICommandTransactionOwner() *mysqlEventTx.Committer
 }
 
+type ReportTransactionInstallHost interface {
+	ReportTransactionOwner() *mongoEventTx.Owner
+	ReportTransactionRoutes() eventcatalog.TopicResolver
+}
+
 // InstallFrom wires and registers the report module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
+	var reportOwner *mongoEventTx.Owner
+	var reportRoutes eventcatalog.TopicResolver
+	if transactions, ok := host.(ReportTransactionInstallHost); ok {
+		reportOwner = transactions.ReportTransactionOwner()
+		reportRoutes = transactions.ReportTransactionRoutes()
+	}
 	var commandOwner *mysqlEventTx.Committer
 	if transactions, ok := host.(CommandTransactionInstallHost); ok {
 		commandOwner = transactions.AICommandTransactionOwner()
 	}
 	module, err := Wire(WireInput{
+		EventTransactionOwner:   reportOwner,
+		TransactionRoutes:       reportRoutes,
 		CommandTransactionOwner: commandOwner,
 		MySQLDB:                 host.MySQLDB(),
 		MySQLLimiter:            host.MySQLLimiter(),

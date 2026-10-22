@@ -52,6 +52,7 @@ type Container struct {
 	// 事件发布器（统一管理）
 	eventPublisher            event.EventPublisher
 	eventSubsystem            *eventsubsystem.Subsystem
+	transactions              *EventTransactionBindings
 	taskOpenedReminderEnabled bool
 
 	// 业务模块
@@ -144,6 +145,10 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	configureRetryPolicies(opts.SystemGovernance)
 	c := newBaseContainer(mysqlDB, mongoDB, redisCache)
 	c.eventSubsystem = opts.EventSubsystem
+	if opts.Transactions != nil {
+		bindings := *opts.Transactions
+		c.transactions = &bindings
+	}
 	c.taskOpenedReminderEnabled = opts.TaskOpenedReminderEnabled
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
@@ -267,6 +272,9 @@ func (c *Container) printf(format string, args ...interface{}) {
 
 // initEventSubsystem 绑定 resource stage 构造完成的唯一事件运行时。
 func (c *Container) initEventSubsystem() error {
+	if err := c.validateTransactionBindings(); err != nil {
+		return err
+	}
 	if c.eventSubsystem == nil {
 		return fmt.Errorf("event subsystem is required")
 	}
