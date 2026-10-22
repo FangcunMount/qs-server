@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -9,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/deliveryevidence"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 )
 
@@ -60,26 +60,9 @@ func SDKRocketMQFailureHandler(recorder DeadLetterRecorder) func(context.Context
 }
 
 func recordTransportEvidence(ctx context.Context, tx *sql.Tx, r DeadLetterRecord) error {
-	e := r.Evidence
-	if e == nil || e.PhysicalTopic == "" || len(e.Wire) == 0 || !json.Valid(e.Metadata) {
+	if r.Evidence == nil {
 		return errors.New("RocketMQ original transport evidence required before ACK")
 	}
-	id := sha256.Sum256([]byte(r.Provider + "\x00" + r.Topic + "\x00" + r.Channel + "\x00" + r.TransportMessageID))
-	_, err := tx.ExecContext(ctx, `INSERT INTO event_delivery_transport_evidence
-(identity_hash,provider,topic_name,channel_name,transport_message_id,application_id,physical_topic,original_wire,metadata_bytes)
-VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE identity_hash=identity_hash`,
-		id[:], r.Provider, r.Topic, r.Channel, r.TransportMessageID, e.ApplicationID, e.PhysicalTopic, e.Wire, e.Metadata)
-	if err != nil {
-		return err
-	}
-	var provider, topic, channel, transportID, application, physical string
-	var wire, metadata []byte
-	err = tx.QueryRowContext(ctx, `SELECT provider,topic_name,channel_name,transport_message_id,application_id,physical_topic,original_wire,metadata_bytes FROM event_delivery_transport_evidence WHERE identity_hash=? FOR UPDATE`, id[:]).Scan(&provider, &topic, &channel, &transportID, &application, &physical, &wire, &metadata)
-	if err != nil {
-		return err
-	}
-	if provider != r.Provider || topic != r.Topic || channel != r.Channel || transportID != r.TransportMessageID || application != e.ApplicationID || physical != e.PhysicalTopic || !bytes.Equal(wire, e.Wire) || !bytes.Equal(metadata, e.Metadata) {
-		return errors.New("RocketMQ transport identity reused with different immutable evidence")
-	}
-	return nil
+	e := r.Evidence
+	return deliveryevidence.Persist(ctx, tx, deliveryevidence.Source{Provider: r.Provider, Topic: r.Topic, Channel: r.Channel, TransportMessageID: r.TransportMessageID, ApplicationID: e.ApplicationID, PhysicalTopic: e.PhysicalTopic, Wire: e.Wire, Metadata: e.Metadata})
 }

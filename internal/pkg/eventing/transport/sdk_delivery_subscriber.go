@@ -134,3 +134,19 @@ func (s *SDKDeliverySubscriber) closeInner(ctx context.Context) error {
 	}
 	return s.inner.Close(ctx)
 }
+
+// RocketMQReady checks recent successful receives, including empty polls, on
+// every registered physical subscription group. It is transport readiness,
+// independent of business acceptance or transaction-witness completion.
+func (s *SDKDeliverySubscriber) RocketMQReady(maxAge time.Duration) bool {
+	return s != nil && s.rocket != nil && s.rocket.Ready(maxAge)
+}
+
+// RocketMQErrors is the existing bounded SDK supervision stream. Reading it
+// creates no worker or retry and carries no business recovery authorization.
+func (s *SDKDeliverySubscriber) RocketMQErrors() <-chan error {
+	if s == nil || s.rocket == nil {
+		return nil
+	}
+	return s.rocket.Errors()
+}

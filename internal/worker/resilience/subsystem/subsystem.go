@@ -3,6 +3,7 @@ package subsystem
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
@@ -21,6 +22,10 @@ type Subsystem struct {
 	identity control.InstanceIdentity
 	locks    *locksubsystem.Subsystem
 	store    control.StateStore
+	mu       sync.Mutex
+	started  bool
+	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
 func New(opts Options) (*Subsystem, error) {
@@ -36,14 +41,28 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 	if s == nil {
 		return cancel
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.started {
+		cancel()
+		return s.cancel
+	}
+	s.started = true
+	s.cancel = cancel
+	s.done = make(chan struct{})
 	heartbeater, ok := s.store.(control.InstanceHeartbeater)
 	if !ok {
+		close(s.done)
 		return cancel
 	}
 	go func() {
+		defer close(s.done)
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
+			if ctx.Err() != nil {
+				return
+			}
 			_ = heartbeater.Heartbeat(ctx, s.identity, 5*time.Second)
 			select {
 			case <-ctx.Done():
@@ -53,6 +72,39 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 		}
 	}()
 	return cancel
+}
+
+// Wait joins the actual borrowed Redis operation. Cancellation alone does not
+// prove the heartbeater has stopped using the host connection.
+func (s *Subsystem) Wait(ctx context.Context) error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	done := s.done
+	s.mu.Unlock()
+	if done == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case <-done:
+		return nil
+	default:
+	}
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		select {
+		case <-done:
+			return nil
+		default:
+			return ctx.Err()
+		}
+	}
 }
 
 func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {

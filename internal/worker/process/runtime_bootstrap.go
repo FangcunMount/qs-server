@@ -59,17 +59,49 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		return output, err
 	}
 	output.messaging.holdStore = holdStore
+	var holdRecorder messagingintegration.DeliveryRetryEventHoldRecorder = holdStore
+	if s.consumeOnlyRocketMQ() {
+		// Load the same fixed host route file; message properties cannot select
+		// stores, connections, topics or business retry authorization.
+		config, loadErr := s.config.Messaging.RocketMQ.Load(nil, s.workerMaxInFlight(), 5*time.Second)
+		if loadErr != nil {
+			return output, loadErr
+		}
+		deferredStore, storeErr := messagingintegration.NewRocketMQDeferredStore(holdStore, s.config.Worker.ServiceName, s.workerMaxDeliveryAttempts(), config.Routes)
+		if storeErr != nil {
+			return output, storeErr
+		}
+		if storeErr = deferredStore.Validate(context.Background()); storeErr != nil {
+			return output, storeErr
+		}
+		holdRecorder = deferredStore
+		timeout := s.config.Messaging.NSQMessageTimeout
+		if timeout <= 0 {
+			timeout = 9 * time.Minute
+		}
+		consumer, consumerErr := messagingintegration.NewDeferredConsumer(deferredStore, containerOutput.container, messagingintegration.DefaultDeferredConsumerOptions(timeout))
+		if consumerErr != nil {
+			return output, consumerErr
+		}
+		output.messaging.deferredConsumer = consumer
+	}
 
 	subscribeErr := messagingintegration.SubscribeSDKHandlersWithOptions(messagingintegration.SubscribeSDKHandlersOptions{
 		ServiceName: s.config.Worker.ServiceName, Logger: s.logger,
 		Runtime: containerOutput.container, Subscriber: subscriber,
-		HoldRecorder:    holdStore,
+		HoldRecorder:    holdRecorder,
 		UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
 	})
 	if subscribeErr != nil {
 		return output, subscribeErr
 	}
-	if (s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled) && (s.config.Messaging.Provider != "rocketmq" || s.config.Messaging.RocketMQ.PublishingEnabled()) {
+	automatic := s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled
+	if automatic && output.messaging.deferredConsumer != nil {
+		if startErr := output.messaging.deferredConsumer.Start(context.Background()); startErr != nil {
+			return output, startErr
+		}
+	}
+	if automatic && !s.consumeOnlyRocketMQ() {
 		var holdReplayer *messagingintegration.RetryEventHoldReplayer
 		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
 		if publishErr == nil {
@@ -84,6 +116,10 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 
 	return output, nil
+}
+
+func (s *server) consumeOnlyRocketMQ() bool {
+	return s != nil && s.config != nil && s.config.Messaging != nil && s.config.Messaging.Provider == "rocketmq" && s.config.Messaging.RocketMQ != nil && !s.config.Messaging.RocketMQ.PublishingEnabled()
 }
 
 func (s *server) loadedSubscriberConfig() eventtransport.SubscriberConfig {

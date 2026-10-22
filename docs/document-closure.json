@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
+    "sha": "93968428287c2980c4d73743112bf3bbcad0f6e1",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -78,8 +78,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 108,
-        "version_count": 108
+        "max_version": 109,
+        "version_count": 109
       },
       "mongodb": {
         "max_version": 42,
@@ -8819,7 +8819,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
+        "source_sha": "93968428287c2980c4d73743112bf3bbcad0f6e1",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -9014,6 +9014,50 @@
         {
           "kind": "source",
           "path": "internal/apiserver/options/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/deferred_store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/deferred_consumer.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/deferred_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/container/dispatch_budget.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/resilience/subsystem/lifecycle_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000109_rocketmq_deferred_delivery.up.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/resources.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/deferred_consumer_contract_test.go"
+        },
+        {
+          "path": "internal/pkg/eventing/deliveryevidence/evidence.go",
+          "kind": "source"
+        },
+        {
+          "path": "internal/worker/process/rocketmq_native_integration_test.go",
+          "kind": "source"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/frozen_retry_contract_test.go"
         }
       ],
       "verification": [
@@ -9080,6 +9124,20 @@
           "result": "passed",
           "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/worker/process ./internal/worker/container ./internal/worker/resilience/subsystem ./internal/worker/integration/messaging ./internal/pkg/eventing/transport ./internal/apiserver/infra/retrygovernance",
+          "result": "passed",
+          "source_sha": "9304ba3d97c269f546f2749296574e06f7709d12",
+          "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -9132,7 +9190,13 @@
         "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced.",
         "T22 default due-dispatch source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}}. Four-package race293 passed,0 failures/skips; pinned lint2.5.0 passed. Startup preflight and real cancellation accounting are unit evidence only; native dual-store/current whole-host and worker deferred-delivery proof remain pending. Historical verification, production and signoff records unchanged.",
         "T22 combined candidate preserves complete parent current metadata: {\"worker_source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"worker_verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"dispatch_source_baseline\": {\"sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}, \"dispatch_verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Both immutable historical verification sets retained; current source binding is updated after the integrating source commit and verification. Production/business/signoff states unchanged.",
-        "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged."
+        "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged.",
+        "Current V2 deferred consumer source9304ba3d97c269f546f2749296574e06f7709d12. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}}. Six-package race79 passed,0 failures/skips; targeted ordinary and native-tag lint2.5.0 passed. Native MySQL/child-kill entrypoint compiled only; no native or full-worker claim. SQL109 is an explicit host migration candidate and is not installed. Doc test first failed twice on the old expected108 pin; checker/test/manifest now all track actual109 without changing past receipts. Staticcheck nil-context test and tagged-switch recommendations fixed. Historical source/production/signoff evidence unchanged.",
+        "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
+        "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged.",
+        "Integrated worker source 9b78c5403f16e77f9a84ba6222e1c572d65d3898. Preserve previous binding {\"source_baseline\": {\"sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}}. Source8fb35d344 complete MySQL matrix39846389533:3x7,0failure/skip,exact receipts/cleanup verified. First real runtime run39846170583 failed initial paused-delivery observation at1ae0ebd; no race/timeout,all owned cleanup true,root cause remains unknown. New9b78 requires actual per-group receive readiness and safe bounded diagnostics; current development run39848361009 pending,not passed. No production or final T22 assertion.",
+        "Current source baseline d85535bc726737a2a8d6e96a6e79128c0fae2b67 including the explicitly tracked native fixture; production code7ffae747096956d36e59461ec706d98acca45fd6 exposes only the existing bounded RocketMQ receive error stream; previous binding retained {\"source_baseline\": {\"sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}}. Integrated candidate adds inert real frozen-wire contract and confirmed half/final seed assertions. Runtime39849972277 still failed first hold with readiness/half/final confirmed,no transport errors or consume outcomes,all owned cleanup; root cause unresolved. Nextd855 fixture observes60s for serial3 logical/max2 physical long polls at one shared slot,records actual latency; fixture RPC/handler3m within host default9m,production unchanged. Source only until native proof; historical checks and production not relabeled.",
+        "Frozen worker source 93968428287c2980c4d73743112bf3bbcad0f6e1 verified by39853362567 onMySQL8.0.36/8.0.44/8.4.11,each11 actual cases (4 workerContainer/runtime/Broker +7 originalMySQL/lease/SIGKILL),0failed/skipped,exact SDK tx.2/no replace,sourceclean andallownedcleanup. Paused observations7504/29776/29804ms; not a production SLA. Original20s andone60s failed observations retained; no claim all earlier scheduling causes resolved. Source/fixture scope is actual worker with owned loopback business RPC,not complete apiserver/provider/system. Prior binding retained {\"baseline\": {\"sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}}. Current73 targetedrace/88docs/lint passed; fullcurrentheadCI/merge still required."
       ]
     },
     {
@@ -10144,7 +10208,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
+        "source_sha": "93968428287c2980c4d73743112bf3bbcad0f6e1",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10243,6 +10307,50 @@
         {
           "kind": "source",
           "path": "internal/apiserver/options/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/deferred_store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/deferred_consumer.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/deferred_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/container/dispatch_budget.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/resilience/subsystem/lifecycle_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000109_rocketmq_deferred_delivery.up.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/resources.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/deferred_consumer_contract_test.go"
+        },
+        {
+          "path": "internal/pkg/eventing/deliveryevidence/evidence.go",
+          "kind": "source"
+        },
+        {
+          "path": "internal/worker/process/rocketmq_native_integration_test.go",
+          "kind": "source"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/frozen_retry_contract_test.go"
         }
       ],
       "verification": [
@@ -10280,6 +10388,20 @@
           "result": "passed",
           "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/worker/process ./internal/worker/container ./internal/worker/resilience/subsystem ./internal/worker/integration/messaging ./internal/pkg/eventing/transport ./internal/apiserver/infra/retrygovernance",
+          "result": "passed",
+          "source_sha": "9304ba3d97c269f546f2749296574e06f7709d12",
+          "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -10307,7 +10429,13 @@
         "T22 worker partial preparation source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"a1c877b2573be7b7d694e32025e8a5943d8c354b\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"a1c877b2573be7b7d694e32025e8a5943d8c354b\", \"verified_on\": \"2026-10-23\"}}. Three-package race48 passed,0 failures/skips; pinned lint2.5.0 passed. Actual invalid-provider constructor fails before subscriber/network IO, then original pre-subscriber SQL pool is demonstrably closed with a cancelled-context check; absent catalog retains its original manager. Preparation errors and drain errors are joined. Native connected DB/Broker/current whole-host/deferred consumer remain pending. Historical attribution and production/signoff state unchanged.",
         "T22 default due-dispatch source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}}. Four-package race293 passed,0 failures/skips; pinned lint2.5.0 passed. Startup preflight and real cancellation accounting are unit evidence only; native dual-store/current whole-host and worker deferred-delivery proof remain pending. Historical verification, production and signoff records unchanged.",
         "T22 combined candidate preserves complete parent current metadata: {\"worker_source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"worker_verified\": {\"source_sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"dispatch_source_baseline\": {\"sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}, \"dispatch_verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Both immutable historical verification sets retained; current source binding is updated after the integrating source commit and verification. Production/business/signoff states unchanged.",
-        "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged."
+        "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged.",
+        "Current V2 deferred consumer source9304ba3d97c269f546f2749296574e06f7709d12. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"43f3e5e3b199b37ff754adc1b0d3d879b64689e5\", \"verified_on\": \"2026-10-23\"}}. Six-package race79 passed,0 failures/skips; targeted ordinary and native-tag lint2.5.0 passed. Native MySQL/child-kill entrypoint compiled only; no native or full-worker claim. SQL109 is an explicit host migration candidate and is not installed. Doc test first failed twice on the old expected108 pin; checker/test/manifest now all track actual109 without changing past receipts. Staticcheck nil-context test and tagged-switch recommendations fixed. Historical source/production/signoff evidence unchanged.",
+        "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
+        "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged.",
+        "Integrated worker source 9b78c5403f16e77f9a84ba6222e1c572d65d3898. Preserve previous binding {\"source_baseline\": {\"sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}}. Source8fb35d344 complete MySQL matrix39846389533:3x7,0failure/skip,exact receipts/cleanup verified. First real runtime run39846170583 failed initial paused-delivery observation at1ae0ebd; no race/timeout,all owned cleanup true,root cause remains unknown. New9b78 requires actual per-group receive readiness and safe bounded diagnostics; current development run39848361009 pending,not passed. No production or final T22 assertion.",
+        "Current source baseline d85535bc726737a2a8d6e96a6e79128c0fae2b67 including the explicitly tracked native fixture; production code7ffae747096956d36e59461ec706d98acca45fd6 exposes only the existing bounded RocketMQ receive error stream; previous binding retained {\"source_baseline\": {\"sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}}. Integrated candidate adds inert real frozen-wire contract and confirmed half/final seed assertions. Runtime39849972277 still failed first hold with readiness/half/final confirmed,no transport errors or consume outcomes,all owned cleanup; root cause unresolved. Nextd855 fixture observes60s for serial3 logical/max2 physical long polls at one shared slot,records actual latency; fixture RPC/handler3m within host default9m,production unchanged. Source only until native proof; historical checks and production not relabeled.",
+        "Frozen worker source 93968428287c2980c4d73743112bf3bbcad0f6e1 verified by39853362567 onMySQL8.0.36/8.0.44/8.4.11,each11 actual cases (4 workerContainer/runtime/Broker +7 originalMySQL/lease/SIGKILL),0failed/skipped,exact SDK tx.2/no replace,sourceclean andallownedcleanup. Paused observations7504/29776/29804ms; not a production SLA. Original20s andone60s failed observations retained; no claim all earlier scheduling causes resolved. Source/fixture scope is actual worker with owned loopback business RPC,not complete apiserver/provider/system. Prior binding retained {\"baseline\": {\"sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}}. Current73 targetedrace/88docs/lint passed; fullcurrentheadCI/merge still required."
       ]
     },
     {
@@ -11575,8 +11703,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "840961581eb318e63830db16004cade57d87cd13",
-        "verified_on": "2026-10-21"
+        "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+        "verified_on": "2026-10-23"
       },
       "fact_sources": [
         {
@@ -11634,6 +11762,18 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/resources.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/deferred_consumer_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000109_rocketmq_deferred_delivery.up.sql"
         }
       ],
       "verification": [
@@ -12014,6 +12154,13 @@
           "result": "passed",
           "source_sha": "840961581eb318e63830db16004cade57d87cd13",
           "verified_on": "2026-10-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/migration",
+          "result": "passed",
+          "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -12242,7 +12389,8 @@
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
-        "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate."
+        "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate.",
+        "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
@@ -14285,8 +14433,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "840961581eb318e63830db16004cade57d87cd13",
-        "verified_on": "2026-10-21"
+        "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+        "verified_on": "2026-10-23"
       },
       "fact_sources": [
         {
@@ -14702,7 +14850,8 @@
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
-        "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate."
+        "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate.",
+        "Current109/42 resource pair reviewc1d4a79f76fe7f868cfd8320270c80280d24b5bf; previous verified binding retained: {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}. Only target inventory/document attribution changes; offline approval, identity, backup/restore, file consumption and runtime boundary code unchanged. No native or production execution claimed."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
