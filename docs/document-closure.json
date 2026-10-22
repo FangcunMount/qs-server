@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5504b042eacd6f17cdc5c2df94b39b2621165767",
+    "sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -8819,7 +8819,7 @@
       "owner": "infra",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5504b042eacd6f17cdc5c2df94b39b2621165767",
+        "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -8998,6 +8998,22 @@
         {
           "kind": "source",
           "path": "internal/apiserver/runtime/scheduler/lifecycle.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/runtime/scheduler/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/options/retry_dispatch.go"
         }
       ],
       "verification": [
@@ -9050,6 +9066,20 @@
           "result": "passed",
           "source_sha": "7de5adbd31b588450735f11b3501292da89a6ada",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/apiserver/options ./internal/apiserver/runtime/scheduler ./internal/apiserver/process ./internal/apiserver/container",
+          "result": "passed",
+          "source_sha": "2be7d03a9940ec7fd5cc04085ceb04c42ce85316",
+          "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/apiserver/options ./internal/apiserver/runtime/scheduler ./internal/apiserver/process ./internal/apiserver/container ./internal/worker/process ./internal/worker/container ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -9099,7 +9129,10 @@
       "notes": [
         "T22 source only 71246d4cc51a9b92bf67421a3b86fe103902e77e; previous per-document binding {\"source_sha\": \"3f47ff9f458e7b12654328025e9a61cb50cd3dc7\", \"verified_on\": \"2026-10-19\"}. Eight-package race294 passed,0 failed/skip. Real host/cross-instance/production acceptance remains pending in infra.",
         "T22 current source review 31c96a29edd9920fd6068db3a78ee5a68bf72f60; previous verified binding {\"source_sha\": \"71246d4cc51a9b92bf67421a3b86fe103902e77e\", \"verified_on\": \"2026-10-23\"}. Targeted regression only; runtime/deployment/business statuses unchanged.",
-        "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced."
+        "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced.",
+        "T22 default due-dispatch source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}}. Four-package race293 passed,0 failures/skips; pinned lint2.5.0 passed. Startup preflight and real cancellation accounting are unit evidence only; native dual-store/current whole-host and worker deferred-delivery proof remain pending. Historical verification, production and signoff records unchanged.",
+        "T22 combined candidate preserves complete parent current metadata: {\"worker_source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"worker_verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"dispatch_source_baseline\": {\"sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}, \"dispatch_verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Both immutable historical verification sets retained; current source binding is updated after the integrating source commit and verification. Production/business/signoff states unchanged.",
+        "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged."
       ]
     },
     {
@@ -10111,7 +10144,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5504b042eacd6f17cdc5c2df94b39b2621165767",
+        "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10170,6 +10203,46 @@
         {
           "kind": "source",
           "path": "configs/worker.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/shutdown_context.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/shutdown_context_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/shutdown_signal_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/runner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/runtime_bootstrap.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/process/prepare_failure_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/runtime/scheduler/retry_dispatch.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/options/retry_dispatch.go"
         }
       ],
       "verification": [
@@ -10179,6 +10252,34 @@
           "result": "passed",
           "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
           "verified_on": "2026-10-07"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/worker/process ./internal/worker/container ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "a1c877b2573be7b7d694e32025e8a5943d8c354b",
+          "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/worker/process ./internal/worker/container ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "c8212560a853ab9f4df9be72337e844bd9f156ee",
+          "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/apiserver/options ./internal/apiserver/runtime/scheduler ./internal/apiserver/process ./internal/apiserver/container",
+          "result": "passed",
+          "source_sha": "2be7d03a9940ec7fd5cc04085ceb04c42ce85316",
+          "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/apiserver/options ./internal/apiserver/runtime/scheduler ./internal/apiserver/process ./internal/apiserver/container ./internal/worker/process ./internal/worker/container ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "43f3e5e3b199b37ff754adc1b0d3d879b64689e5",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -10201,7 +10302,12 @@
       ],
       "notes": [
         "T22 current source review 31c96a29edd9920fd6068db3a78ee5a68bf72f60; previous verified binding {\"source_sha\": \"6e0bef988054da0d834f25f7371e771e90ac8830\", \"verified_on\": \"2026-10-07\"}. Targeted regression only; runtime/deployment/business statuses unchanged.",
-        "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced."
+        "T22 source 5504b042eacd6f17cdc5c2df94b39b2621165767; prior per-document binding {\"source_sha\": \"31c96a29edd9920fd6068db3a78ee5a68bf72f60\", \"verified_on\": \"2026-10-23\"}. Selected real transport unit and module construction proof only; no deployment or whole-host acceptance advanced.",
+        "T22 worker owned signal/main barrier source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}}. Three-package race45 passed,0 failures/skips,including actual SIGTERM child with test subscriber/dependency; pinned lint2.5.0 passed. First child-harness development failure was a marker-stat/exit observation race after the failure child correctly exited1; fixed by retaining the exit result after verifying the marker. No test case removed. Full current worker with real Broker/DB and deferred delivery remain pending. Historical native/production/signoff attributions unchanged.",
+        "T22 worker partial preparation source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"a1c877b2573be7b7d694e32025e8a5943d8c354b\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"a1c877b2573be7b7d694e32025e8a5943d8c354b\", \"verified_on\": \"2026-10-23\"}}. Three-package race48 passed,0 failures/skips; pinned lint2.5.0 passed. Actual invalid-provider constructor fails before subscriber/network IO, then original pre-subscriber SQL pool is demonstrably closed with a cancelled-context check; absent catalog retains its original manager. Preparation errors and drain errors are joined. Native connected DB/Broker/current whole-host/deferred consumer remain pending. Historical attribution and production/signoff state unchanged.",
+        "T22 default due-dispatch source batch. Prior current metadata retained: {\"source_baseline\": {\"sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5504b042eacd6f17cdc5c2df94b39b2621165767\", \"verified_on\": \"2026-10-23\"}}. Four-package race293 passed,0 failures/skips; pinned lint2.5.0 passed. Startup preflight and real cancellation accounting are unit evidence only; native dual-store/current whole-host and worker deferred-delivery proof remain pending. Historical verification, production and signoff records unchanged.",
+        "T22 combined candidate preserves complete parent current metadata: {\"worker_source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"worker_verified\": {\"source_sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"dispatch_source_baseline\": {\"sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}, \"dispatch_verified\": {\"source_sha\": \"2be7d03a9940ec7fd5cc04085ceb04c42ce85316\", \"verified_on\": \"2026-10-23\"}}. Both immutable historical verification sets retained; current source binding is updated after the integrating source commit and verification. Production/business/signoff states unchanged.",
+        "Final combined T22 runtime source43f3e5e3b199b37ff754adc1b0d3d879b64689e5: seven-package race341 passed,0 failures/skips; repository-wide pinned lint2.5.0 passed. Prior current binding retained: {\"source_baseline\": {\"sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c8212560a853ab9f4df9be72337e844bd9f156ee\", \"verified_on\": \"2026-10-23\"}}. Original parent verification and failure history retained. Current whole-host native, deferred consumption and task completion remain pending; production unchanged."
       ]
     },
     {

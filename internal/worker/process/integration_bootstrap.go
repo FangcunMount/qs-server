@@ -11,14 +11,12 @@ func (s *server) initializeIntegrations(containerOutput containerOutput) (integr
 	if err != nil {
 		return integrationOutput{}, err
 	}
+	output := integrationOutput{grpcClients: grpcClientsOutput{grpcManager: grpcManager}}
 
 	grpcRegistry := grpcclientintegration.NewRegistry(grpcManager)
 	containerOutput.container.InitializeRuntimeClients(grpcRegistry.ClientBundle())
 	if err := containerOutput.container.Initialize(); err != nil {
-		_ = grpcManager.Close()
-		return integrationOutput{}, err
+		return output, err
 	}
-	return integrationOutput{
-		grpcClients: grpcClientsOutput{grpcManager: grpcManager},
-	}, nil
+	return output, nil
 }

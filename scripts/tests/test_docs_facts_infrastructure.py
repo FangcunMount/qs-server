@@ -284,6 +284,17 @@ class InfrastructureParserTest(unittest.TestCase):
         )
         self.assertIn("process-shutdown-source-drift", {issue.kind for issue in loop_issues})
 
+    def test_worker_owned_shutdown_and_main_barrier_mutations_are_rejected(self) -> None:
+        for path, old, new in (
+            (check_docs_facts.PROCESS_SOURCES["worker"][1], "s.shutdown.Close(ctx)", "s.shutdown.Wait(ctx)"),
+            (check_docs_facts.WORKER_SHUTDOWN_COORDINATOR, "runWorkerLifecycle(s.deps)", "ignoreWorkerLifecycle(s.deps)"),
+            (check_docs_facts.PROCESS_SOURCES["worker"][1], "<-s.shutdown.requested", "legacySignalWait()"),
+            (check_docs_facts.PROCESS_SOURCES["worker"][1], '{"close grpc manager", deps.closeGRPCManager}', '{"close grpc manager", deps.ignoreGRPCManager}'),
+        ):
+            with self.subTest(selector=old):
+                issues = self.issues_after_mutation(path, old, new, check_docs_facts.process_lifecycle_contract_issues)
+                self.assertIn("process-shutdown-source-drift", {issue.kind for issue in issues})
+
     def test_probe_and_deployment_config_mutations_are_rejected(self) -> None:
         probe_issues = self.issues_after_mutation(
             check_docs_facts.COLLECTION_HEALTH_SOURCE,
