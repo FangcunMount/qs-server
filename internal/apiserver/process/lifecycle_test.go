@@ -243,13 +243,20 @@ func TestCleanupFailurePreservesDependenciesAndReportsActualError(t *testing.T) 
 		t.Fatal("failed consumer drain released dependencies or reported success")
 	}
 }
-func TestResourceCloseFailuresAreReturnedAfterAttemptingBoth(t *testing.T) {
-	publisher, db := errors.New("publisher"), errors.New("database")
-	calls := 0
+func TestPublisherDrainFailurePreservesDatabase(t *testing.T) {
+	publisher := errors.New("publisher still draining")
+	databaseClosed := false
 	err := runProcessLifecycleDeps(processLifecycleDeps{resource: resourceLifecycleDeps{
-		closePublisher: func() error { calls++; return publisher }, closeDatabase: func() error { calls++; return db },
+		closePublisher: func() error { return publisher }, closeDatabase: func() error { databaseClosed = true; return nil },
 	}})
-	if !errors.Is(err, publisher) || !errors.Is(err, db) || calls != 2 {
-		t.Fatal("shutdown hid real resource errors")
+	if !errors.Is(err, publisher) || databaseClosed {
+		t.Fatal("publisher failure lost or database released")
+	}
+}
+func TestDatabaseCloseFailureIsReturned(t *testing.T) {
+	database := errors.New("database close failed")
+	err := runProcessLifecycleDeps(processLifecycleDeps{resource: resourceLifecycleDeps{closeDatabase: func() error { return database }}})
+	if !errors.Is(err, database) {
+		t.Fatal("database close error hidden")
 	}
 }

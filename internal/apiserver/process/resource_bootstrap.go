@@ -52,6 +52,7 @@ type wirePublisherResource interface {
 }
 
 type databaseResourceDeps struct {
+	close      func() error
 	initialize func() error
 	getMySQL   func() (*gorm.DB, error)
 	getMongo   func() (*mongo.Database, error)
@@ -159,6 +160,7 @@ func buildDatabaseDeps(dbManager *bootstrap.DatabaseManager) databaseResourceDep
 
 	return databaseResourceDeps{
 		initialize: dbManager.Initialize,
+		close:      dbManager.Close,
 		getMySQL:   dbManager.GetMySQLDB,
 		getMongo:   dbManager.GetMongoDB,
 	}
@@ -276,12 +278,39 @@ func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) cont
 	return s.buildContainerOptions
 }
 
-func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
+func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr error) {
+	var closePublisher func() error
+	var events *eventsubsystem.Subsystem
+	var cacheSubsystem *cachebootstrap.Subsystem
+	defer func() {
+		if resultErr == nil {
+			return
+		}
+		// These constructors can own started NORMAL clients even before the resource
+		// stage is published. Do not discard their drain errors or close DB early.
+		cleanup := processLifecycleDeps{resource: resourceLifecycleDeps{closePublisher: closePublisher, closeDatabase: deps.database.close}}
+		cleanup.container.containerCleanup = func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if events != nil {
+				if err := events.CloseContext(ctx); err != nil {
+					return err
+				}
+			}
+			if cacheSubsystem != nil {
+				return cacheSubsystem.Close()
+			}
+			return nil
+		}
+		resultErr = errors.Join(resultErr, runProcessLifecycleDeps(cleanup))
+	}()
+
 	mysqlDB, mongoDB, err := initializeDatabaseConnections(deps.database)
 	if err != nil {
 		return resourceOutput{}, err
 	}
-	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
+	redisCache, redisRuntime, constructedCache := initializeRedisRuntime(deps.redisRuntime)
+	cacheSubsystem = constructedCache
 	var resilience *resiliencesubsystem.Subsystem
 	if deps.buildResilience != nil {
 		resilience, err = deps.buildResilience(redisRuntime)
@@ -291,7 +320,6 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	}
 	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
 	var wirePublisher wirePublisherResource
-	var closePublisher func() error
 	publishMode := deps.mqPublisher.fallbackMode
 	if deps.mqPublisher.enabled {
 		if deps.mqPublisher.newWirePublisher != nil && deps.mqPublisher.newNormalPublisher != nil {
@@ -309,12 +337,6 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 		publishMode = eventruntime.PublishModeMQ
 	}
-	prepared := false
-	defer func() {
-		if !prepared && closePublisher != nil {
-			_ = closePublisher()
-		}
-	}()
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
@@ -335,7 +357,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 	}
 	deps.eventSubsystem.wirePublisher = wirePublisher
-	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
+	events, err = buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
 		return resourceOutput{}, err
 	}
@@ -367,7 +389,6 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		})
 		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
 	}
-	prepared = true
 	return output, nil
 }
 

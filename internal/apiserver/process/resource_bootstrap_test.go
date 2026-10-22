@@ -396,3 +396,36 @@ func TestAPIServerBuildResourceStageDepsWithConfigIncludesConfigBoundBuilders(t 
 		t.Fatal("buildContainerOptions = nil, want builder")
 	}
 }
+
+type failedDrainWire struct {
+	fakeWirePublisher
+	failure error
+}
+
+func (w *failedDrainWire) Close() error { return w.failure }
+func TestResourcePreparationFailureReleasesOrRetainsExactOwnedDependencies(t *testing.T) {
+	for _, pending := range []bool{false, true} {
+		dbClosed := 0
+		original := errors.New("catalog unavailable")
+		drain := errors.New("publisher shutdown incomplete")
+		var wire wirePublisherResource = &fakeWirePublisher{}
+		if pending {
+			wire = &failedDrainWire{failure: drain}
+		}
+		_, err := prepareResources(resourceStageDeps{
+			database:         databaseResourceDeps{close: func() error { dbClosed++; return nil }},
+			mqPublisher:      mqPublisherStageDeps{enabled: true, provider: "rocketmq", newWirePublisher: func() (wirePublisherResource, error) { return wire, nil }},
+			loadEventCatalog: func() (*eventcatalog.Catalog, error) { return nil, original },
+		})
+		if !errors.Is(err, original) {
+			t.Fatal("original failure lost", err)
+		}
+		if pending {
+			if !errors.Is(err, drain) || dbClosed != 0 {
+				t.Fatal("unfinished publisher lost ownership", err, dbClosed)
+			}
+		} else if dbClosed != 1 {
+			t.Fatal("failed startup leaked owned database", dbClosed)
+		}
+	}
+}

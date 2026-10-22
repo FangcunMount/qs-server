@@ -250,3 +250,10 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 	}
 	return fmt.Errorf("cache governance warmup coordinator is unavailable")
 }
+
+// StopEventAdmission is fast and leaves Checkers running through host drain.
+func (c *Container) StopEventAdmission() {
+	if c != nil && c.eventSubsystem != nil {
+		c.eventSubsystem.StopAdmission()
+	}
+}

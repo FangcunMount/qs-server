@@ -15,6 +15,7 @@ import (
 )
 
 type LeaseRecoveryRunner struct {
+	runnerLifecycle
 	name      string
 	opts      *apiserveroptions.LeaseRecoveryOptions
 	recoverer evaluationscheduler.LeaseRecoverer
@@ -66,14 +67,14 @@ func (r *LeaseRecoveryRunner) Start(ctx context.Context) {
 		return
 	}
 	log.Infof("%s started (interval=%s, batch_limit=%d, lock_key=%s)", r.name, r.opts.Interval, r.opts.BatchLimit, r.leader.DisplayKey())
-	go func() {
+	r.launch(func() {
 		for {
 			r.executeTick(ctx)
 			if !waitForScheduler(ctx, r.opts.Interval) {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (r *LeaseRecoveryRunner) executeTick(ctx context.Context) {

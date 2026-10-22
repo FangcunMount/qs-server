@@ -14,6 +14,7 @@ import (
 )
 
 type MongoConsistencyAuditRunner struct {
+	runnerLifecycle
 	opts        *apiserveroptions.MongoConsistencyAuditOptions
 	service     mongoconsistency.RunnerService
 	leader      leaderLeaseRunner
@@ -67,7 +68,7 @@ func (r *MongoConsistencyAuditRunner) Start(ctx context.Context) {
 	}
 	log.Infof("mongo consistency audit started (initial_delay=%s tick_interval=%s cycle_interval=%s batch_size=%d batch_timeout=%s max_samples=%d lock_key=%s lock_ttl=%s)",
 		r.opts.InitialDelay, r.opts.TickInterval, r.opts.CycleInterval, r.opts.BatchSize, r.opts.BatchTimeout, r.opts.MaxSamples, r.leader.DisplayKey(), r.opts.LockTTL)
-	go func() {
+	r.launch(func() {
 		initial := time.NewTimer(r.opts.InitialDelay)
 		defer initial.Stop()
 		select {
@@ -86,7 +87,7 @@ func (r *MongoConsistencyAuditRunner) Start(ctx context.Context) {
 				r.executeTick(ctx)
 			}
 		}
-	}()
+	})
 }
 
 func (r *MongoConsistencyAuditRunner) executeTick(ctx context.Context) {

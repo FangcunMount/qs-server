@@ -36,6 +36,7 @@ func (e *StatisticsSyncPartialError) Error() string {
 }
 
 type StatisticsSyncRunner struct {
+	runnerLifecycle
 	opts        *apiserveroptions.StatisticsSyncOptions
 	coordinator statisticsCoordinator
 	leader      leaderLeaseRunner
@@ -123,7 +124,7 @@ func (r *StatisticsSyncRunner) Start(ctx context.Context) {
 		return
 	}
 	log.Infof("statistics sync scheduler started (org_ids=%v, run_at=%s, repair_window_days=%d, lock_key=%s, lock_ttl=%s)", r.opts.OrgIDs, r.opts.RunAt, r.opts.RepairWindowDays, r.lockKey(), r.opts.LockTTL)
-	go func() {
+	r.launch(func() {
 		for {
 			now := r.now().In(statisticsDomain.Shanghai)
 			timer := time.NewTimer(time.Until(NextDailyRun(now, r.clock.Hour, r.clock.Minute)))
@@ -137,7 +138,7 @@ func (r *StatisticsSyncRunner) Start(ctx context.Context) {
 				log.Warnf("statistics sync scheduler tick failed: %v", err)
 			}
 		}
-	}()
+	})
 }
 
 func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {

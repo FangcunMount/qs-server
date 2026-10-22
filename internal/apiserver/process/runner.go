@@ -1,8 +1,11 @@
 package process
 
 import (
+	"context"
+	"errors"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	"time"
 )
 
 type prepareState struct {
@@ -50,10 +53,10 @@ func (resourceStage) Name() string { return "prepare resources" }
 
 func (s resourceStage) Run(state *prepareState) error {
 	resources, err := prepareResources(s.server.buildResourceStageDeps())
+	state.resources = resources
 	if err != nil {
 		return err
 	}
-	state.resources = resources
 	return nil
 }
 
@@ -65,10 +68,10 @@ func (containerStage) Name() string { return "initialize container" }
 
 func (s containerStage) Run(state *prepareState) error {
 	output, err := s.server.initializeContainer(state.resources)
+	state.container = output
 	if err != nil {
 		return err
 	}
-	state.container = output
 	return nil
 }
 
@@ -80,10 +83,10 @@ func (integrationStage) Name() string { return "initialize integrations" }
 
 func (s integrationStage) Run(state *prepareState) error {
 	output, err := s.server.initializeIntegrations(state.resources, state.container)
+	state.integration = output
 	if err != nil {
 		return err
 	}
-	state.integration = output
 	return nil
 }
 
@@ -95,10 +98,10 @@ func (transportStage) Name() string { return "initialize transports" }
 
 func (s transportStage) Run(state *prepareState) error {
 	output, err := s.server.initializeTransports(state.container)
+	state.transport = output
 	if err != nil {
 		return err
 	}
-	state.transport = output
 	return nil
 }
 
@@ -124,7 +127,7 @@ func (s shutdownStage) Run(state *prepareState) error {
 }
 
 func (r *prepareRunner) run() (preparedServer, string, error) {
-	return processruntime.Runner[prepareState, preparedServer]{
+	prepared, stage, err := (processruntime.Runner[prepareState, preparedServer]{
 		State:  &r.state,
 		Stages: r.stages,
 		BuildPrepared: func(state *prepareState) preparedServer {
@@ -134,7 +137,41 @@ func (r *prepareRunner) run() (preparedServer, string, error) {
 				grpcServer:    state.transport.grpcServer,
 			}
 		},
-	}.Run()
+	}).Run()
+	if err != nil {
+		err = errors.Join(err, cleanupFailedPreparation(&r.state))
+	}
+	return prepared, stage, err
+}
+
+// Every stage preserves partial ownership. A failed startup uses the same drain
+// order as normal shutdown; failed drains retain database and publisher handles.
+func cleanupFailedPreparation(state *prepareState) error {
+	if state == nil {
+		return nil
+	}
+	if err := runPrepareRunShutdownHooks(state.runtime.lifecycle); err != nil {
+		return err
+	}
+	deps := buildLifecycleDeps(state.resources, state.container, state.integration, state.transport, state.runtime)
+	if state.container.container == nil {
+		deps.container.containerCleanup = func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			events := state.resources.containerInput.containerOptions.EventSubsystem
+			if events != nil {
+				if err := events.CloseContext(ctx); err != nil {
+					return err
+				}
+			}
+			cache := state.resources.cacheRuntime.cacheSubsystem
+			if cache != nil {
+				return cache.Close()
+			}
+			return nil
+		}
+	}
+	return runProcessLifecycleDeps(deps)
 }
 
 func newContainerFromResourceStage(resources resourceOutput) *container.Container {

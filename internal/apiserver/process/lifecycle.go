@@ -18,6 +18,7 @@ type resourceLifecycleDeps struct {
 }
 
 type containerLifecycleDeps struct {
+	stopAdmission    func()
 	containerCleanup func() error
 	stopAuthzSync    func() error
 }
@@ -52,7 +53,12 @@ type preparedServerRunDeps struct {
 func (s *server) registerShutdownCallback(deps processLifecycleDeps) {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 
-		runPrepareRunShutdownHooks(deps.runtime.lifecycle)
+		if deps.container.stopAdmission != nil {
+			deps.container.stopAdmission()
+		}
+		if err := runPrepareRunShutdownHooks(deps.runtime.lifecycle); err != nil {
+			return err
+		}
 		if err := runProcessLifecycleDeps(deps); err != nil {
 			return err
 		}
@@ -71,6 +77,7 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 		deps.resource.closePublisher = resources.messaging.closePublisher
 	}
 	if containerOutput.container != nil {
+		deps.container.stopAdmission = containerOutput.container.StopEventAdmission
 		deps.container.containerCleanup = func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -94,14 +101,19 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	return deps
 }
 
-func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) {
+func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) error {
+	var failures []error
 	lifecycle.Run(func(name string, err error) {
 		log.Errorf("Failed to run shutdown hook %q: %v", name, err)
+		failures = append(failures, err)
 	})
+	return errors.Join(failures...)
 }
 
 func runProcessLifecycleDeps(deps processLifecycleDeps) error {
-	var failures []error
+	if deps.container.stopAdmission != nil {
+		deps.container.stopAdmission()
+	}
 	// Stop accepting new work and wait for in-flight transports before closing
 	// the database or Provider/container resources they still need to persist a
 	// terminal result. In particular, gRPC GracefulStop must complete before the
@@ -117,7 +129,7 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	if deps.container.stopAuthzSync != nil {
 		if err := deps.container.stopAuthzSync(); err != nil {
 			log.Errorf("Failed to close IAM authz version subscriber: %v", err)
-			failures = append(failures, err)
+			return err
 		}
 	}
 	if deps.container.containerCleanup != nil {
@@ -125,7 +137,7 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 			log.Errorf("Failed to cleanup container resources: %v", err)
 			// A failed drain is not proof that dependency users stopped. Preserve
 			// host pools and return the actual error, including incomplete shutdown.
-			return errors.Join(append(failures, err)...)
+			return err
 
 		}
 	}
@@ -134,16 +146,16 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	if deps.resource.closePublisher != nil {
 		if err := deps.resource.closePublisher(); err != nil {
 			log.Errorf("Failed to close event publisher: %v", err)
-			failures = append(failures, err)
+			return err
 		}
 	}
 	if deps.resource.closeDatabase != nil {
 		if err := deps.resource.closeDatabase(); err != nil {
 			log.Errorf("Failed to close database connections: %v", err)
-			failures = append(failures, err)
+			return err
 		}
 	}
-	return errors.Join(failures...)
+	return nil
 }
 
 func (s *server) fatalPrepareRun(action string, err error) {
