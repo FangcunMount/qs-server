@@ -44,7 +44,9 @@ func TestRunRuntimeStageInvokesCacheEventsAndSchedulers(t *testing.T) {
 		t.Fatalf("shutdown hook count = %d, want 1", got)
 	}
 
-	runPrepareRunShutdownHooks(output.lifecycle)
+	if err := runPrepareRunShutdownHooks(output.lifecycle); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRunRuntimeStageStopsWhenEventSubsystemFails(t *testing.T) {

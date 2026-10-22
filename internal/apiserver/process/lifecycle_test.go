@@ -27,7 +27,9 @@ func TestPrepareRunLifecycleRunsHooksInRegistrationOrder(t *testing.T) {
 		return nil
 	})
 
-	runPrepareRunShutdownHooks(lifecycle)
+	if err := runPrepareRunShutdownHooks(lifecycle); err != nil {
+		t.Fatal(err)
+	}
 
 	want := []string{"first", "second"}
 	if !reflect.DeepEqual(order, want) {
@@ -49,7 +51,9 @@ func TestPrepareRunLifecycleContinuesAfterHookError(t *testing.T) {
 		return nil
 	})
 
-	runPrepareRunShutdownHooks(lifecycle)
+	if err := runPrepareRunShutdownHooks(lifecycle); err == nil {
+		t.Fatal("lost shutdown hook failure")
+	}
 
 	want := []string{"first", "second"}
 	if !reflect.DeepEqual(order, want) {
@@ -61,7 +65,7 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 	t.Parallel()
 
 	var order []string
-	runProcessLifecycleDeps(processLifecycleDeps{
+	err := runProcessLifecycleDeps(processLifecycleDeps{
 		container: containerLifecycleDeps{
 			containerCleanup: func() error {
 				order = append(order, "container")
@@ -91,6 +95,10 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 			},
 		},
 	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	want := []string{"http", "grpc", "authz", "container", "publisher", "database"}
 	if !reflect.DeepEqual(order, want) {
