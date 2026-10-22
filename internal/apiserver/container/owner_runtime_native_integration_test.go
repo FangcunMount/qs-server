@@ -514,6 +514,12 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	}, 90*time.Second, 50*time.Millisecond, "fresh paused owners did not execute real Broker checks")
 	require.False(t, mysqlNext.Stats().Ready)
 	require.False(t, mongoNext.Stats().Ready)
+	for index, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
+		require.Zero(t, runtime.Stats().HalfPreparedResults, "Checker prepared a new message")
+		input := branches[index].plan.Input()
+		_, reserveErr := runtime.Reserve(t.Context(), transaction.Request{Owner: input.Owner, Scope: input.Scope, Key: input.IdempotencyKey, InputHash: input.InputHash}, branches[index].plan)
+		require.ErrorIs(t, reserveErr, messagingruntime.ErrTransactionAdmissionClosed)
+	}
 	require.LessOrEqual(t, maxima["running"], 4)
 	require.LessOrEqual(t, maxima["queued"], 32)
 	cases["fresh_paused_instance_actual_broker_checker_commits"] = true
@@ -579,7 +585,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	cases["actual_shutdown_and_owned_cleanup"] = true
 	sourceSHA, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
-	receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "default QS dual-owner lifecycle, actual Broker restart and next-instance Checker; protocol fixture facts", "domain_api_provider_system_not_claimed": true, "producer_process_exit_not_claimed": true, "owned_databases_dropped": true, "owned_runtimes_drained": true, "same_broker_container_restarted": true, "local_executor_calls": []int32{branches[0].calls.Load(), branches[1].calls.Load()}, "mongo_database_callbacks": mongoCallbacks.Load(), "new_checker_commits": []int64{mysqlNext.Stats().CheckCommit, mongoNext.Stats().CheckCommit}, "observed_callbacks": maxima, "duplicate_deliveries": duplicateDeliveries.Load(), "close_wait_ms": closeWait.Milliseconds()})
+	receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "default QS dual-owner lifecycle, actual Broker restart and next-instance Checker; protocol fixture facts", "domain_api_provider_system_not_claimed": true, "producer_process_exit_not_claimed": true, "owned_databases_dropped": true, "owned_runtimes_drained": true, "same_broker_container_restarted": true, "local_executor_calls": []int32{branches[0].calls.Load(), branches[1].calls.Load()}, "mongo_database_callbacks": mongoCallbacks.Load(), "new_checker_commits": []int64{mysqlNext.Stats().CheckCommit, mongoNext.Stats().CheckCommit}, "observed_callbacks": maxima, "duplicate_deliveries": duplicateDeliveries.Load(), "close_wait_ms": closeWait.Milliseconds(), "new_half_prepared_results": []int64{mysqlNext.Stats().HalfPreparedResults, mongoNext.Stats().HalfPreparedResults}})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_DEFAULT_OWNER_RECEIPT " + string(receipt))
 }
