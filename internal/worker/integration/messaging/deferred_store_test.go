@@ -11,8 +11,8 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/deliveryevidence"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
