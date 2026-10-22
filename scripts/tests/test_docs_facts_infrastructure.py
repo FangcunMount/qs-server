@@ -271,6 +271,18 @@ class InfrastructureParserTest(unittest.TestCase):
             check_docs_facts.process_lifecycle_contract_issues,
         )
         self.assertIn("process-shutdown-source-drift", {issue.kind for issue in shutdown_issues})
+        coordinator_issues = self.issues_after_mutation(
+            check_docs_facts.PROCESS_SOURCES["apiserver"][1],
+            "closer.Close(ctx)", "closer.Wait(ctx)",
+            check_docs_facts.process_lifecycle_contract_issues,
+        )
+        self.assertIn("process-shutdown-source-drift", {issue.kind for issue in coordinator_issues})
+        loop_issues = self.issues_after_mutation(
+            check_docs_facts.APISERVER_SHUTDOWN_COORDINATOR,
+            "runProcessLifecycleDeps(s.deps)", "ignoreProcessLifecycleDeps(s.deps)",
+            check_docs_facts.process_lifecycle_contract_issues,
+        )
+        self.assertIn("process-shutdown-source-drift", {issue.kind for issue in loop_issues})
 
     def test_probe_and_deployment_config_mutations_are_rejected(self) -> None:
         probe_issues = self.issues_after_mutation(

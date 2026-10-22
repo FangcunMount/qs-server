@@ -35,6 +35,7 @@ MIGRATION_README = ROOT / "internal/pkg/migration/README.md"
 PRODUCTION_CONFIG = ROOT / "configs/apiserver.prod.yaml"
 DEVELOPMENT_CONFIG = ROOT / "configs/apiserver.dev.yaml"
 SCHEDULER_BOOTSTRAP = ROOT / "internal/apiserver/process/runtime_bootstrap.go"
+APISERVER_SHUTDOWN_COORDINATOR = ROOT / "internal/apiserver/process/shutdown_context.go"
 PERF_PLAN_SOURCE = ROOT / "scripts/perf/perfctl/plan.go"
 PERF_RUNNER_SOURCE = ROOT / "scripts/perf/perfctl/runner.go"
 PERF_CONFIG = ROOT / "scripts/perf/qs-perf.config.example.json"
@@ -2978,10 +2979,13 @@ def process_lifecycle_contract_issues() -> list[Issue]:
     for process, (_, lifecycle_path) in PROCESS_SOURCES.items():
         lifecycle_text = lifecycle_path.read_text(encoding="utf-8")
         if process == "apiserver":
-            source_contract = (
-                go_function_body(lifecycle_text, "registerShutdownCallback")
-                + go_function_body(lifecycle_text, "runProcessLifecycleDeps")
-            )
+            registration = go_function_body(lifecycle_text, "registerShutdownCallback")
+            coordinator = APISERVER_SHUTDOWN_COORDINATOR.read_text(encoding="utf-8")
+            close_body = go_function_body(coordinator, "Close")
+            if (not ordered_tokens(registration, ["newProcessShutdown", "closer.Close(ctx)"])
+                or not ordered_tokens(close_body, ["runPrepareRunShutdownHooks", "runProcessLifecycleDeps"])):
+                issues.append(Issue("process-shutdown-source-drift", "apiserver owned coordinator registration or drain changed"))
+            source_contract = close_body + go_function_body(lifecycle_text, "runProcessLifecycleDeps")
         elif process == "collection-server":
             source_contract = go_function_body(lifecycle_text, "runCollectionLifecycle")
         else:
