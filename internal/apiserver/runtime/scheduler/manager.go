@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 // Runner is a background scheduler task that manages its own goroutine lifecycle.
@@ -29,6 +30,12 @@ func NewManager(runners ...Runner) *Manager {
 // Add registers one runner when it is available.
 func (m *Manager) Add(runner Runner) {
 	if m == nil || runner == nil {
+		return
+	}
+	// Constructors return typed nil pointers for disabled schedules. They must
+	// not reach promoted Wait methods, which require an actual lifecycle owner.
+	value := reflect.ValueOf(runner)
+	if value.Kind() == reflect.Ptr && value.IsNil() {
 		return
 	}
 	m.runners = append(m.runners, runner)

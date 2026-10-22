@@ -55,3 +55,14 @@ func TestAllProductionRunnersExposeTheirRealCompletion(t *testing.T) {
 		}
 	}
 }
+
+func TestDisabledTypedNilRunnersDoNotOwnShutdownWork(t *testing.T) {
+	manager := NewManager((*PlanRunner)(nil), (*LeaseRecoveryRunner)(nil), (*StatisticsSyncRunner)(nil), (*AuthzRoleProjectionRunner)(nil), (*EvaluationConsistencyAuditRunner)(nil), (*ReportCatalogAuditRunner)(nil), (*MongoConsistencyAuditRunner)(nil))
+	if manager.Len() != 0 {
+		t.Fatal("disabled constructors became active runners")
+	}
+	manager.Start(context.Background())
+	if err := manager.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
