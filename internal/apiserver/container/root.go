@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -86,6 +87,9 @@ type Container struct {
 	TaskOpenedReminderService          notificationApp.TaskOpenedReminderService
 
 	// 容器状态
+	cleanupOnce sync.Once
+	cleanupDone chan struct{}
+	cleanupErr  error
 	initialized bool
 	silent      bool
 	modules     map[string]Module

@@ -231,3 +231,25 @@ func TestPreparedAPIServerBuildRunDepsUsesPreparedFields(t *testing.T) {
 		t.Fatal("runGRPC = nil, want value")
 	}
 }
+
+func TestCleanupFailurePreservesDependenciesAndReportsActualError(t *testing.T) {
+	want := errors.New("consumer still owns database")
+	closed := false
+	err := runProcessLifecycleDeps(processLifecycleDeps{
+		container: containerLifecycleDeps{containerCleanup: func() error { return want }},
+		resource:  resourceLifecycleDeps{closePublisher: func() error { closed = true; return nil }, closeDatabase: func() error { closed = true; return nil }},
+	})
+	if !errors.Is(err, want) || closed {
+		t.Fatal("failed consumer drain released dependencies or reported success")
+	}
+}
+func TestResourceCloseFailuresAreReturnedAfterAttemptingBoth(t *testing.T) {
+	publisher, db := errors.New("publisher"), errors.New("database")
+	calls := 0
+	err := runProcessLifecycleDeps(processLifecycleDeps{resource: resourceLifecycleDeps{
+		closePublisher: func() error { calls++; return publisher }, closeDatabase: func() error { calls++; return db },
+	}})
+	if !errors.Is(err, publisher) || !errors.Is(err, db) || calls != 2 {
+		t.Fatal("shutdown hid real resource errors")
+	}
+}

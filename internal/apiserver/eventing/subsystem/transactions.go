@@ -186,3 +186,17 @@ func (s *Subsystem) closeTransactionOwners() error {
 	}
 	return errors.Join(failures...)
 }
+
+// StopAdmission closes only the host write gate. Checkers and owned clients
+// remain available while original business consumers finish their work.
+func (s *Subsystem) StopAdmission() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.HasTransactionOwners() {
+		s.transactions.admission = false
+	}
+	s.pauseTransactionAdmission()
+}

@@ -3,7 +3,10 @@ package container
 import (
 	"context"
 	"errors"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -78,5 +81,101 @@ func TestContainerGetContainerInfoReflectsModulesAndInfrastructure(t *testing.T)
 	}
 	if _, exists := modules["plan"]; !exists {
 		t.Fatalf("modules = %#v, want plan entry", modules)
+	}
+}
+
+// This module deliberately ignores caller cancellation while real work owns
+// dependencies. The container must bound waits without creating more cleaners.
+type drainingModule struct {
+	fakeModule
+	entered, release chan struct{}
+	calls            atomic.Int32
+}
+
+func (m *drainingModule) Cleanup() error {
+	m.calls.Add(1)
+	close(m.entered)
+	<-m.release
+	return nil
+}
+func TestCleanupTimeoutRetainsOneRealCoordinatorUntilModuleDrains(t *testing.T) {
+	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Silent: true})
+	module := &drainingModule{entered: make(chan struct{}), release: make(chan struct{})}
+	c.registerModule("draining", module)
+	c.initialized = true
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for i := 0; i < 8; i++ {
+		err := c.CleanupContext(ctx)
+		var pending *eventsubsystem.ShutdownIncomplete
+		if !errors.As(err, &pending) || pending.PendingClosures != 1 || !errors.Is(err, context.Canceled) {
+			t.Fatalf("cleanup returned false completion: %v", err)
+		}
+	}
+	select {
+	case <-module.entered:
+	case <-time.After(time.Second):
+		t.Fatal("real coordinator not running")
+	}
+	if module.calls.Load() != 1 {
+		t.Fatal("repeated cleanup created another drain")
+	}
+	close(module.release)
+	wait, cancelWait := context.WithTimeout(context.Background(), time.Second)
+	defer cancelWait()
+	if err := c.CleanupContext(wait); err != nil {
+		t.Fatal(err)
+	}
+	if c.initialized || module.calls.Load() != 1 {
+		t.Fatal("completion or ownership was lost")
+	}
+	// Completion wins over an already cancelled subsequent waiter.
+	if err := c.CleanupContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type contextualModule struct {
+	fakeModule
+	contextual bool
+	event      *eventsubsystem.Subsystem
+}
+
+func (m *contextualModule) CleanupContext(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	// Closing owner runtime before its business module is an ordering violation.
+	if m.event.Wait(ctx) == nil {
+		return errors.New("owner closed before consumer")
+	}
+	m.contextual = true
+	return nil
+}
+func TestTransactionCleanupDrainsModulesBeforeClosingOwnerSubsystem(t *testing.T) {
+	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Silent: true})
+	c.transactions = &EventTransactionBindings{}
+	c.eventSubsystem = &eventsubsystem.Subsystem{}
+	module := &contextualModule{event: c.eventSubsystem}
+	c.registerModule("ai", module)
+	if err := c.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
+	if !module.contextual || module.cleanupCalls != 0 {
+		t.Fatal("transaction consumer ignored shared drain context")
+	}
+	if err := c.eventSubsystem.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestLegacyCleanupPreservesModuleOwnBudget(t *testing.T) {
+	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Silent: true})
+	module := &contextualModule{}
+	c.registerModule("legacy", module)
+	if err := c.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
+	if module.contextual || module.cleanupCalls != 1 {
+		t.Fatal("legacy module cleanup policy changed")
 	}
 }

@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
-	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
-	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 type resourceLifecycleDeps struct {
@@ -72,7 +71,11 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 		deps.resource.closePublisher = resources.messaging.closePublisher
 	}
 	if containerOutput.container != nil {
-		deps.container.containerCleanup = containerOutput.container.Cleanup
+		deps.container.containerCleanup = func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			return containerOutput.container.CleanupContext(ctx)
+		}
 	}
 	if integrationOutput.authzVersionSubscriber != nil {
 		deps.container.stopAuthzSync = func() error {
@@ -98,6 +101,7 @@ func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) {
 }
 
 func runProcessLifecycleDeps(deps processLifecycleDeps) error {
+	var failures []error
 	// Stop accepting new work and wait for in-flight transports before closing
 	// the database or Provider/container resources they still need to persist a
 	// terminal result. In particular, gRPC GracefulStop must complete before the
@@ -113,19 +117,16 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	if deps.container.stopAuthzSync != nil {
 		if err := deps.container.stopAuthzSync(); err != nil {
 			log.Errorf("Failed to close IAM authz version subscriber: %v", err)
+			failures = append(failures, err)
 		}
 	}
 	if deps.container.containerCleanup != nil {
 		if err := deps.container.containerCleanup(); err != nil {
 			log.Errorf("Failed to cleanup container resources: %v", err)
-			var hostIncomplete *eventsubsystem.ShutdownIncomplete
-			var sdkIncomplete *transaction.ShutdownIncomplete
-			if errors.As(err, &hostIncomplete) || errors.As(err, &sdkIncomplete) {
-				// Real work still owns these dependencies. The shutdown callback
-				// must report incomplete and permit another wait, not close the
-				// database/publisher and announce successful shutdown.
-				return err
-			}
+			// A failed drain is not proof that dependency users stopped. Preserve
+			// host pools and return the actual error, including incomplete shutdown.
+			return errors.Join(append(failures, err)...)
+
 		}
 	}
 	// The container first stops relays and drains standard Outbox publishes.
@@ -133,14 +134,16 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	if deps.resource.closePublisher != nil {
 		if err := deps.resource.closePublisher(); err != nil {
 			log.Errorf("Failed to close event publisher: %v", err)
+			failures = append(failures, err)
 		}
 	}
 	if deps.resource.closeDatabase != nil {
 		if err := deps.resource.closeDatabase(); err != nil {
 			log.Errorf("Failed to close database connections: %v", err)
+			failures = append(failures, err)
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }
 
 func (s *server) fatalPrepareRun(action string, err error) {
