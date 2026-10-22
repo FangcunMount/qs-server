@@ -19,6 +19,7 @@ import (
 	"time"
 
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	mongoTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	mysqlTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -194,6 +195,17 @@ func TestM3DefaultDispatchFactory(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, duplicate.Cleanup()) })
 	_, duplicateErr = duplicate.BuildRetryDispatchers(true)
 	require.Error(t, duplicateErr, "same database must not authorize a second independent owner runtime")
+	duplicateDocument, duplicateErr := mongoTx.New(documents, &options, []string{"qs.evaluation.lifecycle"})
+	require.NoError(t, duplicateErr)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		require.NoError(t, duplicateDocument.Runtime().Close(ctx))
+	})
+	duplicateMongo := NewContainerWithOptions(db, documents, nil, ContainerOptions{EventSubsystem: events, Transactions: &EventTransactionBindings{MySQL: sqlOwner, Mongo: duplicateDocument, Routes: routes}, Silent: true})
+	t.Cleanup(func() { require.NoError(t, duplicateMongo.Cleanup()) })
+	_, duplicateErr = duplicateMongo.BuildRetryDispatchers(true)
+	require.Error(t, duplicateErr, "same Mongo database must not authorize a second independent owner runtime")
 	cases["duplicate_owner_runtime_refused"] = true
 	_, err = pool.ExecContext(t.Context(), "UPDATE rm_tx_binding SET store_id=? WHERE owner=?", []byte("foreign"), []byte(sb.Owner))
 	require.NoError(t, err)
