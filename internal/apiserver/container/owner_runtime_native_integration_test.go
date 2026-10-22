@@ -150,6 +150,35 @@ func waitOwnedHostTLS(t *testing.T, o *generic.RocketMQOptions) {
 	}, 45*time.Second, 250*time.Millisecond, "restarted owned verified TLS endpoint unavailable")
 }
 
+// Export only fixed classifications/numeric driver codes, never driver text,
+// DSNs, execution tokens, references, payloads or SQL statements.
+func ownerNativeError(err error) map[string]any {
+	kind, code := "none", 0
+	switch {
+	case err == nil:
+	case errors.Is(err, context.DeadlineExceeded):
+		kind = "deadline"
+	case errors.Is(err, context.Canceled):
+		kind = "canceled"
+	case errors.Is(err, transaction.ErrStaleExecution):
+		kind = "stale_execution"
+	case errors.Is(err, transaction.ErrBinding):
+		kind = "binding"
+	case errors.Is(err, transaction.ErrTransactionRequired):
+		kind = "transaction_required"
+	default:
+		kind = "other"
+		var sqlError *driver.MySQLError
+		var mongoError mongo.CommandError
+		if errors.As(err, &sqlError) {
+			kind, code = "mysql", int(sqlError.Number)
+		} else if errors.As(err, &mongoError) {
+			kind, code = "mongo", int(mongoError.Code)
+		}
+	}
+	return map[string]any{"kind": kind, "code": code}
+}
+
 // Real default subsystem and both original stores. The frozen wire and fact
 // rows below are protocol fixtures, not domain/API/provider/system acceptance.
 func TestM3DefaultOwnerRuntime(t *testing.T) {
@@ -273,6 +302,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 		plan    transaction.FrozenPlan
 		owned   transaction.Execution
 		calls   atomic.Int32
+		phase   atomic.Int32
 	}
 	branches := make([]*branch, 0, 2)
 	for _, spec := range []struct {
@@ -348,6 +378,21 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 		require.True(t, reserved.Acquired)
 		branch.owned = reserved.Execution
 	}
+	reservedAt := time.Now()
+	diagnostic := func(stage string, index int, local transaction.LocalOutcome, err error) {
+		t.Helper()
+		phases := make([]int32, 0, len(branches))
+		leases := make([]int64, 0, len(branches))
+		for _, branch := range branches {
+			phases = append(phases, branch.phase.Load())
+			leases = append(leases, time.Until(branch.owned.LeaseUntil).Milliseconds())
+		}
+		raw, e := json.Marshal(map[string]any{"stage": stage, "owner_index": index,
+			"local": local, "error": ownerNativeError(err), "root_phases": phases,
+			"lease_remaining_ms": leases, "elapsed_ms": time.Since(reservedAt).Milliseconds()})
+		require.NoError(t, e)
+		fmt.Println("M3_QS_OWNER_DIAGNOSTIC " + string(raw))
+	}
 	type outcome struct {
 		index int
 		value transaction.Result
@@ -368,6 +413,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 			defer group.Done()
 			value, e := b.runtime.Execute(ctx, b.owned, func(ctx context.Context, execution transaction.Execution) (transaction.LocalOutcome, error) {
 				b.calls.Add(1)
+				b.phase.Store(1)
 				entered <- index
 				select {
 				case <-allowRoots:
@@ -378,17 +424,21 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 				hash := sha256.Sum256(input.Wire)
 				var e error
 				if index == 0 {
+					b.phase.Store(2)
 					e = data.sql.WithContext(ctx).Transaction(func(original *gorm.DB) error {
 						guard, e := storeSQL.BindGORM(ctx, original, execution)
 						if e != nil {
 							return e
 						}
+						b.phase.Store(3)
 						if e = original.Exec("INSERT INTO m3_owner_runtime_facts VALUES(?,?)", []byte(input.Message.Input().ID), hash[:]).Error; e != nil {
 							return e
 						}
+						b.phase.Store(4)
 						return guard.CommitWitness(ctx)
 					})
 				} else {
+					b.phase.Store(2)
 					session, sessionErr := data.documents.Client().StartSession()
 					if sessionErr != nil {
 						return transaction.LocalUnknown, sessionErr
@@ -400,9 +450,11 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 						if e != nil {
 							return nil, e
 						}
+						b.phase.Store(3)
 						if _, e = data.documents.Collection("m3_owner_runtime_facts").InsertOne(original, bson.M{"_id": input.Message.Input().ID, "wire_hash": hash[:]}); e != nil {
 							return nil, e
 						}
+						b.phase.Store(4)
 						return nil, guard.CommitWitness(original)
 					}, mongooptions.Transaction().SetWriteConcern(writeconcern.Majority()))
 				}
@@ -410,6 +462,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 					return transaction.LocalUnknown, e
 				}
 				// No Broker operation or non-deterministic input occurs inside either root.
+				b.phase.Store(5)
 				committed <- index
 				select {
 				case <-brokerDown:
@@ -432,25 +485,29 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 			t.Error("owned original SDK executions did not join")
 		}
 	})
-	await := func(signal <-chan int) {
+	await := func(signal <-chan int, stage string) {
 		t.Helper()
 		for range 2 {
 			select {
 			case <-signal:
 			case result := <-results:
+				diagnostic(stage, result.index, result.value.Local, result.err)
 				t.Fatalf("owned execution ended before barrier: index=%d local=%s error=%T", result.index, result.value.Local, result.err)
 			case <-time.After(35 * time.Second):
+				diagnostic(stage, -1, transaction.LocalUnknown, nil)
 				t.Fatal("owned execution barrier unavailable")
 			}
 		}
 	}
-	await(entered)
+	await(entered, "local_entered")
 	select {
 	case <-received:
 		t.Fatal("uncommitted half became visible")
 	case <-time.After(time.Second):
 	}
+	diagnostic("before_observer_close", -1, transaction.LocalNotStarted, nil)
 	require.NoError(t, before.Close(t.Context()))
+	diagnostic("after_observer_close", -1, transaction.LocalNotStarted, nil)
 	cases["prepared_halves_hidden_before_original_roots"] = true
 	closeStarted := time.Now()
 	closeCtx, closeCancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
@@ -470,7 +527,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	}
 	cases["real_inflight_close_retains_original_dependencies"] = true
 	allow()
-	await(committed)
+	await(committed, "local_committed")
 	for _, b := range branches {
 		require.Zero(t, b.runtime.Stats().CheckCommit, "fixture pre-check window was not respected")
 	}
