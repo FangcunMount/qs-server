@@ -14,6 +14,7 @@ import (
 )
 
 type ReportCatalogAuditRunner struct {
+	runnerLifecycle
 	opts        *apiserveroptions.ReportCatalogAuditOptions
 	service     interpretationcatalog.RunnerService
 	leader      leaderLeaseRunner
@@ -65,7 +66,7 @@ func (r *ReportCatalogAuditRunner) Start(ctx context.Context) {
 	}
 	log.Infof("report catalog audit started (initial_delay=%s tick_interval=%s cycle_interval=%s batch_size=%d batch_timeout=%s lock_key=%s lock_ttl=%s)",
 		r.opts.InitialDelay, r.opts.TickInterval, r.opts.CycleInterval, r.opts.BatchSize, r.opts.BatchTimeout, r.leader.DisplayKey(), r.opts.LockTTL)
-	go func() {
+	r.launch(func() {
 		initial := time.NewTimer(r.opts.InitialDelay)
 		defer initial.Stop()
 		select {
@@ -84,7 +85,7 @@ func (r *ReportCatalogAuditRunner) Start(ctx context.Context) {
 				r.executeTick(ctx)
 			}
 		}
-	}()
+	})
 }
 
 func (r *ReportCatalogAuditRunner) executeTick(ctx context.Context) {

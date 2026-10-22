@@ -153,7 +153,7 @@ func startSchedulerManager(manager *runtimescheduler.Manager, runtimeOutput *run
 	ctx, cancel := context.WithCancel(context.Background())
 	runtimeOutput.lifecycle.AddShutdownHook("stop schedulers", func() error {
 		cancel()
-		return nil
+		return manager.Wait(context.Background())
 	})
 
 	manager.Start(ctx)

@@ -132,3 +132,15 @@ func TestAuthzVersionSubscriberIdentityKeepsSharedHandoffSeparateFromLegacy(t *t
 		t.Fatalf("ephemeral subscription lacks a stable handoff group: %q / %q", ephemeral, group)
 	}
 }
+
+func TestContainerFailureReturnsPartialOwnerForRunnerCleanup(t *testing.T) {
+	host := container.NewContainerWithOptions(nil, nil, nil, container.ContainerOptions{Silent: true})
+	want := errors.New("module initialization failed")
+	got, err := bootstrapContainerStage(containerStageDeps{newContainer: func() *container.Container { return host }, initialize: func(*container.Container) error { return want }})
+	if got.container != host || !errors.Is(err, want) {
+		t.Fatal("partial container ownership discarded", err)
+	}
+	if err := got.container.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -239,7 +239,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)
 	}
 
-	if deps.OutboxProfile.Stager == nil || deps.OutboxProfile.PostCommit == nil {
+	if !selected && (deps.OutboxProfile.Stager == nil || deps.OutboxProfile.PostCommit == nil) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
 	startTxRunner := modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{
@@ -255,7 +255,9 @@ func New(deps Deps) (*Module, error) {
 		Limiter:  deps.MongoLimiter,
 	})
 	module.txRunner = retryTxRunner
-	module.eventStager = deps.OutboxProfile.Stager
+	if !selected {
+		module.eventStager = deps.OutboxProfile.Stager
+	}
 	{
 		registry, err := buildReportBuilderRegistry()
 		if err != nil {
@@ -668,9 +670,15 @@ func buildReportBuilderRegistry() (rendering.Registry, error) {
 
 // Cleanup releases module resources.
 func (m *Module) Cleanup() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return m.CleanupContext(ctx)
+}
+
+// CleanupContext borrows the host's remaining drain budget. Root transaction
+// owners and database resources must remain alive until this consumer stops.
+func (m *Module) CleanupContext(ctx context.Context) error {
 	if m != nil && m.aiMessagingRuntime != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
 		if err := m.aiMessagingRuntime.Stop(ctx); err != nil {
 			return err
 		}

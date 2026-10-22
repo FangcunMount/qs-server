@@ -155,14 +155,17 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.runRepo = mysqlEval.NewRunRepository(normalized.MySQLDB)
 	infra.outcomeRepo = mysqlEval.NewOutcomeRepository(normalized.MySQLDB)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
-	if normalized.OutboxProfile.Stager == nil || normalized.OutboxProfile.PostCommit == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event profile is required")
+	if normalized.EventTransactionOwner == nil {
+		if normalized.OutboxProfile.Stager == nil || normalized.OutboxProfile.PostCommit == nil {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event profile is required")
+		}
+		if _, ok := normalized.OutboxProfile.Stager.(outboxport.ReferencePreparer); !ok {
+			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event reference preparer is required")
+		}
+		infra.assessmentOutboxStore = normalized.OutboxProfile.Stager
+		infra.postCommit = normalized.OutboxProfile.PostCommit
+
 	}
-	if _, ok := normalized.OutboxProfile.Stager.(outboxport.ReferencePreparer); !ok {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment MySQL event reference preparer is required")
-	}
-	infra.assessmentOutboxStore = normalized.OutboxProfile.Stager
-	infra.postCommit = normalized.OutboxProfile.PostCommit
 
 	if owner := normalized.EventTransactionOwner; owner != nil {
 		submitter, ok := infra.assessmentRepo.(assessment.PendingSubmissionRepository)

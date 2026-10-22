@@ -16,6 +16,7 @@ import (
 )
 
 type EvaluationConsistencyAuditRunner struct {
+	runnerLifecycle
 	opts    *apiserveroptions.EvaluationConsistencyAuditOptions
 	service evaluationscheduler.Service
 	leader  leaderLeaseRunner
@@ -76,7 +77,7 @@ func (r *EvaluationConsistencyAuditRunner) Start(ctx context.Context) {
 	}
 	log.Infof("evaluation consistency audit started (initial_delay=%s, batch_interval=%s, cycle_interval=%s, batch_size=%d, lock_key=%s)",
 		r.opts.InitialDelay, r.opts.BatchInterval, r.opts.CycleInterval, r.opts.BatchSize, r.leader.DisplayKey())
-	go func() {
+	r.launch(func() {
 		if !waitForScheduler(ctx, r.opts.InitialDelay) {
 			return
 		}
@@ -90,7 +91,7 @@ func (r *EvaluationConsistencyAuditRunner) Start(ctx context.Context) {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (r *EvaluationConsistencyAuditRunner) runCycle(ctx context.Context) error {

@@ -29,6 +29,7 @@ var planSchedulerBusinessLocation = func() *time.Location {
 
 // PlanRunner executes built-in plan scheduling inside apiserver.
 type PlanRunner struct {
+	runnerLifecycle
 	opts    *apiserveroptions.PlanSchedulerOptions
 	command planCommandService
 	leader  leaderLeaseRunner
@@ -115,7 +116,7 @@ func (r *PlanRunner) Start(ctx context.Context) {
 	log.Infof("apiserver plan scheduler started (org_ids=%v, interval=%s, initial_delay=%s, batch_size=%d, max_tasks_per_tick=%d, missed_expiration_enabled=%t, lock_key=%s, lock_ttl=%s)",
 		r.opts.OrgIDs, r.opts.Interval, r.opts.InitialDelay, r.opts.BatchSize, r.opts.MaxTasksPerTick, r.opts.MissedExpirationEnabled, lockKey, r.opts.LockTTL)
 
-	go func() {
+	r.launch(func() {
 		if !WaitDelay(ctx, r.opts.InitialDelay) {
 			return
 		}
@@ -128,7 +129,7 @@ func (r *PlanRunner) Start(ctx context.Context) {
 			}
 			r.executeTick(ctx)
 		}
-	}()
+	})
 }
 
 func (r *PlanRunner) executeTick(ctx context.Context) {

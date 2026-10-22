@@ -3,6 +3,8 @@ package container
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -52,6 +54,7 @@ type Container struct {
 	// 事件发布器（统一管理）
 	eventPublisher            event.EventPublisher
 	eventSubsystem            *eventsubsystem.Subsystem
+	transactions              *EventTransactionBindings
 	taskOpenedReminderEnabled bool
 
 	// 业务模块
@@ -85,10 +88,14 @@ type Container struct {
 	TaskOpenedReminderService          notificationApp.TaskOpenedReminderService
 
 	// 容器状态
-	initialized bool
-	silent      bool
-	modules     map[string]Module
-	moduleOrder []string
+	cleanupOnce    sync.Once
+	cleanupDone    chan struct{}
+	cleanupStarted atomic.Bool
+	cleanupErr     error
+	initialized    bool
+	silent         bool
+	modules        map[string]Module
+	moduleOrder    []string
 }
 
 // NewContainer 创建容器
@@ -144,6 +151,10 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	configureRetryPolicies(opts.SystemGovernance)
 	c := newBaseContainer(mysqlDB, mongoDB, redisCache)
 	c.eventSubsystem = opts.EventSubsystem
+	if opts.Transactions != nil {
+		bindings := *opts.Transactions
+		c.transactions = &bindings
+	}
 	c.taskOpenedReminderEnabled = opts.TaskOpenedReminderEnabled
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
@@ -185,6 +196,9 @@ func configureRetryPolicies(opts *apiserveroptions.SystemGovernanceOptions) {
 
 // Initialize 初始化容器
 func (c *Container) Initialize() error {
+	if c.cleanupStarted.Load() {
+		return fmt.Errorf("container shutdown already requested")
+	}
 	if c.initialized {
 		return nil
 	}
@@ -267,8 +281,17 @@ func (c *Container) printf(format string, args ...interface{}) {
 
 // initEventSubsystem 绑定 resource stage 构造完成的唯一事件运行时。
 func (c *Container) initEventSubsystem() error {
+	if err := c.validateTransactionBindings(); err != nil {
+		return err
+	}
 	if c.eventSubsystem == nil {
 		return fmt.Errorf("event subsystem is required")
+	}
+	if c.eventSubsystem.HasTransactionOwners() != (c.transactions != nil) {
+		return fmt.Errorf("transaction module bindings must belong to the selected event subsystem")
+	}
+	if c.transactions != nil && (c.transactions.MySQL != c.eventSubsystem.MySQLTransactionOwner() || c.transactions.Mongo != c.eventSubsystem.MongoTransactionOwner() || c.transactions.Routes != c.eventSubsystem.Catalog()) {
+		return fmt.Errorf("transaction module bindings cannot replace process owners or routes")
 	}
 	c.eventPublisher = c.eventSubsystem.Publisher()
 	return nil

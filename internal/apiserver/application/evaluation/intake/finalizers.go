@@ -53,3 +53,13 @@ func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAs
 	}
 	return nil
 }
+
+// SavePending stores an eventless draft on the original local business root.
+// It is selected only with an explicit transaction submitter. A future domain
+// event cannot silently disappear through this creation path.
+func (f assessmentCreateFinalizer) SavePending(ctx context.Context, a *domainAssessment.Assessment) error {
+	if f.repo == nil || f.txRunner == nil || a == nil || len(a.Events()) != 0 {
+		return evalerrors.ModuleNotConfigured("eventless pending assessment and original transaction runner required")
+	}
+	return f.txRunner.WithinTransaction(ctx, func(root context.Context) error { return f.repo.Save(root, a) })
+}

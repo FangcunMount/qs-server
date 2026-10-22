@@ -1,9 +1,13 @@
 package process
 
 import (
+	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
@@ -120,5 +124,42 @@ func TestPrepareRunRunnerStopsOnFirstError(t *testing.T) {
 	want := []string{"prepare resources", "initialize container"}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("stage order = %#v, want %#v", order, want)
+	}
+}
+
+func TestFailedPreparationDrainsPartialContainerBeforeReleasingResources(t *testing.T) {
+	events := &eventsubsystem.Subsystem{}
+	host := container.NewContainerWithOptions(nil, nil, nil, container.ContainerOptions{Silent: true, EventSubsystem: events})
+	want := errors.New("failed after runtime started")
+	order := []string{}
+	r := &prepareRunner{stages: []processruntime.Stage[prepareState]{
+		fakePrepareRunStage{stageName: "partial", stageRun: func(s *prepareState) error {
+			s.container.container = host
+			s.runtime.lifecycle.AddShutdownHook("stop", func() error { order = append(order, "hook"); return nil })
+			s.resources.messaging.closePublisher = func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				if err := events.Wait(ctx); err != nil {
+					return err
+				}
+				order = append(order, "publisher")
+				return nil
+			}
+			return want
+		}},
+	}}
+	_, stage, err := r.run()
+	if !errors.Is(err, want) || stage != "partial" || !reflect.DeepEqual(order, []string{"hook", "publisher"}) {
+		t.Fatalf("partial ownership/drain lost: %s %v %v", stage, err, order)
+	}
+}
+func TestFailedPreparationRetainsResourcesWhenShutdownHookCannotDrain(t *testing.T) {
+	want := errors.New("background loop still owns database")
+	closed := false
+	state := &prepareState{}
+	state.runtime.lifecycle.AddShutdownHook("pending", func() error { return want })
+	state.resources.messaging.closePublisher = func() error { closed = true; return nil }
+	if err := cleanupFailedPreparation(state); !errors.Is(err, want) || closed {
+		t.Fatal("failed hook allowed dependency release", err)
 	}
 }

@@ -18,6 +18,7 @@ const (
 // AuthzRoleProjectionRunner periodically converges the non-authoritative operator
 // role projection after IAM assignment changes.
 type AuthzRoleProjectionRunner struct {
+	runnerLifecycle
 	reconciler operatorapp.OperatorRoleProjectionReconciler
 	locks      locklease.Runner
 	interval   time.Duration
@@ -43,7 +44,7 @@ func (r *AuthzRoleProjectionRunner) Start(ctx context.Context) {
 		return
 	}
 	log.Infof("authz role projection reconciler started (interval=%s, batch_size=%d)", r.interval, r.batchSize)
-	go func() {
+	r.launch(func() {
 		ticker := time.NewTicker(r.interval)
 		defer ticker.Stop()
 		for {
@@ -56,7 +57,7 @@ func (r *AuthzRoleProjectionRunner) Start(ctx context.Context) {
 				}
 			}
 		}
-	}()
+	})
 }
 
 func (r *AuthzRoleProjectionRunner) runOnce(ctx context.Context) error {

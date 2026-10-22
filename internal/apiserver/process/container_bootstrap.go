@@ -87,21 +87,18 @@ func bootstrapContainerStage(deps containerStageDeps) (containerOutput, error) {
 	if deps.newIAMModule != nil {
 		iamModule, err := deps.newIAMModule(context.Background())
 		if err != nil {
-			return containerOutput{}, err
+			return output, err
 		}
 		output.container.IAMModule = iamModule
 		if deps.validateIAM != nil {
 			if err := deps.validateIAM(context.Background(), iamModule); err != nil {
-				if iamModule != nil {
-					_ = iamModule.Close()
-				}
-				return containerOutput{}, err
+				return output, err
 			}
 		}
 	}
 	if deps.initialize != nil {
 		if err := deps.initialize(output.container); err != nil {
-			return containerOutput{}, err
+			return output, err
 		}
 		if output.container.IAMModule != nil {
 			output.container.IAMModule.StartAuthzVersionGuard()
@@ -109,7 +106,7 @@ func bootstrapContainerStage(deps containerStageDeps) (containerOutput, error) {
 		return output, nil
 	}
 	if err := output.container.Initialize(); err != nil {
-		return containerOutput{}, err
+		return output, err
 	}
 	if output.container.IAMModule != nil {
 		output.container.IAMModule.StartAuthzVersionGuard()

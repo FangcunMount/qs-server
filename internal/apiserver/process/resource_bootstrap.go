@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,6 +52,7 @@ type wirePublisherResource interface {
 }
 
 type databaseResourceDeps struct {
+	close      func() error
 	initialize func() error
 	getMySQL   func() (*gorm.DB, error)
 	getMongo   func() (*mongo.Database, error)
@@ -63,10 +65,11 @@ type redisRuntimeStageDeps struct {
 }
 
 type mqPublisherStageDeps struct {
-	fallbackMode     eventruntime.PublishMode
-	enabled          bool
-	provider         string
-	newWirePublisher func() (wirePublisherResource, error)
+	fallbackMode       eventruntime.PublishMode
+	enabled            bool
+	provider           string
+	newWirePublisher   func() (wirePublisherResource, error)
+	newNormalPublisher func(*eventcatalog.Catalog) (wirePublisherResource, error)
 }
 
 func (s *server) buildResourceStageDeps() resourceStageDeps {
@@ -157,6 +160,7 @@ func buildDatabaseDeps(dbManager *bootstrap.DatabaseManager) databaseResourceDep
 
 	return databaseResourceDeps{
 		initialize: dbManager.Initialize,
+		close:      dbManager.Close,
 		getMySQL:   dbManager.GetMySQLDB,
 		getMongo:   dbManager.GetMongoDB,
 	}
@@ -197,6 +201,31 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 		deps.enabled = options.Enabled
 		deps.provider = options.Provider
 		if options.Provider == "nsq" || options.Provider == "rocketmq" {
+			if options.Provider == "rocketmq" && options.RocketMQ != nil && len(options.RocketMQ.Transactions) > 0 {
+				deps.newNormalPublisher = func(catalog *eventcatalog.Catalog) (wirePublisherResource, error) {
+					topics, err := eventruntime.BestEffortTopics(catalog)
+					if err != nil {
+						return nil, err
+					}
+					binding, ok := options.RocketMQ.Transactions["qs.mysql"]
+					if !ok {
+						return nil, fmt.Errorf("NORMAL host publisher requires explicit qs.mysql binding")
+					}
+					limits, err := binding.ProtocolLimits("qs.mysql")
+					if err != nil {
+						return nil, err
+					}
+					p, err := messagingruntime.NewNormalWirePublisher(options, topics, limits.Sends)
+					if err != nil {
+						return nil, err
+					}
+					if err = p.Start(); err != nil {
+						return nil, errors.Join(err, (&normalWireResource{NormalWirePublisher: p}).Close())
+					}
+					return &normalWireResource{NormalWirePublisher: p}, nil
+				}
+				return deps
+			}
 			deps.newWirePublisher = func() (wirePublisherResource, error) {
 				return messagingruntime.NewSDKWirePublisher(options)
 			}
@@ -249,12 +278,40 @@ func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) cont
 	return s.buildContainerOptions
 }
 
-func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
+func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr error) {
+	var closePublisher func() error
+	var events *eventsubsystem.Subsystem
+	var cacheSubsystem *cachebootstrap.Subsystem
+	defer func() {
+		if resultErr == nil {
+			return
+		}
+		// These constructors can own started NORMAL clients even before the resource
+		// stage is published. Do not discard their drain errors or close DB early.
+		cleanup := processLifecycleDeps{resource: resourceLifecycleDeps{closePublisher: closePublisher, closeDatabase: deps.database.close}}
+		cleanup.container.containerCleanup = func() error {
+			ctx := context.Background()
+			if events != nil {
+				if err := events.CloseContext(ctx); err != nil {
+					return err
+				}
+			}
+			if cacheSubsystem != nil {
+				return cacheSubsystem.Close()
+			}
+			return nil
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		resultErr = errors.Join(resultErr, newProcessShutdown(cleanup).Close(ctx))
+	}()
+
 	mysqlDB, mongoDB, err := initializeDatabaseConnections(deps.database)
 	if err != nil {
 		return resourceOutput{}, err
 	}
-	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
+	redisCache, redisRuntime, constructedCache := initializeRedisRuntime(deps.redisRuntime)
+	cacheSubsystem = constructedCache
 	var resilience *resiliencesubsystem.Subsystem
 	if deps.buildResilience != nil {
 		resilience, err = deps.buildResilience(redisRuntime)
@@ -264,28 +321,36 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	}
 	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
 	var wirePublisher wirePublisherResource
-	var closePublisher func() error
 	publishMode := deps.mqPublisher.fallbackMode
 	if deps.mqPublisher.enabled {
-		if (deps.mqPublisher.provider != "nsq" && deps.mqPublisher.provider != "rocketmq") || deps.mqPublisher.newWirePublisher == nil {
+		if deps.mqPublisher.newWirePublisher != nil && deps.mqPublisher.newNormalPublisher != nil {
+			return resourceOutput{}, fmt.Errorf("ambiguous legacy and NORMAL publisher factories")
+		}
+		if (deps.mqPublisher.provider != "nsq" && deps.mqPublisher.provider != "rocketmq") || (deps.mqPublisher.newWirePublisher == nil && deps.mqPublisher.newNormalPublisher == nil) {
 			return resourceOutput{}, fmt.Errorf("NSQ wire publisher factory is required when messaging is enabled")
 		}
-		wirePublisher, err = createNSQWirePublisher(deps.mqPublisher)
-		if err != nil {
-			return resourceOutput{}, err
+		if deps.mqPublisher.newNormalPublisher == nil {
+			wirePublisher, err = createNSQWirePublisher(deps.mqPublisher)
+			if err != nil {
+				return resourceOutput{}, err
+			}
+			closePublisher = wirePublisher.Close
 		}
-		closePublisher = wirePublisher.Close
 		publishMode = eventruntime.PublishModeMQ
 	}
-	prepared := false
-	defer func() {
-		if !prepared && closePublisher != nil {
-			_ = closePublisher()
-		}
-	}()
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
+	}
+	if deps.mqPublisher.enabled && deps.mqPublisher.newNormalPublisher != nil {
+		wirePublisher, err = deps.mqPublisher.newNormalPublisher(eventCatalog)
+		if err != nil {
+			return resourceOutput{}, err
+		}
+		if wirePublisher == nil {
+			return resourceOutput{}, fmt.Errorf("NORMAL publisher factory returned nil")
+		}
+		closePublisher = wirePublisher.Close
 	}
 	if deps.prepareMQChannels != nil {
 		if err := deps.prepareMQChannels(eventCatalog); err != nil {
@@ -293,7 +358,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		}
 	}
 	deps.eventSubsystem.wirePublisher = wirePublisher
-	events, err := buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
+	events, err = buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
 		return resourceOutput{}, err
 	}
@@ -325,7 +390,6 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		})
 		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
 	}
-	prepared = true
 	return output, nil
 }
 

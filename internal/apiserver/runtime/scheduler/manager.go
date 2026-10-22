@@ -1,6 +1,11 @@
 package scheduler
 
-import "context"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"reflect"
+)
 
 // Runner is a background scheduler task that manages its own goroutine lifecycle.
 type Runner interface {
@@ -27,6 +32,12 @@ func (m *Manager) Add(runner Runner) {
 	if m == nil || runner == nil {
 		return
 	}
+	// Constructors return typed nil pointers for disabled schedules. They must
+	// not reach promoted Wait methods, which require an actual lifecycle owner.
+	value := reflect.ValueOf(runner)
+	if value.Kind() == reflect.Ptr && value.IsNil() {
+		return
+	}
 	m.runners = append(m.runners, runner)
 }
 
@@ -49,4 +60,23 @@ func (m *Manager) Start(ctx context.Context) {
 		}
 		runner.Start(ctx)
 	}
+}
+
+// Wait joins the loops started by this manager. A runner without a completion
+// contract is an error; it cannot justify releasing the host database.
+func (m *Manager) Wait(ctx context.Context) error {
+	if m == nil {
+		return nil
+	}
+	var failures []error
+	for _, runner := range m.runners {
+		if waiter, ok := runner.(interface{ Wait(context.Context) error }); ok {
+			if err := waiter.Wait(ctx); err != nil {
+				failures = append(failures, fmt.Errorf("scheduler %s: %w", runner.Name(), err))
+			}
+		} else {
+			failures = append(failures, fmt.Errorf("scheduler %s cannot prove completion", runner.Name()))
+		}
+	}
+	return errors.Join(failures...)
 }

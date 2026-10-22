@@ -102,8 +102,14 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 		return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 	}
 	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, postCommit: s.postCommit}
-	if err := finalizer.SaveAndStage(ctx, a, req, command); err != nil {
-		return nil, evalerrors.Database(err, "保存测评失败")
+	var persistErr error
+	if s.transactionSubmitter != nil {
+		persistErr = finalizer.SavePending(ctx, a)
+	} else {
+		persistErr = finalizer.SaveAndStage(ctx, a, req, command)
+	}
+	if persistErr != nil {
+		return nil, evalerrors.Database(persistErr, "保存测评失败")
 	}
 	return resultFromDomain(a)
 }

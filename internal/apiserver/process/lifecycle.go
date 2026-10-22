@@ -2,7 +2,9 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -16,11 +18,13 @@ type resourceLifecycleDeps struct {
 }
 
 type containerLifecycleDeps struct {
+	stopAdmission    func()
 	containerCleanup func() error
 	stopAuthzSync    func() error
 }
 
 type transportLifecycleDeps struct {
+	drainHTTP func() error
 	closeHTTP func()
 	closeGRPC func()
 }
@@ -42,16 +46,21 @@ type preparedServerTransports struct {
 }
 
 type preparedServerRunDeps struct {
+	shutdown      *processShutdown
 	startShutdown func() error
 
 	transports preparedServerTransports
 }
 
 func (s *server) registerShutdownCallback(deps processLifecycleDeps) {
+	closer := newProcessShutdown(deps)
+	s.shutdown = closer
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-
-		runPrepareRunShutdownHooks(deps.runtime.lifecycle)
-		runProcessLifecycleDeps(deps)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := closer.Close(ctx); err != nil {
+			return err
+		}
 		log.Info("🏗️  Hexagonal Architecture server shutdown complete")
 		return nil
 	}))
@@ -67,7 +76,11 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 		deps.resource.closePublisher = resources.messaging.closePublisher
 	}
 	if containerOutput.container != nil {
-		deps.container.containerCleanup = containerOutput.container.Cleanup
+		deps.container.stopAdmission = containerOutput.container.StopEventAdmission
+		deps.container.containerCleanup = func() error {
+			// The process coordinator bounds caller waiting and retains this work.
+			return containerOutput.container.CleanupContext(context.Background())
+		}
 	}
 	if integrationOutput.authzVersionSubscriber != nil {
 		deps.container.stopAuthzSync = func() error {
@@ -76,7 +89,11 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 		}
 	}
 	if transportOutput.httpServer != nil {
-		deps.transport.closeHTTP = transportOutput.httpServer.Close
+		if containerOutput.container != nil && containerOutput.container.HasTransactionOwners() {
+			deps.transport.drainHTTP = func() error { return transportOutput.httpServer.CloseContext(context.Background()) }
+		} else {
+			deps.transport.closeHTTP = transportOutput.httpServer.Close
+		}
 	}
 	if transportOutput.grpcServer != nil {
 		deps.transport.closeGRPC = transportOutput.grpcServer.Close
@@ -86,18 +103,29 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	return deps
 }
 
-func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) {
+func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) error {
+	var failures []error
 	lifecycle.Run(func(name string, err error) {
 		log.Errorf("Failed to run shutdown hook %q: %v", name, err)
+		failures = append(failures, err)
 	})
+	return errors.Join(failures...)
 }
 
-func runProcessLifecycleDeps(deps processLifecycleDeps) {
+func runProcessLifecycleDeps(deps processLifecycleDeps) error {
+	if deps.container.stopAdmission != nil {
+		deps.container.stopAdmission()
+	}
 	// Stop accepting new work and wait for in-flight transports before closing
 	// the database or Provider/container resources they still need to persist a
 	// terminal result. In particular, gRPC GracefulStop must complete before the
 	// AI Prompt evaluation commit path loses its dependencies.
-	if deps.transport.closeHTTP != nil {
+	if deps.transport.drainHTTP != nil {
+		log.Info("Draining API server HTTP transports...")
+		if err := deps.transport.drainHTTP(); err != nil {
+			return err
+		}
+	} else if deps.transport.closeHTTP != nil {
 		log.Info("Draining API server HTTP transports...")
 		deps.transport.closeHTTP()
 	}
@@ -108,11 +136,16 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 	if deps.container.stopAuthzSync != nil {
 		if err := deps.container.stopAuthzSync(); err != nil {
 			log.Errorf("Failed to close IAM authz version subscriber: %v", err)
+			return err
 		}
 	}
 	if deps.container.containerCleanup != nil {
 		if err := deps.container.containerCleanup(); err != nil {
 			log.Errorf("Failed to cleanup container resources: %v", err)
+			// A failed drain is not proof that dependency users stopped. Preserve
+			// host pools and return the actual error, including incomplete shutdown.
+			return err
+
 		}
 	}
 	// The container first stops relays and drains standard Outbox publishes.
@@ -120,13 +153,16 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 	if deps.resource.closePublisher != nil {
 		if err := deps.resource.closePublisher(); err != nil {
 			log.Errorf("Failed to close event publisher: %v", err)
+			return err
 		}
 	}
 	if deps.resource.closeDatabase != nil {
 		if err := deps.resource.closeDatabase(); err != nil {
 			log.Errorf("Failed to close database connections: %v", err)
+			return err
 		}
 	}
+	return nil
 }
 
 func (s *server) fatalPrepareRun(action string, err error) {
@@ -144,6 +180,7 @@ func (s *server) fatalPrepareRun(action string, err error) {
 
 func (s preparedServer) buildPreparedServerRunDeps() preparedServerRunDeps {
 	var deps preparedServerRunDeps
+	deps.shutdown = s.shutdown
 	if s.startShutdown != nil {
 		deps.startShutdown = s.startShutdown
 	}
@@ -171,7 +208,7 @@ func runPreparedServer(deps preparedServerRunDeps) error {
 	if deps.transports.runGRPC != nil {
 		log.Info("🚀 Starting Hexagonal Architecture GRPC server...")
 	}
-	if err := (processruntime.RunGroup{
+	runErr := (processruntime.RunGroup{
 		Services: []processruntime.ServiceRunner{
 			{
 				Name: "http",
@@ -182,11 +219,19 @@ func runPreparedServer(deps preparedServerRunDeps) error {
 				Run:  deps.transports.runGRPC,
 			},
 		},
-	}).Run(); err != nil {
-		log.Errorf("Failed to run prepared server: %v", err)
-		return err
+	}).Run()
+	if deps.shutdown != nil {
+		if !deps.shutdown.requested.Load() && runErr == nil {
+			runErr = errors.New("required transport exited before shutdown")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		runErr = errors.Join(runErr, deps.shutdown.Close(ctx))
 	}
-	return nil
+	if runErr != nil {
+		log.Errorf("Failed to run prepared server: %v", runErr)
+	}
+	return runErr
 }
 
 // Run 运行 API 服务器

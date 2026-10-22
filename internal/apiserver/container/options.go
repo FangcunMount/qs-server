@@ -12,6 +12,9 @@ import (
 
 // ContainerOptions 容器配置选项。
 type ContainerOptions struct {
+	// Transactions are borrowed from the process owner. Modules do not create,
+	// start or close another sender for the same database owner.
+	Transactions *EventTransactionBindings
 	// EventSubsystem 是 resource stage 构造完成的唯一事件运行时。
 	EventSubsystem            *eventsubsystem.Subsystem
 	TaskOpenedReminderEnabled bool

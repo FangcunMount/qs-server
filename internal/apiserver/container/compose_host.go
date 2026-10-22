@@ -12,6 +12,7 @@ import (
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
+	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
@@ -23,6 +24,7 @@ import (
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	answerrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -308,6 +310,21 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	if err != nil {
 		return nil, err
 	}
+	if c.transactions != nil {
+		owner := c.ReportTransactionOwner()
+		if !owner.UsesDatabase(c.mongoDB) {
+			return nil, fmt.Errorf("answer submission requires the shared host Mongo owner")
+		}
+		if infra.SubmissionStore == nil {
+			runner := modtx.NewMongoRunner(c.mongoDB, modtx.MongoRunnerOptions{Boundary: "answersheet_submit", Limiter: c.MongoLimiter()})
+			infra.SubmissionStore, err = answerrepo.NewRocketMQSubmissionStoreWithOwner(infra.AnswerSheetRepo, runner, c.transactions.Routes, owner)
+			if err != nil {
+				return nil, err
+			}
+		} else if store, ok := infra.SubmissionStore.(*answerrepo.RocketMQSubmissionStore); !ok || store == nil || store.Runtime() != owner.Runtime() {
+			return nil, fmt.Errorf("answer submission cannot replace the shared host Mongo owner")
+		}
+	}
 	c.surveyRuntimeInfra = infra
 	return infra, nil
 }
@@ -321,13 +338,17 @@ func (c *Container) resolveIdentityService() *iam.IdentityService {
 
 // compile-time checks
 var (
-	_ compose.Host            = (*Container)(nil)
-	_ surveymod.InstallHost   = (*Container)(nil)
-	_ ammod.InstallHost       = (*Container)(nil)
-	_ actormod.InstallHost    = (*Container)(nil)
-	_ reportmod.InstallHost   = (*Container)(nil)
-	_ evalmod.InstallHost     = (*Container)(nil)
-	_ planmod.InstallHost     = (*Container)(nil)
-	_ statmod.InstallHost     = (*Container)(nil)
-	_ platformmod.InstallHost = (*Container)(nil)
+	_ evalmod.TransactionInstallHost          = (*Container)(nil)
+	_ planmod.TransactionInstallHost          = (*Container)(nil)
+	_ reportmod.CommandTransactionInstallHost = (*Container)(nil)
+	_ reportmod.ReportTransactionInstallHost  = (*Container)(nil)
+	_ compose.Host                            = (*Container)(nil)
+	_ surveymod.InstallHost                   = (*Container)(nil)
+	_ ammod.InstallHost                       = (*Container)(nil)
+	_ actormod.InstallHost                    = (*Container)(nil)
+	_ reportmod.InstallHost                   = (*Container)(nil)
+	_ evalmod.InstallHost                     = (*Container)(nil)
+	_ planmod.InstallHost                     = (*Container)(nil)
+	_ statmod.InstallHost                     = (*Container)(nil)
+	_ platformmod.InstallHost                 = (*Container)(nil)
 )

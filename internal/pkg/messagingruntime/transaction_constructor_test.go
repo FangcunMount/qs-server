@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,6 +60,12 @@ func TestTransactionConstructorIsInertAndUsesExactBinding(t *testing.T) {
 	if _, err := NewSDKWirePublisher(o); err == nil {
 		t.Fatal("legacy Outbox wire publisher accepted transaction owners")
 	}
+	bindings := o.RocketMQ.Transactions
+	o.RocketMQ.Transactions = nil
+	if _, err := NewSDKWirePublisher(o); err == nil || !strings.Contains(err.Error(), "transaction routes cannot use the legacy Outbox") {
+		t.Fatal("missing owner map silently selected legacy publication for transaction routes", err)
+	}
+	o.RocketMQ.Transactions = bindings
 	runtime, err := NewTransactionalSender(o, owner, store, []string{topic})
 	if err != nil {
 		t.Fatal(err)

@@ -27,7 +27,9 @@ func TestPrepareRunLifecycleRunsHooksInRegistrationOrder(t *testing.T) {
 		return nil
 	})
 
-	runPrepareRunShutdownHooks(lifecycle)
+	if err := runPrepareRunShutdownHooks(lifecycle); err != nil {
+		t.Fatal(err)
+	}
 
 	want := []string{"first", "second"}
 	if !reflect.DeepEqual(order, want) {
@@ -49,7 +51,9 @@ func TestPrepareRunLifecycleContinuesAfterHookError(t *testing.T) {
 		return nil
 	})
 
-	runPrepareRunShutdownHooks(lifecycle)
+	if err := runPrepareRunShutdownHooks(lifecycle); err == nil {
+		t.Fatal("lost shutdown hook failure")
+	}
 
 	want := []string{"first", "second"}
 	if !reflect.DeepEqual(order, want) {
@@ -61,7 +65,7 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 	t.Parallel()
 
 	var order []string
-	runProcessLifecycleDeps(processLifecycleDeps{
+	err := runProcessLifecycleDeps(processLifecycleDeps{
 		container: containerLifecycleDeps{
 			containerCleanup: func() error {
 				order = append(order, "container")
@@ -91,6 +95,10 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 			},
 		},
 	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	want := []string{"http", "grpc", "authz", "container", "publisher", "database"}
 	if !reflect.DeepEqual(order, want) {
@@ -229,5 +237,46 @@ func TestPreparedAPIServerBuildRunDepsUsesPreparedFields(t *testing.T) {
 	}
 	if deps.transports.runGRPC == nil {
 		t.Fatal("runGRPC = nil, want value")
+	}
+}
+
+func TestCleanupFailurePreservesDependenciesAndReportsActualError(t *testing.T) {
+	want := errors.New("consumer still owns database")
+	closed := false
+	err := runProcessLifecycleDeps(processLifecycleDeps{
+		container: containerLifecycleDeps{containerCleanup: func() error { return want }},
+		resource:  resourceLifecycleDeps{closePublisher: func() error { closed = true; return nil }, closeDatabase: func() error { closed = true; return nil }},
+	})
+	if !errors.Is(err, want) || closed {
+		t.Fatal("failed consumer drain released dependencies or reported success")
+	}
+}
+func TestPublisherDrainFailurePreservesDatabase(t *testing.T) {
+	publisher := errors.New("publisher still draining")
+	databaseClosed := false
+	err := runProcessLifecycleDeps(processLifecycleDeps{resource: resourceLifecycleDeps{
+		closePublisher: func() error { return publisher }, closeDatabase: func() error { databaseClosed = true; return nil },
+	}})
+	if !errors.Is(err, publisher) || databaseClosed {
+		t.Fatal("publisher failure lost or database released")
+	}
+}
+func TestDatabaseCloseFailureIsReturned(t *testing.T) {
+	database := errors.New("database close failed")
+	err := runProcessLifecycleDeps(processLifecycleDeps{resource: resourceLifecycleDeps{closeDatabase: func() error { return database }}})
+	if !errors.Is(err, database) {
+		t.Fatal("database close error hidden")
+	}
+}
+
+func TestTransactionHTTPDrainFailureRetainsOriginalDependencies(t *testing.T) {
+	want := errors.New("accepted HTTP handler remains active")
+	closed := false
+	err := runProcessLifecycleDeps(processLifecycleDeps{
+		transport: transportLifecycleDeps{drainHTTP: func() error { return want }},
+		resource:  resourceLifecycleDeps{closeDatabase: func() error { closed = true; return nil }},
+	})
+	if !errors.Is(err, want) || closed {
+		t.Fatal("HTTP timeout released original database", err)
 	}
 }

@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 )
 
 // HealthCheck 健康检查
@@ -58,7 +59,64 @@ func (c *Container) checkModulesHealth(_ context.Context) error {
 }
 
 // Cleanup 清理资源
-func (c *Container) Cleanup() error {
+func (c *Container) Cleanup() error { return c.CleanupContext(context.Background()) }
+
+// CleanupContext owns exactly one real cleanup coordinator. A caller timeout
+// does not cancel its drain or release the database/publisher still in use.
+func (c *Container) CleanupContext(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	c.cleanupStarted.Store(true)
+	c.cleanupOnce.Do(func() {
+		c.cleanupDone = make(chan struct{})
+		if c.eventSubsystem != nil {
+			c.eventSubsystem.StopAdmission()
+		}
+		go func() {
+			c.cleanupErr = c.cleanupResources(context.Background())
+			close(c.cleanupDone)
+		}()
+	})
+	result := func() error { return c.cleanupErr }
+	select {
+	case <-c.cleanupDone:
+		return result()
+	default:
+	}
+	select {
+	case <-c.cleanupDone:
+		return result()
+	case <-ctx.Done():
+		select {
+		case <-c.cleanupDone:
+			return result()
+		default:
+		}
+		return &eventsubsystem.ShutdownIncomplete{PendingClosures: 1, Cause: ctx.Err()}
+	}
+}
+
+func (c *Container) cleanupModules(ctx context.Context) error {
+	for _, module := range c.loadedModules() {
+		var err error
+		if contextual, ok := module.(interface{ CleanupContext(context.Context) error }); ok && c.transactions != nil {
+			err = contextual.CleanupContext(ctx)
+		} else {
+			err = module.Cleanup()
+		}
+		if err != nil {
+			return fmt.Errorf("failed to cleanup module: %w", err)
+		}
+		c.printf("   ✅ %s module cleaned up\n", module.ModuleInfo().Name)
+	}
+	return nil
+}
+
+func (c *Container) cleanupResources(ctx context.Context) error {
 	c.printf("🧹 Cleaning up container resources...\n")
 	if c.resilienceCancel != nil {
 		c.resilienceCancel()
@@ -68,8 +126,16 @@ func (c *Container) Cleanup() error {
 		c.actionAuditCancel()
 		c.actionAuditCancel = nil
 	}
+	// Transaction consumers may still finalize original business writes. Drain
+	// them while owner Checkers and the original databases remain alive.
+	transactionMode := c.transactions != nil
+	if transactionMode {
+		if err := c.cleanupModules(ctx); err != nil {
+			return err
+		}
+	}
 	if c.eventSubsystem != nil {
-		if err := c.eventSubsystem.Close(); err != nil {
+		if err := c.eventSubsystem.CloseContext(ctx); err != nil {
 			return fmt.Errorf("failed to close event subsystem: %w", err)
 		}
 	}
@@ -87,11 +153,10 @@ func (c *Container) Cleanup() error {
 		c.printf("   ✅ IAM module cleaned up\n")
 	}
 
-	for _, module := range c.loadedModules() {
-		if err := module.Cleanup(); err != nil {
-			return fmt.Errorf("failed to cleanup module: %w", err)
+	if !transactionMode {
+		if err := c.cleanupModules(ctx); err != nil {
+			return err
 		}
-		c.printf("   ✅ %s module cleaned up\n", module.ModuleInfo().Name)
 	}
 
 	c.initialized = false
@@ -103,6 +168,9 @@ func (c *Container) Cleanup() error {
 func (c *Container) StartEventSubsystem(ctx context.Context) error {
 	if c == nil || c.eventSubsystem == nil {
 		return nil
+	}
+	if c.cleanupStarted.Load() {
+		return fmt.Errorf("container shutdown already requested")
 	}
 	return c.eventSubsystem.Start(ctx)
 }
@@ -185,4 +253,15 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 		return nil
 	}
 	return fmt.Errorf("cache governance warmup coordinator is unavailable")
+}
+
+// StopEventAdmission is fast and leaves Checkers running through host drain.
+func (c *Container) StopEventAdmission() {
+	if c != nil && c.eventSubsystem != nil {
+		c.eventSubsystem.StopAdmission()
+	}
+}
+
+func (c *Container) HasTransactionOwners() bool {
+	return c != nil && c.transactions != nil && c.eventSubsystem.HasTransactionOwners()
 }

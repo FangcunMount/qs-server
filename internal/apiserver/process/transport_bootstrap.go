@@ -58,14 +58,14 @@ func bootstrapTransports(deps transportStageDeps) (transportOutput, error) {
 	if deps.buildHTTPServer != nil {
 		httpServer, err := deps.buildHTTPServer()
 		if err != nil {
-			return transportOutput{}, err
+			return output, err
 		}
 		output.httpServer = httpServer
 	}
 	if deps.buildGRPCServer != nil {
 		grpcServer, err := deps.buildGRPCServer()
 		if err != nil {
-			return transportOutput{}, err
+			return output, err
 		}
 		output.grpcServer = grpcServer
 	}
@@ -74,7 +74,7 @@ func bootstrapTransports(deps transportStageDeps) (transportOutput, error) {
 	}
 	if deps.registerGRPC != nil && output.grpcServer != nil {
 		if err := deps.registerGRPC(output.grpcServer); err != nil {
-			return transportOutput{}, err
+			return output, err
 		}
 	}
 	return output, nil
