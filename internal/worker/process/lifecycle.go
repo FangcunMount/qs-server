@@ -39,14 +39,18 @@ func (s *server) registerShutdownCallback(deps lifecycleDeps) {
 
 func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutput, integrationOutput integrationOutput, runtimeOutput runtimeOutput) lifecycleDeps {
 	var deps lifecycleDeps
-	if runtimeOutput.messaging.subscriber != nil {
+	if runtimeOutput.messaging.subscriber != nil || runtimeOutput.messaging.holdReplayer != nil || runtimeOutput.messaging.publisher != nil || runtimeOutput.messaging.deadLetterRecorder != nil || runtimeOutput.messaging.holdStore != nil {
 		deps.stopSubscriber = func() error {
-			runtimeOutput.messaging.subscriber.Stop()
+			if runtimeOutput.messaging.subscriber != nil {
+				runtimeOutput.messaging.subscriber.Stop()
+			}
 			if runtimeOutput.messaging.holdReplayer != nil {
 				runtimeOutput.messaging.holdReplayer.Stop()
 			}
-			if err := runtimeOutput.messaging.subscriber.Close(); err != nil {
-				return err
+			if runtimeOutput.messaging.subscriber != nil {
+				if err := runtimeOutput.messaging.subscriber.Close(); err != nil {
+					return err
+				}
 			}
 			if runtimeOutput.messaging.publisher != nil {
 				if err := runtimeOutput.messaging.publisher.Close(); err != nil {

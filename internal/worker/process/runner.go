@@ -1,8 +1,11 @@
 package process
 
 import (
+	"context"
+	"errors"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
+	"time"
 )
 
 type prepareRunner struct {
@@ -33,7 +36,7 @@ func newPrepareRunner(server *server) *prepareRunner {
 }
 
 func (r *prepareRunner) run() (preparedServer, string, error) {
-	return processruntime.Runner[prepareState, preparedServer]{
+	prepared, stage, err := (processruntime.Runner[prepareState, preparedServer]{
 		State:  &r.state,
 		Stages: r.stages,
 		BuildPrepared: func(*prepareState) preparedServer {
@@ -42,7 +45,14 @@ func (r *prepareRunner) run() (preparedServer, string, error) {
 				shutdown:      r.server.shutdown,
 			}
 		},
-	}.Run()
+	}).Run()
+	if err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		deps := buildLifecycleDeps(r.state.resources, r.state.container, r.state.integration, r.state.runtime)
+		err = errors.Join(err, newWorkerShutdown(deps).Close(ctx))
+	}
+	return prepared, stage, err
 }
 
 type resourceStage struct{ server *server }
@@ -51,10 +61,10 @@ func (resourceStage) Name() string { return "prepare resources" }
 
 func (s resourceStage) Run(state *prepareState) error {
 	output, err := s.server.prepareResources()
+	state.resources = output
 	if err != nil {
 		return err
 	}
-	state.resources = output
 	return nil
 }
 
@@ -64,10 +74,10 @@ func (containerStage) Name() string { return "initialize container" }
 
 func (s containerStage) Run(state *prepareState) error {
 	output, err := s.server.initializeContainer(state.resources)
+	state.container = output
 	if err != nil {
 		return err
 	}
-	state.container = output
 	return nil
 }
 
@@ -77,10 +87,10 @@ func (integrationStage) Name() string { return "initialize integrations" }
 
 func (s integrationStage) Run(state *prepareState) error {
 	output, err := s.server.initializeIntegrations(state.container)
+	state.integration = output
 	if err != nil {
 		return err
 	}
-	state.integration = output
 	return nil
 }
 
@@ -90,10 +100,10 @@ func (runtimeStage) Name() string { return "initialize runtime" }
 
 func (s runtimeStage) Run(state *prepareState) error {
 	output, err := s.server.initializeRuntime(state.resources, state.container)
+	state.runtime = output
 	if err != nil {
 		return err
 	}
-	state.runtime = output
 	return nil
 }
 

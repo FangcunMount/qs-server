@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
@@ -26,10 +25,10 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 			resources.redisRuntime.familyStatus,
 			containerOutput.container.ResilienceSnapshot,
 		)
-		if err := metrics.Start(); err != nil {
-			return runtimeOutput{}, err
-		}
 		output.observability.metricsServer = metrics
+		if err := metrics.Start(); err != nil {
+			return output, err
+		}
 	}
 
 	if s.config != nil && s.config.Messaging.Provider == "nsq" {
@@ -37,37 +36,27 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		err := messagingintegration.EnsureChannels(ctx, s.config.Messaging, s.config.Worker.ServiceName, containerOutput.container)
 		cancel()
 		if err != nil {
-			if output.observability.metricsServer != nil {
-				_ = output.observability.metricsServer.Shutdown(context.Background())
-			}
-			return runtimeOutput{}, fmt.Errorf("prepare Worker NSQ channels before consuming: %w", err)
+			return output, fmt.Errorf("prepare Worker NSQ channels before consuming: %w", err)
 		}
 	}
 
 	deadLetterRecorder, err := eventtransport.OpenMySQLDeadLetterRecorder(s.config.MySQL)
 	if err != nil {
-		return runtimeOutput{}, err
+		return output, err
 	}
+	output.messaging.deadLetterRecorder = deadLetterRecorder
 	subscriberConfig := s.loadedSubscriberConfig()
 	subscriber, err := eventtransport.NewSDKDeliverySubscriber(
 		subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
 		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder, s.config.Messaging.Provider), eventtransport.SDKRocketMQFailureHandler(deadLetterRecorder),
 	)
 	if err != nil {
-		_ = deadLetterRecorder.Close()
-		if output.observability.metricsServer != nil {
-			_ = output.observability.metricsServer.Shutdown(context.Background())
-		}
-		return runtimeOutput{}, err
+		return output, err
 	}
 	output.messaging.subscriber = subscriber
-	output.messaging.deadLetterRecorder = deadLetterRecorder
 	holdStore, err := messagingintegration.NewMySQLRetryEventHoldStore(s.config.MySQL, s.config.Messaging.Provider, s.holdReplayPolicy())
 	if err != nil {
-		subscriber.Stop()
-		_ = subscriber.Close()
-		_ = deadLetterRecorder.Close()
-		return runtimeOutput{}, err
+		return output, err
 	}
 	output.messaging.holdStore = holdStore
 
@@ -78,34 +67,18 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		UnknownRecorder: eventtransport.NewDeliveryUnknownEventRecorder(s.config.Messaging.Provider, deadLetterRecorder),
 	})
 	if subscribeErr != nil {
-		subscriber.Stop()
-		_ = subscriber.Close()
-		_ = holdStore.Close()
-		_ = deadLetterRecorder.Close()
-		if output.observability.metricsServer != nil {
-			_ = output.observability.metricsServer.Shutdown(context.Background())
-		}
-		return runtimeOutput{}, subscribeErr
+		return output, subscribeErr
 	}
 	if (s.config.RetryGovernance == nil || s.config.RetryGovernance.AutomaticRetryEnabled) && (s.config.Messaging.Provider != "rocketmq" || s.config.Messaging.RocketMQ.PublishingEnabled()) {
-		var publisher io.Closer
 		var holdReplayer *messagingintegration.RetryEventHoldReplayer
 		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
 		if publishErr == nil {
-			publisher = wirePublisher
+			output.messaging.publisher = wirePublisher
 			holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)
 		}
 		if publishErr != nil {
-			if publisher != nil {
-				_ = publisher.Close()
-			}
-			subscriber.Stop()
-			_ = subscriber.Close()
-			_ = holdStore.Close()
-			_ = deadLetterRecorder.Close()
-			return runtimeOutput{}, publishErr
+			return output, publishErr
 		}
-		output.messaging.publisher = publisher
 		output.messaging.holdReplayer = holdReplayer
 		output.messaging.holdReplayer.Start()
 	}

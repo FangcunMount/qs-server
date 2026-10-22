@@ -16,8 +16,9 @@ const defaultEventConfigPath = "configs/events.yaml"
 
 func (s *server) prepareResources() (resourceOutput, error) {
 	dbManager := bootstrap.NewDatabaseManager(s.config)
+	output := resourceOutput{handles: resourceHandles{dbManager: dbManager}}
 	if err := dbManager.Initialize(); err != nil {
-		return resourceOutput{}, err
+		return output, err
 	}
 
 	redisRuntime := cacheplanebootstrap.BuildRuntime(context.Background(), cacheplanebootstrap.Options{
@@ -51,7 +52,7 @@ func (s *server) prepareResources() (resourceOutput, error) {
 	})
 	eventCatalog, err := loadWorkerEventCatalog(s.eventConfigPath())
 	if err != nil {
-		return resourceOutput{}, err
+		return output, err
 	}
 	return resourceOutput{
 		handles: resourceHandles{
