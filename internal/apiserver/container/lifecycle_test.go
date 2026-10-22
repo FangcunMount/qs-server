@@ -179,3 +179,13 @@ func TestLegacyCleanupPreservesModuleOwnBudget(t *testing.T) {
 		t.Fatal("legacy module cleanup policy changed")
 	}
 }
+
+func TestClosedContainerCannotInitializeNewResources(t *testing.T) {
+	c := NewContainerWithOptions(nil, nil, nil, ContainerOptions{Silent: true})
+	if err := c.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Initialize(); err == nil {
+		t.Fatal("closed coordinator allowed another resource generation")
+	}
+}

@@ -2,7 +2,6 @@ package process
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
@@ -154,9 +153,7 @@ func startSchedulerManager(manager *runtimescheduler.Manager, runtimeOutput *run
 	ctx, cancel := context.WithCancel(context.Background())
 	runtimeOutput.lifecycle.AddShutdownHook("stop schedulers", func() error {
 		cancel()
-		wait, cancelWait := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancelWait()
-		return manager.Wait(wait)
+		return manager.Wait(context.Background())
 	})
 
 	manager.Start(ctx)

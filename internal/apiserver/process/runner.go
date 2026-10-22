@@ -150,14 +150,10 @@ func cleanupFailedPreparation(state *prepareState) error {
 	if state == nil {
 		return nil
 	}
-	if err := runPrepareRunShutdownHooks(state.runtime.lifecycle); err != nil {
-		return err
-	}
 	deps := buildLifecycleDeps(state.resources, state.container, state.integration, state.transport, state.runtime)
 	if state.container.container == nil {
 		deps.container.containerCleanup = func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
+			ctx := context.Background()
 			events := state.resources.containerInput.containerOptions.EventSubsystem
 			if events != nil {
 				if err := events.CloseContext(ctx); err != nil {
@@ -171,7 +167,9 @@ func cleanupFailedPreparation(state *prepareState) error {
 			return nil
 		}
 	}
-	return runProcessLifecycleDeps(deps)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return newProcessShutdown(deps).Close(ctx)
 }
 
 func newContainerFromResourceStage(resources resourceOutput) *container.Container {

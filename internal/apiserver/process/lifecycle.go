@@ -51,15 +51,11 @@ type preparedServerRunDeps struct {
 }
 
 func (s *server) registerShutdownCallback(deps processLifecycleDeps) {
+	closer := newProcessShutdown(deps)
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-
-		if deps.container.stopAdmission != nil {
-			deps.container.stopAdmission()
-		}
-		if err := runPrepareRunShutdownHooks(deps.runtime.lifecycle); err != nil {
-			return err
-		}
-		if err := runProcessLifecycleDeps(deps); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := closer.Close(ctx); err != nil {
 			return err
 		}
 		log.Info("🏗️  Hexagonal Architecture server shutdown complete")
@@ -79,9 +75,8 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	if containerOutput.container != nil {
 		deps.container.stopAdmission = containerOutput.container.StopEventAdmission
 		deps.container.containerCleanup = func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			return containerOutput.container.CleanupContext(ctx)
+			// The process coordinator bounds caller waiting and retains this work.
+			return containerOutput.container.CleanupContext(context.Background())
 		}
 	}
 	if integrationOutput.authzVersionSubscriber != nil {

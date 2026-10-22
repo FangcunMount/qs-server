@@ -70,6 +70,7 @@ func (c *Container) CleanupContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	c.cleanupStarted.Store(true)
 	c.cleanupOnce.Do(func() {
 		c.cleanupDone = make(chan struct{})
 		if c.eventSubsystem != nil {
@@ -167,6 +168,9 @@ func (c *Container) cleanupResources(ctx context.Context) error {
 func (c *Container) StartEventSubsystem(ctx context.Context) error {
 	if c == nil || c.eventSubsystem == nil {
 		return nil
+	}
+	if c.cleanupStarted.Load() {
+		return fmt.Errorf("container shutdown already requested")
 	}
 	return c.eventSubsystem.Start(ctx)
 }

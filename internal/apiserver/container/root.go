@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -87,13 +88,14 @@ type Container struct {
 	TaskOpenedReminderService          notificationApp.TaskOpenedReminderService
 
 	// 容器状态
-	cleanupOnce sync.Once
-	cleanupDone chan struct{}
-	cleanupErr  error
-	initialized bool
-	silent      bool
-	modules     map[string]Module
-	moduleOrder []string
+	cleanupOnce    sync.Once
+	cleanupDone    chan struct{}
+	cleanupStarted atomic.Bool
+	cleanupErr     error
+	initialized    bool
+	silent         bool
+	modules        map[string]Module
+	moduleOrder    []string
 }
 
 // NewContainer 创建容器
@@ -194,6 +196,9 @@ func configureRetryPolicies(opts *apiserveroptions.SystemGovernanceOptions) {
 
 // Initialize 初始化容器
 func (c *Container) Initialize() error {
+	if c.cleanupStarted.Load() {
+		return fmt.Errorf("container shutdown already requested")
+	}
 	if c.initialized {
 		return nil
 	}

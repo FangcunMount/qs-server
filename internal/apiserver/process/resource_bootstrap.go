@@ -290,8 +290,7 @@ func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr 
 		// stage is published. Do not discard their drain errors or close DB early.
 		cleanup := processLifecycleDeps{resource: resourceLifecycleDeps{closePublisher: closePublisher, closeDatabase: deps.database.close}}
 		cleanup.container.containerCleanup = func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
+			ctx := context.Background()
 			if events != nil {
 				if err := events.CloseContext(ctx); err != nil {
 					return err
@@ -302,7 +301,9 @@ func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr 
 			}
 			return nil
 		}
-		resultErr = errors.Join(resultErr, runProcessLifecycleDeps(cleanup))
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		resultErr = errors.Join(resultErr, newProcessShutdown(cleanup).Close(ctx))
 	}()
 
 	mysqlDB, mongoDB, err := initializeDatabaseConnections(deps.database)
