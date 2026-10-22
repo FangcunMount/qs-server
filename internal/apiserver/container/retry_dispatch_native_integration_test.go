@@ -19,6 +19,7 @@ import (
 	"time"
 
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	mysqlTx "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -182,6 +183,18 @@ func TestM3DefaultDispatchFactory(t *testing.T) {
 	_, err = wrongMongo.BuildRetryDispatchers(true)
 	require.Error(t, err)
 	cases["foreign_original_handles_rejected"] = true
+	duplicateSQL, duplicateErr := mysqlTx.New(db, &options, routes, []string{"qs.evaluation.lifecycle"})
+	require.NoError(t, duplicateErr)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		require.NoError(t, duplicateSQL.Runtime().Close(ctx))
+	})
+	duplicate := NewContainerWithOptions(db, documents, nil, ContainerOptions{EventSubsystem: events, Transactions: &EventTransactionBindings{MySQL: duplicateSQL, Mongo: documentOwner, Routes: routes}, Silent: true})
+	t.Cleanup(func() { require.NoError(t, duplicate.Cleanup()) })
+	_, duplicateErr = duplicate.BuildRetryDispatchers(true)
+	require.Error(t, duplicateErr, "same database must not authorize a second independent owner runtime")
+	cases["duplicate_owner_runtime_refused"] = true
 	_, err = pool.ExecContext(t.Context(), "UPDATE rm_tx_binding SET store_id=? WHERE owner=?", []byte("foreign"), []byte(sb.Owner))
 	require.NoError(t, err)
 	require.ErrorIs(t, factory.Validate(t.Context()), transaction.ErrBinding)
