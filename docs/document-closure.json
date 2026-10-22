@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "5811955e2f06392012dbc4cf3d344b3d289acf2a",
+    "sha": "cc7609ad6dd78b8250437a36f777c98da8b22a24",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -10208,7 +10208,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "5811955e2f06392012dbc4cf3d344b3d289acf2a",
+        "source_sha": "cc7609ad6dd78b8250437a36f777c98da8b22a24",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10409,6 +10409,13 @@
           "result": "passed",
           "source_sha": "5811955e2f06392012dbc4cf3d344b3d289acf2a",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -tags=integration,m3_host_runtime -run=^DO_NOT_RUN_NATIVE_TESTS ./internal/apiserver/container",
+          "result": "passed",
+          "source_sha": "cc7609ad6dd78b8250437a36f777c98da8b22a24",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -10443,7 +10450,8 @@
         "Integrated worker source 9b78c5403f16e77f9a84ba6222e1c572d65d3898. Preserve previous binding {\"source_baseline\": {\"sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}}. Source8fb35d344 complete MySQL matrix39846389533:3x7,0failure/skip,exact receipts/cleanup verified. First real runtime run39846170583 failed initial paused-delivery observation at1ae0ebd; no race/timeout,all owned cleanup true,root cause remains unknown. New9b78 requires actual per-group receive readiness and safe bounded diagnostics; current development run39848361009 pending,not passed. No production or final T22 assertion.",
         "Current source baseline d85535bc726737a2a8d6e96a6e79128c0fae2b67 including the explicitly tracked native fixture; production code7ffae747096956d36e59461ec706d98acca45fd6 exposes only the existing bounded RocketMQ receive error stream; previous binding retained {\"source_baseline\": {\"sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}}. Integrated candidate adds inert real frozen-wire contract and confirmed half/final seed assertions. Runtime39849972277 still failed first hold with readiness/half/final confirmed,no transport errors or consume outcomes,all owned cleanup; root cause unresolved. Nextd855 fixture observes60s for serial3 logical/max2 physical long polls at one shared slot,records actual latency; fixture RPC/handler3m within host default9m,production unchanged. Source only until native proof; historical checks and production not relabeled.",
         "Frozen worker source 93968428287c2980c4d73743112bf3bbcad0f6e1 verified by39853362567 onMySQL8.0.36/8.0.44/8.4.11,each11 actual cases (4 workerContainer/runtime/Broker +7 originalMySQL/lease/SIGKILL),0failed/skipped,exact SDK tx.2/no replace,sourceclean andallownedcleanup. Paused observations7504/29776/29804ms; not a production SLA. Original20s andone60s failed observations retained; no claim all earlier scheduling causes resolved. Source/fixture scope is actual worker with owned loopback business RPC,not complete apiserver/provider/system. Prior binding retained {\"baseline\": {\"sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}}. Current73 targetedrace/88docs/lint passed; fullcurrentheadCI/merge still required.",
-        "T22 exact registered owner identity guard after disconnected real-constructor regression: both MySQL and Mongo duplicate runtimes reproduced as expected failures before fix;127 targeted race passed, ordinary full-repository and native container tagged lint zero issues, native compile passed. First native factory9 case success belongs to947c1ebe3 only; new identity guard native verification pending. No complete host or production claim. Prior current binding retained as JSON {\"source_baseline\": {\"sha\": \"93968428287c2980c4d73743112bf3bbcad0f6e1\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"93968428287c2980c4d73743112bf3bbcad0f6e1\", \"verified_on\": \"2026-10-23\"}}. Historical commands/native/production/signoff evidence unchanged."
+        "T22 exact registered owner identity guard after disconnected real-constructor regression: both MySQL and Mongo duplicate runtimes reproduced as expected failures before fix;127 targeted race passed, ordinary full-repository and native container tagged lint zero issues, native compile passed. First native factory9 case success belongs to947c1ebe3 only; new identity guard native verification pending. No complete host or production claim. Prior current binding retained as JSON {\"source_baseline\": {\"sha\": \"93968428287c2980c4d73743112bf3bbcad0f6e1\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"93968428287c2980c4d73743112bf3bbcad0f6e1\", \"verified_on\": \"2026-10-23\"}}. Historical commands/native/production/signoff evidence unchanged.",
+        "T22 default dual-owner native runtime proof preparation: actual default subsystem, original SQL/Mongo protocol fact+witness roots, paused next instance and real owned Broker kill/restart. Thirteen required cases; compilation and native container tagged lint passed, real CI pending. Fixture controls only the owned compose Broker after checking project label and restart=no; no local Docker execution, domain API/provider/system or producer-process-exit claim. First compile used a nonexistent receive health method; corrected to actual fixed SDK Ready API before success. Prior current binding preserved {\"source_baseline\": {\"sha\": \"5811955e2f06392012dbc4cf3d344b3d289acf2a\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"5811955e2f06392012dbc4cf3d344b3d289acf2a\", \"verified_on\": \"2026-10-23\"}}. Historical verification/production/signoffs retain their original sources."
       ]
     },
     {
