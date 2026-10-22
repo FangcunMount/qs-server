@@ -2,12 +2,15 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 type resourceLifecycleDeps struct {
@@ -51,7 +54,9 @@ func (s *server) registerShutdownCallback(deps processLifecycleDeps) {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 
 		runPrepareRunShutdownHooks(deps.runtime.lifecycle)
-		runProcessLifecycleDeps(deps)
+		if err := runProcessLifecycleDeps(deps); err != nil {
+			return err
+		}
 		log.Info("🏗️  Hexagonal Architecture server shutdown complete")
 		return nil
 	}))
@@ -92,7 +97,7 @@ func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) {
 	})
 }
 
-func runProcessLifecycleDeps(deps processLifecycleDeps) {
+func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	// Stop accepting new work and wait for in-flight transports before closing
 	// the database or Provider/container resources they still need to persist a
 	// terminal result. In particular, gRPC GracefulStop must complete before the
@@ -113,6 +118,14 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 	if deps.container.containerCleanup != nil {
 		if err := deps.container.containerCleanup(); err != nil {
 			log.Errorf("Failed to cleanup container resources: %v", err)
+			var hostIncomplete *eventsubsystem.ShutdownIncomplete
+			var sdkIncomplete *transaction.ShutdownIncomplete
+			if errors.As(err, &hostIncomplete) || errors.As(err, &sdkIncomplete) {
+				// Real work still owns these dependencies. The shutdown callback
+				// must report incomplete and permit another wait, not close the
+				// database/publisher and announce successful shutdown.
+				return err
+			}
 		}
 	}
 	// The container first stops relays and drains standard Outbox publishes.
@@ -127,6 +140,7 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) {
 			log.Errorf("Failed to close database connections: %v", err)
 		}
 	}
+	return nil
 }
 
 func (s *server) fatalPrepareRun(action string, err error) {

@@ -101,6 +101,8 @@ type Subsystem struct {
 	closeStarted         bool
 	closeDone            chan struct{}
 	closeErr             error
+	startDone            chan struct{}
+	closeAsyncOnce       sync.Once
 }
 
 var profileStartOrder = []eventcatalog.OutboxProfile{
@@ -191,7 +193,7 @@ func (s *Subsystem) RegisterConsumer(id string, handler ConsumerHandler) error {
 	return nil
 }
 
-func (s *Subsystem) Start(parent context.Context) error {
+func (s *Subsystem) Start(parent context.Context) (startErr error) {
 	if parent == nil {
 		parent = context.Background()
 	}
@@ -214,11 +216,20 @@ func (s *Subsystem) Start(parent context.Context) error {
 	ctx, cancel := context.WithCancel(parent)
 	s.cancel = cancel
 	s.started = true
+	s.startDone = make(chan struct{})
+	startDone := s.startDone
 	s.mu.Unlock()
+	defer func() {
+		// Close must see every subscriber created by this startup, including
+		// one whose Subscribe was still running when shutdown was requested.
+		close(startDone)
+		if startErr != nil {
+			startErr = errors.Join(startErr, s.Close())
+		}
+	}()
 
 	if s.publisher.IsMQBacked() {
 		if err := s.startConsumers(ctx); err != nil {
-			_ = s.Close()
 			return err
 		}
 	}
@@ -234,6 +245,12 @@ func (s *Subsystem) Start(parent context.Context) error {
 			}
 
 		}
+	}
+	s.mu.Lock()
+	closed := s.closed
+	s.mu.Unlock()
+	if closed {
+		return errors.New("event subsystem closed during startup")
 	}
 	return nil
 }
@@ -368,6 +385,15 @@ func (s *Subsystem) Close() error {
 	s.closeStarted = true
 	s.closed = true
 	cancel := s.cancel
+	startDone := s.startDone
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	if startDone != nil {
+		<-startDone
+	}
+	s.mu.Lock()
 	profiles := s.orderedProfiles()
 	consumerIDs := s.orderedConsumerIDs()
 	consumers := make([]*consumerRuntime, 0, len(consumerIDs))
@@ -375,9 +401,6 @@ func (s *Subsystem) Close() error {
 		consumers = append(consumers, s.consumers[id])
 	}
 	s.mu.Unlock()
-	if cancel != nil {
-		cancel()
-	}
 	s.wg.Wait()
 	var closeErrors []error
 	for i := len(profiles) - 1; i >= 0; i-- {
