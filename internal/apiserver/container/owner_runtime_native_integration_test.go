@@ -132,10 +132,18 @@ func ownedHostBroker(t *testing.T, action string) string {
 		if action == "release-checks" {
 			value = "6000"
 		}
-		out, e := exec.CommandContext(ctx, "docker", "exec", broker, "java", "-Xms32m", "-Xmx128m", "-XX:MaxDirectMemorySize=32m", "-cp", "/opt/rocketmq/conf:/opt/rocketmq/lib/*", "org.apache.rocketmq.tools.command.MQAdminStartup", "updateBrokerConfig", "-b", "127.0.0.1:10911", "-k", "transactionTimeOut", "-v", value).Output()
+		// Each JVM/admin operation has its own bounded fixture budget. A
+		// successful update must not consume the readback's remaining time.
+		adminCall := func(arguments ...string) ([]byte, error) {
+			operation, stop := context.WithTimeout(t.Context(), 45*time.Second)
+			defer stop()
+			command := []string{"exec", broker, "java", "-Xms32m", "-Xmx128m", "-XX:MaxDirectMemorySize=32m", "-cp", "/opt/rocketmq/conf:/opt/rocketmq/lib/*", "org.apache.rocketmq.tools.command.MQAdminStartup"}
+			return exec.CommandContext(operation, "docker", append(command, arguments...)...).Output()
+		}
+		out, e := adminCall("updateBrokerConfig", "-b", "127.0.0.1:10911", "-k", "transactionTimeOut", "-v", value)
 		require.NoError(t, e)
 		require.NotEmpty(t, out)
-		actual, e := exec.CommandContext(ctx, "docker", "exec", broker, "java", "-Xms32m", "-Xmx128m", "-XX:MaxDirectMemorySize=32m", "-cp", "/opt/rocketmq/conf:/opt/rocketmq/lib/*", "org.apache.rocketmq.tools.command.MQAdminStartup", "getBrokerConfig", "-b", "127.0.0.1:10911").Output()
+		actual, e := adminCall("getBrokerConfig", "-b", "127.0.0.1:10911")
 		require.NoError(t, e)
 		found := false
 		for line := range strings.SplitSeq(string(actual), "\n") {
