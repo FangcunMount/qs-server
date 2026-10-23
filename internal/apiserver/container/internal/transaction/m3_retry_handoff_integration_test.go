@@ -119,6 +119,16 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 		require.Zero(t, executions)
 		cliCases["offline_cli_no_new_tables_or_collections"] = true
 		cliCases["offline_cli_no_sdk_transaction_rows"] = true
+		func() {
+			_, err := pool.ExecContext(t.Context(), "RENAME TABLE rm_outbox TO rm_outbox_native_hidden")
+			require.NoError(t, err)
+			defer func() {
+				_, err := pool.ExecContext(context.Background(), "RENAME TABLE rm_outbox_native_hidden TO rm_outbox")
+				require.NoError(t, err)
+			}()
+			nativeMissingHandoffLedger(t, binding, database, "QS_RETRY_HANDOFF_MYSQL_DSN", cfg.FormatDSN())
+		}()
+		cliCases["offline_inventory_missing_ledger_not_empty"] = true
 	} else {
 		require.NoError(t, root.WithinTransaction(t.Context(), func(ctx context.Context) error {
 			already, err := store.TransferLegacy(ctx, f, authority)
@@ -254,6 +264,15 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 		}
 		cliCases["offline_cli_no_new_tables_or_collections"] = true
 		cliCases["offline_cli_no_sdk_transaction_rows"] = true
+		func() {
+			admin := db.Client().Database("admin")
+			require.NoError(t, admin.RunCommand(t.Context(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox"}, {Key: "to", Value: db.Name() + ".rm_outbox_native_hidden"}}).Err())
+			defer func() {
+				require.NoError(t, admin.RunCommand(context.Background(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox_native_hidden"}, {Key: "to", Value: db.Name() + ".rm_outbox"}}).Err())
+			}()
+			nativeMissingHandoffLedger(t, binding, db.Name(), "QS_RETRY_HANDOFF_MONGO_URI", os.Getenv("QS_M3_MONGO_URI"))
+		}()
+		cliCases["offline_inventory_missing_ledger_not_empty"] = true
 	} else {
 		require.NoError(t, root.WithinTransaction(t.Context(), func(ctx context.Context) error {
 			already, err := store.TransferLegacy(ctx, f, authority)

@@ -36,10 +36,28 @@ type HandoffOutcome struct {
 
 func NewHandoff(store port.HandoffStore, runner root.Runner, authority port.AuthorityValidator, binding transaction.Binding) (*Handoff, error) {
 	if store == nil || runner == nil || authority == nil || !binding.Valid() ||
-		(binding.Owner != "qs.mysql" && binding.Owner != "qs.mongo") {
+		(binding.Owner != "qs.mysql" && binding.Owner != "qs.mongo") || store.Binding() != binding {
 		return nil, transaction.ErrBinding
 	}
 	return &Handoff{store: store, root: runner, authority: authority, binding: binding}, nil
+}
+
+func (h *Handoff) Inspect(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	if err := model.ValidateHandoffSelection(h.binding, selected); err != nil {
+		return model.LegacyInventory{}, err
+	}
+	reader, ok := h.store.(port.HandoffInspector)
+	if !ok {
+		return model.LegacyInventory{}, transaction.ErrBinding
+	}
+	result, err := reader.InspectLegacy(ctx, selected)
+	if err != nil {
+		return model.LegacyInventory{}, err
+	}
+	if result.Binding != h.binding {
+		return model.LegacyInventory{}, transaction.ErrBinding
+	}
+	return result, nil
 }
 
 // Apply transfers each selected plan in its own original root, stopping at the

@@ -21,11 +21,14 @@ type handoffRootKey struct{}
 
 type handoffStoreFixture struct {
 	*storeFixture
+	binding          transaction.Binding
 	validated, calls int
 	validateErr, err error
 	already          bool
 	plans            [][]byte
 }
+
+func (s *handoffStoreFixture) Binding() transaction.Binding { return s.binding }
 
 func (s *handoffStoreFixture) Validate(context.Context) error {
 	s.validated++
@@ -47,7 +50,7 @@ func handoffFixture(t *testing.T) (*handoffStoreFixture, model.HandoffReview, Ha
 	binding := transaction.Binding{Owner: "qs.mysql", StoreID: "original-primary", WriterEpoch: "m3-1"}
 	review, err := model.ReviewHandoff(binding, strings.Repeat("a", 40), "operator:9", "approved maintenance", []model.Frozen{store.record.Plan})
 	require.NoError(t, err)
-	return &handoffStoreFixture{storeFixture: store}, review, HandoffPreconditions{
+	return &handoffStoreFixture{storeFixture: store, binding: binding}, review, HandoffPreconditions{
 		AdmissionClosed: true, AllLegacyWritersStopped: true,
 		ExpectedSourceSHA: review.SourceSHA(), ReviewedDigest: review.Digest(),
 	}
@@ -79,13 +82,12 @@ func TestOfflineHandoffRequiresReviewedExactHostBeforeAnyDatabaseWork(t *testing
 			require.Zero(t, store.calls)
 		})
 	}
-	store, review, p := handoffFixture(t)
+	store, review, _ := handoffFixture(t)
 	binding := review.Binding()
 	binding.WriterEpoch = "another-epoch"
 	h, err := NewHandoff(store, root.RunnerFunc(handoffRunner), &authorityFixture{}, binding)
-	require.NoError(t, err)
-	_, err = h.Apply(t.Context(), review, p)
-	require.ErrorIs(t, err, model.ErrInvalid)
+	require.ErrorIs(t, err, transaction.ErrBinding)
+	require.Nil(t, h)
 	require.Zero(t, store.validated)
 }
 
