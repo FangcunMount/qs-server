@@ -534,3 +534,5 @@ M3 T24-D 候选110/43显式安装宿主原生事务超限保护账本。索引�
 `PreviewInitialBinding`、`ApplyInitialBinding`、`VerifyInitialBinding`只处理显式已安装资源对中的单个原owner。实际双库身份及资源摘要继续复用原offline preflight；新绑定所选store须无SDK/原生notice责任，实际DDL或Mongo collection/index规格由原私有计划冻结，不能用journal行代替具体对象审查。源码不新增迁移，也不把绑定做成启动时隐式安装。
 
 SQL和Mongo分别使用原根事务，只INSERT初始绑定，分别记录commit与独立fresh verify结果；不提供跨库原子性承诺、不补偿删除另一个已提交根。维护CLI及具体拒绝边界见[离线工具](../../../scripts/maintenance/qs-migrate-offline/README.md#m3初始事务-owner-绑定候选)。两个owner验证、旧责任交接和infra受审步骤都完成前，runtime与新准入继续关闭。原105独立生产前置、保护恢复与首次启动后只准前向恢复均保持；源码/CI不代表生产DDL或切换完成。
+
+T25-C3 的受控原库 fixture 新增已处置 notice 的重导入验证：保留首次 evidence/receipt，周期读取只见未处置责任，新物理索引继续封闭。fixture 直接设置 resolved 仅用于状态读取/约束测试，不是生产处置入口或真实 Broker/RPC 恢复证明；独立绑定、原版本账本和停写/保护/恢复规则保持。

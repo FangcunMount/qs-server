@@ -135,7 +135,6 @@ func ParseNativeLimitEvidence(raw []byte, expected [32]byte) (NativeLimitEvidenc
 			return reject()
 		}
 	}
-	seen := map[string]bool{}
 	indices := make([][32]byte, 0, len(report.Records))
 	keyHash, _ := hex.DecodeString(report.KeySHA)
 	for _, row := range report.Records {
@@ -143,11 +142,9 @@ func ParseNativeLimitEvidence(raw []byte, expected [32]byte) (NativeLimitEvidenc
 			return reject()
 		}
 		id, err := hex.DecodeString(row.MessageID)
-		canonical := hex.EncodeToString(id)
-		if err != nil || seen[canonical] {
+		if err != nil {
 			return reject()
 		}
-		seen[canonical] = true
 		for _, number := range []*int64{row.QueueID, row.QueueOffset, row.CommitlogOffset, row.IndexHour} {
 			if number == nil || *number < 0 {
 				return reject()
@@ -169,5 +166,11 @@ func ParseNativeLimitEvidence(raw []byte, expected [32]byte) (NativeLimitEvidenc
 		indices = append(indices, fingerprint)
 	}
 	sort.Slice(indices, func(i, j int) bool { return bytes.Compare(indices[i][:], indices[j][:]) < 0 })
-	return NativeLimitEvidence{digest: expected, indices: indices}, nil
+	// A client ID can survive a native copy. Deduplicate the full frozen
+	// index fingerprint; keep its v1 framing and every existing notice key.
+	evidence := NativeLimitEvidence{digest: expected, indices: indices}
+	if !evidence.valid() {
+		return reject()
+	}
+	return evidence, nil
 }

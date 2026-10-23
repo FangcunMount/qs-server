@@ -127,3 +127,43 @@ func TestNativeNoticeCrossLanguageOriginalByteVector(t *testing.T) {
 		t.Fatal("cross-language key drifted")
 	}
 }
+
+// Broker native recheck copies retain UNIQ_KEY; getMsgId may therefore repeat
+// across distinct internal offsets. Golden fingerprints keep v1 bytes frozen.
+func TestNativeLimitEvidenceAcceptsClientIDReuseForDistinctIndices(t *testing.T) {
+	var value map[string]any
+	if err := json.Unmarshal(nativeAuditFixture(t), &value); err != nil {
+		t.Fatal(err)
+	}
+	original := value["records"].([]any)[0].(map[string]any)
+	copyIndex := make(map[string]any)
+	for key, v := range original {
+		copyIndex[key] = v
+	}
+	copyIndex["queue_offset"], copyIndex["commitlog_offset"] = 2, 3
+	value["records"] = []any{original, copyIndex}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := ParseNativeLimitEvidence(raw, sha256.Sum256(raw))
+	if err != nil || !evidence.valid() || evidence.IndexCount() != 2 {
+		t.Fatalf("native copy with unchanged client ID rejected: %v", err)
+	}
+	expected := []string{"61922da276bd4e4b9eced322f30aac9224929b6614dce2205f5fed99df91a878", "c17eef089ffe8dcd195b09d54c8d7af26283362fc173a6226b964a4a4c0968d3"}
+	for i, index := range evidence.indices {
+		if hex.EncodeToString(index[:]) != expected[i] {
+			t.Fatal("v1 fingerprint bytes changed")
+		}
+	}
+	// Case-normalized aliases of the SAME full index still must be rejected.
+	copyIndex["queue_offset"], copyIndex["commitlog_offset"] = 1, 2
+	copyIndex["broker_message_id"] = strings.Repeat("a", 32)
+	raw, err = json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseNativeLimitEvidence(raw, sha256.Sum256(raw)); !errors.Is(err, ErrNativeLimitEvidence) {
+		t.Fatal("same canonical native index accepted twice")
+	}
+}

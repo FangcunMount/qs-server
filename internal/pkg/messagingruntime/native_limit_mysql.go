@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -39,13 +40,15 @@ func (s *SQLNativeLimits) Binding() transaction.Binding {
 type sqlNativeNotice struct {
 	key, owner, store, epoch, revision, index, proof, state []byte
 	schema                                                  int
+	resolvedAt                                              *time.Time
+	receipt                                                 []byte
 }
 
 func (s *SQLNativeLimits) validate(row sqlNativeNotice) error {
 	if row.schema != 1 {
 		return transaction.ErrSchema
 	}
-	if !bytes.Equal(row.owner, []byte(s.binding.Owner)) || !bytes.Equal(row.store, []byte(s.binding.StoreID)) || !bytes.Equal(row.epoch, []byte(s.binding.WriterEpoch)) || !bytes.Equal(row.revision, []byte(s.revision)) || len(row.key) != 32 || len(row.index) != 32 || len(row.proof) != 32 || string(row.state) != "blocked" {
+	if !bytes.Equal(row.owner, []byte(s.binding.Owner)) || !bytes.Equal(row.store, []byte(s.binding.StoreID)) || !bytes.Equal(row.epoch, []byte(s.binding.WriterEpoch)) || !bytes.Equal(row.revision, []byte(s.revision)) || len(row.key) != 32 || len(row.index) != 32 || len(row.proof) != 32 || !nativeNoticeResolutionValid(string(row.state), row.resolvedAt, row.receipt) {
 		return transaction.ErrBinding
 	}
 	var index, proof [32]byte
@@ -58,12 +61,13 @@ func (s *SQLNativeLimits) validate(row sqlNativeNotice) error {
 	return nil
 }
 
-const nativeNoticeColumns = "notice_key,owner,store_id,writer_epoch,route_revision,native_index_sha256,evidence_sha256,status,schema_version"
+const nativeNoticeColumns = "notice_key,owner,store_id,writer_epoch,route_revision,native_index_sha256,evidence_sha256,status,schema_version,resolved_at,resolution_receipt_sha256"
 
 // RecordNativeLimit writes deny-only governance, never bindings/witnesses or
 // Broker confirmations. The caller establishes authority/provenance separately.
 // A batch is bounded by64 indices and one caller budget. First audit provenance
 // stays immutable when logs/order/formatting change in a later export.
+// Re-importing an independently resolved row neither reopens nor rewrites it.
 func (s *SQLNativeLimits) RecordNativeLimit(ctx context.Context, e NativeLimitEvidence) error {
 	if s == nil || s.db == nil || s.authority == nil {
 		return transaction.ErrBinding
@@ -115,7 +119,7 @@ func (s *SQLNativeLimits) RecordNativeLimit(ctx context.Context, e NativeLimitEv
 	verify := func() error {
 		for rows.Next() {
 			var row sqlNativeNotice
-			if err := rows.Scan(&row.key, &row.owner, &row.store, &row.epoch, &row.revision, &row.index, &row.proof, &row.state, &row.schema); err != nil {
+			if err := rows.Scan(&row.key, &row.owner, &row.store, &row.epoch, &row.revision, &row.index, &row.proof, &row.state, &row.schema, &row.resolvedAt, &row.receipt); err != nil {
 				return err
 			}
 			if err := s.validate(row); err != nil {
@@ -152,7 +156,7 @@ func (s *SQLNativeLimits) ReadNativeLimit(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	var row sqlNativeNotice
-	err := s.db.QueryRowContext(ctx, `SELECT `+nativeNoticeColumns+` FROM messaging_native_limit_notices WHERE owner=? LIMIT 1`, []byte(s.binding.Owner)).Scan(&row.key, &row.owner, &row.store, &row.epoch, &row.revision, &row.index, &row.proof, &row.state, &row.schema)
+	err := s.db.QueryRowContext(ctx, `SELECT `+nativeNoticeColumns+` FROM messaging_native_limit_notices WHERE owner=? AND status<>'resolved' LIMIT 1`, []byte(s.binding.Owner)).Scan(&row.key, &row.owner, &row.store, &row.epoch, &row.revision, &row.index, &row.proof, &row.state, &row.schema, &row.resolvedAt, &row.receipt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}

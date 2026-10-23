@@ -50,3 +50,22 @@ func nativeNoticeBudget(ctx context.Context) (context.Context, context.CancelFun
 	}
 	return context.WithTimeout(ctx, 2*time.Second)
 }
+
+// Resolution metadata is governance proof, never business/witness authority.
+// Active reads use the owner/status index; imports validate resolved history
+// without reopening it or scanning all historical rows on each observation.
+func nativeNoticeResolutionValid(state string, at *time.Time, receipt []byte) bool {
+	switch state {
+	case "blocked":
+		return at == nil && receipt == nil
+	case "resolved":
+		if at == nil || at.IsZero() || len(receipt) != 32 {
+			return false
+		}
+		var digest [32]byte
+		copy(digest[:], receipt)
+		return digest != [32]byte{}
+	default:
+		return false
+	}
+}
