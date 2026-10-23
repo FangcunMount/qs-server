@@ -11,6 +11,7 @@ import (
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 // ErrReservationRace requires the whole borrowed transaction to roll back.
@@ -59,5 +60,13 @@ type AuthorizationGuard interface {
 // the original source and exact stored plan; they never reset terminal state.
 type HandoffStore interface {
 	Store
+	Binding() transaction.Binding
 	TransferLegacy(context.Context, model.Frozen, AuthorityValidator) (alreadyTransferred bool, err error)
+}
+
+// HandoffInspector owns one bounded fresh read boundary on the configured
+// original primary. Selected held sources must match their exact stored plans;
+// unselected held rows remain unaccounted. It never transfers or publishes.
+type HandoffInspector interface {
+	InspectLegacy(context.Context, []model.Frozen) (model.LegacyInventory, error)
 }

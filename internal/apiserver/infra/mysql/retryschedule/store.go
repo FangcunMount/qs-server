@@ -32,6 +32,8 @@ type Store struct {
 
 var _ port.Store = (*Store)(nil)
 
+func (s *Store) Binding() transaction.Binding { return s.binding }
+
 // New is inert and rejects a transaction as a long-lived primary.
 func New(db *gorm.DB, binding transaction.Binding, opts ...hostmysql.BaseRepositoryOptions) (*Store, error) {
 	if db == nil || db.Error != nil || db.Config == nil || db.Dialector == nil || db.Name() != "mysql" || db.Statement == nil || binding.Owner != "qs.mysql" || !binding.Valid() {

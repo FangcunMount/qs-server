@@ -36,6 +36,8 @@ type Store struct {
 
 var _ port.Store = (*Store)(nil)
 
+func (s *Store) Binding() transaction.Binding { return s.binding }
+
 func New(db *mongo.Database, binding transaction.Binding, opts ...base.BaseRepositoryOptions) (*Store, error) {
 	if db == nil || db.Client() == nil || db.Name() == "" || binding.Owner != "qs.mongo" || !binding.Valid() {
 		return nil, transaction.ErrBinding

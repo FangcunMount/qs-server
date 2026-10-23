@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ad51a102ef19298ef9e1bb2ad8e41986f706268d",
-    "verified_on": "2026-10-23"
+    "sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
+    "verified_on": "2026-10-24"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 45,
+      "expected_count": 46,
       "budgeted": false
     }
   },
@@ -13162,8 +13162,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "7ea6de30f14d91bd4b7f39cfc365689524778b1f",
-        "verified_on": "2026-10-19"
+        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -13247,7 +13247,8 @@
             }
           ]
         }
-      ]
+      ],
+      "review_note": " Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"7ea6de30f14d91bd4b7f39cfc365689524778b1f\", \"verified_on\": \"2026-10-19\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks."
     },
     {
       "path": "scripts/oneoff/assign_unassigned_testees.md",
@@ -13839,8 +13840,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "5a5095e8786ae667566be1a8eebc0aef76e27ff9",
-        "verified_on": "2026-10-23"
+        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -14434,7 +14435,7 @@
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
         "M3 T24 scoped native-fixture review: previous source baseline and document binding preserved here, not relabelled as current native acceptance: {\"source_baseline\": {\"sha\": \"dcd231e48fed37a2f6262d891273b2641e39d030\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"f899d5cb4b19ed15e5dbe741fd42b3d804370784\", \"verified_on\": \"2026-10-19\"}}. Only readiness test synchronization/child-test attribution changed; client release remains required and actual server processlist must drain within one second. Original CI failure did not distinguish query error from nonzero thread count; its root cause remains unknown. Tag compilation passed; exact native CI pending; production tool/limits/schema unchanged."
       ],
-      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed."
+      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks."
     },
     {
       "path": "scripts/database/compatibility-retirement.md",
@@ -14995,8 +14996,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b788a5dab83ae5cb45e989d8d30f27fbcbf04220",
-        "verified_on": "2026-10-18"
+        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -15091,7 +15092,8 @@
             }
           ]
         }
-      ]
+      ],
+      "review_note": " Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"b788a5dab83ae5cb45e989d8d30f27fbcbf04220\", \"verified_on\": \"2026-10-18\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks."
     },
     {
       "path": "scripts/maintenance/qs-ai-messaging/README.md",
@@ -15099,8 +15101,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9c8eb4b510cf724467f5458fa25eb862ef15529a",
-        "verified_on": "2026-10-19"
+        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -15181,7 +15183,106 @@
           ]
         }
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"9c8eb4b510cf724467f5458fa25eb862ef15529a\", \"verified_on\": \"2026-10-19\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks."
+    },
+    {
+      "path": "scripts/maintenance/qs-retry-handoff/README.md",
+      "class": "sidecar",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
+        "verified_on": "2026-10-24"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/maintenance/qs-retry-handoff/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/retryschedule/handoff_review.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/eventing/retrydispatch/handoff.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/retry_handoff.go"
+        },
+        {
+          "kind": "source",
+          "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/retryschedule/handoff_inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/retryschedule/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/retryschedule/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/port/retryschedule/store.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race ./scripts/maintenance/qs-retry-handoff ./internal/apiserver/eventing/retryschedule ./internal/apiserver/application/eventing/retrydispatch",
+          "result": "passed",
+          "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+          "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "source_selector",
+          "path": "scripts/maintenance/qs-retry-handoff/main.go",
+          "selector": "func run(",
+          "result": "matched",
+          "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+          "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "make build-maintenance",
+          "result": "passed",
+          "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+          "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./scripts/maintenance/qs-retry-handoff ./internal/apiserver/eventing/retryschedule ./internal/apiserver/application/eventing/retrydispatch ./internal/apiserver/infra/mysql/retryschedule ./internal/apiserver/infra/mongo/retryschedule",
+          "result": "passed",
+          "source_sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
+          "verified_on": "2026-10-24"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Local pure/race/static/compile evidence only; no local real dependencies, native host acceptance, CI merge, production approval, deployment or business acceptance. Input is private original-plan evidence; complete inventory/export and actual database handoff remain required.",
+          "Maintenance binaries built into a task-private temporary directory with the same committed Go/Makefile source. Documentation was still uncommitted; this is a local build check, not a frozen clean release artifact or production execution."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "M3-T25-B-NATIVE-HANDOFF",
+          "kind": "verification",
+          "severity": "high",
+          "summary": "Offline future-handoff candidate needs actual original-primary CLI acceptance, complete inventory/export, full CI and merge.",
+          "exit_criteria": "Verify original first bytes/authority/deadline, DB root atomicity, old claimer exclusion, partial/unknown outcomes and cleanup through isolated Actions before production cutover."
+        }
+      ],
+      "review_note": "Original CLI development run39990541142 on aa977fc790104f636f4d301163a5eb8df6e7831a passed60/0/0 with cleanup. Readonly inventory source208fb8ff has only local pure/race/lint and tagged compile so far; do not reuse the earlier native report for this new behavior. Prior review marker preserved: {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Historical checks retain their own exact source attribution."
     }
   ],
   "initial_review_baseline": {
