@@ -46,7 +46,9 @@ func TestM3TransactionSchemaNative(t *testing.T) {
 		t.Fatal("approved original 105/40 upgrade failed", result, err)
 	}
 	m3SQLProof(t, n.db, "qs.mysql")
+	t.Run("resolved-native-governance-read-and-reimport", func(t *testing.T) { verifySQLNativeResolutionFixture(t, n.db, "qs.mysql") })
 	m3MongoProof(t, n)
+	t.Run("resolved-Mongo-native-governance-read-and-reimport", func(t *testing.T) { verifyMongoNativeResolutionFixture(t, n) })
 	var payload, state string
 	var attempts, failures int
 	err = n.db.QueryRowContext(t.Context(), `SELECT HEX(payload),state,attempt_count,failure_count FROM rm_outbox WHERE message_id='old'`).Scan(&payload, &state, &attempts, &failures)

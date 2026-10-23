@@ -42,15 +42,17 @@ func (s *MongoNativeLimits) Binding() transaction.Binding {
 }
 
 type nativeNoticeDocument struct {
-	Key      []byte `bson:"_id"`
-	Owner    string `bson:"owner"`
-	StoreID  string `bson:"store_id"`
-	Epoch    string `bson:"writer_epoch"`
-	Revision string `bson:"route_revision"`
-	Index    []byte `bson:"native_index_sha256"`
-	Evidence []byte `bson:"evidence_sha256"`
-	Status   string `bson:"status"`
-	Schema   int    `bson:"schema_version"`
+	Key        []byte     `bson:"_id"`
+	Owner      string     `bson:"owner"`
+	StoreID    string     `bson:"store_id"`
+	Epoch      string     `bson:"writer_epoch"`
+	Revision   string     `bson:"route_revision"`
+	Index      []byte     `bson:"native_index_sha256"`
+	Evidence   []byte     `bson:"evidence_sha256"`
+	Status     string     `bson:"status"`
+	Schema     int        `bson:"schema_version"`
+	ResolvedAt *time.Time `bson:"resolved_at"`
+	Receipt    []byte     `bson:"resolution_receipt_sha256"`
 }
 
 func (s *MongoNativeLimits) validate(row nativeNoticeDocument) ([32]byte, error) {
@@ -65,7 +67,7 @@ func (s *MongoNativeLimits) validate(row nativeNoticeDocument) ([32]byte, error)
 	var index [32]byte
 	copy(index[:], row.Index)
 	key := nativeNoticeKey(s.binding, s.revision, index)
-	if index == [32]byte{} || evidence == [32]byte{} || !bytes.Equal(row.Key, key[:]) || row.Status != "blocked" {
+	if index == [32]byte{} || evidence == [32]byte{} || !bytes.Equal(row.Key, key[:]) || !nativeNoticeResolutionValid(row.Status, row.ResolvedAt, row.Receipt) {
 		return [32]byte{}, transaction.ErrBinding
 	}
 	return evidence, nil
@@ -143,7 +145,7 @@ func (s *MongoNativeLimits) ReadNativeLimit(ctx context.Context) (bool, error) {
 	if err := s.validateSchema(ctx); err != nil {
 		return false, err
 	}
-	query := bson.M{"owner": s.binding.Owner}
+	query := bson.M{"owner": s.binding.Owner, "status": bson.M{"$ne": "resolved"}}
 	var actual nativeNoticeDocument
 	err := s.db.Collection("messaging_native_limit_notices").FindOne(ctx, query).Decode(&actual)
 	if errors.Is(err, mongo.ErrNoDocuments) {
