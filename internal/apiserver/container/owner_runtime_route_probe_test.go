@@ -99,12 +99,15 @@ func waitOwnedProxyRoutes(ctx context.Context, base, observer *generic.RocketMQO
 	}
 	defer conn.Close()
 	stub := pb.NewMessagingServiceClient(conn)
-	deadline, cancel := context.WithTimeout(ctx, 45*time.Second)
+	// Proxy5.5.1 caches a not-found route and refreshes after20s. A ten-try
+	// two-second loop could expire before its first async refresh. This owned
+	// restart readiness window covers registration/cache refresh, not sends.
+	deadline, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	endpoints := &pb.Endpoints{Scheme: pb.AddressScheme_IPv4, Addresses: []*pb.Address{{Host: host, Port: int32(number)}}}
 	var last error
 	lastOwner := -1
-	for attempt := 0; attempt < 10; attempt++ {
+	for attempt := 0; attempt < 46; attempt++ {
 		all := true
 		for _, query := range queries {
 			call, done := context.WithTimeout(deadline, 3*time.Second)
@@ -134,7 +137,7 @@ func waitOwnedProxyRoutes(ctx context.Context, base, observer *generic.RocketMQO
 		if all {
 			return -1, nil
 		}
-		if attempt == 9 {
+		if attempt == 45 {
 			break
 		}
 		select {
