@@ -330,6 +330,16 @@ func run() (result map[string]any) {
 			}
 			continue
 		}
+		if c.Mode == "close_for_recovery" {
+			// Transfer ONLY this isolated fixture's cleanup ownership. Normal
+			// close still drops its temporary schema; a recovery process verifies
+			// the original binding before adopting the final cleanup duty.
+			if !schemaOwned {
+				return fail("recovery_handoff", errors.New("owned fixture schema required"))
+			}
+			schemaOwned = false
+			return map[string]any{"ok": true, "closed": true, "schema_retained": true}
+		}
 		if c.Mode == "close" {
 			return map[string]any{"ok": true, "closed": true}
 		}
