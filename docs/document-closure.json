@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "397445dac0042f883898e80755cc83b49f2dc001",
+    "sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
     "verified_on": "2026-10-24"
   },
   "status_policy": {
@@ -11834,7 +11834,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "397445dac0042f883898e80755cc83b49f2dc001",
+        "source_sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
         "verified_on": "2026-10-24"
       },
       "fact_sources": [
@@ -12307,6 +12307,13 @@
           "result": "matched",
           "source_sha": "e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1",
           "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/migration ./internal/pkg/messagingruntime -count=1",
+          "result": "passed",
+          "source_sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
+          "verified_on": "2026-10-24"
         }
       ],
       "production_evidence": {
@@ -12544,7 +12551,8 @@
         "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment.",
         "T25-C2 transaction startup policy source review at e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1. Prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only early no-DDL rejection added; existing paired schema/identity readonly validation and offline approval/restore contracts unchanged. README updated. Native and production evidence remain separate; first docs-facts stale-source failure retained in progress.",
         "Merge PR434 startup no-DDL guard into initial binding candidate; preserve incoming review {\"source_sha\": \"e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1\", \"verified_on\": \"2026-10-24\"}. Revalidate combined source; no native or production receipts reassigned.",
-        "Combined initial binding and merged PR434 source review at 397445dac0042f883898e80755cc83b49f2dc001. Preserve previous {\"source_sha\": \"d7aa4ddd16460d25a82d6116413b547a9f37d836\", \"verified_on\": \"2026-10-24\"}. README includes readonly startup guard and separate binding roots; fresh combined native CI pending. No prior reports reassigned."
+        "Combined initial binding and merged PR434 source review at 397445dac0042f883898e80755cc83b49f2dc001. Preserve previous {\"source_sha\": \"d7aa4ddd16460d25a82d6116413b547a9f37d836\", \"verified_on\": \"2026-10-24\"}. README includes readonly startup guard and separate binding roots; fresh combined native CI pending. No prior reports reassigned.",
+        "Reviewed controlled governance read/reimport fixtures at 8ce415393505ac7a94a273315fce8a1782900ceb; package race passed; native only compiled locally. No production resolution or RPC claim. Original installation, binding and protection/recovery boundaries preserved."
       ]
     },
     {
@@ -14591,7 +14599,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
+        "source_sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
         "verified_on": "2026-10-24"
       },
       "fact_sources": [
@@ -14851,6 +14859,13 @@
           "result": "passed",
           "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
           "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/pkg/migration ./internal/pkg/messagingruntime -count=1",
+          "result": "passed",
+          "source_sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
+          "verified_on": "2026-10-24"
         }
       ],
       "production_evidence": {
@@ -15021,7 +15036,8 @@
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified.",
       "review_history": [
-        "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment."
+        "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment.",
+        "Reviewed controlled governance read/reimport fixtures at 8ce415393505ac7a94a273315fce8a1782900ceb; package race passed; native only compiled locally. No production resolution or RPC claim. Original installation, binding and protection/recovery boundaries preserved."
       ]
     },
     {

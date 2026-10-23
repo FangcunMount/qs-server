@@ -151,3 +151,5 @@ M3 T24-D 候选110/43显式安装宿主原生事务超限保护账本。索引�
 - `verify`在新只读边界核对精确原绑定、当前双库与资源。已有绑定或任一新责任不允许再次apply，不upsert、覆盖或删除。SQL/Mongo分别返回`not_attempted`（未尝试commit）、`unknown`或`committed`以及独立`verified`；一个owner成功不能覆盖另一个失败或未知，准入继续关闭。提交未知先保留材料并只读盘点，不自动重试、补偿或伪造witness。
 
 这些新SDK表/集合和notice须为空，旧业务、Outbox、重试计划及历史责任不会被删除，也不由绑定入口签为排空。冻结声明不是真实停写证明；所有结果始终`cutover_authorized=false`，受审文件/命令仍由infra单一协调目录持久记录。构造与运行都不执行DDL、不启动MQ/API/worker、不改变worker配额。`TestM3InitialBindingCLINative`通过实际独立CLI验证原库安装、并发唯一赢家、新责任拒绝及版本账本保持；本地仅编译收集，真实结果须隔离CI，本候选的原生结果以infra执行总表为准。
+
+T25-C3 的受控原库 fixture 新增已处置 notice 的重导入验证：保留首次 evidence/receipt，周期读取只见未处置责任，新物理索引继续封闭。fixture 直接设置 resolved 仅用于状态读取/约束测试，不是生产处置入口或真实 Broker/RPC 恢复证明；独立绑定、原版本账本和停写/保护/恢复规则保持。
