@@ -62,3 +62,9 @@ MongoDB 13 当前迁移不包含 `dropIndexes`，不得保留“force 13 绕过 
 新增 MySQL 106 / MongoDB 41，独立安装 SDK schema v1 的 rm_tx_binding/request/execution/witness（Mongo witness 内嵌 execution）及 rm_tx_expiry。身份字段采用二进制/简单排序规则；不改旧 Outbox，不自动生成 owner/store_id/writer_epoch binding。新目标只接受完整106/41，部分106/40、105/41不作为可启动pair。Down拒绝删除协议证据。
 
 这些是宿主显式迁移资源，构造和 Start 不执行 DDL；旧105独立生产上线仍为前置，106/41只在隔离CI验证。当前业务未切换。业务档案及接入进度以 [infra M3总表](https://github.com/FangcunMount/infra/blob/codex/rocketmq-m3/docs/server/rocketmq-m3-execution.md) 为准。
+
+## M3 事务 runtime 的离线安装约束
+
+启用领域消息或 AI command 事务 owner 时，必须显式设置 `migration.enabled=false`。Options 和数据库初始化入口在创建连接前拒绝自动 DDL；旧 NSQ、仅 NORMAL 及禁用的 AI 配置保持原有迁移策略。关闭 DDL 后仍通过已有原 MySQL/Mongo 双库身份和唯一 clean head 核验，缺失 metadata 不会由启动自动创建。
+
+先使用受审离线入口安装精确候选资源和 owner 绑定，再经 infra 首次启动屏障启动业务进程。worker/collection 的独立启动归属、原资源与并发配置保持原样；最终候选须逐进程核对实际 owner 和只读启动路径。源码检查不代表生产 DDL 已执行，完整切换进度以 infra M3 总表为准。

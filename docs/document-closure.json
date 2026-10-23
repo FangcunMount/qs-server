@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
+    "sha": "e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1",
     "verified_on": "2026-10-24"
   },
   "status_policy": {
@@ -11834,8 +11834,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a784c574704d8cdf29ed308785e754479fa25345",
-        "verified_on": "2026-10-23"
+        "source_sha": "e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -12292,6 +12292,14 @@
           "result": "passed",
           "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/bootstrap/database.go",
+          "selector": "ValidateTransactionStartupPolicy()",
+          "result": "matched",
+          "source_sha": "e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1",
+          "verified_on": "2026-10-24"
         }
       ],
       "production_evidence": {
@@ -12524,7 +12532,10 @@
         "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified.",
+      "review_history": [
+        "T25-C2 transaction startup policy source review at e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1. Prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only early no-DDL rejection added; existing paired schema/identity readonly validation and offline approval/restore contracts unchanged. README updated. Native and production evidence remain separate; first docs-facts stale-source failure retained in progress."
+      ]
     },
     {
       "path": "internal/pkg/migration/migrations/mongodb/README.md",

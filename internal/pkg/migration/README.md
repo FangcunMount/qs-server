@@ -8,7 +8,7 @@
 
 ## 结论
 
-qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁移。迁移文件嵌入二进制，不依赖运行目录挂载 SQL 或 JSON 文件。
+qs-server 的 legacy/仅 NORMAL 模式在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁移。启用领域或 AI command 事务 owner 时要求显式 `migration.enabled=false`，在数据库初始化前拒绝自动 DDL；关闭 DDL 后仍通过原双库身份与唯一 clean head 只读核验。事务 schema 和绑定必须由受审离线入口安装。迁移文件嵌入二进制，不依赖运行目录挂载 SQL 或 JSON 文件。
 
 迁移版本机制只保证同一版本不会被正常重复执行，不保证迁移无损。仓库中存在 `DROP`、结构替换、数据清理和遗留对象退役迁移；任何生产迁移都必须按迁移内容评估风险、备份和验收。
 

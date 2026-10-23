@@ -39,6 +39,11 @@ func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 
 // Initialize 初始化所有数据库连接
 func (dm *DatabaseManager) Initialize() error {
+	if dm.config != nil {
+		if err := dm.config.ValidateTransactionStartupPolicy(); err != nil {
+			return err
+		}
+	}
 	ctx := context.Background()
 	logger.L(ctx).Infow("Initializing database connections...",
 		"component", "DatabaseManager",
@@ -471,6 +476,11 @@ func redisDatabaseForLog(cfg *database.RedisConfig) int {
 
 // runMigrations 执行数据库迁移
 func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
+	if dm.config != nil {
+		if err := dm.config.ValidateTransactionStartupPolicy(); err != nil {
+			return err
+		}
+	}
 	if dm.config.MigrationOptions == nil {
 		return fmt.Errorf("migration options are required")
 	}
