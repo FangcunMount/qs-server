@@ -2,6 +2,7 @@ package messagingruntime
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -125,4 +126,87 @@ func TestRuntimeProtectionKeepsCheckerAndCannotBeBypassedByOpeningAdmission(t *t
 	require.True(t, runtime.Stats().Ready)
 	require.NoError(t, runtime.SetAdmission(false))
 	require.False(t, runtime.Stats().Ready, "review bypassed operator's configured pause")
+}
+
+// The startup driver uses atomics because the real host sampler reads Stats
+// concurrently; the simpler admission stubs above have no background readers.
+type observedStartupDriver struct {
+	transactionDriverStub
+	starts         atomic.Int32
+	ready, stopped atomic.Bool
+}
+
+func (d *observedStartupDriver) Start(context.Context) error {
+	d.starts.Add(1)
+	d.ready.Store(true)
+	return nil
+}
+func (d *observedStartupDriver) StopAdmission() { d.ready.Store(false) }
+func (d *observedStartupDriver) Close(context.Context) error {
+	d.ready.Store(false)
+	d.stopped.Store(true)
+	return nil
+}
+func (d *observedStartupDriver) Wait(context.Context) error { return nil }
+func (d *observedStartupDriver) Stats() rocketmq.TransactionStats {
+	return rocketmq.TransactionStats{Ready: d.ready.Load(), Stopped: d.stopped.Load()}
+}
+
+func TestCanceledInitialObservationRetainsRealWorkAndNeverRegistersProducer(t *testing.T) {
+	driver := &observedStartupDriver{}
+	runtime := &TransactionRuntime{sender: driver, admission: true, cleanupBudget: 10 * time.Millisecond}
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	t.Cleanup(func() { once.Do(func() { close(release) }) })
+	monitor, err := newProtocolMonitor("iam.mysql", func(context.Context) (protocolSample, error) { close(entered); <-release; return protocolSample{}, nil }, driver.Stats, runtime.admitted, transaction.DefaultLimits(), prometheus.NewRegistry())
+	require.NoError(t, err)
+	runtime.monitor = monitor
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	finished := make(chan error, 1)
+	go func() { finished <- runtime.Start(ctx) }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("initial read not started")
+	}
+	require.Zero(t, driver.starts.Load(), "producer registered before authoritative initial observation")
+	cancel()
+	select {
+	case err := <-finished:
+		require.ErrorIs(t, err, transaction.ErrShutdownIncomplete)
+	case <-time.After(time.Second):
+		t.Fatal("startup cleanup ignored its explicit budget")
+	}
+	require.Zero(t, driver.starts.Load())
+	require.False(t, runtime.Stats().Stopped, "startup cancellation discarded actual database work")
+	require.True(t, runtime.ProtectionStats().ObservationInFlight)
+	once.Do(func() { close(release) })
+	wait, stop := context.WithTimeout(t.Context(), time.Second)
+	defer stop()
+	require.NoError(t, runtime.Wait(wait))
+	require.True(t, runtime.Stats().Stopped)
+	require.False(t, runtime.ProtectionStats().SamplerRunning)
+}
+
+func TestProtectedInitialObservationStillStartsIdleChecker(t *testing.T) {
+	driver := &observedStartupDriver{}
+	runtime := &TransactionRuntime{sender: driver, admission: true}
+	monitor, err := newProtocolMonitor("iam.mysql", func(context.Context) (protocolSample, error) {
+		return protocolSample{gaps: 1, confirmationAge: 600}, nil
+	}, driver.Stats, runtime.admitted, transaction.DefaultLimits(), prometheus.NewRegistry())
+	require.NoError(t, err)
+	runtime.monitor = monitor
+	require.NoError(t, runtime.Start(t.Context()))
+	t.Cleanup(func() {
+		// testing cancels t.Context before cleanup callbacks run.
+		finish, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, runtime.Close(finish))
+	})
+	require.EqualValues(t, 1, driver.starts.Load())
+	require.True(t, driver.Stats().Ready, "host protection prevented idle Checker registration")
+	require.True(t, runtime.ProtectionStats().Protected)
+	require.False(t, runtime.Stats().Ready)
+	require.ErrorIs(t, runtime.SetAdmission(true), ErrTransactionAdmissionClosed)
 }

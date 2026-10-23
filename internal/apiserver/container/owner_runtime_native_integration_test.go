@@ -36,6 +36,7 @@ import (
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/go-sql-driver/mysql"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -162,15 +163,22 @@ func ownerNativeError(err error) map[string]any {
 		kind = "canceled"
 	case errors.Is(err, transaction.ErrStaleExecution):
 		kind = "stale_execution"
+	case errors.Is(err, messagingruntime.ErrProtocolProtection):
+		kind = "protocol_protection"
+	case errors.Is(err, messagingruntime.ErrTransactionAdmissionClosed):
+		kind = "host_admission"
 	case errors.Is(err, transaction.ErrBinding):
 		kind = "binding"
 	case errors.Is(err, transaction.ErrTransactionRequired):
 		kind = "transaction_required"
 	default:
 		kind = "other"
+		var registrationError prometheus.AlreadyRegisteredError
 		var sqlError *driver.MySQLError
 		var mongoError mongo.CommandError
-		if errors.As(err, &sqlError) {
+		if errors.As(err, &registrationError) {
+			kind = "metrics_registration"
+		} else if errors.As(err, &sqlError) {
 			kind, code = "mysql", int(sqlError.Number)
 		} else if errors.As(err, &mongoError) {
 			kind, code = "mongo", int(mongoError.Code)
@@ -588,7 +596,11 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	require.Equal(t, oldID, ownedHostBroker(t, "id"))
 	require.NotEqual(t, oldPID, ownedHostBroker(t, "pid"))
 	next := newInstance(true)
-	require.NoError(t, next.events.Start(t.Context()))
+	startErr := next.events.Start(t.Context())
+	if startErr != nil {
+		diagnostic("next_owner_start", -1, transaction.LocalUnknown, startErr)
+	}
+	require.NoError(t, startErr)
 	mysqlNext, mongoNext := next.events.MySQLTransactionOwner().Runtime(), next.events.MongoTransactionOwner().Runtime()
 	if verifyProtection {
 		for _, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
