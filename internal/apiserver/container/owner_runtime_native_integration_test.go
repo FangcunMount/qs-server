@@ -43,6 +43,8 @@ import (
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -182,6 +184,11 @@ func ownerNativeError(err error) map[string]any {
 			kind, code = "mysql", int(sqlError.Number)
 		} else if errors.As(err, &mongoError) {
 			kind, code = "mongo", int(mongoError.Code)
+		} else if rpc, ok := status.FromError(err); ok {
+			code = int(rpc.Code())
+			if rpc.Code() == codes.DeadlineExceeded {
+				kind = "deadline"
+			}
 		}
 	}
 	return map[string]any{"kind": kind, "code": code}
@@ -595,7 +602,16 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	waitOwnedHostTLS(t, opts.RocketMQ)
 	require.Equal(t, oldID, ownedHostBroker(t, "id"))
 	require.NotEqual(t, oldPID, ownedHostBroker(t, "pid"))
-	next := newInstance(true)
+	// A listening TLS socket does not prove the restarted Proxy can serve the
+	// restored routes/authentication. Warm the real consume-only observer before
+	// starting fresh owners; do not relax the production SDK's five-second RPC.
+	after := startObserver()
+	subscribe(after)
+	require.Eventually(t, func() bool { return after.Ready(10 * time.Second) }, 30*time.Second, 50*time.Millisecond)
+	// With protection enabled, reproduce the normal configured-open production
+	// startup. Registration must finish while the observed latch keeps writes
+	// closed; a manual-open attempt is not the startup barrier.
+	next := newInstance(!verifyProtection)
 	startErr := next.events.Start(t.Context())
 	if startErr != nil {
 		diagnostic("next_owner_start", -1, transaction.LocalUnknown, startErr)
@@ -614,8 +630,6 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 		protectionCases["initial_authoritative_observation_latches_before_registration"] = true
 		protectionCases["plain_admission_cannot_bypass_latch"] = true
 	}
-	after := startObserver()
-	subscribe(after)
 	maxima := map[string]int{"running": 0, "queued": 0}
 	require.Eventually(t, func() bool {
 		left, right := mysqlNext.Stats(), mongoNext.Stats()
@@ -698,6 +712,7 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 			status := runtime.ProtectionStats()
 			require.True(t, status.Protected, "healthy sample automatically reopened admission")
 			require.ErrorIs(t, runtime.SetAdmission(true), messagingruntime.ErrTransactionAdmissionClosed)
+			require.NoError(t, runtime.SetAdmission(false), "pause explicitly before named review")
 			require.ErrorIs(t, runtime.ReviewProtection(status.Generation+1, "native-owned-recovery-review"), messagingruntime.ErrProtocolProtection)
 			require.NoError(t, runtime.ReviewProtection(status.Generation, "native-owned-recovery-review"))
 			require.False(t, runtime.Stats().Ready, "named review bypassed explicitly paused host gate")

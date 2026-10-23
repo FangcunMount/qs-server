@@ -18,10 +18,9 @@ import (
 )
 
 type transactionState struct {
-	mysql     *mysqlTx.Committer
-	mongo     *mongoTx.Owner
-	runtimes  []*messagingruntime.TransactionRuntime
-	admission bool
+	mysql    *mysqlTx.Committer
+	mongo    *mongoTx.Owner
+	runtimes []*messagingruntime.TransactionRuntime
 }
 
 func transactionTopics(catalog *eventcatalog.Catalog, kinds []string) ([]string, error) {
@@ -115,9 +114,9 @@ func NewWithTransactionOwners(opts Options, o *options.MessagingOptions) (*Subsy
 		return nil, err
 	}
 	s.transactions = &transactionState{mysql: mysqlOwner, mongo: mongoOwner,
-		runtimes: []*messagingruntime.TransactionRuntime{mysqlOwner.Runtime(), mongoOwner.Runtime()}, admission: o.RocketMQ.PublishingEnabled()}
+		runtimes: []*messagingruntime.TransactionRuntime{mysqlOwner.Runtime(), mongoOwner.Runtime()}}
 	for _, runtime := range s.transactions.runtimes {
-		if err = runtime.SetAdmission(false); err != nil {
+		if err = runtime.HoldStartupAdmission(); err != nil {
 			return nil, err
 		}
 	}
@@ -154,7 +153,7 @@ func (s *Subsystem) startTransactionOwners(ctx context.Context) error {
 		return errors.New("transaction host closed during startup")
 	}
 	for _, runtime := range s.transactions.runtimes {
-		if err := runtime.SetAdmission(s.transactions.admission); err != nil {
+		if err := runtime.ReleaseStartupAdmission(); err != nil {
 			return err
 		}
 	}
@@ -195,8 +194,5 @@ func (s *Subsystem) StopAdmission() {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.HasTransactionOwners() {
-		s.transactions.admission = false
-	}
 	s.pauseTransactionAdmission()
 }

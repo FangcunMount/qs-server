@@ -96,3 +96,5 @@ disposable test databases retain explicit `DISABLED`. Production cutover and bus
 acceptance require separate runtime evidence.
 
 当前接收器固定为已核验的腾讯云 serverA / Linux AMD64。维护包仅携带该目标所需的 AMD64 二进制，保留原 32 MiB 解包上限；不会通过扩大输入上限容纳无关架构。
+
+M3 宿主验收的旧 Readiness 原生夹具在 CI39941425800 的 dirty_version_rejected 处报 native_readiness_connection_not_released，随后触发父测试 FailNow。该条件同时包含查询失败及剩余线程非零，原记录未区分两者，不能确认具体原因或倒签为连接泄漏/服务端延迟。此次仅修正测试同步假设：client Conn/DB/pool 释放仍须为真，另在原测试 context 内最多一秒观察该自有用户的 server processlist 真正归零；查询错误或超时仍失败，不重跑 reader、不 KILL 连接、不修改任何生产查询预算。reader 显式借用当前子测试；只编译通过，当前 SHA 的完整 required 原生 CI 仍待完成，旧失败不改成成功。

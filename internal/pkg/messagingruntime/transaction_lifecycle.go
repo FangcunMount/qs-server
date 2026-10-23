@@ -27,6 +27,7 @@ type TransactionRuntime struct {
 	cleanupBudget       time.Duration
 	mu                  sync.RWMutex
 	admission, stopping bool
+	startupHeld         bool
 }
 
 var _ transaction.Runtime = (*TransactionRuntime)(nil)
@@ -61,15 +62,31 @@ func (r *TransactionRuntime) startFailure(cause error) error {
 func (r *TransactionRuntime) SetAdmission(open bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.stopping || (open && (!r.sender.Stats().Ready || !r.monitor.allowed())) {
+	if r.stopping || (open && (r.startupHeld || !r.sender.Stats().Ready || !r.monitor.allowed())) {
 		return ErrTransactionAdmissionClosed
 	}
 	r.admission = open
 	return nil
 }
+
+// HoldStartupAdmission stages the host without changing configured write intent.
+// All owners must register before ReleaseStartupAdmission. Neither operation
+// clears protection, overrides SDK health, or reopens a stopping runtime.
+func (r *TransactionRuntime) HoldStartupAdmission() error    { return r.setStartupHeld(true) }
+func (r *TransactionRuntime) ReleaseStartupAdmission() error { return r.setStartupHeld(false) }
+func (r *TransactionRuntime) setStartupHeld(held bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopping {
+		return ErrTransactionAdmissionClosed
+	}
+	r.startupHeld = held
+	return nil
+}
+
 func (r *TransactionRuntime) admitted() bool {
 	r.mu.RLock()
-	open := r.admission && !r.stopping
+	open := r.admission && !r.stopping && !r.startupHeld
 	r.mu.RUnlock()
 	return open && r.sender.Stats().Ready && r.monitor.allowed()
 }

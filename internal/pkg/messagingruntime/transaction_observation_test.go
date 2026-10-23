@@ -197,7 +197,9 @@ func TestProtectedInitialObservationStillStartsIdleChecker(t *testing.T) {
 	}, driver.Stats, runtime.admitted, transaction.DefaultLimits(), prometheus.NewRegistry())
 	require.NoError(t, err)
 	runtime.monitor = monitor
+	require.NoError(t, runtime.HoldStartupAdmission())
 	require.NoError(t, runtime.Start(t.Context()))
+	require.NoError(t, runtime.ReleaseStartupAdmission(), "host startup barrier mistook protection for failed Checker registration")
 	t.Cleanup(func() {
 		// testing cancels t.Context before cleanup callbacks run.
 		finish, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -209,4 +211,21 @@ func TestProtectedInitialObservationStillStartsIdleChecker(t *testing.T) {
 	require.True(t, runtime.ProtectionStats().Protected)
 	require.False(t, runtime.Stats().Ready)
 	require.ErrorIs(t, runtime.SetAdmission(true), ErrTransactionAdmissionClosed)
+}
+
+func TestStartupBarrierRetainsExplicitPauseAndCannotBypassProtectionOrStop(t *testing.T) {
+	driver := &transactionDriverStub{ready: true}
+	runtime := &TransactionRuntime{sender: driver, admission: true}
+	require.NoError(t, runtime.HoldStartupAdmission())
+	require.False(t, runtime.Stats().Ready)
+	require.ErrorIs(t, runtime.SetAdmission(true), ErrTransactionAdmissionClosed)
+	require.NoError(t, runtime.SetAdmission(false))
+	require.NoError(t, runtime.ReleaseStartupAdmission())
+	require.False(t, runtime.Stats().Ready, "startup completion overwrote a concurrent explicit pause")
+	require.NoError(t, runtime.SetAdmission(true))
+	require.True(t, runtime.Stats().Ready)
+	runtime.StopAdmission()
+	require.ErrorIs(t, runtime.ReleaseStartupAdmission(), ErrTransactionAdmissionClosed)
+	require.ErrorIs(t, runtime.HoldStartupAdmission(), ErrTransactionAdmissionClosed)
+	require.False(t, runtime.Stats().Ready)
 }
