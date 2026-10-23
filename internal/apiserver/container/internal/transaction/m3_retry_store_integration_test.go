@@ -74,7 +74,7 @@ func retryFrozen(t *testing.T, a model.Authority, evt event.DomainEvent, due tim
 
 func retryStoreReceipt(t *testing.T, backend string, cases map[string]bool) {
 	t.Helper()
-	raw, err := json.Marshal(map[string]any{"backend": backend, "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "original_authorization_and_explicit_future_ownership_handoff", "broker_dispatch_not_claimed": true, "system_login_not_claimed": true})
+	raw, err := json.Marshal(map[string]any{"backend": backend, "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "original_authorization_and_explicit_future_ownership_handoff", "offline_cli_required": handoffCLIRequired(t), "broker_dispatch_not_claimed": true, "system_login_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_RETRY_STORE_RECEIPT " + string(raw))
 }
@@ -201,7 +201,7 @@ func TestM3RetryMySQLStore(t *testing.T) {
 	for name, passed := range verifyGovernedMySQL(t, db, store) {
 		cases[name] = passed
 	}
-	for name, passed := range verifyLegacyHandoffMySQL(t, db, store, frozen) {
+	for name, passed := range verifyLegacyHandoffMySQL(t, db, store, frozen, binding) {
 		cases[name] = passed
 	}
 	retryStoreReceipt(t, "mysql", cases)
@@ -333,7 +333,7 @@ func TestM3RetryMongoStore(t *testing.T) {
 	for name, passed := range verifyGovernedMongo(t, db, store) {
 		cases[name] = passed
 	}
-	for name, passed := range verifyLegacyHandoffMongo(t, db, store, frozen) {
+	for name, passed := range verifyLegacyHandoffMongo(t, db, store, frozen, binding) {
 		cases[name] = passed
 	}
 	retryStoreReceipt(t, "mongo", cases)
