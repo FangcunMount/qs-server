@@ -44,6 +44,8 @@ import (
 
 type config struct {
 	Project, Source, DSN, Schema, TLSDirectory, AIPayloadEndpoint string
+	RecoverExisting                                               bool
+	PayloadBind                                                   string
 	Options                                                       hostopts.AIWorkflowMessagingOptions
 }
 
@@ -110,6 +112,9 @@ func run() (result map[string]any) {
 		cfg.Options.RocketMQ == nil || !loopback(cfg.Options.RocketMQ.Endpoint) {
 		return result
 	}
+	if (cfg.PayloadBind != "" && !loopback(cfg.PayloadBind)) || (cfg.RecoverExisting && cfg.PayloadBind == "") {
+		return result
+	}
 	// An isolated process must never send standard/SDK logs through the control pipe.
 	sink, err := os.OpenFile(filepath.Join(cfg.TLSDirectory, "qs-private.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
@@ -135,10 +140,17 @@ func run() (result map[string]any) {
 	defer admin.Close()
 	installCtx, installCancel := context.WithTimeout(root, 30*time.Second)
 	defer installCancel()
-	if _, err = admin.ExecContext(installCtx, "CREATE DATABASE `"+cfg.Schema+"`"); err != nil {
-		return fail("create_owned_schema", err)
+	schemaOwned := false
+	if !cfg.RecoverExisting {
+		if _, err = admin.ExecContext(installCtx, "CREATE DATABASE `"+cfg.Schema+"`"); err != nil {
+			return fail("create_owned_schema", err)
+		}
+		schemaOwned = true
 	}
 	defer func() {
+		if !schemaOwned {
+			return
+		}
 		ctx, c := context.WithTimeout(context.Background(), 10*time.Second)
 		defer c()
 		if _, e := admin.ExecContext(ctx, "DROP DATABASE `"+cfg.Schema+"`"); e != nil {
@@ -156,16 +168,6 @@ func run() (result map[string]any) {
 	}
 	pool.SetMaxOpenConns(12)
 	defer pool.Close()
-	// Explicit fixture installation, never a constructor side effect or production DDL.
-	for _, name := range []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index", "000091_ai_messaging", "000092_ai_messaging_failures", "000094_ai_messaging_admission", "000095_ai_messaging_observations", "000097_ai_command_retirement", "000106_transaction_messaging", "000108_ai_transaction_command_order"} {
-		raw, e := os.ReadFile(filepath.Join(cfg.Source, "internal/pkg/migration/migrations/mysql", name+".up.sql"))
-		if e != nil {
-			return fail("migration_source", e)
-		}
-		if _, e = pool.ExecContext(installCtx, string(raw)); e != nil {
-			return fail("explicit_migrations", e)
-		}
-	}
 	if cfg.Options.RocketMQ == nil || cfg.Options.SelectedProvider() != "rocketmq" {
 		return result
 	}
@@ -173,11 +175,33 @@ func run() (result map[string]any) {
 	if !ok {
 		return result
 	}
-	if _, err = pool.ExecContext(installCtx, "INSERT INTO rm_tx_binding VALUES(?,?,?,1)", []byte("qs.mysql"), []byte(binding.StoreID), []byte(binding.WriterEpoch)); err != nil {
-		return fail("owner_binding", err)
-	}
-	if _, err = pool.ExecContext(installCtx, "UPDATE ai_messaging_admission SET closed=FALSE WHERE singleton=1"); err != nil {
-		return fail("fixture_admission", err)
+	if cfg.RecoverExisting {
+		// A restart may read only the current owned database and exact original
+		// binding. It never installs/adopts historical rows or changes the epoch.
+		var storedOwner, storedStore, storedEpoch []byte
+		var version int
+		err = pool.QueryRowContext(installCtx, "SELECT owner,store_id,writer_epoch,schema_version FROM rm_tx_binding WHERE owner=?", []byte("qs.mysql")).Scan(&storedOwner, &storedStore, &storedEpoch, &version)
+		if err != nil || string(storedOwner) != "qs.mysql" || string(storedStore) != binding.StoreID || string(storedEpoch) != binding.WriterEpoch || version != 1 {
+			return fail("recovery_binding", errors.New("exact original binding required"))
+		}
+		schemaOwned = true
+	} else {
+		// Explicit fixture installation only; never a constructor side effect.
+		for _, name := range []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index", "000091_ai_messaging", "000092_ai_messaging_failures", "000094_ai_messaging_admission", "000095_ai_messaging_observations", "000097_ai_command_retirement", "000106_transaction_messaging", "000108_ai_transaction_command_order"} {
+			raw, e := os.ReadFile(filepath.Join(cfg.Source, "internal/pkg/migration/migrations/mysql", name+".up.sql"))
+			if e != nil {
+				return fail("migration_source", e)
+			}
+			if _, e = pool.ExecContext(installCtx, string(raw)); e != nil {
+				return fail("explicit_migrations", e)
+			}
+		}
+		if _, err = pool.ExecContext(installCtx, "INSERT INTO rm_tx_binding VALUES(?,?,?,1)", []byte("qs.mysql"), []byte(binding.StoreID), []byte(binding.WriterEpoch)); err != nil {
+			return fail("owner_binding", err)
+		}
+		if _, err = pool.ExecContext(installCtx, "UPDATE ai_messaging_admission SET closed=FALSE WHERE singleton=1"); err != nil {
+			return fail("fixture_admission", err)
+		}
 	}
 	keys, err := host.LoadMessagingKeys(cfg.Options)
 	if err != nil {
@@ -256,11 +280,13 @@ func run() (result map[string]any) {
 			result = fail("owner_close", e)
 		}
 	}()
-	if err = shared.Runtime().SetAdmission(true); err != nil {
+	if err = shared.Runtime().SetAdmission(!cfg.RecoverExisting); err != nil {
 		return fail("owner_admission", err)
 	}
-	if err = runtime.Start(root); err != nil {
-		return fail("consumer_start", err)
+	if !cfg.RecoverExisting {
+		if err = runtime.Start(root); err != nil {
+			return fail("consumer_start", err)
+		}
 	}
 	defer func() {
 		ctx, c := context.WithTimeout(context.Background(), 30*time.Second)
@@ -269,7 +295,11 @@ func run() (result map[string]any) {
 			result = fail("consumer_close", e)
 		}
 	}()
-	listener, err = net.Listen("tcp", "127.0.0.1:0")
+	listen := cfg.PayloadBind
+	if listen == "" {
+		listen = "127.0.0.1:0"
+	}
+	listener, err = net.Listen("tcp", listen)
 	if err != nil {
 		return fail("payload_listener", err)
 	}
@@ -286,7 +316,7 @@ func run() (result map[string]any) {
 	commandStore := &store.MessagingCommandStore{Store: &store.Store{DB: pool}, Messaging: legacy, Seal: seal, Transactions: commands}
 	service := &app.Service{Store: commandStore}
 	output := json.NewEncoder(os.Stdout)
-	if err = output.Encode(map[string]any{"ready": true, "schema": cfg.Schema, "payload_endpoint": listener.Addr().String()}); err != nil {
+	if err = output.Encode(map[string]any{"ready": true, "schema": cfg.Schema, "payload_endpoint": listener.Addr().String(), "recovered": cfg.RecoverExisting}); err != nil {
 		return fail("control_ready", err)
 	}
 	input := bufio.NewScanner(os.Stdin)
@@ -300,12 +330,34 @@ func run() (result map[string]any) {
 			}
 			continue
 		}
+		if c.Mode == "close_for_recovery" {
+			// Transfer ONLY this isolated fixture's cleanup ownership. Normal
+			// close still drops its temporary schema; a recovery process verifies
+			// the original binding before adopting the final cleanup duty.
+			if !schemaOwned {
+				return fail("recovery_handoff", errors.New("owned fixture schema required"))
+			}
+			schemaOwned = false
+			return map[string]any{"ok": true, "closed": true, "schema_retained": true}
+		}
 		if c.Mode == "close" {
 			return map[string]any{"ok": true, "closed": true}
 		}
 		ctx, end := context.WithTimeout(root, 20*time.Second)
 		response := map[string]any{"ok": true}
 		switch c.Mode {
+		case "owner_state":
+			stats := shared.Runtime().Stats()
+			response["protocol"] = map[string]any{"ready": stats.Ready, "completed_results": stats.CompletedResults, "half_prepared": stats.HalfPreparedResults, "local_committed": stats.LocalCommittedResults, "final_unknown": stats.FinalUnknownResults, "check_commit": stats.CheckCommit, "check_rollback": stats.CheckRollback}
+		case "open_recovery":
+			if !cfg.RecoverExisting {
+				err = app.ErrInvalid
+				break
+			}
+			err = shared.Runtime().SetAdmission(true)
+			if err == nil {
+				err = runtime.Start(root)
+			}
 		case "start":
 			err = service.Start(ctx, c.Start)
 		case "change":
