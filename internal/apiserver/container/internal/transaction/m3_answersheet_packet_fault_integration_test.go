@@ -12,7 +12,9 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -35,9 +37,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// The infra parent owns the packet proxy. All matching original-session COMMIT
-// requests are disconnected, including native driver retries. No client hook
-// substitutes for a server commit, and no SDK business executor is repeated.
+// The infra parent owns a finite packet-loss window for matching original
+// session COMMITs, including native driver retries, then restores the real path.
+// No client hook substitutes for a server commit or repeats the SDK executor.
 func TestM3AnswerOriginalCommitPacketFault(t *testing.T) {
 	boundary := os.Getenv("QS_M3_FAULT_BOUNDARY")
 	require.Contains(t, []string{"before", "after"}, boundary)
@@ -99,13 +101,16 @@ func TestM3AnswerOriginalCommitPacketFault(t *testing.T) {
 	root := modtx.NewMongoRunner(originalDB, modtx.MongoRunnerOptions{Boundary: "answersheet_submit", Limiter: backpressure.NewLimiter(2, time.Second)})
 	var calls, callbacks atomic.Int32
 	var sessionID bson.Raw
+	var sessionMu sync.Mutex
 	rootFinished := make(chan struct{})
 	runner := apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
 		calls.Add(1)
 		defer close(rootFinished)
 		return root.WithinTransaction(ctx, func(active context.Context) error {
 			callbacks.Add(1)
+			sessionMu.Lock()
 			sessionID = append(bson.Raw(nil), mongo.SessionFromContext(active).ID()...)
+			sessionMu.Unlock()
 			return fn(active)
 		})
 	})
@@ -144,26 +149,39 @@ func TestM3AnswerOriginalCommitPacketFault(t *testing.T) {
 	}))
 	require.Eventually(t, func() bool { return consumer.Ready(10 * time.Second) }, 30*time.Second, 50*time.Millisecond)
 	sheet, meta := m3AnswerSheet(t, 901, "original-packet-input")
-	// This is the caller's bounded operation deadline, not a changed SDK lease
-	// or an injected exception. Driver COMMIT retries keep the same session/plan.
+	// The caller deadline is not proof that the driver returned: its commit loop
+	// uses a background context. Keep real capacity until path recovery and join.
 	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Second)
 	result, _, applicationError := store.CreateDurably(ctx, sheet, meta)
 	cancel()
-	select {
-	case <-rootFinished:
-	case <-time.After(15 * time.Second):
-		t.Fatal("original Mongo driver did not return after operation deadline")
-	}
 	require.Equal(t, int32(1), calls.Load())
 	require.GreaterOrEqual(t, callbacks.Load(), int32(1))
-	require.LessOrEqual(t, callbacks.Load(), int32(16))
-	require.NotEmpty(t, sessionID)
+	sessionMu.Lock()
+	exactSession := append(bson.Raw(nil), sessionID...)
+	sessionMu.Unlock()
+	require.NotEmpty(t, exactSession)
 	if boundary == "before" {
-		// The old driver has returned and no COMMIT reached the server. Release
-		// this exact original session so the durable abort can compete for locks.
-		// Killing it is not itself accepted as an SDK Rollback proof.
-		require.NoError(t, primary.Database("admin").RunCommand(t.Context(), bson.D{{Key: "killSessions", Value: bson.A{sessionID}}}).Err())
+		// Dispose the exact still-open server session after the caller deadline.
+		// The driver's real COMMIT loop can outlive that deadline; this alone is
+		// not accepted as an SDK rollback decision or a released execution slot.
+		require.NoError(t, primary.Database("admin").RunCommand(t.Context(), bson.D{{Key: "killSessions", Value: bson.A{exactSession}}}).Err())
 	}
+	control := os.Getenv("QS_M3_FAULT_PATH_RESTORED")
+	require.True(t, filepath.IsAbs(control))
+	require.True(t, strings.HasPrefix(filepath.Base(filepath.Dir(control)), "rocketmq-m2-"))
+	// The parent first captures real proxy events/counters, then restores the
+	// path for this original session. It does not synthesize a COMMIT response.
+	fmt.Println("M3_QS_MONGO_FAULT_STATE {\"event\":\"fault_window_ready\"}")
+	require.Eventually(t, func() bool {
+		raw, e := os.ReadFile(control)
+		return e == nil && string(raw) == "original-path-restored"
+	}, 15*time.Second, 50*time.Millisecond)
+	select {
+	case <-rootFinished:
+	case <-time.After(35 * time.Second):
+		t.Fatal("original Mongo driver did not return after the real network path recovered")
+	}
+	require.LessOrEqual(t, callbacks.Load(), int32(16))
 	require.Eventually(t, func() bool { return store.Runtime().Stats().ActiveSends == 0 }, 15*time.Second, 50*time.Millisecond)
 	var execution struct {
 		Plan []byte `bson:"plan"`
