@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "dcd231e48fed37a2f6262d891273b2641e39d030",
+    "sha": "6856fc1479e08a5393e638fe1e9a11d8b3e91d5e",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -9248,6 +9248,66 @@
         {
           "kind": "source",
           "path": "internal/apiserver/infra/answersheetgap/scanner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/owner_runtime_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_constructor_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_lifecycle.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_lifecycle_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_metrics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_metrics_http_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_observation.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_observation_binding.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_observation_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_protection.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_protection_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/subsystem/transactions.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/owner_runtime_error_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/owner_runtime_route_probe_test.go"
         }
       ],
       "verification": [
@@ -9318,6 +9378,12 @@
           "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
           "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
         }
+      ],
+      "notes": [
+        "M3 T24 host observability WIP: actual published tx.4, default /metrics cached collector, original-primary snapshot, initial observation before Producer registration, latched generation review and actual sampler shutdown ownership. Target race, lint and docs pass; native actual dual-owner/Broker guard profile pending. Preserve existing gaps and production evidence; no full old page re-signoff.",
+        "QS configured-open startup now uses an independent host startup hold/release; protection no longer turns successful Checker registration into startup failure. Preserve explicit pause made during startup and reject reopening stopped owners. Target race/subsystem and lint passed; configured-open native revision pending. Broker restart fixture warms actual consume-only route readiness before owner registration; no production RPC budget increase. Prior paused-owner native21 pass remains scoped to its original SHA; full473 matrix8.0.44 passes21,8.0.36/8.4.11 fail at next-owner start with fixed other/0 diagnostic, root cause not yet established.",
+        "Owned native fixture readiness21e7de: full294 run39948283390 passed21/0/0 on8.0.44 and8.4.11;8.0.36 failed at consume-only Subscribe before new owner registration, cleanup verified, root cause not established. Add bounded read-only signed QueryRoute for all seven physical routes/account roles after actual owned Broker restart before creating any new clients; no executor/half/client startup retries, production RPC timeout change or SDK source mutation. Signature golden/race and tagged lint passed; current exact-SHA native pending. Prior root baseline retained {\"sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Historical native/production evidence is not relabelled.",
+        "Owned readiness09cce run39952347643 passes8.0.36/8.0.44 each21/0/0;8.4.11 fails fixed QueryRoute TOPIC_NOT_FOUND40402 at preflight, before next owner registration; all owned cleanup/parameters restored. This proves missing actual authenticated route readiness, not a MySQL failure or unique explanation of earlier failures. Proxy5.5.1 TopicRouteService caches missing routes and refreshAfterWrite is20s; the previous10-attempt/two-second loop can finish before that first async refresh despite its45s outer context. Correct the read-only owned restart readiness to90s overall/46 attempts with original3s per-query budget. No production SDK timeout,half/executor retry,resource/schema/SDK change. Signature/race and tagged lint passed; corrected exact-source full native pending. Prior root baseline retained {\"sha\": \"21e7de49536ded254c583f0213bec6f8246cb780\", \"verified_on\": \"2026-10-23\"}. Historical evidence unchanged."
       ]
     },
     {
@@ -13772,8 +13838,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f899d5cb4b19ed15e5dbe741fd42b3d804370784",
-        "verified_on": "2026-10-19"
+        "source_sha": "5a5095e8786ae667566be1a8eebc0aef76e27ff9",
+        "verified_on": "2026-10-23"
       },
       "fact_sources": [
         {
@@ -14364,7 +14430,8 @@
         "Fixed MySQL content CI source task5185 plus normal actualmain353 merge4f28: complete prior current metadata preserved as JSON {\"source_baseline\": {\"sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}, \"verified\": {\"source_sha\": \"08df11df78e3811674f284b8db636d28593dfdaa\", \"verified_on\": \"2026-10-16\"}}. MySQL registry digest a532724022429812ec797c285c1b540a644c15e248579c6bfdf12a8fbaab4964 is from the original f8f successful pull in immutable backend79a9e7072347ef0aa77033696a72ef0919e4185df48808ff768d3cbf62f414bd, not a new tag lookup. The fixture checks Linux/AMD64, observed RepoDigest/engineId/owned container.Image chain and exact8.0.36 in result/qualify; no configID assumption. Original14 test function ASTs unchanged; new3 plus original14 pure17 passed, selected config ordinary/race117 each oncePASS0FAIL/SKIP, actual ShellCheck0.11/actionlint/vet/pinnedlint and Python compile/syntax passed, QA b38aa55819eba38254ca198ed484ed3d291dcc2c2c7106187fa1089ddb8c121a. All original Tool602/2c314, V10, business511/280, carrier512MiB/UID/hostbind and inner/outer budgets retain original bytes/values. Entire C/D metadata job equals actualmain353 including fresh I14/110m, old proofs and H fixed old CLI. New optional-carrier actual run and new-head CI/AI remain pending; f8f/e877/C500 original results and all historical failures, commands, production/signoffs retain their own source. No Docker/registry/SSH/CI/production executed.",
         "R3 retired M4 object tools and carrier-only CI. Prior native/production receipts retain their historical sources in the existing ledger and Git13dea; removed entries are no longer live verification commands. Current migration and generic metadata gates remain.",
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
-        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34."
+        "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
+        "M3 T24 scoped native-fixture review: previous source baseline and document binding preserved here, not relabelled as current native acceptance: {\"source_baseline\": {\"sha\": \"dcd231e48fed37a2f6262d891273b2641e39d030\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"f899d5cb4b19ed15e5dbe741fd42b3d804370784\", \"verified_on\": \"2026-10-19\"}}. Only readiness test synchronization/child-test attribution changed; client release remains required and actual server processlist must drain within one second. Original CI failure did not distinguish query error from nonzero thread count; its root cause remains unknown. Tag compilation passed; exact native CI pending; production tool/limits/schema unchanged."
       ],
       "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed."
     },

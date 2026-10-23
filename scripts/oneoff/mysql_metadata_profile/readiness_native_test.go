@@ -101,13 +101,28 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		return db
 	}
 	b := binding{SHA: strings.Repeat("a", 40), RunID: "12345-1", Expected: hashText(cfg.Host, strconv.Itoa(cfg.Port), cfg.Database, uuid)}
-	reader := func(user string) readinessReceipt {
+	reader := func(t *testing.T, user string) readinessReceipt {
 		t.Helper()
 		db := open(user)
 		r := releaseReadinessDatabase(db, probeReadiness(ctx, db, cfg, b))
-		var remaining int
-		if admin.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.processlist WHERE USER = ?", user).Scan(&remaining) != nil || remaining != 0 {
-			t.Fatal("native_readiness_connection_not_released")
+		// Closing the client socket and the server removing its processlist row
+		// are separate observations. Require actual server-side drain within a
+		// fixed budget instead of assuming that FIN was processed synchronously.
+		drain, stop := context.WithTimeout(ctx, time.Second)
+		defer stop()
+		for {
+			var remaining int
+			if admin.QueryRowContext(drain, "SELECT COUNT(*) FROM information_schema.processlist WHERE USER = ?", user).Scan(&remaining) != nil {
+				t.Fatal("native_readiness_connection_release_read_failed")
+			}
+			if remaining == 0 {
+				break
+			}
+			select {
+			case <-drain.Done():
+				t.Fatal("native_readiness_connection_not_released")
+			case <-time.After(10 * time.Millisecond):
+			}
 		}
 		raw, err := json.Marshal(r)
 		if err != nil {
@@ -124,7 +139,7 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		return r
 	}
 	t.Run("missing_process_real_privilege_error", func(t *testing.T) {
-		r := reader("readiness_no_process")
+		r := reader(t, "readiness_no_process")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "query_permission_denied" || r.FailureStage != "transactions" {
 			t.Fatalf("native missing PROCESS not rejected: %s/%s", r.ErrorCategory, r.FailureStage)
 		}
@@ -245,7 +260,7 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		if _, err = txn.ExecContext(ctx, "UPDATE assessment SET historical_lifecycle_evidence=JSON_OBJECT('fixture','held-private-value') WHERE id=3"); err != nil {
 			t.Fatal("owned_writer_mutation_failed")
 		}
-		r := reader("readiness_global")
+		r := reader(t, "readiness_global")
 		if !r.Complete || r.QueryCount != 23 || r.ControlStatementCount != 3 || r.TransactionReleased == nil || !*r.TransactionReleased || r.FormatVersion != 2 || r.Measurements == nil {
 			t.Fatalf("native readiness incomplete: %s/%s", r.ErrorCategory, r.FailureStage)
 		}
@@ -380,7 +395,7 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 				t.Error("owned_primary_restore_failed")
 			}
 		}()
-		r := reader("readiness_global")
+		r := reader(t, "readiness_global")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "metadata_invalid" || r.FailureStage != "primary_indexes" || r.TransactionReleased == nil || !*r.TransactionReleased {
 			t.Fatal("native_signed_primary_shape_accepted")
 		}
@@ -389,7 +404,7 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		if _, err := admin.ExecContext(ctx, "UPDATE schema_migrations SET dirty=true WHERE version=100"); err != nil {
 			t.Fatal("owned_version_mutation_failed")
 		}
-		r := reader("readiness_global")
+		r := reader(t, "readiness_global")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "migration_pair_rejected" || r.FailureStage != "migration_before" {
 			t.Fatal("native_dirty_version_accepted")
 		}
@@ -401,7 +416,7 @@ func TestMetadataReadinessNativeOwnedMySQL(t *testing.T) {
 		if _, err := admin.ExecContext(ctx, "ALTER TABLE evaluation_outcome DROP CHECK chk_outcome_historical_committed"); err != nil {
 			t.Fatal("owned_shape_mutation_failed")
 		}
-		r := reader("readiness_global")
+		r := reader(t, "readiness_global")
 		if r.Complete || r.Measurements != nil || r.ErrorCategory != "metadata_invalid" {
 			t.Fatal("native_missing_target_check_accepted")
 		}

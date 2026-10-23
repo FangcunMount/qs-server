@@ -26,5 +26,9 @@ func NewTransactionalSender(o *options.MessagingOptions, owner string, store tra
 	if err != nil {
 		return nil, err
 	}
-	return &TransactionRuntime{sender: sender, admission: o.RocketMQ.PublishingEnabled()}, nil
+	runtime := &TransactionRuntime{sender: sender, admission: o.RocketMQ.PublishingEnabled()}
+	if err = attachProtocolMonitor(runtime, store, config.Limits); err != nil {
+		return nil, err
+	}
+	return runtime, nil
 }
