@@ -150,4 +150,4 @@ M3 T24-D 候选110/43显式安装宿主原生事务超限保护账本。索引�
 - `apply`只接收原`--binding-plan`、独立`--binding-reviewed-sha256`及`--binding-writers-excluded`。重新核对原身份/clean head/实际对象摘要、空SDK责任及空原生notice；SQL在SERIALIZABLE根内重查并持锁，Mongo在原session根内重查并唯一INSERT绑定。Mongo所选库使用Primary/majority；不在transaction callback里做外部调用，不执行消息/模型或SDK发送。
 - `verify`在新只读边界核对精确原绑定、当前双库与资源。已有绑定或任一新责任不允许再次apply，不upsert、覆盖或删除。SQL/Mongo分别返回`not_attempted`（未尝试commit）、`unknown`或`committed`以及独立`verified`；一个owner成功不能覆盖另一个失败或未知，准入继续关闭。提交未知先保留材料并只读盘点，不自动重试、补偿或伪造witness。
 
-这些新SDK表/集合和notice须为空，旧业务、Outbox、重试计划及历史责任不会被删除，也不由绑定入口签为排空。冻结声明不是真实停写证明；所有结果始终`cutover_authorized=false`，受审文件/命令仍由infra单一协调目录持久记录。构造与运行都不执行DDL、不启动MQ/API/worker、不改变worker配额。`TestM3InitialBindingCLINative`通过实际独立CLI验证原库安装、并发唯一赢家、新责任拒绝及版本账本保持；本地仅编译收集，真实结果须隔离CI，当前尚未有本候选通过报告。
+这些新SDK表/集合和notice须为空，旧业务、Outbox、重试计划及历史责任不会被删除，也不由绑定入口签为排空。冻结声明不是真实停写证明；所有结果始终`cutover_authorized=false`，受审文件/命令仍由infra单一协调目录持久记录。构造与运行都不执行DDL、不启动MQ/API/worker、不改变worker配额。`TestM3InitialBindingCLINative`通过实际独立CLI验证原库安装、并发唯一赢家、新责任拒绝及版本账本保持；本地仅编译收集，真实结果须隔离CI，本候选的原生结果以infra执行总表为准。
