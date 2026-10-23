@@ -612,6 +612,14 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	waitOwnedHostTLS(t, opts.RocketMQ)
 	require.Equal(t, oldID, ownedHostBroker(t, "id"))
 	require.NotEqual(t, oldPID, ownedHostBroker(t, "pid"))
+	// Verify actual signed QueryRoute for both owners and the consume-only
+	// account before creating new clients. Retry only read-side startup probes;
+	// never an executor, half message, model call or failed SDK runtime.
+	index, routeErr := waitOwnedProxyRoutes(t.Context(), opts.RocketMQ, observer.RocketMQ)
+	if routeErr != nil {
+		diagnostic("next_owner_start", index, transaction.LocalUnknown, routeErr)
+	}
+	require.NoError(t, routeErr)
 	// A listening TLS socket does not prove the restarted Proxy can serve the
 	// restored routes/authentication. Warm the real consume-only observer before
 	// starting fresh owners; do not relax the production SDK's five-second RPC.
