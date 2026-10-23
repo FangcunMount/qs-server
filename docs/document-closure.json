@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "1fedb4509cfd1fdc39e76aa10eed18a8c9670945",
+    "sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
     "verified_on": "2026-10-24"
   },
   "status_policy": {
@@ -15191,7 +15191,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+        "source_sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
         "verified_on": "2026-10-24"
       },
       "fact_sources": [
@@ -15214,6 +15214,22 @@
         {
           "kind": "source",
           "path": "Makefile"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/retryschedule/handoff_inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/retryschedule/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/retryschedule/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/port/retryschedule/store.go"
         }
       ],
       "verification": [
@@ -15238,6 +15254,13 @@
           "result": "passed",
           "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
           "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./scripts/maintenance/qs-retry-handoff ./internal/apiserver/eventing/retryschedule ./internal/apiserver/application/eventing/retrydispatch ./internal/apiserver/infra/mysql/retryschedule ./internal/apiserver/infra/mongo/retryschedule",
+          "result": "passed",
+          "source_sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
+          "verified_on": "2026-10-24"
         }
       ],
       "production_evidence": {
@@ -15258,7 +15281,8 @@
           "summary": "Offline future-handoff candidate needs actual original-primary CLI acceptance, complete inventory/export, full CI and merge.",
           "exit_criteria": "Verify original first bytes/authority/deadline, DB root atomicity, old claimer exclusion, partial/unknown outcomes and cleanup through isolated Actions before production cutover."
         }
-      ]
+      ],
+      "review_note": "Original CLI development run39990541142 on aa977fc790104f636f4d301163a5eb8df6e7831a passed60/0/0 with cleanup. Readonly inventory source208fb8ff has only local pure/race/lint and tagged compile so far; do not reuse the earlier native report for this new behavior. Prior review marker preserved: {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Historical checks retain their own exact source attribution."
     }
   ],
   "initial_review_baseline": {

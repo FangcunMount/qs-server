@@ -2,7 +2,7 @@
 
 `qs-retry-handoff` 在已停旧写者、封闭准入的维护窗口内，复用原 MySQL/Mongo 根事务的 `TransferLegacy`。它不创建 Sender/Checker、不连接 MQ、不安装 schema、不生成新消息、不评分、不生成报告，也不启动调度或普通业务 Container。
 
-当前仅本地纯测试、race、静态检查及编译验证。实际维护入口的原主库演练、完整 CI、合并及生产批准尚未完成；不能据本文件执行生产交接。M3 进度唯一总表由 infra 的 [M3 进度总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)维护。
+首次CLI开发档已在隔离GitHub验收原MySQL/Mongo，各30项零失败/跳过；当前新增只读盘点仍待实际依赖验收。完整CI、合并及生产批准尚未完成，不能据本文件执行生产交接。M3进度唯一总表由infra的[M3进度总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)维护。
 
 ## 冻结清单与默认校验
 
@@ -47,3 +47,31 @@ Mongo 驱动 callback 重入只重复这段确定性 DB 交接；不更换 ID、
 回执为 JSON Lines：第一行 `started`，第二行含最终状态与逐计划摘要身份/结果。进程提前退出、连接失败、磁盘写入失败可能只有第一行或不完整末行，此时不能推断交接完成；保留原数据库、清单和私有回执，再按原身份核验。
 
 命令成功也始终 `cutover_authorized=false`。它不证明完整责任已穷尽、旧进程已经退出、NSQ 已排空、生产 DDL 已批准、runtime 已启动或 system 验收完成，不解除原生超限治理、不伪造正向 Broker 审计。启动前恢复/启动后前向修复及最终 30 分钟演练由 T25-C/T29 单独验证。
+
+## 只读原账本盘点
+
+切换主流程先关闭新准入，让旧链路排空。旧自动重试通常仅30/60秒延迟，保护和DDL可能跨过到期点；交接命令不改变原due，也不放宽已到期/已尝试责任的拒绝条件。无法提供完整原计划的责任保持旧链路收敛或阻断切换，不能从当前业务状态生成新事件替代。
+
+显式`--inventory`读取原主库完整状态聚合；可选审核清单只用于核验已经交接的源/目标，不创建计划或改写记录：
+
+```sh
+/private/task-owned/qs-retry-handoff --inventory \
+  --owner=qs.mysql --store-id=<configured-original-store> \
+  --writer-epoch=<configured-original-epoch> \
+  --database=<explicit-original-database> \
+  --receipt=/private/task-owned/new-inventory.jsonl
+```
+
+无清单时所有held都计为未核验责任。已交接记录需要另外提供原`--review-file`与独立`--review-sha256`：逐条核对原消息ID、正文/fingerprint、due、无claim/lease/replay、精确held标记以及目标冻结计划。仅有格式正确的标记不够；原消息或目标缺失、矛盾、未知状态或读取失败均不能报零。published历史行保留，有效确认之外的published也保留为阻断项。
+
+MySQL使用服务器只读Repeatable Read事务；Mongo在新snapshot事务中只读，结束后abort，并在两侧检查原集合UUID。检查前后缺失/UUID不符拒绝；这不替代DDL冻结证明。总预算30秒、选择最多100项、单条正文与计划读取有界，借用的主库和准入容量保持到实际边界结束。该维护预算不改变SDK Checker/worker预算。
+
+盘点需要宿主已显式安装的SDK binding和调度schema；缺失就拒绝，不补建或回填。维护窗口前按旧链路盘点/排空，批准的离线安装之后再以此工具复核。全体旧写者、自主任务、旧消息/业务receipt和未来责任的具名清单仍由T25-C/T30控制；本盘点只描述原rm_outbox账本。
+
+| 退出码 | 只读盘点结果 |
+| --- | --- |
+| 0 | 该快照中原账本非终态为零、held全部精确配对、published确认无缺口；不授权切换 |
+| 2 | 有效快照仍有pending/retry_wait/publishing/quarantined、未核验held或缺确认责任；保持封闭 |
+| 1 | 参数、绑定、schema/原集合、读取或清理不可用；不能解释为空 |
+
+盘点同样先持久化私有started，再记录完成时间、计数及核验结果。stdout只有固定状态和总量，不含wire、原ID或连接信息。`--inventory`与`--apply`互斥，不接受停写声明冒充自动停写；所有输出仍为`cutover_authorized=false`。
