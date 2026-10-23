@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3841987b9072cc3cd6ef2a458b7cf7a34f94d3a2",
+    "sha": "dcd231e48fed37a2f6262d891273b2641e39d030",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -10208,7 +10208,7 @@
       "owner": "runtime",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "3841987b9072cc3cd6ef2a458b7cf7a34f94d3a2",
+        "source_sha": "dcd231e48fed37a2f6262d891273b2641e39d030",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -10451,6 +10451,13 @@
           "result": "passed",
           "source_sha": "3841987b9072cc3cd6ef2a458b7cf7a34f94d3a2",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -p 1 -tags=integration,m3_answersheet_integration,m3_ai_command_broker,m3_host_faults -run=^DO_NOT_RUN_NATIVE_TESTS ./internal/apiserver/container/internal/transaction ./internal/apiserver/infra/mysql/aibridge",
+          "result": "passed",
+          "source_sha": "dcd231e48fed37a2f6262d891273b2641e39d030",
+          "verified_on": "2026-10-23"
         }
       ],
       "production_evidence": {
@@ -10491,7 +10498,8 @@
         "Second native run39869534165 passed startup/half preparation/inflight close but failed at original-root committed barrier before any Broker kill. Cause not established;no timeout/race,all owned cleanup and parameters restored. This source adds only fixed numeric/enum diagnostics for phase,lease and error class;no changed lease,domain code or weakened assertions. Compilation/tagged lint passed; diagnostic native rerun pending. Prior binding retained {\"source_baseline\": {\"sha\": \"ce9445c049b381c787eb3915b58764589b7c3aa3\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"ce9445c049b381c787eb3915b58764589b7c3aa3\", \"verified_on\": \"2026-10-23\"}}.",
         "Diagnostic native39870851183 identifies fixture MySQL1136 at fact write with58s lease remaining,while Mongo root phase5 committed. Source GORM raw VALUES(?,?) expands first []byte ID as a parameter list. Actual pinned GORM DryRun reproduces11 bindings versus fixed2,with0 open connections. Fix keeps scalar original ID and explicit columns in same original root;no production code,lease or assertion changes. Tagged compile/lint passed;corrected native pending. Earlier failure report remains unchanged. Prior binding retained {\"source_baseline\": {\"sha\": \"61dd0ac48a9595c850978f430b5421495db88947\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"61dd0ac48a9595c850978f430b5421495db88947\", \"verified_on\": \"2026-10-23\"}}.",
         "T23 actual AnswerSheet/original Mongo commit packet-fault fixture, fixed published SDK tx.2. Infra owns the query/session-aware wire proxy. The real runner keeps original session, deterministic callback and caller deadline; before-commit session disposition is not a rollback proof until exact persistent abort and new paused owner Broker check. After-loss acceptance requires exact committed fact/witness, unchanged first wire and no repeated executor. Native CI pending; compile only has run, no local Docker/full API/process/provider/system/production claim. Prior current binding retained {\"source_baseline\": {\"sha\": \"da0ef4529a0a78fe6ea65ec14e320782134233b9\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"da0ef4529a0a78fe6ea65ec14e320782134233b9\", \"verified_on\": \"2026-10-23\"}}. Historical verification/production/signoffs unchanged.",
-        "T23 native39879921975 failed at original-driver join before a receipt, 0/1/0 with owned Compose/process/private fixture cleanup verified. Frozen Mongo driver1.17.6 WithTransaction CommitLoop uses newBackgroundContext, so caller cancellation is not driver completion. Fixture now captures actual packet-loss window, disposes exact pre-commit original session, restores the real original-session server path and joins true driver exit; it does not fabricate a response or alter SDK lease/production code. New phase supervision still needs real CI. Prior binding retained {\"source_baseline\": {\"sha\": \"e18a4f485065f7fd978ac2815daf2b3f541dff5c\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"e18a4f485065f7fd978ac2815daf2b3f541dff5c\", \"verified_on\": \"2026-10-23\"}}. Original failed evidence and historical signoffs unchanged."
+        "T23 native39879921975 failed at original-driver join before a receipt, 0/1/0 with owned Compose/process/private fixture cleanup verified. Frozen Mongo driver1.17.6 WithTransaction CommitLoop uses newBackgroundContext, so caller cancellation is not driver completion. Fixture now captures actual packet-loss window, disposes exact pre-commit original session, restores the real original-session server path and joins true driver exit; it does not fabricate a response or alter SDK lease/production code. New phase supervision still needs real CI. Prior binding retained {\"source_baseline\": {\"sha\": \"e18a4f485065f7fd978ac2815daf2b3f541dff5c\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"e18a4f485065f7fd978ac2815daf2b3f541dff5c\", \"verified_on\": \"2026-10-23\"}}. Original failed evidence and historical signoffs unchanged.",
+        "T23 native39881279130: before-commit Mongo case passed6 native assertions with19 real matching COMMIT drops,0 backend ACKs,2 driver callbacks/1 SDK executor and1 new paused Rollback check. Overall run still failed in after case at initial API success assertion. The M3 contract allows Unknown during real topology loss: exact committed fact/witness remain mandatory, and same-key duplicate must recover the original accepted answer without another executor/half. Fixture now enforces that coherent outcome; it never treats half/driver cancellation as business acceptance. New actual QS command/original MySQL packet fixture preserves initial Seal/plan/operation and exact authority; SDK execution count is not called a measured database callback count. Both native tag packages compile, new diff lint0; command full tagged package retains6 old errcheck findings, no local native DB execution. Revised real CI pending. Prior binding retained {\"source_baseline\": {\"sha\": \"3841987b9072cc3cd6ef2a458b7cf7a34f94d3a2\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"3841987b9072cc3cd6ef2a458b7cf7a34f94d3a2\", \"verified_on\": \"2026-10-23\"}}. All old native failures/signoffs kept."
       ]
     },
     {
