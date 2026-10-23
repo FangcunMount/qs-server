@@ -21,7 +21,7 @@ func TestExistingHTTPMetricsIncludesCachedOwnerObservationWithoutDatabaseScrapes
 	limits.ReconcileInterval = time.Hour
 	monitor, err := newProtocolMonitor("qs.mysql", func(context.Context) (protocolSample, error) {
 		reads.Add(1)
-		return protocolSample{gaps: 2, confirmationAge: 30}, nil
+		return protocolSample{nativeBlocked: true, gaps: 2, confirmationAge: 30}, nil
 	}, func() rocketmq.TransactionStats {
 		return rocketmq.TransactionStats{Ready: true, HalfPreparedResults: 2, LocalCommittedResults: 1, FinalUnknownResults: 2}
 	},
@@ -43,6 +43,7 @@ func TestExistingHTTPMetricsIncludesCachedOwnerObservationWithoutDatabaseScrapes
 		require.Contains(t, result.Body.String(), `reliable_messaging_transaction_confirmation_gap_branches{owner="qs.mysql"} 2`)
 		require.Contains(t, result.Body.String(), `reliable_messaging_transaction_observation_available{owner="qs.mysql"} 1`)
 		require.Contains(t, result.Body.String(), `reliable_messaging_transaction_sampler_running{owner="qs.mysql"} 1`)
+		require.Contains(t, result.Body.String(), `reliable_messaging_transaction_native_limit_active{owner="qs.mysql"} 1`)
 	}
 	require.Equal(t, before, reads.Load(), "HTTP scraping started database work")
 }

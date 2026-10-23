@@ -1,0 +1,105 @@
+[
+  {
+    "create": "messaging_native_limit_notices",
+    "collation": {
+      "locale": "simple"
+    },
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "_id",
+          "owner",
+          "store_id",
+          "writer_epoch",
+          "route_revision",
+          "evidence_sha256",
+          "status",
+          "schema_version",
+          "recorded_at",
+          "native_index_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "bsonType": "binData"
+          },
+          "owner": {
+            "bsonType": "string"
+          },
+          "store_id": {
+            "bsonType": "string"
+          },
+          "writer_epoch": {
+            "bsonType": "string"
+          },
+          "route_revision": {
+            "enum": [
+              "m3-1"
+            ]
+          },
+          "evidence_sha256": {
+            "bsonType": "binData"
+          },
+          "status": {
+            "enum": [
+              "blocked",
+              "resolved"
+            ]
+          },
+          "schema_version": {
+            "enum": [
+              1
+            ]
+          },
+          "recorded_at": {
+            "bsonType": "date"
+          },
+          "resolved_at": {
+            "bsonType": [
+              "date",
+              "null"
+            ]
+          },
+          "resolution_receipt_sha256": {
+            "bsonType": [
+              "binData",
+              "null"
+            ]
+          },
+          "native_index_sha256": {
+            "bsonType": "binData"
+          }
+        }
+      }
+    }
+  },
+  {
+    "createIndexes": "messaging_native_limit_notices",
+    "indexes": [
+      {
+        "name": "messaging_native_limit_owner",
+        "key": {
+          "owner": 1,
+          "status": 1,
+          "_id": 1
+        }
+      }
+    ]
+  },
+  {
+    "create": "messaging_native_limit_schema",
+    "collation": {
+      "locale": "simple"
+    }
+  },
+  {
+    "insert": "messaging_native_limit_schema",
+    "documents": [
+      {
+        "_id": "v1",
+        "version": 1
+      }
+    ]
+  }
+]

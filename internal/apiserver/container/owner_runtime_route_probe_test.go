@@ -97,7 +97,7 @@ func waitOwnedProxyRoutes(ctx context.Context, base, observer *generic.RocketMQO
 	if err != nil {
 		return -1, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	stub := pb.NewMessagingServiceClient(conn)
 	// Proxy5.5.1 caches a not-found route and refreshes after20s. A ten-try
 	// two-second loop could expire before its first async refresh. This owned

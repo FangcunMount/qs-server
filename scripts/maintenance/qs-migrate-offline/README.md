@@ -65,7 +65,7 @@ sha256sum /private/task-owned/qs-migrate-offline
 }
 ```
 
-两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。本候选资源目标为109/42（M3未来重试计划、AI命令顺序索引及当前V2延期消费关联，尚未生产执行）；105/40的Task旧token退出仍是独立上线前置；生产实际版本仍须只读核实。SQL-only101/39、Mongo-only101/40、Actor-only102/40及维护表-only103/40分别需要独立迁移资源、已审核初始版本对和各自批准，旧迁移字节保持不变。
+两个目标版本必须来自当前二进制的只读输出，不能照抄示例数字。本候选资源目标为110/43（M3未来重试计划、AI命令顺序索引及当前V2延期消费关联，尚未生产执行）；105/40的Task旧token退出仍是独立上线前置；生产实际版本仍须只读核实。SQL-only101/39、Mongo-only101/40、Actor-only102/40及维护表-only103/40分别需要独立迁移资源、已审核初始版本对和各自批准，旧迁移字节保持不变。
 
 `protection_scope` 必须显式声明，范围与版本转换不可互换：
 
@@ -138,3 +138,5 @@ budgets, timezone, transactions, schema and existing approval boundaries are pre
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business
 acceptance require separate runtime evidence.
+
+M3 T24-D 候选110/43显式安装宿主原生事务超限保护账本。索引身份与首次私有审计摘要分离；仅封闭新事务准入，不改写业务、SDK witness或Broker确认。构造和启动不执行DDL，未安装/损坏/错误绑定均不放行。该候选不提供解除、删除或自动清理入口，不代表生产已安装。只声明完整110/43，不接受110/42或109/43。

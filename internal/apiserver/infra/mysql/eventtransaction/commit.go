@@ -79,7 +79,11 @@ func New(db *gorm.DB, o *options.MessagingOptions, resolver catalog.TopicResolve
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := messagingruntime.NewTransactionalSender(o, owner, store, topics)
+	native, err := messagingruntime.NewSQLNativeLimits(pool, store.Binding(), config.RouteRevision)
+	if err != nil {
+		return nil, err
+	}
+	runtime, err := messagingruntime.NewTransactionalSender(o, owner, store, topics, native)
 	if err != nil {
 		return nil, err
 	}

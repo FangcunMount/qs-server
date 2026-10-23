@@ -152,10 +152,11 @@ func TestM3DefaultDispatchFactory(t *testing.T) {
 	}
 	sqlMigration("000106_transaction_messaging.up.sql")
 	sqlMigration("000107_business_retry_schedule.up.sql")
+	sqlMigration("000110_native_transaction_limit_notices.up.sql")
 	sb, mb := sqlOwner.Binding(), documentOwner.Binding()
 	_, err = pool.ExecContext(t.Context(), "INSERT INTO rm_tx_binding VALUES(?,?,?,1)", []byte(sb.Owner), []byte(sb.StoreID), []byte(sb.WriterEpoch))
 	require.NoError(t, err)
-	for _, file := range []string{"000041_transaction_messaging.up.json", "000042_business_retry_schedule.up.json"} {
+	for _, file := range []string{"000041_transaction_messaging.up.json", "000042_business_retry_schedule.up.json", "000043_native_transaction_limit_notices.up.json"} {
 		body, e := os.ReadFile(filepath.Join("..", "..", "pkg", "migration", "migrations", "mongodb", file))
 		require.NoError(t, e)
 		var commands []json.RawMessage
