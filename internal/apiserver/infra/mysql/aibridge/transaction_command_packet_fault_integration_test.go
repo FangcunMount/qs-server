@@ -76,7 +76,7 @@ func TestM3AICommandOriginalCommitPacketFault(t *testing.T) {
 		_, err = pool.ExecContext(t.Context(), string(raw))
 		require.NoError(t, err)
 	}
-	for _, file := range []string{"000072_ai_bridge_delivery.up.sql", "000083_ai_runtime_index.up.sql", "000091_ai_messaging.up.sql", "000094_ai_messaging_admission.up.sql", "000097_ai_command_retirement.up.sql", "000106_transaction_messaging.up.sql", "000108_ai_transaction_command_order.up.sql"} {
+	for _, file := range []string{"000072_ai_bridge_delivery.up.sql", "000083_ai_runtime_index.up.sql", "000091_ai_messaging.up.sql", "000094_ai_messaging_admission.up.sql", "000097_ai_command_retirement.up.sql", "000106_transaction_messaging.up.sql", "000110_native_transaction_limit_notices.up.sql", "000108_ai_transaction_command_order.up.sql"} {
 		install(file)
 	}
 	load := func(key string) qsoptions.MessagingOptions {

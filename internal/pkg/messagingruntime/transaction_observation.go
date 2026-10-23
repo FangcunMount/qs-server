@@ -155,6 +155,7 @@ func (m *protocolMonitor) close(ctx context.Context) error {
 // It is not a message or business operation status API.
 type ProtocolProtectionStats struct {
 	Available, Fresh, Protected             bool
+	NativeLimitActive                       bool
 	Generation                              uint64
 	Reason                                  string
 	ObservationErrors                       int64
@@ -177,7 +178,7 @@ func (m *protocolMonitor) snapshot() ProtocolProtectionStats {
 		default:
 		}
 	}
-	return ProtocolProtectionStats{Available: m.policy.available, Fresh: m.policy.fresh(time.Now(), m.freshness), Protected: m.policy.reason != "", Generation: m.policy.generation, Reason: m.policy.reason, ObservationErrors: m.policy.errors,
+	return ProtocolProtectionStats{NativeLimitActive: m.policy.sample.nativeBlocked, Available: m.policy.available, Fresh: m.policy.fresh(time.Now(), m.freshness), Protected: m.policy.reason != "", Generation: m.policy.generation, Reason: m.policy.reason, ObservationErrors: m.policy.errors,
 		ConfirmationGapBranches: m.policy.sample.gaps, OldestConfirmationObservationAgeSeconds: m.policy.sample.confirmationAge,
 		SamplerRunning: running, ObservationInFlight: m.inflight}
 }

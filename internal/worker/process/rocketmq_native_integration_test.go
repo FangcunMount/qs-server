@@ -127,7 +127,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		_, e = pool.ExecContext(t.Context(), string(raw))
 		require.NoError(t, e)
 	}
-	for _, file := range []string{"000050_add_retry_event_hold.up.sql", "000104_rocketmq_transport_evidence.up.sql", "000106_transaction_messaging.up.sql"} {
+	for _, file := range []string{"000050_add_retry_event_hold.up.sql", "000104_rocketmq_transport_evidence.up.sql", "000106_transaction_messaging.up.sql", "000110_native_transaction_limit_notices.up.sql"} {
 		install(file)
 	}
 	load := func(key string) *generic.RocketMQOptions {

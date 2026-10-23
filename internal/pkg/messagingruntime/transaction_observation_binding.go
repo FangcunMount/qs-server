@@ -10,7 +10,10 @@ import (
 
 // Attach only the explicitly supplied primary store. Message properties cannot
 // select databases. Constructing descriptors starts no reads or background work.
-func attachProtocolMonitor(runtime *TransactionRuntime, store transaction.PreparedStore, limits transaction.Limits) error {
+func attachProtocolMonitor(runtime *TransactionRuntime, store transaction.PreparedStore, limits transaction.Limits, native NativeLimitReader) error {
+	if native == nil || native.Binding() != store.Binding() {
+		return transaction.ErrBinding
+	}
 	reader, ok := store.(transaction.ObservationReader)
 	if !ok {
 		return errors.New("transaction primary store requires protocol observation")
@@ -19,14 +22,18 @@ func attachProtocolMonitor(runtime *TransactionRuntime, store transaction.Prepar
 		return errors.New("transaction primary store requires positive recovery audit")
 	}
 	read := func(ctx context.Context) (protocolSample, error) {
-		snapshot, err := reader.ObserveProtocol(ctx)
+		blocked, err := native.ReadNativeLimit(ctx)
 		if err != nil {
 			return protocolSample{}, err
 		}
-		if snapshot.AsOf.IsZero() {
-			return protocolSample{}, ErrProtocolProtection
+		snapshot, err := reader.ObserveProtocol(ctx)
+		if err != nil {
+			return protocolSample{nativeBlocked: blocked}, err
 		}
-		return protocolSample{reserved: snapshot.ReservedExecutions, preparing: snapshot.PreparingExecutions, gaps: snapshot.ConfirmationGapBranches,
+		if snapshot.AsOf.IsZero() {
+			return protocolSample{nativeBlocked: blocked}, ErrProtocolProtection
+		}
+		return protocolSample{nativeBlocked: blocked, reserved: snapshot.ReservedExecutions, preparing: snapshot.PreparingExecutions, gaps: snapshot.ConfirmationGapBranches,
 			unaged: snapshot.UnagedConfirmationGapBranches, untrackedAborted: snapshot.UntrackedAbortedBranches,
 			unobservedCommitted: snapshot.UnobservedCommittedBranches, conflicts: snapshot.MetadataConflicts,
 			expiryAge: snapshot.PreparedExpiryAgeSeconds, confirmationAge: snapshot.OldestConfirmationObservationAgeSeconds}, nil

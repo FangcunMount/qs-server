@@ -19,6 +19,7 @@ const (
 var ErrProtocolProtection = errors.New("transaction protocol protection requires fresh evidence and named review")
 
 type protocolSample struct {
+	nativeBlocked                                                                       bool
 	reserved, preparing, gaps, unaged, untrackedAborted, unobservedCommitted, conflicts int64
 	expiryAge, confirmationAge                                                          float64
 }
@@ -45,6 +46,10 @@ func (p *protocolProtection) latch(reason string) {
 }
 
 func (p *protocolProtection) observe(now time.Time, sample protocolSample, readErr error, bindingConflict bool, full bool, freshness time.Duration) {
+	if sample.nativeBlocked {
+		p.sample.nativeBlocked = true
+		p.latch("native_transaction_limit")
+	}
 	if !p.lastPoll.IsZero() && now.Sub(p.lastPoll) > freshness {
 		p.saturatedSince = time.Time{}
 	}
@@ -104,7 +109,7 @@ func (p *protocolProtection) allowed(now time.Time, freshness time.Duration) boo
 }
 func (p *protocolProtection) review(now time.Time, freshness time.Duration, generation uint64, review string, ready, full bool) error {
 	if strings.TrimSpace(review) == "" || len(review) > 128 || generation != p.generation || p.reason == "" || !p.fresh(now, freshness) || !ready || full ||
-		p.sample.conflicts > 0 || p.sample.unaged > 0 || p.sample.unobservedCommitted > 0 ||
+		p.sample.nativeBlocked || p.sample.conflicts > 0 || p.sample.unaged > 0 || p.sample.unobservedCommitted > 0 ||
 		(p.sample.gaps > 0 && p.sample.confirmationAge >= protocolWarningAge.Seconds()) ||
 		(p.sample.preparing > 0 && p.sample.expiryAge >= protocolWarningAge.Seconds()) {
 		return ErrProtocolProtection

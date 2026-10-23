@@ -53,7 +53,11 @@ func New(db *mongo.Database, o *options.MessagingOptions, topics []string) (*Own
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := messagingruntime.NewTransactionalSender(o, ownerName, store, append([]string(nil), topics...))
+	native, err := messagingruntime.NewMongoNativeLimits(db, store.Binding(), b.RouteRevision)
+	if err != nil {
+		return nil, err
+	}
+	runtime, err := messagingruntime.NewTransactionalSender(o, ownerName, store, append([]string(nil), topics...), native)
 	if err != nil {
 		return nil, err
 	}

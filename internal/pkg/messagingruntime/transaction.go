@@ -10,7 +10,7 @@ import (
 
 // NewTransactionalSender borrows exactly one original primary store. It reads
 // configuration, without opening connections, starting work or applying DDL.
-func NewTransactionalSender(o *options.MessagingOptions, owner string, store transaction.PreparedStore, topics []string) (*TransactionRuntime, error) {
+func NewTransactionalSender(o *options.MessagingOptions, owner string, store transaction.PreparedStore, topics []string, native NativeLimitReader) (*TransactionRuntime, error) {
 	if o == nil || o.Provider != "rocketmq" || o.RocketMQ == nil {
 		return nil, errors.New("explicit RocketMQ transaction configuration required")
 	}
@@ -27,7 +27,7 @@ func NewTransactionalSender(o *options.MessagingOptions, owner string, store tra
 		return nil, err
 	}
 	runtime := &TransactionRuntime{sender: sender, admission: o.RocketMQ.PublishingEnabled()}
-	if err = attachProtocolMonitor(runtime, store, config.Limits); err != nil {
+	if err = attachProtocolMonitor(runtime, store, config.Limits, native); err != nil {
 		return nil, err
 	}
 	return runtime, nil

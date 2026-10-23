@@ -49,7 +49,8 @@ func TestTransactionConstructorIsInertAndUsesExactBinding(t *testing.T) {
 	}
 	binding := transaction.Binding{Owner: owner, StoreID: "fixture-primary", WriterEpoch: "m3-epoch"}
 	// A zero DB cannot execute queries. Constructor success proves no DB access.
-	store, err := txmysql.New(new(sql.DB), binding)
+	pool := new(sql.DB)
+	store, err := txmysql.New(pool, binding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +67,11 @@ func TestTransactionConstructorIsInertAndUsesExactBinding(t *testing.T) {
 		t.Fatal("missing owner map silently selected legacy publication for transaction routes", err)
 	}
 	o.RocketMQ.Transactions = bindings
-	runtime, err := NewTransactionalSender(o, owner, store, []string{topic})
+	native, err := NewSQLNativeLimits(pool, binding, "m3-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewTransactionalSender(o, owner, store, []string{topic}, native)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +87,7 @@ func TestTransactionConstructorIsInertAndUsesExactBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	wrong, _ := txmysql.New(new(sql.DB), transaction.Binding{Owner: owner, StoreID: "wrong-primary", WriterEpoch: binding.WriterEpoch})
-	if _, err := NewTransactionalSender(o, owner, wrong, []string{topic}); err == nil {
+	if _, err := NewTransactionalSender(o, owner, wrong, []string{topic}, native); err == nil {
 		t.Fatal("wrong primary store accepted")
 	}
 }

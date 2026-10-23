@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -126,6 +127,34 @@ func ownedHostBroker(t *testing.T, action string) string {
 		out, e := exec.CommandContext(ctx, "docker", "inspect", "--format", field, broker).Output()
 		require.NoError(t, e)
 		return strings.TrimSpace(string(out))
+	case "hold-checks", "release-checks":
+		value := "600000"
+		if action == "release-checks" {
+			value = "6000"
+		}
+		// Each JVM/admin operation has its own bounded fixture budget. A
+		// successful update must not consume the readback's remaining time.
+		adminCall := func(arguments ...string) ([]byte, error) {
+			operation, stop := context.WithTimeout(t.Context(), 45*time.Second)
+			defer stop()
+			command := []string{"exec", broker, "java", "-Xms32m", "-Xmx128m", "-XX:MaxDirectMemorySize=32m", "-cp", "/opt/rocketmq/conf:/opt/rocketmq/lib/*", "org.apache.rocketmq.tools.command.MQAdminStartup"}
+			return exec.CommandContext(operation, "docker", append(command, arguments...)...).Output()
+		}
+		out, e := adminCall("updateBrokerConfig", "-b", "127.0.0.1:10911", "-k", "transactionTimeOut", "-v", value)
+		require.NoError(t, e)
+		require.NotEmpty(t, out)
+		actual, e := adminCall("getBrokerConfig", "-b", "127.0.0.1:10911")
+		require.NoError(t, e)
+		found := false
+		for line := range strings.SplitSeq(string(actual), "\n") {
+			fields := strings.Fields(strings.ReplaceAll(line, "=", " "))
+			if len(fields) == 2 && fields[0] == "transactionTimeOut" {
+				require.Equal(t, value, fields[1])
+				found = true
+			}
+		}
+		require.True(t, found, "owned check hold/release not read back")
+
 	case "kill", "start":
 		_, err = exec.CommandContext(ctx, "docker", action, broker).Output()
 		require.NoError(t, err)
@@ -239,6 +268,9 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	cases := map[string]bool{}
 	verifyProtection := os.Getenv("QS_M3_VERIFY_PROTOCOL_PROTECTION") == "1"
 	protectionCases := map[string]bool{}
+	verifyNative := os.Getenv("QS_M3_VERIFY_NATIVE_LIMIT") == "1"
+	require.False(t, verifyNative && verifyProtection, "native evidence and timestamp-aging profiles are distinct")
+	nativeCases := map[string]bool{}
 	// Construction is inert; the fixture installs schema explicitly afterward.
 	type instance struct {
 		events *eventsubsystem.Subsystem
@@ -278,13 +310,13 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	names, err := data.documents.ListCollectionNames(t.Context(), bson.D{})
 	require.NoError(t, err)
 	require.Empty(t, names)
-	for _, file := range []string{"000106_transaction_messaging.up.sql", "000107_business_retry_schedule.up.sql"} {
+	for _, file := range []string{"000106_transaction_messaging.up.sql", "000107_business_retry_schedule.up.sql", "000110_native_transaction_limit_notices.up.sql"} {
 		body, e := os.ReadFile(filepath.Join("..", "..", "pkg", "migration", "migrations", "mysql", file))
 		require.NoError(t, e)
 		_, e = data.pool.ExecContext(t.Context(), string(body))
 		require.NoError(t, e)
 	}
-	for _, file := range []string{"000041_transaction_messaging.up.json", "000042_business_retry_schedule.up.json"} {
+	for _, file := range []string{"000041_transaction_messaging.up.json", "000042_business_retry_schedule.up.json", "000043_native_transaction_limit_notices.up.json"} {
 		body, e := os.ReadFile(filepath.Join("..", "..", "pkg", "migration", "migrations", "mongodb", file))
 		require.NoError(t, e)
 		var commands []json.RawMessage
@@ -610,6 +642,9 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	}
 	ownedHostBroker(t, "start")
 	waitOwnedHostTLS(t, opts.RocketMQ)
+	if verifyNative {
+		ownedHostBroker(t, "hold-checks")
+	}
 	require.Equal(t, oldID, ownedHostBroker(t, "id"))
 	require.NotEqual(t, oldPID, ownedHostBroker(t, "pid"))
 	// Verify actual signed QueryRoute for both owners and the consume-only
@@ -629,13 +664,90 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	// With protection enabled, reproduce the normal configured-open production
 	// startup. Registration must finish while the observed latch keeps writes
 	// closed; a manual-open attempt is not the startup barrier.
-	next := newInstance(!verifyProtection)
+	next := newInstance(!verifyProtection && !verifyNative)
 	startErr := next.events.Start(t.Context())
 	if startErr != nil {
 		diagnostic("next_owner_start", -1, transaction.LocalUnknown, startErr)
 	}
 	require.NoError(t, startErr)
 	mysqlNext, mongoNext := next.events.MySQLTransactionOwner().Runtime(), next.events.MongoTransactionOwner().Runtime()
+	if verifyNative {
+		// This file and its independent digest come from the infra-owned real
+		// SYS index exporter; never synthesize a positive native fault here.
+		path := os.Getenv("QS_M3_NATIVE_LIMIT_AUDIT")
+		require.True(t, filepath.IsAbs(path))
+		info, e := os.Lstat(path)
+		require.NoError(t, e)
+		require.True(t, info.Mode().IsRegular())
+		require.Zero(t, info.Mode().Perm()&0077)
+		require.LessOrEqual(t, info.Size(), int64(65536))
+		raw, e := os.ReadFile(path)
+		require.NoError(t, e)
+		digest, e := hex.DecodeString(os.Getenv("QS_M3_NATIVE_LIMIT_SHA256"))
+		require.NoError(t, e)
+		require.Len(t, digest, 32)
+		var expected [32]byte
+		copy(expected[:], digest)
+		evidence, e := messagingruntime.ParseNativeLimitEvidence(raw, expected)
+		require.NoError(t, e)
+		require.Equal(t, 1, evidence.IndexCount())
+		sqlNotices, e := messagingruntime.NewSQLNativeLimits(data.pool, sqlBinding, "m3-1")
+		require.NoError(t, e)
+		mongoNotices, e := messagingruntime.NewMongoNativeLimits(data.documents, mongoBinding, "m3-1")
+		require.NoError(t, e)
+		for i, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
+			require.True(t, runtime.Stats().Ready, "no native governance existed before ingestion")
+			input := branches[i].plan.Input()
+			duplicate, e := runtime.Reserve(t.Context(), transaction.Request{Owner: input.Owner, Scope: input.Scope, Key: input.IdempotencyKey, InputHash: input.InputHash}, branches[i].plan)
+			require.NoError(t, e)
+			require.False(t, duplicate.Acquired)
+			require.Zero(t, runtime.Stats().CheckCommit, "held Broker checks ran before native protection")
+		}
+		nativeCases["live_configured_open_before_private_native_ingest"] = true
+		for range 2 {
+			require.NoError(t, sqlNotices.RecordNativeLimit(t.Context(), evidence))
+			require.NoError(t, mongoNotices.RecordNativeLimit(t.Context(), evidence))
+		}
+		var count int
+		require.NoError(t, data.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM messaging_native_limit_notices").Scan(&count))
+		require.Equal(t, evidence.IndexCount(), count)
+		n, e := data.documents.Collection("messaging_native_limit_notices").CountDocuments(t.Context(), bson.D{})
+		require.NoError(t, e)
+		require.EqualValues(t, evidence.IndexCount(), n)
+		nativeCases["actual_sys_index_recorded_idempotently_on_both_original_primaries"] = true
+		verifyBlocked := func(runtimes ...*messagingruntime.TransactionRuntime) {
+			t.Helper()
+			for i, runtime := range runtimes {
+				require.Eventually(t, func() bool {
+					status := runtime.ProtectionStats()
+					return status.Fresh && status.NativeLimitActive && status.Protected && status.Reason == "native_transaction_limit"
+				}, 15*time.Second, 50*time.Millisecond)
+				require.True(t, runtime.ProtectionStats().SamplerRunning)
+				require.False(t, runtime.Stats().Stopped)
+				require.ErrorIs(t, runtime.SetAdmission(true), messagingruntime.ErrTransactionAdmissionClosed)
+				input := branches[i].plan.Input()
+				_, e := runtime.Reserve(t.Context(), transaction.Request{Owner: input.Owner, Scope: input.Scope, Key: input.IdempotencyKey, InputHash: input.InputHash}, branches[i].plan)
+				require.ErrorIs(t, e, messagingruntime.ErrTransactionAdmissionClosed)
+				_, e = runtime.Execute(t.Context(), branches[i].owned, nil)
+				require.ErrorIs(t, e, messagingruntime.ErrTransactionAdmissionClosed)
+				status := runtime.ProtectionStats()
+				require.Error(t, runtime.ReviewProtection(status.Generation, "native-limit-no-resolution"))
+				require.Zero(t, runtime.Stats().HalfPreparedResults)
+			}
+		}
+		verifyBlocked(mysqlNext, mongoNext)
+		nativeCases["live_sampler_seals_reserve_execute_plain_open_and_review"] = true
+		require.NoError(t, next.events.CloseContext(t.Context()))
+		require.NoError(t, next.normal.Close(t.Context()))
+		require.NoError(t, next.host.Cleanup())
+		next = newInstance(false)
+		require.NoError(t, next.events.Start(t.Context()))
+		mysqlNext, mongoNext = next.events.MySQLTransactionOwner().Runtime(), next.events.MongoTransactionOwner().Runtime()
+		verifyBlocked(mysqlNext, mongoNext)
+		nativeCases["new_configured_open_instance_retains_durable_deny_before_registration"] = true
+		ownedHostBroker(t, "release-checks")
+	}
+
 	if verifyProtection {
 		for _, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
 			status := runtime.ProtectionStats()
@@ -721,6 +833,21 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 		}
 	}
 	cases["wrong_reference_unknown_without_changed_facts"] = true
+	if verifyNative {
+		for _, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
+			require.Eventually(t, func() bool {
+				stats := runtime.Stats()
+				return stats.RecoveryCommitConfirmed > 0 && stats.RecoveryAuditRecorded > 0 && runtime.ProtectionStats().ConfirmationGapBranches == 0
+			}, 20*time.Second, 50*time.Millisecond)
+			require.True(t, runtime.ProtectionStats().NativeLimitActive)
+			require.True(t, runtime.ProtectionStats().Protected)
+			require.ErrorIs(t, runtime.SetAdmission(true), messagingruntime.ErrTransactionAdmissionClosed)
+		}
+		nativeCases["real_original_checker_commit_rpc_and_positive_audit_while_native_blocked"] = true
+		nativeCases["first_wire_facts_and_single_executor_preserved_without_new_half"] = true
+		nativeCases["no_automatic_or_unaudited_governance_resolution"] = true
+	}
+
 	if verifyProtection {
 		for i, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
 			require.Eventually(t, func() bool {
@@ -763,6 +890,14 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "default QS dual-owner lifecycle, actual Broker restart and next-instance Checker; protocol fixture facts", "domain_api_provider_system_not_claimed": true, "domain_consumers_explicitly_disabled": true, "producer_process_exit_not_claimed": true, "owned_databases_dropped": true, "owned_runtimes_drained": true, "same_broker_container_restarted": true, "local_executor_calls": []int32{branches[0].calls.Load(), branches[1].calls.Load()}, "mongo_database_callbacks": mongoCallbacks.Load(), "new_checker_commits": []int64{mysqlNext.Stats().CheckCommit, mongoNext.Stats().CheckCommit}, "observed_callbacks": maxima, "duplicate_deliveries": duplicateDeliveries.Load(), "close_wait_ms": closeWait.Milliseconds(), "new_half_prepared_results": []int64{mysqlNext.Stats().HalfPreparedResults, mongoNext.Stats().HalfPreparedResults}})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_DEFAULT_OWNER_RECEIPT " + string(receipt))
+	if verifyNative {
+		nativeCases["actual_sampler_sdk_shutdown_joined_original_pools_owned_cleanup"] = !mysqlNext.ProtectionStats().SamplerRunning && !mongoNext.ProtectionStats().SamplerRunning && mysqlNext.Stats().Stopped && mongoNext.Stats().Stopped
+		require.True(t, nativeCases["actual_sampler_sdk_shutdown_joined_original_pools_owned_cleanup"])
+		receipt, e := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(nativeCases), "failed": 0, "skipped": 0, "cases": nativeCases, "owner_count": 2, "real_sys_index_required": true, "timestamp_aging_not_used": true, "governance_resolution_not_claimed": true, "domain_api_provider_system_not_claimed": true, "owned_databases_dropped": true})
+		require.NoError(t, e)
+		fmt.Println("M3_QS_NATIVE_LIMIT_RECEIPT " + string(receipt))
+	}
+
 	if verifyProtection {
 		protectionCases["actual_sampler_and_sdk_shutdown_joined"] = !mysqlNext.ProtectionStats().SamplerRunning && !mongoNext.ProtectionStats().SamplerRunning && mysqlNext.Stats().Stopped && mongoNext.Stats().Stopped
 		require.True(t, protectionCases["actual_sampler_and_sdk_shutdown_joined"])

@@ -67,7 +67,7 @@ func TestM3AIEventBrokerHost(t *testing.T) {
 	pool, err := db.DB()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, pool.Close()) })
-	for _, file := range []string{"000072_ai_bridge_delivery.up.sql", "000083_ai_runtime_index.up.sql", "000091_ai_messaging.up.sql", "000092_ai_messaging_failures.up.sql", "000094_ai_messaging_admission.up.sql", "000095_ai_messaging_observations.up.sql", "000097_ai_command_retirement.up.sql", "000106_transaction_messaging.up.sql", "000108_ai_transaction_command_order.up.sql"} {
+	for _, file := range []string{"000072_ai_bridge_delivery.up.sql", "000083_ai_runtime_index.up.sql", "000091_ai_messaging.up.sql", "000092_ai_messaging_failures.up.sql", "000094_ai_messaging_admission.up.sql", "000095_ai_messaging_observations.up.sql", "000097_ai_command_retirement.up.sql", "000106_transaction_messaging.up.sql", "000110_native_transaction_limit_notices.up.sql", "000108_ai_transaction_command_order.up.sql"} {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "pkg", "migration", "migrations", "mysql", file))
 		require.NoError(t, err)
 		_, err = pool.ExecContext(t.Context(), string(raw))
