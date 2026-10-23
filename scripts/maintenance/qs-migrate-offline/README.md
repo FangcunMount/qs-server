@@ -140,3 +140,14 @@ disposable test databases retain explicit `DISABLED`. Production cutover and bus
 acceptance require separate runtime evidence.
 
 M3 T24-D 候选110/43显式安装宿主原生事务超限保护账本。索引身份与首次私有审计摘要分离；仅封闭新事务准入，不改写业务、SDK witness或Broker确认。构造和启动不执行DDL，未安装/损坏/错误绑定均不放行。该候选不提供解除、删除或自动清理入口，不代表生产已安装。只声明完整110/43，不接受110/42或109/43。
+
+## M3：初始事务 owner 绑定（候选）
+
+同一维护二进制新增`--binding-action preview|apply|verify`，与原DDL action/批准严格分开；每次只处理`qs.mysql`或`qs.mongo`一个原库根事务，绝不宣称MySQL和Mongo分布式原子提交。必须先显式安装完整、clean的当前资源对，两个owner分别验证完成前，全部业务runtime保持停止。原迁移、双库保护/恢复和首次启动边界不变。
+
+- 公共参数继续显式选择原MySQL/Mongo库，凭据及TLS继续使用`QS_OFFLINE_MYSQL_DSN`/`QS_OFFLINE_MONGO_URI`。绑定action必须额外指定`--timeout 30s`等至多2分钟的总预算，不使用普通离线DDL默认的15分钟。
+- `preview`要求`--binding-plan <新私有文件>`、`--binding-operation-id`、`--binding-owner`、`--binding-store-id`及`--binding-writer-epoch`。原文件独占0600创建，冻结当前完整资源摘要、真实双库身份、所选store的实际DDL/collection与index规格摘要、owner及一小时有效期；不推断绑定、不创建元数据。
+- `apply`只接收原`--binding-plan`、独立`--binding-reviewed-sha256`及`--binding-writers-excluded`。重新核对原身份/clean head/实际对象摘要、空SDK责任及空原生notice；SQL在SERIALIZABLE根内重查并持锁，Mongo在原session根内重查并唯一INSERT绑定。Mongo所选库使用Primary/majority；不在transaction callback里做外部调用，不执行消息/模型或SDK发送。
+- `verify`在新只读边界核对精确原绑定、当前双库与资源。已有绑定或任一新责任不允许再次apply，不upsert、覆盖或删除。SQL/Mongo分别返回`not_attempted`（未尝试commit）、`unknown`或`committed`以及独立`verified`；一个owner成功不能覆盖另一个失败或未知，准入继续关闭。提交未知先保留材料并只读盘点，不自动重试、补偿或伪造witness。
+
+这些新SDK表/集合和notice须为空，旧业务、Outbox、重试计划及历史责任不会被删除，也不由绑定入口签为排空。冻结声明不是真实停写证明；所有结果始终`cutover_authorized=false`，受审文件/命令仍由infra单一协调目录持久记录。构造与运行都不执行DDL、不启动MQ/API/worker、不改变worker配额。`TestM3InitialBindingCLINative`通过实际独立CLI验证原库安装、并发唯一赢家、新责任拒绝及版本账本保持；本地仅编译收集，真实结果须隔离CI，本候选的原生结果以infra执行总表为准。
