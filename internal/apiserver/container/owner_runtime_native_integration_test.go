@@ -159,6 +159,8 @@ func ownerNativeError(err error) map[string]any {
 	kind, code := "none", 0
 	switch {
 	case err == nil:
+	case strings.Contains(err.Error(), "initial settings deadline exceeded"):
+		kind = "deadline"
 	case errors.Is(err, context.DeadlineExceeded):
 		kind = "deadline"
 	case errors.Is(err, context.Canceled):
@@ -175,6 +177,10 @@ func ownerNativeError(err error) map[string]any {
 		kind = "transaction_required"
 	default:
 		kind = "other"
+		var protocolStatus interface {
+			error
+			GetCode() int32
+		}
 		var registrationError prometheus.AlreadyRegisteredError
 		var sqlError *driver.MySQLError
 		var mongoError mongo.CommandError
@@ -184,6 +190,10 @@ func ownerNativeError(err error) map[string]any {
 			kind, code = "mysql", int(sqlError.Number)
 		} else if errors.As(err, &mongoError) {
 			kind, code = "mongo", int(mongoError.Code)
+		} else if errors.As(err, &protocolStatus) {
+			if n := protocolStatus.GetCode(); n >= 0 && n <= 1000000000 {
+				code = int(n)
+			}
 		} else if rpc, ok := status.FromError(err); ok {
 			code = int(rpc.Code())
 			if rpc.Code() == codes.DeadlineExceeded {
