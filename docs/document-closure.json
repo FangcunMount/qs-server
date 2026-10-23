@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "21e7de49536ded254c583f0213bec6f8246cb780",
+    "sha": "6856fc1479e08a5393e638fe1e9a11d8b3e91d5e",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -9382,7 +9382,8 @@
       "notes": [
         "M3 T24 host observability WIP: actual published tx.4, default /metrics cached collector, original-primary snapshot, initial observation before Producer registration, latched generation review and actual sampler shutdown ownership. Target race, lint and docs pass; native actual dual-owner/Broker guard profile pending. Preserve existing gaps and production evidence; no full old page re-signoff.",
         "QS configured-open startup now uses an independent host startup hold/release; protection no longer turns successful Checker registration into startup failure. Preserve explicit pause made during startup and reject reopening stopped owners. Target race/subsystem and lint passed; configured-open native revision pending. Broker restart fixture warms actual consume-only route readiness before owner registration; no production RPC budget increase. Prior paused-owner native21 pass remains scoped to its original SHA; full473 matrix8.0.44 passes21,8.0.36/8.4.11 fail at next-owner start with fixed other/0 diagnostic, root cause not yet established.",
-        "Owned native fixture readiness21e7de: full294 run39948283390 passed21/0/0 on8.0.44 and8.4.11;8.0.36 failed at consume-only Subscribe before new owner registration, cleanup verified, root cause not established. Add bounded read-only signed QueryRoute for all seven physical routes/account roles after actual owned Broker restart before creating any new clients; no executor/half/client startup retries, production RPC timeout change or SDK source mutation. Signature golden/race and tagged lint passed; current exact-SHA native pending. Prior root baseline retained {\"sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Historical native/production evidence is not relabelled."
+        "Owned native fixture readiness21e7de: full294 run39948283390 passed21/0/0 on8.0.44 and8.4.11;8.0.36 failed at consume-only Subscribe before new owner registration, cleanup verified, root cause not established. Add bounded read-only signed QueryRoute for all seven physical routes/account roles after actual owned Broker restart before creating any new clients; no executor/half/client startup retries, production RPC timeout change or SDK source mutation. Signature golden/race and tagged lint passed; current exact-SHA native pending. Prior root baseline retained {\"sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Historical native/production evidence is not relabelled.",
+        "Owned readiness09cce run39952347643 passes8.0.36/8.0.44 each21/0/0;8.4.11 fails fixed QueryRoute TOPIC_NOT_FOUND40402 at preflight, before next owner registration; all owned cleanup/parameters restored. This proves missing actual authenticated route readiness, not a MySQL failure or unique explanation of earlier failures. Proxy5.5.1 TopicRouteService caches missing routes and refreshAfterWrite is20s; the previous10-attempt/two-second loop can finish before that first async refresh despite its45s outer context. Correct the read-only owned restart readiness to90s overall/46 attempts with original3s per-query budget. No production SDK timeout,half/executor retry,resource/schema/SDK change. Signature/race and tagged lint passed; corrected exact-source full native pending. Prior root baseline retained {\"sha\": \"21e7de49536ded254c583f0213bec6f8246cb780\", \"verified_on\": \"2026-10-23\"}. Historical evidence unchanged."
       ]
     },
     {
