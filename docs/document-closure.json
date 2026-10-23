@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6856fc1479e08a5393e638fe1e9a11d8b3e91d5e",
+    "sha": "a784c574704d8cdf29ed308785e754479fa25345",
     "verified_on": "2026-10-23"
   },
   "status_policy": {
@@ -78,12 +78,12 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 109,
-        "version_count": 109
+        "max_version": 110,
+        "version_count": 110
       },
       "mongodb": {
-        "max_version": 42,
-        "version_count": 42
+        "max_version": 43,
+        "version_count": 43
       }
     },
     "events": {
@@ -11834,7 +11834,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+        "source_sha": "a784c574704d8cdf29ed308785e754479fa25345",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -12521,7 +12521,8 @@
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
         "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate.",
-        "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged."
+        "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
+        "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
@@ -14565,7 +14566,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
+        "source_sha": "a784c574704d8cdf29ed308785e754479fa25345",
         "verified_on": "2026-10-23"
       },
       "fact_sources": [
@@ -14983,7 +14984,8 @@
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
         "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate.",
-        "Current109/42 resource pair reviewc1d4a79f76fe7f868cfd8320270c80280d24b5bf; previous verified binding retained: {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}. Only target inventory/document attribution changes; offline approval, identity, backup/restore, file consumption and runtime boundary code unchanged. No native or production execution claimed."
+        "Current109/42 resource pair reviewc1d4a79f76fe7f868cfd8320270c80280d24b5bf; previous verified binding retained: {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}. Only target inventory/document attribution changes; offline approval, identity, backup/restore, file consumption and runtime boundary code unchanged. No native or production execution claimed.",
+        "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
     },
