@@ -810,9 +810,10 @@ jobs:
         run: |
           set -euo pipefail
           go test -race -tags=integration -count=1 -timeout=5m -v \
-            -run '^TestM3TransactionSchemaNative$' ./internal/pkg/migration \
+            -run '^TestM3(TransactionSchemaNative|InitialBindingCLINative)$' ./internal/pkg/migration \
             | tee "${RUNNER_TEMP}/m3-transaction-schema.log"
           grep -q -- '--- PASS: TestM3TransactionSchemaNative ' "${RUNNER_TEMP}/m3-transaction-schema.log"
+          grep -q -- '--- PASS: TestM3InitialBindingCLINative ' "${RUNNER_TEMP}/m3-transaction-schema.log"
           if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/m3-transaction-schema.log"; then exit 1; fi
 
       - name: Verify SQL105 Task token retirement on real databases

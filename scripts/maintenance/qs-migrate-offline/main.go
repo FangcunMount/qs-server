@@ -23,6 +23,7 @@ import (
 )
 
 type arguments struct {
+	binding                                                    initialBindingArguments
 	mysqlDatabase, mongoDatabase, approvalFile, approvalSHA256 string
 	apply                                                      bool
 	timeout                                                    time.Duration
@@ -38,6 +39,7 @@ func parseArguments(args []string) (arguments, error) {
 	flags.StringVar(&out.approvalSHA256, "approval-sha256", "", "approved raw file digest")
 	flags.BoolVar(&out.apply, "apply", false, "consume approval and execute embedded migrations")
 	flags.DurationVar(&out.timeout, "timeout", 15*time.Minute, "total connection/migration deadline, at most 30m")
+	registerInitialBindingFlags(flags, &out.binding)
 	if err := flags.Parse(args); err != nil {
 		return out, err
 	}
@@ -45,6 +47,12 @@ func parseArguments(args []string) (arguments, error) {
 		(out.apply && (out.approvalFile == "" || out.approvalSHA256 == "")) ||
 		(!out.apply && (out.approvalFile != "" || out.approvalSHA256 != "")) {
 		return out, errors.New("explicit selected databases and bounded offline action required")
+	}
+	if out.binding.action != "" && out.timeout > 2*time.Minute {
+		return out, errors.New("initial binding requires explicit timeout at most 2m")
+	}
+	if err := out.binding.validate(out.apply, out.approvalFile, out.approvalSHA256); err != nil {
+		return out, err
 	}
 	return out, nil
 }
@@ -102,6 +110,9 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 		return err
 	}
 	pair := migration.PairConfig{MySQLDatabase: a.mysqlDatabase, MongoDatabase: a.mongoDatabase, ExpectedSourceSHA: version.GitCommit}
+	if a.binding.action != "" {
+		return runInitialBinding(ctx, db, client, pair, a.binding, output)
+	}
 	if !a.apply {
 		snapshot, err := migration.InspectOffline(ctx, db, client, pair)
 		if err != nil {
