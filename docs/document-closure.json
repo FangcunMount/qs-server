@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
+    "sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
     "verified_on": "2026-10-24"
   },
   "status_policy": {
@@ -11834,8 +11834,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a784c574704d8cdf29ed308785e754479fa25345",
-        "verified_on": "2026-10-23"
+        "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -12292,6 +12292,13 @@
           "result": "passed",
           "source_sha": "c1d4a79f76fe7f868cfd8320270c80280d24b5bf",
           "verified_on": "2026-10-23"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/migration ./scripts/maintenance/qs-migrate-offline",
+          "result": "passed",
+          "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
+          "verified_on": "2026-10-24"
         }
       ],
       "production_evidence": {
@@ -12524,7 +12531,10 @@
         "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified.",
+      "review_history": [
+        "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment."
+      ]
     },
     {
       "path": "internal/pkg/migration/migrations/mongodb/README.md",
@@ -13840,7 +13850,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
+        "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
         "verified_on": "2026-10-24"
       },
       "fact_sources": [
@@ -14435,7 +14445,10 @@
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
         "M3 T24 scoped native-fixture review: previous source baseline and document binding preserved here, not relabelled as current native acceptance: {\"source_baseline\": {\"sha\": \"dcd231e48fed37a2f6262d891273b2641e39d030\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"f899d5cb4b19ed15e5dbe741fd42b3d804370784\", \"verified_on\": \"2026-10-19\"}}. Only readiness test synchronization/child-test attribution changed; client release remains required and actual server processlist must drain within one second. Original CI failure did not distinguish query error from nonzero thread count; its root cause remains unknown. Tag compilation passed; exact native CI pending; production tool/limits/schema unchanged."
       ],
-      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks."
+      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks.",
+      "review_history": [
+        "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment."
+      ]
     },
     {
       "path": "scripts/database/compatibility-retirement.md",
@@ -14567,8 +14580,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "a784c574704d8cdf29ed308785e754479fa25345",
-        "verified_on": "2026-10-23"
+        "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
+        "verified_on": "2026-10-24"
       },
       "fact_sources": [
         {
@@ -14820,6 +14833,13 @@
           "result": "passed",
           "source_sha": "840961581eb318e63830db16004cade57d87cd13",
           "verified_on": "2026-10-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/migration ./scripts/maintenance/qs-migrate-offline",
+          "result": "passed",
+          "source_sha": "d7aa4ddd16460d25a82d6116413b547a9f37d836",
+          "verified_on": "2026-10-24"
         }
       ],
       "production_evidence": {
@@ -14988,7 +15008,10 @@
         "Current109/42 resource pair reviewc1d4a79f76fe7f868cfd8320270c80280d24b5bf; previous verified binding retained: {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}. Only target inventory/document attribution changes; offline approval, identity, backup/restore, file consumption and runtime boundary code unchanged. No native or production execution claimed.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified.",
+      "review_history": [
+        "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment."
+      ]
     },
     {
       "path": "scripts/maintenance/qs-authz/README.md",

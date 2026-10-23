@@ -528,3 +528,9 @@ M3 T14 的108/42只增加 `ai_messaging_operations(aggregate_key,aggregate_seque
 SQL109为当前V2延期消费关联原运输证据104，保留旧行的protocol_version=1；新读取器仅处理V2，旧未决责任由协调切换清单处置。它不创建发布型Outbox或业务重试授权，构造/启动不执行DDL。109自动down禁用，保留首次wire与消费责任；目录包含109不代表生产已经安装或完成业务验收。
 
 M3 T24-D 候选110/43显式安装宿主原生事务超限保护账本。索引身份与首次私有审计摘要分离；仅封闭新事务准入，不改写业务、SDK witness或Broker确认。构造和启动不执行DDL，未安装/损坏/错误绑定均不放行。该候选不提供解除、删除或自动清理入口，不代表生产已安装。只声明完整110/43，不接受110/42或109/43。
+
+## M3 初始事务绑定
+
+`PreviewInitialBinding`、`ApplyInitialBinding`、`VerifyInitialBinding`只处理显式已安装资源对中的单个原owner。实际双库身份及资源摘要继续复用原offline preflight；新绑定所选store须无SDK/原生notice责任，实际DDL或Mongo collection/index规格由原私有计划冻结，不能用journal行代替具体对象审查。源码不新增迁移，也不把绑定做成启动时隐式安装。
+
+SQL和Mongo分别使用原根事务，只INSERT初始绑定，分别记录commit与独立fresh verify结果；不提供跨库原子性承诺、不补偿删除另一个已提交根。维护CLI及具体拒绝边界见[离线工具](../../../scripts/maintenance/qs-migrate-offline/README.md#m3初始事务-owner-绑定候选)。两个owner验证、旧责任交接和infra受审步骤都完成前，runtime与新准入继续关闭。原105独立生产前置、保护恢复与首次启动后只准前向恢复均保持；源码/CI不代表生产DDL或切换完成。
