@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
@@ -22,6 +23,8 @@ type transactionDriver interface {
 
 type TransactionRuntime struct {
 	sender              transactionDriver
+	monitor             *protocolMonitor
+	cleanupBudget       time.Duration
 	mu                  sync.RWMutex
 	admission, stopping bool
 }
@@ -29,11 +32,36 @@ type TransactionRuntime struct {
 var _ transaction.Runtime = (*TransactionRuntime)(nil)
 var _ transaction.Sender = (*TransactionRuntime)(nil)
 
-func (r *TransactionRuntime) Start(ctx context.Context) error { return r.sender.Start(ctx) }
+func (r *TransactionRuntime) Start(ctx context.Context) error {
+	// Establish the initial authoritative observation before producer registration
+	// can resolve old halves. Protection never prevents the Checker from starting.
+	if r.monitor != nil {
+		if err := r.startObservation(ctx); err != nil {
+			return r.startFailure(err)
+		}
+	}
+	if err := r.sender.Start(ctx); err != nil {
+		if r.monitor == nil {
+			return err
+		}
+		return r.startFailure(err)
+	}
+	return nil
+}
+func (r *TransactionRuntime) startFailure(cause error) error {
+	budget := r.cleanupBudget
+	if budget <= 0 {
+		budget = 5 * time.Second
+	}
+	cleanup, cancel := context.WithTimeout(context.Background(), budget)
+	defer cancel()
+	return errors.Join(cause, r.Close(cleanup))
+}
+
 func (r *TransactionRuntime) SetAdmission(open bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.stopping || (open && !r.sender.Stats().Ready) {
+	if r.stopping || (open && (!r.sender.Stats().Ready || !r.monitor.allowed())) {
 		return ErrTransactionAdmissionClosed
 	}
 	r.admission = open
@@ -41,8 +69,9 @@ func (r *TransactionRuntime) SetAdmission(open bool) error {
 }
 func (r *TransactionRuntime) admitted() bool {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.admission && !r.stopping
+	open := r.admission && !r.stopping
+	r.mu.RUnlock()
+	return open && r.sender.Stats().Ready && r.monitor.allowed()
 }
 func (r *TransactionRuntime) Reserve(ctx context.Context, q transaction.Request, p transaction.FrozenPlan) (transaction.Reservation, error) {
 	if !r.admitted() {
@@ -65,11 +94,41 @@ func (r *TransactionRuntime) StopAdmission() {
 }
 func (r *TransactionRuntime) Close(ctx context.Context) error {
 	r.StopAdmission()
-	return r.sender.Close(ctx)
+	if err := r.sender.Close(ctx); err != nil {
+		return err
+	}
+	return r.monitor.close(ctx)
 }
-func (r *TransactionRuntime) Wait(ctx context.Context) error { return r.sender.Wait(ctx) }
+func (r *TransactionRuntime) Wait(ctx context.Context) error {
+	if err := r.sender.Wait(ctx); err != nil {
+		return err
+	}
+	return r.monitor.close(ctx)
+}
 func (r *TransactionRuntime) Stats() rocketmq.TransactionStats {
 	stats := r.sender.Stats()
 	stats.Ready = stats.Ready && r.admitted()
+	stats.Stopped = stats.Stopped && r.monitor.drained()
 	return stats
+}
+
+// ReviewProtection cannot open configured admission or restart a stopping owner.
+// The maintenance caller records its named review; no review ID is a metric label.
+func (r *TransactionRuntime) ReviewProtection(generation uint64, review string) error {
+	r.mu.RLock()
+	stopped := r.stopping
+	r.mu.RUnlock()
+	if stopped {
+		return ErrProtocolProtection
+	}
+	return r.monitor.review(generation, review)
+}
+
+func (r *TransactionRuntime) ProtectionStats() ProtocolProtectionStats { return r.monitor.snapshot() }
+
+func (r *TransactionRuntime) startObservation(ctx context.Context) error {
+	if err := r.monitor.start(); err != nil {
+		return err
+	}
+	return r.monitor.waitInitial(ctx)
 }

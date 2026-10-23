@@ -212,6 +212,8 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	}
 	require.NotEmpty(t, consumers)
 	cases := map[string]bool{}
+	verifyProtection := os.Getenv("QS_M3_VERIFY_PROTOCOL_PROTECTION") == "1"
+	protectionCases := map[string]bool{}
 	// Construction is inert; the fixture installs schema explicitly afterward.
 	type instance struct {
 		events *eventsubsystem.Subsystem
@@ -561,6 +563,26 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	cases["original_mysql_and_mongo_facts_witness_atomic"] = true
 	require.NoError(t, data.pool.PingContext(t.Context()))
 	require.NoError(t, data.documents.Client().Ping(t.Context(), readpref.Primary()))
+	if verifyProtection {
+		// Fixture-only audit clock aging in the two owned temporary databases.
+		// Do not mutate business facts, terminal witnesses, IDs, wire or RPC results.
+		for i, b := range branches {
+			ref := b.owned.References()[0]
+			key := transaction.ExecutionKey(ref.Owner, ref.OperationID, ref.WriterEpoch, ref.Fence)
+			if i == 0 {
+				result, e := data.pool.ExecContext(t.Context(), "UPDATE rm_tx_witness SET half_recorded_at=UTC_TIMESTAMP(6)-INTERVAL 10 MINUTE WHERE execution_key=? AND state='committed' AND half_outcome='prepared' AND final_outcome='unknown'", key[:])
+				require.NoError(t, e)
+				n, e := result.RowsAffected()
+				require.NoError(t, e)
+				require.EqualValues(t, 1, n)
+			} else {
+				result, e := data.documents.Collection("rm_tx_execution").UpdateOne(t.Context(), bson.M{"_id": key[:], "state": transaction.Committed, "witnesses.0.half_outcome": transaction.HalfPrepared, "witnesses.0.final_outcome": transaction.FinalUnknown}, bson.M{"$set": bson.M{"witnesses.0.half_recorded_at": time.Now().UTC().Add(-10 * time.Minute)}})
+				require.NoError(t, e)
+				require.EqualValues(t, 1, result.MatchedCount)
+			}
+		}
+		protectionCases["exact_owned_audit_timestamp_fixture_only"] = true
+	}
 	ownedHostBroker(t, "start")
 	waitOwnedHostTLS(t, opts.RocketMQ)
 	require.Equal(t, oldID, ownedHostBroker(t, "id"))
@@ -568,6 +590,18 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	next := newInstance(true)
 	require.NoError(t, next.events.Start(t.Context()))
 	mysqlNext, mongoNext := next.events.MySQLTransactionOwner().Runtime(), next.events.MongoTransactionOwner().Runtime()
+	if verifyProtection {
+		for _, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
+			status := runtime.ProtectionStats()
+			require.True(t, status.Protected)
+			require.Equal(t, "confirmation_gap", status.Reason)
+			require.Positive(t, status.Generation)
+			require.True(t, status.SamplerRunning)
+			require.ErrorIs(t, runtime.SetAdmission(true), messagingruntime.ErrTransactionAdmissionClosed)
+		}
+		protectionCases["initial_authoritative_observation_latches_before_registration"] = true
+		protectionCases["plain_admission_cannot_bypass_latch"] = true
+	}
 	after := startObserver()
 	subscribe(after)
 	maxima := map[string]int{"running": 0, "queued": 0}
@@ -643,6 +677,33 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 		}
 	}
 	cases["wrong_reference_unknown_without_changed_facts"] = true
+	if verifyProtection {
+		for i, runtime := range []*messagingruntime.TransactionRuntime{mysqlNext, mongoNext} {
+			require.Eventually(t, func() bool {
+				status, stats := runtime.ProtectionStats(), runtime.Stats()
+				return status.Fresh && status.ConfirmationGapBranches == 0 && stats.RecoveryCommitConfirmed > 0 && stats.RecoveryAuditRecorded > 0
+			}, 20*time.Second, 50*time.Millisecond, "real positive recovery RPC/audit did not clear observed gap")
+			status := runtime.ProtectionStats()
+			require.True(t, status.Protected, "healthy sample automatically reopened admission")
+			require.ErrorIs(t, runtime.SetAdmission(true), messagingruntime.ErrTransactionAdmissionClosed)
+			require.ErrorIs(t, runtime.ReviewProtection(status.Generation+1, "native-owned-recovery-review"), messagingruntime.ErrProtocolProtection)
+			require.NoError(t, runtime.ReviewProtection(status.Generation, "native-owned-recovery-review"))
+			require.False(t, runtime.Stats().Ready, "named review bypassed explicitly paused host gate")
+			require.NoError(t, runtime.SetAdmission(true))
+			input := branches[i].plan.Input()
+			duplicate, e := runtime.Reserve(t.Context(), transaction.Request{Owner: input.Owner, Scope: input.Scope, Key: input.IdempotencyKey, InputHash: input.InputHash}, branches[i].plan)
+			require.NoError(t, e)
+			require.False(t, duplicate.Acquired)
+			require.Equal(t, branches[i].plan.Digest(), duplicate.Execution.Plan.Digest())
+			require.Zero(t, runtime.Stats().HalfPreparedResults)
+			require.Equal(t, int32(1), branches[i].calls.Load())
+			require.NoError(t, runtime.SetAdmission(false))
+		}
+		protectionCases["real_broker_recovery_rpc_then_positive_audit_clears_gap"] = true
+		protectionCases["healthy_sampling_does_not_unlatch"] = true
+		protectionCases["generation_bound_named_review_then_explicit_admission"] = true
+		protectionCases["duplicate_plan_no_new_half_or_business_executor"] = true
+	}
 	require.NoError(t, after.Close(t.Context()))
 	require.NoError(t, next.events.CloseContext(t.Context()))
 	require.NoError(t, next.normal.Close(t.Context()))
@@ -657,4 +718,11 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "scope": "default QS dual-owner lifecycle, actual Broker restart and next-instance Checker; protocol fixture facts", "domain_api_provider_system_not_claimed": true, "domain_consumers_explicitly_disabled": true, "producer_process_exit_not_claimed": true, "owned_databases_dropped": true, "owned_runtimes_drained": true, "same_broker_container_restarted": true, "local_executor_calls": []int32{branches[0].calls.Load(), branches[1].calls.Load()}, "mongo_database_callbacks": mongoCallbacks.Load(), "new_checker_commits": []int64{mysqlNext.Stats().CheckCommit, mongoNext.Stats().CheckCommit}, "observed_callbacks": maxima, "duplicate_deliveries": duplicateDeliveries.Load(), "close_wait_ms": closeWait.Milliseconds(), "new_half_prepared_results": []int64{mysqlNext.Stats().HalfPreparedResults, mongoNext.Stats().HalfPreparedResults}})
 	require.NoError(t, err)
 	fmt.Println("M3_QS_DEFAULT_OWNER_RECEIPT " + string(receipt))
+	if verifyProtection {
+		protectionCases["actual_sampler_and_sdk_shutdown_joined"] = !mysqlNext.ProtectionStats().SamplerRunning && !mongoNext.ProtectionStats().SamplerRunning && mysqlNext.Stats().Stopped && mongoNext.Stats().Stopped
+		require.True(t, protectionCases["actual_sampler_and_sdk_shutdown_joined"])
+		receipt, err := json.Marshal(map[string]any{"source_sha": strings.TrimSpace(string(sourceSHA)), "passed": len(protectionCases), "failed": 0, "skipped": 0, "cases": protectionCases, "fixture_timestamp_aging_seconds": 600, "real_ten_minute_elapsed_not_claimed": true, "owner_count": 2, "domain_api_provider_system_not_claimed": true, "owned_databases_dropped": true})
+		require.NoError(t, err)
+		fmt.Println("M3_QS_PROTOCOL_PROTECTION_RECEIPT " + string(receipt))
+	}
 }

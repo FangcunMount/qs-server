@@ -9248,6 +9248,54 @@
         {
           "kind": "source",
           "path": "internal/apiserver/infra/answersheetgap/scanner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/owner_runtime_native_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_constructor_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_lifecycle.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_lifecycle_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_metrics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_metrics_http_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_observation.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_observation_binding.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_observation_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_protection.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/messagingruntime/transaction_protection_test.go"
         }
       ],
       "verification": [
@@ -9318,6 +9366,9 @@
           "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
           "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
         }
+      ],
+      "notes": [
+        "M3 T24 host observability WIP: actual published tx.4, default /metrics cached collector, original-primary snapshot, initial observation before Producer registration, latched generation review and actual sampler shutdown ownership. Target race, lint and docs pass; native actual dual-owner/Broker guard profile pending. Preserve existing gaps and production evidence; no full old page re-signoff."
       ]
     },
     {
