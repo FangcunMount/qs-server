@@ -30,8 +30,8 @@ type HandoffPreconditions struct {
 }
 
 type HandoffOutcome struct {
-	ScheduleID string
-	Status     string // transferred, already_transferred, or unknown
+	ScheduleID string `json:"schedule_id"`
+	Status     string `json:"status"` // transferred, already_transferred, or unknown
 }
 
 func NewHandoff(store port.HandoffStore, runner root.Runner, authority port.AuthorityValidator, binding transaction.Binding) (*Handoff, error) {
