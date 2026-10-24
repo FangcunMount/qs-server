@@ -235,7 +235,23 @@ func ownerNativeError(err error) map[string]any {
 
 // Real default subsystem and both original stores. The frozen wire and fact
 // rows below are protocol fixtures, not domain/API/provider/system acceptance.
-func TestM3DefaultOwnerRuntime(t *testing.T) {
+func TestM3DefaultOwnerRuntime(t *testing.T) { runDefaultOwnerRuntime(t, false) }
+
+// Original QS owner/root component proof; not full domain/API or system acceptance.
+func TestM3DefaultOwnerNativeRecovery(t *testing.T) { runDefaultOwnerRuntime(t, true) }
+
+func runDefaultOwnerRuntime(t *testing.T, recovery bool) {
+	directory := os.Getenv("QS_M3_NATIVE_RECOVERY_DIRECTORY")
+	if recovery {
+		require.Equal(t, "true", os.Getenv("GITHUB_ACTIONS"))
+		require.Equal(t, "Linux", os.Getenv("RUNNER_OS"))
+		require.Equal(t, "github-hosted", os.Getenv("RUNNER_ENVIRONMENT"))
+		require.True(t, filepath.IsAbs(directory))
+		info, e := os.Lstat(directory)
+		require.NoError(t, e)
+		require.True(t, info.IsDir())
+		require.Zero(t, info.Mode().Perm()&0077)
+	}
 	data := ownedDefaultOwnerData(t)
 	load := func(key string) generic.MessagingOptions {
 		t.Helper()
@@ -620,6 +636,115 @@ func TestM3DefaultOwnerRuntime(t *testing.T) {
 	cases["original_mysql_and_mongo_facts_witness_atomic"] = true
 	require.NoError(t, data.pool.PingContext(t.Context()))
 	require.NoError(t, data.documents.Client().Ping(t.Context(), readpref.Primary()))
+
+	if recovery {
+		require.False(t, verifyProtection)
+		require.False(t, verifyNative)
+		write := func(name string, value any) {
+			t.Helper()
+			raw, e := json.Marshal(value)
+			require.NoError(t, e)
+			f, e := os.OpenFile(filepath.Join(directory, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+			require.NoError(t, e)
+			_, e = f.Write(raw)
+			require.NoError(t, e)
+			require.NoError(t, f.Close())
+		}
+		wait := func(name string) {
+			t.Helper()
+			deadline := time.Now().Add(360 * time.Second)
+			for time.Now().Before(deadline) {
+				if info, e := os.Lstat(filepath.Join(directory, name)); e == nil {
+					require.True(t, info.Mode().IsRegular())
+					require.Zero(t, info.Mode().Perm()&0077)
+					return
+				}
+				select {
+				case <-t.Context().Done():
+					t.Fatal("owned QS recovery control cancelled")
+				case <-time.After(50 * time.Millisecond):
+				}
+			}
+			t.Fatal("owned QS recovery control timeout")
+		}
+		ownedHostBroker(t, "start")
+		waitOwnedHostTLS(t, opts.RocketMQ)
+		ownedHostBroker(t, "release-checks")
+		records := make([]map[string]any, 0, 2)
+		for i, b := range branches {
+			ref := b.owned.References()[0]
+			binding := sqlBinding
+			if i == 1 {
+				binding = mongoBinding
+			}
+			records = append(records, map[string]any{"owner": binding.Owner, "store_id": binding.StoreID, "writer_epoch": binding.WriterEpoch, "operation_id": ref.OperationID, "branch_id": ref.BranchID, "fence": ref.Fence, "message_id": ref.MessageID, "wire_hash": hex.EncodeToString(ref.WireHash[:])})
+		}
+		write("original-roots.json", map[string]any{"database": data.documents.Name(), "branches": records, "original_root_calls": 2, "original_owners_stopped": true, "broker_sigkill_after_commit": true})
+		wait("record-notices")
+		for i, b := range branches {
+			raw, e := os.ReadFile(filepath.Join(directory, "native-"+b.owner+".json"))
+			require.NoError(t, e)
+			expected := sha256.Sum256(raw)
+			evidence, e := messagingruntime.ParseNativeLimitEvidence(raw, expected)
+			require.NoError(t, e)
+			require.Equal(t, 1, evidence.IndexCount())
+			if i == 0 {
+				notices, e := messagingruntime.NewSQLNativeLimits(data.pool, sqlBinding, "m3-1")
+				require.NoError(t, e)
+				require.NoError(t, notices.RecordNativeLimit(t.Context(), evidence))
+			} else {
+				notices, e := messagingruntime.NewMongoNativeLimits(data.documents, mongoBinding, "m3-1")
+				require.NoError(t, e)
+				require.NoError(t, notices.RecordNativeLimit(t.Context(), evidence))
+			}
+		}
+		write("notices.json", map[string]bool{"both_original_stores_recorded": true})
+		wait("verify")
+		for i, b := range branches {
+			ref := b.owned.References()[0]
+			if i == 0 {
+				proof, e := storeSQL.Evidence(t.Context(), ref)
+				require.NoError(t, e)
+				require.Equal(t, transaction.Commit, transaction.Resolve(ref, proof))
+				var n int
+				require.NoError(t, data.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM m3_owner_runtime_facts").Scan(&n))
+				require.Equal(t, 1, n)
+				require.NoError(t, data.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM rm_tx_witness WHERE final_outcome='commit_confirmed' AND final_recorded_at IS NOT NULL").Scan(&n))
+				require.Equal(t, 1, n)
+				require.NoError(t, data.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM messaging_native_limit_notices WHERE status='resolved' AND resolved_at IS NOT NULL AND resolution_receipt_sha256 IS NOT NULL").Scan(&n))
+				require.Equal(t, 1, n)
+			} else {
+				proof, e := storeMongo.Evidence(t.Context(), ref)
+				require.NoError(t, e)
+				require.Equal(t, transaction.Commit, transaction.Resolve(ref, proof))
+				n, e := data.documents.Collection("m3_owner_runtime_facts").CountDocuments(t.Context(), bson.M{})
+				require.NoError(t, e)
+				require.EqualValues(t, 1, n)
+				n, e = data.documents.Collection("rm_tx_execution").CountDocuments(t.Context(), bson.M{"state": "committed", "witnesses.0.final_outcome": "commit_confirmed", "witnesses.0.final_recorded_at": bson.M{"$type": "date"}})
+				require.NoError(t, e)
+				require.EqualValues(t, 1, n)
+				n, e = data.documents.Collection("messaging_native_limit_notices").CountDocuments(t.Context(), bson.M{"status": "resolved", "resolved_at": bson.M{"$type": "date"}})
+				require.NoError(t, e)
+				require.EqualValues(t, 1, n)
+			}
+			require.Equal(t, int32(1), b.calls.Load())
+		}
+		next := newInstance(true)
+		require.NoError(t, next.normal.Start())
+		require.NoError(t, next.events.Start(t.Context()))
+		require.True(t, next.events.MySQLTransactionOwner().Runtime().Stats().Ready)
+		require.True(t, next.events.MongoTransactionOwner().Runtime().Stats().Ready)
+		closeCtx, closeCancel := context.WithTimeout(t.Context(), 30*time.Second)
+		defer closeCancel()
+		require.NoError(t, next.events.CloseContext(closeCtx))
+		require.NoError(t, next.normal.Close(closeCtx))
+		require.NoError(t, next.host.Cleanup())
+		require.NoError(t, data.pool.PingContext(t.Context()))
+		require.NoError(t, data.documents.Client().Ping(t.Context(), readpref.Primary()))
+		data.close()
+		fmt.Println(`M3_QS_NATIVE_RECOVERY {"passed":7,"failed":0,"skipped":0,"original_roots":2,"both_owners_stopped":true,"both_stores_resolved":true,"paused_replacement_drained":true,"owned_databases_removed":true,"whole_api":false,"system_acceptance":false}`)
+		return
+	}
 	if verifyProtection {
 		// Fixture-only audit clock aging in the two owned temporary databases.
 		// Do not mutate business facts, terminal witnesses, IDs, wire or RPC results.
