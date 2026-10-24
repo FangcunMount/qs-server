@@ -199,7 +199,7 @@ func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 		printViperConfig(envPrefix)
 
 		// 如果选项不为空，则反序列化选项
-		if err := viper.Unmarshal(a.options); err != nil {
+		if err := DecodeOptions(viper.GetViper(), a.options); err != nil {
 			return err
 		}
 		if aware, ok := a.options.(RuntimeConfigContextAware); ok {
