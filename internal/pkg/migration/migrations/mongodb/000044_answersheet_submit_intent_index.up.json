@@ -1,0 +1,13 @@
+[
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "submit_meta.writer_id": 1, "submit_meta.idempotency_key": 1 },
+        "name": "uk_answersheet_submit_intent",
+        "unique": true,
+        "partialFilterExpression": { "submit_meta.idempotency_key": { "$exists": true } }
+      }
+    ]
+  }
+]

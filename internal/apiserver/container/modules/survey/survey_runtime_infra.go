@@ -36,6 +36,9 @@ type SurveyRuntimeInfraDeps struct {
 	StaticBuilder *keyspace.Builder
 	CachePolicies sharedcache.PolicyProvider
 	Observer      *observability.ComponentObserver
+	// The transaction composition root has already verified the explicitly
+	// installed schema. Never reconcile indexes while borrowing that database.
+	BorrowInstalledSchema bool
 }
 
 // EnsureSurveyRuntimeInfraCached returns cached survey runtime infrastructure or builds it once.
@@ -67,9 +70,15 @@ func EnsureSurveyRuntimeInfra(deps SurveyRuntimeInfraDeps) (*SurveyRuntimeInfra,
 		)
 	}
 
-	answerSheetRepo, err := answerSheetMongo.NewRepository(deps.MongoDB, mongoOpts)
-	if err != nil {
-		return nil, err
+	var answerSheetRepo *answerSheetMongo.Repository
+	if deps.BorrowInstalledSchema {
+		answerSheetRepo = answerSheetMongo.NewRepositoryWithoutSchema(deps.MongoDB, mongoOpts)
+	} else {
+		var err error
+		answerSheetRepo, err = answerSheetMongo.NewRepository(deps.MongoDB, mongoOpts)
+		if err != nil {
+			return nil, err
+		}
 	}
 	answerSheetReader := answerSheetMongo.NewAnswerSheetReadModel(answerSheetRepo)
 

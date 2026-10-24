@@ -293,6 +293,9 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}
+	if c.transactions != nil && !c.ReportTransactionOwner().UsesDatabase(c.mongoDB) {
+		return nil, fmt.Errorf("answer submission requires the shared host Mongo owner")
+	}
 	provider := c.CachePolicyProvider()
 	binding := compose.ResolveCacheCapability(provider, cachepolicy.CapabilitySurveyQuestionnaire)
 	staticRedis := c.CacheClient(redisruntime.FamilyStatic)
@@ -300,21 +303,19 @@ func (c *Container) ensureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, e
 		staticRedis = nil
 	}
 	infra, err := surveymod.EnsureSurveyRuntimeInfraCached(c.surveyRuntimeInfra, surveymod.SurveyRuntimeInfraDeps{
-		MongoDB:       c.mongoDB,
-		MongoLimiter:  c.MongoLimiter(),
-		StaticRedis:   staticRedis,
-		StaticBuilder: c.CacheBuilder(redisruntime.FamilyStatic),
-		CachePolicies: provider,
-		Observer:      c.cacheObserver(),
+		MongoDB:               c.mongoDB,
+		MongoLimiter:          c.MongoLimiter(),
+		StaticRedis:           staticRedis,
+		StaticBuilder:         c.CacheBuilder(redisruntime.FamilyStatic),
+		CachePolicies:         provider,
+		Observer:              c.cacheObserver(),
+		BorrowInstalledSchema: c.transactions != nil,
 	})
 	if err != nil {
 		return nil, err
 	}
 	if c.transactions != nil {
 		owner := c.ReportTransactionOwner()
-		if !owner.UsesDatabase(c.mongoDB) {
-			return nil, fmt.Errorf("answer submission requires the shared host Mongo owner")
-		}
 		if infra.SubmissionStore == nil {
 			runner := modtx.NewMongoRunner(c.mongoDB, modtx.MongoRunnerOptions{Boundary: "answersheet_submit", Limiter: c.MongoLimiter()})
 			infra.SubmissionStore, err = answerrepo.NewRocketMQSubmissionStoreWithOwner(infra.AnswerSheetRepo, runner, c.transactions.Routes, owner)

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +46,7 @@ func TestM3TransactionSchemaNative(t *testing.T) {
 	if err != nil || !result.Verified || !result.AuthorizationConsumed {
 		t.Fatal("approved original 105/40 upgrade failed", result, err)
 	}
+	t.Run("answersheet-submit-index-installed-offline", func(t *testing.T) { m3AnswerSheetSubmitIndex(t, n) })
 	m3SQLProof(t, n.db, "qs.mysql")
 	t.Run("resolved-native-governance-read-and-reimport", func(t *testing.T) { verifySQLNativeResolutionFixture(t, n.db, "qs.mysql") })
 	m3MongoProof(t, n)
@@ -68,6 +70,49 @@ func TestM3TransactionSchemaNative(t *testing.T) {
 	}
 	if _, err = n.db.ExecContext(t.Context(), string(down)); err == nil {
 		t.Fatal("SQL downgrade erased protocol proof")
+	}
+}
+
+func m3AnswerSheetSubmitIndex(t *testing.T, n nativeSchemaPair) {
+	t.Helper()
+	collection := n.mongoDB.Collection("answersheets")
+	cursor, err := collection.Indexes().List(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cursor.Close(t.Context())
+	found := false
+	for cursor.Next(t.Context()) {
+		raw := cursor.Current
+		if raw.Lookup("name").StringValue() != "uk_answersheet_submit_intent" {
+			continue
+		}
+		var keys bson.D
+		if err := bson.Unmarshal(raw.Lookup("key").Document(), &keys); err != nil || len(keys) != 2 ||
+			keys[0].Key != "submit_meta.writer_id" || keys[1].Key != "submit_meta.idempotency_key" ||
+			!raw.Lookup("unique").Boolean() || !raw.Lookup("partialFilterExpression", "submit_meta.idempotency_key", "$exists").Boolean() {
+			t.Fatal("original submit identity index differs", err)
+		}
+		found = true
+	}
+	if err := cursor.Err(); err != nil || !found {
+		t.Fatal("explicit offline migration did not install submit identity index", err)
+	}
+	for index, writer := range []int{7, 7, 8} {
+		_, err := collection.InsertOne(t.Context(), bson.M{"_id": fmt.Sprintf("m3-submit-index-%d", index), "domain_id": int64(900001 + index),
+			"submit_meta": bson.M{"writer_id": writer, "idempotency_key": "same-key"}})
+		if index == 1 {
+			if !mongo.IsDuplicateKeyError(err) || !strings.Contains(err.Error(), "uk_answersheet_submit_intent") {
+				t.Fatal("same writer/key was not rejected", err)
+			}
+		} else if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index := range 2 {
+		if _, err := collection.InsertOne(t.Context(), bson.M{"_id": fmt.Sprintf("m3-without-submit-key-%d", index), "domain_id": int64(900011 + index)}); err != nil {
+			t.Fatal("partial index rejected original unkeyed records", err)
+		}
 	}
 }
 
