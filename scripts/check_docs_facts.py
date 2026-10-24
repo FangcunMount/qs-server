@@ -3579,10 +3579,13 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     # New transport code is transaction recovery RPC/audit and diagnostics;
     # it does not replace terminal consumer handoff. SDK PR54-56 source/native
     # gates passed; actual QS host native/production remain separate evidence.
+    # Stable v0.5.0 source1345266 has identical implementation/schema/patch
+    # hashes to tx.4/a4 (published receipts), including terminal settlement.
+    # Stable host/native cutover evidence is separately required by M3 T28.
     # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.5\.0-rocketmq-tx\.4\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.5\.0\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(
