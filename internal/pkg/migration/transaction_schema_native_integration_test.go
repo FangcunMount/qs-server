@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,10 +99,10 @@ func m3AnswerSheetSubmitIndex(t *testing.T, n nativeSchemaPair) {
 		t.Fatal("explicit offline migration did not install submit identity index", err)
 	}
 	for index, writer := range []int{7, 7, 8} {
-		_, err := collection.InsertOne(t.Context(), bson.M{"_id": fmt.Sprintf("m3-submit-index-%d", index),
+		_, err := collection.InsertOne(t.Context(), bson.M{"_id": fmt.Sprintf("m3-submit-index-%d", index), "domain_id": int64(900001 + index),
 			"submit_meta": bson.M{"writer_id": writer, "idempotency_key": "same-key"}})
 		if index == 1 {
-			if !mongo.IsDuplicateKeyError(err) {
+			if !mongo.IsDuplicateKeyError(err) || !strings.Contains(err.Error(), "uk_answersheet_submit_intent") {
 				t.Fatal("same writer/key was not rejected", err)
 			}
 		} else if err != nil {
@@ -109,7 +110,7 @@ func m3AnswerSheetSubmitIndex(t *testing.T, n nativeSchemaPair) {
 		}
 	}
 	for index := range 2 {
-		if _, err := collection.InsertOne(t.Context(), bson.M{"_id": fmt.Sprintf("m3-without-submit-key-%d", index)}); err != nil {
+		if _, err := collection.InsertOne(t.Context(), bson.M{"_id": fmt.Sprintf("m3-without-submit-key-%d", index), "domain_id": int64(900011 + index)}); err != nil {
 			t.Fatal("partial index rejected original unkeyed records", err)
 		}
 	}
