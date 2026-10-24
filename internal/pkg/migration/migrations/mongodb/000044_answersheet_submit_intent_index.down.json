@@ -1,0 +1,3 @@
+[
+  { "dropIndexes": "answersheets", "index": "uk_answersheet_submit_intent" }
+]
