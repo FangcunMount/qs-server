@@ -187,7 +187,7 @@ func run() (result map[string]any) {
 		schemaOwned = true
 	} else {
 		// Explicit fixture installation only; never a constructor side effect.
-		for _, name := range []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index", "000091_ai_messaging", "000092_ai_messaging_failures", "000094_ai_messaging_admission", "000095_ai_messaging_observations", "000097_ai_command_retirement", "000106_transaction_messaging", "000108_ai_transaction_command_order"} {
+		for _, name := range []string{"000072_ai_bridge_delivery", "000083_ai_runtime_index", "000091_ai_messaging", "000092_ai_messaging_failures", "000094_ai_messaging_admission", "000095_ai_messaging_observations", "000097_ai_command_retirement", "000106_transaction_messaging", "000108_ai_transaction_command_order", "000110_native_transaction_limit_notices"} {
 			raw, e := os.ReadFile(filepath.Join(cfg.Source, "internal/pkg/migration/migrations/mysql", name+".up.sql"))
 			if e != nil {
 				return fail("migration_source", e)
