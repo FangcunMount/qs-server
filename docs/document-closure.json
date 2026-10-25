@@ -11009,6 +11009,26 @@
         {
           "kind": "source",
           "path": ".github/workflows/cd.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/prepare-package.sh"
+        },
+        {
+          "kind": "source",
+          "path": "configs/worker.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "build/docker/docker-compose.prod.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/worker_package_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test_worker_compose.py"
         }
       ],
       "verification": [
@@ -11053,6 +11073,13 @@
           "result": "passed",
           "source_sha": "2a4ecd365a6306b11b4824d0234312822c6f2708",
           "verified_on": "2026-10-08"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./scripts/cd ./internal/worker/options -count=1",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
         }
       ],
       "production_evidence": {
@@ -13321,8 +13348,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
-        "verified_on": "2026-10-19"
+        "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+        "verified_on": "2026-10-25"
       },
       "fact_sources": [
         {
@@ -13465,6 +13492,34 @@
           "result": "passed",
           "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
           "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_image_deploy_lock.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test-direct-registry-deploy.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
         }
       ],
       "production_evidence": {
@@ -13477,7 +13532,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates."
     },
     {
       "path": "scripts/testing/reliable-messaging-proof.md",
@@ -13705,8 +13760,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
-        "verified_on": "2026-10-19"
+        "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+        "verified_on": "2026-10-25"
       },
       "fact_sources": [
         {
@@ -13760,6 +13815,34 @@
           "result": "passed",
           "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
           "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_ai_messaging_release.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_image_retention.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_image_deploy_lock.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test-direct-registry-deploy.py",
+          "result": "passed",
+          "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
+          "verified_on": "2026-10-25"
         }
       ],
       "production_evidence": {
@@ -13772,7 +13855,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
