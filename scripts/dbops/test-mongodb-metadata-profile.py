@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location("mongo_profile", Path(__file__).with_name("mongodb-metadata-profile.py"))
 m = importlib.util.module_from_spec(spec)
@@ -302,6 +303,30 @@ class TransportTests(unittest.TestCase):
                     with mock.patch.object(m, "capture_private", side_effect=self.offline_capture(config, calls)), mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(m.ProfileError):
                         m.trusted_ssh(home, lambda: 5)
                     self.assertEqual(len(calls), 1)
+
+    def test_trusted_reader_ignores_only_access_time_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "owned-known-hosts"
+            raw = b"owned offline host key fixture\n"
+            path.write_bytes(raw)
+            path.chmod(0o600)
+            # Linux relatime can update atime during our own read. Exercise an
+            # actual owned file and deterministic access-time-only snapshots.
+            os.utime(path, ns=(0, path.stat().st_mtime_ns))
+            expected = hashlib.sha256(raw).hexdigest()
+            self.assertEqual(m.trusted_file(path, 65536), expected)
+            original = os.fstat
+            fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_uid", "st_gid", "st_size", "st_mtime_ns", "st_ctime_ns")
+            def observed(fd, changed="st_atime_ns"):
+                value = original(fd)
+                info = {name: getattr(value, name) for name in (*fields, "st_atime_ns")}
+                info[changed] += 1
+                return SimpleNamespace(**info)
+            with mock.patch.object(m.os, "fstat", side_effect=observed):
+                self.assertEqual(m.trusted_file(path, 65536), expected)
+            for field in fields:
+                with self.subTest(tampered=field), mock.patch.object(m.os, "fstat", side_effect=lambda fd, changed=field: observed(fd, changed)), self.assertRaises(m.ProfileError):
+                    m.trusted_file(path, 65536)
 
     def test_effective_route_requires_single_root_ip_port(self):
         valid = b"user root\nhostname 81.70.102.15\nport 22\nidentityfile /owned/id\n"
