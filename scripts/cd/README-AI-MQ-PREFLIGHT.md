@@ -26,3 +26,9 @@ budgets, timezone, transactions, schema and existing approval boundaries are pre
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business
 acceptance require separate runtime evidence.
+
+## M4：覆盖AI配置时保留领域事务绑定
+
+最终API主配置包含 `messaging.rocketmq.transactions` 中的字面owner键 `qs.mysql`、`qs.mongo`。离线AI绑定渲染保留原领域messaging子树，只覆盖具名的AI messaging配置；不使用 `AllSettings` 重建这两个点号键。原store/epoch的大小写、UTF-8和美元字节、两个owner的凭据文件及既有预算保持，关闭的发布准入也不被打开。
+
+真实渲染输出再次通过宿主 `app.DecodeOptions` 验证两种存储绑定和AI的同一SQL身份；既有不读环境秘密、不加载业务事实的测试继续运行。此修复只解决配置覆盖中的键形状，不完成全部最终CD参数/私有文件目录重建，不安装生产资源或启用CD。M4进度见 [infra总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m4-execution.md)。

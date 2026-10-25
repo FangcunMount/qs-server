@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	options "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/pkg/app"
 	"github.com/spf13/viper"
 )
 
@@ -151,5 +153,77 @@ func TestMQBindingKeyPathsKeepHistoricalRoleIDsWithoutResealing(t *testing.T) {
 	}
 	if _, err = Decode(raw); err != nil {
 		t.Fatal("historical local key retention rejected")
+	}
+}
+
+func TestMQBindingRenderPreservesFinalDomainOwnerMaps(t *testing.T) {
+	base := []byte(`messaging:
+  provider: rocketmq
+  rocketmq:
+    endpoint: broker.invalid:8081
+    credentials_file: /fixture/mysql.json
+    ca_file: /fixture/ca.crt
+    routes_file: /fixture/routes.json
+    publish_enabled: false
+    transactions:
+      qs.mysql:
+        store_id: 'Original-MySQL-$主'
+        writer_epoch: Original-Writer-Epoch
+        route_revision: m3-1
+        credentials_file: /fixture/mysql.json
+      qs.mongo:
+        store_id: Original-Mongo
+        writer_epoch: Original-Mongo-Epoch
+        route_revision: m3-1
+        credentials_file: /fixture/mongo.json
+ai_workflow:
+  enabled: true
+  management:
+    address: ai.invalid:50061
+`)
+	b := fixture()
+	b.Provider = "rocketmq"
+	b.NSQD = nil
+	disabled := false
+	b.PublishEnabled = &disabled
+	b.RocketMQ = &genericoptions.RocketMQOptions{
+		Endpoint: "broker.invalid:8081", CredentialsFile: "/fixture/mysql.json", CAFile: "/fixture/ca.crt", RoutesFile: "/fixture/routes.json",
+		Transactions: map[string]genericoptions.TransactionOptions{"qs.mysql": {StoreID: "Original-MySQL-$主", WriterEpoch: "Original-Writer-Epoch", RouteRevision: "m3-1", CredentialsFile: "/fixture/mysql.json"}},
+	}
+	rendered, err := Render(base, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := viper.New()
+	v.SetConfigType("json")
+	if err := v.ReadConfig(strings.NewReader(string(rendered))); err != nil {
+		t.Fatal(err)
+	}
+	opts := options.NewOptions()
+	if err := app.DecodeOptions(v, opts); err != nil {
+		t.Fatal(err)
+	}
+	domain := opts.MessagingOptions.RocketMQ.Transactions
+	if len(domain) != 2 || domain["qs.mysql"].StoreID != "Original-MySQL-$主" || domain["qs.mongo"].StoreID != "Original-Mongo" || domain["qs.mysql"].WriterEpoch != "Original-Writer-Epoch" || domain["qs.mongo"].WriterEpoch != "Original-Mongo-Epoch" {
+		t.Fatal("AI overlay corrupted original domain transaction identities")
+	}
+	if domain["qs.mysql"].CredentialsFile != "/fixture/mysql.json" || domain["qs.mongo"].CredentialsFile != "/fixture/mongo.json" {
+		t.Fatal("separate owner credentials changed")
+	}
+	for owner, binding := range domain {
+		limits, err := binding.ProtocolLimits(owner)
+		if err != nil || limits.Sends != 4 || limits.CheckWorkers != 2 || limits.ReconcileBatch != 50 {
+			t.Fatalf("original owner budget changed: %v", err)
+		}
+	}
+	workflow := opts.AIWorkflow.Messaging.RocketMQ.Transactions
+	if len(workflow) != 1 || workflow["qs.mysql"].StoreID != domain["qs.mysql"].StoreID || workflow["qs.mysql"].WriterEpoch != domain["qs.mysql"].WriterEpoch {
+		t.Fatal("frozen AI owner changed")
+	}
+	if opts.MessagingOptions.RocketMQ.PublishingEnabled() || opts.AIWorkflow.Messaging.RocketMQ.PublishingEnabled() {
+		t.Fatal("closed admission changed")
+	}
+	if v.GetString("ai_workflow.management.address") != "ai.invalid:50061" {
+		t.Fatal("non-MQ settings changed")
 	}
 }
