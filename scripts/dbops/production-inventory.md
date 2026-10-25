@@ -47,3 +47,9 @@ budgets, timezone, transactions, schema and existing approval boundaries are pre
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business
 acceptance require separate runtime evidence.
+
+## Mongo可信文件读取的访问时间
+
+`mongodb-metadata-profile.py` 在读取 known_hosts 前后核对同一普通文件的设备、inode、链接数、类型/权限、UID/GID、大小及纳秒级 mtime/ctime。读取本身可能更新 atime，不能将它当作文件被替换的证据；只排除 atime，仍拒绝其它任一稳定字段变化。`O_NOFOLLOW`、原SSH别名/端点、代理与转发拒绝、host key及最终连接约束保持。该本地修复不更改生产SSH设置、凭据或数据库权限。
+
+离线门禁使用任务自己的临时文件复现访问时间更新，并逐项证明九个稳定字段变化仍被拒绝；原路由拒绝用例全部保留。真实MongoDB原生metadata验收仍由required CI执行，离线通过不表示已读取生产。

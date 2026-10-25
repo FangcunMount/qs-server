@@ -262,16 +262,23 @@ def binary_hash(binary):
         return hashlib.sha256(handle.read()).hexdigest()
 
 
+def _trusted_identity(info):
+    # Access time can change because of this reader itself (Linux relatime).
+    # Preserve every other stat tuple field, using nanosecond mtime/ctime.
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_uid,
+            info.st_gid, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
 def trusted_file(path, limit):
     before = path.lstat()
     if not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid() or before.st_mode & 0o022 or not 0 < before.st_size <= limit:
         raise ProfileError("ssh_route_invalid")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(fd, "rb") as stream:
-        if os.fstat(stream.fileno()) != before:
+        if _trusted_identity(os.fstat(stream.fileno())) != _trusted_identity(before):
             raise ProfileError("ssh_route_invalid")
         raw = stream.read(limit + 1)
-        if len(raw) > limit or os.fstat(stream.fileno()) != before:
+        if len(raw) > limit or _trusted_identity(os.fstat(stream.fileno())) != _trusted_identity(before):
             raise ProfileError("ssh_route_invalid")
     return hashlib.sha256(raw).hexdigest()
 
