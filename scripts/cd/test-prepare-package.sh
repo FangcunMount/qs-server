@@ -35,6 +35,11 @@ assert_package_contract() {
     apiserver)
       env \
         SERVICE=apiserver \
+        MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 \
+        ROCKETMQ_INSTANCE_ID=qs-apiserver-1 \
+        ROCKETMQ_MYSQL_STORE_ID=Original-MySQL ROCKETMQ_MYSQL_WRITER_EPOCH=Original-SQL-Epoch \
+        ROCKETMQ_MONGO_STORE_ID=Original-Mongo ROCKETMQ_MONGO_WRITER_EPOCH=Original-Mongo-Epoch \
+        ROCKETMQ_PUBLISH_ENABLED=false \
         DEPLOY_PACKAGE_DIR="$package_dir" \
         DEPLOY_PACKAGE="$package_archive" \
         MONGODB_HOST=mongodb MONGODB_PORT=27017 \
@@ -43,7 +48,6 @@ assert_package_contract() {
         MYSQL_USERNAME=user MYSQL_PASSWORD=password MYSQL_DATABASE=qs \
         REDIS_HOST=redis REDIS_PORT=6379 \
         JWT_SECRET=jwt-secret DELEGATED_SUBJECT_CURRENT_KEY=delegated-key \
-        NSQ_NSQD_HOST=nsqd NSQ_NSQD_PORT=4150 \
         OSS_ACCESS_KEY_ID=access-key OSS_ACCESS_KEY_SECRET=access-secret \
         "$SCRIPT_DIR/prepare-package.sh" >"$output_file"
       ;;
@@ -109,7 +113,7 @@ assert_package_contract() {
       assert_line "$env_file" "QS_APISERVER_MONGODB_MAX_CONN_IDLE_TIME=10m"
       test -s "$package_dir/configs/cache/apiserver.prod.yaml"
       assert_line "$env_file" "QS_APISERVER_REDIS_DATABASE=0"
-      assert_line "$env_file" "QS_APISERVER_MESSAGING_NSQ_ADDR=nsqd:4150"
+      assert_absent "$env_file" "NSQ_"
       assert_absent "$output_file" "deepseek-test-secret-value"
       assert_absent "$env_file" "QS_APISERVER_NSQ_NSQD_"
       ;;
@@ -133,7 +137,7 @@ assert_package_contract() {
 cd "$REPO_ROOT"
 assert_package_contract apiserver
 assert_package_contract collection
-MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_INSTANCE_ID=proof ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract apiserver
+MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_INSTANCE_ID=qs-apiserver-1 ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract apiserver
 MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false ROCKETMQ_WORKER_BINDING_REVISION=proof-v1 assert_package_contract worker
 
 # Tencent public Redis must fail closed rather than infer TLS from its port.

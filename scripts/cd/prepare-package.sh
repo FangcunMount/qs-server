@@ -38,6 +38,11 @@ redact_env_file() {
     "$1"
 }
 
+# Final API owner identities must be complete before replacing an existing package.
+if [ "$SERVICE" = apiserver ]; then
+  python3 "$SCRIPT_DIR/render-api-messaging.py" validate
+fi
+
 # A production worker consumes only. Validate before replacing a package.
 if [ "$SERVICE" = worker ]; then
   if [ "${MESSAGING_PROVIDER:-}" != rocketmq ] || [ "${ROCKETMQ_PUBLISH_ENABLED:-false}" != false ]; then
@@ -78,20 +83,18 @@ cp scripts/dbops/receipt-transport.py "${PACKAGE_DIR}/scripts/dbops/"
 if [ "${MESSAGING_PROVIDER_REQUIRED:-false}" = true ] && [ "$SERVICE" != collection ]; then
   require_env MESSAGING_PROVIDER
 fi
-MESSAGING_PROVIDER="${MESSAGING_PROVIDER:-nsq}"
-case "$MESSAGING_PROVIDER" in nsq|rocketmq) ;; *) echo 'Unsupported broker provider' >&2; exit 1 ;; esac
-ROCKETMQ_PUBLISH_ENABLED="${ROCKETMQ_PUBLISH_ENABLED:-true}"
+MESSAGING_PROVIDER="${MESSAGING_PROVIDER:-}"
+if [ "$SERVICE" != collection ] && [ "$MESSAGING_PROVIDER" != rocketmq ]; then
+  echo 'Production requires explicit final RocketMQ configuration' >&2
+  exit 1
+fi
+ROCKETMQ_PUBLISH_ENABLED="${ROCKETMQ_PUBLISH_ENABLED:-false}"
 case "$ROCKETMQ_PUBLISH_ENABLED" in true|false) ;; *) echo 'Invalid publish gate' >&2; exit 1 ;; esac
-NSQ_NSQD_HOST="${NSQ_NSQD_HOST:-}"
-NSQ_LOOKUPD_HOST="${NSQ_LOOKUPD_HOST:-}"
 if [ "$SERVICE" != collection ]; then
-  if [ "$MESSAGING_PROVIDER" = rocketmq ]; then
-    require_env ROCKETMQ_ENDPOINT
-    if [ "$SERVICE" = apiserver ]; then require_env ROCKETMQ_INSTANCE_ID; fi
-  else
-    require_env NSQ_NSQD_HOST
-    if [ "$SERVICE" = worker ]; then require_env NSQ_LOOKUPD_HOST; fi
-  fi
+  require_env ROCKETMQ_ENDPOINT
+fi
+if [ "$SERVICE" = apiserver ]; then
+  python3 "$SCRIPT_DIR/render-api-messaging.py" render "$PACKAGE_DIR/configs/apiserver.prod.yaml"
 fi
 
 if [ "${SERVICE:-apiserver}" != collection ]; then
@@ -127,7 +130,6 @@ case "$SERVICE" in
     MONGODB_PORT="${MONGODB_PORT:-27017}"
     MYSQL_PORT="${MYSQL_PORT:-3306}"
     REDIS_PORT="${REDIS_PORT:-6379}"
-    NSQ_NSQD_PORT="${NSQ_NSQD_PORT:-4150}"
     default_redis_ssl
     require_env \
       MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
@@ -168,8 +170,6 @@ QS_APISERVER_JWT_SECRET=${JWT_SECRET}
 
 QS_APISERVER_DELEGATED_SUBJECT_CURRENT_KEY=${DELEGATED_SUBJECT_CURRENT_KEY}
 QS_APISERVER_DELEGATED_SUBJECT_PREVIOUS_KEY=${DELEGATED_SUBJECT_PREVIOUS_KEY:-}
-
-QS_APISERVER_MESSAGING_NSQ_ADDR=${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}
 
 QS_APISERVER_OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
 QS_APISERVER_OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}

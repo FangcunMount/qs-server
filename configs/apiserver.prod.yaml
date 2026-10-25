@@ -155,7 +155,7 @@ mysql:
 # 3.2 数据库迁移配置
 # ----------------------------------------------------------------------------
 migration:
-  enabled: true   # 生产环境建议开启
+  enabled: false  # 生产DDL由显式迁移执行，启动不安装schema
   autoseed: false
   database: "qs"
 
@@ -489,15 +489,20 @@ mongodb:
 # ----------------------------------------------------------------------------
 # 3.10 消息队列配置
 # ----------------------------------------------------------------------------
+# BEGIN FINAL API MESSAGING
+# Filled by the reviewed packager from original installed identities.
 messaging:
-  enabled: true                        # 启用消息队列发布: true
-  provider: nsq                        # 当前仅支持 NSQ
-
-  # NSQ 配置（生产环境使用 Docker 服务名或实际地址）
-  nsq-addr: "nsqd:4150"                 # NSQ 生产者地址: nsqd:4150 (Docker 网络内部)
-  nsq-lookupd-addr: "nsqlookupd:4161"   # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
-  nsqd-http-endpoints: ["http://nsqd:4151"] # 显式管理端点；首投前准备 topic/channel
-  primary-worker-channel: "qs-worker"   # 必须与 worker.prod.yaml service-name 一致
+  enabled: true
+  provider: rocketmq
+  rocketmq:
+    endpoint: ""
+    credentials_file: /app/configs/rocketmq/credentials.json
+    ca_file: /app/configs/rocketmq/ca.crt
+    routes_file: /app/configs/rocketmq/routes.json
+    instance_id: qs-apiserver-1
+    publish_enabled: false
+    transactions: {}
+# END FINAL API MESSAGING
 
 # EventSubsystem 本地消费者。hot-rank 与主 worker 使用同一 Topic、不同 channel，
 # Redis 投影失败只会重试该 channel，不会阻断 answersheet Evaluation 主链。
@@ -507,8 +512,8 @@ eventing:
   # switches. The MySQL switch covers the assessment lifecycle and task-opened
   # reminder intent; the outward reminder sender remains separately disabled.
   standard_outbox:
-    mongo: true
-    assessment: true
+    mongo: false
+    assessment: false
   consumers:
     modelcatalog-hot-rank:
       enabled: true
@@ -531,7 +536,7 @@ iam:
   enable-tracing: true            # 启用 OpenTelemetry 链路追踪
   enable-metrics: true            # 启用 Prometheus 指标
 
-  # 即使 NSQ 通知断线，也每 5 秒读取 IAM 已提交策略版本；证明超过 10 秒时拒绝沿用旧授权。
+  # 即使消息通知断线，也每 5 秒读取 IAM 已提交策略版本；证明超过 10 秒时拒绝沿用旧授权。
   authz-version-guard:
     enabled: true
     max-age: 10s
@@ -539,13 +544,20 @@ iam:
     read-timeout: 2s
 
   # authz 规则通知
-  authz-sync:                           # authz 规则同步配置 (authz 规则更新后，通过 NSQ 通知 apiserver 更新规则)
-    enabled: true                       # 是否启用 authz 同步: true
-    provider: "nsq"                     # 当前仅支持 NSQ
-    nsq-lookupd-addr: "nsqlookupd:4161" # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
-    topic: "iam.authz.version.v2"          # 主题: iam.authz.version.v2
-    channel-prefix: "qs-authz-sync"     # 频道前缀: qs-authz-sync
-    ephemeral-nsq: true                 # 每实例临时 channel；失联时由已提交版本栅栏守住十秒时效
+  authz-sync:
+    enabled: true
+    provider: rocketmq
+    topic: iam.authz.version.v2
+    channel-prefix: qs-authz-sync
+    ephemeral-nsq: false
+    rocketmq:
+      endpoint: ""
+      credentials_file: /app/configs/rocketmq/credentials.json
+      ca_file: /app/configs/rocketmq/ca.crt
+      routes_file: /app/configs/rocketmq/routes.json
+      instance_id: qs-apiserver-1
+      publish_enabled: false
+      transactions: {}
 
   # gRPC 连接配置
   grpc:

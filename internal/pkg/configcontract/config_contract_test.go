@@ -37,6 +37,13 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
 			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
+			if name == "apiserver.prod.yaml" {
+				if opts.MessagingOptions.RocketMQ.Validate() == nil {
+					t.Fatal("production endpoint must require explicit binding")
+				}
+				opts.MessagingOptions.RocketMQ.Endpoint = "broker.invalid:8081"
+				opts.IAMOptions.AuthzSync.RocketMQ.Endpoint = "broker.invalid:8081"
+			}
 			completeAndValidate(t, opts)
 			cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
 			if err != nil {

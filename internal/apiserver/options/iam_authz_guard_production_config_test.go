@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func TestProductionConfigPairsEphemeralAuthzNSQWithCommittedVersionGuard(t *testing.T) {
+func TestFinalProductionConfigPairsRocketMQWithCommittedVersionGuard(t *testing.T) {
 	config := viper.New()
 	config.SetConfigFile(filepath.Join("..", "..", "..", "configs", "apiserver.prod.yaml"))
 	if err := config.ReadInConfig(); err != nil {
@@ -27,12 +27,16 @@ func TestProductionConfigPairsEphemeralAuthzNSQWithCommittedVersionGuard(t *test
 		t.Fatalf("production IAM committed-version guard = %+v", guard)
 	}
 	sync := loaded.IAMOptions.AuthzSync
-	if sync == nil || !sync.Enabled || sync.Provider != "nsq" || !sync.EphemeralNSQ {
-		t.Fatalf("production authorization NSQ channel is not ephemeral: %+v", sync)
+	if sync == nil || !sync.Enabled || sync.Provider != "rocketmq" || sync.EphemeralNSQ {
+		t.Fatalf("final production authorization subscription differs: %+v", sync)
 	}
 	if errs := guard.Validate(); len(errs) != 0 {
 		t.Fatalf("production IAM guard options invalid: %v", errs)
 	}
+	if errs := sync.Validate(); len(errs) == 0 {
+		t.Fatal("unbound production endpoint must fail closed")
+	}
+	sync.RocketMQ.Endpoint = "broker.invalid:8081"
 	if errs := sync.Validate(); len(errs) != 0 {
 		t.Fatalf("production IAM authorization sync options invalid: %v", errs)
 	}
