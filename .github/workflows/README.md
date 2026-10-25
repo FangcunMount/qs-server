@@ -116,3 +116,8 @@ workflow 成功后若未写入证据台账，只能称为“run 成功”，不�
 - effective config hash 或具名 unknown limitation；
 - workflow/命令、结果和原始 evidence reference；
 - 探针/查询覆盖、limitations、`expires_on`、`supersedes`。
+
+
+### M3 固定镜像预置
+
+`rocketmq-m3-image-cache.yml`仅允许main精确workflow SHA手动执行，在原qlume组的旧Mac mini运行。保留`PRODUCTION_DEPLOY_PAUSED=true`，使用已合并、固定SHA的infra缓存工具和固定计划，只向serverA/serverD拉取五个已发布digest并核对原容器保持；不调用部署脚本、启动业务或迁移数据库。复用既有ACR/SSH/SUDO Secrets，经SSH stdin临时传递，正常及失败均清理临时认证、runner密钥，另有always幂等清理步骤；只上传摘要回执。实际缓存和业务切换分开验收，M3总进度以[infra执行总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)为准。
