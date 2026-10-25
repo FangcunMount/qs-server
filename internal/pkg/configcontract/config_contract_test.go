@@ -334,6 +334,17 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := workeroptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
+			if name == "worker.prod.yaml" {
+				if opts.Messaging.Provider != "rocketmq" || opts.Messaging.RocketMQ.PublishingEnabled() || len(opts.Messaging.RocketMQ.Transactions) != 0 {
+					t.Fatal("production worker must remain consumer-only")
+				}
+				if opts.Messaging.RocketMQ.Endpoint != "" || opts.Messaging.RocketMQ.Validate() == nil {
+					t.Fatal("production must require its explicitly injected endpoint")
+				}
+				// Only the local contract fixture supplies this address. The
+				// actual CD env→decoder path is covered by worker_package_test.
+				opts.Messaging.RocketMQ.Endpoint = "broker.invalid:8081"
+			}
 			completeAndValidate(t, opts)
 			cfg, err := workerconfig.CreateConfigFromOptions(opts)
 			if err != nil {
@@ -377,8 +388,12 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if opts.Messaging.Provider == "nsq" && opts.Messaging.NSQMessageTimeout <= opts.GRPC.RequestTimeout {
 				t.Fatalf("%s NSQ message timeout = %s, must exceed RPC timeout %s", name, opts.Messaging.NSQMessageTimeout, opts.GRPC.RequestTimeout)
 			}
-			if workerEventConfigPath(cfg.Worker) != "configs/events.yaml" {
-				t.Fatalf("worker event config fallback = %q, want configs/events.yaml", workerEventConfigPath(cfg.Worker))
+			wantCatalog := "configs/events.yaml"
+			if name == "worker.prod.yaml" {
+				wantCatalog = "/app/configs/events.yaml"
+			}
+			if got := workerEventConfigPath(cfg.Worker); got != wantCatalog {
+				t.Fatalf("worker event config = %q, want %q", got, wantCatalog)
 			}
 			assertEventCatalogLoads(t)
 		})
