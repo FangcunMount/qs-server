@@ -30,3 +30,9 @@ acceptance require separate runtime evidence.
 ## M4 worker配置边界
 
 worker发布现在只接受消费专用RocketMQ配置，冻结文件版本在同步配置前校验并加入Compose环境；发布门关闭、无事务owner。三个文件逐一只读挂载，缺失来源不自动创建。该变化不修改共享镜像保留策略、部署锁inode、API不可变AI预检或原保护列表。当前CD继续暂停，实际文件目录、账号、配置和八实例重建仍须通过M4门禁；源码验证不表示生产已安装。详见 [部署正文](../../docs/04-接口与运维/06-部署与端口.md#7-m4-worker生产配置收敛)。
+
+## M4：覆盖AI配置时保留领域事务绑定
+
+最终API主配置包含 `messaging.rocketmq.transactions` 中的字面owner键 `qs.mysql`、`qs.mongo`。离线AI绑定渲染保留原领域messaging子树，只覆盖具名的AI messaging配置；不使用 `AllSettings` 重建这两个点号键。原store/epoch的大小写、UTF-8和美元字节、两个owner的凭据文件及既有预算保持，关闭的发布准入也不被打开。
+
+真实渲染输出再次通过宿主 `app.DecodeOptions` 验证两种存储绑定和AI的同一SQL身份；既有不读环境秘密、不加载业务事实的测试继续运行。此修复只解决配置覆盖中的键形状，不完成全部最终CD参数/私有文件目录重建，不安装生产资源或启用CD。M4进度见 [infra总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m4-execution.md)。

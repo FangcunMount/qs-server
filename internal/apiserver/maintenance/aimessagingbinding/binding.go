@@ -219,6 +219,12 @@ func Render(base []byte, b Binding) ([]byte, error) {
 		return nil, ErrBinding
 	}
 	settings := v.AllSettings()
+	// AllSettings expands literal dotted owner IDs into nested maps. Keep the
+	// original domain subtree while replacing only the reviewed AI binding.
+	// Get reads the file map directly; this Viper has no env/flag bindings.
+	if v.IsSet("messaging") {
+		settings["messaging"] = v.Get("messaging")
+	}
 	workflow, ok := settings["ai_workflow"].(map[string]any)
 	if !ok {
 		return nil, ErrBinding

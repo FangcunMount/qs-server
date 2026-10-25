@@ -13843,6 +13843,13 @@
           "result": "passed",
           "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
           "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/apiserver/maintenance/aimessagingbinding ./internal/apiserver/options -count=1",
+          "result": "passed",
+          "source_sha": "816701d007a0dc3a1fe9e9b04596b47e2fe02e74",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
@@ -13855,7 +13862,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 C06 renderer review: preserve the raw domain messaging subtree so literal dotted owner IDs and original identities survive the AI-only overlay. The existing environment secrecy, local files and bounded preflight constraints remain unchanged. New actual decoder round-trip and original option/renderer race tests passed; full CI and deployment remain separate."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
