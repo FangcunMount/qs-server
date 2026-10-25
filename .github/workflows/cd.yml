@@ -14,7 +14,6 @@ name: Production Deploy
 #   MONGODB_HOST, MONGODB_PORT
 #   MYSQL_PUBLIC_HOST, MYSQL_PUBLIC_PORT, MYSQL_TLS_MODE, MYSQL_TLS_CA_REF (组织 Variables)
 #   REDIS_HOST, REDIS_PORT, REDIS_USE_SSL, REDIS_SSL_INSECURE_SKIP_VERIFY
-#   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 #   ALIYUN_ACR_REGISTRY (如 registry.cn-hangzhou.aliyuncs.com)
 #   ALIYUN_ACR_NAMESPACE (ACR 命名空间)
@@ -290,7 +289,11 @@ jobs:
           MESSAGING_PROVIDER: ${{ vars.MESSAGING_PROVIDER }}
           ROCKETMQ_ENDPOINT: ${{ vars.ROCKETMQ_ENDPOINT }}
           ROCKETMQ_INSTANCE_ID: ${{ vars.ROCKETMQ_INSTANCE_ID }}
-          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'true' }}
+          ROCKETMQ_MYSQL_STORE_ID: ${{ vars.ROCKETMQ_MYSQL_STORE_ID }}
+          ROCKETMQ_MYSQL_WRITER_EPOCH: ${{ vars.ROCKETMQ_MYSQL_WRITER_EPOCH }}
+          ROCKETMQ_MONGO_STORE_ID: ${{ vars.ROCKETMQ_MONGO_STORE_ID }}
+          ROCKETMQ_MONGO_WRITER_EPOCH: ${{ vars.ROCKETMQ_MONGO_WRITER_EPOCH }}
+          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'false' }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
@@ -314,8 +317,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DELEGATED_SUBJECT_CURRENT_KEY: ${{ secrets.DELEGATED_SUBJECT_CURRENT_KEY }}
           DELEGATED_SUBJECT_PREVIOUS_KEY: ${{ secrets.DELEGATED_SUBJECT_PREVIOUS_KEY }}
-          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
-          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
           OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
           OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
         run: |
@@ -426,11 +427,6 @@ jobs:
 
       - name: Prepare deployment package
         env:
-          MESSAGING_PROVIDER_REQUIRED: 'true'
-          MESSAGING_PROVIDER: ${{ vars.MESSAGING_PROVIDER }}
-          ROCKETMQ_ENDPOINT: ${{ vars.ROCKETMQ_ENDPOINT }}
-          ROCKETMQ_INSTANCE_ID: ${{ vars.ROCKETMQ_INSTANCE_ID }}
-          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'true' }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
           REDIS_DB: ${{ secrets.REDIS_DB || 0 }}

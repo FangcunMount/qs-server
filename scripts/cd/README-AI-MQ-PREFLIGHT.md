@@ -36,3 +36,18 @@ worker发布现在只接受消费专用RocketMQ配置，冻结文件版本在同
 最终API主配置包含 `messaging.rocketmq.transactions` 中的字面owner键 `qs.mysql`、`qs.mongo`。离线AI绑定渲染保留原领域messaging子树，只覆盖具名的AI messaging配置；不使用 `AllSettings` 重建这两个点号键。原store/epoch的大小写、UTF-8和美元字节、两个owner的凭据文件及既有预算保持，关闭的发布准入也不被打开。
 
 真实渲染输出再次通过宿主 `app.DecodeOptions` 验证两种存储绑定和AI的同一SQL身份；既有不读环境秘密、不加载业务事实的测试继续运行。此修复只解决配置覆盖中的键形状，不完成全部最终CD参数/私有文件目录重建，不安装生产资源或启用CD。M4进度见 [infra总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m4-execution.md)。
+
+
+## M4：API生产包的双owner与固定授权订阅
+
+API打包要求显式RocketMQ和原有 `qs-apiserver-1` 实例身份；从四个非秘密部署变量
+`ROCKETMQ_MYSQL_STORE_ID/ROCKETMQ_MYSQL_WRITER_EPOCH` 与
+`ROCKETMQ_MONGO_STORE_ID/ROCKETMQ_MONGO_WRITER_EPOCH` 冻结原已安装身份。
+不得为新镜像生成或规范化这些值。缺失、超过128 UTF-8字节或无效provider/准入在替换原包之前拒绝。
+包中的 `qs.mysql` 与 `qs.mongo` 分别使用 `credentials.json` 和 `mongo-credentials.json`；
+两者继续使用m3-1及4发送/2回查worker/16队列/每owner每轮50条维护预算。
+IAM订阅保留 `qs-authz-sync` 前缀与原实例身份，使用原SQL账号，仅订阅、不取得事务owner。
+生产启动DDL和旧发布型Outbox关闭，默认新写准入关闭；事件catalog仍沿用当前业务分类。
+
+该子批仅收敛打包配置。AI桥接绑定一致性、Mongo凭据实际挂载及完整主机预检/八角色重建
+继续作为infra C06-B/C06-D门禁；生产CD保持暂停，不能据此恢复部署。
