@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ea17805fd1ad66ff310a8b96bc5d395308f1b034",
+    "sha": "7893e9a1c1adaad703bcac432ba5546b4c8a2953",
     "verified_on": "2026-10-26"
   },
   "status_policy": {
@@ -10994,8 +10994,8 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "7893e9a1c1adaad703bcac432ba5546b4c8a2953",
+        "verified_on": "2026-10-26"
       },
       "fact_sources": [
         {
@@ -11029,6 +11029,18 @@
         {
           "kind": "source",
           "path": "scripts/cd/test_worker_compose.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/render-api-messaging.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/api_package_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/apiserver.prod.yaml"
         }
       ],
       "verification": [
@@ -13760,7 +13772,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "ea17805fd1ad66ff310a8b96bc5d395308f1b034",
+        "source_sha": "7893e9a1c1adaad703bcac432ba5546b4c8a2953",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -13771,6 +13783,18 @@
         {
           "kind": "source",
           "path": "scripts/cd/ai-messaging-release.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/render-api-messaging.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/api_package_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/apiserver.prod.yaml"
         }
       ],
       "verification": [
