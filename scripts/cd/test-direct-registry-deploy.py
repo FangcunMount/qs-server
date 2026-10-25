@@ -13,7 +13,7 @@ FUNCTIONS += SOURCE[SOURCE.index('select_image_from_registry()'):SOURCE.index('s
 
 
 class RegistryDeployTests(unittest.TestCase):
-    def run_selection(self, failure=''):
+    def run_selection(self, failure='', service='apiserver'):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             docker = root / 'docker'
@@ -31,12 +31,13 @@ esac
 ''')
             docker.chmod(0o700)
             env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}',
-                       SUDO='', DEPLOY_PULL_REGISTRY='acr',
+                       SUDO='', DEPLOY_PULL_REGISTRY='acr', SERVICE=service,
+                       ROCKETMQ_WORKER_BINDING_REVISION='m4-worker-fixture',
                        ALIYUN_ACR_REGISTRY='acr.example', ALIYUN_ACR_NAMESPACE='qs',
                        ALIYUN_ACR_USERNAME='reader', ALIYUN_ACR_PASSWORD='fake-secret',
                        DOCKER_REGISTRY='ghcr.io', DOCKER_REPOSITORY='fangcunmount',
-                       IMAGE_NAME='qs-apiserver', IMAGE_TAG='a' * 40,
-                       IMAGE_ENV_VAR='DOCKER_IMAGE_QS_APISERVER', DEPLOY_TMP=str(root),
+                       IMAGE_NAME='qs-' + service, IMAGE_TAG='a' * 40,
+                       IMAGE_ENV_VAR='DOCKER_IMAGE_QS_' + service.upper(), DEPLOY_TMP=str(root),
                        CALL_LOG=str(root / 'calls'), AUTH_PATH=str(root / 'auth'),
                        FAIL_COMMAND=failure)
             result = subprocess.run(['bash', '-c', 'set -Eeuo pipefail\n' + FUNCTIONS +
@@ -54,6 +55,15 @@ esac
         self.assertIn('pull --platform linux/amd64 acr.example/qs/qs-apiserver:' + 'a' * 40, calls)
         self.assertIn('tag acr.example/qs/qs-apiserver:', calls)
         self.assertEqual(composed, 'DOCKER_IMAGE_QS_APISERVER=ghcr.io/fangcunmount/qs-apiserver:' + 'a' * 40 + '\n')
+
+    def test_worker_registry_selection_keeps_frozen_config_revision(self):
+        result, calls, composed = self.run_selection(service='worker')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(composed.splitlines(), [
+            'DOCKER_IMAGE_QS_WORKER=ghcr.io/fangcunmount/qs-worker:' + 'a' * 40,
+            'ROCKETMQ_WORKER_BINDING_REVISION=m4-worker-fixture',
+        ])
+        self.assertIn('pull --platform linux/amd64 acr.example/qs/qs-worker:', calls)
 
     def test_login_pull_tag_or_inspect_failure_never_selects_image(self):
         for failure in ('login', 'pull', 'tag', 'image'):

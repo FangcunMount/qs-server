@@ -65,8 +65,6 @@ assert_package_contract() {
         MONGODB_USERNAME=user MONGODB_PASSWORD=password MONGODB_DBNAME=qs \
         MYSQL_TLS_MODE=VERIFY_IDENTITY MYSQL_HOST=mysql MYSQL_PORT=3306 \
         MYSQL_USERNAME=user MYSQL_PASSWORD=password MYSQL_DATABASE=qs \
-        NSQ_NSQD_HOST=nsqd NSQ_NSQD_PORT=4150 \
-        NSQ_LOOKUPD_HOST=nsqlookupd NSQ_LOOKUPD_PORT=4161 \
         REDIS_HOST=redis REDIS_PORT=6379 \
         "$SCRIPT_DIR/prepare-package.sh" >"$output_file"
       ;;
@@ -93,7 +91,9 @@ assert_package_contract() {
     if [ "$service" = apiserver ]; then prefix=QS_APISERVER; fi
     assert_line "$env_file" "${prefix}_MESSAGING_PROVIDER=rocketmq"
     assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_ENDPOINT=127.0.0.1:8081"
-    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_CREDENTIALS_FILE=/app/configs/rocketmq/credentials.json"
+    local mq_root=/app/configs/rocketmq
+    if [ "$service" = worker ]; then mq_root=/etc/qs-worker/rocketmq; fi
+    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_CREDENTIALS_FILE=${mq_root}/credentials.json"
     assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_PUBLISH_ENABLED=false"
     if [ "$service" = apiserver ]; then
       assert_line "$env_file" "QS_APISERVER_IAM_AUTHZ_SYNC_PROVIDER=rocketmq"
@@ -124,8 +124,8 @@ assert_package_contract() {
       assert_line "$env_file" "QS_WORKER_MONGODB_MAX_CONN_IDLE_TIME=10m"
       assert_line "$env_file" "QS_WORKER_MYSQL_HOST=mysql:3306"
       assert_line "$env_file" "QS_WORKER_REDIS_DATABASE=0"
-      assert_line "$env_file" "QS_WORKER_MESSAGING_NSQ_ADDR=nsqd:4150"
-      assert_line "$env_file" "QS_WORKER_MESSAGING_NSQ_LOOKUPD_ADDR=nsqlookupd:4161"
+      assert_absent "$env_file" "NSQ_"
+      assert_line "$env_file" "ROCKETMQ_WORKER_BINDING_REVISION=proof-v1"
       ;;
   esac
 }
@@ -133,9 +133,8 @@ assert_package_contract() {
 cd "$REPO_ROOT"
 assert_package_contract apiserver
 assert_package_contract collection
-assert_package_contract worker
 MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_INSTANCE_ID=proof ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract apiserver
-MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract worker
+MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false ROCKETMQ_WORKER_BINDING_REVISION=proof-v1 assert_package_contract worker
 
 # Tencent public Redis must fail closed rather than infer TLS from its port.
 redis_tls_dir="$TEST_ROOT/tencent-redis"

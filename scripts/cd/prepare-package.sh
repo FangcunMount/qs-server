@@ -38,6 +38,20 @@ redact_env_file() {
     "$1"
 }
 
+# A production worker consumes only. Validate before replacing a package.
+if [ "$SERVICE" = worker ]; then
+  if [ "${MESSAGING_PROVIDER:-}" != rocketmq ] || [ "${ROCKETMQ_PUBLISH_ENABLED:-false}" != false ]; then
+    echo 'Production worker requires RocketMQ consumer-only configuration' >&2
+    exit 1
+  fi
+  if ! [[ "${ROCKETMQ_WORKER_BINDING_REVISION:-}" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]]; then
+    echo 'Production worker requires an immutable messaging file revision' >&2
+    exit 1
+  fi
+  require_env ROCKETMQ_ENDPOINT
+  ROCKETMQ_PUBLISH_ENABLED=false
+fi
+
 PACKAGE_DIR="${DEPLOY_PACKAGE_DIR:-deploy-package}"
 ENV_FILE="${PACKAGE_DIR}/configs/env/config.prod.env"
 
@@ -190,8 +204,6 @@ EOF
   worker)
     MONGODB_PORT="${MONGODB_PORT:-27017}"
     MYSQL_PORT="${MYSQL_PORT:-3306}"
-    NSQ_NSQD_PORT="${NSQ_NSQD_PORT:-4150}"
-    NSQ_LOOKUPD_PORT="${NSQ_LOOKUPD_PORT:-4161}"
     GRPC_APISERVER_ADDR="${GRPC_APISERVER_ADDR:-qs-apiserver:9090}"
     REDIS_PORT="${REDIS_PORT:-6379}"
     default_redis_ssl
@@ -219,8 +231,7 @@ QS_WORKER_MYSQL_USERNAME=${MYSQL_USERNAME}
 QS_WORKER_MYSQL_PASSWORD=${MYSQL_PASSWORD}
 QS_WORKER_MYSQL_DATABASE=${MYSQL_DATABASE}
 
-QS_WORKER_MESSAGING_NSQ_ADDR=${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}
-QS_WORKER_MESSAGING_NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}
+ROCKETMQ_WORKER_BINDING_REVISION=${ROCKETMQ_WORKER_BINDING_REVISION}
 
 QS_WORKER_GRPC_APISERVER_ADDR=${GRPC_APISERVER_ADDR}
 
@@ -240,11 +251,13 @@ if [ "$SERVICE" != collection ]; then
   case "$SERVICE" in apiserver) mq_prefix=QS_APISERVER ;; worker) mq_prefix=QS_WORKER ;; esac
   printf '%s_MESSAGING_PROVIDER=%s\n' "$mq_prefix" "$MESSAGING_PROVIDER" >> "$ENV_FILE"
   if [ "$MESSAGING_PROVIDER" = rocketmq ]; then
+    mq_file_root=/app/configs/rocketmq
+    if [ "$SERVICE" = worker ]; then mq_file_root=/etc/qs-worker/rocketmq; fi
     for mq_entry in \
       "ENDPOINT=${ROCKETMQ_ENDPOINT}" \
-      "CREDENTIALS_FILE=/app/configs/rocketmq/credentials.json" \
-      "CA_FILE=/app/configs/rocketmq/ca.crt" \
-      "ROUTES_FILE=/app/configs/rocketmq/routes.json" \
+      "CREDENTIALS_FILE=${mq_file_root}/credentials.json" \
+      "CA_FILE=${mq_file_root}/ca.crt" \
+      "ROUTES_FILE=${mq_file_root}/routes.json" \
       "INSTANCE_ID=${ROCKETMQ_INSTANCE_ID:-}" \
       "PUBLISH_ENABLED=${ROCKETMQ_PUBLISH_ENABLED}"; do
       printf '%s_MESSAGING_ROCKETMQ_%s\n' "$mq_prefix" "$mq_entry" >> "$ENV_FILE"

@@ -97,7 +97,7 @@ services:
   runtime:
     image: ${DOCKER_IMAGE_QS_WORKER:-ghcr.io/fangcunmount/qs-worker:latest}
     restart: unless-stopped
-    # Worker Stop waits for NSQ handlers (including the 7m AI gRPC deadline)
+    # Worker Stop waits for in-flight message handlers (including the 7m AI gRPC deadline)
     # before closing clients and persistence resources.
     stop_grace_period: 8m30s
     # serverD 独立部署（compose -p qs-worker）；此处为资源模板
@@ -124,8 +124,26 @@ services:
     env_file:
       - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:
+      - type: bind
+        source: /data/infra/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/credentials.json
+        target: /etc/qs-worker/rocketmq/credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /data/infra/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/ca.crt
+        target: /etc/qs-worker/rocketmq/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /data/infra/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/routes.json
+        target: /etc/qs-worker/rocketmq/routes.json
+        read_only: true
+        bind:
+          create_host_path: false
       - /data/infra/ssl/redis/ca-chain.pem:/etc/qlume/redis/ca-chain.pem:ro
-      - /opt/qs-server/qs-worker/configs:/app/configs
+      - /opt/qs-server/qs-worker/configs:/app/configs:ro
       - /data/logs/qs-server/qs-worker:/data/logs/qs
       # gRPC mTLS 证书目录（CA + 客户端证书），worker 不需要公网 REST TLS 证书
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro

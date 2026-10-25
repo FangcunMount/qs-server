@@ -13,13 +13,13 @@ import (
 
 type collectionComposeContract struct {
 	Services map[string]struct {
-		ContainerName string   `yaml:"container_name"`
-		Ports         []string `yaml:"ports"`
-		Expose        []string `yaml:"expose"`
-		MemLimit      string   `yaml:"mem_limit"`
-		CPUs          string   `yaml:"cpus"`
-		Environment   []string `yaml:"environment"`
-		Volumes       []string `yaml:"volumes"`
+		ContainerName string      `yaml:"container_name"`
+		Ports         []string    `yaml:"ports"`
+		Expose        []string    `yaml:"expose"`
+		MemLimit      string      `yaml:"mem_limit"`
+		CPUs          string      `yaml:"cpus"`
+		Environment   []string    `yaml:"environment"`
+		Volumes       []yaml.Node `yaml:"volumes"`
 		Logging       struct {
 			Driver  string            `yaml:"driver"`
 			Options map[string]string `yaml:"options"`
@@ -77,8 +77,21 @@ func TestCollectionComposeSupportsTwoReplicas(t *testing.T) {
 		}
 	}
 	for _, volume := range service.Volumes {
-		if strings.Contains(volume, "/data/logs") {
-			t.Fatalf("collection replica must not share rotating log volume %q", volume)
+		paths := volume.Value
+		if volume.Kind == yaml.MappingNode {
+			var mount struct {
+				Source string `yaml:"source"`
+				Target string `yaml:"target"`
+			}
+			if err := volume.Decode(&mount); err != nil {
+				t.Fatal(err)
+			}
+			paths = mount.Source + " " + mount.Target
+		} else if volume.Kind != yaml.ScalarNode {
+			t.Fatal("unsupported Compose volume syntax")
+		}
+		if strings.Contains(paths, "/data/logs") {
+			t.Fatalf("collection replica must not share rotating log volume %q", paths)
 		}
 	}
 	if service.Logging.Driver != "json-file" ||

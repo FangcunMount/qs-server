@@ -246,6 +246,9 @@ write_compose_image_env() {
   export "$IMAGE_ENV_VAR"
   COMPOSE_ENV_FILE="$DEPLOY_TMP/compose-image.env"
   printf '%s=%s\n' "$IMAGE_ENV_VAR" "$image" >"$COMPOSE_ENV_FILE"
+  if [ "$SERVICE" = worker ]; then
+    printf 'ROCKETMQ_WORKER_BINDING_REVISION=%s\n' "$ROCKETMQ_WORKER_BINDING_REVISION" >> "$COMPOSE_ENV_FILE"
+  fi
   chmod 0600 "$COMPOSE_ENV_FILE"
   export COMPOSE_ENV_FILE
 }
@@ -862,6 +865,14 @@ echo "=========================================="
 acquire_image_deploy_lock
 prepare_dirs_and_backup
 extract_package
+if [ "$SERVICE" = worker ]; then
+  ROCKETMQ_WORKER_BINDING_REVISION=$(sed -n 's/^ROCKETMQ_WORKER_BINDING_REVISION=//p' "$DEPLOY_TMP/configs/env/config.prod.env")
+  if ! [[ "$ROCKETMQ_WORKER_BINDING_REVISION" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]]; then
+    echo 'Invalid frozen worker messaging revision' >&2
+    exit 1
+  fi
+  export ROCKETMQ_WORKER_BINDING_REVISION
+fi
 
 # Verify the public CA before syncing configuration or touching a running service.
 python3 /opt/infra/scripts/redis/ca.py verify
