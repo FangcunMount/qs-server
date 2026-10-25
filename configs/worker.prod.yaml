@@ -34,21 +34,24 @@ worker:
   attention-projection-reconcile-dry-run: true
   attention-projection-reconcile-report-ids: []
   attention-projection-reconcile-fingerprint: ""
+  event-config-path: /app/configs/events.yaml
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
   concurrency: 48              # 300QPS 目标：serverD 单实例消费并发（与 apiserver gRPC 跨云）
 
 # ============================================================
 # 2. 消息队列配置
 # ============================================================
-# NSQ 消息队列配置
-
+# 最终 RocketMQ 消费专用；生产文件由 CD 固定，只读挂载。
 messaging:
-  provider: nsq  # 当前仅支持 NSQ
-  nsq-addr: "nsqd:4150"
-  nsq-lookupd-addr: "nsqlookupd:4161"
-  nsqd-http-endpoints: ["http://nsqd:4151"] # 显式管理端点；订阅前准备持久 channel
-  # 长于 AI gRPC deadline，避免 NSQ 在仍执行 Provider 调用时重复投递。
-  nsq-message-timeout: 9m
+  provider: rocketmq
+  rocketmq:
+    endpoint: ""
+    credentials_file: /etc/qs-worker/rocketmq/credentials.json
+    ca_file: /etc/qs-worker/rocketmq/ca.crt
+    routes_file: /etc/qs-worker/rocketmq/routes.json
+    instance_id: ""
+    publish_enabled: false
+    transactions: {}
   delivery:
     enable: true
     max-attempts: 8

@@ -559,7 +559,8 @@ jobs:
           MESSAGING_PROVIDER: ${{ vars.MESSAGING_PROVIDER }}
           ROCKETMQ_ENDPOINT: ${{ vars.ROCKETMQ_ENDPOINT }}
           ROCKETMQ_INSTANCE_ID: ${{ vars.ROCKETMQ_INSTANCE_ID }}
-          ROCKETMQ_PUBLISH_ENABLED: ${{ vars.ROCKETMQ_PUBLISH_ENABLED || 'true' }}
+          ROCKETMQ_PUBLISH_ENABLED: 'false'
+          ROCKETMQ_WORKER_BINDING_REVISION: ${{ vars.ROCKETMQ_WORKER_BINDING_REVISION }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
@@ -575,10 +576,6 @@ jobs:
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
-          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
-          NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
-          NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT || 4161 }}
           GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
