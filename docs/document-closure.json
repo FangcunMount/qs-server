@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "bd0556d7d184788543db7abf424d4f6892ced6a2",
-    "verified_on": "2026-10-25"
+    "sha": "816701d007a0dc3a1fe9e9b04596b47e2fe02e74",
+    "verified_on": "2026-10-26"
   },
   "status_policy": {
     "doc_status": [
@@ -13705,8 +13705,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "3ef53fd0c784ff2af5f991a5848711320052615b",
-        "verified_on": "2026-10-19"
+        "source_sha": "816701d007a0dc3a1fe9e9b04596b47e2fe02e74",
+        "verified_on": "2026-10-26"
       },
       "fact_sources": [
         {
@@ -13760,6 +13760,13 @@
           "result": "passed",
           "source_sha": "e1750505ae3524d4732d7cf5860d6ca1f8edc883",
           "verified_on": "2026-10-13"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race ./internal/apiserver/maintenance/aimessagingbinding ./internal/apiserver/options -count=1",
+          "result": "passed",
+          "source_sha": "816701d007a0dc3a1fe9e9b04596b47e2fe02e74",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
@@ -13772,7 +13779,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 renderer review: preserve the raw domain messaging subtree so literal dotted owner IDs and original identities survive the AI-only overlay. The existing environment secrecy, local files and bounded preflight constraints remain unchanged. New actual decoder round-trip and original option/renderer race tests passed; full CI and deployment remain separate."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
