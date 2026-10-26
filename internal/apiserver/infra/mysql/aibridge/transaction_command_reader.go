@@ -55,7 +55,7 @@ func (s *TransactionCommands) plannedStart(ctx context.Context, actor app.Actor,
 }
 
 // operation distinguishes absence from a damaged/uncommitted new identity.
-// Only true absence permits the caller to consult the historical Outbox reader.
+// Absence is reported as NotFound by the current host; no old body is read.
 // No wire, token, private plan or body is returned through this public boundary.
 func (s *TransactionCommands) operation(ctx context.Context, scope app.OperationScope, requestID, id string) (result app.MessagingOperation, found bool, err error) {
 	org, parseErr := strconv.ParseUint(scope.OrganizationID, 10, 64)
@@ -160,7 +160,7 @@ func (s *TransactionCommands) pendingOperation(ctx context.Context, scope app.Op
 	return result, true, nil
 }
 
-// Presence alone blocks historical payload fallback. This also covers a
+// Read the exact current command reservation for operation status, including a
 // Prepared/Aborted plan whose business archive has never been committed.
 func (s *TransactionArchive) commandRequest(ctx context.Context, organization, id string) (q transaction.Request, found bool, err error) {
 	return s.commandRequestIn(ctx, s.db, organization, id)

@@ -272,17 +272,25 @@ func TestM3AIEventBrokerHost(t *testing.T) {
 			hash = archive.Envelope.BodySha256
 		}
 		receipt := ai(pb.MessagingKind_COMMAND_RECEIPT, uuid.NewString(), run, &pb.MessagingBody{Value: &pb.MessagingBody_CommandReceipt{CommandReceipt: &pb.MessagingCommandReceipt{CommandId: id, CommandBodySha256: hash, Decision: pb.MessagingDecision_ACCEPTED, OriginalReceipt: &pb.MessagingCommandReceipt_EvaluationReceipt{EvaluationReceipt: &pb.EvaluationState{RunId: run, Version: 1}}}}})
-		require.NoError(t, receiver.Receive(t.Context(), receipt.Wire))
-		_, _, ack := lookup(receipt)
-		await(ack.Envelope.MessageId)
-		require.Equal(t, 1, count("SELECT COUNT(*) FROM ai_messaging_operations WHERE command_id=? AND decision='accepted'", id))
+
 		if historical {
-			require.Equal(t, 1, count("SELECT COUNT(*) FROM ai_messaging_outbox WHERE message_id=? AND stage='confirmed'", id))
-			cases["legacy_command_receipt_compatible"] = true
+			// Missing current archive must abort the original root, not settle
+			// a retained old delivery or publish a new acknowledgement.
+			require.NoError(t, receiver.Receive(t.Context(), receipt.Wire))
+			require.Equal(t, 1, count("SELECT COUNT(*) FROM ai_messaging_quarantine WHERE wire_sha256=?", messagingHash(receipt.Wire)))
+			require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_operations WHERE command_id=? AND decision='accepted'", id))
+			require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_outbox WHERE message_id=? AND stage='confirmed'", id))
+			require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_archive WHERE message_id=?", []byte(receipt.Envelope.MessageId)))
+			cases["legacy_command_receipt_rejected"] = true
 		} else {
+			require.NoError(t, receiver.Receive(t.Context(), receipt.Wire))
+			_, _, ack := lookup(receipt)
+			await(ack.Envelope.MessageId)
+			require.Equal(t, 1, count("SELECT COUNT(*) FROM ai_messaging_operations WHERE command_id=? AND decision='accepted'", id))
 			require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_outbox WHERE message_id=?", id))
 			cases["new_command_receipt_without_outbox"] = true
 		}
+
 	}
 	// Reject on the real SQL server AFTER Inbox/projection/archive writes, before witness commit.
 	reject := func() {

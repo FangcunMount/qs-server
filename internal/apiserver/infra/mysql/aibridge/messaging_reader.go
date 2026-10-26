@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
+	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 )
 
 // MessagingReader is a host read boundary over a borrowed database pool.
@@ -16,18 +17,18 @@ type MessagingReader struct {
 }
 
 func (s *MessagingReader) ReadMessagePayload(ctx context.Context, ref *pb.MessagePayloadReference, workload string) ([]byte, error) {
-	if s.Archive != nil {
-		body, found, err := s.Archive.Payload(ctx, ref, workload)
-		if err != nil || found {
-			return body, err
-		}
+	if s == nil || s.Archive == nil {
+		return nil, app.ErrManagementUnavailable
 	}
-	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	body, found, err := s.Archive.Payload(ctx, ref, workload)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = tx.Rollback() }()
-	return s.Store.Payload(ctx, tx, ref, workload)
+	if !found {
+		return nil, app.ErrNotFound
+	}
+	return body, nil
+
 }
 
 // ObserveMessagePayloadFailure does not reuse or commit the body-read transaction.

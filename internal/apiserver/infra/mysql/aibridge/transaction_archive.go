@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
-	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -105,7 +104,7 @@ func (g *ArchiveGuard) CommitWitness(ctx context.Context) error {
 }
 
 // ReadCommitted returns found even for an unpublished/damaged archive. Callers
-// MUST NOT fall back to legacy Outbox when found=true. Evidence is freshly read
+// never fall back to legacy Outbox. Evidence is freshly read
 // from the same configured primary; neither a wire ACK nor a business row proves commit.
 func (s *TransactionArchive) ReadCommitted(ctx context.Context, id string) (a app.FrozenMessagingArchive, found bool, err error) {
 	return s.readCommitted(ctx, s.db, id, s.store.Evidence)
@@ -178,7 +177,7 @@ func (s *TransactionArchive) readCommitted(ctx context.Context, q archiveReadCon
 }
 
 // Payload retains the original authenticated workload, tenant and exact-body
-// contract. Legacy fallback is permitted only when the new identity is absent.
+// contract. Missing current archives expose no bytes; callers return NotFound.
 func (s *TransactionArchive) Payload(ctx context.Context, ref *pb.MessagePayloadReference, workload string) ([]byte, bool, error) {
 	if ref == nil || workload != "qs-ai" || ref.Producer != "qs-server" || ref.Destination != "qs-ai" {
 		return nil, true, app.ErrMessagingContract
@@ -188,50 +187,13 @@ func (s *TransactionArchive) Payload(ctx context.Context, ref *pb.MessagePayload
 		return nil, found, err
 	}
 	if !found {
-		_, planned, lookupErr := s.commandRequest(ctx, ref.OrganizationId, ref.MessageId)
-		if lookupErr != nil {
-			return nil, true, lookupErr
-		}
-		if planned {
-			return nil, true, app.ErrNotFound
-		}
-		// ACK requests are keyed by the incoming event, not the outgoing ACK ID.
-		// Any exact new branch footprint also forbids historical body fallback.
-		planned, lookupErr = s.hasPlannedBranch(ctx, ref.MessageId)
-		if lookupErr != nil {
-			return nil, true, lookupErr
-		}
-		if planned {
-			return nil, true, app.ErrNotFound
-		}
-		return nil, false, nil
+		return nil, true, app.ErrNotFound
 	}
+
 	if ref.OrganizationId != strconv.FormatUint(a.OrganizationID, 10) || ref.BodySha256 != a.Envelope.BodySha256 || ref.BodyLength != uint64(len(a.Body)) {
 		// A caller reference mismatch keeps the established sanitized NotFound
 		// RPC result. Internal proof/binding errors above remain unavailable.
 		return nil, true, app.ErrConflict
 	}
 	return bytes.Clone(a.Body), true, nil
-}
-
-func (s *TransactionArchive) hasPlannedBranch(ctx context.Context, id string) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	bk := transaction.BranchKey(id)
-	var raw []byte
-	// Only the rare absent-archive/absent-command fallback scans this immutable
-	// protocol footprint. Bound both server work and client wait; errors fail
-	// closed rather than expose a historical row under a new ACK identity.
-	err := s.db.QueryRowContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */ w.reference FROM rm_tx_witness w JOIN rm_tx_execution e ON e.execution_key=w.execution_key WHERE e.owner=? AND w.branch_key=? LIMIT 1`, []byte(s.store.Binding().Owner), bk[:]).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return true, err
-	}
-	ref, err := transaction.DecodeReference(raw)
-	if err != nil || ref.Owner != s.store.Binding().Owner || ref.BranchID != id || ref.MessageID != id {
-		return true, app.ErrMessagingContract
-	}
-	return true, nil
 }
