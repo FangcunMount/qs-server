@@ -241,7 +241,8 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		return r.Execution
 	}
 	observed, phase := paused, "paused_delivery"
-	t.Cleanup(func() {
+	// Capture live failure facts before t.Cleanup drains the replacement runtime.
+	defer func() {
 		if !t.Failed() {
 			return
 		}
@@ -313,7 +314,7 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 			return result
 		}()})
 		fmt.Println("M3_WORKER_DIAGNOSTIC " + string(raw))
-	})
+	}()
 	// New groups must complete real receives before the fixture publishes. This
 	// barrier has no message side effects and does not weaken the hold assertion.
 	pausedSubscriber, ok := paused.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
