@@ -8,6 +8,8 @@ import sys
 
 START = "# BEGIN FINAL API MESSAGING\n"
 END = "# END FINAL API MESSAGING\n"
+SUB_START = "# BEGIN FINAL IAM SUBSCRIPTION\n"
+SUB_END = "# END FINAL IAM SUBSCRIPTION\n"
 
 
 def production_binding(environment):
@@ -55,11 +57,20 @@ def main():
             raise ValueError("Expected validate or render CONFIG")
         path = Path(sys.argv[2])
         text = path.read_text()
-        if text.count(START) != 1 or text.count(END) != 1:
-            raise ValueError("Owned production template required")
-        before, body = text.split(START)
-        _, after = body.split(END)
-        path.write_text(before + START + "messaging: " + json.dumps(binding, ensure_ascii=True) + "\n" + END + after)
+        transport = {k: v for k, v in binding["rocketmq"].items() if k != "transactions"}
+        transport.update(transactions={}, publish_enabled=False)
+        subscription = {"enabled": True, "provider": "rocketmq", "topic": "iam.authz.version.v2",
+                        "channel-prefix": "qs-authz-sync", "ephemeral-nsq": False, "rocketmq": transport}
+        for start, end, content in (
+            (START, END, "messaging: " + json.dumps(binding, ensure_ascii=True)),
+            (SUB_START, SUB_END, "  authz-sync: " + json.dumps(subscription, ensure_ascii=True)),
+        ):
+            if text.count(start) != 1 or text.count(end) != 1:
+                raise ValueError("Owned production template required")
+            before, body = text.split(start)
+            _, after = body.split(end)
+            text = before + start + content + "\n" + end + after
+        path.write_text(text)
     except (ValueError, TypeError, OSError):
         raise SystemExit("Invalid final API messaging configuration; contents withheld") from None
 

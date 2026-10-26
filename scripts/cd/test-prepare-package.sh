@@ -90,19 +90,14 @@ assert_package_contract() {
   test -x "$package_dir/scripts/cd/wait-worker-readiness.sh"
   test -x "$package_dir/scripts/cd/verify-worker-dependencies.sh"
   assert_absent "$env_file" "_REDIS_DB="
-  if [ "${MESSAGING_PROVIDER:-nsq}" = rocketmq ] && [ "$service" != collection ]; then
-    local prefix=QS_WORKER
-    if [ "$service" = apiserver ]; then prefix=QS_APISERVER; fi
-    assert_line "$env_file" "${prefix}_MESSAGING_PROVIDER=rocketmq"
-    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_ENDPOINT=127.0.0.1:8081"
-    local mq_root=/app/configs/rocketmq
-    if [ "$service" = worker ]; then mq_root=/etc/qs-worker/rocketmq; fi
-    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_CREDENTIALS_FILE=${mq_root}/credentials.json"
-    assert_line "$env_file" "${prefix}_MESSAGING_ROCKETMQ_PUBLISH_ENABLED=false"
-    if [ "$service" = apiserver ]; then
-      assert_line "$env_file" "QS_APISERVER_IAM_AUTHZ_SYNC_PROVIDER=rocketmq"
-      assert_line "$env_file" "QS_APISERVER_IAM_AUTHZ_SYNC_EPHEMERAL_NSQ=false"
-    fi
+  if [ "$service" = worker ]; then
+    assert_line "$env_file" "QS_WORKER_MESSAGING_PROVIDER=rocketmq"
+    assert_line "$env_file" "QS_WORKER_MESSAGING_ROCKETMQ_ENDPOINT=127.0.0.1:8081"
+    assert_line "$env_file" "QS_WORKER_MESSAGING_ROCKETMQ_CREDENTIALS_FILE=/etc/qs-worker/rocketmq/credentials.json"
+    assert_line "$env_file" "QS_WORKER_MESSAGING_ROCKETMQ_PUBLISH_ENABLED=false"
+  elif [ "$service" = apiserver ]; then
+    assert_absent "$env_file" "QS_APISERVER_MESSAGING_"
+    assert_absent "$env_file" "QS_APISERVER_IAM_AUTHZ_SYNC_"
   fi
 
   case "$service" in

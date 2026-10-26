@@ -544,6 +544,7 @@ iam:
     read-timeout: 2s
 
   # authz 规则通知
+# BEGIN FINAL IAM SUBSCRIPTION
   authz-sync:
     enabled: true
     provider: rocketmq
@@ -558,6 +559,7 @@ iam:
       instance_id: qs-apiserver-1
       publish_enabled: false
       transactions: {}
+# END FINAL IAM SUBSCRIPTION
 
   # gRPC 连接配置
   grpc:

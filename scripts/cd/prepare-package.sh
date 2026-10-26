@@ -247,28 +247,18 @@ EOF
     ;;
 esac
 
-if [ "$SERVICE" != collection ]; then
-  case "$SERVICE" in apiserver) mq_prefix=QS_APISERVER ;; worker) mq_prefix=QS_WORKER ;; esac
-  printf '%s_MESSAGING_PROVIDER=%s\n' "$mq_prefix" "$MESSAGING_PROVIDER" >> "$ENV_FILE"
-  if [ "$MESSAGING_PROVIDER" = rocketmq ]; then
-    mq_file_root=/app/configs/rocketmq
-    if [ "$SERVICE" = worker ]; then mq_file_root=/etc/qs-worker/rocketmq; fi
-    for mq_entry in \
-      "ENDPOINT=${ROCKETMQ_ENDPOINT}" \
-      "CREDENTIALS_FILE=${mq_file_root}/credentials.json" \
-      "CA_FILE=${mq_file_root}/ca.crt" \
-      "ROUTES_FILE=${mq_file_root}/routes.json" \
-      "INSTANCE_ID=${ROCKETMQ_INSTANCE_ID:-}" \
-      "PUBLISH_ENABLED=${ROCKETMQ_PUBLISH_ENABLED}"; do
-      printf '%s_MESSAGING_ROCKETMQ_%s\n' "$mq_prefix" "$mq_entry" >> "$ENV_FILE"
-      if [ "$SERVICE" = apiserver ]; then
-        printf 'QS_APISERVER_IAM_AUTHZ_SYNC_ROCKETMQ_%s\n' "$mq_entry" >> "$ENV_FILE"
-      fi
-    done
-    if [ "$SERVICE" = apiserver ]; then
-      printf 'QS_APISERVER_IAM_AUTHZ_SYNC_PROVIDER=rocketmq\nQS_APISERVER_IAM_AUTHZ_SYNC_EPHEMERAL_NSQ=false\n' >> "$ENV_FILE"
-    fi
-  fi
+# API domain/bridge/IAM bindings are frozen in files, not overridden by env.
+if [ "$SERVICE" = worker ]; then
+  printf '%s\n' 'QS_WORKER_MESSAGING_PROVIDER=rocketmq' >> "$ENV_FILE"
+  for mq_entry in \
+    "ENDPOINT=${ROCKETMQ_ENDPOINT}" \
+    "CREDENTIALS_FILE=/etc/qs-worker/rocketmq/credentials.json" \
+    "CA_FILE=/etc/qs-worker/rocketmq/ca.crt" \
+    "ROUTES_FILE=/etc/qs-worker/rocketmq/routes.json" \
+    "INSTANCE_ID=${ROCKETMQ_INSTANCE_ID:-}" \
+    "PUBLISH_ENABLED=false"; do
+    printf 'QS_WORKER_MESSAGING_ROCKETMQ_%s\n' "$mq_entry" >> "$ENV_FILE"
+  done
 fi
 # Redis cloud TLS uses Go's additive system trust directories; retain stock roots.
 if [ "${REDIS_HOST:-}" = bj-crs-3dli07u2.sql.tencentcdb.com ] && [ "${REDIS_USE_SSL:-false}" != true ]; then
