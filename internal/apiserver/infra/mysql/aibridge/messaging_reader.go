@@ -12,7 +12,6 @@ import (
 // No resource is created or closed; the read transaction never writes or commits.
 type MessagingReader struct {
 	DB      *sql.DB
-	Store   *MessagingStore
 	Archive *TransactionArchive
 }
 

@@ -63,7 +63,7 @@ func TestTransactionConstructorIsInertAndUsesExactBinding(t *testing.T) {
 	}
 	bindings := o.RocketMQ.Transactions
 	o.RocketMQ.Transactions = nil
-	if _, err := NewSDKWirePublisher(o); err == nil || !strings.Contains(err.Error(), "transaction routes cannot use the legacy Outbox") {
+	if _, err := NewSDKWirePublisher(o); err == nil || !strings.Contains(err.Error(), "legacy Outbox wire publisher retired") {
 		t.Fatal("missing owner map silently selected legacy publication for transaction routes", err)
 	}
 	o.RocketMQ.Transactions = bindings

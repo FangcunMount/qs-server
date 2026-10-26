@@ -156,7 +156,7 @@ func TestTransactionPayloadAbsenceAndStorageFailureNeverConsultLegacy(t *testing
 			_, archive, err := app.ReadTransactionCommand(e.Plan)
 			require.NoError(t, err)
 			mock.ExpectQuery("SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive").WillReturnError(failure)
-			reader := &MessagingReader{DB: a.db, Store: NewMessagingStore(), Archive: a}
+			reader := &MessagingReader{DB: a.db, Archive: a}
 			body, err := reader.ReadMessagePayload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: orderCommand, OrganizationId: "7", BodySha256: archive.Envelope.BodySha256, BodyLength: uint64(len(archive.Body))}, "qs-ai")
 			if failure == sql.ErrNoRows {
 				require.ErrorIs(t, err, app.ErrNotFound)
@@ -175,7 +175,7 @@ func TestCurrentPayloadAbsenceNeverOpensLegacyRead(t *testing.T) {
 	mock.ExpectQuery("SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive").WillReturnError(sql.ErrNoRows)
 	_, archive, err := app.ReadTransactionCommand(e.Plan)
 	require.NoError(t, err)
-	reader := &MessagingReader{DB: a.db, Store: NewMessagingStore(), Archive: a}
+	reader := &MessagingReader{DB: a.db, Archive: a}
 	body, err := reader.ReadMessagePayload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: orderCommand, OrganizationId: "7", BodySha256: archive.Envelope.BodySha256, BodyLength: uint64(len(archive.Body))}, "qs-ai")
 	require.ErrorIs(t, err, app.ErrNotFound)
 	require.Empty(t, body)

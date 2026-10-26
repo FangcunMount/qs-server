@@ -58,20 +58,6 @@ func (s *MessagingStore) RecordTechnicalFailure(ctx context.Context, tx *sql.Tx,
 	return s.FailureAttempts(ctx, tx, e)
 }
 
-// ReceiveHeldEvent archives a known technical hold with a final HELD ACK.
-// It never applies a projection or decides a command. Stored duplicates reuse
-// their original ACK, even if a failed commit acknowledgement raised the budget.
-func (s *MessagingStore) ReceiveHeldEvent(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, raw, wire []byte, seal func(string, string) (*app.PreparedMessaging, error)) error {
-	attempts, err := s.FailureAttempts(ctx, tx, e)
-	if err != nil {
-		return err
-	}
-	if attempts < 8 {
-		return app.ErrInvalid
-	}
-	return s.receiveEvent(ctx, tx, e, raw, wire, true, seal)
-}
-
 func (s *MessagingStore) heldEventOrganization(ctx context.Context, tx *sql.Tx, e *pb.MessagingEnvelope, b *pb.MessagingBody) (string, error) {
 	return readEventOrganization(ctx, tx, e, b, true)
 }

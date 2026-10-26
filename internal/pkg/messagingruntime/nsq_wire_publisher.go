@@ -20,7 +20,11 @@ var (
 
 // sdkNSQWirePublisher owns the SDK producer without exposing a legacy Message.
 type sdkNSQWirePublisher struct {
-	publisher Publisher
+	publisher interface {
+		PublishRaw(context.Context, string, []byte) rmtransport.Result
+		Close(context.Context) error
+		Interrupt()
+	}
 	provider  string
 	closeOnce sync.Once
 	closed    chan struct{}

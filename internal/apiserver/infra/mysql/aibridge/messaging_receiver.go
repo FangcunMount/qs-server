@@ -18,7 +18,7 @@ type MessagingBodyReader interface {
 }
 
 // MessagingEventReceiver is inert until the host calls Receive. It borrows the
-// pool, keyring and body client. Only a committed transaction permits NSQ FIN.
+// pool, keyring and body client. Only a committed root permits delivery ACK.
 type MessagingEventReceiver struct {
 	DB           *sql.DB
 	Store        *MessagingStore
@@ -48,33 +48,12 @@ func (r *MessagingEventReceiver) Isolate(ctx context.Context, wire []byte, code 
 	return r.transaction(ctx, func(ctx context.Context, tx *sql.Tx) error { return r.Store.Quarantine(ctx, tx, wire, code) })
 }
 func (r *MessagingEventReceiver) settle(ctx context.Context, e *pb.MessagingEnvelope, raw, wire []byte, held bool) error {
-	if r.Transactions != nil {
-		return r.Transactions.Settle(ctx, e, raw, wire, held)
+	if r == nil || r.Transactions == nil {
+		return app.ErrManagementUnavailable
 	}
-	return r.transaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
-		seal := func(id, org string) (*app.PreparedMessaging, error) {
-			outcome := pb.MessagingEventAcknowledgement_STORED
-			if held {
-				outcome = pb.MessagingEventAcknowledgement_TECHNICALLY_HELD
-			}
-			body := &pb.MessagingBody{Value: &pb.MessagingBody_EventAcknowledgement{EventAcknowledgement: &pb.MessagingEventAcknowledgement{EventId: e.MessageId, EventBodySha256: e.BodySha256, EventKind: e.Kind, Outcome: outcome}}}
-			return r.Seal(pb.MessagingKind_EVENT_ACKNOWLEDGEMENT, id, e.AggregateKey, org, "", body)
-		}
-		var err error
-		if !held {
-			var count uint64
-			count, err = r.Store.FailureAttempts(ctx, tx, e)
-			if err != nil {
-				return err
-			}
-			held = count >= 8
-		}
-		if held {
-			return r.Store.ReceiveHeldEvent(ctx, tx, e, raw, wire, seal)
-		}
-		return r.Store.ReceiveEvent(ctx, tx, e, raw, wire, seal)
-	})
+	return r.Transactions.Settle(ctx, e, raw, wire, held)
 }
+
 func (r *MessagingEventReceiver) failure(ctx context.Context, e *pb.MessagingEnvelope, wire []byte) (uint64, error) {
 	var attempts uint64
 	err := r.transaction(ctx, func(ctx context.Context, tx *sql.Tx) error {
@@ -86,6 +65,9 @@ func (r *MessagingEventReceiver) failure(ctx context.Context, e *pb.MessagingEnv
 }
 
 func (r *MessagingEventReceiver) Receive(ctx context.Context, wire []byte) error {
+	if r == nil || r.Transactions == nil {
+		return app.ErrManagementUnavailable
+	}
 	if _, nested := hostmysql.TxFromContext(ctx); nested && r.Transactions != nil {
 		return transaction.ErrTransactionRequired
 	}
@@ -142,6 +124,9 @@ func (r *MessagingEventReceiver) FailedHandoff(ctx context.Context, signedWire, 
 	return r.failed(ctx, signedWire, auditWire)
 }
 func (r *MessagingEventReceiver) failed(ctx context.Context, wire, auditWire []byte) error {
+	if r == nil || r.Transactions == nil {
+		return app.ErrManagementUnavailable
+	}
 	e, err := app.AuthenticateMessaging(wire, app.EventsTopic, r.Keys)
 	if err != nil {
 		return r.Isolate(ctx, auditWire, "authentication_failed")

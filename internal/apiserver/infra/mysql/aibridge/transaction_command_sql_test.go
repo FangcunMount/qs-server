@@ -63,7 +63,7 @@ func TestTransactionCommandChangedInputRetainsOriginalBusinessConflictContract(t
 		return nil, app.ErrMessagingContract
 	}
 	s := &MessagingCommandStore{Store: &Store{DB: a.db}, Messaging: NewMessagingStore(), Seal: seal, Transactions: &TransactionCommands{archive: a, sender: refuseCommandSender{t}, seal: seal}}
-	err = s.stageCommand(t.Context(), changed.Kind(), changed.ID(), changed.Aggregate(), changed.Scope(), body, nil)
+	err = s.stageCommand(t.Context(), changed.Kind(), changed.ID(), changed.Aggregate(), changed.Scope(), body)
 	require.ErrorIs(t, err, app.ErrConflict)
 	require.ErrorIs(t, err, transaction.ErrInputConflict)
 }
