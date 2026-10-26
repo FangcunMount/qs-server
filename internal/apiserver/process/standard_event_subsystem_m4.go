@@ -44,27 +44,14 @@ type standardGovernedEventTypeStatusReader struct {
 	outboxport.EventTypeStatusReader
 }
 
-// configuredEventSubsystem accepts only standard profiles. Retired configuration
-// must not silently recreate legacy writers; rollback uses a retained image.
-
+// configuredEventSubsystem has one production path. Isolated old-profile
+// constructors below are retained only for the C04 fixture cleanup batch.
 func configuredEventSubsystem(cfg *config.Config) func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-	if cfg != nil && cfg.Options != nil && cfg.MessagingOptions != nil && cfg.MessagingOptions.RocketMQ != nil && len(cfg.MessagingOptions.RocketMQ.Transactions) > 0 {
-		return func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-			if cfg.Eventing != nil && cfg.Eventing.StandardOutbox != nil && (cfg.Eventing.StandardOutbox.Mongo || cfg.Eventing.StandardOutbox.Assessment) {
-				return nil, errors.New("transaction owners cannot also select standard Outbox profiles")
-			}
-			return eventsubsystem.NewWithTransactionOwners(opts, cfg.MessagingOptions)
-		}
-	}
-	if cfg == nil || cfg.Options == nil || cfg.Eventing == nil || cfg.Eventing.StandardOutbox == nil ||
-		(!cfg.Eventing.StandardOutbox.Mongo && !cfg.Eventing.StandardOutbox.Assessment) {
-		return func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-			return nil, errors.New("legacy outbox configuration is retired; enable standard profiles or use the retained rollback image")
-		}
-	}
-	selected := *cfg.Eventing.StandardOutbox
 	return func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-		return buildM4StandardEventSubsystem(opts, cfg, selected)
+		if err := validateFinalMessaging(cfg); err != nil {
+			return nil, err
+		}
+		return eventsubsystem.NewWithTransactionOwners(opts, cfg.MessagingOptions)
 	}
 }
 

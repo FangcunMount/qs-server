@@ -43,8 +43,10 @@ func TestFailedWorkerPreparationPreservesStartupAndDrainErrors(t *testing.T) {
 func TestActualWorkerRuntimeFailureRetainsAndClosesPreSubscriberPool(t *testing.T) {
 	opts := workeroptions.NewOptions()
 	opts.Metrics.Enable = false
-	opts.Messaging.Provider = "fixture-invalid-provider"
-	// sql.Open is inert. Invalid provider fails before Subscribe or any database
+	off := false
+	opts.Messaging.Provider = "rocketmq"
+	opts.Messaging.RocketMQ = &genericoptions.RocketMQOptions{PublishEnabled: &off}
+	// sql.Open is inert. Missing frozen RocketMQ files fail before Subscribe or any database
 	// operation. The later verification uses a cancelled context, so even a
 	// regression that leaves the pool open cannot dial an unowned endpoint.
 	opts.MySQL = &genericoptions.MySQLOptions{Host: "127.0.0.1:1", Database: "owned_constructor_only"}
@@ -52,7 +54,7 @@ func TestActualWorkerRuntimeFailureRetainsAndClosesPreSubscriberPool(t *testing.
 	r := &prepareRunner{server: s, state: prepareState{container: containerOutput{container: &container.Container{}}}, stages: []processruntime.Stage[prepareState]{runtimeStage{server: s}}}
 	_, stage, err := r.run()
 	if err == nil || stage != "initialize runtime" {
-		t.Fatal("invalid provider unexpectedly started", stage, err)
+		t.Fatal("invalid frozen binding unexpectedly started", stage, err)
 	}
 	if r.state.runtime.messaging.deadLetterRecorder == nil || r.state.runtime.messaging.subscriber != nil {
 		t.Fatal("partial pre-subscriber ownership lost")
@@ -67,6 +69,9 @@ func TestActualWorkerRuntimeFailureRetainsAndClosesPreSubscriberPool(t *testing.
 
 func TestActualWorkerResourceFailureRetainsManagerBeforeCatalogFailure(t *testing.T) {
 	opts := workeroptions.NewOptions()
+	off := false
+	opts.Messaging.Provider = "rocketmq"
+	opts.Messaging.RocketMQ = &genericoptions.RocketMQOptions{PublishEnabled: &off}
 	opts.MySQL, opts.Redis, opts.MongoDB = nil, nil, nil
 	opts.RedisProfiles = nil
 	opts.Worker.EventConfigPath = filepath.Join(t.TempDir(), "absent-events.yaml")

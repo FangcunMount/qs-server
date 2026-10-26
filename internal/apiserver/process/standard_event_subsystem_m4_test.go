@@ -35,7 +35,7 @@ func TestStandardBuildRejectsRetiredLegacyConfiguration(t *testing.T) {
 			// No catalog or database is provided: rejection must precede all
 			// old-store construction, storage preflight and publisher ownership.
 			subsystem, err := configuredEventSubsystem(tc.config)(eventsubsystem.Options{})
-			if err == nil || !strings.Contains(err.Error(), "legacy outbox configuration is retired") {
+			if err == nil || !strings.Contains(err.Error(), "final RocketMQ transaction owners required") {
 				t.Fatalf("retired selection was not rejected before I/O: subsystem=%v err=%v", subsystem, err)
 			}
 			if subsystem != nil {
@@ -45,11 +45,11 @@ func TestStandardBuildRejectsRetiredLegacyConfiguration(t *testing.T) {
 	}
 }
 
-func TestCandidateStandardOutboxRequiresNSQAndHostDatabase(t *testing.T) {
+func TestConfiguredStandardOutboxCannotBecomeAProductionFallback(t *testing.T) {
 	cfg := &config.Config{Options: options.NewOptions()}
 	cfg.Eventing.StandardOutbox.Mongo = true
 	_, err := configuredEventSubsystem(cfg)(eventsubsystem.Options{})
-	if err == nil || !strings.Contains(err.Error(), "live NSQ-backed") {
+	if err == nil || !strings.Contains(err.Error(), "final RocketMQ transaction owners required") {
 		t.Fatalf("standard profile accepted logging/fallback mode: %v", err)
 	}
 }

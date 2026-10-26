@@ -25,13 +25,13 @@ import (
 )
 
 type resourceStageDeps struct {
+	validateMessaging     func() error
 	dbManager             *bootstrap.DatabaseManager
 	database              databaseResourceDeps
 	redisRuntime          redisRuntimeStageDeps
 	mqPublisher           mqPublisherStageDeps
 	eventSubsystem        eventSubsystemResourceDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
-	prepareMQChannels     func(*eventcatalog.Catalog) error
 	buildResilience       func(*cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error)
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
@@ -68,7 +68,6 @@ type mqPublisherStageDeps struct {
 	fallbackMode       eventruntime.PublishMode
 	enabled            bool
 	provider           string
-	newWirePublisher   func() (wirePublisherResource, error)
 	newNormalPublisher func(*eventcatalog.Catalog) (wirePublisherResource, error)
 }
 
@@ -79,13 +78,13 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 
 	dbManager := s.buildDatabaseManager()
 	deps := resourceStageDeps{
+		validateMessaging:     func() error { return validateFinalMessaging(s.config) },
 		dbManager:             dbManager,
 		database:              buildDatabaseDeps(dbManager),
 		redisRuntime:          s.buildRedisRuntimeDeps(dbManager),
 		mqPublisher:           s.buildMQPublisherDeps(),
 		eventSubsystem:        s.buildEventSubsystemResourceDeps(),
 		loadEventCatalog:      loadDefaultEventCatalog,
-		prepareMQChannels:     s.buildMQChannelPreparer(),
 		buildResilience:       s.buildResilienceDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
@@ -119,15 +118,14 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 			}
 			return recorder, nil
 		}
-		if s.config.MessagingOptions.Provider == "nsq" || s.config.MessagingOptions.Provider == "rocketmq" {
+		if validateFinalMessaging(s.config) == nil {
 			buildSDKSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SDKSubscriberFactory, error) {
 				recorder, err := recorderFor(mysqlDB)
 				if err != nil {
 					return nil, err
 				}
 				config := eventtransport.SubscriberConfig{
-					RocketMQ: s.config.MessagingOptions.RocketMQ, Provider: s.config.MessagingOptions.Provider, NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr,
-					NSQDHTTPEndpoints: s.config.MessagingOptions.NSQDHTTPEndpoints,
+					RocketMQ: s.config.MessagingOptions.RocketMQ, Provider: "rocketmq",
 				}
 				return func() (eventsubsystem.SDKSubscriber, error) {
 					return eventtransport.NewSDKDeliverySubscriber(config, 0,
@@ -200,75 +198,32 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 		options := s.config.MessagingOptions
 		deps.enabled = options.Enabled
 		deps.provider = options.Provider
-		if options.Provider == "nsq" || options.Provider == "rocketmq" {
-			if options.Provider == "rocketmq" && options.RocketMQ != nil && len(options.RocketMQ.Transactions) > 0 {
-				deps.newNormalPublisher = func(catalog *eventcatalog.Catalog) (wirePublisherResource, error) {
-					topics, err := eventruntime.BestEffortTopics(catalog)
-					if err != nil {
-						return nil, err
-					}
-					binding, ok := options.RocketMQ.Transactions["qs.mysql"]
-					if !ok {
-						return nil, fmt.Errorf("NORMAL host publisher requires explicit qs.mysql binding")
-					}
-					limits, err := binding.ProtocolLimits("qs.mysql")
-					if err != nil {
-						return nil, err
-					}
-					p, err := messagingruntime.NewNormalWirePublisher(options, topics, limits.Sends)
-					if err != nil {
-						return nil, err
-					}
-					if err = p.Start(); err != nil {
-						return nil, errors.Join(err, (&normalWireResource{NormalWirePublisher: p}).Close())
-					}
-					return &normalWireResource{NormalWirePublisher: p}, nil
+		if validateFinalMessaging(s.config) == nil {
+			deps.newNormalPublisher = func(catalog *eventcatalog.Catalog) (wirePublisherResource, error) {
+				topics, err := eventruntime.BestEffortTopics(catalog)
+				if err != nil {
+					return nil, err
 				}
-				return deps
-			}
-			deps.newWirePublisher = func() (wirePublisherResource, error) {
-				return messagingruntime.NewSDKWirePublisher(options)
+				binding, ok := options.RocketMQ.Transactions["qs.mysql"]
+				if !ok {
+					return nil, fmt.Errorf("NORMAL host publisher requires explicit qs.mysql binding")
+				}
+				limits, err := binding.ProtocolLimits("qs.mysql")
+				if err != nil {
+					return nil, err
+				}
+				p, err := messagingruntime.NewNormalWirePublisher(options, topics, limits.Sends)
+				if err != nil {
+					return nil, err
+				}
+				if err = p.Start(); err != nil {
+					return nil, errors.Join(err, (&normalWireResource{NormalWirePublisher: p}).Close())
+				}
+				return &normalWireResource{NormalWirePublisher: p}, nil
 			}
 		}
 	}
 	return deps
-}
-
-func (s *server) buildMQChannelPreparer() func(*eventcatalog.Catalog) error {
-	if s == nil || s.config == nil || s.config.MessagingOptions == nil {
-		return nil
-	}
-	options := s.config.MessagingOptions
-	if !options.Enabled || options.Provider != "nsq" {
-		return nil
-	}
-	consumerOptions := buildEventConsumerOptions(s.config)
-	return func(catalog *eventcatalog.Catalog) error {
-		registry, err := eventcatalog.NewEffectiveRegistry(catalog, eventcatalog.DefaultSpecs())
-		if err != nil {
-			return fmt.Errorf("resolve NSQ channel catalog: %w", err)
-		}
-		channels := make([]messagingruntime.DurableChannel, 0)
-		for _, subscription := range catalog.TopicSubscriptions() {
-			channels = append(channels, messagingruntime.DurableChannel{Topic: subscription.TopicName, Channel: options.PrimaryWorkerChannel})
-		}
-		for _, event := range registry.Snapshot() {
-			for _, consumer := range event.AdditionalConsumers {
-				if configured, ok := consumerOptions[consumer.ID]; ok {
-					if !configured.Enabled {
-						continue
-					}
-					if configured.Channel != "" {
-						consumer.Channel = configured.Channel
-					}
-				}
-				channels = append(channels, messagingruntime.DurableChannel{Topic: event.Topic, Channel: consumer.Channel})
-			}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		return messagingruntime.EnsureNSQChannels(ctx, options.NSQDHTTPEndpoints, channels)
-	}
 }
 
 func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) container.ContainerOptions {
@@ -279,6 +234,12 @@ func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) cont
 }
 
 func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr error) {
+	if deps.validateMessaging != nil {
+		if err := deps.validateMessaging(); err != nil {
+			return resourceOutput{}, err
+		}
+	}
+
 	var closePublisher func() error
 	var events *eventsubsystem.Subsystem
 	var cacheSubsystem *cachebootstrap.Subsystem
@@ -323,21 +284,12 @@ func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr 
 	var wirePublisher wirePublisherResource
 	publishMode := deps.mqPublisher.fallbackMode
 	if deps.mqPublisher.enabled {
-		if deps.mqPublisher.newWirePublisher != nil && deps.mqPublisher.newNormalPublisher != nil {
-			return resourceOutput{}, fmt.Errorf("ambiguous legacy and NORMAL publisher factories")
-		}
-		if (deps.mqPublisher.provider != "nsq" && deps.mqPublisher.provider != "rocketmq") || (deps.mqPublisher.newWirePublisher == nil && deps.mqPublisher.newNormalPublisher == nil) {
-			return resourceOutput{}, fmt.Errorf("NSQ wire publisher factory is required when messaging is enabled")
-		}
-		if deps.mqPublisher.newNormalPublisher == nil {
-			wirePublisher, err = createNSQWirePublisher(deps.mqPublisher)
-			if err != nil {
-				return resourceOutput{}, err
-			}
-			closePublisher = wirePublisher.Close
+		if deps.mqPublisher.provider != "rocketmq" || deps.mqPublisher.newNormalPublisher == nil {
+			return resourceOutput{}, fmt.Errorf("final RocketMQ NORMAL publisher factory is required")
 		}
 		publishMode = eventruntime.PublishModeMQ
 	}
+
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
 		return resourceOutput{}, err
@@ -352,11 +304,7 @@ func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr 
 		}
 		closePublisher = wirePublisher.Close
 	}
-	if deps.prepareMQChannels != nil {
-		if err := deps.prepareMQChannels(eventCatalog); err != nil {
-			return resourceOutput{}, fmt.Errorf("prepare MQ channels before serving: %w", err)
-		}
-	}
+
 	deps.eventSubsystem.wirePublisher = wirePublisher
 	events, err = buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
 	if err != nil {
@@ -469,22 +417,6 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 		return redisCache, redisRuntime, nil
 	}
 	return redisCache, redisRuntime, deps.buildSubsystem(redisRuntime)
-}
-
-func createNSQWirePublisher(deps mqPublisherStageDeps) (wirePublisherResource, error) {
-	if deps.newWirePublisher == nil {
-		return nil, fmt.Errorf("NSQ wire publisher factory is required")
-	}
-	publisher, err := deps.newWirePublisher()
-	if err != nil {
-		return nil, fmt.Errorf("create NSQ wire publisher: %w", err)
-	}
-	if publisher == nil {
-		return nil, fmt.Errorf("NSQ wire publisher factory returned nil")
-	}
-	logger.L(context.Background()).Infow("MQ publisher created successfully",
-		"component", "apiserver", "provider", "nsq")
-	return publisher, nil
 }
 
 func loadDefaultEventCatalog() (*eventcatalog.Catalog, error) {

@@ -2,7 +2,6 @@ package process
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
@@ -13,6 +12,9 @@ import (
 
 func (s *server) initializeRuntime(resources resourceOutput, containerOutput containerOutput) (runtimeOutput, error) {
 	output := runtimeOutput{}
+	if err := s.validateFinalMessaging(); err != nil {
+		return output, err
+	}
 	if containerOutput.container == nil {
 		return output, nil
 	}
@@ -28,15 +30,6 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		output.observability.metricsServer = metrics
 		if err := metrics.Start(); err != nil {
 			return output, err
-		}
-	}
-
-	if s.config != nil && s.config.Messaging.Provider == "nsq" {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		err := messagingintegration.EnsureChannels(ctx, s.config.Messaging, s.config.Worker.ServiceName, containerOutput.container)
-		cancel()
-		if err != nil {
-			return output, fmt.Errorf("prepare Worker NSQ channels before consuming: %w", err)
 		}
 	}
 
@@ -101,19 +94,6 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 			return output, startErr
 		}
 	}
-	if automatic && !s.consumeOnlyRocketMQ() {
-		var holdReplayer *messagingintegration.RetryEventHoldReplayer
-		wirePublisher, publishErr := messagingintegration.CreateSDKWirePublisher(s.config.Messaging)
-		if publishErr == nil {
-			output.messaging.publisher = wirePublisher
-			holdReplayer, publishErr = messagingintegration.NewSDKRetryEventHoldReplayer(holdStore, wirePublisher)
-		}
-		if publishErr != nil {
-			return output, publishErr
-		}
-		output.messaging.holdReplayer = holdReplayer
-		output.messaging.holdReplayer.Start()
-	}
 
 	return output, nil
 }
@@ -124,9 +104,8 @@ func (s *server) consumeOnlyRocketMQ() bool {
 
 func (s *server) loadedSubscriberConfig() eventtransport.SubscriberConfig {
 	return eventtransport.SubscriberConfig{
-		RocketMQ: s.config.Messaging.RocketMQ, Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
+		RocketMQ: s.config.Messaging.RocketMQ, Provider: "rocketmq",
 		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout,
-		NSQDHTTPEndpoints: s.config.Messaging.NSQDHTTPEndpoints,
 	}
 }
 

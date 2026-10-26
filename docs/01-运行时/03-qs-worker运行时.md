@@ -2,9 +2,13 @@
 
 ## 1. 结论
 
-`qs-worker` 是事件消费和异步执行控制进程。它把 NSQ 消息解析成对 `qs-apiserver` 窄化 gRPC 用例的调用，并负责重复抑制、执行租约、ACK/NACK、自动重试、retry hold 和死信记录。
+`qs-worker` 是事件消费和异步执行控制进程。它把 RocketMQ 消息解析成对 `qs-apiserver` 窄化 gRPC 用例的调用，并负责重复抑制、执行租约、ACK/NACK、自动重试、retry hold 和死信记录。
 
 worker 不拥有 Evaluation、Interpretation、Survey 的核心业务规则，也不直接修改它们的主业务存储。消息处理策略属于 worker，业务状态迁移仍属于 apiserver。
+
+当前进程只接受消费专用RocketMQ：禁止worker拥有事务owner或发布客户端。配置在数据库资源及runtime副作用前检查；旧NSQ channel创建和自动重发布循环已退出。当前deferred consumer继续处理已接受投递，保留原hold证据、租约、原尝试次数和幂等；它不授予新的业务或模型重试。
+
+原配置名 `NSQMessageTimeout` 仍承载当前处理时限，不能因旧名称删除。逻辑订阅共享原worker并发，未因物理Topic拆分增加配额。下文残留的NSQ专属描述是待C04收口的历史对照，不表示还有可选择的生产NSQ装配。当前入口见 [最终配置门禁](../../internal/worker/process/final_messaging.go)和 [runtime装配](../../internal/worker/process/runtime_bootstrap.go)。
 
 ## 2. 启动模型
 
