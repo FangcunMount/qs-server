@@ -14,18 +14,20 @@ m4_material_preflight() {
     return 1
   fi
   tool="/opt/fangcun-m4/material-tools/${M4_MATERIAL_TOOL_SHA256}.py"
-  if ! python3 - "$tool" "$M4_MATERIAL_TOOL_SHA256" <<'PYTOOL'
+  if ! python3 -I - "$tool" "$M4_MATERIAL_TOOL_SHA256" <<'PYTOOL'
 import hashlib,os,stat,sys
 from pathlib import Path
+def require(value):
+    if not value:raise ValueError
 try:
     p=Path(sys.argv[1])
-    assert p.resolve()==p
+    require(p.resolve()==p)
     for parent in p.parents:
         i=parent.lstat()
-        assert stat.S_ISDIR(i.st_mode) and i.st_uid==0 and i.st_mode&0o022==0
+        require(stat.S_ISDIR(i.st_mode) and i.st_uid==0 and i.st_mode&0o022==0)
     i=p.lstat()
-    assert stat.S_ISREG(i.st_mode) and i.st_uid==0 and stat.S_IMODE(i.st_mode)==0o555 and 0<i.st_size<=65536
-    assert hashlib.sha256(p.read_bytes()).hexdigest()==sys.argv[2]
+    require(stat.S_ISREG(i.st_mode) and i.st_uid==0 and stat.S_IMODE(i.st_mode)==0o555 and 0<i.st_size<=65536)
+    require(hashlib.sha256(p.read_bytes()).hexdigest()==sys.argv[2])
 except Exception:
     raise SystemExit('Reviewed material tool unavailable; refusing deployment') from None
 PYTOOL
@@ -34,17 +36,19 @@ PYTOOL
   # The parent already holds the original deployment lock. This entry is read-only.
   if ! $SUDO /usr/bin/python3 -I "$tool" --verify-installed --host "$host" \
     --expect-role "$role" --expect-revision "$revision" > "$report"; then return 1; fi
-  python3 - "$report" "$role" "$revision" "$host" <<'PYRESULT'
+  python3 -I - "$report" "$role" "$revision" "$host" <<'PYRESULT'
 import json,re,sys
 from pathlib import Path
+def require(value):
+    if not value:raise ValueError
 try:
     raw=Path(sys.argv[1]).read_bytes()
-    assert 0<len(raw)<=32768
+    require(0<len(raw)<=32768)
     x=json.loads(raw)
-    assert x['status']=='verified' and x['read_only'] is True and x['activated'] is False
-    assert (x['role'],x['revision'],x['host'])==tuple(sys.argv[2:5])
-    assert x['material_root']=='/var/lib/fangcun-m4-materials'
-    assert re.fullmatch('[a-f0-9]{64}',x['receipt_sha256'])
+    require(x['status']=='verified' and x['read_only'] is True and x['activated'] is False)
+    require((x['role'],x['revision'],x['host'])==tuple(sys.argv[2:5]))
+    require(x['material_root']=='/var/lib/fangcun-m4-materials')
+    require(re.fullmatch('[a-f0-9]{64}',x['receipt_sha256']))
 except Exception:
     raise SystemExit('Installed materials not verified; refusing deployment') from None
 PYRESULT
