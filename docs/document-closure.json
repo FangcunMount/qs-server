@@ -8484,7 +8484,7 @@
       "path": "docs/03-基础设施/event/15-从事实到结算-失败窗口与状态机.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "archive_candidate",
       "verified": {
         "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
         "verified_on": "2026-10-07"
@@ -8564,7 +8564,8 @@
         "observed_at": null,
         "limitations": [
           "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
-          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review.",
+          "M4 C08 scope: retained historical/phase reference only; current event operation guide is event/README.md. Old NSQ/Relay gates and phase commands do not describe final production."
         ]
       },
       "gaps": [
@@ -8831,7 +8832,7 @@
       "path": "docs/03-基础设施/event/40-MQ发布消费与结算.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "archive_candidate",
       "verified": {
         "source_sha": "d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e",
         "verified_on": "2026-10-26"
@@ -9162,7 +9163,8 @@
         "limitations": [
           "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
           "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review.",
-          "AI workflow runtime and maintenance documentation moved from the retired CLI sidecar on 2026-10-18. This source cleanup does not add production deployment, external caller or business acceptance evidence. Original sidecar evidence remains bound to its historical source in the dated archive."
+          "AI workflow runtime and maintenance documentation moved from the retired CLI sidecar on 2026-10-18. This source cleanup does not add production deployment, external caller or business acceptance evidence. Original sidecar evidence remains bound to its historical source in the dated archive.",
+          "M4 C08 scope: retained historical/phase reference only; current event operation guide is event/README.md. Old NSQ/Relay gates and phase commands do not describe final production."
         ]
       },
       "gaps": [
@@ -9217,7 +9219,7 @@
       "path": "docs/03-基础设施/event/50-可观测性与故障恢复.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "archive_candidate",
       "verified": {
         "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
         "verified_on": "2026-10-07"
@@ -9360,7 +9362,8 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached."
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
+          "M4 C08 scope: retained historical/phase reference only; current event operation guide is event/README.md. Old NSQ/Relay gates and phase commands do not describe final production."
         ]
       },
       "gaps": [
@@ -9532,7 +9535,7 @@
       "path": "docs/03-基础设施/event/70-扩展与验收.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "archive_candidate",
       "verified": {
         "source_sha": "6e0bef988054da0d834f25f7371e771e90ac8830",
         "verified_on": "2026-10-07"
@@ -9616,7 +9619,8 @@
         "observed_at": null,
         "limitations": [
           "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
-          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review.",
+          "M4 C08 scope: retained historical/phase reference only; current event operation guide is event/README.md. Old NSQ/Relay gates and phase commands do not describe final production."
         ]
       },
       "gaps": [
