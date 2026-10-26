@@ -12,6 +12,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$SCRIPT_DIR/image-retention.sh"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/sudo-selection.sh"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/material-guard.sh"
 
 : "${DOCKER_REGISTRY:?DOCKER_REGISTRY is required}"
 : "${DOCKER_REPOSITORY:?DOCKER_REPOSITORY is required}"
@@ -872,6 +874,7 @@ if [ "$SERVICE" = worker ]; then
     exit 1
   fi
   export ROCKETMQ_WORKER_BINDING_REVISION
+  m4_material_preflight worker "$ROCKETMQ_WORKER_BINDING_REVISION"
 fi
 
 # Verify the public CA before syncing configuration or touching a running service.
@@ -903,6 +906,8 @@ if [ "$SERVICE" = "apiserver" ]; then
     --uid "$APP_UID" --gid "$APP_GID" > "$DEPLOY_TMP/ai-mq-preflight.json"
   MQ_COMPOSE_OVERRIDE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["compose_file"])' "$DEPLOY_TMP/ai-mq-preflight.json")"
   MQ_IMAGE_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["image_id"])' "$DEPLOY_TMP/ai-mq-preflight.json")"
+  mq_material_revision="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["binding_revision"])' "$DEPLOY_TMP/ai-mq-preflight.json")"
+  m4_material_preflight qs-api "$mq_material_revision"
   while IFS= read -r mq_retained_image; do
     RETENTION_PREVIOUS_IDS+=(--protect-image-id "$mq_retained_image")
   done < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["protected_image_ids"]))' "$DEPLOY_TMP/ai-mq-preflight.json")

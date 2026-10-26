@@ -69,6 +69,7 @@ cp \
   scripts/cd/image-retention.py \
   scripts/cd/image-retention.sh \
   scripts/cd/ai-messaging-release.py \
+  scripts/cd/material-guard.sh \
   scripts/cd/sudo-selection.sh \
   scripts/cd/remote-deploy.sh \
   scripts/cd/runtime-evidence.py \

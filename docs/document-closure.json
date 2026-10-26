@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e",
+    "sha": "1f76901ca780f6879139c9ebef02fd3d75de3d59",
     "verified_on": "2026-10-26"
   },
   "status_policy": {
@@ -10994,7 +10994,7 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e",
+        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -11069,6 +11069,14 @@
         {
           "kind": "source",
           "path": ".github/workflows/ai-bridge.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/material-guard.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test_material_gate.py"
         }
       ],
       "verification": [
@@ -11120,6 +11128,13 @@
           "result": "passed",
           "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
           "verified_on": "2026-10-25"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_material_gate.py",
+          "result": "passed",
+          "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
@@ -11140,7 +11155,7 @@
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ],
-      "review_note": " M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused."
+      "review_note": " M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused. M4 D04 host material guard source review; prior binding {\"source_sha\": \"d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e\", \"verified_on\": \"2026-10-26\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused."
     },
     {
       "path": "docs/04-接口与运维/07-调度任务.md",
@@ -11906,8 +11921,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
-        "verified_on": "2026-10-25"
+        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+        "verified_on": "2026-10-26"
       },
       "fact_sources": [
         {
@@ -12618,7 +12633,7 @@
         "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution.",
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
         "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment.",
         "T25-C2 transaction startup policy source review at e161e76b5ef1c385a2a8378c7d0ee890a8ca4ec1. Prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only early no-DDL rejection added; existing paired schema/identity readonly validation and offline approval/restore contracts unchanged. README updated. Native and production evidence remain separate; first docs-facts stale-source failure retained in progress.",
@@ -13389,7 +13404,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e",
+        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -13573,7 +13588,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 final transaction preflight review: previous binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 final transaction preflight review: previous binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused. M4 D04 host material guard source review; prior binding {\"source_sha\": \"d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e\", \"verified_on\": \"2026-10-26\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused."
     },
     {
       "path": "scripts/testing/reliable-messaging-proof.md",
@@ -13801,7 +13816,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e",
+        "source_sha": "1f76901ca780f6879139c9ebef02fd3d75de3d59",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -13852,6 +13867,14 @@
         {
           "kind": "source",
           "path": ".github/workflows/ai-bridge.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/material-guard.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test_material_gate.py"
         }
       ],
       "verification": [
@@ -13931,6 +13954,13 @@
           "result": "passed",
           "source_sha": "816701d007a0dc3a1fe9e9b04596b47e2fe02e74",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_material_gate.py",
+          "result": "passed",
+          "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
@@ -13943,7 +13973,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 C06 renderer review: preserve the raw domain messaging subtree so literal dotted owner IDs and original identities survive the AI-only overlay. The existing environment secrecy, local files and bounded preflight constraints remain unchanged. New actual decoder round-trip and original option/renderer race tests passed; full CI and deployment remain separate. Combined source review retains both previously verified deltas: consumer-only worker packaging and literal domain-owner preservation. No test gate, deployment pause or production boundary relaxed. M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 C06 renderer review: preserve the raw domain messaging subtree so literal dotted owner IDs and original identities survive the AI-only overlay. The existing environment secrecy, local files and bounded preflight constraints remain unchanged. New actual decoder round-trip and original option/renderer race tests passed; full CI and deployment remain separate. Combined source review retains both previously verified deltas: consumer-only worker packaging and literal domain-owner preservation. No test gate, deployment pause or production boundary relaxed. M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused. M4 D04 host material guard source review; prior binding {\"source_sha\": \"d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e\", \"verified_on\": \"2026-10-26\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused. Material client uses isolated Python and explicit checks independent of optimization flags; other domain and runtime evidence unchanged."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
@@ -14046,8 +14076,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
-        "verified_on": "2026-10-25"
+        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+        "verified_on": "2026-10-26"
       },
       "fact_sources": [
         {
@@ -14641,7 +14671,7 @@
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
         "M3 T24 scoped native-fixture review: previous source baseline and document binding preserved here, not relabelled as current native acceptance: {\"source_baseline\": {\"sha\": \"dcd231e48fed37a2f6262d891273b2641e39d030\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"f899d5cb4b19ed15e5dbe741fd42b3d804370784\", \"verified_on\": \"2026-10-19\"}}. Only readiness test synchronization/child-test attribution changed; client release remains required and actual server processlist must drain within one second. Original CI failure did not distinguish query error from nonzero thread count; its root cause remains unknown. Tag compilation passed; exact native CI pending; production tool/limits/schema unchanged."
       ],
-      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution.",
+      "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
         "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment."
       ]
@@ -14776,8 +14806,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4d871f4974e95186f50071590a8bec88e60cbade",
-        "verified_on": "2026-10-25"
+        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+        "verified_on": "2026-10-26"
       },
       "fact_sources": [
         {
@@ -15211,7 +15241,7 @@
         "Current109/42 resource pair reviewc1d4a79f76fe7f868cfd8320270c80280d24b5bf; previous verified binding retained: {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}. Only target inventory/document attribution changes; offline approval, identity, backup/restore, file consumption and runtime boundary code unchanged. No native or production execution claimed.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned."
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution.",
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
         "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"a784c574704d8cdf29ed308785e754479fa25345\", \"verified_on\": \"2026-10-23\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment.",
         "Reviewed controlled governance read/reimport fixtures at 8ce415393505ac7a94a273315fce8a1782900ceb; package race passed; native only compiled locally. No production resolution or RPC claim. Original installation, binding and protection/recovery boundaries preserved.",
@@ -15330,7 +15360,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e",
+        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -15412,7 +15442,7 @@
           ]
         }
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"9c8eb4b510cf724467f5458fa25eb862ef15529a\", \"verified_on\": \"2026-10-19\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 final transaction preflight review: previous binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"9c8eb4b510cf724467f5458fa25eb862ef15529a\", \"verified_on\": \"2026-10-19\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 final transaction preflight review: previous binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change. M4 D03 host material source path review; prior binding {\"source_sha\": \"7e68e733d2e70dfaed5962002a6c491c35ca8c78\", \"verified_on\": \"2026-10-26\"}. Root-owned /var/lib/fangcun-m4-materials replaces deployment sources; original container targets, key bytes, store/epoch, budgets, image retention/lock and native final capability retained. Source path-only regression passed; full CI/eight-role rebuild and runtime deployment separately pending. CD remains paused. M4 D04 host material guard source review; prior binding {\"source_sha\": \"d9e4f41b074f1c5e5b36e4d74e5d9efdbbddc22e\", \"verified_on\": \"2026-10-26\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused."
     },
     {
       "path": "scripts/maintenance/qs-retry-handoff/README.md",

@@ -24,6 +24,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Render real consumer-only package without starting containers
         run: python3 scripts/cd/test_worker_compose.py -v
+      - name: API and worker material refusal precedes configuration sync
+        run: python3 scripts/cd/test_material_gate.py -v
 
   test:
     name: Run Tests
