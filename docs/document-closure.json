@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "848b02475c8dbe72a87039e8f41131ef0f311d40",
+    "sha": "7e68e733d2e70dfaed5962002a6c491c35ca8c78",
     "verified_on": "2026-10-26"
   },
   "status_policy": {
@@ -10994,7 +10994,7 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "848b02475c8dbe72a87039e8f41131ef0f311d40",
+        "source_sha": "7e68e733d2e70dfaed5962002a6c491c35ca8c78",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -11140,7 +11140,7 @@
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
       ],
-      "review_note": " M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged."
+      "review_note": " M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change."
     },
     {
       "path": "docs/04-接口与运维/07-调度任务.md",
@@ -13389,7 +13389,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "848b02475c8dbe72a87039e8f41131ef0f311d40",
+        "source_sha": "7e68e733d2e70dfaed5962002a6c491c35ca8c78",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -13573,7 +13573,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 final transaction preflight review: previous binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 final transaction preflight review: previous binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change."
     },
     {
       "path": "scripts/testing/reliable-messaging-proof.md",
@@ -13801,7 +13801,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "848b02475c8dbe72a87039e8f41131ef0f311d40",
+        "source_sha": "7e68e733d2e70dfaed5962002a6c491c35ca8c78",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -13943,7 +13943,7 @@
         ]
       },
       "gaps": [],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 C06 renderer review: preserve the raw domain messaging subtree so literal dotted owner IDs and original identities survive the AI-only overlay. The existing environment secrecy, local files and bounded preflight constraints remain unchanged. New actual decoder round-trip and original option/renderer race tests passed; full CI and deployment remain separate. Combined source review retains both previously verified deltas: consumer-only worker packaging and literal domain-owner preservation. No test gate, deployment pause or production boundary relaxed. M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. M4 C06 worker review: only the frozen worker file revision is validated and passed to Compose; fixed API offline preflight and original image retention/lock protection remain unchanged. Local worker config and registry/retention/lock regressions passed. Production CD remains paused; actual assets and eight-role reconstruction are separate pending gates. M4 C06 renderer review: preserve the raw domain messaging subtree so literal dotted owner IDs and original identities survive the AI-only overlay. The existing environment secrecy, local files and bounded preflight constraints remain unchanged. New actual decoder round-trip and original option/renderer race tests passed; full CI and deployment remain separate. Combined source review retains both previously verified deltas: consumer-only worker packaging and literal domain-owner preservation. No test gate, deployment pause or production boundary relaxed. M4 C06-B04/B05 source-only final transaction preflight: previous verified {\"source_sha\": \"7893e9a1c1adaad703bcac432ba5546b4c8a2953\", \"verified_on\": \"2026-10-26\"}. Local Go race 271 passed and host Python 17 passed, zero failed/skipped; actual standard image CI pending. Every API deploy requires native final capability and frozen root/bridge/IAM binding consistency, both credential mounts and frozen-release revalidation. Production tool installation/eight-role rebuild remain C06-D; production CD stays paused. Historical runtime and signoff attributions unchanged. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change."
     },
     {
       "path": "scripts/dbops/production-inventory.md",
@@ -15330,7 +15330,7 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "848b02475c8dbe72a87039e8f41131ef0f311d40",
+        "source_sha": "7e68e733d2e70dfaed5962002a6c491c35ca8c78",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -15412,7 +15412,7 @@
           ]
         }
       ],
-      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"9c8eb4b510cf724467f5458fa25eb862ef15529a\", \"verified_on\": \"2026-10-19\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 final transaction preflight review: previous binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately."
+      "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"9c8eb4b510cf724467f5458fa25eb862ef15529a\", \"verified_on\": \"2026-10-19\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 final transaction preflight review: previous binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Original image protection/lock and DB audit/control semantics retained; updated required CLI paths, capability receipt and four transport files. Actual native CI and production installation recorded separately. Receipt-only CI ownership follow-up 7e68e733d2e70dfaed5962002a6c491c35ca8c78 preserves original source 848b02475c8dbe72a87039e8f41131ef0f311d40; runner can upload the mode0600 native report. No application/runtime change."
     },
     {
       "path": "scripts/maintenance/qs-retry-handoff/README.md",
