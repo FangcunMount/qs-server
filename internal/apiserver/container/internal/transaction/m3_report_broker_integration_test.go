@@ -34,6 +34,7 @@ import (
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	qsoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -144,14 +145,19 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, repository.InstallLifecycleSchema(t.Context(), db))
 	require.NoError(t, txmongo.InstallSchema(t.Context(), db))
 	require.NoError(t, db.CreateCollection(t.Context(), "rm_outbox"))
-	retrySchema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mongodb", "000042_business_retry_schedule.up.json"))
-	require.NoError(t, err)
-	var retryCommands []json.RawMessage
-	require.NoError(t, json.Unmarshal(retrySchema, &retryCommands))
-	for _, raw := range retryCommands {
-		var command bson.D
-		require.NoError(t, bson.UnmarshalExtJSON(raw, true, &command))
-		require.NoError(t, db.RunCommand(t.Context(), command).Err())
+	// The final host also reads native-limit governance on Start. Install the
+	// same explicit production schema in the disposable database; a missing
+	// notice schema must keep admission closed, never be bypassed by the probe.
+	for _, name := range []string{"000042_business_retry_schedule.up.json", "000043_native_transaction_limit_notices.up.json"} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mongodb", name))
+		require.NoError(t, err)
+		var commands []json.RawMessage
+		require.NoError(t, json.Unmarshal(raw, &commands))
+		for _, raw := range commands {
+			var command bson.D
+			require.NoError(t, bson.UnmarshalExtJSON(raw, true, &command))
+			require.NoError(t, db.RunCommand(t.Context(), command).Err())
+		}
 	}
 
 	bound := producer.RocketMQ.Transactions["qs.mongo"]
@@ -160,6 +166,11 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	authority, err := txmongo.New(db, binding)
 	require.NoError(t, err)
+	native, err := messagingruntime.NewMongoNativeLimits(db, binding, "m3-1")
+	require.NoError(t, err)
+	blocked, err := native.ReadNativeLimit(t.Context())
+	require.NoError(t, err, "explicit current native-limit schema is required")
+	require.False(t, blocked)
 	require.NoError(t, owner.Runtime().Start(t.Context()))
 	consumerConfig, err := observer.RocketMQ.Load([]string{topic}, 2, 5*time.Second)
 	require.NoError(t, err)
@@ -257,6 +268,8 @@ func TestM3ReportTerminalBrokerHost(t *testing.T) {
 	go func() { _, err := committer.CommitSuccess(ctx, first); finished <- err }()
 	select {
 	case <-entered:
+	case err := <-finished:
+		t.Fatalf("commit returned before original runner (admission_closed=%t schema=%t invalid_plan=%t)", errors.Is(err, messagingruntime.ErrTransactionAdmissionClosed), errors.Is(err, tx.ErrSchema), errors.Is(err, tx.ErrInvalidPlan))
 	case <-time.After(30 * time.Second):
 		t.Fatal("prepared halves did not reach original runner")
 	}

@@ -15,9 +15,9 @@ func TestMixedTransactionHostSelectsDeferredNormalFactoryAndNeverLegacyOutboxPub
 	cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
 	cfg.MessagingOptions.Enabled = true
 	cfg.MessagingOptions.Provider = "rocketmq"
-	cfg.MessagingOptions.RocketMQ = &genericoptions.RocketMQOptions{Transactions: map[string]genericoptions.TransactionOptions{"qs.mysql": {}}}
+	cfg.MessagingOptions.RocketMQ = &genericoptions.RocketMQOptions{Transactions: map[string]genericoptions.TransactionOptions{"qs.mysql": {}, "qs.mongo": {}}}
 	deps := (&server{config: cfg}).buildMQPublisherDeps()
-	if deps.newNormalPublisher == nil || deps.newWirePublisher != nil {
+	if deps.newNormalPublisher == nil {
 		t.Fatal("transaction host selected legacy publisher")
 	}
 }

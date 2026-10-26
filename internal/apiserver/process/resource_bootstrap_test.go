@@ -3,8 +3,6 @@ package process
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 
@@ -36,31 +34,27 @@ func (p *fakeWirePublisher) Close() error {
 
 func (*fakePublisher) PublishWire(context.Context, string, []byte) error { return nil }
 
-func TestAPISelectsNativeNSQWireFactory(t *testing.T) {
-	cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
-	cfg.MessagingOptions.Enabled = true
-	cfg.MessagingOptions.Provider = "nsq"
-	deps := (&server{config: cfg}).buildMQPublisherDeps()
-	if deps.newWirePublisher == nil {
-		t.Fatalf("NSQ should use the native wire factory: %+v", deps)
-	}
-	cfg.MessagingOptions.Provider = "rabbitmq"
-	deps = (&server{config: cfg}).buildMQPublisherDeps()
-	if deps.newWirePublisher != nil {
-		t.Fatalf("retired RabbitMQ provider still has a publisher factory: %+v", deps)
-	}
-	if _, err := prepareResources(resourceStageDeps{mqPublisher: deps}); err == nil {
-		t.Fatal("retired provider reached a usable publisher")
+func TestAPIRejectsRetiredPublisherFactories(t *testing.T) {
+	for _, provider := range []string{"nsq", "rabbitmq", ""} {
+		cfg := finalMessageConfig()
+		cfg.MessagingOptions.Provider = provider
+		deps := (&server{config: cfg}).buildMQPublisherDeps()
+		if deps.newNormalPublisher != nil {
+			t.Fatalf("retired provider %q allocated a factory", provider)
+		}
+		if _, err := prepareResources(resourceStageDeps{mqPublisher: deps}); err == nil {
+			t.Fatal("retired provider reached a usable publisher")
+		}
 	}
 }
 
-func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T) {
+func TestPrepareResourcesPassesNormalWirePortAndDefersUntilCatalog(t *testing.T) {
 	wire := &fakeWirePublisher{}
 	var options eventsubsystem.Options
 	got, err := prepareResources(resourceStageDeps{
 		mqPublisher: mqPublisherStageDeps{
-			enabled: true, provider: "nsq",
-			newWirePublisher: func() (wirePublisherResource, error) { return wire, nil },
+			enabled: true, provider: "rocketmq",
+			newNormalPublisher: func(*eventcatalog.Catalog) (wirePublisherResource, error) { return wire, nil },
 		},
 		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
 		eventSubsystem: eventSubsystemResourceDeps{
@@ -87,26 +81,26 @@ func TestPrepareResourcesPassesNativeNSQWirePortAndClosesOnFailure(t *testing.T)
 	closed = false
 	_, err = prepareResources(resourceStageDeps{
 		mqPublisher: mqPublisherStageDeps{
-			enabled: true, provider: "nsq",
-			newWirePublisher: func() (wirePublisherResource, error) { return wire, nil },
+			enabled: true, provider: "rocketmq",
+			newNormalPublisher: func(*eventcatalog.Catalog) (wirePublisherResource, error) { return wire, nil },
 		},
 		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return nil, errors.New("catalog unavailable") },
 	})
-	if err == nil || !closed {
-		t.Fatalf("startup failure leaked native NSQ publisher: err=%v closed=%t", err, closed)
+	if err == nil || closed {
+		t.Fatalf("catalog failure acquired a deferred NORMAL publisher: err=%v closed=%t", err, closed)
 	}
 }
 
-func TestAPIProjectionOnlySelectsSDKSubscriberForNSQ(t *testing.T) {
+func TestAPIProjectionOnlySelectsFinalRocketMQSubscriber(t *testing.T) {
 	for _, item := range []struct {
 		provider string
 		wantSDK  bool
 	}{
-		{provider: "nsq", wantSDK: true},
+		{provider: "rocketmq", wantSDK: true},
 		{provider: "rabbitmq", wantSDK: false},
 	} {
 		t.Run(item.provider, func(t *testing.T) {
-			cfg := &apiserverconfig.Config{Options: apiserveroptions.NewOptions()}
+			cfg := finalMessageConfig()
 			cfg.MessagingOptions.Enabled = true
 			cfg.MessagingOptions.Provider = item.provider
 			deps := (&server{config: cfg}).buildEventSubsystemResourceDeps()
@@ -129,7 +123,7 @@ func TestPrepareResourcesClosesPublisherWhenEventSubsystemFails(t *testing.T) {
 	closed := false
 	_, err := prepareResources(resourceStageDeps{
 		mqPublisher: mqPublisherStageDeps{
-			enabled: true, provider: "nsq", newWirePublisher: func() (wirePublisherResource, error) {
+			enabled: true, provider: "rocketmq", newNormalPublisher: func(*eventcatalog.Catalog) (wirePublisherResource, error) {
 				return &fakeWirePublisher{onClose: func() { closed = true }}, nil
 			},
 		},
@@ -181,10 +175,10 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			},
 		},
 		mqPublisher: mqPublisherStageDeps{
-			fallbackMode:     eventruntime.PublishModeLogging,
-			enabled:          true,
-			provider:         "nsq",
-			newWirePublisher: func() (wirePublisherResource, error) { return publisher, nil },
+			fallbackMode:       eventruntime.PublishModeLogging,
+			enabled:            true,
+			provider:           "rocketmq",
+			newNormalPublisher: func(*eventcatalog.Catalog) (wirePublisherResource, error) { return publisher, nil },
 		},
 		eventSubsystem: eventSubsystemResourceDeps{
 			newSubsystem: func(opts eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
@@ -274,8 +268,8 @@ func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T
 func TestPrepareResourcesFailsClosedWhenEnabledPublisherCannotStart(t *testing.T) {
 	for _, deps := range []mqPublisherStageDeps{
 		{fallbackMode: eventruntime.PublishModeLogging, enabled: true, provider: "unsupported"},
-		{fallbackMode: eventruntime.PublishModeLogging, enabled: true, provider: "nsq",
-			newWirePublisher: func() (wirePublisherResource, error) { return nil, errors.New("boom") }},
+		{fallbackMode: eventruntime.PublishModeLogging, enabled: true, provider: "rocketmq",
+			newNormalPublisher: func(*eventcatalog.Catalog) (wirePublisherResource, error) { return nil, errors.New("boom") }},
 	} {
 		output, err := prepareResources(resourceStageDeps{mqPublisher: deps})
 		if err == nil || output.messaging.publishMode == eventruntime.PublishModeLogging {
@@ -300,73 +294,6 @@ func TestPrepareResourcesPreservesFallbackModeWhenMessagingDisabled(t *testing.T
 		if err != nil || got.messaging.publishMode != mode || got.messaging.closePublisher != nil {
 			t.Fatalf("disabled messaging output = %+v, err = %v, want mode %q", got.messaging, err, mode)
 		}
-	}
-}
-
-func TestPrepareResourcesStopsBeforeEventSubsystemWhenChannelPreparationFails(t *testing.T) {
-	closed := false
-	built := false
-	_, err := prepareResources(resourceStageDeps{
-		mqPublisher: mqPublisherStageDeps{
-			enabled: true, provider: "nsq", newWirePublisher: func() (wirePublisherResource, error) {
-				return &fakeWirePublisher{onClose: func() { closed = true }}, nil
-			},
-		},
-		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
-		prepareMQChannels: func(*eventcatalog.Catalog) error {
-			return errors.New("nsqd unavailable")
-		},
-		eventSubsystem: eventSubsystemResourceDeps{
-			newSubsystem: func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) {
-				built = true
-				return &eventsubsystem.Subsystem{}, nil
-			},
-		},
-	})
-	if err == nil || !closed || built {
-		t.Fatalf("unsafe bootstrap: err=%v, publisher closed=%t, event subsystem built=%t", err, closed, built)
-	}
-}
-
-func TestAPIChannelPreparationCreatesWorkerAndProjectionChannels(t *testing.T) {
-	created := make(map[string]bool)
-	nsqd := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		topic := r.URL.Query().Get("topic")
-		switch r.URL.Path {
-		case "/topic/create":
-			created[topic] = true
-		case "/channel/create":
-			if !created[topic] {
-				t.Errorf("channel %s was created before its topic", r.URL.Query().Get("channel"))
-			}
-			created[topic+"/"+r.URL.Query().Get("channel")] = true
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer nsqd.Close()
-	options := apiserveroptions.NewOptions()
-	options.MessagingOptions.Enabled = true
-	options.MessagingOptions.NSQDHTTPEndpoints = []string{nsqd.URL}
-	options.Eventing.Consumers.ModelCatalogHotRank.Channel = "custom-projection-channel"
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := (&server{config: &apiserverconfig.Config{Options: options}}).buildMQChannelPreparer()(eventcatalog.NewCatalog(cfg)); err != nil {
-		t.Fatal(err)
-	}
-	for _, topic := range []string{"qs.survey.lifecycle", "qs.evaluation.lifecycle", "qs.plan.task"} {
-		if !created[topic+"/qs-worker"] {
-			t.Errorf("primary Worker channel missing for %s", topic)
-		}
-	}
-	if !created["qs.evaluation.lifecycle/custom-projection-channel"] {
-		t.Error("API projection channel missing before serving")
 	}
 }
 
@@ -406,7 +333,7 @@ func (w *failedDrainWire) Close() error { return w.failure }
 func TestResourcePreparationFailureReleasesOrRetainsExactOwnedDependencies(t *testing.T) {
 	for _, pending := range []bool{false, true} {
 		dbClosed := 0
-		original := errors.New("catalog unavailable")
+		original := errors.New("subsystem unavailable")
 		drain := errors.New("publisher shutdown incomplete")
 		var wire wirePublisherResource = &fakeWirePublisher{}
 		if pending {
@@ -414,8 +341,9 @@ func TestResourcePreparationFailureReleasesOrRetainsExactOwnedDependencies(t *te
 		}
 		_, err := prepareResources(resourceStageDeps{
 			database:         databaseResourceDeps{close: func() error { dbClosed++; return nil }},
-			mqPublisher:      mqPublisherStageDeps{enabled: true, provider: "rocketmq", newWirePublisher: func() (wirePublisherResource, error) { return wire, nil }},
-			loadEventCatalog: func() (*eventcatalog.Catalog, error) { return nil, original },
+			mqPublisher:      mqPublisherStageDeps{enabled: true, provider: "rocketmq", newNormalPublisher: func(*eventcatalog.Catalog) (wirePublisherResource, error) { return wire, nil }},
+			loadEventCatalog: func() (*eventcatalog.Catalog, error) { return eventcatalog.NewCatalog(nil), nil },
+			eventSubsystem:   eventSubsystemResourceDeps{newSubsystem: func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error) { return nil, original }},
 		})
 		if !errors.Is(err, original) {
 			t.Fatal("original failure lost", err)

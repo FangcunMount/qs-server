@@ -6,6 +6,10 @@
 
 启动代码采用显式构造函数、阶段式 Runner 和手工装配。当前没有使用 Wire、Fx 等依赖注入框架；这是代码自然演进形成的实现方式，其实际优点是依赖路径可直接追踪，但不应被包装成项目初期刻意制定的框架决策。
 
+消息资源准备现只接受显式RocketMQ、完整的 `qs.mysql`/`qs.mongo` 双owner，且旧standard Outbox profile必须关闭。[最终配置门禁](../../internal/apiserver/process/final_messaging.go)在数据库初始化及客户端获取前运行；不自动创建NSQ Topic/channel，不选择旧WirePublisher或扫描Relay。普通通知仍使用目录解析后的NORMAL客户端；其后失败继续按原关闭协调器保留/释放依赖。
+
+唯一生产选择由 `configuredEventSubsystem` 转交 `NewWithTransactionOwners`。当前原事务、首次wire、witness、到期dispatcher、消费幂等和恢复授权保持；残余旧profile/helper只由历史夹具持有，C04再清理，不作为生产备选。
+
 ## 2. 从入口到运行
 
 入口为 `cmd/qs-apiserver/apiserver.go`。进程创建配置与 app 后进入 `internal/apiserver/process`，由 `processruntime.Runner` 依次执行六个阶段：

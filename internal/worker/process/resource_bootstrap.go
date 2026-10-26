@@ -15,6 +15,9 @@ import (
 const defaultEventConfigPath = "configs/events.yaml"
 
 func (s *server) prepareResources() (resourceOutput, error) {
+	if err := s.validateFinalMessaging(); err != nil {
+		return resourceOutput{}, err
+	}
 	dbManager := bootstrap.NewDatabaseManager(s.config)
 	output := resourceOutput{handles: resourceHandles{dbManager: dbManager}}
 	if err := dbManager.Initialize(); err != nil {

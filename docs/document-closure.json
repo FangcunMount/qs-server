@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "1f76901ca780f6879139c9ebef02fd3d75de3d59",
+    "sha": "f232e634680b9d7751a03625631909c9b6e6e8f4",
     "verified_on": "2026-10-26"
   },
   "status_policy": {
@@ -1439,7 +1439,12 @@
         "source_sha": "5db561a71fa1b19edc5ad9099978000a9338c02b",
         "verified_on": "2026-10-09"
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/final_messaging.go"
+        }
+      ],
       "verification": [
         {
           "kind": "command",
@@ -1507,7 +1512,12 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/worker/process/final_messaging.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -11921,7 +11931,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+        "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -12401,6 +12411,13 @@
           "result": "passed",
           "source_sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
           "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
@@ -14076,7 +14093,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+        "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -14593,6 +14610,13 @@
           "result": "matched",
           "source_sha": "741a5cfe45234fb75ac12d54d2ac74887ea39f81",
           "verified_on": "2026-10-18"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
@@ -14806,7 +14830,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
+        "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
         "verified_on": "2026-10-26"
       },
       "fact_sources": [
@@ -15073,6 +15097,13 @@
           "result": "passed",
           "source_sha": "8ce415393505ac7a94a273315fce8a1782900ceb",
           "verified_on": "2026-10-24"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-check",
+          "result": "passed",
+          "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
+          "verified_on": "2026-10-26"
         }
       ],
       "production_evidence": {
