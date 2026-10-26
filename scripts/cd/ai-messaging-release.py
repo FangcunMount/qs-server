@@ -240,7 +240,7 @@ def prepare(image, base, uid, gid, binding_root=BINDING_ROOT, release_root=RELEA
             retained_id = decoded(read(retained_release / 'metadata.json', 32768))['image_id']
             require(re.fullmatch(r'sha256:[0-9a-f]{64}', retained_id))
             protected.add(retained_id)
-    return {'source_sha': source, 'image_id': image_id, 'protected_image_ids': sorted(protected),
+    return {'source_sha': source, 'image_id': image_id, 'binding_revision': binding['binding_revision'], 'protected_image_ids': sorted(protected),
             'compose_file': str(release / 'compose.json'), 'preflight': 'passed',
             'binding_sha256': metadata['binding_sha256']}
 
