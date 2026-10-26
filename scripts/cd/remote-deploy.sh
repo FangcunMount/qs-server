@@ -881,12 +881,9 @@ if [ "${SERVICE:-apiserver}" != collection ]; then
   mysql_ca_ref=$(sed -n 's/^MYSQL_TLS_CA_REF=//p' "$DEPLOY_TMP/configs/env/config.prod.env" | head -1)
   python3 /opt/infra/scripts/mysql/ca.py verify --ref "$mysql_ca_ref"
 fi
-# Optional on first installation; mandatory once MQ ownership was established.
-# Preflight is offline and occurs BEFORE source config sync or stopping old QS.
-if [ "$SERVICE" = "apiserver" ] && {
-  $SUDO test -e /data/infra/qs-server-messaging/current.json ||
-  $SUDO test -e /opt/qs-server/qs-apiserver/ai-mq-releases/required;
-}; then
+# Every API target requires the final binding, including a first installation.
+# Offline validation precedes config sync and stopping any running service.
+if [ "$SERVICE" = "apiserver" ]; then
   select_image
   MQ_IMAGE_SELECTED=1
   docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"

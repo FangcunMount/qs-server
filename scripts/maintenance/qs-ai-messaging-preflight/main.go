@@ -20,7 +20,7 @@ var sourceSHA = "development"
 func main() {
 	version := flag.Bool("source-sha", false, "print embedded source identity without reading configuration")
 	input := flag.String("binding", "", "reviewed local binding JSON; no key contents")
-	base := flag.String("base-config", "", "optional source YAML; no environment credential merge")
+	base := flag.String("base-config", "", "required production source YAML; no environment credential merge")
 	out := flag.String("output-config", "", "new rendered JSON file; never overwritten")
 	flag.Parse()
 	if *version {
@@ -51,7 +51,7 @@ func bounded(path string, max int64) (raw []byte, resultErr error) {
 }
 
 func run(input, base, out string) (resultErr error) {
-	if input == "" || ((base == "") != (out == "")) {
+	if input == "" || base == "" || out == "" {
 		return binding.ErrBinding
 	}
 	raw, err := bounded(input, 16384)
@@ -62,45 +62,46 @@ func run(input, base, out string) (resultErr error) {
 	if err != nil {
 		return err
 	}
+	if binding.ValidateFinalBinding(b) != nil {
+		return binding.ErrBinding
+	}
+	original, err := bounded(base, 1<<20)
+	if err != nil {
+		return err
+	}
+	config, err := binding.RenderFinal(original, b)
+	if err != nil {
+		return err
+	}
 	fingerprints, err := binding.ValidateKeys(b)
 	if err != nil {
 		return err
 	}
-	transportFiles, err := b.TransportFiles()
+	transportFiles, err := binding.FinalTransportFiles(config)
 	if err != nil {
 		return err
 	}
-	var configHash string
-	if base != "" {
-		original, err := bounded(base, 1<<20)
-		if err != nil {
-			return err
-		}
-		config, err := binding.Render(original, b)
-		if err != nil {
-			return err
-		}
-		f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0640)
-		if err != nil {
-			return err
-		}
-		n, writeErr := f.Write(config)
-		if n != len(config) && writeErr == nil {
-			writeErr = io.ErrShortWrite
-		}
-		if err = errors.Join(writeErr, f.Close()); err != nil {
-			return err
-		}
-		sum := sha256.Sum256(config)
-		configHash = hex.EncodeToString(sum[:])
+	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0640)
+	if err != nil {
+		return err
 	}
+	n, writeErr := f.Write(config)
+	if n != len(config) && writeErr == nil {
+		writeErr = io.ErrShortWrite
+	}
+	if err = errors.Join(writeErr, f.Close()); err != nil {
+		return err
+	}
+	sum := sha256.Sum256(config)
+	configHash := hex.EncodeToString(sum[:])
 	return json.NewEncoder(os.Stdout).Encode(struct {
-		TransportFiles map[string]string `json:"transport_files_sha256,omitempty"`
-		SourceSHA      string            `json:"source_sha"`
-		Revision       string            `json:"binding_revision"`
-		BindingHash    string            `json:"binding_sha256"`
-		ConfigHash     string            `json:"rendered_config_sha256,omitempty"`
-		Fingerprints   map[string]string `json:"public_key_fingerprints"`
-		Offline        bool              `json:"offline"`
-	}{transportFiles, sourceSHA, b.Revision, b.SHA256(), configHash, fingerprints, true})
+		FinalTransactionBinding bool              `json:"final_transaction_binding"`
+		TransportFiles          map[string]string `json:"transport_files_sha256,omitempty"`
+		SourceSHA               string            `json:"source_sha"`
+		Revision                string            `json:"binding_revision"`
+		BindingHash             string            `json:"binding_sha256"`
+		ConfigHash              string            `json:"rendered_config_sha256,omitempty"`
+		Fingerprints            map[string]string `json:"public_key_fingerprints"`
+		Offline                 bool              `json:"offline"`
+	}{true, transportFiles, sourceSHA, b.Revision, b.SHA256(), configHash, fingerprints, true})
 }

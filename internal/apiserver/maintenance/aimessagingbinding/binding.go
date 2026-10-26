@@ -307,16 +307,11 @@ func (b Binding) TransportFiles() (map[string]string, error) {
 		if path != "/app/configs/rocketmq/"+name {
 			return nil, ErrBinding
 		}
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > 1<<20 || info.Mode().Perm()&0022 != 0 || (name == "credentials.json" && info.Mode().Perm()&0007 != 0) {
-			return nil, ErrBinding
-		}
-		body, err := os.ReadFile(path)
+		hash, err := transportFileHash(path, name == "credentials.json")
 		if err != nil {
 			return nil, ErrBinding
 		}
-		h := sha256.Sum256(body)
-		files[name] = hex.EncodeToString(h[:])
+		files[name] = hash
 	}
 	return files, nil
 }

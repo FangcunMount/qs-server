@@ -78,9 +78,23 @@ def key_mounts(binding, root):
     require(type(binding['max_in_flight']) is int)
     base_fields = {'binding_revision', 'enabled', 'nsqd', 'signing_key_file',
                    'decrypt_key_files', 'ai_signer_files', 'ai_recipient_key_file', 'max_in_flight'}
-    provider = binding.get('provider', 'nsq')
-    expected = base_fields if provider == 'nsq' else ((base_fields - {'nsqd'}) | {'provider', 'rocketmq', 'publish_enabled'})
-    require(provider in {'nsq', 'rocketmq'} and set(binding) == expected)
+    expected = (base_fields - {'nsqd'}) | {'provider', 'rocketmq', 'publish_enabled'}
+    require(binding.get('provider') == 'rocketmq' and set(binding) == expected)
+    require(type(binding['publish_enabled']) is bool)
+    config = binding['rocketmq']
+    required = {'endpoint', 'credentials_file', 'ca_file', 'routes_file', 'instance_id', 'transactions'}
+    require(isinstance(config, dict) and required <= set(config) <= required | {'publish_enabled'})
+    require(config['instance_id'] == 'qs-apiserver-1')
+    require(config.get('publish_enabled') is None or
+            (type(config['publish_enabled']) is bool and config['publish_enabled'] == binding['publish_enabled']))
+    owners = config['transactions']
+    require(isinstance(owners, dict) and set(owners) == {'qs.mysql'})
+    owner = owners['qs.mysql']
+    required_owner = {'store_id', 'writer_epoch', 'route_revision', 'limits'}
+    require(isinstance(owner, dict) and required_owner <= set(owner) <= required_owner | {'credentials_file'})
+    require(owner.get('credentials_file', '/app/configs/rocketmq/credentials.json') == '/app/configs/rocketmq/credentials.json')
+    # Native preflight checks exact identities, complete budgets, both stores,
+    # IAM subscription and canonical route types before any replacement.
     entries = [(binding['signing_key_file'], 'qs.sign', None),
                (binding['ai_recipient_key_file'], 'ai.encrypt', None)]
     for field, role in [('decrypt_key_files', 'qs.encrypt'), ('ai_signer_files', 'ai.sign')]:
@@ -101,19 +115,16 @@ def key_mounts(binding, root):
         require(source.stat().st_mode & 0o022 == 0)
         require(not role.startswith('qs.') or source.stat().st_mode & 0o007 == 0)
         mounts.append((source, target, True))
-    if provider == 'rocketmq':
-        config = binding['rocketmq']
-        require(isinstance(config, dict) and set(config) == {'endpoint', 'credentials_file', 'ca_file', 'routes_file'})
-        require(type(binding['publish_enabled']) is bool)
-        for field, name in [('credentials_file', 'credentials.json'), ('ca_file', 'ca.crt'), ('routes_file', 'routes.json')]:
-            target = '/app/configs/rocketmq/' + name
-            require(config[field] == target)
-            source = root / 'versions' / revision / 'rocketmq' / name
-            require(source.resolve() == source.absolute())
-            read(source, 1 << 20)
-            require(source.stat().st_mode & 0o022 == 0)
-            require(name != 'credentials.json' or source.stat().st_mode & 0o007 == 0)
-            mounts.append((source, target, True))
+    for field, name in [('credentials_file', 'credentials.json'), ('ca_file', 'ca.crt'), ('routes_file', 'routes.json')]:
+        require(config[field] == '/app/configs/rocketmq/' + name)
+    for name in ('credentials.json', 'mongo-credentials.json', 'ca.crt', 'routes.json'):
+        target = '/app/configs/rocketmq/' + name
+        source = root / 'versions' / revision / 'rocketmq' / name
+        require(source.resolve() == source.absolute())
+        read(source, 1 << 20)
+        require(source.stat().st_mode & 0o022 == 0)
+        require(not name.endswith('credentials.json') or source.stat().st_mode & 0o007 == 0)
+        mounts.append((source, target, True))
     return mounts
 
 
@@ -122,8 +133,8 @@ def overlay(release, mounts, image):
     # external cache policy relative to it. Overlay just the immutable main file
     # read-only within the existing configs mount; leave its sibling files intact.
     volumes = [{'type': 'bind', 'source': str(release / 'apiserver.json'),
-                'target': '/app/configs/apiserver.prod.yaml', 'read_only': True}]
-    volumes += [{'type': 'bind', 'source': str(source), 'target': target, 'read_only': readonly}
+                'target': '/app/configs/apiserver.prod.yaml', 'read_only': True, 'bind': {'create_host_path': False}}]
+    volumes += [{'type': 'bind', 'source': str(source), 'target': target, 'read_only': readonly, 'bind': {'create_host_path': False}}
                 for source, target, readonly in mounts]
     return {'services': {'qs-apiserver': {'image': image,
             'command': ['--config=/app/configs/apiserver.prod.yaml'], 'volumes': volumes}}}
@@ -161,14 +172,28 @@ def prepare(image, base, uid, gid, binding_root=BINDING_ROOT, release_root=RELEA
     base_raw = read(base, 1 << 20)
     if existing:
         metadata = decoded(read(release / 'metadata.json', 32768))
+        require(metadata.get('final_transaction_binding') is True)
         require(metadata['source_sha'] == source and metadata['image_id'] == image_id)
         require(metadata['source_config_sha256'] == digest(base_raw))
         require(metadata['binding_file_sha256'] == digest(binding_raw))
         require(metadata['rendered_config_sha256'] == digest(read(release / 'apiserver.json', 1 << 20)))
         require(metadata['compose_sha256'] == digest(read(release / 'compose.json', 32768)))
         require(decoded(read(release / 'compose.json', 32768)) == overlay(release, mounts, image_id))
-        check = decoded(offline(image_id, ['--binding=/preflight/binding.json'],
-                         [(binding_path, '/preflight/binding.json', True)] + mounts))
+        with tempfile.TemporaryDirectory(prefix='.mq-preflight-', dir=release_root) as temporary:
+            staging = Path(temporary)
+            staging.chmod(0o750)
+            os.chown(staging, uid, gid)
+            local_base = staging / 'source.yaml'
+            write_new(local_base, base_raw, mode=0o400)
+            os.chown(local_base, uid, gid)
+            check = decoded(offline(image_id,
+                ['--binding=/preflight/binding.json', '--base-config=/preflight/source.yaml',
+                 '--output-config=/output/apiserver.json'],
+                [(binding_path, '/preflight/binding.json', True),
+                 (local_base, '/preflight/source.yaml', True), (staging, '/output', False)] + mounts))
+            require(check.get('final_transaction_binding') is True)
+            require(check['rendered_config_sha256'] == metadata['rendered_config_sha256'])
+            require(check['rendered_config_sha256'] == digest(read(staging / 'apiserver.json', 1 << 20)))
         require(all(check[k] == metadata[k] for k in
                     ('source_sha', 'binding_revision', 'binding_sha256', 'public_key_fingerprints')))
         require(check.get('transport_files_sha256') == metadata.get('transport_files_sha256'))
@@ -192,6 +217,7 @@ def prepare(image, base, uid, gid, binding_root=BINDING_ROOT, release_root=RELEA
                 [(local_binding, '/preflight/binding.json', True),
                  (local_base, '/preflight/source.yaml', True), (staging, '/output', False)] + mounts))
             local_base.unlink()  # Keep only the existing frozen release assets.
+            require(metadata.get('final_transaction_binding') is True)
             require(metadata['source_sha'] == source and metadata['offline'] is True)
             require(metadata['rendered_config_sha256'] == digest(read(staging / 'apiserver.json', 1 << 20)))
             composition = encoded(overlay(release, mounts, image_id))

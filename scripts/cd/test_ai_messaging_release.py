@@ -29,7 +29,14 @@ class MQReleaseTests(unittest.TestCase):
         self.base = self.root / 'source.yaml'
         self.base.write_text('ai_workflow:\n  enabled: true\n')
         self.binding = {'binding_revision': 'mq-v1', 'enabled': True,
-            'nsqd': {'nsqd:4150': 'http://nsqd:4151'}, 'max_in_flight': 1,
+            'provider': 'rocketmq', 'publish_enabled': False, 'max_in_flight': 1,
+            'rocketmq': {'endpoint': 'broker.invalid:8081', 'instance_id': 'qs-apiserver-1',
+                'credentials_file': '/app/configs/rocketmq/credentials.json',
+                'ca_file': '/app/configs/rocketmq/ca.crt', 'routes_file': '/app/configs/rocketmq/routes.json',
+                'transactions': {'qs.mysql': {'store_id': 'Original-Primary', 'writer_epoch': 'Original-Epoch',
+                    'route_revision': 'm3-1', 'limits': {'sends': 4, 'branches': 16, 'check_workers': 2,
+                    'check_queue': 16, 'reconcile_batch': 50, 'check_timeout': 2000000000,
+                    'rpc_timeout': 5000000000, 'lease': 60000000000, 'reconcile_interval': 5000000000}}}},
             'signing_key_file': '/run/qs-server-jose/qs.sign.v1.json',
             'decrypt_key_files': {'qs.encrypt': '/run/qs-server-jose/qs.encrypt.json'},
             'ai_signer_files': {'ai.sign': '/run/qs-server-jose/ai.sign.json'},
@@ -38,6 +45,12 @@ class MQReleaseTests(unittest.TestCase):
             file = self.versions / name
             file.write_text('{"fixture":"never logged"}')
             file.chmod(0o600 if name.startswith('qs.') else 0o644)
+        transport = self.versions / 'rocketmq'
+        transport.mkdir()
+        for name in ('credentials.json', 'mongo-credentials.json', 'ca.crt', 'routes.json'):
+            path = transport / name
+            path.write_text('fixture')
+            path.chmod(0o600 if name.endswith('credentials.json') else 0o644)
         self.write_binding()
         self.calls = []
         self.fail_keys = False
@@ -53,7 +66,7 @@ class MQReleaseTests(unittest.TestCase):
             return (self.source + '\n').encode()
         if self.fail_keys:
             raise module.Refused('key unavailable')
-        data = {'source_sha': self.source, 'offline': True,
+        data = {'source_sha': self.source, 'offline': True, 'final_transaction_binding': True,
                 'binding_revision': 'mq-v1', 'binding_sha256': 'c' * 64,
                 'public_key_fingerprints': {'qs.sign.v1': 'd' * 64}}
         if any(arg.startswith('--output-config') for arg in args):
@@ -69,13 +82,33 @@ class MQReleaseTests(unittest.TestCase):
             return module.prepare('selected-tag', self.base, os.getuid(), os.getgid(),
                                   self.binding_root, self.releases)
 
+    def test_final_host_rejects_legacy_provider(self):
+        self.binding['provider'] = 'nsq'
+        self.write_binding()
+        with self.assertRaises(module.Refused):
+            self.prepare()
+
+    def test_final_host_rejects_unverified_native_receipt(self):
+        original = self.fake_offline
+        def old_receipt(image, args, mounts=()):
+            raw = original(image, args, mounts)
+            if args == ['--source-sha']:
+                return raw
+            value = json.loads(raw)
+            value.pop('final_transaction_binding')
+            return json.dumps(value).encode()
+        self.fake_offline = old_receipt
+        with self.assertRaises(module.Refused):
+            self.prepare()
+
     def test_mq_freezes_exact_image_and_readonly_original_key_paths(self):
         result = self.prepare()
         self.assertEqual(result['source_sha'], SOURCE)
         config = json.loads(Path(result['compose_file']).read_text())['services']['qs-apiserver']
         self.assertEqual(config['image'], IMAGE)
         self.assertEqual(config['command'], ['--config=/app/configs/apiserver.prod.yaml'])
-        self.assertEqual(len(config['volumes']), 5)
+        self.assertEqual(len(config['volumes']), 9)
+        self.assertTrue(all(not v['bind']['create_host_path'] for v in config['volumes']))
         self.assertTrue(all(v['read_only'] for v in config['volumes']))
         self.assertTrue(any(v['target'].endswith('/qs.encrypt.json') for v in config['volumes']))
         self.assertNotIn('never logged', (self.releases / SOURCE / 'metadata.json').read_text())
@@ -286,6 +319,35 @@ SUDO=restricted
                     self.assertEqual(marker.stat().st_ino, inode)
                 if risk == 'symlink':
                     self.assertEqual(self.base.read_text(), 'ai_workflow:\n  enabled: true\n')
+
+    def test_first_install_requires_preflight_even_without_pointer_or_marker(self):
+        text = Path(__file__).with_name('remote-deploy.sh').read_text()
+        begin = text.index('if [ "$SERVICE" = "apiserver" ]; then', text.index('# Every API target'))
+        body = text[begin:text.index('\nsync_configs\n', begin)]
+        upload = self.root / 'first-upload'
+        (upload / 'scripts/cd').mkdir(parents=True)
+        script = upload / 'scripts/cd/ai-messaging-release.py'
+        script.write_text('raise SystemExit("final binding missing")\n')
+        tools = self.root / 'first-tools'
+        tools.mkdir()
+        tool = tools / (hashlib.sha256(script.read_bytes()).hexdigest() + '.py')
+        tool.write_bytes(script.read_bytes())
+        body = body.replace('/opt/qs-server/qs-apiserver/ai-mq-tools', str(tools))
+        marker = upload / 'would-sync'
+        shell = r'''set -e
+select_image() { :; }
+docker_compose_pull() { :; }
+resolve_compose_image_ref() { printf 'sha256:fixture\n'; }
+stat() { printf '0:555\n'; }
+restricted() { if [ "$1" = test ]; then return 1; fi; "$@"; }
+SUDO=restricted
+APP_UID=2000
+APP_GID=2000
+''' + body + '\nprintf synced > "$SYNC_MARKER"\n'
+        result = subprocess.run(['bash', '-c', shell], capture_output=True, timeout=15,
+            env={**os.environ, 'SERVICE': 'apiserver', 'DEPLOY_TMP': str(upload), 'SYNC_MARKER': str(marker)})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(marker.exists())
 
     def test_mq_preflight_precedes_config_sync_and_stop_without_changing_default_flow(self):
         text = Path(__file__).with_name('remote-deploy.sh').read_text()

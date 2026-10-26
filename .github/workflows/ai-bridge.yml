@@ -163,6 +163,23 @@ jobs:
           p = Path('artifacts') / f'{service}-source.json'
           p.write_text(json.dumps({'source_sha': os.environ['GITHUB_SHA'], 'service': service, 'dockerfile': f'build/docker/Dockerfile.{service}', 'runtime_health': 'not_verified', 'production': False}))
           PY
+      - uses: actions/setup-go@v6
+        if: matrix.service == 'qs-apiserver'
+        with:
+          go-version: '1.25.12'
+          cache: true
+      - name: Required final transaction native preflight
+        if: matrix.service == 'qs-apiserver'
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          fixture_dir="$(mktemp -d "${RUNNER_TEMP}/qs-final-preflight.XXXXXX")"
+          trap 'sudo -n rm -rf -- "$fixture_dir"' EXIT
+          go run ./scripts/maintenance/qs-ai-messaging-preflight/testdata/fixture "$fixture_dir"
+          sudo -n env GITHUB_ACTIONS=true GITHUB_SHA="$GITHUB_SHA" RUNNER_TEMP="$RUNNER_TEMP" \
+            python3 scripts/cd/test_final_native_preflight.py \
+            --fixture "$fixture_dir" --image qs-mq-qs-apiserver:ci \
+            --report "$PWD/artifacts/final-transaction-preflight.json"
       - uses: actions/upload-artifact@v7
         with:
           name: ai-mq-image-${{ matrix.service }}
