@@ -335,6 +335,21 @@ checkAbortedVisibility:
 			break checkAbortedVisibility
 		}
 	}
+	// Current diagnostics must not depend on a row in the retired publish queue.
+	currentView, viewErr := store.GetRuntime(t.Context(), 7, r.RequestID)
+	require.NoError(t, viewErr)
+	require.GreaterOrEqual(t, currentView.CommandsPending, 1)
+	require.False(t, currentView.CommandAttemptsAvailable)
+	currentBacklog, viewErr := store.RuntimeBacklog(t.Context(), 7)
+	require.NoError(t, viewErr)
+	require.GreaterOrEqual(t, currentBacklog["pending_commands"], int64(1))
+	// Missing or contradictory exact branch evidence is unknown, never zero debt.
+	_, viewErr = pool.ExecContext(t.Context(), "UPDATE rm_tx_witness SET state='prepared' WHERE execution_key=(SELECT execution_key FROM ai_messaging_archive WHERE message_id=?)", []byte(r.RequestID))
+	require.NoError(t, viewErr)
+	_, viewErr = store.GetRuntime(t.Context(), 7, r.RequestID)
+	require.ErrorIs(t, viewErr, ErrMessagingLedgerIntegrity)
+	_, viewErr = pool.ExecContext(t.Context(), "UPDATE rm_tx_witness SET state='committed' WHERE execution_key=(SELECT execution_key FROM ai_messaging_archive WHERE message_id=?)", []byte(r.RequestID))
+	require.NoError(t, viewErr)
 	// Retained historical identities are not public current operations and cannot
 	// authorize a modern execution, a new wire or a second business invocation.
 	old := r
