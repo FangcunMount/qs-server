@@ -1,108 +1,33 @@
-# Outbox 与业务效果恢复
+# 事务消息与业务效果恢复
 
-QS 的标准 Outbox 使用 SDK `rm_outbox`，保留业务原事务与恢复许可。它将待发送责任持久化，`published` 只证明发送结算；下游效果由 QS 业务事实或回执证明。
+当前可靠发布使用 RocketMQ 事务消息。本文保留原路径供链接使用；新业务事实提交不依赖扫描发布型 Outbox。
 
 ## 原事务与两个 Profile
 
-| Profile | 权威存储 | 业务范围 |
-| --- | --- | --- |
-| `mongo_domain_events` | Mongo `rm_outbox` | 答卷提交、报告生成/失败、Interpretation 重试授权 |
-| `assessment_mysql_events` | MySQL `rm_outbox` | Evaluation 请求/结果/失败/重试，启用后的 Task 开放提醒 |
+先预查幂等、冻结首次消息 ID/时间/wire/路由，准备全部半消息，再由宿主开启原根事务。执行 guard、业务、业务证据、全部 witness 共同提交。MySQL 借用原 SQL/GORM 根事务，Mongo 借用活跃原 session；callback 重入只重复确定性的数据库操作。
 
-每个已提供数据库都必须绑定完整标准 Profile。配置缺失、禁用标准 Profile、存储预检失败或非 NSQ/MQ-backed 装配会启动失败；当前源码不提供旧 Outbox 的配置回退。
+半消息失败/未知不启动业务。`LocalCommitted + FinalUnknown` 保留成功的本地事实，由精确 Checker 恢复 Broker 确认；不能重执行业务、重新签名加密或调用模型。取消、超时和 lease 到期本身不证明回滚。没有业务根事务时必须拒绝发送；当前源码不提供旧 Outbox 的配置回退。
 
-```text
-原业务事务：事实 + Stager → SDK Appender.Append 原意图
-  ├─ rollback：共同回滚
-  └─ commit：共同持久化
-       → PostCommitWake（可丢唤醒）
-       → SDK 周期扫描、claim、发送与条件结算
-```
+## 业务效果与未来调度
 
-Mongo Stager 使用原活动 `mongo.SessionContext` 绑定 `sdkmongo.Bind`；MySQL 使用 `mysql.RequireTx` 和 `sdkmysql.BindGORM`。没有业务事务时必须拒绝暂存，不另开业务事务兜底。Mongo callback 重入仍须保持原事件 ID/bytes；原事务 runner 的耐久性、背压和重试边界归宿主。
+消费者必须幂等，继续承担业务状态裁决。Run/Outcome、Generation/Report、Task 收件账本、Inbox、receipt、首次业务 ACK 与不可变正文档案保持各自职责，不因旧命名或表中有 outbox 就删除。
 
-标准意图在首次暂存前编码完整 Revision2 wire，保存原事件 UUID、metadata 和领域 envelope。SDK Publisher 原样发送 `Message.Payload`，不在重投时重新构造当前业务数据。`EvaluationRequested` 另在原 MySQL 事务保存 `qs_rm_evaluation_request_ref`，用于找回原评估关联；它是业务恢复证据，不是第二套 Outbox。
+未来 retry decision 保留原授权、due、attempt 和冻结事件，由 `retrydispatch` 到期准备半消息并在原事务 CAS 提交 dispatch 及 witness。协议维护不授予业务重试许可，不提前到期，不增加模型调用。
 
-`AfterCommit` 没有错误返回且只在提交成功后调用：此时不能再回滚业务事实。它只向本地 Wake channel 发提示，不 claim、不 publish，不使用旧 ready-index、ImmediateDispatcher 或 reconciler。
+## AI command、receipt 与 ACK
 
-## 标准状态与 QS 治理投影
+`MessagingCommandStore` 只进入当前 `TransactionCommands`；缺适配在存储/Seal 前拒绝。接收 AI 事件只进入 `TransactionEvents`，Inbox、投影、首次 ACK 档案和 witness 同根提交。缺原 command Committed 档案的 receipt 回滚并隔离，不确认旧投递。当前 Operation/Payload 不读取旧 Outbox fallback。
 
-| 持久状态 | 当前含义 |
-| --- | --- |
-| `pending` | 原业务事务已追加意图，等待到期领取 |
-| `publishing` | 发送者获得有效 claim；不证明已发送 |
-| `retry_wait` | 原意图等待下次技术投递 |
-| `quarantined` | 自动扫描不再领取；保留损坏、拒绝或预算耗尽责任 |
-| `published` | 当前 claim 的 Broker 确认已经条件写回 |
+重复当前请求返回原计划或结果，保留首次 wire。历史 command ID 仍须参与负向冲突检查；它不能授权新执行，也不能冒充 witness。旧 Inbox 不能被新 ACK 事务领养。
 
-Store 用原记录、token、version 和数据库租约拒绝过期写回。PUB 接受与 Store.Confirm 是两次操作：MQ 接收但发布结算未持久化时，租约恢复可能再次投递，消费者必须幂等；响应错误本身也不能证明数据库未更新，应回查原状态。
+## 保留资产与退出范围
 
-SDKRetryPolicy 使用 QS `OutboxPolicy` 与 claim `FailureCount`，当前预算为 30，退避 10 秒起步、1 分钟封顶、20% deterministic jitter，策略版本 `outbox-publish-retry/v2`。预算不能与 claim 次数、NSQ 物理次数或业务 attempt 相加。
+M4 已移除仅服务旧中间链路的 NSQ runtime、拓扑 HTTP 预检、发布扫描、旧 Stage/ACK rearm/payload reader、旧一体化探针及其孤立合同。新的负向用例只用 SQL 预置历史事实，不执行退役发布器。
 
-QS 状态 reader 按标准状态读积压，不再使用旧 `failed` 存储状态。治理层将 `quarantined + publish_unknown` 投影为 `manual_required`，其余隔离原因投影为 terminal；`retry_wait` 与原授权版本决定 automatic/authorized。处置必须读取实际错误及原事实，不能把所有 quarantined 都当作可自动重发。
-
-旧记录已有的未来 `next_attempt_at` 不随政策升级自动改写。72 秒是默认退避含 jitter 的最大等待，不是端到端恢复时限；较长故障仍可能耗尽预算。
-
-## published 后的业务效果由 QS 核对
-
-NSQ PUB 确认不证明同步刷盘、某 channel 消费或业务完成。标准 Relay 不自动重新扫描所有 published 行；无条件重投会重复正常完成的业务或外部副作用。
-
-`answersheetgap.Scanner` 是 QS 的有界、只读跨库效果检查：读取 durable AnswerSheet 与冻结准入，核对原标准 Outbox 身份/指纹，再查 MySQL Assessment。
-
-| 分类 | 判断与后续责任 |
-| --- | --- |
-| `assessment_present` | 原答卷已有正确组织的 Assessment，不能因缺少投递日志重建 |
-| `not_required` | 原冻结准入为独立问卷，不要求 Assessment |
-| `delivery_pending` | 原 Outbox 仍 pending/publishing/retry_wait，发送恢复责任尚未结束 |
-| `missing_confirmed` | 原 Outbox published，但要求的 Assessment 缺失；形成审核候选 |
-| `manual_required` | 原意图缺失、冻结事实不全、身份冲突或其他需治理状态 |
-| `unknown` | 查询失败等证据不足；不能渲染成无缺口 |
-
-这项 scanner 只核对答卷到 Assessment，不核验报告完成或未知模型执行。恢复准备由 `CaptureOriginalRecovery` 复查原 Mongo snapshot、原消息、冻结上下文及任何 Assessment（含软删除）；Mongo/MySQL 不共享快照，持久授权后仍须再次捕获，正常消费者并发由原 Intake 唯一键裁决。Scanner 本身不自动发消息。
-
-当前 `ScanPage` 的调用仅见于集成合同，`CaptureOriginalRecovery` 提供恢复准备能力；二者尚未见生产 composition root、调度器或治理 API 接入。上界、grace period、cursor 持久化、授权 owner 和现场操作仍需明确装配；不能把包与测试存在写成后台自动发现/修复已上线。
-
-已确认消息的恢复必须证明对应业务效果缺失、保存授权/审计并保留原身份、bytes、计数与确认历史；SDK 提供受限原行条件重排原语，宿主决定是否调用。Task 提醒另有原 Task、收件账本及时间窗合同，见[任务调度、入口与提醒](../../02-业务模块/60-plan/23-核心设计-任务调度、入口与提醒.md)。Evaluation/报告的原效果恢复也依各自业务证据，不能沿用答卷 scanner 的结论。
-
-结果未知的外部调用不因新物理投递或消息重排而获得重新执行许可；模型调用应继续原任务/冻结配置恢复，提醒应核对逐收件状态。
-
-## 运行与回退
-
-EventSubsystem 启动附加消费者和标准 Profile Supervisor；退出时先取消并等待 Run 完成，再 drain Publisher。宿主保留数据库、schema/索引、退出预算和部署所有权，见[架构与责任边界](./10-架构与责任边界.md)。
-
-旧 core/Store/ready-index 历史合同从固定旧提交运行，入口为 `scripts/testing/run-retired-outbox-contracts.sh`，清单为 [`retired-outbox-contracts.json`](../../retired-outbox-contracts.json)。它们只证明固定旧实现，不能替代当前 SDK 验证。部署回退使用核验过的旧镜像及其数据版本约束；删除旧源码不授权删除生产历史行、索引、NSQ channel 或回退镜像。
+只读数据库审计、准入 revision/CAS、离线正式镜像预检、历史 schema/备份、SDK 通用兼容测试和开发依赖保留。旧状态查询仅用于保留资产审计，不能当成新事务队列指标。没有自动删表、卷、业务历史或事务证据。
 
 ## 代码与验证
 
-- 原事务：`infra/mongo/standardoutbox/stager.go`、`infra/mysql/standardoutbox/stager.go`
-- Profile 装配：`process/standard_event_subsystem_m4.go`
-- Wake/监督/政策/观测：`eventing/standardoutbox`
-- 状态与授权：`infra/{mongo,mysql}/standardoutbox/{status,governance,replay}.go`
-- 答卷效果：`infra/answersheetgap/{scanner,recovery}.go`
-- 原评估/报告效果：`maintenance/originaleffect`
+当前原事务与路由实现见 [架构边界](./10-架构与责任边界.md)。真实 Broker 下的 command、event、Payload/mTLS、原根回滚、跨实例和故障验收由 infra 固定源码 SHA 运行；源码 CI、隔离验证、生产部署与 system 验收分别记录。
 
-以上路径均以 `internal/apiserver/` 为前缀。普通合同及实库/故障验证入口见[扩展与验收](./70-扩展与验收.md)。SDK claim/时钟机制以[当前依赖版本的源码合同](./10-架构与责任边界.md#sdk-版本与参考文档)为准；本页不把单元测试、代码存在或 published 计数当作现场效果验收。
-
-### M3 T13：未来业务调度的冻结计划（实现中）
-
-`eventing/retryschedule` 已新增独立冻结模型：保存原失败 Run、业务授权、到期时间和首次消息/wire，不包含发布 attempt、delivered 或消费完成状态。评分仅绑定 qs.mysql，报告仅绑定 qs.mongo；重复同输入复用第一份计划，授权或业务输入变化必须冲突，不用新时钟/事件ID覆盖赢家。存储索引时间按数据库精度向上取整，原始 deadline 和 wire 保持不变，避免提前到期。
-
-已新增借用原 GORM 根事务或活跃 Mongo session 的存储适配；构造不执行DDL，显式安装107/42，版本及绑定不符拒绝。事务计划的 Prepared 入口复用首次wire，不重新构造消息。合同测试及原生用例编译通过；真实双库原子性、到期 Sender、旧调度交接及恢复治理仍待 T13 后续验收。既有调度、Outbox与生产消息责任尚未切换。进度及证据统一维护在 [infra M3 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)。
-
-T13到期核心已新增 `application/eventing/retrydispatch`：单次串行有界扫描最多100条，在SDK准备半消息后取得原根调度guard，锁定/条件写入当前Run授权，并将dispatch事实与witness共同提交。冻结首次selectedAt，重复/Unknown只读恢复，不自动新建fence或再次调用业务；FinalUnknown保留本地已提交。原根密封上下文校验精确引用和计划，失效callback拒绝使用。该入口尚未接管活动调度：真实到期Broker、显式中止重试、自动/人工授权写入口、暂停/交接与旧Replay责任仍待验收。当前普通源码回归7144通过、60既有可选依赖跳过；required真实依赖门禁仍待新候选，不表示T13或生产已完成。
-
-评分失败和报告失败的新私有计划采用V2：在原根内写Run/失败事实、未来调度及本次失败事件的witness，未来事件不进入发布型Outbox，也不提前准备未来半消息。V1赢家按其冻结版本继续原Outbox责任；新旧版本稳定业务input hash相同，重复请求读取原赢家，不能以版本升级覆盖旧wire/责任。恢复V2还核对精确未来计划。自动入口及原生用例源码已通过7147项全仓race（60既有可选跳过），真实到期Broker门禁待执行；人工/force、暂停、显式中止重试与旧计划交接尚未完成，不能激活生产切换。
-
-人工/force授权入口在显式事务owner配置下改用未来计划：调用原权限/组织校验后，在根事务外冻结完整授权命令和首次wire；根内先竞争Ready计划，再校验原Run/Generation并提交授权事实。重复同输入读取第一份计划，变更理由/主体/动作产生冲突；根提交回复丢弃后按fresh原库事实恢复，不再次授权或调用旧Stage。授权正文只保存在私有计划，消费者wire不含这些审计字段；自动计划的旧codec字节保持不变。该批源码race7157通过（60既有可选依赖跳过），真实双库人工门禁尚待执行。暂停、中止后新fence授权、旧调度交接/Replay与最终宿主生命周期仍未完成，不能据此切换生产。
-
-T13显式协议恢复入口 `RetryAborted` 先读取原Ready计划和精确Aborted证据，再调用固定SDK的原子Retry申请新fence；沿用原计划、首次selectedAt和wire，旧执行保留。常规扫描/Checker不调用此入口。自动暂停开关在reserve之前拒绝自动计划，也禁止其显式协议恢复；人工/force不受该自动开关影响。新增合同30项race通过，源码全仓7166通过/60既有可选跳过；required真实恢复仍待新候选。人工首轮原库发现初始Assessment夹具未显式插入，已修正并新增初始事实回读；不能以编译通过代替修正后原库验收。
-
-T13新增显式原根 `TransferLegacy` 适配：仅匹配完整原消息、fingerprint、原due以及未尝试pending责任；SQL行锁/Mongo写冲突与原Run授权共同竞争，数据库时钟确认仍为未来后，在同一根内保存未来计划并将原行标为held，错误码绑定完整计划摘要。原wire/身份/due/旧数据不删除，重复只读核对原交接及计划，不重置终态；旧Relay不能领取held，旧Replay明确返回future_schedule_owned。旧MySQL Outbox的UTC字符串微秒截断独立于原Run精度，交接按其真实编码读取。89项合同race、原生标签编译及固定lint通过；真实交接验收待新候选，尚无生产交接工具执行（T25/T30以后）。
-
-显式恢复验收首轮三档在新增helper内失败，保留脱敏报告和完整清理回执。原宿主把本地回调错误保守地视作Unknown是正确行为：测试现在等待实际lease并调用原库ReconcileOnce，取得持久化Aborted后再申请新fence；旧fence由精确StoreChecker读取，不拿“当前活动执行”查询替代历史证据。实际SQL与Mongo标签分别编译和固定lint通过，修正后的真实Broker门禁待重跑；前次使用了不存在的report标签，未覆盖该helper的报告独立构建，已校正为m3_report_integration。
-
-旧Outbox状态读取已排除held且标记为完整小写计划摘要的交接行，不再把其算作旧链路未完成发布；畸形held标记和其他未知状态仍失败。该筛选只用于责任分类，不替代计划/原行一致性或witness审计。真实双库交接初版f5084f77三档各42项零失败/跳过，全仓7197 race通过/60既有可选依赖跳过；增加状态兼容原生用例后的候选待重验。宿主调度循环、启动schema就绪和已经消费的RocketMQ暂停任务恢复仍按T22完成，共享逻辑消费预算，不向事务Topic发送普通重发消息。
-
-5582e030真实lease/显式恢复三档各41项零失败/跳过且清理完整；2cc8fdf90完整源码race7197通过/60既有可选跳过，全仓固定lint零问题。状态兼容首轮在新增原生断言失败：标准SDK始终返回四个状态桶，现按四桶计数/增龄清零验证，保留其原接口；修正5ed29545原生编译与固定lint通过，44项真实依赖矩阵待重验。前次native lint与独立冻结工作区的全仓lint争用全局锁，退出3，顺序重跑已通过；不记作代码通过或忽略门禁。
-
-大小门禁在提交授权前验证完整嵌套dispatch artifact，并预留最长合法selectedAt/revision编码；超出宿主1MiB私有artifact限制即拒绝，不能先持久化无法dispatch的授权。600KB私有授权红绿回归证明此前可落入此边界，100KB对照在最长时间/版本下仍能经正式transactionplan冻结；有效计划原编码不变。修正7e8aba25目标race239项通过/5既有可选Mongo跳过，固定lint零问题；最终候选重新绑定完整门禁，早期通过仍归其原SHA。
+完整清理进度与原报告见 [M4 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m4-execution.md)。旧机制的阶段记录可从 Git 历史追溯，不表示当前生产仍运行这些链路。

@@ -254,16 +254,13 @@ func TestM3AIEventBrokerHost(t *testing.T) {
 	require.Equal(t, 1, count("SELECT COUNT(*) FROM ai_bridge_events WHERE event_id=?", eventID))
 	cases["interpretation_projection_original_root"] = true
 	for _, historical := range []bool{false, true} {
-		current := commandStore
-		if historical {
-			current = &MessagingCommandStore{Store: &Store{DB: pool}, Messaging: legacyStore, Seal: seal}
-		}
 		run, id := uuid.NewString(), uuid.NewString()
-		require.NoError(t, current.SubmitEvaluationStart(t.Context(), app.EvaluationScope{OrganizationID: 7, OperatorUserID: 9, RunID: run}, id, app.EvaluationStart{ExpectedVersion: 1, Confirm: true}))
 		var hash string
 		if historical {
-			require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT body_sha256 FROM ai_messaging_outbox WHERE message_id=?", id).Scan(&hash))
+			body := &pb.MessagingBody{Value: &pb.MessagingBody_EvaluationStart{EvaluationStart: &pb.EvaluationStartCommand{Scope: &pb.EvaluationQuery{OrganizationId: 7, OperatorUserId: 9, RunId: run}, ExpectedVersion: 1, Confirm: true}}}
+			hash = seedRetainedOperation(t, pool, pb.MessagingKind_EVALUATION_START, id, run, app.OperationScope{OrganizationID: "7", SubjectID: "9", ResourceID: run}, body)
 		} else {
+			require.NoError(t, commandStore.SubmitEvaluationStart(t.Context(), app.EvaluationScope{OrganizationID: 7, OperatorUserID: 9, RunID: run}, id, app.EvaluationStart{ExpectedVersion: 1, Confirm: true}))
 			command := await(id)
 			require.NotEmpty(t, command.Wire)
 			archive, found, err := commands.Archive().ReadCommitted(t.Context(), id)
@@ -341,15 +338,14 @@ func TestM3AIEventBrokerHost(t *testing.T) {
 	require.Equal(t, transaction.LocalAborted, events.confirmEvent(t.Context(), mustIncomingEvent(t, held), beforeHeld.Execution))
 	cases["technical_hold_without_projection"], cases["aborted_disposition_explicit_replan"] = true, true
 	legacy := state()
-	oldReceiver := *receiver
-	oldReceiver.Transactions = nil
-	require.NoError(t, oldReceiver.Receive(t.Context(), legacy.Wire))
+	_, err = pool.ExecContext(t.Context(), `INSERT INTO ai_messaging_inbox(producer,message_id,body_sha256,body,wire_sha256,kind,aggregate_key,ack_id,received_at) VALUES(?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6))`, legacy.Envelope.Producer, legacy.Envelope.MessageId, legacy.Envelope.BodySha256, legacy.Body, messagingHash(legacy.Wire), legacy.Envelope.Kind, legacy.Envelope.AggregateKey, uuid.NewString())
+	require.NoError(t, err)
 	beforeSeals = seals.Load()
 	require.ErrorIs(t, receiver.Receive(t.Context(), legacy.Wire), ErrLegacyEventResponsibility)
 	require.Equal(t, beforeSeals, seals.Load())
 	require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_failures WHERE message_id=?", legacy.Envelope.MessageId))
 	cases["nonempty_legacy_inbox_not_adopted"] = true
-	require.Equal(t, 1, count("SELECT COUNT(*) FROM ai_messaging_outbox WHERE kind=?", pb.MessagingKind_EVENT_ACKNOWLEDGEMENT)) // exactly the legacy fixture
+	require.Zero(t, count("SELECT COUNT(*) FROM ai_messaging_outbox WHERE kind=?", pb.MessagingKind_EVENT_ACKNOWLEDGEMENT)) // fixtures and current host create no publish queue
 	cases["no_new_ack_outbox"] = true
 	fresh, err := NewTransactionEvents(db, shared, legacyStore, seal, bind)
 	require.NoError(t, err)

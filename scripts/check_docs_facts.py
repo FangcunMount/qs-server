@@ -3457,10 +3457,10 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
             "技术重投不得重新生成事件身份",
         ),
         EVENT_OUTBOX_DOC: (
-            "MQ 接收但发布结算未持久化",
-            "租约恢复可能再次投递",
+            "LocalCommitted + FinalUnknown",
+            "不能重执行业务",
             "消费者必须幂等",
-            "没有业务事务时必须拒绝暂存",
+            "没有业务根事务时必须拒绝发送",
             "当前源码不提供旧 Outbox 的配置回退",
         ),
         EVENT_CONTRACT_DOC: (

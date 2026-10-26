@@ -68,3 +68,7 @@ required CI 使用标准非 root API 镜像、真实密钥/CA/路由和主机冻
 
 M4 D03：新部署材料使用root管理的 `/var/lib/fangcun-m4-materials`，容器内文件路径和原密钥保持。
 原目录、冻结镜像/发布资产及共享锁保留；生产CD继续暂停，八实例重建与最终发布单独验收。
+
+## M4 中间协议清理
+
+AI bridge CI 保留 MySQL 存储/鉴权/准入和正式镜像离线预检，移除仅用于旧宿主 NSQ runtime 的启动与一体化探针。完整事务/Broker 验收由 infra 的最终 owner、current reader 与 QS↔AI 故障矩阵完成；本次源码清理不激活原材料、不安装生产工具或恢复自动 CD。

@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-// OutboxProfile identifies one durable local-transaction outbox runtime.
+// OutboxProfile retains the domain catalog classification. Final production
+// maps these profiles to original transaction owners, never a publish scan.
 type OutboxProfile string
 
 const (

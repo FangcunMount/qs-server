@@ -45,26 +45,6 @@ jobs:
         with:
           go-version: '1.25.12'
           cache: true
-      - name: Start isolated NSQ with the production message size limit
-        run: |
-          # Same immutable Docker Hub v1.3.0 manifest, served by its public cache.
-          # Avoid the upstream pull quota; keep the actual NSQ scenario mandatory.
-          nsq_cached='mirror.gcr.io/nsqio/nsq@sha256:1a369c146af71bc95c25d54b375a2b98452478c1eaf4e85f8fcb01da20f2c78a'
-          docker pull "$nsq_cached"
-          docker tag "$nsq_cached" nsqio/nsq:v1.3.0
-          docker run -d --name qs-ai-mq-ci-nsq --memory=128m --cpus=1 -p 4150:4150 -p 4151:4151 nsqio/nsq:v1.3.0 /nsqd --max-msg-size=262144 --mem-queue-size=3000
-          python3 - <<'PYREADY'
-          import time, urllib.request
-          for attempt in range(30):
-              try:
-                  with urllib.request.urlopen('http://127.0.0.1:4151/ping', timeout=1) as response:
-                      if response.status == 200:
-                          break
-              except Exception:
-                  time.sleep(1)
-          else:
-              raise SystemExit('required isolated NSQ is not ready')
-          PYREADY
       - name: Apply bridge schema to isolated test database
         env:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
@@ -81,8 +61,6 @@ jobs:
         env:
           QS_AI_BRIDGE_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
           QS_AI_MQ_TEST_DSN: 'root:bridge_test_root@tcp(127.0.0.1:3306)/qs_bridge_test?parseTime=true'
-          QS_AI_MQ_NSQD: '127.0.0.1:4150'
-          QS_AI_MQ_NSQD_HTTP: 'http://127.0.0.1:4151'
           GOWORK: 'off'
         run: |
           mkdir -p artifacts
@@ -95,10 +73,10 @@ jobs:
             go test -count=1 -race -json ./internal/apiserver/maintenance/aimessagingbinding ./scripts/maintenance/qs-ai-messaging-preflight
           } >> artifacts/ai-mq-tests.json
           go build ./cmd/qs-apiserver ./cmd/collection-server
+          go build -tags=m3_ai_paired -o artifacts/current-ai-paired-probe ./tests/m3_ai_paired_probe
           go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging ./scripts/maintenance/qs-ai-messaging
           go build -ldflags "-X main.sourceSHA=${{ github.sha }}" -o artifacts/qs-ai-messaging-preflight ./scripts/maintenance/qs-ai-messaging-preflight
           python3 scripts/cd/test_ai_messaging_release.py > artifacts/ai-mq-release-tests.json
-          go build ./scripts/testing/ai-mq-process
           python3 scripts/testing/ai-mq-report.py artifacts/ai-mq-tests.json
       - uses: actions/upload-artifact@v7
         if: always()

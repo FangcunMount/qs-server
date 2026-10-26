@@ -4,13 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
-	store "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/aibridge"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,12 +24,10 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 	if err != nil {
 		return err
 	}
-	physical := transport.PhysicalTopic(app.EventsTopic)
-	if r.Receiver.Transactions != nil {
-		config.Routes, physical, err = transactionalEventRoutes(config.Routes)
-		if err != nil {
-			return err
-		}
+	var physical string
+	config.Routes, physical, err = transactionalEventRoutes(config.Routes)
+	if err != nil {
+		return err
 	}
 	handlerCtx, cancel := context.WithCancel(context.Background())
 	r.handlerCancel = cancel
@@ -62,51 +56,11 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 	}); err != nil {
 		return err
 	}
-	r.handlersReady = true
-	if r.Receiver.Transactions != nil {
-		// The shared qs.mysql owner sends commands and ACKs transactionally.
-		// New events never enter the historical Outbox/Relay scan.
-		observations := newMessagingCollector(r.DB)
-		if err = prometheus.DefaultRegisterer.Register(observations); err != nil {
-			return errors.New("AI MQ observation registration unavailable")
-		}
-		r.observations = observations
-		r.started = true
-		return nil
-	}
-	r.publisher, err = messagingruntime.NewPublisher(&genericoptions.MessagingOptions{Provider: "rocketmq", RocketMQ: r.Options.RocketMQ}, map[string]string{app.CommandsTopic: app.CommandsTopic, app.AcksTopic: app.AcksTopic}, 1)
-	if err != nil {
-		return err
-	}
-	relay, err := store.NewMessagingRelay(r.DB, r.Store.Outbox, r.publisher)
-	if err != nil {
-		return err
-	}
 	observations := newMessagingCollector(r.DB)
 	if err = prometheus.DefaultRegisterer.Register(observations); err != nil {
 		return errors.New("AI MQ observation registration unavailable")
 	}
 	r.observations = observations
-	relayCtx, relayCancel := context.WithCancel(ctx)
-	r.relayCancel = relayCancel
-	r.relayDone = make(chan struct{})
-	go func() {
-		defer close(r.relayDone)
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			if r.Options.RocketMQ.PublishingEnabled() {
-				if err := relay.Step(relayCtx); err != nil && relayCtx.Err() == nil {
-					log.Print("AI MQ relay storage unavailable")
-				}
-			}
-			select {
-			case <-relayCtx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	}()
 	r.started = true
 	return nil
 }

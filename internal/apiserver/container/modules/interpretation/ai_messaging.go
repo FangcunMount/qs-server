@@ -29,7 +29,7 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, primary
 	if err != nil {
 		return err
 	}
-	if shared != nil && (o.SelectedProvider() != "rocketmq" || !shared.UsesPrimary(primary) || !shared.HasTopic(app.CommandsTopic) || !shared.HasTopic(app.AcksTopic)) {
+	if shared == nil || (o.SelectedProvider() != "rocketmq" || !shared.UsesPrimary(primary) || !shared.HasTopic(app.CommandsTopic) || !shared.HasTopic(app.AcksTopic)) {
 		return errors.New("AI command transaction owner must share original MySQL and RocketMQ route")
 	}
 	keys, err := client.LoadMessagingKeys(o)
@@ -72,7 +72,7 @@ func (m *Module) configureAIMessaging(o opts.AIWorkflowMessagingOptions, primary
 	m.aiBridge.Store = commands
 	m.aiEligibility = c.Commands
 	m.aiMessagingRuntime = runtime
-	m.aiMessagingReader = &store.MessagingReader{DB: db, Store: s}
+	m.aiMessagingReader = &store.MessagingReader{DB: db}
 	if commands.Transactions != nil {
 		m.aiMessagingReader.Archive = commands.Transactions.Archive()
 	}

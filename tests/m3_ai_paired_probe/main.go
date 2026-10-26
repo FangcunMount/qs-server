@@ -310,7 +310,7 @@ func run() (result map[string]any) {
 			return next(ctx, req)
 		}),
 	)
-	(&payload.MessagePayloads{Reader: &store.MessagingReader{DB: pool, Store: legacy, Archive: commands.Archive()}}).RegisterService(server)
+	(&payload.MessagePayloads{Reader: &store.MessagingReader{DB: pool, Archive: commands.Archive()}}).RegisterService(server)
 	serveDone = make(chan error, 1)
 	go func() { serveDone <- server.Serve(listener) }()
 	commandStore := &store.MessagingCommandStore{Store: &store.Store{DB: pool}, Messaging: legacy, Seal: seal, Transactions: commands}

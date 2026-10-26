@@ -1,16 +1,13 @@
 # QS Event 与 Signal
 
-QS 保留业务事件、原事务、消费幂等和恢复许可；`reliable-messaging` 提供消息身份、wire、标准 Outbox、Relay、NSQ 传输和 Redis Signal 机制。抽出消息库后，Outbox 仍在 QS 的原业务数据库中，EventSubsystem 仍由 QS 进程装配和监督。
+QS 保留业务事实、原事务、消费幂等和恢复许可；`reliable-messaging v0.5.0` 提供冻结计划、事务发送、精确 witness、Checker 与 RocketMQ 传输，继续以 SDK 嵌入宿主。
 
 ```text
-QS 业务事实 + 原事务内 Outbox
-  → SDK Relay / NSQ 发布
-  → QS 消费者持久处理
-  → SDK 消费结算
-  → QS 核对业务效果与恢复责任
+冻结计划 → 全部分支半消息 → 原业务根事务（业务＋witness）
+  → Broker 最终确认／新实例精确回查 → 消费者幂等处理
 ```
 
-`published` 证明发送结算，ACK 证明某 channel 的这次投递结算；二者都不能证明报告完成。NSQ 发布确认也不提供数据库与 Broker 的共同事务。
+半消息确认不证明本地提交，`LocalCommitted + FinalUnknown` 是合法结果。事务提交不证明消费者或模型已经完成。尽力通知走独立 NORMAL Topic；Redis Signal 保持原职责。
 
 `evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed` 的 report-status Redis 写入/Signal 唤醒是 best-effort；Reporter 吞掉写入与通知错误，handler 可以最终 ACK。ACK 不证明 report-status 投影或唤醒已成功，具体业务窗口见[从事实到结算](./15-从事实到结算-失败窗口与状态机.md)。
 
@@ -18,11 +15,11 @@ QS 业务事实 + 原事务内 Outbox
 
 | 机制 | QS 用法 | 恢复责任 |
 | --- | --- | --- |
-| `durable_outbox` Event | 业务事实与 Mongo/MySQL `rm_outbox` 在同一本地事务提交 | SDK 扫描与租约恢复；业务效果缺口由 QS 核对 |
+| `durable_outbox` Event | 保留目录分类名；当前通过原事务 owner 提交业务与 witness | 精确 Checker；业务效果与重试授权由 QS 核对 |
 | `best_effort` Event | RoutingPublisher 直接发布可丢通知 | producer 无持久补偿；消费端仍按声明的结算合同处理 |
 | `ephemeral_signal` | Redis Pub/Sub 提示缓存失效或报告状态刷新 | TTL、权威回读或下一次变更；无 ACK/Outbox |
 
-提交后的 `PostCommitWake` 只唤醒 SDK 的下次扫描。周期扫描以持久 Outbox 为依据。旧 Redis ready-index、ImmediateDispatcher、reconciler 已退役；`immediate/priority` 仅保留为兼容契约字段，不能据此推断当前有对应执行器。
+最终装配不使用发布型 Outbox、Relay 或 NSQ；`immediate/priority`、Profile 分类名和旧表不代表活动扫描。历史合同/SDK 通用兼容测试及开发依赖按各自范围保留。
 
 ## 阅读地图
 
@@ -31,7 +28,7 @@ QS 业务事实 + 原事务内 Outbox
 | QS 与 SDK 分别负责什么，谁启动和关闭资源？ | [架构与责任边界](./10-架构与责任边界.md) |
 | 答卷到测评、报告有哪些失败窗口？ | [从事实到结算](./15-从事实到结算-失败窗口与状态机.md) |
 | 有哪些事件、路由、业务 owner 和消费者？ | [事件契约与演进](./20-事件契约与演进.md) |
-| 如何在原事务接入标准 Outbox，怎样核对已发布但效果缺失？ | [Outbox 与业务效果恢复](./30-Outbox可靠出站链路.md) |
+| 如何接入原事务 witness，怎样保留业务恢复责任？ | [事务消息与业务效果恢复](./30-Outbox可靠出站链路.md) |
 | Worker、附加投影和失败记录何时 ACK？ | [消费与结算](./40-MQ发布消费与结算.md) |
 | AI workflow 的接收、准入维护和离线发布预检在哪里？ | [AI 消息运行与维护](./40-MQ发布消费与结算.md#ai-workflow-消息运行与维护) |
 | 哪些指标确实有接线，如何定位失败与人工恢复？ | [可观测性与故障恢复](./50-可观测性与故障恢复.md) |

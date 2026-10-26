@@ -337,10 +337,9 @@ checkAbortedVisibility:
 	}
 	// Retained historical identities are not public current operations and cannot
 	// authorize a modern execution, a new wire or a second business invocation.
-	legacyStore := &MessagingCommandStore{Store: &Store{DB: pool}, Messaging: NewMessagingStore(), Seal: seal}
 	old := r
 	old.RequestID = uuid.NewString()
-	require.NoError(t, legacyStore.StageStart(t.Context(), old))
+	seedRetainedOperation(t, pool, pb.MessagingKind_START, old.RequestID, old.RequestID, app.OperationScope{OrganizationID: "7", SubjectID: "9", ResourceID: old.RequestID}, startMessagingBody(old))
 	op, err = store.ReadOperation(t.Context(), app.OperationScope{OrganizationID: "7", SubjectID: "9"}, old.RequestID)
 	require.ErrorIs(t, err, app.ErrNotFound)
 	beforeDuplicate = seals.Load()

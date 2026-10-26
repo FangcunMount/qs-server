@@ -28,80 +28,35 @@ type MessagingCommandStore struct {
 }
 
 func (s *MessagingCommandStore) StageStart(ctx context.Context, r app.Start) error {
-	raw, hash, err := encode(r)
-	if err != nil {
-		return err
-	}
 	body := startMessagingBody(r)
-	return s.stageCommand(ctx, pb.MessagingKind_START, r.RequestID, r.RequestID, app.OperationScope{OrganizationID: r.Actor.OrgID, SubjectID: r.Actor.SubjectID, ResourceID: r.RequestID}, body, func(tx *sql.Tx) error { return persistStart(ctx, tx, r, raw, hash) })
+	return s.stageCommand(ctx, pb.MessagingKind_START, r.RequestID, r.RequestID, app.OperationScope{OrganizationID: r.Actor.OrgID, SubjectID: r.Actor.SubjectID, ResourceID: r.RequestID}, body)
 }
 
 func (s *MessagingCommandStore) StageChange(ctx context.Context, requestID string, r app.Change) error {
 	body := changeMessagingBody(r)
-	return s.stageCommand(ctx, pb.MessagingKind_CHANGE, r.CommandID, requestID, app.OperationScope{OrganizationID: r.Actor.OrgID, SubjectID: r.Actor.SubjectID, ResourceID: r.SessionID}, body, func(tx *sql.Tx) error { return validateChange(ctx, tx, requestID, r) })
+	return s.stageCommand(ctx, pb.MessagingKind_CHANGE, r.CommandID, requestID, app.OperationScope{OrganizationID: r.Actor.OrgID, SubjectID: r.Actor.SubjectID, ResourceID: r.SessionID}, body)
 }
 
-func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.MessagingKind, id, aggregate string, scope app.OperationScope, body *pb.MessagingBody, original func(*sql.Tx) error) error {
-	if s == nil || s.Store == nil || s.DB == nil || s.Messaging == nil || s.Seal == nil {
+func (s *MessagingCommandStore) stageCommand(ctx context.Context, kind pb.MessagingKind, id, aggregate string, scope app.OperationScope, body *pb.MessagingBody) error {
+	if s == nil || s.Store == nil || s.DB == nil || s.Messaging == nil || s.Seal == nil || s.Transactions == nil {
 		return app.ErrManagementUnavailable
 	}
-	if s.Transactions != nil {
-		command, err := app.NewTransactionCommand(kind, id, aggregate, scope, body)
-		if err != nil {
-			return err
-		}
-		err = s.Transactions.Submit(ctx, command)
-		if errors.Is(err, transaction.ErrInputConflict) {
-			return errors.Join(app.ErrConflict, err)
-		}
-		return err
-	}
-	envelope, raw, err := app.PrepareMessaging(kind, id, aggregate, "", body)
+	command, err := app.NewTransactionCommand(kind, id, aggregate, scope, body)
 	if err != nil {
 		return err
 	}
-	envelope.OriginalOccurredAt = time.Now().In(time.FixedZone("UTC+8", 8*60*60)).Format(time.RFC3339Nano)
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	err = s.Transactions.Submit(ctx, command)
+	if errors.Is(err, transaction.ErrInputConflict) {
+		return errors.Join(app.ErrConflict, err)
 	}
-	defer func() { _ = tx.Rollback() }()
-	// Acquire the shared gate lock before any business write, then check immutable
-	// identities. A closed gate still permits the original operation to be read
-	// and returned; current authorization has already run in the host application.
-	admission, err := (MessagingAdmission{}).Read(ctx, tx)
-	if err != nil {
-		return err
-	}
-	exists, err := s.Messaging.existingOperation(ctx, tx, envelope, scope)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return tx.Commit()
-	}
-	if admission.Closed {
-		return app.ErrRuntimeAdmissionClosed
-	}
-	if original != nil {
-		if err = original(tx); err != nil {
-			return err
-		}
-	}
-	_, err = s.Messaging.StageOperation(ctx, tx, envelope, raw, scope, func() (*app.PreparedMessaging, error) {
-		return s.Seal(kind, id, aggregate, scope.OrganizationID, envelope.OriginalOccurredAt, body)
-	})
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
 // SubmitParticipantRetry preserves the original request aggregate. The host
 // authenticates the operator before calling; qs-ai decides current eligibility
 // and rechecks participant access in its original admission transaction.
 func (s *MessagingCommandStore) SubmitParticipantRetry(ctx context.Context, scope app.DraftScope, sessionID string, command app.ParticipantRetry) error {
-	if s == nil || s.Store == nil || s.DB == nil {
+	if s == nil || s.Store == nil || s.DB == nil || s.Transactions == nil {
 		return app.ErrManagementUnavailable
 	}
 	if s.Transactions != nil {
@@ -120,21 +75,21 @@ func (s *MessagingCommandStore) SubmitParticipantRetry(ctx context.Context, scop
 	body := &pb.MessagingBody{Value: &pb.MessagingBody_ParticipantRetry{ParticipantRetry: &pb.ParticipantRetryCommand{
 		Scope: &pb.PublicationScope{OrganizationId: scope.OrganizationID, OperatorUserId: scope.OperatorUserID}, SessionId: sessionID, CommandId: command.CommandID, ExpectedRunId: command.ExpectedRunID, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm, ExpectedProviderInvocations: command.ExpectedProviderInvocations, AcceptResultUnknownRisk: command.AcceptResultUnknownRisk,
 	}}}
-	return s.stageCommand(ctx, pb.MessagingKind_PARTICIPANT_RETRY, command.CommandID, requestID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: sessionID}, body, nil)
+	return s.stageCommand(ctx, pb.MessagingKind_PARTICIPANT_RETRY, command.CommandID, requestID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: sessionID}, body)
 }
 
 func (s *MessagingCommandStore) SubmitEvaluationStart(ctx context.Context, scope app.EvaluationScope, commandID string, command app.EvaluationStart) error {
 	body := &pb.MessagingBody{Value: &pb.MessagingBody_EvaluationStart{EvaluationStart: &pb.EvaluationStartCommand{
 		Scope: &pb.EvaluationQuery{OrganizationId: scope.OrganizationID, OperatorUserId: scope.OperatorUserID, RunId: scope.RunID}, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm,
 	}}}
-	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_START, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body, nil)
+	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_START, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body)
 }
 
 func (s *MessagingCommandStore) SubmitEvaluationCancel(ctx context.Context, scope app.EvaluationScope, commandID string, command app.EvaluationCancel) error {
 	body := &pb.MessagingBody{Value: &pb.MessagingBody_EvaluationCancel{EvaluationCancel: &pb.EvaluationCancelCommand{
 		Scope: &pb.EvaluationQuery{OrganizationId: scope.OrganizationID, OperatorUserId: scope.OperatorUserID, RunId: scope.RunID}, ExpectedVersion: command.ExpectedVersion, Reason: command.Reason, Confirm: command.Confirm, Discard: command.Discard,
 	}}}
-	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_CANCEL, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body, nil)
+	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_CANCEL, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body)
 }
 
 // Current operation readers never interpret retained publication rows as modern
