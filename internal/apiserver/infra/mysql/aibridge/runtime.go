@@ -154,11 +154,8 @@ func (s *Store) RuntimeBacklog(ctx context.Context, org int64) (map[string]int64
 	var pending, unbound int64
 	err := s.DB.QueryRowContext(ctx, `SELECT
  (SELECT COUNT(*) FROM ai_messaging_operations o
- JOIN ai_bridge_requests r ON r.request_id=o.aggregate_key AND r.organization_id=o.organization_id
- JOIN ai_messaging_outbox b ON b.producer='qs-server' AND b.destination='qs-ai' AND b.message_id=o.command_id
- WHERE o.retired=FALSE AND o.organization_id=? AND o.kind IN (1,2,3)
- AND b.kind=o.kind AND b.topic='qs.ai.commands.v1' AND b.requires_receipt=TRUE
- AND b.organization_id=o.organization_id AND b.aggregate_key=o.aggregate_key
+ JOIN ai_bridge_requests r ON r.request_id=o.aggregate_key AND r.organization_id=o.organization_id`+runtimeArchiveJoin+`
+ WHERE o.retired=FALSE AND o.organization_id=? AND o.kind IN(1,2,3)
  AND o.decision NOT IN ('accepted','rejected')),
  (SELECT COUNT(*) FROM ai_bridge_requests r WHERE r.organization_id=? AND r.session_id IS NULL)`, org, org).Scan(&pending, &unbound)
 	return map[string]int64{"pending_commands": pending, "requests_without_session": unbound}, err

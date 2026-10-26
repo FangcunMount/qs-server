@@ -88,17 +88,19 @@ func DecodeRuntimeCursor(raw string) (RuntimeCursor, error) {
 }
 
 type RuntimeRequest struct {
-	RequestID       string          `json:"request_id"`
-	SessionID       string          `json:"session_id"`
-	TesteeID        string          `json:"testee_id"`
-	AssessmentIDs   []string        `json:"assessment_ids"`
-	Status          string          `json:"status"`
-	Version         int64           `json:"version"`
-	CreatedAt       *time.Time      `json:"created_at"`
-	UpdatedAt       *time.Time      `json:"updated_at"`
-	CommandsPending int             `json:"commands_pending"`
-	CommandAttempts int             `json:"command_attempts"`
-	AI              json.RawMessage `json:"ai,omitempty"`
+	RequestID       string     `json:"request_id"`
+	SessionID       string     `json:"session_id"`
+	TesteeID        string     `json:"testee_id"`
+	AssessmentIDs   []string   `json:"assessment_ids"`
+	Status          string     `json:"status"`
+	Version         int64      `json:"version"`
+	CreatedAt       *time.Time `json:"created_at"`
+	UpdatedAt       *time.Time `json:"updated_at"`
+	CommandsPending int        `json:"commands_pending"`
+	// CommandAttempts is retained for response compatibility, never a model budget.
+	CommandAttempts          int             `json:"command_attempts"`
+	CommandAttemptsAvailable bool            `json:"command_attempts_available"`
+	AI                       json.RawMessage `json:"ai,omitempty"`
 }
 type RuntimePage struct {
 	Items          []RuntimeRequest `json:"items"`
