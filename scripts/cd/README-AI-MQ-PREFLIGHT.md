@@ -2,6 +2,10 @@
 
 所有 API 正常部署（包括首次安装）必须先完成最终事务绑定离线预检，之后才同步配置或停止旧实例。预检固定原密钥路径、完整配置、运行镜像身份与历史回退资产，不连接数据库、Broker 或模型。
 
+API 原生预检返回冻结材料的 `binding_revision`，随后 [material-guard.sh](material-guard.sh) 用该版本调用固定 root 只读验证器；worker 使用部署包的冻结 revision。两者均在 `sync_configs` 和停止服务之前验证已安装收据、原始审核计划、完整文件摘要、Unix 身份与权限。验证器不复制材料、不切换指针、不再次加锁，也不读取旧 M3 来源文件。缺工具或任何材料冲突均拒绝；Collection 不新增 MQ 材料责任。
+
+客户端只以普通部署用户运行；root 仅执行 `/opt/fangcun-m4/material-tools/<固定摘要>.py` 的 `--verify-installed`，不执行上传的 Python。infra 负责先安装固定工具及原计划，保留旧工具与历史资产；接入源码不会恢复自动 CD。总进度和独立验收见 [M4 总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m4-execution.md)。
+
 ACR 直拉模式先在服务器拉取本次 SHA 镜像，再执行相同离线预检；拉取失败不停止旧实例。镜像选择方式不改变固定工具、归属标记或回退资产保护。
 
 服务器部署账号不能从可写上传目录以 root 运行任意 Python。发布负责人须在生产执行材料中核对 `scripts/cd/ai-messaging-release.py` 的 SHA-256，将原字节安装为 `/opt/qs-server/qs-apiserver/ai-mq-tools/<sha256>.py`，目录及文件由 root 拥有，目录不可被其他用户写入，文件模式为 0555。
