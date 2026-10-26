@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -14,11 +15,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (f *mqFixture) commandStore(calls *int) *MessagingCommandStore {
-	return &MessagingCommandStore{Store: &Store{DB: f.db}, Messaging: f.store, Seal: func(kind pb.MessagingKind, id, aggregate, org, stamp string, body *pb.MessagingBody) (*app.PreparedMessaging, error) {
+func (f *mqFixture) commandStore(calls *int) *retainedCommandFixture {
+	return &retainedCommandFixture{MessagingCommandStore: &MessagingCommandStore{Store: &Store{DB: f.db}, Messaging: f.store, Seal: func(kind pb.MessagingKind, id, aggregate, org, stamp string, body *pb.MessagingBody) (*app.PreparedMessaging, error) {
 		*calls++
 		return app.ProtectMessaging(kind, id, aggregate, "", org, stamp, body, f.qsSign, f.aiCrypt.Public())
-	}}
+	}}}
 }
 
 func TestMQSubmissionSharesOriginalRequestAndAvoidsLegacyDelivery(t *testing.T) {
@@ -183,4 +184,47 @@ func TestMQParticipantOperationCannotCrossAggregateOrActor(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Isolated pre-transaction storage fixture; not built into any application.
+// C04 retires these old contract fixtures; current operation proofs run through
+// MessagingCommandStore's final-only reader in the separate native gate.
+type retainedCommandFixture struct{ *MessagingCommandStore }
+
+func (s *retainedCommandFixture) ReadOperation(ctx context.Context, scope app.OperationScope, id string) (app.MessagingOperation, error) {
+	if s == nil || s.Store == nil || s.DB == nil || s.Messaging == nil {
+		return app.MessagingOperation{}, app.ErrManagementUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return app.MessagingOperation{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	return s.Messaging.Operation(ctx, tx, scope, id)
+}
+
+func (s *retainedCommandFixture) ReadRequestOperation(ctx context.Context, scope app.OperationScope, requestID, id string) (app.MessagingOperation, error) {
+	if s == nil || s.DB == nil || s.Messaging == nil {
+		return app.MessagingOperation{}, app.ErrManagementUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return app.MessagingOperation{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var found string
+	err = tx.QueryRowContext(ctx, `SELECT b.message_id FROM ai_messaging_outbox b JOIN ai_messaging_operations o ON o.command_id=b.message_id AND o.retired=FALSE WHERE b.producer='qs-server' AND b.destination='qs-ai' AND b.message_id=? AND b.aggregate_key=? AND b.kind IN (?,?)`, id, requestID, pb.MessagingKind_START, pb.MessagingKind_CHANGE).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return app.MessagingOperation{}, app.ErrNotFound
+	}
+	if err != nil {
+		return app.MessagingOperation{}, err
+	}
+	return s.Messaging.Operation(ctx, tx, scope, id)
 }

@@ -18,15 +18,9 @@ func (s *MessagingStore) transactionCommandReceipt(ctx context.Context, tx *sql.
 		return true, err
 	}
 	if !found {
-		_, planned, err := s.Archive.commandRequestIn(ctx, tx, organization, id)
-		if err != nil {
-			return true, err
-		}
-		if planned {
-			return true, app.ErrMessagingContract // a Prepared/new identity cannot become legacy settlement
-		}
-		return false, nil
+		return true, app.ErrMessagingContract
 	}
+
 	body, err := app.ParseMessagingBody(a.Envelope, a.Body)
 	if err != nil {
 		return true, err

@@ -335,19 +335,18 @@ checkAbortedVisibility:
 			break checkAbortedVisibility
 		}
 	}
-	// Nonempty historical rows remain owned by the original path. Reading or
-	// submitting their duplicate must not fabricate a new transaction witness.
+	// Retained historical identities are not public current operations and cannot
+	// authorize a modern execution, a new wire or a second business invocation.
 	legacyStore := &MessagingCommandStore{Store: &Store{DB: pool}, Messaging: NewMessagingStore(), Seal: seal}
 	old := r
 	old.RequestID = uuid.NewString()
 	require.NoError(t, legacyStore.StageStart(t.Context(), old))
 	op, err = store.ReadOperation(t.Context(), app.OperationScope{OrganizationID: "7", SubjectID: "9"}, old.RequestID)
-	require.NoError(t, err)
-	require.Equal(t, "staged", op.TransportStatus)
+	require.ErrorIs(t, err, app.ErrNotFound)
 	beforeDuplicate = seals.Load()
-	require.NoError(t, store.StageStart(t.Context(), old))
+	require.ErrorIs(t, store.StageStart(t.Context(), old), app.ErrConflict)
 	require.Equal(t, beforeDuplicate, seals.Load())
-	cases := map[string]bool{"constructor_no_ddl": true, "missing_order_schema_refused": true, "half_invisible_before_root_commit": true, "original_business_archive_witness_atomic": true, "first_wire_authenticated_and_reused": true, "stable_input_conflict_before_reseal": true, "operation_and_payload_scoped": true, "fresh_adapter_exact_witness": true, "predecessor_pending_before_half": true, "held_predecessor_before_half": true, "workflow_and_evaluation_original_entrypoints": true, "no_new_command_outbox": true, "real_server_rejection_root_rollback": true, "aborted_duplicate_never_reexecutes": true, "nonempty_legacy_operation_compatible": true}
+	cases := map[string]bool{"constructor_no_ddl": true, "missing_order_schema_refused": true, "half_invisible_before_root_commit": true, "original_business_archive_witness_atomic": true, "first_wire_authenticated_and_reused": true, "stable_input_conflict_before_reseal": true, "operation_and_payload_scoped": true, "fresh_adapter_exact_witness": true, "predecessor_pending_before_half": true, "held_predecessor_before_half": true, "workflow_and_evaluation_original_entrypoints": true, "no_new_command_outbox": true, "real_server_rejection_root_rollback": true, "aborted_duplicate_never_reexecutes": true, "nonempty_legacy_operation_rejected": true}
 	raw, err := json.Marshal(map[string]any{"passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "root": "original_mysql_sql", "system_login_not_claimed": true, "paired_ai_receiver_not_claimed": true, "process_exit_not_claimed": true, "database_commit_network_fault_not_claimed": true})
 	require.NoError(t, err)
 	t.Log("M3_QS_AI_COMMAND_RECEIPT " + string(raw))

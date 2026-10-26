@@ -89,8 +89,8 @@ func (s *TransactionCommands) Submit(ctx context.Context, c app.TransactionComma
 	if !errors.Is(err, transaction.ErrNotFound) {
 		return err
 	}
-	// Do not reinterpret an old operation as a new transaction. The old path
-	// retains its exact payload and its outstanding receipt/Relay responsibility.
+	// An old operation ID cannot authorize new execution or become modern success.
+	// Retained collision evidence prevents an accidental model/business replay.
 	exists, err := s.legacyOperation(ctx, c)
 	if err != nil || exists {
 		return err
@@ -186,7 +186,7 @@ func (s *TransactionCommands) legacyOperation(ctx context.Context, c app.Transac
 		if archives != 0 {
 			return false, app.ErrMessagingContract // damaged new request is never legacy success
 		}
-		return true, nil
+		return true, app.ErrConflict
 	}
 	gate, err := (MessagingAdmission{}).Inspect(ctx, tx)
 	if err != nil {

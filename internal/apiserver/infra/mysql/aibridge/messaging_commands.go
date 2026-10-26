@@ -137,52 +137,28 @@ func (s *MessagingCommandStore) SubmitEvaluationCancel(ctx context.Context, scop
 	return s.stageCommand(ctx, pb.MessagingKind_EVALUATION_CANCEL, commandID, scope.RunID, app.OperationScope{OrganizationID: strconv.FormatInt(scope.OrganizationID, 10), SubjectID: strconv.FormatInt(scope.OperatorUserID, 10), ResourceID: scope.RunID}, body, nil)
 }
 
+// Current operation readers never interpret retained publication rows as modern
+// business evidence. The original host must supply its transaction adapter.
 func (s *MessagingCommandStore) ReadOperation(ctx context.Context, scope app.OperationScope, id string) (app.MessagingOperation, error) {
-	if s == nil || s.Store == nil || s.DB == nil || s.Messaging == nil {
-		return app.MessagingOperation{}, app.ErrManagementUnavailable
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if s.Transactions != nil {
-		operation, found, err := s.Transactions.operation(ctx, scope, "", id)
-		if err != nil || found {
-			return operation, err
-		}
-	}
-	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return app.MessagingOperation{}, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	return s.Messaging.Operation(ctx, tx, scope, id)
+	return s.readCurrentOperation(ctx, scope, "", id)
 }
-
 func (s *MessagingCommandStore) ReadRequestOperation(ctx context.Context, scope app.OperationScope, requestID, id string) (app.MessagingOperation, error) {
-	if s == nil || s.DB == nil || s.Messaging == nil {
+	return s.readCurrentOperation(ctx, scope, requestID, id)
+}
+func (s *MessagingCommandStore) readCurrentOperation(ctx context.Context, scope app.OperationScope, requestID, id string) (app.MessagingOperation, error) {
+	if s == nil || s.Transactions == nil {
 		return app.MessagingOperation{}, app.ErrManagementUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if s.Transactions != nil {
-		operation, found, err := s.Transactions.operation(ctx, scope, requestID, id)
-		if err != nil || found {
-			return operation, err
-		}
-	}
-	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	operation, found, err := s.Transactions.operation(ctx, scope, requestID, id)
 	if err != nil {
 		return app.MessagingOperation{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
-	var found string
-	err = tx.QueryRowContext(ctx, `SELECT b.message_id FROM ai_messaging_outbox b JOIN ai_messaging_operations o ON o.command_id=b.message_id AND o.retired=FALSE WHERE b.producer='qs-server' AND b.destination='qs-ai' AND b.message_id=? AND b.aggregate_key=? AND b.kind IN (?,?)`, id, requestID, pb.MessagingKind_START, pb.MessagingKind_CHANGE).Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
+	if !found {
 		return app.MessagingOperation{}, app.ErrNotFound
 	}
-	if err != nil {
-		return app.MessagingOperation{}, err
-	}
-	return s.Messaging.Operation(ctx, tx, scope, id)
+	return operation, nil
 }
 
 func startMessagingBody(r app.Start) *pb.MessagingBody {

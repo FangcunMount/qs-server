@@ -116,7 +116,7 @@ func TestMQPayloadMTLSTrustAndExactStoredReference(t *testing.T) {
 		return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: k}
 	}
 	server := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{leaf("qs-apiserver.svc", 2, true)}, ClientCAs: pool, ClientAuth: tls.RequireAndVerifyClientCert})))
-	(&MessagePayloads{Reader: &store.MessagingReader{DB: db, Store: messages}}).RegisterService(server)
+	(&MessagePayloads{Reader: &retainedPayloadFixtureReader{DB: db, Store: messages}}).RegisterService(server)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -159,4 +159,23 @@ func TestMQPayloadMTLSTrustAndExactStoredReference(t *testing.T) {
 	if err = db.Ping(); err != nil {
 		t.Fatal("borrowed host pool closed")
 	}
+}
+
+// Pre-transaction storage fixture, never part of the application. Current mTLS
+// and original-witness protection are exercised by the paired current gate.
+type retainedPayloadFixtureReader struct {
+	DB    *sql.DB
+	Store *store.MessagingStore
+}
+
+func (r *retainedPayloadFixtureReader) ReadMessagePayload(ctx context.Context, ref *pb.MessagePayloadReference, workload string) ([]byte, error) {
+	tx, err := r.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	return r.Store.Payload(ctx, tx, ref, workload)
+}
+func (r *retainedPayloadFixtureReader) ObserveMessagePayloadFailure(ctx context.Context, kind string) error {
+	return store.RecordPayloadObservation(ctx, r.DB, kind)
 }
