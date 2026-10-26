@@ -240,11 +240,12 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 		}
 		return r.Execution
 	}
+	observed, phase := paused, "paused_delivery"
 	t.Cleanup(func() {
 		if !t.Failed() {
 			return
 		}
-		stats := paused.container.DispatchBudgetSnapshot()
+		stats := observed.container.DispatchBudgetSnapshot()
 		counters := map[string]float64{}
 		families, gatherErr := prometheus.DefaultGatherer.Gather()
 		if gatherErr == nil {
@@ -280,9 +281,9 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 				sites[key]++
 			}
 		}
-		raw, _ := json.Marshal(map[string]any{"sdk_stack_sites": sites, "sdk_stack_truncated": stackSize == len(stackBytes), "phase": "paused_delivery", "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters, "transport_errors": func() map[string]int {
+		raw, _ := json.Marshal(map[string]any{"sdk_stack_sites": sites, "sdk_stack_truncated": stackSize == len(stackBytes), "phase": phase, "active": stats.Active, "waiting": stats.Waiting, "holds": holds, "evidence": evidence, "query_failed": holdErr != nil || evidenceErr != nil, "consume_outcomes": counters, "transport_errors": func() map[string]int {
 			result := map[string]int{}
-			sub, ok := paused.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
+			sub, ok := observed.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
 			if !ok {
 				return result
 			}
@@ -346,6 +347,14 @@ func TestM3WorkerRocketMQRuntime(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, active.runtime.messaging.publisher)
 	require.Nil(t, active.runtime.messaging.holdReplayer)
+	observed, phase = active, "active_delivery"
+	// A resumed deferred callback can enter gRPC before the replacement
+	// consumer completes its first receives. Await the same real transport
+	// readiness used for the paused instance before publishing the second seed.
+	// Keep all routes, the shared limit of one and the 60-second assertion.
+	activeSubscriber, ok := active.runtime.messaging.subscriber.(*eventtransport.SDKDeliverySubscriber)
+	require.True(t, ok)
+	require.Eventually(t, func() bool { return activeSubscriber.RocketMQReady(time.Minute) }, 45*time.Second, 50*time.Millisecond)
 	select {
 	case id := <-rpc.entered:
 		require.EqualValues(t, 1, id)
