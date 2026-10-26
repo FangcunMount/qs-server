@@ -6,11 +6,11 @@
 
 先预查幂等、冻结首次消息 ID/时间/wire/路由，准备全部半消息，再由宿主开启原根事务。执行 guard、业务、业务证据、全部 witness 共同提交。MySQL 借用原 SQL/GORM 根事务，Mongo 借用活跃原 session；callback 重入只重复确定性的数据库操作。
 
-半消息失败/未知不启动业务。`LocalCommitted + FinalUnknown` 保留成功的本地事实，由精确 Checker 恢复 Broker 确认；不能重执行业务、重新签名加密或调用模型。取消、超时和 lease 到期本身不证明回滚。
+半消息失败/未知不启动业务。`LocalCommitted + FinalUnknown` 保留成功的本地事实，由精确 Checker 恢复 Broker 确认；不能重执行业务、重新签名加密或调用模型。取消、超时和 lease 到期本身不证明回滚。没有业务根事务时必须拒绝发送；当前源码不提供旧 Outbox 的配置回退。
 
 ## 业务效果与未来调度
 
-消费者继续承担幂等和业务状态裁决。Run/Outcome、Generation/Report、Task 收件账本、Inbox、receipt、首次业务 ACK 与不可变正文档案保持各自职责，不因旧命名或表中有 outbox 就删除。
+消费者必须幂等，继续承担业务状态裁决。Run/Outcome、Generation/Report、Task 收件账本、Inbox、receipt、首次业务 ACK 与不可变正文档案保持各自职责，不因旧命名或表中有 outbox 就删除。
 
 未来 retry decision 保留原授权、due、attempt 和冻结事件，由 `retrydispatch` 到期准备半消息并在原事务 CAS 提交 dispatch 及 witness。协议维护不授予业务重试许可，不提前到期，不增加模型调用。
 

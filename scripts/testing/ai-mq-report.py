@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 required = {
+    "TestMessagingWritesRequireTransactionOwnerBeforeStorage",
     "TestMQRetirementSchemaEnforcedAndIndexesRequired",
     "TestMQMaintenanceCommandsRejectBeforeDatabaseSelection",
     "TestMQMaintenanceRedactsDatabaseBindingErrors",
