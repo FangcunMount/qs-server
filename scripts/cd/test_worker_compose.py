@@ -59,7 +59,7 @@ class WorkerCompose(unittest.TestCase):
             for mount in mounts:
                 self.assertTrue(mount["read_only"])
                 self.assertFalse(mount["bind"].get("create_host_path", False))
-                self.assertEqual(mount["source"], "/data/infra/qs-worker-messaging/versions/m4-worker-fixture/rocketmq/" + mount["target"].rsplit("/", 1)[1])
+                self.assertEqual(mount["source"], "/var/lib/fangcun-m4-materials/qs-worker-messaging/versions/m4-worker-fixture/rocketmq/" + mount["target"].rsplit("/", 1)[1])
             self.assertEqual(int(services["qs-apiserver"]["mem_limit"]), 1024 * 1024 * 1024)
             self.assertEqual(float(services["qs-apiserver"]["cpus"]), 2)
             self.assertEqual(int(services["server"]["mem_limit"]), 320 * 1024 * 1024)

@@ -14,7 +14,7 @@ import re
 import subprocess
 import tempfile
 
-BINDING_ROOT = Path('/data/infra/qs-server-messaging')
+BINDING_ROOT = Path('/var/lib/fangcun-m4-materials/qs-server-messaging')
 RELEASE_ROOT = Path('/opt/qs-server/qs-apiserver/ai-mq-releases')
 SHA = re.compile(r'[0-9a-f]{40}')
 REVISION = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')

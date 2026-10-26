@@ -125,19 +125,19 @@ services:
       - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:
       - type: bind
-        source: /data/infra/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/credentials.json
+        source: /var/lib/fangcun-m4-materials/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/credentials.json
         target: /etc/qs-worker/rocketmq/credentials.json
         read_only: true
         bind:
           create_host_path: false
       - type: bind
-        source: /data/infra/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/ca.crt
+        source: /var/lib/fangcun-m4-materials/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/ca.crt
         target: /etc/qs-worker/rocketmq/ca.crt
         read_only: true
         bind:
           create_host_path: false
       - type: bind
-        source: /data/infra/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/routes.json
+        source: /var/lib/fangcun-m4-materials/qs-worker-messaging/versions/${ROCKETMQ_WORKER_BINDING_REVISION:-unconfigured}/rocketmq/routes.json
         target: /etc/qs-worker/rocketmq/routes.json
         read_only: true
         bind:

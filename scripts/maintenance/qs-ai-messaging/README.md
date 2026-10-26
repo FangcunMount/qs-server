@@ -28,3 +28,6 @@ budgets, timezone, transactions, schema and existing approval boundaries are pre
 This connection change does not authorize a migration or business write. Local and
 disposable test databases retain explicit `DISABLED`. Production cutover and business
 acceptance require separate runtime evidence.
+
+M4 D03：新部署材料使用root管理的 `/var/lib/fangcun-m4-materials`，容器内文件路径和原密钥保持。
+原目录、冻结镜像/发布资产及共享锁保留；生产CD继续暂停，八实例重建与最终发布单独验收。
