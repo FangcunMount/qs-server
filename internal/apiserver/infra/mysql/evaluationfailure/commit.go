@@ -46,7 +46,7 @@ func New(db *gorm.DB, owner *boundary.Committer, resolver catalog.TopicResolver,
 	if owner == nil || !owner.UsesPrimary(db) || resolver == nil || writer == nil || runWriter == nil {
 		return nil, transaction.ErrBinding
 	}
-	schedules, err := schedulestore.New(db, owner.Binding())
+	schedules, err := schedulestore.NewWithPlanReader(db, owner.Binding(), owner.Artifact)
 	if err != nil {
 		return nil, err
 	}

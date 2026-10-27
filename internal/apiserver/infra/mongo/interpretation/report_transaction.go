@@ -59,7 +59,7 @@ func NewTransactionCommitter(db *mongo.Database, owner *guarded.Owner, runner gu
 		}
 	}
 	primary := db.Client().Database(db.Name(), options.Database().SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority()))
-	schedules, err := schedulestore.New(db, owner.Binding(), opts...)
+	schedules, err := schedulestore.NewWithPlanReader(db, owner.Binding(), boundary.Artifact, opts...)
 	if err != nil {
 		return nil, err
 	}
