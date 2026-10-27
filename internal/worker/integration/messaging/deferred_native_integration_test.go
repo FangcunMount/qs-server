@@ -148,7 +148,10 @@ func TestReadableDeferredHistoryNative(t *testing.T) {
 	require.Zero(t, attempts)
 	store := newStore(legacyRoutes)
 	require.NoError(t, store.Validate(t.Context()))
-	require.NoError(t, store.HoldDelivery(t.Context(), f.message, eventcatalog.EvaluationRetryRequested, eventruntime.ErrAutomaticRetryPaused))
+	require.ErrorIs(t, store.HoldDelivery(t.Context(), f.message, eventcatalog.EvaluationRetryRequested, eventruntime.ErrAutomaticRetryPaused), ErrHistoricalDelivery)
+	var holds int
+	require.NoError(t, f.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM retry_event_hold").Scan(&holds))
+	require.Equal(t, 1, holds)
 	item, err = store.claim(t.Context(), time.Now().UTC(), time.Minute)
 	require.NoError(t, err)
 	require.NotNil(t, item)
@@ -169,7 +172,7 @@ func TestReadableDeferredHistoryNative(t *testing.T) {
 	require.NoError(t, f.pool.QueryRowContext(t.Context(), "SELECT replayed_at FROM retry_event_hold").Scan(&replayed))
 	require.False(t, replayed.Valid, "database consumption must not claim MQ publication")
 	f.cleanup()
-	t.Log(`READABLE_DEFERRED_HISTORY_RECEIPT {"passed":4,"failed":0,"skipped":0,"cases":{"active_subscriptions_exclude_history":true,"missing_history_does_not_spend_attempt":true,"original_wire_and_transport_identity_retained":true,"completed_history_not_republished":true},"broker_not_claimed":true,"owned_database_dropped":true}`)
+	t.Log(`READABLE_DEFERRED_HISTORY_RECEIPT {"passed":5,"failed":0,"skipped":0,"cases":{"active_subscriptions_exclude_history":true,"missing_history_does_not_spend_attempt":true,"historical_input_cannot_create_hold":true,"original_wire_and_transport_identity_retained":true,"completed_history_not_republished":true},"broker_not_claimed":true,"owned_database_dropped":true}`)
 }
 
 func TestRocketMQDeferredNative(t *testing.T) {

@@ -18,6 +18,7 @@ import (
 )
 
 var ErrDeferredClaimLost = errors.New("deferred consumer claim no longer owned")
+var ErrHistoricalDelivery = errors.New("historical delivery routes only authorize existing deferred recovery")
 
 const deferredDBBudget = 2 * time.Second
 
@@ -28,6 +29,7 @@ type DeferredDeliveryStore struct {
 	original *mysqlRetryEventHoldStore
 	channel  string
 	routes   map[string]rmtransport.RouteBinding
+	active   map[string]bool
 	policy   retrygovernance.Policy
 }
 
@@ -44,7 +46,7 @@ func NewRocketMQDeferredStoreWithHistory(original *mysqlRetryEventHoldStore, cha
 	if _, err := rmtransport.NewRouteResolver(routes, history); err != nil {
 		return nil, err
 	}
-	s := &DeferredDeliveryStore{original: original, channel: channel, routes: map[string]rmtransport.RouteBinding{}, policy: original.policy}
+	s := &DeferredDeliveryStore{original: original, channel: channel, routes: map[string]rmtransport.RouteBinding{}, active: map[string]bool{}, policy: original.policy}
 	if s.policy.MaxAutomaticAttempts == 0 {
 		s.policy = retrygovernance.DefaultOutboxPolicy
 	}
@@ -67,6 +69,7 @@ func NewRocketMQDeferredStoreWithHistory(original *mysqlRetryEventHoldStore, cha
 		s.routes[r.PhysicalTopic] = r
 		if index < len(routes) {
 			owners[r.Owner] = true
+			s.active[r.PhysicalTopic] = true
 		}
 	}
 	if !owners["qs.mysql"] || !owners["qs.mongo"] {
@@ -125,6 +128,9 @@ func (s *DeferredDeliveryStore) eventType(m rmtransport.Received) (string, error
 }
 
 func (s *DeferredDeliveryStore) HoldDelivery(ctx context.Context, m rmtransport.Received, eventType string, cause error) error {
+	if !s.active[m.PhysicalTopic] {
+		return ErrHistoricalDelivery
+	}
 	if !errors.Is(cause, eventruntime.ErrAutomaticRetryPaused) {
 		return errors.New("deferred hold requires an explicit consumer pause")
 	}

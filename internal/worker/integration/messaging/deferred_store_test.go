@@ -214,6 +214,8 @@ func TestReadableDeferredStoreKeepsOldDeliveryIdentityWithoutOldSubscription(t *
 	require.NoError(t, err)
 	_, err = store.eventType(message)
 	require.NoError(t, err, "old deferred delivery must keep its exact original identity")
+	require.ErrorIs(t, store.HoldDelivery(context.Background(), message, eventcatalog.EvaluationRetryRequested, eventruntime.ErrAutomaticRetryPaused), ErrHistoricalDelivery, "historical read permission created a new hold")
+	require.NoError(t, mock.ExpectationsWereMet(), "historical hold attempted database IO")
 	resolver, err := rmtransport.NewRouteResolver(active, history)
 	require.NoError(t, err)
 	subscribed, err := resolver.SubscriptionRoutes("qs.evaluation.lifecycle", "qs-worker")
