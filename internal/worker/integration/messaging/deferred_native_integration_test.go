@@ -110,6 +110,68 @@ func nativeDeferredHold(t *testing.T, f *nativeDeferredFixture) {
 	require.NoError(t, f.store.HoldDelivery(t.Context(), f.message, eventcatalog.EvaluationRetryRequested, eventruntime.ErrAutomaticRetryPaused))
 }
 
+// This test uses the real original delivery row. It never publishes a new MQ
+// message or treats a renamed Topic as permission to repeat business work.
+func TestReadableDeferredHistoryNative(t *testing.T) {
+	f := nativeDeferredFixtureFor(t, true)
+	nativeDeferredHold(t, f)
+	legacyRoutes := deferredRoutes(t)
+	active := append([]rmtransport.RouteBinding(nil), legacyRoutes...)
+	for i := range active {
+		var err error
+		active[i].PhysicalTopic, err = rmtransport.PhysicalTopicV3(active[i].Topic, active[i].MessageType, active[i].Owner, active[i].RouteRevision)
+		require.NoError(t, err)
+		active[i].ConsumerGroup, err = rmtransport.ConsumerGroupV3(active[i].Topic, active[i].Subscription)
+		require.NoError(t, err)
+		active[i].NamingScheme = rmtransport.ReadableNamingV1
+	}
+	resolver, err := rmtransport.NewRouteResolver(active, legacyRoutes)
+	require.NoError(t, err)
+	inputs, err := resolver.SubscriptionRoutes("qs.evaluation.lifecycle", "qs-worker")
+	require.NoError(t, err)
+	require.Len(t, inputs, 2)
+	for _, row := range inputs {
+		require.Equal(t, rmtransport.ReadableNamingV1, row.NamingScheme)
+	}
+	newStore := func(history []rmtransport.RouteBinding) *DeferredDeliveryStore {
+		store, err := NewRocketMQDeferredStoreWithHistory(f.store.original, "qs-worker", 8, active, history)
+		require.NoError(t, err)
+		return store
+	}
+	// A missing history registration cannot rewrite the old transport identity
+	// or consume one of its durable attempts when the real transaction aborts.
+	item, err := newStore(nil).claim(t.Context(), time.Now().UTC(), time.Minute)
+	require.Error(t, err)
+	require.Nil(t, item)
+	var attempts int
+	require.NoError(t, f.pool.QueryRowContext(t.Context(), "SELECT replay_attempt_count FROM retry_event_hold").Scan(&attempts))
+	require.Zero(t, attempts)
+	store := newStore(legacyRoutes)
+	require.NoError(t, store.Validate(t.Context()))
+	require.NoError(t, store.HoldDelivery(t.Context(), f.message, eventcatalog.EvaluationRetryRequested, eventruntime.ErrAutomaticRetryPaused))
+	item, err = store.claim(t.Context(), time.Now().UTC(), time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	require.Equal(t, f.message.TransportID, item.Message.TransportID)
+	require.Equal(t, f.message.PhysicalTopic, item.Message.PhysicalTopic)
+	require.Equal(t, f.message.ID, item.Message.ID)
+	require.Equal(t, f.message.Wire, item.Message.Wire)
+	require.Equal(t, f.message.Timestamp, item.Message.Timestamp)
+	require.Equal(t, 1, item.ResumeCount)
+	require.NoError(t, store.complete(t.Context(), item, time.Now().UTC()))
+	remaining, err := store.claim(t.Context(), time.Now().UTC(), time.Minute)
+	require.NoError(t, err)
+	require.Nil(t, remaining)
+	var rows int
+	var replayed sql.NullTime
+	require.NoError(t, f.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM event_delivery_transport_evidence").Scan(&rows))
+	require.Equal(t, 1, rows, "history was repackaged as a new physical delivery")
+	require.NoError(t, f.pool.QueryRowContext(t.Context(), "SELECT replayed_at FROM retry_event_hold").Scan(&replayed))
+	require.False(t, replayed.Valid, "database consumption must not claim MQ publication")
+	f.cleanup()
+	t.Log(`READABLE_DEFERRED_HISTORY_RECEIPT {"passed":4,"failed":0,"skipped":0,"cases":{"active_subscriptions_exclude_history":true,"missing_history_does_not_spend_attempt":true,"original_wire_and_transport_identity_retained":true,"completed_history_not_republished":true},"broker_not_claimed":true,"owned_database_dropped":true}`)
+}
+
 func TestRocketMQDeferredNative(t *testing.T) {
 	cases := map[string]bool{}
 	check := func(name string, run func(*testing.T)) {
