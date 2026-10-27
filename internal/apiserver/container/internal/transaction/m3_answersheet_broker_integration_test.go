@@ -228,6 +228,9 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	go func() { _, _, err := durable.CreateDurably(ctx, sheet, metaInfo); finished <- err }()
 	select {
 	case <-entered:
+	case err := <-finished:
+		require.NoError(t, err, "submission returned before original root")
+		t.Fatal("submission completed without original root")
 	case <-time.After(30 * time.Second):
 		t.Fatal("half preparation did not reach host")
 	}
