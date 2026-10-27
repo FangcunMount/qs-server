@@ -16,6 +16,7 @@ import (
 	"time"
 
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
@@ -142,4 +143,43 @@ func TestOriginalReferenceBindsExactBranchMetadataFenceAndWire(t *testing.T) {
 			require.Error(t, matchReference(e, bad))
 		})
 	}
+}
+
+func TestHistoricalOwnerRetryRefusesBeforeMongoReadOrNewFence(t *testing.T) {
+	_, config, db, previous, _ := ownerFixture(t)
+	raw, err := os.ReadFile(config.RocketMQ.RoutesFile)
+	require.NoError(t, err)
+	var manifest struct {
+		Routes []map[string]string `json:"routes"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &manifest))
+	var active []map[string]string
+	var topics []string
+	for _, row := range manifest.Routes {
+		current := make(map[string]string, len(row)+1)
+		for key, value := range row {
+			current[key] = value
+		}
+		current["naming_scheme"] = transport.ReadableNamingV1
+		current["physical_topic"], err = transport.PhysicalTopicV3(row["topic"], "TRANSACTION", ownerName, routeRevision)
+		require.NoError(t, err)
+		active = append(active, current)
+		topics = append(topics, row["topic"])
+	}
+	raw, err = json.Marshal(map[string]any{"version": 3, "routes": active, "historical_routes": manifest.Routes})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(config.RocketMQ.RoutesFile, raw, 0600))
+	owner, err := New(db, config, topics)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, owner.Runtime().Close(ctx))
+	})
+	require.NoError(t, owner.validatePlan(previous.Plan), "history remains readable")
+	_, err = owner.RetryAborted(t.Context(), previous, transaction.ReserveOptions{Lease: time.Minute})
+	require.ErrorIs(t, err, shared.ErrHistoricalExecution)
+	// The Mongo client remains disconnected and the runtime inert. A DB lookup,
+	// new fence or implicit fallback would fail or return a different error.
+	require.False(t, owner.Runtime().Stats().Ready)
 }

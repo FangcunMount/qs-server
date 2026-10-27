@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	owner "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
@@ -126,6 +127,10 @@ func (s *TransactionEvents) reserveEvent(ctx context.Context, incoming app.Froze
 		state := s.confirmEvent(ctx, incoming, previous.Execution)
 		if state != transaction.LocalAborted {
 			return previous, nil
+		}
+		// Historical evidence authorizes reads, never a new automatic fence or ACK.
+		if err := shared.RequireActiveRoutes(previous.Execution.Plan, s.archive.routes); err != nil {
+			return transaction.Reservation{}, err
 		}
 		if !s.ready() {
 			return transaction.Reservation{}, messagingruntime.ErrTransactionAdmissionClosed
