@@ -287,7 +287,7 @@ func TestM3FailureBrokerHost(t *testing.T) {
 
 	// The observer ACKs only; it never starts the next business attempt.
 	// Wait for the real deadline instead of advancing a fixture clock.
-	schedules, err := schedulestore.New(db, binding)
+	schedules, err := schedulestore.NewWithPlanReader(db, binding, owner.Artifact)
 	require.NoError(t, err)
 	dispatcher, err := dispatchapp.New(schedules, owner, checkpoint.NewRepository(db))
 	require.NoError(t, err)
