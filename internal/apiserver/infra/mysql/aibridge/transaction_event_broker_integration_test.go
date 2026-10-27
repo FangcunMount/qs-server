@@ -186,7 +186,7 @@ func TestM3AIEventBrokerHost(t *testing.T) {
 		require.NoError(t, err)
 		winner, err := events.archive.store.Lookup(t.Context(), incoming.Request())
 		require.NoError(t, err)
-		ack, err := incoming.ReadACK(winner.Execution.Plan)
+		ack, err := incoming.ReadACK(winner.Execution.Plan, events.archive.routes)
 		require.NoError(t, err)
 		return incoming, winner, ack
 	}

@@ -16,7 +16,7 @@ import (
 
 func expectReadCommandArchive(t *testing.T, mock sqlmock.Sqlmock, e transaction.Execution, state transaction.State) app.FrozenMessagingArchive {
 	t.Helper()
-	c, a, err := app.ReadTransactionCommand(e.Plan)
+	c, a, err := app.ReadTransactionCommand(e.Plan, archiveTestRoutes(t))
 	require.NoError(t, err)
 	ek := transaction.ExecutionKey("qs.mysql", c.ID(), e.WriterEpoch, e.Fence)
 	bk := transaction.BranchKey(c.ID())
@@ -101,7 +101,7 @@ func TestTransactionPayloadRequiresExactCommittedWitnessTenantRecipientAndHash(t
 	for _, name := range []string{"committed", "prepared", "wrong-org", "wrong-hash", "wrong-length", "wrong-workload"} {
 		t.Run(name, func(t *testing.T) {
 			a, mock, e := commandArchiveFixture(t)
-			_, archive, err := app.ReadTransactionCommand(e.Plan)
+			_, archive, err := app.ReadTransactionCommand(e.Plan, archiveTestRoutes(t))
 			require.NoError(t, err)
 			ref := &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: orderCommand, OrganizationId: "7", BodySha256: archive.Envelope.BodySha256, BodyLength: uint64(len(archive.Body))}
 			workload := "qs-ai"
@@ -153,7 +153,7 @@ func TestTransactionPayloadAbsenceAndStorageFailureNeverConsultLegacy(t *testing
 	for _, failure := range []error{sql.ErrNoRows, sql.ErrConnDone} {
 		t.Run(failure.Error(), func(t *testing.T) {
 			a, mock, e := commandArchiveFixture(t)
-			_, archive, err := app.ReadTransactionCommand(e.Plan)
+			_, archive, err := app.ReadTransactionCommand(e.Plan, archiveTestRoutes(t))
 			require.NoError(t, err)
 			mock.ExpectQuery("SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive").WillReturnError(failure)
 			reader := &MessagingReader{DB: a.db, Archive: a}
@@ -173,7 +173,7 @@ func TestTransactionPayloadAbsenceAndStorageFailureNeverConsultLegacy(t *testing
 func TestCurrentPayloadAbsenceNeverOpensLegacyRead(t *testing.T) {
 	a, mock, e := commandArchiveFixture(t)
 	mock.ExpectQuery("SELECT organization_id,frozen_payload,first_wire,execution_key,branch_key,reference FROM ai_messaging_archive").WillReturnError(sql.ErrNoRows)
-	_, archive, err := app.ReadTransactionCommand(e.Plan)
+	_, archive, err := app.ReadTransactionCommand(e.Plan, archiveTestRoutes(t))
 	require.NoError(t, err)
 	reader := &MessagingReader{DB: a.db, Archive: a}
 	body, err := reader.ReadMessagePayload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: orderCommand, OrganizationId: "7", BodySha256: archive.Envelope.BodySha256, BodyLength: uint64(len(archive.Body))}, "qs-ai")

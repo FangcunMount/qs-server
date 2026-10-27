@@ -101,7 +101,7 @@ func (d *Dispatcher) dispatch(ctx context.Context, r model.Record, at time.Time)
 func (d *Dispatcher) executeReservation(ctx context.Context, r model.Record, reservation transaction.Reservation) Outcome {
 	out := Outcome{ScheduleID: r.Plan.ID(), State: r.State}
 	execution := reservation.Execution
-	proof, err := model.DispatchProof(r, execution)
+	proof, err := model.DispatchProof(r, execution, d.owner.Artifact)
 	if err != nil {
 		out.Err = err
 		return out
@@ -180,7 +180,7 @@ func (d *Dispatcher) RetryAborted(ctx context.Context, r model.Record, previous 
 		out.Err = eventruntime.ErrAutomaticRetryPaused
 		return out
 	}
-	if _, err := model.ReadDispatch(r, previous.Plan); err != nil {
+	if _, err := model.ReadDispatch(r, previous.Plan, d.owner.Artifact); err != nil {
 		out.Err = err
 		return out
 	}

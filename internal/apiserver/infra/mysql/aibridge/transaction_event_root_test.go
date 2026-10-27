@@ -50,9 +50,9 @@ func eventExecutionFixture(t *testing.T, held bool) (app.FrozenIncomingEvent, tr
 	ackHeader, ackBody, err := app.PrepareMessaging(pb.MessagingKind_EVENT_ACKNOWLEDGEMENT, ackID, run, "", &pb.MessagingBody{Value: &pb.MessagingBody_EventAcknowledgement{EventAcknowledgement: &pb.MessagingEventAcknowledgement{EventId: id, EventBodySha256: header.BodySha256, EventKind: header.Kind, Outcome: outcome}}})
 	require.NoError(t, err)
 	ackHeader.OriginalOccurredAt = "2026-10-21T05:00:01+08:00"
-	p, err := incoming.FreezeACK(&app.PreparedMessaging{Envelope: ackHeader, Body: ackBody, Wire: wrap(ackID), Topic: app.AcksTopic}, uuid.NewString())
+	p, err := incoming.FreezeACK(&app.PreparedMessaging{Envelope: ackHeader, Body: ackBody, Wire: wrap(ackID), Topic: app.AcksTopic}, uuid.NewString(), archiveTestRoutes(t))
 	require.NoError(t, err)
-	a, err := incoming.ReadACK(p)
+	a, err := incoming.ReadACK(p, archiveTestRoutes(t))
 	require.NoError(t, err)
 	return incoming, transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "test-epoch", Token: [32]byte{1}, LeaseUntil: time.Now().Add(time.Minute)}, a
 }

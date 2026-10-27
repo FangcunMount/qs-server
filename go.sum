@@ -50,6 +50,8 @@ github.com/FangcunMount/reliable-messaging v0.5.0-rocketmq-tx.4 h1:PflI1oWRjU4RF
 github.com/FangcunMount/reliable-messaging v0.5.0-rocketmq-tx.4/go.mod h1:GPiWG8ZsX4pvIZ6QyvLnBVO5iCqNhvsnKwFcg0ftC7I=
 github.com/FangcunMount/reliable-messaging v0.5.0 h1:JUayISCwmVwrLbHfLvgiOo3jr3Dxs7JfWeF3/Br45O0=
 github.com/FangcunMount/reliable-messaging v0.5.0/go.mod h1:GPiWG8ZsX4pvIZ6QyvLnBVO5iCqNhvsnKwFcg0ftC7I=
+github.com/FangcunMount/reliable-messaging v0.6.0-rc.1 h1:kGWE8og29Er3UYYaNzPgaXj/T/2ltmQJrb+/iI4+nGo=
+github.com/FangcunMount/reliable-messaging v0.6.0-rc.1/go.mod h1:GPiWG8ZsX4pvIZ6QyvLnBVO5iCqNhvsnKwFcg0ftC7I=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

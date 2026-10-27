@@ -12,6 +12,7 @@ import (
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -25,9 +26,10 @@ const readBudget = 2 * time.Second
 const columns = "key_identity,input_hash,plan_hash,owner,scope,kind,subject_id,run_id,message_id,due_index_at,frozen_plan,state,revision,dispatch_evidence"
 
 type Store struct {
-	primary *sql.DB
-	binding transaction.Binding
-	limiter backpressure.Acquirer
+	primary    *sql.DB
+	binding    transaction.Binding
+	limiter    backpressure.Acquirer
+	planReader model.ArtifactReader
 }
 
 var _ port.Store = (*Store)(nil)
@@ -50,6 +52,7 @@ func New(db *gorm.DB, binding transaction.Binding, opts ...hostmysql.BaseReposit
 	if len(opts) > 0 {
 		s.limiter = opts[0].Limiter
 	}
+	s.planReader = func(p transaction.FrozenPlan) ([]byte, error) { return shared.Artifact(p, binding.Owner, "m3-1") }
 	return s, nil
 }
 
@@ -276,4 +279,18 @@ func (s *Store) Due(ctx context.Context, now time.Time, limit int) (result []mod
 		result = append(result, *r)
 	}
 	return result, rows.Err()
+}
+
+// NewWithPlanReader binds dispatch validation to the same trusted owner codec
+// used for reservation and original-root execution; construction performs no I/O.
+func NewWithPlanReader(db *gorm.DB, binding transaction.Binding, read model.ArtifactReader, opts ...hostmysql.BaseRepositoryOptions) (*Store, error) {
+	if read == nil {
+		return nil, transaction.ErrBinding
+	}
+	s, err := New(db, binding, opts...)
+	if err != nil {
+		return nil, err
+	}
+	s.planReader = read
+	return s, nil
 }

@@ -76,13 +76,13 @@ func (o *RocketMQOptions) Load(topics []string, concurrency int, timeout time.Du
 	if err != nil {
 		return rocketmq.Config{}, errors.New("read configured RocketMQ route manifest")
 	}
-	routes, err := decodeRouteManifest(body)
+	manifest, err := transport.ParseRouteManifest(body)
 	if err != nil {
 		return rocketmq.Config{}, err
 	}
 	selected := make([]transport.RouteBinding, 0)
 	seen := map[string]bool{}
-	for _, r := range routes {
+	for _, r := range manifest.Routes {
 		if len(topics) == 0 {
 			selected = append(selected, r)
 			continue
@@ -100,6 +100,12 @@ func (o *RocketMQOptions) Load(topics []string, concurrency int, timeout time.Du
 			return rocketmq.Config{}, errors.New("required logical topic absent from RocketMQ manifest")
 		}
 	}
+	history := make([]transport.RouteBinding, 0)
+	for _, r := range manifest.HistoricalRoutes {
+		if len(topics) == 0 || seen[r.Topic] {
+			history = append(history, r)
+		}
+	}
 	ca, err := os.ReadFile(o.CAFile)
 	if err != nil {
 		return rocketmq.Config{}, errors.New("read configured RocketMQ CA")
@@ -108,7 +114,7 @@ func (o *RocketMQOptions) Load(topics []string, concurrency int, timeout time.Du
 	if !roots.AppendCertsFromPEM(ca) {
 		return rocketmq.Config{}, errors.New("invalid RocketMQ CA")
 	}
-	return rocketmq.Config{Endpoint: o.Endpoint, AccessKey: credentials.Username, SecretKey: credentials.Password, Routes: selected, MaxInFlight: concurrency, RequestTimeout: timeout, TLS: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}}, nil
+	return rocketmq.Config{Endpoint: o.Endpoint, AccessKey: credentials.Username, SecretKey: credentials.Password, Routes: selected, HistoricalRoutes: history, MaxInFlight: concurrency, RequestTimeout: timeout, TLS: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}}, nil
 }
 
 type rocketMQCredentials struct{ Username, Password string }

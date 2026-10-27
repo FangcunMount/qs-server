@@ -11,6 +11,7 @@ import (
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -28,10 +29,11 @@ const collection = "qs_retry_schedule"
 const readBudget = 2 * time.Second
 
 type Store struct {
-	db      *mongo.Database
-	primary *mongo.Database
-	binding transaction.Binding
-	limiter backpressure.Acquirer
+	db         *mongo.Database
+	primary    *mongo.Database
+	binding    transaction.Binding
+	limiter    backpressure.Acquirer
+	planReader model.ArtifactReader
 }
 
 var _ port.Store = (*Store)(nil)
@@ -47,6 +49,7 @@ func New(db *mongo.Database, binding transaction.Binding, opts ...base.BaseRepos
 	if len(opts) > 0 {
 		s.limiter = opts[0].Limiter
 	}
+	s.planReader = func(p transaction.FrozenPlan) ([]byte, error) { return shared.Artifact(p, binding.Owner, "m3-1") }
 	return s, nil
 }
 
@@ -292,4 +295,18 @@ func (s *Store) Due(ctx context.Context, now time.Time, limit int) (result []mod
 		result = append(result, *r)
 	}
 	return result, cursor.Err()
+}
+
+// NewWithPlanReader binds dispatch validation to the same trusted owner codec
+// used for reservation and original-root execution; construction performs no I/O.
+func NewWithPlanReader(db *mongo.Database, binding transaction.Binding, read model.ArtifactReader, opts ...base.BaseRepositoryOptions) (*Store, error) {
+	if read == nil {
+		return nil, transaction.ErrBinding
+	}
+	s, err := New(db, binding, opts...)
+	if err != nil {
+		return nil, err
+	}
+	s.planReader = read
+	return s, nil
 }

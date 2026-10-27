@@ -32,10 +32,16 @@ type DeferredDeliveryStore struct {
 }
 
 func NewRocketMQDeferredStore(original *mysqlRetryEventHoldStore, channel string, attempts int, routes []rmtransport.RouteBinding) (*DeferredDeliveryStore, error) {
+	return NewRocketMQDeferredStoreWithHistory(original, channel, attempts, routes, nil)
+}
+
+// Historical rows are only a database evidence allowlist. They are never passed
+// to Subscriber or Publisher and retain their original transport identity.
+func NewRocketMQDeferredStoreWithHistory(original *mysqlRetryEventHoldStore, channel string, attempts int, routes, history []rmtransport.RouteBinding) (*DeferredDeliveryStore, error) {
 	if original == nil || original.db == nil || original.provider != "rocketmq" || channel == "" || attempts < 1 || attempts > retrygovernance.HardMaxDeliveryAttempts {
 		return nil, errors.New("original RocketMQ hold pool, subscription and bounded attempts required")
 	}
-	if err := rmtransport.ValidateRoutes(routes); err != nil {
+	if _, err := rmtransport.NewRouteResolver(routes, history); err != nil {
 		return nil, err
 	}
 	s := &DeferredDeliveryStore{original: original, channel: channel, routes: map[string]rmtransport.RouteBinding{}, policy: original.policy}
@@ -48,18 +54,20 @@ func NewRocketMQDeferredStore(original *mysqlRetryEventHoldStore, channel string
 		return nil, err
 	}
 	owners := map[string]bool{}
-	for _, r := range routes {
+	for index, r := range append(append([]rmtransport.RouteBinding(nil), routes...), history...) {
 		if r.Topic != "qs.evaluation.lifecycle" || r.Subscription != channel {
 			continue
 		}
 		if r.MessageType != rmtransport.TransactionMessageType || r.RouteRevision != "m3-1" || (r.Owner != "qs.mysql" && r.Owner != "qs.mongo") || r.PhysicalTopic == "" {
-			return nil, errors.New("deferred consumption requires reviewed v2 transaction inputs")
+			return nil, errors.New("deferred consumption requires reviewed typed transaction inputs")
 		}
 		if _, found := s.routes[r.PhysicalTopic]; found {
 			return nil, errors.New("duplicate deferred physical input")
 		}
 		s.routes[r.PhysicalTopic] = r
-		owners[r.Owner] = true
+		if index < len(routes) {
+			owners[r.Owner] = true
+		}
 	}
 	if !owners["qs.mysql"] || !owners["qs.mongo"] {
 		return nil, errors.New("both original evaluation/report inputs required")

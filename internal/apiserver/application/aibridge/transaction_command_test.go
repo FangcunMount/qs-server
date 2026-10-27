@@ -31,13 +31,13 @@ func commandFixture(t *testing.T) (TransactionCommand, *PreparedMessaging) {
 
 func TestTransactionCommandWinnerKeepsOriginalWireAcrossChangedClocksAndSequences(t *testing.T) {
 	c, m := commandFixture(t)
-	first, err := c.Freeze(m, 1)
+	first, err := c.Freeze(m, 1, messagingTestRoutes(t))
 	require.NoError(t, err)
 	original := bytes.Clone(m.Wire)
 	m.Envelope.OriginalOccurredAt = "2026-10-21T03:10:00Z"
 	m.Wire, err = legacy.Encode(legacy.Envelope{UUID: c.ID(), Metadata: messagingMetadata(), Payload: []byte("another-local-candidate")}, legacy.Revision2)
 	require.NoError(t, err)
-	candidate, err := c.Freeze(m, 2)
+	candidate, err := c.Freeze(m, 2, messagingTestRoutes(t))
 	require.NoError(t, err)
 	require.Equal(t, first.Input().InputHash, candidate.Input().InputHash)
 	require.Equal(t, first.Input().IdempotencyKey, candidate.Input().IdempotencyKey)
@@ -46,7 +46,7 @@ func TestTransactionCommandWinnerKeepsOriginalWireAcrossChangedClocksAndSequence
 	require.NoError(t, err)
 	restored, err := transaction.DecodePlan(raw)
 	require.NoError(t, err)
-	request, archive, err := ReadTransactionCommand(restored)
+	request, archive, err := ReadTransactionCommand(restored, messagingTestRoutes(t))
 	require.NoError(t, err)
 	require.Equal(t, c.Scope(), request.Scope())
 	require.Equal(t, c.InputHash(), request.InputHash())
@@ -58,7 +58,7 @@ func TestTransactionCommandWinnerKeepsOriginalWireAcrossChangedClocksAndSequence
 	// None of the returned mutable buffers/protobufs is a plan capability.
 	archive.Wire[0] ^= 1
 	archive.Envelope.MessageId = "mutated"
-	_, again, err := ReadTransactionCommand(first)
+	_, again, err := ReadTransactionCommand(first, messagingTestRoutes(t))
 	require.NoError(t, err)
 	require.Equal(t, original, again.Wire)
 }
@@ -78,10 +78,10 @@ func TestTransactionCommandOwnsBodyAndBindsOriginalScopeBeforeSeal(t *testing.T)
 	changed, err := NewTransactionCommand(pb.MessagingKind_START, c.ID(), c.Aggregate(), c.Scope(), body)
 	require.NoError(t, err)
 	require.NotEqual(t, c.InputHash(), changed.InputHash())
-	_, err = changed.Freeze(m, 1)
+	_, err = changed.Freeze(m, 1, messagingTestRoutes(t))
 	require.ErrorIs(t, err, ErrMessagingContract)
 	for _, seq := range []uint64{0, ^uint64(0)} {
-		_, err = c.Freeze(m, seq)
+		_, err = c.Freeze(m, seq, messagingTestRoutes(t))
 		require.ErrorIs(t, err, ErrMessagingContract)
 	}
 }
@@ -114,7 +114,7 @@ func TestTransactionCommandRejectsAlteredOwnerRouteHashScopeAndArchiveFlags(t *t
 	for _, name := range []string{"owner", "route", "hash", "scope", "key", "operation", "branch-id", "unordered", "receipt-free", "correlation"} {
 		t.Run(name, func(t *testing.T) {
 			c, m := commandFixture(t)
-			first, err := c.Freeze(m, 1)
+			first, err := c.Freeze(m, 1, messagingTestRoutes(t))
 			require.NoError(t, err)
 			in := first.Input()
 			switch name {
@@ -137,7 +137,7 @@ func TestTransactionCommandRejectsAlteredOwnerRouteHashScopeAndArchiveFlags(t *t
 			case "branch-id":
 				in.Branches[0].ID = "different-branch"
 			default:
-				_, a, err := ReadTransactionCommand(first)
+				_, a, err := ReadTransactionCommand(first, messagingTestRoutes(t))
 				require.NoError(t, err)
 				if name == "unordered" {
 					a.Ordered = false
@@ -150,7 +150,7 @@ func TestTransactionCommandRejectsAlteredOwnerRouteHashScopeAndArchiveFlags(t *t
 					a.Header, err = proto.MarshalOptions{Deterministic: true}.Marshal(a.Envelope)
 					require.NoError(t, err)
 					m.Envelope.CorrelationCommandId = "another-command"
-					_, err = c.Freeze(m, 1)
+					_, err = c.Freeze(m, 1, messagingTestRoutes(t))
 					require.ErrorIs(t, err, ErrMessagingContract)
 				}
 
@@ -159,7 +159,7 @@ func TestTransactionCommandRejectsAlteredOwnerRouteHashScopeAndArchiveFlags(t *t
 			}
 			altered, err := transaction.NewPlan(in)
 			require.NoError(t, err)
-			_, _, err = ReadTransactionCommand(altered)
+			_, _, err = ReadTransactionCommand(altered, messagingTestRoutes(t))
 			require.Error(t, err)
 		})
 	}

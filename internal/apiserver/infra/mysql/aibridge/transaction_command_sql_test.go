@@ -74,6 +74,7 @@ func commandArchiveFixture(t *testing.T) (*TransactionArchive, sqlmock.Sqlmock, 
 	e := commandExecutionFixture(t)
 	a, err := NewTransactionArchive(db, transaction.Binding{Owner: "qs.mysql", StoreID: "test-primary", WriterEpoch: e.WriterEpoch})
 	require.NoError(t, err)
+	a.routes = archiveTestRoutes(t)
 	return a, mock, e
 }
 
@@ -99,7 +100,7 @@ func TestCommandOriginalSQLRootAtomicallyWritesFactsArchiveOperationAndWitness(t
 	for _, name := range []string{"committed", "commit-reply-lost"} {
 		t.Run(name, func(t *testing.T) {
 			a, mock, e := commandArchiveFixture(t)
-			c, archive, err := app.ReadTransactionCommand(e.Plan)
+			c, archive, err := app.ReadTransactionCommand(e.Plan, archiveTestRoutes(t))
 			require.NoError(t, err)
 			ek := transaction.ExecutionKey("qs.mysql", c.ID(), e.WriterEpoch, e.Fence)
 			bk := transaction.BranchKey(c.ID())

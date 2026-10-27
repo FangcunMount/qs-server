@@ -11,6 +11,7 @@ import (
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -21,7 +22,7 @@ func submissionPlanForTest(t *testing.T) transaction.FrozenPlan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := freezeSubmission(context.Background(), sheet, submit.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "same-key", Fingerprint: fingerprint, RequestID: "original-request"}, "answersheet.submitted")
+	plan, err := freezeSubmission(context.Background(), sheet, submit.DurableSubmitMeta{WriterID: 301, IdempotencyKey: "same-key", Fingerprint: fingerprint, RequestID: "original-request"}, "answersheet.submitted", submissionTestRoutes(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +42,7 @@ func TestTransactionSubmissionPlanFreezesBSONAndOriginalWire(t *testing.T) {
 	if !bytes.Equal(plan.Input().Branches[0].Wire, restored.Input().Branches[0].Wire) {
 		t.Fatal("first wire changed")
 	}
-	po, _, err := readSubmissionPlan(restored)
+	po, _, err := readSubmissionPlan(restored, submissionTestRoutes(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,11 +50,11 @@ func TestTransactionSubmissionPlanFreezesBSONAndOriginalWire(t *testing.T) {
 		t.Fatal("private artifact confused with commit proof")
 	}
 	e := transaction.Execution{Plan: restored, Fence: 1, WriterEpoch: "m3-1", LeaseUntil: time.Now().Add(time.Minute), Token: [32]byte{1}}
-	first, sheet, err := materializeSubmission(e)
+	first, sheet, err := materializeSubmission(e, submissionTestRoutes(t))
 	if err != nil || sheet == nil {
 		t.Fatalf("materialize: %v", err)
 	}
-	second, _, err := materializeSubmission(e)
+	second, _, err := materializeSubmission(e, submissionTestRoutes(t))
 	if err != nil || !bytes.Equal(first, second) {
 		t.Fatal("callback reentry would change BSON identity, audit clocks or witness")
 	}
@@ -143,9 +144,66 @@ func TestTransactionSubmissionRejectsArtifactAndWireDrift(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := readSubmissionPlan(changed); err == nil {
+			if _, _, err := readSubmissionPlan(changed, submissionTestRoutes(t)); err == nil {
 				t.Fatal("accepted a newly hashed but inconsistent business artifact")
 			}
 		})
+	}
+}
+
+func submissionTestRoutes(t *testing.T) *transport.RouteResolver {
+	t.Helper()
+	physical, err := transport.PhysicalTopicV2("answersheet.submitted", transport.TransactionMessageType, submissionOwner, submissionRouteRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := transport.NewRouteResolver([]transport.RouteBinding{{Topic: "answersheet.submitted", PhysicalTopic: physical, MessageType: transport.TransactionMessageType, Owner: submissionOwner, RouteRevision: submissionRouteRevision}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestSubmissionUsesActiveReadableRouteAndKeepsHistoricalWire(t *testing.T) {
+	old := submissionPlanForTest(t)
+	physical, err := transport.PhysicalTopicV3("answersheet.submitted", transport.TransactionMessageType, submissionOwner, submissionRouteRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := old.Input().Branches[0].PhysicalTopic
+	row := transport.RouteBinding{Topic: "answersheet.submitted", PhysicalTopic: physical, MessageType: transport.TransactionMessageType, Owner: submissionOwner, RouteRevision: submissionRouteRevision, NamingScheme: transport.ReadableNamingV1}
+	history := row
+	history.PhysicalTopic = legacy
+	history.NamingScheme = ""
+	routes, err := transport.NewRouteResolver([]transport.RouteBinding{row}, []transport.RouteBinding{history})
+	if err != nil {
+		t.Fatal(err)
+	}
+	po, _, err := readSubmissionPlan(old, routes)
+	if err != nil || po == nil {
+		t.Fatal("historical evidence unreadable", err)
+	}
+	in := old.Input()
+	in.Branches[0].PhysicalTopic = physical
+	current, err := transaction.NewPlan(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = readSubmissionPlan(current, routes); err != nil {
+		t.Fatal(err)
+	}
+	// Only routing changes. Identity, BSON and first consumer wire stay exact.
+	if old.Input().OperationID != current.Input().OperationID || !bytes.Equal(old.Input().Branches[0].Wire, current.Input().Branches[0].Wire) || old.Digest() == current.Digest() {
+		t.Fatal("immutable identity or plan digest differs incorrectly")
+	}
+	activeOnly, err := transport.NewRouteResolver([]transport.RouteBinding{row}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = readSubmissionPlan(old, activeOnly); err == nil {
+		t.Fatal("unregistered history accepted")
+	}
+	if _, _, err = readSubmissionPlan(current, nil); err == nil {
+		t.Fatal("missing trusted resolver accepted")
 	}
 }

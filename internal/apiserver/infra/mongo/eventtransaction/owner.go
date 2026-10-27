@@ -80,8 +80,8 @@ func (o *Owner) validatePlan(p transaction.FrozenPlan) error {
 	}
 	for _, b := range p.Input().Branches {
 		in := b.Message.Input()
-		physical, err := transport.PhysicalTopicV2(in.Destination, transport.TransactionMessageType, ownerName, routeRevision)
-		if err != nil || !o.HasTopic(in.Destination) || b.PhysicalTopic != physical || b.RouteRevision != routeRevision || in.Producer != "qs-server" || len(b.Wire) > 262144 {
+		row, err := o.runtime.Routes().RecordedRoute(transport.RouteKey{Topic: in.Destination, MessageType: transport.TransactionMessageType, Owner: ownerName, RouteRevision: routeRevision}, b.PhysicalTopic)
+		if err != nil || !o.HasTopic(in.Destination) || b.PhysicalTopic != row.PhysicalTopic || b.RouteRevision != routeRevision || in.Producer != "qs-server" || len(b.Wire) > 262144 {
 			return transaction.ErrBinding
 		}
 	}

@@ -207,7 +207,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	require.NoError(t, err)
 	pendingWinner, err := commands.archive.store.Lookup(t.Context(), transaction.Request{Owner: "qs.mysql", Scope: "org:7", Key: pendingCommand.Key(), InputHash: pendingCommand.InputHash()})
 	require.NoError(t, err)
-	_, pendingArchive, err := app.ReadTransactionCommand(pendingWinner.Execution.Plan)
+	_, pendingArchive, err := app.ReadTransactionCommand(pendingWinner.Execution.Plan, commands.archive.routes)
 	require.NoError(t, err)
 	_, found, err := commands.archive.Payload(t.Context(), &pb.MessagePayloadReference{Producer: "qs-server", Destination: "qs-ai", MessageId: r.RequestID, OrganizationId: "7", BodySha256: pendingArchive.Envelope.BodySha256, BodyLength: uint64(len(pendingArchive.Body))}, "qs-ai")
 	require.True(t, found)
@@ -246,6 +246,7 @@ func TestM3AICommandBrokerHost(t *testing.T) {
 	require.Equal(t, sha256.Sum256(a.Body), sha256.Sum256(payload))
 	fresh, err := NewTransactionArchive(pool, commands.archive.store.Binding())
 	require.NoError(t, err)
+	fresh.routes = commands.archive.routes
 	_, found, err = fresh.ReadCommitted(t.Context(), r.RequestID)
 	require.NoError(t, err)
 	require.True(t, found)

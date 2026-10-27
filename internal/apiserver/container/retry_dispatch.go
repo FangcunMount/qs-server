@@ -32,20 +32,20 @@ func (c *Container) BuildRetryDispatchers(automatic bool) (*RetryDispatchers, er
 		return nil, err
 	}
 	mysqlOwner, mongoOwner := c.EvaluationTransactionOwner(), c.ReportTransactionOwner()
-	sqlStore, err := mysqlSchedule.New(c.mysqlDB, mysqlOwner.Binding(), mysqlBase.BaseRepositoryOptions{Limiter: c.MySQLLimiter()})
+	sqlStore, err := mysqlSchedule.NewWithPlanReader(c.mysqlDB, mysqlOwner.Binding(), mysqlOwner.Artifact, mysqlBase.BaseRepositoryOptions{Limiter: c.MySQLLimiter()})
 	if err != nil {
 		return nil, err
 	}
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: c.MongoLimiter()}
-	documentStore, err := mongoSchedule.New(c.mongoDB, mongoOwner.Binding(), mongoOptions)
-	if err != nil {
-		return nil, err
-	}
 	authority, err := mongoAuthority.NewRetryDispatchAuthority(c.mongoDB, mongoOptions)
 	if err != nil {
 		return nil, err
 	}
 	commit, err := mongoTx.NewCommitter(c.mongoDB, mongoOwner, modtx.NewMongoRunner(c.mongoDB, modtx.MongoRunnerOptions{Boundary: "retry_dispatch", Limiter: c.MongoLimiter()}), c.ReportTransactionRoutes())
+	if err != nil {
+		return nil, err
+	}
+	documentStore, err := mongoSchedule.NewWithPlanReader(c.mongoDB, mongoOwner.Binding(), commit.Artifact, mongoOptions)
 	if err != nil {
 		return nil, err
 	}

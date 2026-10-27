@@ -60,7 +60,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		if loadErr != nil {
 			return output, loadErr
 		}
-		deferredStore, storeErr := messagingintegration.NewRocketMQDeferredStore(holdStore, s.config.Worker.ServiceName, s.workerMaxDeliveryAttempts(), config.Routes)
+		deferredStore, storeErr := messagingintegration.NewRocketMQDeferredStoreWithHistory(holdStore, s.config.Worker.ServiceName, s.workerMaxDeliveryAttempts(), config.Routes, config.HistoricalRoutes)
 		if storeErr != nil {
 			return output, storeErr
 		}

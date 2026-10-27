@@ -28,7 +28,7 @@ func NewCommitter(db *mongo.Database, owner *Owner, runner OriginalRunner, resol
 }
 
 func (c *Committer) Artifact(p transaction.FrozenPlan) ([]byte, error) {
-	return shared.Artifact(p, ownerName, routeRevision)
+	return shared.ArtifactWithRoutes(p, ownerName, routeRevision, c.owner.Runtime().Routes())
 }
 
 func (c *Committer) validatePlan(p transaction.FrozenPlan) error {
@@ -52,7 +52,7 @@ func (c *Committer) Reserve(ctx context.Context, q port.Request) (transaction.Re
 	if mongo.SessionFromContext(ctx) != nil {
 		return transaction.Reservation{}, transaction.ErrTransactionRequired
 	}
-	p, err := shared.Freeze(q, c.resolver, ownerName, routeRevision)
+	p, err := shared.FreezeWithRoutes(q, c.resolver, ownerName, routeRevision, c.owner.Runtime().Routes())
 	if err != nil {
 		return transaction.Reservation{}, err
 	}

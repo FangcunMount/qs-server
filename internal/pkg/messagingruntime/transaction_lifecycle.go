@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 )
 
@@ -23,6 +24,7 @@ type transactionDriver interface {
 
 type TransactionRuntime struct {
 	sender              transactionDriver
+	routes              *transport.RouteResolver
 	monitor             *protocolMonitor
 	cleanupBudget       time.Duration
 	mu                  sync.RWMutex

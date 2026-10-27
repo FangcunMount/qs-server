@@ -14,7 +14,7 @@ import (
 // this one original SQL root; the archive guard borrows it. No Seal or Broker I/O
 // occurs while it holds business locks.
 func (s *TransactionArchive) commandRoot(ctx context.Context, e transaction.Execution) (transaction.LocalOutcome, error) {
-	c, a, err := app.ReadTransactionCommand(e.Plan)
+	c, a, err := app.ReadTransactionCommand(e.Plan, s.routes)
 	if err != nil || !e.Valid() {
 		return transaction.LocalUnknown, errors.Join(app.ErrMessagingContract, err)
 	}
@@ -89,7 +89,7 @@ func originalStart(v *pb.StartCommand) app.Start {
 }
 
 func (s *TransactionArchive) confirmCommand(ctx context.Context, e transaction.Execution) transaction.LocalOutcome {
-	if _, _, err := app.ReadTransactionCommand(e.Plan); err != nil {
+	if _, _, err := app.ReadTransactionCommand(e.Plan, s.routes); err != nil {
 		return transaction.LocalUnknown
 	}
 	var facts []*transaction.Evidence

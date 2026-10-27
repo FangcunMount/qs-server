@@ -82,14 +82,14 @@ func (e FrozenIncomingEvent) Input() (*pb.MessagingEnvelope, []byte, []byte, str
 	return proto.Clone(e.envelope).(*pb.MessagingEnvelope), bytes.Clone(e.body), bytes.Clone(e.wire), e.org
 }
 
-func (e FrozenIncomingEvent) FreezeACK(message *PreparedMessaging, operationID string) (transaction.FrozenPlan, error) {
+func (e FrozenIncomingEvent) FreezeACK(message *PreparedMessaging, operationID string, routes *transport.RouteResolver) (transaction.FrozenPlan, error) {
 	if !e.Request().Valid() || !validID(operationID) || message == nil || message.Envelope == nil {
 		return transaction.FrozenPlan{}, ErrMessagingContract
 	}
 	if err := e.validateACK(message.Envelope, message.Body); err != nil {
 		return transaction.FrozenPlan{}, err
 	}
-	physical, err := transport.PhysicalTopicV2(AcksTopic, transport.TransactionMessageType, commandOwner, commandRevision)
+	physical, err := messagingPhysicalTopic(routes, AcksTopic, "")
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
@@ -103,7 +103,7 @@ func (e FrozenIncomingEvent) FreezeACK(message *PreparedMessaging, operationID s
 
 // ReadACK validates a reservation winner against the exact incoming delivery.
 // Checker uses persisted witnesses only, never this business callback input.
-func (e FrozenIncomingEvent) ReadACK(plan transaction.FrozenPlan) (FrozenMessagingArchive, error) {
+func (e FrozenIncomingEvent) ReadACK(plan transaction.FrozenPlan, routes *transport.RouteResolver) (FrozenMessagingArchive, error) {
 	var empty FrozenMessagingArchive
 	if !e.Request().Valid() || !plan.Valid() || len(plan.Input().Branches) != 1 || !validID(plan.Input().OperationID) {
 		return empty, ErrMessagingContract
@@ -116,7 +116,7 @@ func (e FrozenIncomingEvent) ReadACK(plan transaction.FrozenPlan) (FrozenMessagi
 	if err != nil {
 		return empty, err
 	}
-	physical, err := transport.PhysicalTopicV2(AcksTopic, transport.TransactionMessageType, commandOwner, commandRevision)
+	physical, err := messagingPhysicalTopic(routes, AcksTopic, b.PhysicalTopic)
 	if err != nil || b.PhysicalTopic != physical || b.ID != a.Envelope.MessageId || strconv.FormatUint(a.OrganizationID, 10) != e.org || a.Sequence != 1 || a.Ordered || a.RequiresReceipt {
 		return empty, ErrMessagingContract
 	}
