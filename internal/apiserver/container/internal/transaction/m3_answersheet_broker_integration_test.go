@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,7 @@ import (
 	answerrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	qsoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -97,12 +99,29 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	require.Empty(t, before, "constructor performed hidden DDL")
 	require.NoError(t, repo.InstallSubmissionIndexes(t.Context()))
 	require.NoError(t, txmongo.InstallSchema(t.Context(), db))
+	// The current host also validates native-limit governance before admission.
+	// Install the existing production schema explicitly in this owned database;
+	// a missing schema must remain a protection failure, not be bypassed.
+	nativeSchema, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "internal", "pkg", "migration", "migrations", "mongodb", "000043_native_transaction_limit_notices.up.json"))
+	require.NoError(t, err)
+	var commands []json.RawMessage
+	require.NoError(t, json.Unmarshal(nativeSchema, &commands))
+	for _, raw := range commands {
+		var command bson.D
+		require.NoError(t, bson.UnmarshalExtJSON(raw, true, &command))
+		require.NoError(t, db.RunCommand(t.Context(), command).Err())
+	}
 	bindingConfig := producerOptions.RocketMQ.Transactions["qs.mongo"]
 	binding := tx.Binding{Owner: "qs.mongo", StoreID: bindingConfig.StoreID, WriterEpoch: bindingConfig.WriterEpoch}
 	_, err = db.Collection("rm_tx_binding").InsertOne(t.Context(), bson.M{"_id": binding.Owner, "store_id": binding.StoreID, "writer_epoch": binding.WriterEpoch, "schema_version": 1})
 	require.NoError(t, err)
 	authority, err := txmongo.New(db, binding)
 	require.NoError(t, err)
+	native, err := messagingruntime.NewMongoNativeLimits(db, binding, "m3-1")
+	require.NoError(t, err)
+	blocked, err := native.ReadNativeLimit(t.Context())
+	require.NoError(t, err, "explicit current native-limit schema is required")
+	require.False(t, blocked)
 	limiter := backpressure.NewLimiter(2, time.Second)
 	rootRunner := modtx.NewMongoRunner(db, modtx.MongoRunnerOptions{Boundary: "answersheet_submit", Limiter: limiter})
 	var runs, callbackAttempts atomic.Int32
@@ -137,6 +156,7 @@ func TestM3AnswerSubmissionBrokerHost(t *testing.T) {
 	var reader appanswersheet.SubmissionIdempotencyReader = store
 	collectionReadback := newM3CollectionReadback(t, db, repo, store, limiter)
 	require.NoError(t, store.Runtime().Start(t.Context()))
+	require.True(t, store.Runtime().Stats().Ready, "owned fixture protocol admission not ready")
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
