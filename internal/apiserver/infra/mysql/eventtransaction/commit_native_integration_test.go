@@ -26,6 +26,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	driver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 	gormmysql "gorm.io/driver/mysql"
@@ -93,6 +94,10 @@ func TestM3MySQLOriginalEventRoot(t *testing.T) {
 	store, err := txmysql.New(pool, binding)
 	require.NoError(t, err)
 	c := &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), resolver: fixtureResolver{}, topics: map[string]bool{"qs.evaluation.lifecycle": true}}
+	physical, err := transport.PhysicalTopicV2("qs.evaluation.lifecycle", transport.TransactionMessageType, owner, revision)
+	require.NoError(t, err)
+	c.routes, err = transport.NewRouteResolver([]transport.RouteBinding{{Topic: "qs.evaluation.lifecycle", PhysicalTopic: physical, MessageType: transport.TransactionMessageType, Owner: owner, RouteRevision: revision}}, nil)
+	require.NoError(t, err)
 	sender := &nativeSender{store: store}
 	c.sender = sender
 	t.Run("lookup-without-inventing-input-hash", func(t *testing.T) {

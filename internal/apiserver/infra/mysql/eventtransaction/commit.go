@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"gorm.io/gorm"
 )
 
@@ -50,6 +51,7 @@ type Committer struct {
 	sender   sender
 	runtime  *messagingruntime.TransactionRuntime
 	resolver catalog.TopicResolver
+	routes   *transport.RouteResolver
 	topics   map[string]bool
 }
 
@@ -92,12 +94,12 @@ func New(db *gorm.DB, o *options.MessagingOptions, resolver catalog.TopicResolve
 	for _, topic := range topics {
 		allowed[topic] = true
 	}
-	return &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), sender: runtime, runtime: runtime, resolver: resolver, topics: allowed}, nil
+	return &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), sender: runtime, runtime: runtime, resolver: resolver, routes: runtime.Routes(), topics: allowed}, nil
 }
 
 func (c *Committer) Runtime() *messagingruntime.TransactionRuntime { return c.runtime }
 func (c *Committer) Artifact(p transaction.FrozenPlan) ([]byte, error) {
-	return shared.ArtifactWithRoutes(p, owner, revision, c.runtime.Routes())
+	return shared.ArtifactWithRoutes(p, owner, revision, c.routes)
 }
 
 func (c *Committer) Find(ctx context.Context, scope, key string) (transaction.Reservation, error) {
@@ -155,7 +157,7 @@ func (c *Committer) Reserve(ctx context.Context, q port.Request) (transaction.Re
 	if _, nested := hostmysql.TxFromContext(ctx); nested {
 		return transaction.Reservation{}, transaction.ErrTransactionRequired
 	}
-	p, err := shared.FreezeWithRoutes(q, c.resolver, owner, revision, c.runtime.Routes())
+	p, err := shared.FreezeWithRoutes(q, c.resolver, owner, revision, c.routes)
 	if err != nil {
 		return transaction.Reservation{}, err
 	}
