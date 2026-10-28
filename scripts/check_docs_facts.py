@@ -3587,10 +3587,14 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     # files are byte-identical. Added config/history validation does not replace
     # ACK/failure handoff. Native readable matrices40510978331 passed31/31+5;
     # host shared-budget/deferred tests passed; host Broker/production are separate.
+    # Stable v0.6.0 source559c735 has byte-identical Go implementation, wire,
+    # transaction codec/schema and transport to the accepted RC source5c2e3cd.
+    # Exact-source stable SDK gates and published installation are recorded in T12;
+    # host image/native/production acceptance remain separate.
     # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.6\.0-rc\.1\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.6\.0\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(
