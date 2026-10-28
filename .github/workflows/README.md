@@ -7,7 +7,6 @@
 | Workflow | 稳定职责 | 状态写入边界 |
 | --- | --- | --- |
 | `ci.yml` | 单测、静态/架构/配置契约、一次性 Mongo Replica Set 上的事务/schema 集成契约、文档与 API 同步、构建 | 只证明该 run 的 checkout；不证明部署 |
-| `sonar.yml` | SonarQube 分析 | 不替代 CI、部署或运行验收 |
 | `cd.yml` | 计划服务、构建/交付镜像、生成部署包、按依赖顺序部署、逐实例验证 | 成功结果必须记录 exact SHA、image digest、effective config 与环境 |
 | `ping-runner.yml` | 周期/手动执行目标环境连通与服务探针 | 只证明该时点、该检查项；不证明业务全链和数据一致性 |
 | `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验；不输出凭据 |
@@ -16,6 +15,8 @@
 | `authz-production-matrix-provision.yml` | 显式创建隔离的 evaluator 与 plan manager 矩阵主体 | 仅手工触发并要求固定确认词；幂等创建无登录凭据/联系方式/外部身份的 IAM 用户及单一角色 assignment，不修改现有用户 |
 
 R4 源码退出候选移除两个专用退役工作流及其打包、恢复夹具和临时运行观察检查。CI 保留标准事务证据、当前 MQ、退休 ID 防护、迁移与正常启动保护；普通构建和部署保留原交付入口。四对象的实际生产验收和材料零剩余仍需独立回执，见[退役工具退出说明](../../scripts/database/compatibility-retirement.md)。
+
+2026-10-28：SonarQube 扫描及配置、固定旧 M3 镜像缓存、两项 NSQ 专用 M5 preflight/postcheck 工作流已退役。原执行证据留在 Git 历史与生产台账；现行 CI/CD、数据库操作、AuthZ 矩阵及 MQ 故障回归继续维护。
 
 删除、重命名或改变触发关系时，必须同步 `scripts/cd` 契约测试和文档门禁。历史 run 只进入证据台账，不回写本页。
 

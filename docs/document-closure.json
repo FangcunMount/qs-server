@@ -425,10 +425,6 @@
         {
           "kind": "source",
           "path": "scripts/dbops/test-mysql-metadata-profile-ssh.py"
-        },
-        {
-          "kind": "source",
-          "path": ".github/workflows/rocketmq-m3-image-cache.yml"
         }
       ],
       "verification": [
