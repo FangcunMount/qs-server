@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,4 +86,36 @@ func TestDueDispatchFreezesSelectionSeparatelyFromBusinessAuthorization(t *testi
 	r.State = Held
 	_, err = FreezeDispatch(r, at)
 	require.ErrorIs(t, err, ErrInvalid)
+}
+
+func TestDueDispatchBindsNewManifestWithoutChangingFutureAuthorityOrFirstWire(t *testing.T) {
+	at := time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC)
+	a, in := fixture(t, Evaluation, retrygovernance.AttemptOriginAutomatic, "", "readable-retry", at)
+	future, err := New(a, in, at)
+	require.NoError(t, err)
+	original := future.Bytes()
+	record := Record{Plan: future, State: Ready, Version: 1}
+	request, err := FreezeDispatch(record, at)
+	require.NoError(t, err)
+	physical, err := transport.PhysicalTopicV3(in.Destination, transport.TransactionMessageType, a.Owner, "m3-1")
+	require.NoError(t, err)
+	route := transport.RouteBinding{Topic: in.Destination, PhysicalTopic: physical, MessageType: transport.TransactionMessageType, Owner: a.Owner, RouteRevision: "m3-1", NamingScheme: transport.ReadableNamingV1}
+	policy, err := transport.NewRouteResolver([]transport.RouteBinding{route}, nil)
+	require.NoError(t, err)
+	plan, err := shared.FreezeWithRoutes(request, routes{}, a.Owner, "m3-1", policy)
+	require.NoError(t, err)
+	read := func(p transaction.FrozenPlan) ([]byte, error) {
+		return shared.ArtifactWithRoutes(p, a.Owner, "m3-1", policy)
+	}
+	_, err = ReadDispatch(record, plan, read)
+	require.NoError(t, err)
+	proof, err := DispatchProof(record, transaction.Execution{Plan: plan, Fence: 1, WriterEpoch: "m3-1"}, read)
+	require.NoError(t, err)
+	require.NoError(t, MatchDispatchProof(record, plan, proof, read))
+	require.Equal(t, original, future.Bytes())
+	require.Equal(t, in.ID, plan.Input().Branches[0].Message.Input().ID)
+	require.Equal(t, in.Payload, plan.Input().Branches[0].Wire)
+	require.Equal(t, physical, plan.Input().Branches[0].PhysicalTopic)
+	_, err = ReadDispatch(record, plan, nil)
+	require.Error(t, err, "missing host manifest reader must fail closed")
 }

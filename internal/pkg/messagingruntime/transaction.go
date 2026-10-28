@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 )
 
@@ -26,9 +27,32 @@ func NewTransactionalSender(o *options.MessagingOptions, owner string, store tra
 	if err != nil {
 		return nil, err
 	}
-	runtime := &TransactionRuntime{sender: sender, admission: o.RocketMQ.PublishingEnabled()}
+	routes, err := transactionRouteResolver(config)
+	if err != nil {
+		return nil, err
+	}
+	runtime := &TransactionRuntime{sender: sender, routes: routes, admission: o.RocketMQ.PublishingEnabled()}
 	if err = attachProtocolMonitor(runtime, store, config.Limits, native); err != nil {
 		return nil, err
 	}
 	return runtime, nil
+}
+
+// Routes exposes only immutable trusted route identities, never credentials.
+// The resolver is assembled from the exact configuration used by this owner.
+func (r *TransactionRuntime) Routes() *transport.RouteResolver {
+	if r == nil {
+		return nil
+	}
+	return r.routes
+}
+func transactionRouteResolver(config rocketmq.TransactionConfig) (*transport.RouteResolver, error) {
+	convert := func(input []rocketmq.TransactionRoute) []transport.RouteBinding {
+		rows := make([]transport.RouteBinding, 0, len(input))
+		for _, row := range input {
+			rows = append(rows, transport.RouteBinding{Topic: row.LogicalTopic, PhysicalTopic: row.PhysicalTopic, MessageType: transport.TransactionMessageType, Owner: config.Owner, RouteRevision: row.Revision, NamingScheme: row.NamingScheme})
+		}
+		return rows
+	}
+	return transport.NewRouteResolver(convert(config.Routes), convert(config.HistoricalRoutes))
 }

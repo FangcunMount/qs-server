@@ -32,7 +32,7 @@ func commandExecutionFixture(t *testing.T) transaction.Execution {
 	header.OriginalOccurredAt = "2026-10-21T03:00:00Z"
 	wire, err := legacy.Encode(legacy.Envelope{UUID: c.ID(), Metadata: map[string]string{"secure_profile": protected.Profile}, Payload: []byte("opaque-unit-wire")}, legacy.Revision2)
 	require.NoError(t, err)
-	plan, err := c.Freeze(&app.PreparedMessaging{Envelope: header, Body: raw, Wire: wire, Topic: app.CommandsTopic}, 1)
+	plan, err := c.Freeze(&app.PreparedMessaging{Envelope: header, Body: raw, Wire: wire, Topic: app.CommandsTopic}, 1, archiveTestRoutes(t))
 	require.NoError(t, err)
 	return transaction.Execution{Plan: plan, Fence: 1, WriterEpoch: "test-epoch", Token: [32]byte{1}, LeaseUntil: time.Now().Add(time.Minute)}
 }

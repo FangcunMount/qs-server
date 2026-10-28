@@ -52,11 +52,23 @@ func FreezeDispatch(r Record, at time.Time) (port.Request, error) {
 
 // ReadDispatch validates the full frozen request and the exact public first
 // wire. It works on readonly recovery plans; an execution token is not needed.
-func ReadDispatch(r Record, p transaction.FrozenPlan) (Dispatch, error) {
+type ArtifactReader func(transaction.FrozenPlan) ([]byte, error)
+
+func ReadDispatch(r Record, p transaction.FrozenPlan, readers ...ArtifactReader) (Dispatch, error) {
 	if !r.Plan.Valid() || r.Version < 1 || r.Version == math.MaxInt64 {
 		return Dispatch{}, ErrInvalid
 	}
-	raw, err := shared.Artifact(p, r.Plan.Authority().Owner, "m3-1")
+	var raw []byte
+	var err error
+	if len(readers) == 0 {
+		// Explicit legacy codec callers retain their v2 contract. Runtime owners
+		// always supply their manifest-bound artifact reader.
+		raw, err = shared.Artifact(p, r.Plan.Authority().Owner, "m3-1")
+	} else if len(readers) == 1 && readers[0] != nil {
+		raw, err = readers[0](p)
+	} else {
+		return Dispatch{}, ErrInvalid
+	}
 	if err != nil {
 		return Dispatch{}, err
 	}
@@ -88,8 +100,8 @@ func ReadDispatch(r Record, p transaction.FrozenPlan) (Dispatch, error) {
 	return d, nil
 }
 
-func DispatchProof(r Record, e transaction.Execution) (*evidence.EventEvidenceV2, error) {
-	d, err := ReadDispatch(r, e.Plan)
+func DispatchProof(r Record, e transaction.Execution, readers ...ArtifactReader) (*evidence.EventEvidenceV2, error) {
+	d, err := ReadDispatch(r, e.Plan, readers...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,11 +118,11 @@ func DispatchProof(r Record, e transaction.Execution) (*evidence.EventEvidenceV2
 
 // MatchDispatchProof also binds the recorded business timestamp to the exact
 // frozen dispatch selection. Reference shape alone cannot establish this fact.
-func MatchDispatchProof(r Record, p transaction.FrozenPlan, proof *evidence.EventEvidenceV2) error {
+func MatchDispatchProof(r Record, p transaction.FrozenPlan, proof *evidence.EventEvidenceV2, readers ...ArtifactReader) error {
 	if err := r.Plan.ValidateDispatchProof(proof); err != nil {
 		return err
 	}
-	selected, err := ReadDispatch(r, p)
+	selected, err := ReadDispatch(r, p, readers...)
 	if err != nil {
 		return err
 	}

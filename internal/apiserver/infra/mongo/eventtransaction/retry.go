@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -20,6 +21,9 @@ func (o *Owner) RetryAborted(ctx context.Context, previous transaction.Execution
 		return transaction.Reservation{}, transaction.ErrInvalidPlan
 	}
 	if err := o.validatePlan(previous.Plan); err != nil {
+		return transaction.Reservation{}, err
+	}
+	if err := shared.RequireActiveRoutes(previous.Plan, o.runtime.Routes()); err != nil {
 		return transaction.Reservation{}, err
 	}
 	if o.runtime == nil || !o.runtime.Stats().Ready {

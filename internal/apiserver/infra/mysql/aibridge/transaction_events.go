@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	owner "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
@@ -48,6 +49,7 @@ func NewTransactionEvents(db *gorm.DB, shared *owner.Committer, store *Messaging
 	if err != nil {
 		return nil, err
 	}
+	archive.routes = shared.Runtime().Routes()
 	// Bind the receipt reader to this same primary without mutating the caller's
 	// legacy store. Direct users get the same proof boundary as module assembly.
 	borrowed := *store
@@ -89,7 +91,7 @@ func (s *TransactionEvents) Settle(ctx context.Context, header *pb.MessagingEnve
 	if err != nil {
 		return err
 	}
-	ack, err := incoming.ReadACK(reservation.Execution.Plan)
+	ack, err := incoming.ReadACK(reservation.Execution.Plan, s.archive.routes)
 	if err != nil {
 		return err
 	}
@@ -118,13 +120,17 @@ func (s *TransactionEvents) reserveEvent(ctx context.Context, incoming app.Froze
 	previous, err := s.archive.store.Lookup(readCtx, incoming.Request())
 	cancel()
 	if err == nil {
-		oldACK, validateErr := incoming.ReadACK(previous.Execution.Plan)
+		oldACK, validateErr := incoming.ReadACK(previous.Execution.Plan, s.archive.routes)
 		if validateErr != nil {
 			return transaction.Reservation{}, validateErr
 		}
 		state := s.confirmEvent(ctx, incoming, previous.Execution)
 		if state != transaction.LocalAborted {
 			return previous, nil
+		}
+		// Historical evidence authorizes reads, never a new automatic fence or ACK.
+		if err := shared.RequireActiveRoutes(previous.Execution.Plan, s.archive.routes); err != nil {
+			return transaction.Reservation{}, err
 		}
 		if !s.ready() {
 			return transaction.Reservation{}, messagingruntime.ErrTransactionAdmissionClosed
@@ -170,7 +176,7 @@ func (s *TransactionEvents) reserveEvent(ctx context.Context, incoming app.Froze
 	if err != nil {
 		return transaction.Reservation{}, err
 	}
-	if _, err := incoming.ReadACK(reservation.Execution.Plan); err != nil {
+	if _, err := incoming.ReadACK(reservation.Execution.Plan, s.archive.routes); err != nil {
 		return transaction.Reservation{}, err
 	}
 	return reservation, nil
@@ -188,11 +194,11 @@ func (s *TransactionEvents) freezeACK(incoming app.FrozenIncomingEvent, held boo
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
-	return incoming.FreezeACK(ack, uuid.NewString())
+	return incoming.FreezeACK(ack, uuid.NewString(), s.archive.routes)
 }
 
 func (s *TransactionEvents) confirmEvent(ctx context.Context, incoming app.FrozenIncomingEvent, execution transaction.Execution) transaction.LocalOutcome {
-	if _, err := incoming.ReadACK(execution.Plan); err != nil {
+	if _, err := incoming.ReadACK(execution.Plan, s.archive.routes); err != nil {
 		return transaction.LocalUnknown
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)

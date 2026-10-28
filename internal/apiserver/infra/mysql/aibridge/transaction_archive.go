@@ -12,13 +12,15 @@ import (
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
 	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 )
 
 // TransactionArchive borrows the primary pool. Construction performs no I/O.
 // Only an original-root guard can write; this is not a publish queue.
 type TransactionArchive struct {
-	db    *sql.DB
-	store *txmysql.Store
+	db     *sql.DB
+	store  *txmysql.Store
+	routes *transport.RouteResolver
 }
 
 func NewTransactionArchive(db *sql.DB, binding transaction.Binding) (*TransactionArchive, error) {
@@ -165,6 +167,12 @@ func (s *TransactionArchive) readCommitted(ctx context.Context, q archiveReadCon
 	ek, bk := transaction.ExecutionKey(ref.Owner, ref.OperationID, ref.WriterEpoch, ref.Fence), transaction.BranchKey(ref.BranchID)
 	if ref.Owner != s.store.Binding().Owner || ref.RouteRevision != "m3-1" || ref.Scope != m.Input().Scope || ref.LogicalTopic != m.Input().Destination || ref.MessageID != id || ref.MessageFingerprint != m.Fingerprint() || ref.WireHash != sha256.Sum256(wire) || a.Envelope.MessageId != id || a.Envelope.Producer != "qs-server" || a.Envelope.Destination != "qs-ai" || org != a.OrganizationID || !bytes.Equal(execution, ek[:]) || !bytes.Equal(branch, bk[:]) {
 		return a, true, app.ErrMessagingContract
+	}
+	if s.routes != nil {
+		_, err = s.routes.RecordedRoute(transport.RouteKey{Topic: ref.LogicalTopic, MessageType: transport.TransactionMessageType, Owner: ref.Owner, RouteRevision: ref.RouteRevision}, ref.PhysicalTopic)
+		if err != nil {
+			return a, true, app.ErrMessagingContract
+		}
 	}
 	evidence, err := readEvidence(ctx, ref)
 	if err != nil {

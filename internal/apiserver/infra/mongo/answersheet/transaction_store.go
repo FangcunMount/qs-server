@@ -173,7 +173,7 @@ func (s *RocketMQSubmissionStore) confirmSubmission(ctx context.Context, po Answ
 	if len(refs) != 1 || refs[0] != ref {
 		return ErrSubmissionUnresolved
 	}
-	frozen, frozenBinding, err := readSubmissionPlan(winner.Execution.Plan)
+	frozen, frozenBinding, err := readSubmissionPlan(winner.Execution.Plan, s.runtime.Routes())
 	if err != nil || frozen.DomainID != po.DomainID || frozen.ID != po.ID || frozenBinding != binding || !frozen.DurableAcceptance.AcceptedAt.Equal(a.AcceptedAt) ||
 		proof.Reference != standard.ReferenceFromMessage(winner.Execution.Plan.Input().Branches[0].Message) || !proof.RecordedAt.Equal(a.AcceptedAt) {
 		return ErrSubmissionUnresolved
@@ -195,7 +195,7 @@ func (s *RocketMQSubmissionStore) CreateDurably(ctx context.Context, sheet *doma
 		}
 		return existing.Sheet, true, nil
 	}
-	plan, err := freezeSubmission(ctx, sheet, meta, s.topic)
+	plan, err := freezeSubmission(ctx, sheet, meta, s.topic, s.runtime.Routes())
 	if err != nil {
 		return nil, false, err
 	}
@@ -206,7 +206,7 @@ func (s *RocketMQSubmissionStore) CreateDurably(ctx context.Context, sheet *doma
 		}
 		return nil, false, err
 	}
-	frozen, _, err := readSubmissionPlan(reservation.Execution.Plan)
+	frozen, _, err := readSubmissionPlan(reservation.Execution.Plan, s.runtime.Routes())
 	if err != nil {
 		return nil, false, err
 	}
@@ -215,7 +215,7 @@ func (s *RocketMQSubmissionStore) CreateDurably(ctx context.Context, sheet *doma
 	}
 	// The final BSON, including the exact reference, is also frozen before the
 	// retryable driver callback. No signing, encoding or event creation in it.
-	raw, _, err := materializeSubmission(reservation.Execution)
+	raw, _, err := materializeSubmission(reservation.Execution, s.runtime.Routes())
 	if err != nil {
 		return nil, false, err
 	}

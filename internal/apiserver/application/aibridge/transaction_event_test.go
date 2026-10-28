@@ -26,9 +26,9 @@ func TestIncomingReceiptRequiresOriginalCommandCorrelationAndFreezesACK(t *testi
 	require.NoError(t, err)
 	incoming, err := FreezeIncomingEvent(header, raw, wire, "7")
 	require.NoError(t, err)
-	plan, err := incoming.FreezeACK(eventACKFixture(t, incoming, false), uuid.NewString())
+	plan, err := incoming.FreezeACK(eventACKFixture(t, incoming, false), uuid.NewString(), messagingTestRoutes(t))
 	require.NoError(t, err)
-	_, err = incoming.ReadACK(plan)
+	_, err = incoming.ReadACK(plan, messagingTestRoutes(t))
 	require.NoError(t, err)
 }
 
@@ -68,9 +68,9 @@ func eventACKFixture(t *testing.T, e FrozenIncomingEvent, held bool) *PreparedMe
 func TestIncomingEventACKPlanKeepsFirstWireAndSeparateStableBusinessInput(t *testing.T) {
 	e := incomingEventFixture(t)
 	first := eventACKFixture(t, e, false)
-	p, err := e.FreezeACK(first, uuid.NewString())
+	p, err := e.FreezeACK(first, uuid.NewString(), messagingTestRoutes(t))
 	require.NoError(t, err)
-	other, err := e.FreezeACK(eventACKFixture(t, e, true), uuid.NewString())
+	other, err := e.FreezeACK(eventACKFixture(t, e, true), uuid.NewString(), messagingTestRoutes(t))
 	require.NoError(t, err)
 	require.Equal(t, transaction.RequestFor(p), transaction.RequestFor(other), "outcome is a host decision, not a changed incoming event")
 	require.NotEqual(t, p.Digest(), other.Digest())
@@ -78,7 +78,7 @@ func TestIncomingEventACKPlanKeepsFirstWireAndSeparateStableBusinessInput(t *tes
 	require.NoError(t, err)
 	restored, err := transaction.DecodePlan(raw)
 	require.NoError(t, err)
-	a, err := e.ReadACK(restored)
+	a, err := e.ReadACK(restored, messagingTestRoutes(t))
 	require.NoError(t, err)
 	require.Equal(t, sha256.Sum256(first.Wire), sha256.Sum256(a.Wire))
 	require.Equal(t, first.Envelope.MessageId, a.Envelope.MessageId)
@@ -89,20 +89,20 @@ func TestIncomingEventACKPlanKeepsFirstWireAndSeparateStableBusinessInput(t *tes
 	header.AggregateKey = "changed"
 	body[0] ^= 1
 	wire[0] ^= 1
-	_, err = e.ReadACK(restored)
+	_, err = e.ReadACK(restored, messagingTestRoutes(t))
 	require.NoError(t, err)
 }
 
 func TestIncomingEventChangedWireOrBodyCannotReuseACKWinner(t *testing.T) {
 	e := incomingEventFixture(t)
-	p, err := e.FreezeACK(eventACKFixture(t, e, false), uuid.NewString())
+	p, err := e.FreezeACK(eventACKFixture(t, e, false), uuid.NewString(), messagingTestRoutes(t))
 	require.NoError(t, err)
 	header, body, _, _ := e.Input()
 	otherWire, err := legacy.Encode(legacy.Envelope{UUID: header.MessageId, Metadata: messagingMetadata(), Payload: []byte("changed-protected-wire")}, legacy.Revision2)
 	require.NoError(t, err)
 	changed, err := FreezeIncomingEvent(header, body, otherWire, "7")
 	require.NoError(t, err)
-	_, err = changed.ReadACK(p)
+	_, err = changed.ReadACK(p, messagingTestRoutes(t))
 	require.ErrorIs(t, err, transaction.ErrInputConflict)
 	_, err = FreezeIncomingEvent(header, body, otherWire, "8")
 	require.ErrorIs(t, err, ErrMessagingContract)
@@ -114,9 +114,9 @@ func TestIncomingEventChangedWireOrBodyCannotReuseACKWinner(t *testing.T) {
 func TestIncomingEventRejectsACKForAnotherEventAndWrongRoute(t *testing.T) {
 	e := incomingEventFixture(t)
 	ack := eventACKFixture(t, incomingEventFixture(t), false)
-	_, err := e.FreezeACK(ack, uuid.NewString())
+	_, err := e.FreezeACK(ack, uuid.NewString(), messagingTestRoutes(t))
 	require.ErrorIs(t, err, ErrMessagingContract)
-	p, err := e.FreezeACK(eventACKFixture(t, e, false), uuid.NewString())
+	p, err := e.FreezeACK(eventACKFixture(t, e, false), uuid.NewString(), messagingTestRoutes(t))
 	require.NoError(t, err)
 	for _, name := range []string{"physical", "owner", "key", "operation"} {
 		t.Run(name, func(t *testing.T) {
@@ -133,7 +133,7 @@ func TestIncomingEventRejectsACKForAnotherEventAndWrongRoute(t *testing.T) {
 			}
 			changed, err := transaction.NewPlan(in)
 			require.NoError(t, err)
-			_, err = e.ReadACK(changed)
+			_, err = e.ReadACK(changed, messagingTestRoutes(t))
 			require.Error(t, err)
 		})
 	}

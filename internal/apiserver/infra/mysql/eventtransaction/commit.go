@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -16,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"gorm.io/gorm"
 )
 
@@ -49,6 +51,7 @@ type Committer struct {
 	sender   sender
 	runtime  *messagingruntime.TransactionRuntime
 	resolver catalog.TopicResolver
+	routes   *transport.RouteResolver
 	topics   map[string]bool
 }
 
@@ -91,11 +94,13 @@ func New(db *gorm.DB, o *options.MessagingOptions, resolver catalog.TopicResolve
 	for _, topic := range topics {
 		allowed[topic] = true
 	}
-	return &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), sender: runtime, runtime: runtime, resolver: resolver, topics: allowed}, nil
+	return &Committer{primary: pool, store: store, uow: hostmysql.NewUnitOfWork(db), sender: runtime, runtime: runtime, resolver: resolver, routes: runtime.Routes(), topics: allowed}, nil
 }
 
-func (c *Committer) Runtime() *messagingruntime.TransactionRuntime     { return c.runtime }
-func (c *Committer) Artifact(p transaction.FrozenPlan) ([]byte, error) { return Artifact(p) }
+func (c *Committer) Runtime() *messagingruntime.TransactionRuntime { return c.runtime }
+func (c *Committer) Artifact(p transaction.FrozenPlan) ([]byte, error) {
+	return shared.ArtifactWithRoutes(p, owner, revision, c.routes)
+}
 
 func (c *Committer) Find(ctx context.Context, scope, key string) (transaction.Reservation, error) {
 	if _, nested := hostmysql.TxFromContext(ctx); nested {
@@ -135,7 +140,7 @@ func (c *Committer) Find(ctx context.Context, scope, key string) (transaction.Re
 }
 
 func (c *Committer) validatePlan(p transaction.FrozenPlan) error {
-	if _, err := Artifact(p); err != nil {
+	if _, err := c.Artifact(p); err != nil {
 		return err
 	}
 	for _, b := range p.Input().Branches {
@@ -152,7 +157,7 @@ func (c *Committer) Reserve(ctx context.Context, q port.Request) (transaction.Re
 	if _, nested := hostmysql.TxFromContext(ctx); nested {
 		return transaction.Reservation{}, transaction.ErrTransactionRequired
 	}
-	p, err := freeze(q, c.resolver)
+	p, err := shared.FreezeWithRoutes(q, c.resolver, owner, revision, c.routes)
 	if err != nil {
 		return transaction.Reservation{}, err
 	}

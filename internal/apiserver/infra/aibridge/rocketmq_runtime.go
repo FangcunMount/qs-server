@@ -66,7 +66,10 @@ func (r *MessagingRuntime) startRocketMQ(ctx context.Context) (resultErr error) 
 }
 
 func transactionalEventRoutes(routes []transport.RouteBinding) ([]transport.RouteBinding, string, error) {
-	physical, err := transport.PhysicalTopicV2(app.EventsTopic, transport.TransactionMessageType, "ai.mysql", "m3-1")
+	if len(routes) != 1 {
+		return nil, "", errors.New("one exact AI transaction event input required")
+	}
+	physical, err := transport.ExpectedPhysicalTopic(app.EventsTopic, transport.TransactionMessageType, "ai.mysql", "m3-1", routes[0].NamingScheme)
 	if err != nil {
 		return nil, "", err
 	}

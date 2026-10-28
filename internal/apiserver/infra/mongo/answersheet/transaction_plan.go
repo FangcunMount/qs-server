@@ -41,7 +41,7 @@ func submissionKey(writer uint64, key, operation string) string {
 	return fmt.Sprintf("answersheet-submit/%d/key/%d:%s", writer, len(key), key)
 }
 
-func freezeSubmission(ctx context.Context, sheet *domain.AnswerSheet, meta submit.DurableSubmitMeta, topic string) (transaction.FrozenPlan, error) {
+func freezeSubmission(ctx context.Context, sheet *domain.AnswerSheet, meta submit.DurableSubmitMeta, topic string, routes *transport.RouteResolver) (transaction.FrozenPlan, error) {
 	if sheet == nil || sheet.ID().IsZero() || meta.WriterID == 0 || topic == "" {
 		return transaction.FrozenPlan{}, fmt.Errorf("complete submission identity required")
 	}
@@ -102,7 +102,7 @@ func freezeSubmission(ctx context.Context, sheet *domain.AnswerSheet, meta submi
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
-	physical, err := transport.PhysicalTopicV2(topic, transport.TransactionMessageType, submissionOwner, submissionRouteRevision)
+	row, err := routes.PublishRoute(transport.RouteKey{Topic: topic, MessageType: transport.TransactionMessageType, Owner: submissionOwner, RouteRevision: submissionRouteRevision})
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
@@ -111,23 +111,23 @@ func freezeSubmission(ctx context.Context, sheet *domain.AnswerSheet, meta submi
 	copy(hash[:], decoded)
 	plan, err := transaction.NewPlan(transaction.PlanInput{Owner: submissionOwner, Scope: msg.Input().Scope, OperationID: evt.EventID(),
 		IdempotencyKey: submissionKey(meta.WriterID, meta.IdempotencyKey, evt.EventID()), InputHash: hash,
-		Branches: []transaction.BranchInput{{ID: submissionBranch, PhysicalTopic: physical, RouteRevision: submissionRouteRevision, Message: msg, Wire: wire}}})
+		Branches: []transaction.BranchInput{{ID: submissionBranch, PhysicalTopic: row.PhysicalTopic, RouteRevision: submissionRouteRevision, Message: msg, Wire: wire}}})
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
-	_, _, err = readSubmissionPlan(plan)
+	_, _, err = readSubmissionPlan(plan, routes)
 	return plan, err
 }
 
-func readSubmissionPlan(plan transaction.FrozenPlan) (*AnswerSheetPO, string, error) {
+func readSubmissionPlan(plan transaction.FrozenPlan, routes *transport.RouteResolver) (*AnswerSheetPO, string, error) {
 	in := plan.Input()
 	if !plan.Valid() || in.Owner != submissionOwner || len(in.Branches) != 1 {
 		return nil, "", transaction.ErrInvalidPlan
 	}
 	b := in.Branches[0]
 	m := b.Message.Input()
-	physical, err := transport.PhysicalTopicV2(m.Destination, transport.TransactionMessageType, submissionOwner, submissionRouteRevision)
-	if err != nil || b.ID != submissionBranch || b.RouteRevision != submissionRouteRevision || b.PhysicalTopic != physical || in.OperationID != m.ID || m.EventType != domain.EventTypeSubmitted || m.Producer != "qs-server" || len(m.Payload) > maxFrozenSubmissionBytes {
+	row, err := routes.RecordedRoute(transport.RouteKey{Topic: m.Destination, MessageType: transport.TransactionMessageType, Owner: submissionOwner, RouteRevision: submissionRouteRevision}, b.PhysicalTopic)
+	if err != nil || b.ID != submissionBranch || b.RouteRevision != submissionRouteRevision || b.PhysicalTopic != row.PhysicalTopic || in.OperationID != m.ID || m.EventType != domain.EventTypeSubmitted || m.Producer != "qs-server" || len(m.Payload) > maxFrozenSubmissionBytes {
 		return nil, "", transaction.ErrInvalidPlan
 	}
 	var artifact submissionArtifact
@@ -195,8 +195,8 @@ func readSubmissionPlan(plan transaction.FrozenPlan) (*AnswerSheetPO, string, er
 	return &po, binding, nil
 }
 
-func materializeSubmission(e transaction.Execution) (bson.Raw, *domain.AnswerSheet, error) {
-	po, binding, err := readSubmissionPlan(e.Plan)
+func materializeSubmission(e transaction.Execution, routes *transport.RouteResolver) (bson.Raw, *domain.AnswerSheet, error) {
+	po, binding, err := readSubmissionPlan(e.Plan, routes)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -43,6 +43,7 @@ func NewTransactionCommands(db *gorm.DB, shared *owner.Committer, seal Messaging
 	if err != nil {
 		return nil, err
 	}
+	archive.routes = shared.Runtime().Routes()
 	return &TransactionCommands{archive: archive, sender: shared.Runtime(), seal: seal}, nil
 }
 
@@ -114,7 +115,7 @@ func (s *TransactionCommands) Submit(ctx context.Context, c app.TransactionComma
 	if err != nil {
 		return err
 	}
-	plan, err := c.Freeze(prepared, sequence)
+	plan, err := c.Freeze(prepared, sequence, s.archive.routes)
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,7 @@ func (s *TransactionCommands) Submit(ctx context.Context, c app.TransactionComma
 	if err := request.Match(winner.Execution.Plan); err != nil {
 		return err
 	}
-	if _, _, err := app.ReadTransactionCommand(winner.Execution.Plan); err != nil {
+	if _, _, err := app.ReadTransactionCommand(winner.Execution.Plan, s.archive.routes); err != nil {
 		return err
 	}
 	if !winner.Acquired {
@@ -147,7 +148,7 @@ func (s *TransactionCommands) readWinner(ctx context.Context, q transaction.Requ
 	if err := q.Match(winner.Execution.Plan); err != nil {
 		return err
 	}
-	if _, _, err := app.ReadTransactionCommand(winner.Execution.Plan); err != nil {
+	if _, _, err := app.ReadTransactionCommand(winner.Execution.Plan, s.archive.routes); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)

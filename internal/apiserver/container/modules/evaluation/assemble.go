@@ -173,7 +173,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "original pending submission writer required")
 		}
 		var err error
-		infra.retrySchedules, err = retrystore.New(normalized.MySQLDB, owner.Binding(), mysqlOptions)
+		infra.retrySchedules, err = retrystore.NewWithPlanReader(normalized.MySQLDB, owner.Binding(), owner.Artifact, mysqlOptions)
 		if err != nil {
 			return nil, err
 		}

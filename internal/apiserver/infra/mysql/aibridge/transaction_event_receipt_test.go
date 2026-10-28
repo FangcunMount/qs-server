@@ -16,7 +16,7 @@ func TestTransactionReceiptBorrowsOriginalRootWithOnePoolSlot(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			a, mock, e := commandArchiveFixture(t)
 			a.db.SetMaxOpenConns(1)
-			c, archive, err := app.ReadTransactionCommand(e.Plan)
+			c, archive, err := app.ReadTransactionCommand(e.Plan, archiveTestRoutes(t))
 			require.NoError(t, err)
 			mock.ExpectBegin()
 			tx, err := a.db.BeginTx(t.Context(), nil)

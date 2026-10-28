@@ -39,7 +39,7 @@ func (s *TransactionCommands) plannedStart(ctx context.Context, actor app.Actor,
 	if err != nil {
 		return nil, true, err
 	}
-	c, a, err := app.ReadTransactionCommand(winner.Execution.Plan)
+	c, a, err := app.ReadTransactionCommand(winner.Execution.Plan, s.archive.routes)
 	if err != nil {
 		return nil, true, err
 	}
@@ -141,7 +141,7 @@ func (s *TransactionCommands) pendingOperation(ctx context.Context, scope app.Op
 	if err != nil {
 		return result, true, err
 	}
-	c, a, err := app.ReadTransactionCommand(winner.Execution.Plan)
+	c, a, err := app.ReadTransactionCommand(winner.Execution.Plan, s.archive.routes)
 	if err != nil {
 		return result, true, err
 	}

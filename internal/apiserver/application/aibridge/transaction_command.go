@@ -128,7 +128,7 @@ func (c TransactionCommand) Body() (*pb.MessagingBody, error) {
 // Freeze runs outside the business root, after the host reads the
 // original aggregate sequence, which the original root must CAS again. It never seals or
 // sends. The SDK reservation winner alone determines future callback input.
-func (c TransactionCommand) Freeze(m *PreparedMessaging, sequence uint64) (transaction.FrozenPlan, error) {
+func (c TransactionCommand) Freeze(m *PreparedMessaging, sequence uint64, routes *transport.RouteResolver) (transaction.FrozenPlan, error) {
 	if c.id == "" || c.hash == [32]byte{} || m == nil || m.Envelope == nil || !bytes.Equal(c.body, m.Body) || m.Envelope.Kind != c.kind || m.Envelope.MessageId != c.id || m.Envelope.AggregateKey != c.aggregate || m.Envelope.CorrelationCommandId != "" || sequence == 0 || sequence == ^uint64(0) {
 		return transaction.FrozenPlan{}, ErrMessagingContract
 	}
@@ -136,7 +136,7 @@ func (c TransactionCommand) Freeze(m *PreparedMessaging, sequence uint64) (trans
 	if err != nil || actual.hash != c.hash {
 		return transaction.FrozenPlan{}, ErrMessagingContract
 	}
-	physical, err := transport.PhysicalTopicV2(CommandsTopic, transport.TransactionMessageType, commandOwner, commandRevision)
+	physical, err := messagingPhysicalTopic(routes, CommandsTopic, "")
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
@@ -149,7 +149,7 @@ func (c TransactionCommand) Freeze(m *PreparedMessaging, sequence uint64) (trans
 
 // ReadTransactionCommand validates a complete winner. It reuses the unchanged
 // v1 archive codec, including unknown header fields and first protected wire.
-func ReadTransactionCommand(p transaction.FrozenPlan) (TransactionCommand, FrozenMessagingArchive, error) {
+func ReadTransactionCommand(p transaction.FrozenPlan, routes *transport.RouteResolver) (TransactionCommand, FrozenMessagingArchive, error) {
 	var empty TransactionCommand
 	var archive FrozenMessagingArchive
 	if !p.Valid() || p.Input().Owner != commandOwner || len(p.Input().Branches) != 1 {
@@ -173,7 +173,7 @@ func ReadTransactionCommand(p transaction.FrozenPlan) (TransactionCommand, Froze
 	if err != nil {
 		return empty, archive, err
 	}
-	physical, err := transport.PhysicalTopicV2(CommandsTopic, transport.TransactionMessageType, commandOwner, commandRevision)
+	physical, err := messagingPhysicalTopic(routes, CommandsTopic, branch.PhysicalTopic)
 	if err != nil || in.Scope != "org:"+scope.OrganizationID || in.OperationID != c.id || branch.ID != c.id || branch.PhysicalTopic != physical || !a.Ordered || !a.RequiresReceipt || a.Sequence == 0 || a.Sequence == ^uint64(0) {
 		return empty, archive, ErrMessagingContract
 	}
@@ -181,4 +181,18 @@ func ReadTransactionCommand(p transaction.FrozenPlan) (TransactionCommand, Froze
 		return empty, archive, err
 	}
 	return c, a, nil
+}
+
+// The host supplies one resolver from its frozen owner manifest. Reads accept
+// exact history, whereas plan construction selects only active capabilities.
+func messagingPhysicalTopic(routes *transport.RouteResolver, topic, recorded string) (string, error) {
+	key := transport.RouteKey{Topic: topic, MessageType: transport.TransactionMessageType, Owner: commandOwner, RouteRevision: commandRevision}
+	var row transport.RouteBinding
+	var err error
+	if recorded == "" {
+		row, err = routes.PublishRoute(key)
+	} else {
+		row, err = routes.RecordedRoute(key, recorded)
+	}
+	return row.PhysicalTopic, err
 }

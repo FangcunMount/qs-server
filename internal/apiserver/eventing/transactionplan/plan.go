@@ -21,7 +21,19 @@ type artifact struct {
 	Wire    []byte `json:"wire"`
 }
 
+// Freeze retains the legacy v2 codec for explicit legacy callers.
 func Freeze(q port.Request, resolver catalog.TopicResolver, owner, revision string) (transaction.FrozenPlan, error) {
+	return freeze(q, resolver, owner, revision, nil)
+}
+
+// FreezeWithRoutes selects exclusively from the owner's active manifest.
+func FreezeWithRoutes(q port.Request, resolver catalog.TopicResolver, owner, revision string, routes *transport.RouteResolver) (transaction.FrozenPlan, error) {
+	if routes == nil {
+		return transaction.FrozenPlan{}, transaction.ErrBinding
+	}
+	return freeze(q, resolver, owner, revision, routes)
+}
+func freeze(q port.Request, resolver catalog.TopicResolver, owner, revision string, routes *transport.RouteResolver) (transaction.FrozenPlan, error) {
 	count := len(q.Events) + len(q.Prepared)
 	if q.Key == "" || len(q.Artifact) == 0 || len(q.Artifact) > 1<<20 || count == 0 || count > transaction.MaxBranches || (len(q.Events) > 0 && len(q.Prepared) > 0) || resolver == nil {
 		return transaction.FrozenPlan{}, transaction.ErrInvalidPlan
@@ -46,7 +58,7 @@ func Freeze(q port.Request, resolver catalog.TopicResolver, owner, revision stri
 		if err != nil {
 			return transaction.FrozenPlan{}, err
 		}
-		physical, err := transport.PhysicalTopicV2(in.Destination, transport.TransactionMessageType, owner, revision)
+		physical, err := physicalRoute(in.Destination, owner, revision, "", routes)
 		if err != nil {
 			return transaction.FrozenPlan{}, err
 		}
@@ -86,6 +98,18 @@ func prepare(q port.Request, resolver catalog.TopicResolver) ([]standard.Prepare
 
 // Artifact reads the reservation winner without re-encoding business JSON.
 func Artifact(p transaction.FrozenPlan, owner, revision string) ([]byte, error) {
+	return artifactBody(p, owner, revision, nil)
+}
+
+// ArtifactWithRoutes accepts exact active or historical evidence. It grants no
+// execution capability and never rebuilds a recorded plan or its first wire.
+func ArtifactWithRoutes(p transaction.FrozenPlan, owner, revision string, routes *transport.RouteResolver) ([]byte, error) {
+	if routes == nil {
+		return nil, transaction.ErrBinding
+	}
+	return artifactBody(p, owner, revision, routes)
+}
+func artifactBody(p transaction.FrozenPlan, owner, revision string, routes *transport.RouteResolver) ([]byte, error) {
 	if !p.Valid() || p.Input().Owner != owner {
 		return nil, transaction.ErrInvalidPlan
 	}
@@ -97,7 +121,7 @@ func Artifact(p transaction.FrozenPlan, owner, revision string) ([]byte, error) 
 			return nil, transaction.ErrInvalidPlan
 		}
 		canonical, err := json.Marshal(a)
-		physical, routeErr := transport.PhysicalTopicV2(in.Destination, transport.TransactionMessageType, owner, revision)
+		physical, routeErr := physicalRoute(in.Destination, owner, revision, branch.PhysicalTopic, routes)
 		if err != nil || routeErr != nil || !bytes.Equal(canonical, in.Payload) || branch.ID != in.ID || branch.RouteRevision != revision || branch.PhysicalTopic != physical || in.Producer != "qs-server" {
 			return nil, transaction.ErrInvalidPlan
 		}
@@ -116,4 +140,19 @@ func Artifact(p transaction.FrozenPlan, owner, revision string) ([]byte, error) 
 		body = bytes.Clone(a.Body)
 	}
 	return body, nil
+}
+
+func physicalRoute(topic, owner, revision, recorded string, routes *transport.RouteResolver) (string, error) {
+	if routes == nil {
+		return transport.PhysicalTopicV2(topic, transport.TransactionMessageType, owner, revision)
+	}
+	key := transport.RouteKey{Topic: topic, MessageType: transport.TransactionMessageType, Owner: owner, RouteRevision: revision}
+	var row transport.RouteBinding
+	var err error
+	if recorded == "" {
+		row, err = routes.PublishRoute(key)
+	} else {
+		row, err = routes.RecordedRoute(key, recorded)
+	}
+	return row.PhysicalTopic, err
 }

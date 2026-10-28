@@ -13,7 +13,7 @@ import (
 )
 
 func (s *TransactionEvents) eventRoot(ctx context.Context, incoming app.FrozenIncomingEvent, execution transaction.Execution, ack app.FrozenMessagingArchive) (transaction.LocalOutcome, error) {
-	if _, err := incoming.ReadACK(execution.Plan); err != nil {
+	if _, err := incoming.ReadACK(execution.Plan, s.archive.routes); err != nil {
 		return transaction.LocalUnknown, err
 	}
 	header, raw, wire, organization := incoming.Input()
@@ -99,7 +99,7 @@ func (s *TransactionEvents) refuseHistoricalInbox(ctx context.Context, incoming 
 }
 
 func (s *TransactionEvents) verifyCommittedEvent(ctx context.Context, incoming app.FrozenIncomingEvent, execution transaction.Execution, duplicate bool) error {
-	ack, err := incoming.ReadACK(execution.Plan)
+	ack, err := incoming.ReadACK(execution.Plan, s.archive.routes)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
@@ -20,6 +21,9 @@ func (c *Committer) RetryAborted(ctx context.Context, previous transaction.Execu
 		return transaction.Reservation{}, transaction.ErrInvalidPlan
 	}
 	if err := c.validatePlan(previous.Plan); err != nil {
+		return transaction.Reservation{}, err
+	}
+	if err := shared.RequireActiveRoutes(previous.Plan, c.routes); err != nil {
 		return transaction.Reservation{}, err
 	}
 	if c.runtime == nil || !c.runtime.Stats().Ready {

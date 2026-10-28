@@ -195,3 +195,34 @@ func TestDeferredStoreRefusesInvalidRoutesSourcesAndImplicitSchema(t *testing.T)
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT protocol_version,transport_identity_hash,received_timestamp,consumed_at,used_manual_replay_request_id FROM retry_event_hold LIMIT 0")).WillReturnError(errors.New("explicit migration absent"))
 	require.Error(t, store.Validate(context.Background()))
 }
+
+func TestReadableDeferredStoreKeepsOldDeliveryIdentityWithoutOldSubscription(t *testing.T) {
+	oldStore, mock, message := deferredFixture(t)
+	_ = mock
+	history := deferredRoutes(t)
+	active := append([]rmtransport.RouteBinding(nil), history...)
+	for i := range active {
+		r := &active[i]
+		r.NamingScheme = rmtransport.ReadableNamingV1
+		var err error
+		r.PhysicalTopic, err = rmtransport.PhysicalTopicV3(r.Topic, r.MessageType, r.Owner, r.RouteRevision)
+		require.NoError(t, err)
+		r.ConsumerGroup, err = rmtransport.ConsumerGroupV3(r.Topic, r.Subscription)
+		require.NoError(t, err)
+	}
+	store, err := NewRocketMQDeferredStoreWithHistory(oldStore.original, "qs-worker", 8, active, history)
+	require.NoError(t, err)
+	_, err = store.eventType(message)
+	require.NoError(t, err, "old deferred delivery must keep its exact original identity")
+	require.ErrorIs(t, store.HoldDelivery(context.Background(), message, eventcatalog.EvaluationRetryRequested, eventruntime.ErrAutomaticRetryPaused), ErrHistoricalDelivery, "historical read permission created a new hold")
+	require.NoError(t, mock.ExpectationsWereMet(), "historical hold attempted database IO")
+	resolver, err := rmtransport.NewRouteResolver(active, history)
+	require.NoError(t, err)
+	subscribed, err := resolver.SubscriptionRoutes("qs.evaluation.lifecycle", "qs-worker")
+	require.NoError(t, err)
+	require.Len(t, subscribed, 2)
+	for _, r := range subscribed {
+		require.Equal(t, rmtransport.ReadableNamingV1, r.NamingScheme)
+	}
+	require.Equal(t, history[0].PhysicalTopic, message.PhysicalTopic)
+}

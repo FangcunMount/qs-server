@@ -1,7 +1,6 @@
 package options
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -54,22 +53,8 @@ func (o TransactionOptions) ProtocolLimits(owner string) (transaction.Limits, er
 }
 
 func decodeRouteManifest(raw []byte) ([]transport.RouteBinding, error) {
-	var manifest struct {
-		Version int                      `json:"version"`
-		Routes  []transport.RouteBinding `json:"routes"`
-	}
-	if json.Unmarshal(raw, &manifest) != nil || (manifest.Version != 1 && manifest.Version != 2) {
-		return nil, errors.New("invalid RocketMQ route manifest version")
-	}
-	for _, r := range manifest.Routes {
-		if (manifest.Version == 1 && (r.MessageType != "" || r.Owner != "" || r.RouteRevision != "")) || (manifest.Version == 2 && r.MessageType == "") {
-			return nil, errors.New("RocketMQ route fields conflict with manifest version")
-		}
-	}
-	if err := transport.ValidateRoutes(manifest.Routes); err != nil {
-		return nil, err
-	}
-	return manifest.Routes, nil
+	m, err := transport.ParseRouteManifest(raw)
+	return m.Routes, err
 }
 
 func transactionRoutes(routes []transport.RouteBinding, owner string, o TransactionOptions, topics []string) ([]rocketmq.TransactionRoute, error) {
@@ -95,13 +80,13 @@ func transactionRoutes(routes []transport.RouteBinding, owner string, o Transact
 		if seen[r.PhysicalTopic] {
 			continue
 		}
-		canonical, err := transport.PhysicalTopicV2(r.Topic, r.MessageType, r.Owner, r.RouteRevision)
+		canonical, err := transport.ExpectedPhysicalTopic(r.Topic, r.MessageType, r.Owner, r.RouteRevision, r.NamingScheme)
 		if err != nil || canonical != r.PhysicalTopic {
 			return nil, errors.New("noncanonical transaction route")
 		}
 		seen[r.PhysicalTopic] = true
 		wanted[r.Topic] = true
-		selected = append(selected, rocketmq.TransactionRoute{LogicalTopic: r.Topic, PhysicalTopic: r.PhysicalTopic, Revision: r.RouteRevision})
+		selected = append(selected, rocketmq.TransactionRoute{LogicalTopic: r.Topic, PhysicalTopic: r.PhysicalTopic, Revision: r.RouteRevision, NamingScheme: r.NamingScheme})
 	}
 	for _, found := range wanted {
 		if !found {
@@ -136,5 +121,12 @@ func (o *RocketMQOptions) TransactionConfig(owner string, topics []string) (rock
 	if err != nil {
 		return rocketmq.TransactionConfig{}, err
 	}
-	return rocketmq.TransactionConfig{TLS: base.TLS, Endpoint: base.Endpoint, AccessKey: base.AccessKey, SecretKey: base.SecretKey, Owner: owner, Routes: routes, Limits: limits}, nil
+	var history []rocketmq.TransactionRoute
+	if len(base.HistoricalRoutes) > 0 {
+		history, err = transactionRoutes(base.HistoricalRoutes, owner, binding, topics)
+		if err != nil {
+			return rocketmq.TransactionConfig{}, err
+		}
+	}
+	return rocketmq.TransactionConfig{TLS: base.TLS, Endpoint: base.Endpoint, AccessKey: base.AccessKey, SecretKey: base.SecretKey, Owner: owner, Routes: routes, HistoricalRoutes: history, Limits: limits}, nil
 }
