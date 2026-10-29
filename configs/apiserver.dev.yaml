@@ -129,7 +129,7 @@ mysql:
 # 3.2 数据库迁移配置
 # -------------------------------------------------------
 migration:
-  enabled: true  # 是否启用自动迁移
+  enabled: false # Transaction schemas and bindings are installed offline.
   autoseed: false  # 是否自动加载种子数据（仅开发/测试环境）
   database: "qs"  # 数据库名称
 
@@ -473,26 +473,37 @@ mongodb:
 # -------------------------------------------------------
 # 4.1 消息队列（NSQ）
 # -------------------------------------------------------
+# Local material must match the installed development Broker and database bindings.
+# See docs/04-接口与运维/13-RocketMQ开发与退役验收.md.
 messaging:
-  # 是否启用消息队列（false 则使用 logging 模式）
   enabled: true
-  
-  # 当前仅支持 NSQ
-  provider: nsq
-  
-  # NSQ 配置（开发环境默认）
-  nsq-addr: "127.0.0.1:4150"           # NSQ Daemon 地址（用于发布）
-  nsq-lookupd-addr: "127.0.0.1:4161"   # NSQ Lookupd 地址（apiserver 不需要，但保留配置）
-  nsqd-http-endpoints: ["http://127.0.0.1:4151"]
-  primary-worker-channel: "qs-worker"
+  provider: rocketmq
+  rocketmq:
+    endpoint: "127.0.0.1:8081"
+    credentials_file: "configs/rocketmq/api-credentials.json"
+    ca_file: "configs/rocketmq/ca.crt"
+    routes_file: "configs/rocketmq/api-routes.json"
+    instance_id: "qs-apiserver-dev"
+    publish_enabled: true
+    transactions:
+      qs.mysql:
+        credentials_file: "configs/rocketmq/mysql-credentials.json"
+        store_id: "qs-dev-mysql"
+        writer_epoch: "dev-1"
+        route_revision: "m3-1"
+      qs.mongo:
+        credentials_file: "configs/rocketmq/mongo-credentials.json"
+        store_id: "qs-dev-mongo"
+        writer_epoch: "dev-1"
+        route_revision: "m3-1"
 
 # hot-rank 与主 worker 共用 Topic、使用独立 channel；Redis 失败只重试本 channel。
 # messaging.enabled=false 时不订阅，status 显示 disabled。
 eventing:
-  # Legacy writers have retired; both business flows use their standard Outbox.
+  # Both stores use their transaction owner; publishing Outbox profiles are retired.
   standard_outbox:
-    mongo: true
-    assessment: true
+    mongo: false
+    assessment: false
   consumers:
     modelcatalog-hot-rank:
       enabled: true

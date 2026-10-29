@@ -1,6 +1,9 @@
 package process
 
 import (
+	"github.com/FangcunMount/qs-server/pkg/app"
+	"github.com/spf13/viper"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +12,25 @@ import (
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
+
+func TestDevelopmentConfigSelectsConsumeOnlyRocketMQ(t *testing.T) {
+	v := viper.New()
+	v.SetConfigFile(filepath.Join("..", "..", "..", "configs", "worker.dev.yaml"))
+	if err := v.ReadInConfig(); err != nil {
+		t.Fatal(err)
+	}
+	opts := workeroptions.NewOptions()
+	if err := app.DecodeOptions(v, opts); err != nil {
+		t.Fatal(err)
+	}
+	s := &server{config: &workerconfig.Config{Options: opts}}
+	if err := s.validateFinalMessaging(); err != nil {
+		t.Fatal(err)
+	}
+	if err := opts.Messaging.RocketMQ.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestRetiredWorkerModeCannotEnterRuntime(t *testing.T) {
 	for _, kind := range []string{"nsq", "empty", "ordinary_writer", "owner_on_worker"} {

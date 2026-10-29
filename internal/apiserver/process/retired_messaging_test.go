@@ -2,6 +2,9 @@ package process
 
 import (
 	"errors"
+	"github.com/FangcunMount/qs-server/pkg/app"
+	"github.com/spf13/viper"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +13,24 @@ import (
 	apioptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
+
+func TestDevelopmentConfigSelectsFinalTransactionOwners(t *testing.T) {
+	v := viper.New()
+	v.SetConfigFile(filepath.Join("..", "..", "..", "configs", "apiserver.dev.yaml"))
+	if err := v.ReadInConfig(); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &apiconfig.Config{Options: apioptions.NewOptions()}
+	if err := app.DecodeOptions(v, cfg.Options); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateFinalMessaging(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.MessagingOptions.RocketMQ.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func finalMessageConfig() *apiconfig.Config {
 	cfg := &apiconfig.Config{Options: apioptions.NewOptions()}

@@ -468,26 +468,21 @@ func TestPerfObservabilityNginxUsesAggregateReadOnlyRoutes(t *testing.T) {
 	observability := readDeploymentContractFile(t, "configs", "nginx", "conf.d", "perf-observability.fangcunmount.cn.conf")
 	for _, required := range []string{
 		"server_name worker.fangcunmount.cn;",
-		"server_name nsqd.fangcunmount.cn;",
 		"location = /metrics",
 		"location = /readyz",
-		"location = /stats",
-		"location = /nodes",
 		`job%3D%22qs-worker%22`,
 		`component%3D%22qs-worker%22`,
 		`exported_component%3D%22worker%22`,
 		"http://prometheus:9090",
-		"http://nsqd:4151",
-		"http://nsqlookupd:4161",
 		"limit_except GET",
 	} {
 		if !strings.Contains(observability, required) {
 			t.Errorf("perf observability Nginx config must contain %q", required)
 		}
 	}
-	for _, forbidden := range []string{"/topic/create", "/topic/delete", "/channel/create", "/channel/delete"} {
+	for _, forbidden := range []string{"nsqd", "nsqlookupd", "/topic/create", "/topic/delete", "/channel/create", "/channel/delete"} {
 		if strings.Contains(observability, forbidden) {
-			t.Errorf("public NSQ observability config must not expose mutation route %q", forbidden)
+			t.Errorf("application observability config must not retain %q", forbidden)
 		}
 	}
 
