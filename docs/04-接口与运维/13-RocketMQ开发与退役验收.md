@@ -26,9 +26,18 @@ QS API、Worker 与 IAM 的开发入口使用 RocketMQ。API 使用 `qs.mysql`�
 | 里程碑 | 源码与隔离验收 | 运行／生产验收 |
 | --- | --- | --- |
 | M1 发布与开发入口 | 移除 NSQ 发布门禁，更新开发配置；检查结果见交付记录 | 尚未执行完整联调和生产发布 |
-| M2 指标与后台 | 进行中 | 未执行 |
+| M2 指标与后台 | 当前回执统计、后台页面与事务看板已更新；MySQL、UI 与 Prometheus 定向检查通过 | 未部署 |
 | M3 恢复与 CI | 未开始 | 未执行 |
 | M4 旧代码清理 | 未开始 | 未执行 |
 | M5 旧表退役 | 未开始；M4 部署后才进入 | 未执行，无生产 DDL |
 
 旧发布表在 M5 之前保留。状态历史、业务 ACK、会话撤销任务、事务凭证和调度记录继续保留。
+
+## 当前消息指标
+
+- `qs_server_ai_mq_awaiting_command_receipts`：有已提交事务档案、尚未收到 accepted/rejected 的当前命令；held 单独统计。
+- `qs_ai_mq_pending_interpretation_receipts`：由 MQ 持有、尚未收到 QS 业务 ACK 的解读状态历史；不代表所有评测事件或 Broker 队列深度。
+- `reliable_messaging_transaction_*`：继续负责原事务准备、确认观察缺口与 Checker 状态。
+- `*_observation_available=0`：本次读取不可用，不生成零积压结论。
+
+原 staged/due/Outbox held 指标退役。后台“事务消息指标”链接对应 infra 的 `event-transactions` dashboard；使用自定义地址时配置 `REACT_APP_GRAFANA_EVENT_TRANSACTIONS_URL`。新查询没有增加表或修改冻结消息。
