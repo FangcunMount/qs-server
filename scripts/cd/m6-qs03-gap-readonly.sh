@@ -118,7 +118,7 @@ try:
     if not isinstance(report.get("scanned"), int) or not isinstance(report.get("complete"), bool):
         fail("scanner_report_invalid")
     counts = report.get("counts")
-    allowed = {"assessment_present", "not_required", "missing_confirmed", "delivery_pending", "unknown", "manual_required"}
+    allowed = {"assessment_present", "not_required", "missing_committed", "missing_confirmed", "delivery_pending", "unknown", "manual_required"}
     if not isinstance(counts, dict) or not set(counts).issubset(allowed) or any(not isinstance(value, int) or value < 0 for value in counts.values()):
         fail("scanner_categories_invalid")
     public_summary = {
@@ -130,7 +130,7 @@ try:
     print("QS-03 read-only audit: " + json.dumps(public_summary, sort_keys=True))
     if not report["complete"]:
         fail("audit_incomplete_private_cursor_required")
-    if any(counts.get(name, 0) for name in ("missing_confirmed", "delivery_pending", "unknown", "manual_required")):
+    if any(counts.get(name, 0) for name in ("missing_committed", "missing_confirmed", "delivery_pending", "unknown", "manual_required")):
         fail("actionable_gap_detected")
     if result.returncode != 0:
         fail("scanner_status_mismatch")
