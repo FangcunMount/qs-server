@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, codex/rocketmq-retirement-m2]
+    branches: [main, codex/rocketmq-retirement-m2, codex/rocketmq-retirement-m3a]
 
 permissions:
   contents: read
@@ -583,6 +583,25 @@ jobs:
             fi
             sleep 2
           done
+
+      - name: Verify current AnswerSheet gap source and recovery on owned databases
+        env:
+          QS_GAP_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true
+          QS_GAP_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=5m -v \
+            -run '^TestCurrentGap(ScanAndRecoveryWithoutOutbox|RejectsMissingOrConflictingSource|MixedHistoricalAndCommittedSources)$' \
+            ./internal/apiserver/infra/answersheetgap \
+            | tee "${RUNNER_TEMP}/answersheet-current-gap.log"
+          for test_name in \
+            TestCurrentGapScanAndRecoveryWithoutOutbox \
+            TestCurrentGapRejectsMissingOrConflictingSource \
+            TestCurrentGapMixedHistoricalAndCommittedSources; do
+            grep -q -- "=== RUN   ${test_name}$" "${RUNNER_TEMP}/answersheet-current-gap.log"
+            grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/answersheet-current-gap.log"
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/answersheet-current-gap.log"; then exit 1; fi
 
       - name: Run retirement and retry persistence integration tests
         env:

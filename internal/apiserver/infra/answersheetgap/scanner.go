@@ -6,10 +6,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -17,6 +19,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"gorm.io/gorm"
 )
 
@@ -32,6 +36,7 @@ const (
 	Present         Disposition = "assessment_present"
 	NotRequired     Disposition = "not_required"
 	Missing         Disposition = "missing_confirmed"
+	CommittedGap    Disposition = "missing_committed"
 	DeliveryPending Disposition = "delivery_pending"
 	Unknown         Disposition = "unknown"
 	ManualRequired  Disposition = "manual_required"
@@ -51,8 +56,9 @@ type Page struct {
 	Exhausted bool
 }
 
-// Scanner performs bounded, read-only cross-store checks. A published Outbox
-// state is never treated as proof that any consumer has completed its effect.
+// Scanner reads each bounded Mongo page and its original evidence in one
+// primary snapshot. MySQL effects are separate facts, not a cross-store atomic
+// snapshot. Neither local commit nor Broker confirmation proves completion.
 type Scanner struct {
 	mongo *mongo.Database
 	mysql *gorm.DB
@@ -81,8 +87,11 @@ type sheetRow struct {
 		ModelAlgorithm string `bson:"model_algorithm"`
 	} `bson:"admission"`
 	DurableAcceptance struct {
-		EventID    string    `bson:"event_id"`
-		AcceptedAt time.Time `bson:"accepted_at"`
+		SchemaVersion       uint32                    `bson:"schema_version"`
+		EventID             string                    `bson:"event_id"`
+		AcceptedAt          time.Time                 `bson:"accepted_at"`
+		TransactionEvidence *evidence.EventEvidenceV2 `bson:"transaction_evidence"`
+		EventEvidence       *evidence.EventEvidenceV1 `bson:"event_evidence"`
 	} `bson:"durable_acceptance"`
 }
 
@@ -107,11 +116,34 @@ func (s *Scanner) ScanPage(ctx context.Context, afterID, upperID uint64, accepte
 	if s == nil || s.mongo == nil || s.mysql == nil || upperID == 0 || upperID < afterID || acceptedBefore.IsZero() || limit < 1 || limit > 500 {
 		return Page{}, fmt.Errorf("invalid answersheet gap scan request")
 	}
+	if mongo.SessionFromContext(ctx) != nil {
+		return Page{}, fmt.Errorf("answersheet gap scanner owns its Mongo snapshot")
+	}
+	session, err := s.mongo.Client().StartSession()
+	if err != nil {
+		return Page{}, err
+	}
+	defer session.EndSession(context.Background())
+	if err := session.StartTransaction(options.Transaction().SetReadConcern(readconcern.Snapshot()).SetReadPreference(readpref.Primary())); err != nil {
+		return Page{}, err
+	}
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = session.AbortTransaction(cleanup)
+	}()
+	return s.scanPage(mongo.NewSessionContext(ctx, session), afterID, upperID, acceptedBefore, limit)
+}
+
+func (s *Scanner) scanPage(ctx context.Context, afterID, upperID uint64, acceptedBefore time.Time, limit int) (Page, error) {
 	filter := bson.M{
-		"durable_acceptance.schema_version": 1,
-		"durable_acceptance.accepted_at":    bson.M{"$lte": acceptedBefore.UTC()},
-		"deleted_at":                        nil,
-		"domain_id":                         bson.M{"$gt": afterID, "$lte": upperID},
+		"durable_acceptance": bson.M{"$ne": nil},
+		"$or": bson.A{
+			bson.M{"durable_acceptance.accepted_at": bson.M{"$lte": acceptedBefore.UTC()}},
+			bson.M{"durable_acceptance.accepted_at": bson.M{"$not": bson.M{"$type": "date"}}},
+		},
+		"deleted_at": nil,
+		"domain_id":  bson.M{"$gt": afterID, "$lte": upperID},
 	}
 	cur, err := s.mongo.Collection("answersheets").Find(ctx, filter, options.Find().SetHint("idx_answersheet_durable_audit").SetSort(bson.D{{Key: "domain_id", Value: 1}}).SetLimit(int64(limit)).SetProjection(bson.M{
 		"domain_id": 1, "org_id": 1, "testee_id": 1, "filler_id": 1,
@@ -139,19 +171,20 @@ func (s *Scanner) ScanPage(ctx context.Context, afterID, upperID uint64, accepte
 		page.Exhausted = true
 	}
 	var assessments []struct {
-		ID            uint64 `gorm:"column:id"`
-		OrgID         uint64 `gorm:"column:org_id"`
-		AnswerSheetID uint64 `gorm:"column:answer_sheet_id"`
+		ID            uint64     `gorm:"column:id"`
+		OrgID         uint64     `gorm:"column:org_id"`
+		AnswerSheetID uint64     `gorm:"column:answer_sheet_id"`
+		DeletedAt     *time.Time `gorm:"column:deleted_at"`
 	}
-	if err := s.mysql.WithContext(ctx).Table("assessment").Select("id,org_id,answer_sheet_id").Where("answer_sheet_id IN ? AND deleted_at IS NULL", ids).Find(&assessments).Error; err != nil {
+	if err := s.mysql.WithContext(ctx).Table("assessment").Select("id,org_id,answer_sheet_id,deleted_at").Where("answer_sheet_id IN ?", ids).Find(&assessments).Error; err != nil {
 		for _, sheet := range sheets {
 			page.Findings = append(page.Findings, Finding{AnswerSheetID: sheet.DomainID, EventID: sheet.DurableAcceptance.EventID, Disposition: Unknown, Reason: "assessment_query_failed"})
 		}
 		return page, fmt.Errorf("query assessment effects: %w", err)
 	}
-	bySheet := make(map[uint64][]struct{ id, orgID uint64 }, len(assessments))
+	bySheet := make(map[uint64][]assessmentEffect, len(assessments))
 	for _, a := range assessments {
-		bySheet[a.AnswerSheetID] = append(bySheet[a.AnswerSheetID], struct{ id, orgID uint64 }{a.ID, a.OrgID})
+		bySheet[a.AnswerSheetID] = append(bySheet[a.AnswerSheetID], assessmentEffect{a.ID, a.OrgID, a.DeletedAt != nil})
 	}
 	for _, sheet := range sheets {
 		finding := s.classify(ctx, sheet, bySheet[sheet.DomainID])
@@ -160,19 +193,23 @@ func (s *Scanner) ScanPage(ctx context.Context, afterID, upperID uint64, accepte
 	return page, nil
 }
 
-func (s *Scanner) classify(ctx context.Context, sheet sheetRow, assessments []struct{ id, orgID uint64 }) Finding {
+type assessmentEffect struct {
+	id, orgID uint64
+	deleted   bool
+}
+
+func (s *Scanner) classify(ctx context.Context, sheet sheetRow, assessments []assessmentEffect) Finding {
 	f := Finding{AnswerSheetID: sheet.DomainID, EventID: sheet.DurableAcceptance.EventID}
-	if sheet.DomainID == 0 || sheet.OrgID == 0 || sheet.DurableAcceptance.EventID == "" || sheet.Admission == nil {
+	if sheet.DomainID == 0 || sheet.OrgID == 0 || sheet.DurableAcceptance.EventID == "" || sheet.DurableAcceptance.AcceptedAt.IsZero() || sheet.Admission == nil {
 		f.Disposition, f.Reason = ManualRequired, "incomplete_frozen_answer_sheet"
 		return f
 	}
-	id := bson.D{{Key: "producer", Value: producer}, {Key: "message_id", Value: f.EventID}, {Key: "destination", Value: destination}}
-	var row outboxRow
-	if err := s.mongo.Collection("rm_outbox").FindOne(ctx, bson.M{"_id": id}).Decode(&row); err != nil {
-		if err == mongo.ErrNoDocuments {
-			f.Disposition, f.Reason = ManualRequired, "original_outbox_missing"
+	row, _, err := s.originalIntent(ctx, sheet)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) || errors.Is(err, ErrUnsafeRecoverySource) {
+			f.Disposition, f.Reason = ManualRequired, "original_source_missing_or_conflicting"
 		} else {
-			f.Disposition, f.Reason = Unknown, "original_outbox_query_failed"
+			f.Disposition, f.Reason = Unknown, "original_source_query_failed"
 		}
 		return f
 	}
@@ -182,6 +219,10 @@ func (s *Scanner) classify(ctx context.Context, sheet sheetRow, assessments []st
 	}
 	if len(assessments) > 1 || len(assessments) == 1 && assessments[0].orgID != sheet.OrgID {
 		f.Disposition, f.Reason = ManualRequired, "assessment_identity_conflict"
+		return f
+	}
+	if len(assessments) == 1 && assessments[0].deleted {
+		f.Disposition, f.Reason, f.AssessmentID = ManualRequired, "assessment_previously_accepted", assessments[0].id
 		return f
 	}
 	if sheet.Admission.Purpose == string(payload.AdmissionPurposeIndependentQuestionnaire) {
@@ -198,6 +239,11 @@ func (s *Scanner) classify(ctx context.Context, sheet sheetRow, assessments []st
 	}
 	if len(assessments) == 1 {
 		f.Disposition, f.AssessmentID = Present, assessments[0].id
+		return f
+	}
+	if sheet.DurableAcceptance.SchemaVersion == 2 {
+		// A local commit proves acceptance, not Broker confirmation or consumer completion.
+		f.Disposition, f.Reason = CommittedGap, "committed_submission_without_assessment"
 		return f
 	}
 	switch row.State {

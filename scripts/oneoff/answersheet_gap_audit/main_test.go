@@ -19,6 +19,17 @@ type scannerStep struct {
 	err  error
 }
 
+func TestCurrentCommittedGapIsNotACleanAudit(t *testing.T) {
+	scanner := &scriptedScanner{steps: []scannerStep{{page: answersheetgap.Page{
+		Findings: []answersheetgap.Finding{{AnswerSheetID: 11, EventID: "current-event", Disposition: answersheetgap.CommittedGap}},
+		NextID:   11, Exhausted: true,
+	}}}}
+	result, err := scanWindow(t.Context(), scanner, config{afterID: 10, upperID: 20, batchSize: 10, maxSheets: 10}, time.Now())
+	if err != nil || result.Counts[answersheetgap.CommittedGap] != 1 || reportExitCode(result) != 2 {
+		t.Fatalf("committed source without an Assessment was reported clean: result=%+v err=%v", result, err)
+	}
+}
+
 type scriptedScanner struct {
 	steps []scannerStep
 	calls int

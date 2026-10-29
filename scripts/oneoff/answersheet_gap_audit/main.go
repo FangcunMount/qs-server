@@ -114,10 +114,14 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		writeDiagnostic(stderr, "answersheet gap audit: encode report: %v\n", err)
 		return 1
 	}
+	return reportExitCode(result)
+}
+
+func reportExitCode(result report) int {
 	if !result.Complete {
 		return 3
 	}
-	if result.Counts[answersheetgap.Missing]+result.Counts[answersheetgap.ManualRequired]+
+	if result.Counts[answersheetgap.Missing]+result.Counts[answersheetgap.CommittedGap]+result.Counts[answersheetgap.ManualRequired]+
 		result.Counts[answersheetgap.Unknown]+result.Counts[answersheetgap.DeliveryPending] > 0 {
 		return 2
 	}
@@ -261,7 +265,7 @@ func scanWindow(ctx context.Context, scanner pageScanner, cfg config, cutoff tim
 				return report{}, fmt.Errorf("scanner returned an answer sheet outside the fixed ID window")
 			}
 			switch finding.Disposition {
-			case answersheetgap.Present, answersheetgap.NotRequired, answersheetgap.Missing,
+			case answersheetgap.Present, answersheetgap.NotRequired, answersheetgap.Missing, answersheetgap.CommittedGap,
 				answersheetgap.DeliveryPending, answersheetgap.Unknown, answersheetgap.ManualRequired:
 			default:
 				return report{}, fmt.Errorf("scanner returned an unknown disposition")
