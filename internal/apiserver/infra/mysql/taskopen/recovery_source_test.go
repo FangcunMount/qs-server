@@ -2,11 +2,13 @@ package taskopen
 
 import (
 	"encoding/json"
+	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	"testing"
 	"time"
 
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	"github.com/FangcunMount/reliable-messaging/transaction"
+	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +27,7 @@ func recoveryPlanFixture(t *testing.T) transaction.FrozenPlan {
 
 func TestRecoveryOpeningUsesOriginalPrivateArtifactAndWire(t *testing.T) {
 	plan := recoveryPlanFixture(t)
-	o, err := readRecoveryOpening(plan)
+	o, err := readRecoveryOpening(plan, boundary.Artifact)
 	require.NoError(t, err)
 	require.Equal(t, plan.Input().Branches[0].Message.Input().ID, o.Request.OpeningEventID)
 	require.Equal(t, o.Task.ID.String(), o.Request.Intent.TaskID)
@@ -80,8 +82,58 @@ func TestRecoveryOpeningRejectsChangedRequestOrWire(t *testing.T) {
 			if err != nil {
 				return
 			}
-			_, err = readRecoveryOpening(plan)
+			_, err = readRecoveryOpening(plan, boundary.Artifact)
 			require.ErrorIs(t, err, ErrUnsafeRecoveryOpening)
 		})
 	}
+}
+
+// Match the same manifest-aware verifier used by the production owner. Legacy
+// evidence is readable only when that exact physical route is registered.
+func TestRecoveryOpeningUsesOwnerRoutesWithoutRewritingOriginalPlan(t *testing.T) {
+	const topic, owner, revision = "qs.plan.task", "qs.mysql", "m3-1"
+	physical, err := transport.PhysicalTopicV3(topic, transport.TransactionMessageType, owner, revision)
+	require.NoError(t, err)
+	active := transport.RouteBinding{Topic: topic, PhysicalTopic: physical, MessageType: transport.TransactionMessageType, Owner: owner, RouteRevision: revision, NamingScheme: transport.ReadableNamingV1}
+	old := active
+	old.NamingScheme = ""
+	old.PhysicalTopic, err = transport.PhysicalTopicV2(topic, transport.TransactionMessageType, owner, revision)
+	require.NoError(t, err)
+	routes, err := transport.NewRouteResolver([]transport.RouteBinding{active}, []transport.RouteBinding{old})
+	require.NoError(t, err)
+	q, err := freeze(openedTask(t), 1)
+	require.NoError(t, err)
+	current, err := shared.FreezeWithRoutes(q, recoveryRoutes{}, owner, revision, routes)
+	require.NoError(t, err)
+	historical, err := shared.Freeze(q, recoveryRoutes{}, owner, revision)
+	require.NoError(t, err)
+	verify := func(p transaction.FrozenPlan) ([]byte, error) {
+		return shared.ArtifactWithRoutes(p, owner, revision, routes)
+	}
+	for _, plan := range []transaction.FrozenPlan{current, historical} {
+		before, err := transaction.EncodePlan(plan)
+		require.NoError(t, err)
+		opening, err := readRecoveryOpening(plan, verify)
+		require.NoError(t, err)
+		require.True(t, opening.MatchesCurrent(&opening.Task))
+		after, err := transaction.EncodePlan(plan)
+		require.NoError(t, err)
+		require.Equal(t, before, after)
+	}
+	_, err = readRecoveryOpening(current, boundary.Artifact)
+	require.ErrorIs(t, err, ErrUnsafeRecoveryOpening, "legacy-only verifier must not accept current routes")
+	_, err = readRecoveryOpening(current, nil)
+	require.ErrorIs(t, err, ErrUnsafeRecoveryOpening)
+	activeOnly, err := transport.NewRouteResolver([]transport.RouteBinding{active}, nil)
+	require.NoError(t, err)
+	_, err = readRecoveryOpening(historical, func(p transaction.FrozenPlan) ([]byte, error) {
+		return shared.ArtifactWithRoutes(p, owner, revision, activeOnly)
+	})
+	require.ErrorIs(t, err, ErrUnsafeRecoveryOpening, "unregistered history must not authorize recovery")
+	changed := current.Input()
+	changed.Branches[0].PhysicalTopic = "other"
+	wrong, err := transaction.NewPlan(changed)
+	require.NoError(t, err)
+	_, err = readRecoveryOpening(wrong, verify)
+	require.ErrorIs(t, err, ErrUnsafeRecoveryOpening)
 }

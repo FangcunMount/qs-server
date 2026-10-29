@@ -21,6 +21,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 )
@@ -42,6 +43,7 @@ type RESTSystemGovernanceInput struct {
 	ReportResolutionReader    interpretationreadmodel.ReportResolutionReader
 	TaskOpenedReminderEnabled bool
 	TaskOpenedReminderService notification.TaskOpenedReminderService
+	TaskOpeningArtifact       func(transaction.FrozenPlan) ([]byte, error)
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -86,8 +88,8 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	currentReminderEnabled := false
 	gapRecoveryEnabled := false
 	if in.MySQLDB != nil {
-		currentReminderRecovery = governanceinfra.NewCurrentReminderRecovery(in.MySQLDB, in.TaskOpenedReminderService)
-		currentReminderEnabled = in.Options != nil && in.Options.Retry != nil && in.Options.Retry.GapRecoveryEnabled && in.TaskOpenedReminderEnabled && in.TaskOpenedReminderService != nil
+		currentReminderRecovery = governanceinfra.NewCurrentReminderRecovery(in.MySQLDB, in.TaskOpenedReminderService, in.TaskOpeningArtifact)
+		currentReminderEnabled = in.Options != nil && in.Options.Retry != nil && in.Options.Retry.GapRecoveryEnabled && in.TaskOpenedReminderEnabled && in.TaskOpenedReminderService != nil && in.TaskOpeningArtifact != nil
 		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
 		pendingReplayAuditReader = reader
 		deliveryReplayReviewReader = reader

@@ -341,7 +341,7 @@ func m3cOpeningDiagnostic(t *testing.T, db *gorm.DB, owner *mysqlboundary.Commit
 	values["original_lookup"] = err == nil
 	if err == nil {
 		plan := r.Execution.Plan
-		artifact, err := mysqlboundary.Artifact(plan)
+		artifact, err := owner.Artifact(plan)
 		values["artifact_valid"] = err == nil
 		var original struct{ Task planrepo.AssessmentTaskPO }
 		if err == nil && json.Unmarshal(artifact, &original) == nil && currentErr == nil {
@@ -615,7 +615,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.Equal(t, float64(1), rank())
 	cases["real_redis_current_day_cli_rebuild_and_repeat"] = true
 
-	recovery := gov.NewCurrentReminderRecovery(db, reminder)
+	recovery := gov.NewCurrentReminderRecovery(db, reminder, events.MySQLTransactionOwner().Artifact)
 	reminderRequests := []govapp.ReminderGapRecoveryRequest{}
 	for i, taskIndex := range []int{0, 1, 2, 7} {
 		req := govapp.ReminderGapRecoveryRequest{TaskID: taskIDs[taskIndex], SourceProtocol: govapp.TransactionReminderSource, ExpectedScheduleRevision: 1, OpenedBefore: cutoff}
@@ -645,7 +645,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.EqualValues(t, 3, providerCalls.Load())
 	reminder.set(newReminder())
 	identity.changed.Store(true)
-	recovered := gov.NewCurrentReminderRecovery(db, reminder)
+	recovered := gov.NewCurrentReminderRecovery(db, reminder, events.MySQLTransactionOwner().Artifact)
 	_, err = recovered.ResumeReminderGap(t.Context(), int64(orgID), 1, reminderRequests[0])
 	require.NoError(t, err)
 	require.EqualValues(t, 3, providerCalls.Load())
@@ -671,7 +671,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	// End the isolated corrupt-schedule counterfactual before normal deliveries.
 	require.NoError(t, db.Exec("UPDATE assessment_task SET status='canceled' WHERE id=?", taskIDs[5]).Error)
 	cases["closed_or_changed_task_refuses_new_send"] = true
-	facade := govapp.NewFacade(govapp.FacadeDeps{CurrentReminderGapRecovery: gov.NewCurrentReminderRecovery(db, nil), CurrentReminderGapRecoveryEnabled: false})
+	facade := govapp.NewFacade(govapp.FacadeDeps{CurrentReminderGapRecovery: gov.NewCurrentReminderRecovery(db, nil, events.MySQLTransactionOwner().Artifact), CurrentReminderGapRecoveryEnabled: false})
 	_, found, err := facade.(govapp.ReminderGapRecovery).ResolveReminderGap(t.Context(), int64(orgID), 1, reminderRequests[0])
 	require.NoError(t, err)
 	require.True(t, found)

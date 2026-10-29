@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"strconv"
 	"time"
 
@@ -162,7 +163,12 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 	if c.ReportModule != nil {
 		resolutionReader = c.ReportModule.ReportResolutionReader()
 	}
+	var openingArtifact func(transaction.FrozenPlan) ([]byte, error)
+	if c.transactions != nil && c.transactions.MySQL != nil {
+		openingArtifact = c.transactions.MySQL.Artifact
+	}
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
+		TaskOpeningArtifact:       openingArtifact,
 		Options:                   c.systemGovernanceOptions,
 		EventStatusService:        eventStatus,
 		EventOutboxes:             outboxes,

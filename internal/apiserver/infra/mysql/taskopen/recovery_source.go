@@ -15,7 +15,6 @@ import (
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
-	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -46,8 +45,11 @@ func (o RecoveryOpening) MatchesCurrent(task *repository.AssessmentTaskPO) bool 
 
 // readRecoveryOpening reuses the production opening artifact and consumer-wire
 // checks, without constructing a sender or granting an execution capability.
-func readRecoveryOpening(plan transaction.FrozenPlan) (RecoveryOpening, error) {
-	raw, err := boundary.Artifact(plan)
+func readRecoveryOpening(plan transaction.FrozenPlan, artifact func(transaction.FrozenPlan) ([]byte, error)) (RecoveryOpening, error) {
+	if artifact == nil {
+		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
+	}
+	raw, err := artifact(plan)
 	if err != nil {
 		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
 	}
@@ -86,16 +88,21 @@ func readRecoveryOpening(plan transaction.FrozenPlan) (RecoveryOpening, error) {
 }
 
 type RecoverySource struct {
-	db  *gorm.DB
-	now func() time.Time
+	db       *gorm.DB
+	now      func() time.Time
+	artifact func(transaction.FrozenPlan) ([]byte, error)
 }
 
-func NewRecoverySource(db *gorm.DB) *RecoverySource { return &RecoverySource{db: db, now: time.Now} }
+// NewRecoverySource borrows the original owner's read-only artifact verifier.
+// A missing verifier fails closed; it must never guess the physical route.
+func NewRecoverySource(db *gorm.DB, artifact func(transaction.FrozenPlan) ([]byte, error)) *RecoverySource {
+	return &RecoverySource{db: db, now: time.Now, artifact: artifact}
+}
 
 // Capture owns a read-only original-primary snapshot. Only exact committed
 // evidence is accepted; local acceptance is not Broker confirmation.
 func (s *RecoverySource) Capture(ctx context.Context, orgID int64, taskID uint64, revision uint32, openedBefore time.Time) (RecoveryOpening, error) {
-	if s == nil || s.db == nil || orgID <= 0 || taskID == 0 || revision == 0 || openedBefore.IsZero() {
+	if s == nil || s.db == nil || s.artifact == nil || orgID <= 0 || taskID == 0 || revision == 0 || openedBefore.IsZero() {
 		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
 	}
 	tx := s.db.WithContext(ctx).Begin(&sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
@@ -132,7 +139,7 @@ func (s *RecoverySource) Capture(ctx context.Context, orgID int64, taskID uint64
 	if err != nil || row.Owner != q.Owner || !bytes.Equal(row.RequestKey, key[:]) || row.OperationID != plan.Input().OperationID || plan.MatchRequest(q.Owner, q.Scope, q.Key, q.InputHash) != nil {
 		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
 	}
-	o, err := readRecoveryOpening(plan)
+	o, err := readRecoveryOpening(plan, s.artifact)
 	if err != nil || o.Task.ID.Uint64() != taskID || o.Task.OrgID != orgID || o.Task.ScheduleRevision != revision {
 		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
 	}
