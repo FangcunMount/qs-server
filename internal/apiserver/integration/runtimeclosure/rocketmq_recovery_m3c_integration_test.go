@@ -810,6 +810,11 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.Positive(t, processingLease)
 	require.LessOrEqual(t, processingLease, capability.Spec.DefaultTTL)
 	processingExpiresAt := time.Now().Add(processingLease)
+	// Evaluation claims last two minutes; interpretation and suppression
+	// leases use five. All existing leases may survive the same SIGKILL.
+	// Use one absolute observed window for the whole recovery, not a shorter
+	// independent report timer that can cut a valid reclaimed attempt short.
+	recoveryDeadline := processingExpiresAt.Add(2 * time.Minute)
 	fmt.Printf("M3C_REAL_PROCESSING_LEASE_MS %d\n", processingLease.Milliseconds())
 	cases["worker_sigkill_after_effect_before_ack"] = true
 	brokerID := m3cBroker(t, "id")
@@ -879,14 +884,16 @@ redelivery:
 	}
 	require.Equal(t, firstMarker, secondMarker)
 	cases["actual_original_wire_redelivery_after_restart"] = true
-	m3cEventually(t, func() bool {
+	reportBudget := time.Until(recoveryDeadline)
+	require.Positive(t, reportBudget)
+	require.Eventually(t, func() bool {
 		result, e := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answer.GetId()})
 		if e != nil || result.GetAssessmentStatus() != "evaluated" {
 			return false
 		}
 		count, e := mongoDB.Collection("interpret_report_artifacts").CountDocuments(t.Context(), bson.M{})
 		return e == nil && count == 1
-	})
+	}, reportBudget, 200*time.Millisecond)
 	evaluated, err := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answer.GetId()})
 	require.NoError(t, err)
 	assertRowCount(t, db, "assessment", "answer_sheet_id=?", 1, answer.GetId())
@@ -913,7 +920,7 @@ redelivery:
 	}
 	// Keep the production lease and existing redelivery/backoff policy. The
 	// deadline follows the observed expiry plus a bounded delivery margin.
-	lateDeliveryBudget := time.Until(processingExpiresAt.Add(2 * time.Minute))
+	lateDeliveryBudget := time.Until(recoveryDeadline)
 	require.Positive(t, lateDeliveryBudget)
 	require.Eventually(t, func() bool {
 		for _, req := range reminderRequests {
