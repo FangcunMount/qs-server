@@ -29,6 +29,7 @@ import (
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	testeeapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	intakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
 	apphot "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
@@ -51,6 +52,7 @@ import (
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechat "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
+	runtimescheduler "github.com/FangcunMount/qs-server/internal/apiserver/runtime/scheduler"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -72,6 +74,9 @@ import (
 	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
+	mongoevent "go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/mongo"
+	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -417,7 +422,54 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	cfg.DBName = dbName
 	t.Setenv("QS_SERVER_TEST_MONGO_URI", os.Getenv("QS_M3_HOST_MONGO_URI"))
 	t.Setenv("QS_SERVER_TEST_MONGO_DB_PREFIX", "qs_m3c_recovery_test")
-	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
+	var phase atomic.Int32
+	reportClaimHeld := make(chan struct{})
+	var claimTransactions, claimCommits sync.Map
+	var reportTrapped atomic.Bool
+	txnKey := func(command bson.Raw) string {
+		number, ok := command.Lookup("txnNumber").Int64OK()
+		if !ok || command.Lookup("lsid").Type == 0 {
+			return ""
+		}
+		return string(command.Lookup("lsid").Value) + ":" + strconv.FormatInt(number, 10)
+	}
+	// Observe the real Mongo transaction, then suspend its original gRPC
+	// callback AFTER commit. SIGKILL cancels that request, leaving a genuine
+	// durable running claim, without changing rows, clocks or business results.
+	monitor := &mongoevent.CommandMonitor{
+		Started: func(_ context.Context, e *mongoevent.CommandStartedEvent) {
+			if phase.Load() != 3 {
+				return
+			}
+			key := txnKey(e.Command)
+			if key == "" {
+				return
+			}
+			if e.CommandName == "insert" && e.Command.Lookup("insert").StringValue() == "interpretation_runs" {
+				claimTransactions.Store(key, true)
+			}
+			if e.CommandName == "commitTransaction" {
+				if _, ok := claimTransactions.LoadAndDelete(key); ok {
+					claimCommits.Store(e.RequestID, true)
+				}
+			}
+		},
+		Succeeded: func(ctx context.Context, e *mongoevent.CommandSucceededEvent) {
+			if _, ok := claimCommits.LoadAndDelete(e.RequestID); ok && reportTrapped.CompareAndSwap(false, true) {
+				close(reportClaimHeld)
+				<-ctx.Done()
+			}
+		},
+	}
+	_, allocatedMongo := mongodbtest.ReplicaSetDatabase(t)
+	mongoClient, err := mongo.Connect(t.Context(), mongooptions.Client().ApplyURI(os.Getenv("QS_M3_HOST_MONGO_URI")).SetMonitor(monitor))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		require.NoError(t, mongoClient.Disconnect(ctx))
+	})
+	mongoDB := mongoClient.Database(allocatedMongo.Name())
 	pair := runtimeClosurePristinePair(t, sqlDB, dbName, mongoClient, mongoDB.Name())
 	_, _, _, err = migrationpkg.EmbeddedMigrationResources()
 	require.NoError(t, err)
@@ -520,7 +572,6 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	reminder.set(newReminder())
 	journey := intakejourney.NewService(deps.Survey.AnswerSheetScoringService, deps.Plan.TaskAssessmentResolver, deps.Plan.CommandService, deps.Evaluation.IntakeService, deps.Interpretation.ReportStatusReporter, deps.Survey.SubmissionReader)
 	assessmentService := grpcservice.NewAssessmentIntakeService(journey, deps.Evaluation.IntakeService, deps.Survey.AnswerSheetManagementService)
-	var phase atomic.Int32
 	phase.Store(1)
 	var ensureCalls atomic.Int64
 	var reminderVisits sync.Map
@@ -536,6 +587,24 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	roots := x509.NewCertPool()
 	require.True(t, roots.AppendCertsFromPEM(ca))
 	server := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots})), grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+		if _, ok := req.(*interpretationpb.GenerateReportFromOutcomeRequest); ok && phase.Load() == 4 {
+			// Delay late original report RPCs at the network boundary while the
+			// API's existing lease runner owns recovery. Return no fabricated
+			// result: after the artifact exists, call the real service normally.
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				n, e := mongoDB.Collection("interpret_report_artifacts").CountDocuments(ctx, bson.M{})
+				if e == nil && n == 1 {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					return nil, status.FromContextError(ctx.Err()).Err()
+				case <-ticker.C:
+				}
+			}
+		}
 		response, e := next(ctx, req)
 		if r, ok := req.(*internalpb.ProcessTaskOpenedReminderRequest); ok && e == nil {
 			reminderVisits.Store(r.OpeningEventId, true)
@@ -565,6 +634,28 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	serveDone := make(chan error, 1)
 	go func() { serveDone <- server.Serve(listener) }()
 	t.Cleanup(func() { server.Stop(); require.NoError(t, <-serveDone) })
+	// Match production API bootstrap: both lease-recovery runners are enabled
+	// by default and own recovery after a killed request leaves a valid claim.
+	runtimeDeps := c.BuildServerRuntimeDeps()
+	require.NotNil(t, runtimeDeps.EvaluationLeaseRecoverer)
+	require.NotNil(t, runtimeDeps.InterpretationLeaseRecoverer)
+	leaseSchedulers := runtimescheduler.NewManager(
+		runtimescheduler.NewEvaluationLeaseRecoveryRunner(apiserveroptions.NewEvaluationLeaseRecoveryOptions(), runtimeDeps.EvaluationLeaseRecoverer, runtimeDeps.LockManager, runtimeDeps.LockBuilder),
+		runtimescheduler.NewInterpretationLeaseRecoveryRunner(apiserveroptions.NewInterpretationLeaseRecoveryOptions(), runtimeDeps.InterpretationLeaseRecoverer, runtimeDeps.LockManager, runtimeDeps.LockBuilder))
+	require.Equal(t, 2, leaseSchedulers.Len())
+	leaseCtx, cancelLeases := context.WithCancel(t.Context())
+	leaseStarted := os.Getenv("QS_M3C_NEGATIVE_OMIT_API_LEASE_RECOVERY") != "1"
+	if leaseStarted {
+		leaseSchedulers.Start(leaseCtx)
+	}
+	stopLeases := func() {
+		cancelLeases()
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		require.NoError(t, leaseSchedulers.Wait(ctx))
+	}
+	t.Cleanup(stopLeases)
+
 	answerService := grpcservice.NewAnswerSheetService(deps.Survey.AnswerSheetSubmissionService)
 	request := &answersheetpb.SaveAnswerSheetRequest{QuestionnaireCode: runtimeQuestionCode, QuestionnaireVersion: runtimeVersion, IdempotencyKey: "m3c-original-answer", WriterId: testeeID, TesteeId: testeeID, OrgId: orgID, TaskId: taskIDs[7], OriginRef: &answersheetpb.OriginRef{Type: "plan_task", Id: taskIDs[7]}, Answers: []*answersheetpb.Answer{{QuestionCode: "Q1", QuestionType: "Radio", Value: "A"}}}
 	answer, err := answerService.SaveAnswerSheet(t.Context(), request)
@@ -787,6 +878,21 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	})
 	require.Equal(t, gap.EventID, firstMarker.EventID)
 	require.Equal(t, hex.EncodeToString(originalWireHash[:]), firstMarker.WireSHA)
+	select {
+	case <-reportClaimHeld:
+	case <-time.After(90 * time.Second):
+		t.Fatal("actual first Worker did not commit original report claim")
+	}
+	var crashedReport struct {
+		ID             any       `bson:"_id"`
+		Status         string    `bson:"status"`
+		LeaseExpiresAt time.Time `bson:"lease_expires_at"`
+	}
+	require.NoError(t, mongoDB.Collection("interpretation_runs").FindOne(t.Context(), bson.M{}).Decode(&crashedReport))
+	require.Equal(t, "running", crashedReport.Status)
+	reportLease := time.Until(crashedReport.LeaseExpiresAt)
+	require.Positive(t, reportLease)
+	require.LessOrEqual(t, reportLease, 5*time.Minute)
 	require.NoError(t, first.cmd.Process.Kill())
 	exit := <-first.done
 	require.Error(t, exit)
@@ -1017,6 +1123,14 @@ redelivery:
 		originalReports[name] = document["_id"]
 		require.NotNil(t, originalReports[name])
 	}
+	require.Equal(t, crashedReport.ID, originalReports["interpretation_runs"], "lease recovery replaced the committed original report run")
+	var recoveredReport struct {
+		RecoveryCount   int       `bson:"recovery_count"`
+		LastReclaimedAt time.Time `bson:"last_reclaimed_at"`
+	}
+	require.NoError(t, mongoDB.Collection("interpretation_runs").FindOne(t.Context(), bson.M{}).Decode(&recoveredReport))
+	require.GreaterOrEqual(t, recoveredReport.RecoveryCount, 1)
+	require.False(t, recoveredReport.LastReclaimedAt.Before(crashedReport.LeaseExpiresAt), "report claim reclaimed before its original lease expired")
 	// Keep the production lease and existing redelivery/backoff policy. The
 	// deadline follows the observed expiry plus a bounded delivery margin.
 	lateDeliveryBudget := time.Until(recoveryDeadline)
@@ -1077,6 +1191,7 @@ redelivery:
 	case <-time.After(30 * time.Second):
 		t.Fatal("actual Worker failed to drain")
 	}
+	stopLeases()
 	// Recheck persistent identities and counts AFTER the late original request
 	// finished and the real Worker drained. Earlier pre-replay counts alone
 	// cannot establish no duplicate business effect.
@@ -1112,7 +1227,7 @@ redelivery:
 	sha, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
 	require.Len(t, cases, 14)
-	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
+	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "api_lease_recovery_started": leaseStarted, "api_lease_recovery_drained": true, "report_claim_observed": true, "report_lease_ttl_ms": reportLease.Milliseconds(), "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
 	rawReceipt, err := json.Marshal(receipt)
 	require.NoError(t, err)
 	fmt.Println("M3C_QS_RECOVERY_RECEIPT " + string(rawReceipt))
