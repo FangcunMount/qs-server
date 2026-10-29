@@ -166,6 +166,7 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 	require.NoError(t, err)
 	sub, err := rocketmq.NewSubscriber(rocketmq.SubscriberConfig{Config: sc, MaxAttempts: 16, InvisibleDuration: 30 * time.Second, HandlerTimeout: time.Minute, RetryDelay: time.Second})
 	require.NoError(t, err)
+	fmt.Println("M3C_WORKER_PHASE companion_subscribe_start")
 	require.NoError(t, sub.Subscribe(t.Context(), "qs.evaluation.lifecycle", "qs-apiserver-modelcatalog-hot-rank-v1", func(ctx context.Context, d transport.Delivery) error {
 		m := d.Message()
 		envelope, err := domainwire.DecodeEnvelope(m.Payload)
@@ -193,7 +194,9 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 		}
 		return d.Ack()
 	}, func(context.Context, transport.Failure) error { return errors.New("owned hot-rank delivery failed") }))
+	fmt.Println("M3C_WORKER_PHASE production_worker_start")
 	require.NoError(t, workerprocess.Run(&workerconfig.Config{Options: opts}))
+	fmt.Println("M3C_WORKER_PHASE production_worker_stopped")
 	cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	require.NoError(t, sub.Close(cleanup))
@@ -320,6 +323,8 @@ func m3cBroker(t *testing.T, action string) string {
 		return invoke("inspect", "--format", "{{.Id}}", broker)
 	case "exit":
 		return invoke("inspect", "--format", "{{.State.ExitCode}}", broker)
+	case "health":
+		return invoke("inspect", "--format", "{{.State.Health.Status}}", broker)
 	case "kill":
 		return invoke("kill", "--signal=KILL", broker)
 	case "start":
@@ -740,12 +745,23 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	t.Cleanup(func() {
 		for _, w := range workers {
 			if !w.doneFlag.Load() {
-				_ = w.cmd.Process.Signal(syscall.SIGTERM)
+				if t.Failed() {
+					_ = w.cmd.Process.Signal(syscall.SIGQUIT)
+				} else {
+					_ = w.cmd.Process.Signal(syscall.SIGTERM)
+				}
 				select {
 				case <-w.done:
 				case <-time.After(20 * time.Second):
 					_ = w.cmd.Process.Kill()
 					<-w.done
+				}
+			}
+			if t.Failed() {
+				// The harness withholds raw Go output and exports only its hash.
+				// Preserve owned-child failure diagnostics in that private output.
+				if raw, e := os.ReadFile(w.log.Name()); e == nil {
+					fmt.Printf("M3C_PRIVATE_CHILD_DIAGNOSTIC\n%s\n", raw)
 				}
 			}
 			_ = w.log.Close()
@@ -778,6 +794,22 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.Equal(t, "137", m3cBroker(t, "exit"))
 	m3cBroker(t, "start")
 	require.Equal(t, brokerID, m3cBroker(t, "id"))
+	// A container start is not Proxy readiness. Restart the replacement Worker
+	// after the real Broker health check and verified TLS handshake succeed.
+	// Original delivery/effect assertions below remain mandatory.
+	connection, err := mq.RocketMQ.Load([]string{"qs.evaluation.lifecycle"}, 2, 5*time.Second)
+	require.NoError(t, err)
+	m3cEventually(t, func() bool {
+		if m3cBroker(t, "health") != "healthy" {
+			return false
+		}
+		conn, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second}, "tcp", connection.Endpoint, connection.TLS.Clone())
+		if e != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
+	})
 	cases["same_owned_broker_sigkill_restart"] = true
 	phase.Store(4)
 	child.Hold = false
