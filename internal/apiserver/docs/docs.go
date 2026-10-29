@@ -8985,7 +8985,7 @@ const docTemplate = `{
         },
         "/internal/v1/system-governance/actions/reminder-gap-recoveries": {
             "post": {
-                "description": "仅 qs:admin；需要恢复及提醒开关同时开启。仅重排原消息，不直接发送微信；已有收件责任拒绝恢复。",
+                "description": "仅 qs:admin。transaction 模式复用原通知业务服务和账本，需恢复及提醒开关；inspect 只读，resume 仅续办原请求。历史默认模式仍受旧发布表装配约束。",
                 "consumes": [
                     "application/json"
                 ],
@@ -9012,11 +9012,22 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/systemgovernance.ReminderGapRecoveryRequest"
                         }
+                    },
+                    {
+                        "enum": [
+                            "apply",
+                            "inspect",
+                            "resume"
+                        ],
+                        "type": "string",
+                        "description": "当前事务操作模式",
+                        "name": "mode",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "inspect 返回 ReminderGapInspection；apply/resume 返回 ActionRunResult",
                         "schema": {
                             "allOf": [
                                 {
@@ -9026,7 +9037,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/systemgovernance.ActionRunResult"
+                                            "type": "object"
                                         }
                                     }
                                 }
@@ -23534,6 +23545,9 @@ const docTemplate = `{
                 "evidence_reference": {
                     "type": "string"
                 },
+                "expected_schedule_revision": {
+                    "type": "integer"
+                },
                 "expected_version": {
                     "type": "integer"
                 },
@@ -23547,6 +23561,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "request_id": {
+                    "type": "string"
+                },
+                "source_fingerprint": {
+                    "type": "string"
+                },
+                "source_protocol": {
+                    "description": "Empty retains the historical protocol and its receipt input unchanged.",
                     "type": "string"
                 },
                 "task_id": {

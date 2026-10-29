@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, codex/rocketmq-retirement-m2, codex/rocketmq-retirement-m3a]
+    branches: [main, codex/rocketmq-retirement-m2, codex/rocketmq-retirement-m3a, codex/rocketmq-retirement-m3b]
 
 permissions:
   contents: read
@@ -602,6 +602,28 @@ jobs:
             grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/answersheet-current-gap.log"
           done
           if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/answersheet-current-gap.log"; then exit 1; fi
+
+      - name: Verify current reminder source and original-operation recovery
+        env:
+          QS_REMINDER_TX_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=5m -v \
+            -run '^TestCurrentReminder(SourceReadsCommittedRootWithoutOutbox|SourceRejectsConflictsAndMissingEvidence|RecoveryKeepsOriginalRequestAndKnownReceipt|RecoveryNilReturnIsNotCompletion|RecoveryUnknownNeverCallsAgain|RecoveryResumesFrozenOriginalRecipients|RecoveryConcurrentRequestsKeepOneOperation)$' \
+            ./internal/apiserver/infra/mysql/taskopen ./internal/apiserver/infra/mysql/systemgovernance \
+            | tee "${RUNNER_TEMP}/current-reminder-recovery.log"
+          for test_name in \
+            TestCurrentReminderSourceReadsCommittedRootWithoutOutbox \
+            TestCurrentReminderSourceRejectsConflictsAndMissingEvidence \
+            TestCurrentReminderRecoveryKeepsOriginalRequestAndKnownReceipt \
+            TestCurrentReminderRecoveryNilReturnIsNotCompletion \
+            TestCurrentReminderRecoveryUnknownNeverCallsAgain \
+            TestCurrentReminderRecoveryResumesFrozenOriginalRecipients \
+            TestCurrentReminderRecoveryConcurrentRequestsKeepOneOperation; do
+            grep -q -- "=== RUN   ${test_name}$" "${RUNNER_TEMP}/current-reminder-recovery.log"
+            grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/current-reminder-recovery.log"
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/current-reminder-recovery.log"; then exit 1; fi
 
       - name: Run retirement and retry persistence integration tests
         env:

@@ -19,6 +19,59 @@ type reminderGapRouteFacade struct {
 	read  func(int64, uint64, systemgov.ReminderGapRecoveryRequest) (*systemgov.ActionRunResult, bool, error)
 }
 
+type currentReminderRouteFacade struct {
+	reminderGapRouteFacade
+	inspect func(int64, uint64, systemgov.ReminderGapRecoveryRequest) (*systemgov.ReminderGapInspection, error)
+	resume  func(int64, uint64, systemgov.ReminderGapRecoveryRequest) (*systemgov.ActionRunResult, error)
+}
+
+func (s currentReminderRouteFacade) InspectReminderGap(_ context.Context, org int64, actor uint64, req systemgov.ReminderGapRecoveryRequest) (*systemgov.ReminderGapInspection, error) {
+	return s.inspect(org, actor, req)
+}
+func (s currentReminderRouteFacade) ResumeReminderGap(_ context.Context, org int64, actor uint64, req systemgov.ReminderGapRecoveryRequest) (*systemgov.ActionRunResult, error) {
+	return s.resume(org, actor, req)
+}
+
+func TestCurrentReminderModesUseTrustedScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	inspects, resumes := 0, 0
+	check := func(org int64, actor uint64, req systemgov.ReminderGapRecoveryRequest) {
+		require.EqualValues(t, 88, org)
+		require.EqualValues(t, 701, actor)
+		require.Equal(t, systemgov.TransactionReminderSource, req.SourceProtocol)
+	}
+	facade := currentReminderRouteFacade{inspect: func(org int64, actor uint64, req systemgov.ReminderGapRecoveryRequest) (*systemgov.ReminderGapInspection, error) {
+		check(org, actor, req)
+		inspects++
+		return &systemgov.ReminderGapInspection{ReadOnly: true}, nil
+	}, resume: func(org int64, actor uint64, req systemgov.ReminderGapRecoveryRequest) (*systemgov.ActionRunResult, error) {
+		check(org, actor, req)
+		resumes++
+		return &systemgov.ActionRunResult{Status: "pending_reconciliation"}, nil
+	}}
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Set(restmiddleware.UserIDKey, uint64(701))
+		c.Next()
+	})
+	newRouterWithBudgets(Deps{SystemGovernanceFacade: facade}).registerSystemGovernanceInternalRoutes(engine.Group("/internal/v1"))
+	for _, mode := range []string{"inspect", "resume", "unsupported"} {
+		request := httptest.NewRequest(http.MethodPost, "/internal/v1/system-governance/actions/reminder-gap-recoveries?mode="+mode, strings.NewReader(`{"source_protocol":"transaction","task_id":"100","org_id":999,"actor_id":999}`))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, request)
+		if mode == "unsupported" {
+			require.Equal(t, http.StatusBadRequest, response.Code)
+		} else {
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		}
+	}
+	require.Equal(t, 1, inspects)
+	require.Equal(t, 1, resumes)
+}
+
 func (s reminderGapRouteFacade) AuthorizeReminderGap(_ context.Context, org int64, actor uint64, req systemgov.ReminderGapRecoveryRequest) (*systemgov.ActionRunResult, error) {
 	return s.write(org, actor, req)
 }

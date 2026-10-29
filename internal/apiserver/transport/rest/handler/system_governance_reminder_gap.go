@@ -9,13 +9,14 @@ import (
 
 // AuthorizeReminderGapRecovery authorizes only a missing original recipient batch.
 // @Summary 系统治理-授权恢复缺收件批次的原任务提醒
-// @Description 仅 qs:admin；需要恢复及提醒开关同时开启。仅重排原消息，不直接发送微信；已有收件责任拒绝恢复。
+// @Description 仅 qs:admin。transaction 模式复用原通知业务服务和账本，需恢复及提醒开关；inspect 只读，resume 仅续办原请求。历史默认模式仍受旧发布表装配约束。
 // @Tags System-Governance
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body systemgovernance.ReminderGapRecoveryRequest true "原Task、事件、版本、固定截点与审核依据"
-// @Success 200 {object} core.Response{data=systemgovernance.ActionRunResult}
+// @Param mode query string false "当前事务操作模式" Enums(apply,inspect,resume)
+// @Success 200 {object} core.Response{data=object} "inspect 返回 ReminderGapInspection；apply/resume 返回 ActionRunResult"
 // @Failure 400 {object} core.ErrResponse
 // @Router /internal/v1/system-governance/actions/reminder-gap-recoveries [post]
 func (h *SystemGovernanceHandler) AuthorizeReminderGapRecovery(c *gin.Context) {
@@ -51,6 +52,36 @@ func (h *SystemGovernanceHandler) reminderGapRecovery(c *gin.Context, resolve bo
 	var req systemgov.ReminderGapRecoveryRequest
 	if !h.bindJSON(c, &req) {
 		return
+	}
+	if !resolve {
+		switch c.Query("mode") {
+		case "inspect", "resume":
+			current, ok := h.facade.(systemgov.CurrentReminderGapRecovery)
+			if !ok {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"message": "current reminder recovery unavailable"})
+				return
+			}
+			if c.Query("mode") == "inspect" {
+				inspection, err := current.InspectReminderGap(c.Request.Context(), orgID, uint64(actorID), req)
+				if err != nil {
+					h.Error(c, err)
+					return
+				}
+				h.Success(c, inspection)
+				return
+			}
+			result, err := current.ResumeReminderGap(c.Request.Context(), orgID, uint64(actorID), req)
+			if err != nil {
+				h.Error(c, err)
+				return
+			}
+			h.Success(c, result)
+			return
+		case "", "apply":
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"message": "unsupported reminder recovery mode"})
+			return
+		}
 	}
 	var result *systemgov.ActionRunResult
 	if resolve {
