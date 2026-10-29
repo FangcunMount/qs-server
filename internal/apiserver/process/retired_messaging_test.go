@@ -2,11 +2,12 @@ package process
 
 import (
 	"errors"
-	"github.com/FangcunMount/qs-server/pkg/app"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/FangcunMount/qs-server/pkg/app"
+	"github.com/spf13/viper"
 
 	apiconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"

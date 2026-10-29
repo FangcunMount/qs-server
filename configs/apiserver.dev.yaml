@@ -471,10 +471,10 @@ mongodb:
 # apiserver 作为事件发布者，需要配置消息队列连接
 
 # -------------------------------------------------------
-# 4.1 消息队列（NSQ）
+# 4.1 消息队列（RocketMQ）
 # -------------------------------------------------------
 # Local material must match the installed development Broker and database bindings.
-# See docs/04-接口与运维/13-RocketMQ开发与退役验收.md.
+# See docs/04-接口与运维/05-配置与环境变量.md.
 messaging:
   enabled: true
   provider: rocketmq

@@ -96,6 +96,23 @@ func TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory(t *testing.T
 	if snapshot["duplicate_observations_available"] != 0 || snapshot["payload_error_observations_available"] != 0 {
 		t.Fatal("invented observations", snapshot)
 	}
+	// Committed business rows alone cannot stand in for exact transaction evidence.
+	// Every mutation below is confined to this test's randomly owned schema.
+	for _, change := range []struct{ damage, restore string }{
+		{"UPDATE rm_tx_execution SET state='prepared'", "UPDATE rm_tx_execution SET state='committed'"},
+		{"UPDATE rm_tx_execution SET owner='other.mysql'", "UPDATE rm_tx_execution SET owner='qs.mysql'"},
+		{"UPDATE rm_tx_witness SET state='aborted'", "UPDATE rm_tx_witness SET state='committed'"},
+		{"UPDATE rm_tx_witness SET reference='conflicting-reference'", "UPDATE rm_tx_witness SET reference='fixture-reference'"},
+	} {
+		_, err = db.Exec(change.damage)
+		mustMQ(t, err)
+		invalid, err := MessagingSnapshot(t.Context(), db)
+		if err != ErrMessagingLedgerIntegrity || invalid != nil {
+			t.Fatal("unproven transaction exposed receipt counts", change.damage, invalid, err)
+		}
+		_, err = db.Exec(change.restore)
+		mustMQ(t, err)
+	}
 	_, err = db.Exec("INSERT INTO ai_messaging_quarantine(wire_sha256,wire,code,attempts,first_seen_at,last_seen_at) VALUES(?,?,'identity_conflict',8,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))", strings.Repeat("c", 64), []byte("untrusted fixture"))
 	mustMQ(t, err)
 	snapshot, err = MessagingSnapshot(t.Context(), db)

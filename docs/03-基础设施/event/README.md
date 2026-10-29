@@ -98,6 +98,8 @@ QS command 冻结首次 ID、Seal 和 wire，原根事务提交 operation、档�
 
 原生回查窗口有限。高级手工恢复仍由 infra 独立台账维护，不因为文档清理宣称通过。Mac mini 继续采集监控，serverD 不新增代理。源码、CI、镜像、运行版和 system 业务验收分别记账。
 
+宿主退役 M2 的 AI bridge 业务观察从当前 operation、已提交 execution/witness 和首次档案读取命令准入回执；AI 从 MQ-owned 解读状态历史读取业务 ACK 等待。它们与上述 Broker 确认观察分别记账，旧发布表不再作为当前积压来源。采样失败时只显示不可用，不输出部分值或零积压。指标范围、四仓发布顺序和验收入口见[配置 Runbook](../../04-接口与运维/05-配置与环境变量.md#8-宿主退役-m2当前消息观察)。本次未删除表、未部署，也不增加历史阶段的完成计数。
+
 ## 当前扩展与验收
 
 新增可靠事件先明确 owner/原事务、幂等输入、固定路由和最多16分支的冻结计划，再接入原根 guard/witness；不能新增发布型 Outbox 或提交后 Relay。尽力通知走独立 NORMAL；Redis Signal 仍由宿主管理连接和生命周期。UUID、时间、签名加密及网络调用放在数据库 callback 外；Mongo callback 重入只做确定性数据库操作。
