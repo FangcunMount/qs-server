@@ -816,6 +816,62 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	// independent report timer that can cut a valid reclaimed attempt short.
 	recoveryDeadline := processingExpiresAt.Add(2 * time.Minute)
 	fmt.Printf("M3C_REAL_PROCESSING_LEASE_MS %d\n", processingLease.Milliseconds())
+	// Register before either business closure assertion so CI failures retain
+	// only technical states from this test's fresh databases (never payloads).
+	snapshot := func(stage string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		visited := make([]bool, len(reminderRequests))
+		for i, req := range reminderRequests {
+			_, visited[i] = reminderVisits.Load(req.OpeningEventID)
+		}
+		var assessments []struct {
+			Status string `json:"status"`
+			Count  int64  `json:"count"`
+		}
+		aerr := db.WithContext(ctx).Table("assessment").Select("status,COUNT(*) AS count").Group("status").Find(&assessments).Error
+		var runs []struct {
+			Status           string `json:"status"`
+			AttemptNo        int    `json:"attempt"`
+			RetryDisposition string `json:"disposition"`
+			LeaseExpired     bool   `json:"lease_expired"`
+		}
+		rerr := db.WithContext(ctx).Table("runtime_checkpoint").Select("status,attempt_no,COALESCE(retry_disposition,'') AS retry_disposition,COALESCE(lease_expires_at<=NOW(3),false) AS lease_expired").Where("scope=?", "evaluation_run").Limit(10).Find(&runs).Error
+		var dead []struct {
+			EventType        string `json:"event_type"`
+			DeliveryAttempts int    `json:"attempt"`
+			RetryDisposition string `json:"disposition"`
+		}
+		derr := db.WithContext(ctx).Table("event_delivery_dead_letter").Select("JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.eventType')) AS event_type,delivery_attempts,retry_disposition").Limit(10).Find(&dead).Error
+		var holds []struct {
+			Status             string `json:"status"`
+			ReplayAttemptCount int    `json:"attempt"`
+			RetryDisposition   string `json:"disposition"`
+		}
+		herr := db.WithContext(ctx).Table("retry_event_hold").Select("status,replay_attempt_count,COALESCE(retry_disposition,'') AS retry_disposition").Limit(10).Find(&holds).Error
+		mongo := map[string]any{}
+		for _, name := range []string{"report_generations", "interpretation_runs", "interpret_report_artifacts"} {
+			collection := mongoDB.Collection(name)
+			count, e := collection.CountDocuments(ctx, bson.M{})
+			states, se := collection.Distinct(ctx, "status", bson.M{})
+			expired, le := collection.CountDocuments(ctx, bson.M{"lease_expires_at": bson.M{"$lte": time.Now()}})
+			if states == nil {
+				states = []any{}
+			}
+			mongo[name] = map[string]any{"count": count, "statuses": states, "expired_leases": expired, "read_ok": e == nil && se == nil && le == nil}
+		}
+		ttl, re := workerRedis.PTTL(ctx, leaseKeys[0]).Result()
+		encoded, _ := json.Marshal(map[string]any{"stage": stage, "ensure_calls": ensureCalls.Load(), "reminder_visits": visited, "provider_calls": providerCalls.Load(),
+			"assessment_read_ok": aerr == nil, "assessments": assessments, "run_read_ok": rerr == nil, "runs": runs,
+			"dead_letter_read_ok": derr == nil, "dead_letters": dead, "hold_read_ok": herr == nil, "held_deliveries": holds,
+			"redis_read_ok": re == nil, "worker_lock_pttl_ms": ttl.Milliseconds(), "mongo": mongo})
+		fmt.Println("M3C_COMPLETION_DIAGNOSTIC " + string(encoded))
+	}
+	t.Cleanup(func() {
+		if t.Failed() {
+			snapshot("failure")
+		}
+	})
 	cases["worker_sigkill_after_effect_before_ack"] = true
 	brokerID := m3cBroker(t, "id")
 	m3cBroker(t, "kill")
@@ -926,6 +982,7 @@ redelivery:
 	}
 	require.Equal(t, firstMarker, secondMarker)
 	cases["actual_original_wire_redelivery_after_restart"] = true
+	snapshot("before_report")
 	reportBudget := time.Until(recoveryDeadline)
 	require.Positive(t, reportBudget)
 	require.Eventually(t, func() bool {
@@ -964,34 +1021,7 @@ redelivery:
 	// deadline follows the observed expiry plus a bounded delivery margin.
 	lateDeliveryBudget := time.Until(recoveryDeadline)
 	require.Positive(t, lateDeliveryBudget)
-	defer func() {
-		if !t.Failed() {
-			return
-		}
-		// Read only this test's original event and owned Redis key. Emit counts
-		// and technical states, never fixture credentials, payloads or DSNs.
-		visited := make([]bool, len(reminderRequests))
-		for i, req := range reminderRequests {
-			_, visited[i] = reminderVisits.Load(req.OpeningEventID)
-		}
-		var deadLetters []struct {
-			DeliveryAttempts int
-			RetryDisposition string
-			LastError        string
-		}
-		deadErr := db.Table("event_delivery_dead_letter").Select("delivery_attempts,retry_disposition,last_error").Where("event_id=?", gap.EventID).Limit(10).Find(&deadLetters).Error
-		var held []struct {
-			Status             string
-			RetryDisposition   string
-			ReplayAttemptCount int
-		}
-		holdErr := db.Table("retry_event_hold").Select("status,retry_disposition,replay_attempt_count").Where("event_id=?", gap.EventID).Limit(10).Find(&held).Error
-		ttl, redisErr := workerRedis.PTTL(context.Background(), leaseKeys[0]).Result()
-		encoded, _ := json.Marshal(map[string]any{"ensure_calls": ensureCalls.Load(), "reminder_visits": visited,
-			"dead_letters": deadLetters, "dead_letter_read_ok": deadErr == nil, "held_deliveries": held, "hold_read_ok": holdErr == nil,
-			"worker_lock_pttl_ms": ttl.Milliseconds(), "redis_read_ok": redisErr == nil, "provider_calls": providerCalls.Load()})
-		fmt.Println("M3C_COMPLETION_DIAGNOSTIC " + string(encoded))
-	}()
+
 	require.Eventually(t, func() bool {
 		for _, req := range reminderRequests {
 			if _, ok := reminderVisits.Load(req.OpeningEventID); !ok {
