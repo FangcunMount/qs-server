@@ -1,0 +1,732 @@
+//go:build integration && m3_host_runtime
+
+package runtimeclosure
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
+
+	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
+	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	intakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
+	apphot "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
+	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	govapp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	redishot "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
+	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	ledger "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/notification"
+	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
+	gov "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	wechat "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
+	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	migrationpkg "github.com/FangcunMount/qs-server/internal/pkg/migration"
+	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
+	generic "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
+	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
+	workerprocess "github.com/FangcunMount/qs-server/internal/worker/process"
+	"github.com/FangcunMount/reliable-messaging/transport"
+	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
+	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
+	driver "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
+	redis "github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+// The child enters the actual production Worker process root. Its companion
+// uses the production hot-rank handler on the real API consumer group. No
+// custom business dispatcher or fake MQ is substituted for the Worker.
+type m3cChildConfig struct {
+	DSN, MongoURI, MongoDB, Redis, Namespace, Endpoint, Cert, Key, Observer string
+	Marker                                                                  string
+	Hold                                                                    bool
+}
+
+type m3cDeliveryMarker struct{ EventID, WireSHA string }
+
+func m3cLoadMQ(t *testing.T, path string) generic.MessagingOptions {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var o generic.MessagingOptions
+	require.NoError(t, json.Unmarshal(raw, &o))
+	require.NotNil(t, o.RocketMQ)
+	host, _, err := net.SplitHostPort(o.RocketMQ.Endpoint)
+	require.NoError(t, err)
+	require.True(t, net.ParseIP(host).IsLoopback())
+	return o
+}
+
+func TestM3RecoveryWorkerProcess(t *testing.T) {
+	path := os.Getenv("QS_M3C_WORKER_CHILD")
+	if path == "" {
+		return
+	}
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var cfg m3cChildConfig
+	require.NoError(t, json.Unmarshal(raw, &cfg))
+	dsn, err := driver.ParseDSN(cfg.DSN)
+	require.NoError(t, err)
+	host, _, err := net.SplitHostPort(dsn.Addr)
+	require.NoError(t, err)
+	require.True(t, net.ParseIP(host).IsLoopback())
+	rh, rp, err := net.SplitHostPort(cfg.Redis)
+	require.NoError(t, err)
+	require.True(t, net.ParseIP(rh).IsLoopback())
+	port, err := strconv.Atoi(rp)
+	require.NoError(t, err)
+	opts := workeroptions.NewOptions()
+	opts.Metrics.Enable = false
+	opts.Worker.Concurrency = 4
+	opts.Worker.ServiceName = "qs-worker"
+	opts.Worker.EventConfigPath = "../../../../configs/events.yaml"
+	opts.MySQL.Host = dsn.Addr
+	opts.MySQL.Username = dsn.User
+	opts.MySQL.Password = dsn.Passwd
+	opts.MySQL.Database = dsn.DBName
+	opts.MySQL.Location = "Asia/Shanghai"
+	opts.MySQL.SessionTimeZone = "+08:00"
+	opts.MongoDB.URL = cfg.MongoURI
+	opts.MongoDB.Database = cfg.MongoDB
+	opts.MongoDB.MaxPoolSize = 4
+	opts.Redis.Host = rh
+	opts.Redis.Port = port
+	opts.Redis.Database = 1
+	opts.RedisProfiles = map[string]*generic.RedisOptions{}
+	for name, db := range map[string]int{"lock_cache": 1, "ops_runtime": 2} {
+		o := *opts.Redis
+		o.Database = db
+		opts.RedisProfiles[name] = &o
+	}
+	mq := m3cLoadMQ(t, cfg.Observer)
+	opts.Messaging.Provider = "rocketmq"
+	opts.Messaging.RocketMQ = mq.RocketMQ
+	opts.RetryGovernance.AutomaticRetryEnabled = true
+	opts.GRPC.ApiserverAddr = cfg.Endpoint
+	opts.GRPC.Insecure = false
+	opts.GRPC.TLSCAFile = cfg.Cert
+	opts.GRPC.TLSCertFile = cfg.Cert
+	opts.GRPC.TLSKeyFile = cfg.Key
+	opts.GRPC.TLSServerName = "127.0.0.1"
+	opts.GRPC.RequestTimeout = 2 * time.Minute
+	client := redis.NewClient(&redis.Options{Addr: cfg.Redis})
+	t.Cleanup(func() { _ = client.Close() })
+	projection := redishot.NewRedisScaleHotRankProjection(client, keyspace.NewBuilderWithNamespace(cfg.Namespace))
+	consume := apphot.NewEventConsumer(projection)
+	sc, err := mq.RocketMQ.Load([]string{"qs.evaluation.lifecycle"}, 2, 5*time.Second)
+	require.NoError(t, err)
+	sub, err := rocketmq.NewSubscriber(rocketmq.SubscriberConfig{Config: sc, MaxAttempts: 16, InvisibleDuration: 30 * time.Second, HandlerTimeout: time.Minute, RetryDelay: time.Second})
+	require.NoError(t, err)
+	require.NoError(t, sub.Subscribe(t.Context(), "qs.evaluation.lifecycle", "qs-apiserver-modelcatalog-hot-rank-v1", func(ctx context.Context, d transport.Delivery) error {
+		m := d.Message()
+		envelope, err := domainwire.DecodeEnvelope(m.Payload)
+		if err != nil {
+			return err
+		}
+		if envelope.EventType != eventcatalog.AnswerSheetSubmitted {
+			return d.Ack()
+		}
+		if e := consume(ctx, envelope.EventType, m.Payload); e != nil {
+			return e
+		}
+		hash := sha256.Sum256(m.Wire)
+		marker := m3cDeliveryMarker{m.ID, hex.EncodeToString(hash[:])}
+		b, e := json.Marshal(marker)
+		if e != nil {
+			return e
+		}
+		if e = os.WriteFile(cfg.Marker, b, 0600); e != nil {
+			return e
+		}
+		if cfg.Hold {
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return d.Ack()
+	}, func(context.Context, transport.Failure) error { return errors.New("owned hot-rank delivery failed") }))
+	require.NoError(t, workerprocess.Run(&workerconfig.Config{Options: opts}))
+	cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	require.NoError(t, sub.Close(cleanup))
+}
+
+type m3cIdentity struct{ changed atomic.Bool }
+
+func (r *m3cIdentity) ListLinkedUsers(context.Context, string) ([]iambridge.MiniProgramLinkedUser, error) {
+	id := "owned-user"
+	if r.changed.Load() {
+		id = "different-current-user"
+	}
+	return []iambridge.MiniProgramLinkedUser{{UserID: id, Relations: []string{"self"}}}, nil
+}
+func (*m3cIdentity) ReadCandidates(_ context.Context, _, app string, users []string) ([]iambridge.MiniProgramRecipientCandidate, error) {
+	out := []iambridge.MiniProgramRecipientCandidate{}
+	for _, id := range users {
+		out = append(out, iambridge.MiniProgramRecipientCandidate{UserID: id, LoginIdentityID: id + "-identity", AppID: app, OpenID: id + "-openid", Relations: []string{"self"}})
+	}
+	return out, nil
+}
+
+type m3cProvider struct{ url string }
+
+func (p m3cProvider) ListTemplates(context.Context, string, string) ([]wechat.SubscribeTemplate, error) {
+	return []wechat.SubscribeTemplate{{ID: "owned-template", Content: "{{thing5.DATA}}{{date1.DATA}}{{character_string2.DATA}}{{thing3.DATA}}"}}, nil
+}
+func (p m3cProvider) SendSubscribeMessage(ctx context.Context, a, b string, m wechat.SubscribeMessage) error {
+	_, e := p.SendSubscribeMessageWithReceipt(ctx, a, b, m)
+	return e
+}
+func (p m3cProvider) SendSubscribeMessageWithReceipt(ctx context.Context, _, _ string, m wechat.SubscribeMessage) (wechat.SubscribeSendReceipt, error) {
+	raw, e := json.Marshal(m)
+	if e != nil {
+		return wechat.SubscribeSendReceipt{}, e
+	}
+	req, e := http.NewRequestWithContext(ctx, http.MethodPost, p.url, bytes.NewReader(raw))
+	if e != nil {
+		return wechat.SubscribeSendReceipt{}, e
+	}
+	response, e := http.DefaultClient.Do(req)
+	if e != nil {
+		return wechat.SubscribeSendReceipt{}, e
+	}
+	defer response.Body.Close()
+	var result wechat.SubscribeSendReceipt
+	e = json.NewDecoder(response.Body).Decode(&result)
+	return result, e
+}
+
+type m3cFreeze struct {
+	notification.ReminderBatchLedger
+	fail atomic.Bool
+}
+
+func (f *m3cFreeze) FreezeRecipients(ctx context.Context, key notification.ReminderBatchKey, app, template string, recipients []notification.ReminderRecipientIdentity, at time.Time) (notification.ReminderBatch, error) {
+	batch, err := f.ReminderBatchLedger.FreezeRecipients(ctx, key, app, template, recipients, at)
+	if err == nil && f.fail.Swap(false) {
+		return batch, errors.New("owned interruption immediately after durable freeze")
+	}
+	return batch, err
+}
+
+type m3cReminder struct {
+	mu      sync.RWMutex
+	service notification.TaskOpenedReminderService
+}
+
+func (s *m3cReminder) set(v notification.TaskOpenedReminderService) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.service = v
+}
+func (s *m3cReminder) ProcessTaskOpenedReminder(ctx context.Context, r notification.TaskOpenedReminderRequest) error {
+	s.mu.RLock()
+	v := s.service
+	s.mu.RUnlock()
+	return v.ProcessTaskOpenedReminder(ctx, r)
+}
+
+func m3cPrivateJSON(t *testing.T, path string, value any) {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, raw, 0600))
+}
+func m3cEventually(t *testing.T, fn func() bool) {
+	t.Helper()
+	require.Eventually(t, fn, 2*time.Minute, 200*time.Millisecond)
+}
+
+func m3cBroker(t *testing.T, action string) string {
+	t.Helper()
+	broker, project := os.Getenv("QS_M3_HOST_BROKER"), os.Getenv("QS_M3_FIXTURE_PROJECT")
+	require.True(t, strings.HasPrefix(project, "rocketmq-m2-"))
+	require.True(t, strings.HasPrefix(broker, project+"-"))
+	invoke := func(args ...string) string {
+		ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+		defer cancel()
+		raw, err := exec.CommandContext(ctx, "docker", args...).Output()
+		require.NoError(t, err)
+		return strings.TrimSpace(string(raw))
+	}
+	require.Equal(t, project, invoke("inspect", "--format", `{{index .Config.Labels "com.docker.compose.project"}}`, broker))
+	switch action {
+	case "id":
+		return invoke("inspect", "--format", "{{.Id}}", broker)
+	case "exit":
+		return invoke("inspect", "--format", "{{.State.ExitCode}}", broker)
+	case "kill":
+		return invoke("kill", "--signal=KILL", broker)
+	case "start":
+		return invoke("start", broker)
+	}
+	t.Fatal("unsupported owned action")
+	return ""
+}
+
+func TestM3HostRetirementRecovery(t *testing.T) {
+	require.True(t, strings.HasPrefix(os.Getenv("QS_M3_FIXTURE_PROJECT"), "rocketmq-m2-"))
+	for _, key := range []string{"QS_M3_HOST_DSN", "QS_M3_HOST_MONGO_URI", "QS_M3_RECOVERY_REDIS", "QS_M3_RECOVERY_CERT", "QS_M3_RECOVERY_KEY"} {
+		require.NotEmpty(t, os.Getenv(key), key)
+	}
+	cfg, err := driver.ParseDSN(os.Getenv("QS_M3_HOST_DSN"))
+	require.NoError(t, err)
+	host, _, err := net.SplitHostPort(cfg.Addr)
+	require.NoError(t, err)
+	require.True(t, net.ParseIP(host).IsLoopback())
+	require.Empty(t, cfg.DBName)
+	cfg.Loc = time.FixedZone("Asia/Shanghai", 8*3600)
+	cfg.ParseTime = true
+	cfg.MultiStatements = true
+	cfg.Params = map[string]string{"time_zone": "'+08:00'"}
+	sqlDB, dbName := openRuntimeDatabase(t, cfg.FormatDSN())
+	cfg.DBName = dbName
+	t.Setenv("QS_SERVER_TEST_MONGO_URI", os.Getenv("QS_M3_HOST_MONGO_URI"))
+	t.Setenv("QS_SERVER_TEST_MONGO_DB_PREFIX", "qs_m3c_recovery_test")
+	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
+	pair := runtimeClosurePristinePair(t, sqlDB, dbName, mongoClient, mongoDB.Name())
+	_, _, _, err = migrationpkg.EmbeddedMigrationResources()
+	require.NoError(t, err)
+	_, _, err = migrationpkg.NewMigrator(sqlDB, pair.MySQLConfig(false)).Run()
+	require.NoError(t, err)
+	_, _, err = migrationpkg.NewMongoMigrator(mongoClient, pair.MongoConfig(false)).Run()
+	require.NoError(t, err)
+	db, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	require.NoError(t, err)
+	addr := os.Getenv("QS_M3_RECOVERY_REDIS")
+	rh, _, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+	require.True(t, net.ParseIP(rh).IsLoopback())
+	redisClient := redis.NewClient(&redis.Options{Addr: addr})
+	t.Cleanup(func() { _ = redisClient.Close() })
+	require.NoError(t, redisClient.Ping(t.Context()).Err())
+	namespace := "m3c-" + uuid.NewString()
+	keys := keyspace.NewBuilderWithNamespace(namespace)
+	eventsConfig, err := eventcatalog.Load("../../../../configs/events.yaml")
+	require.NoError(t, err)
+	routes := eventcatalog.NewCatalog(eventsConfig)
+	mq := m3cLoadMQ(t, os.Getenv("QS_M3_HOST_OPTIONS"))
+	normal, err := messagingruntime.NewNormalWirePublisher(&mq, []string{"qs.survey.lifecycle", "qs.plan.task"}, 4)
+	require.NoError(t, err)
+	registry, err := eventcatalog.NewEffectiveRegistry(routes, eventcatalog.DefaultSpecs())
+	require.NoError(t, err)
+	consumers := map[string]eventsubsystem.ConsumerOptions{}
+	for _, spec := range registry.Snapshot() {
+		for _, c := range spec.AdditionalConsumers {
+			consumers[c.ID] = eventsubsystem.ConsumerOptions{Enabled: false}
+		}
+	}
+	events, err := eventsubsystem.NewWithTransactionOwners(eventsubsystem.Options{MySQLDB: db, MongoDB: mongoDB, OpsRedis: redisClient, Catalog: routes, WirePublisher: normal, PublisherMode: eventruntime.PublishModeMQ, Consumers: consumers}, &mq)
+	require.NoError(t, err)
+	my, mg := events.MySQLTransactionOwner().Binding(), events.MongoTransactionOwner().Binding()
+	_, err = sqlDB.ExecContext(t.Context(), "INSERT INTO rm_tx_binding VALUES(?,?,?,1)", []byte(my.Owner), []byte(my.StoreID), []byte(my.WriterEpoch))
+	require.NoError(t, err)
+	_, err = mongoDB.Collection("rm_tx_binding").InsertOne(t.Context(), bson.M{"_id": mg.Owner, "store_id": mg.StoreID, "writer_epoch": mg.WriterEpoch, "schema_version": 1})
+	require.NoError(t, err)
+	locks := newTestLocks(redisClient, "apiserver", namespace+":locks")
+	c := container.NewContainerWithOptions(db, mongoDB, redisClient, container.ContainerOptions{EventSubsystem: events, Transactions: &container.EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, CacheSubsystem: newRuntimeCacheSubsystem(redisClient), LockSubsystem: locks, PlanEntryBaseURL: "https://collection.example.test/entry", Silent: true})
+	require.NoError(t, c.Initialize())
+	require.NoError(t, c.StartEventSubsystem(t.Context()))
+	t.Cleanup(func() {
+		require.NoError(t, c.Cleanup())
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		require.NoError(t, normal.Close(ctx))
+	})
+	seedRuntimeCatalog(t, mongoDB)
+	orgID := uint64(830000)
+	require.NoError(t, mysqlActor.NewOperatorRepository(db).Save(t.Context(), operatorDomain.NewOperator(int64(orgID), 1, "owned headquarters")))
+	deps := c.BuildGRPCDeps(nil)
+	testeeID, _ := createRuntimeActorAndEntry(t, c, deps, orgID)
+	taskIDs := []string{}
+	for range 8 {
+		plan, err := c.PlanModule.CommandService.CreatePlan(t.Context(), planapp.CreatePlanDTO{OrgID: int64(orgID), ScaleCode: runtimeModelCode, ScheduleType: "by_day", TriggerTime: "00:00:00", Interval: 1, TotalTimes: 1})
+		require.NoError(t, err)
+		enrollment, err := c.PlanModule.CommandService.EnrollTestee(t.Context(), planapp.EnrollTesteeDTO{OrgID: int64(orgID), PlanID: plan.ID, TesteeID: strconv.FormatUint(testeeID, 10), StartDate: time.Now().In(cfg.Loc).Format("2006-01-02")})
+		require.NoError(t, err)
+		require.Len(t, enrollment.Tasks, 1)
+		taskID := enrollment.Tasks[0].ID
+		_, err = c.PlanModule.CommandService.OpenTask(t.Context(), int64(orgID), taskID)
+		require.NoError(t, err)
+		taskIDs = append(taskIDs, taskID)
+	}
+	var providerCalls atomic.Int64
+	var unknown atomic.Bool
+	providerHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.Copy(io.Discard, r.Body)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		n := providerCalls.Add(1)
+		if unknown.Load() {
+			conn, _, e := w.(http.Hijacker).Hijack()
+			if e == nil {
+				_ = conn.Close()
+			}
+			return
+		}
+		_ = json.NewEncoder(w).Encode(wechat.SubscribeSendReceipt{Accepted: true, PlatformMessageID: fmt.Sprintf("owned-%d", n)})
+	}))
+	t.Cleanup(providerHTTP.Close)
+	identity := &m3cIdentity{}
+	freeze := &m3cFreeze{ReminderBatchLedger: ledger.NewReminderBatchLedger(db)}
+	provider := m3cProvider{providerHTTP.URL}
+	reminder := &m3cReminder{}
+	newReminder := func() notification.TaskOpenedReminderService {
+		return notification.NewTaskOpenedReminderService(planapp.NewTaskReminderStateReader(planrepo.NewTaskRepository(db)), deps.Actor.TesteeQueryService, identity, freeze, ledger.NewReminderDeliveryLedger(db), nil, provider, provider, nil, nil, &notification.Config{AppID: "owned-app", AppSecret: "owned-fixture", PagePath: "pages/task/index", TaskOpenedTemplateID: "owned-template"})
+	}
+	reminder.set(newReminder())
+	journey := intakejourney.NewService(deps.Survey.AnswerSheetScoringService, deps.Plan.TaskAssessmentResolver, deps.Plan.CommandService, deps.Evaluation.IntakeService, deps.Interpretation.ReportStatusReporter, deps.Survey.SubmissionReader)
+	assessmentService := grpcservice.NewAssessmentIntakeService(journey, deps.Evaluation.IntakeService, deps.Survey.AnswerSheetManagementService)
+	var phase atomic.Int32
+	phase.Store(1)
+	var ensureCalls atomic.Int64
+	held := make(chan *evaluationpb.EnsureAssessmentRequest, 1)
+	var heldOnce sync.Once
+	certPath, keyPath := os.Getenv("QS_M3_RECOVERY_CERT"), os.Getenv("QS_M3_RECOVERY_KEY")
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	require.NoError(t, err)
+	ca, err := os.ReadFile(certPath)
+	require.NoError(t, err)
+	roots := x509.NewCertPool()
+	require.True(t, roots.AppendCertsFromPEM(ca))
+	server := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots})), grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
+		response, e := next(ctx, req)
+		if v, ok := req.(*evaluationpb.EnsureAssessmentRequest); ok && e == nil {
+			ensureCalls.Add(1)
+			if phase.CompareAndSwap(1, 2) {
+				return nil, status.Error(codes.Unavailable, "owned response loss after original intake commit")
+			}
+			if phase.Load() == 3 {
+				heldOnce.Do(func() { held <- v })
+				<-ctx.Done()
+				return nil, status.Error(codes.Canceled, "owned worker exited before response/ACK")
+			}
+		}
+		return response, e
+	}))
+	assessmentService.RegisterService(server)
+	grpcservice.NewEvaluationWorkerService(deps.Evaluation.WorkerService).RegisterService(server)
+	grpcservice.NewInterpretationAutomationService(deps.Interpretation.AutomationService).RegisterService(server)
+	grpcservice.NewInternalService(deps.Actor.TesteeAssessmentAttentionService, nil, nil, nil, nil, nil, nil, nil, reminder).RegisterService(server)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- server.Serve(listener) }()
+	t.Cleanup(func() { server.Stop(); require.NoError(t, <-serveDone) })
+	answerService := grpcservice.NewAnswerSheetService(deps.Survey.AnswerSheetSubmissionService)
+	request := &answersheetpb.SaveAnswerSheetRequest{QuestionnaireCode: runtimeQuestionCode, QuestionnaireVersion: runtimeVersion, IdempotencyKey: "m3c-original-answer", WriterId: testeeID, TesteeId: testeeID, OrgId: orgID, TaskId: taskIDs[7], OriginRef: &answersheetpb.OriginRef{Type: "plan_task", Id: taskIDs[7]}, Answers: []*answersheetpb.Answer{{QuestionCode: "Q1", QuestionType: "Radio", Value: "A"}}}
+	answer, err := answerService.SaveAnswerSheet(t.Context(), request)
+	require.NoError(t, err)
+	require.NotZero(t, answer.GetId())
+	// All fixture tasks/answer are now before this immutable cutoff. Wait the
+	// existing operator policy's ten-second safety margin rather than weakening it.
+	cutoff := time.Now().UTC()
+	remaining := time.Until(cutoff.Add(11 * time.Second))
+	select {
+	case <-time.After(remaining):
+	case <-t.Context().Done():
+		t.Fatal(t.Context().Err())
+	}
+	cases := map[string]bool{}
+	cases["original_transaction_roots_without_relay"] = true
+	day := time.Now().In(cfg.Loc).Format("20060102")
+	audit := t.TempDir()
+	require.NoError(t, os.Chmod(audit, 0700))
+	toolInput, _ := json.Marshal(map[string]any{"mongo_uri": os.Getenv("QS_M3_HOST_MONGO_URI"), "mongo_db": mongoDB.Name(), "redis_address": addr, "redis_db": 0, "redis_namespace": namespace})
+	runTool := func(path string, expected int, env []string, input []byte, args ...string) []byte {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, path, args...)
+		cmd.Env = append(os.Environ(), env...)
+		cmd.Stdin = bytes.NewReader(input)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		raw, e := cmd.Output()
+		code := 0
+		if e != nil {
+			var exit *exec.ExitError
+			require.ErrorAs(t, e, &exit, "owned operator executable unavailable")
+			code = exit.ExitCode()
+		}
+		require.Equal(t, expected, code, "operator diagnostic: %s", stderr.String())
+		return raw
+	}
+	hotTool := os.Getenv("QS_M3_RECOVERY_HOTRANK")
+	indexBytes, err := os.ReadFile("../../../../scripts/oneoff/hotrank_day_rebuild/index.up.json")
+	require.NoError(t, err)
+	indexHash := sha256.Sum256(indexBytes)
+	runTool(hotTool, 0, nil, toolInput, "--mode", "prepare-index", "--day", day, "--request-id", uuid.NewString(), "--operator", "owned-m3c", "--expected-fingerprint", hex.EncodeToString(indexHash[:]), "--audit-dir", audit)
+	inspected := runTool(hotTool, 0, nil, toolInput, "--mode", "inspect", "--day", day)
+	var inspect struct {
+		Fingerprint string `json:"fingerprint"`
+	}
+	require.NoError(t, json.Unmarshal(inspected, &inspect))
+	require.NotEmpty(t, inspect.Fingerprint)
+	hotArgs := []string{"--mode", "apply", "--day", day, "--request-id", uuid.NewString(), "--operator", "owned-m3c", "--expected-fingerprint", inspect.Fingerprint, "--audit-dir", audit}
+	runTool(hotTool, 0, nil, toolInput, hotArgs...)
+	runTool(hotTool, 0, nil, toolInput, hotArgs...)
+	rank := func() float64 {
+		v, e := redisClient.ZScore(t.Context(), keys.BuildScaleHotDailyKey(day), runtimeQuestionCode).Result()
+		require.NoError(t, e)
+		return v
+	}
+	require.Equal(t, float64(1), rank())
+	cases["real_redis_current_day_cli_rebuild_and_repeat"] = true
+
+	recovery := gov.NewCurrentReminderRecovery(db, reminder)
+	reminderRequests := []govapp.ReminderGapRecoveryRequest{}
+	for i, taskIndex := range []int{0, 1, 2, 7} {
+		req := govapp.ReminderGapRecoveryRequest{TaskID: taskIDs[taskIndex], SourceProtocol: govapp.TransactionReminderSource, ExpectedScheduleRevision: 1, OpenedBefore: cutoff}
+		inspection, err := recovery.InspectReminderGap(t.Context(), int64(orgID), 1, req)
+		require.NoError(t, err)
+		req.RequestID = uuid.NewString()
+		req.OpeningEventID = inspection.OpeningEventID
+		req.SourceFingerprint = inspection.SourceFingerprint
+		req.EvidenceReference = "owned-m3c"
+		req.Reason = "original operation only"
+		req.Confirm = true
+		unknown.Store(i == 1)
+		freeze.fail.Store(i == 2)
+		result, err := recovery.AuthorizeReminderGap(t.Context(), int64(orgID), 1, req)
+		require.NoError(t, err)
+		if i == 0 || i == 3 {
+			require.Equal(t, "succeeded", result.Status)
+		} else {
+			require.Equal(t, govapp.ActionAuditStatusPendingReconciliation, result.Status)
+		}
+		reminderRequests = append(reminderRequests, req)
+	}
+	unknown.Store(false)
+	require.EqualValues(t, 3, providerCalls.Load())
+	reminder.set(newReminder())
+	identity.changed.Store(true)
+	recovered := gov.NewCurrentReminderRecovery(db, reminder)
+	_, err = recovered.ResumeReminderGap(t.Context(), int64(orgID), 1, reminderRequests[0])
+	require.NoError(t, err)
+	require.EqualValues(t, 3, providerCalls.Load())
+	cases["known_reminder_original_receipt_no_repeat"] = true
+	_, err = recovered.ResumeReminderGap(t.Context(), int64(orgID), 1, reminderRequests[1])
+	require.NoError(t, err)
+	require.EqualValues(t, 3, providerCalls.Load())
+	cases["unknown_provider_response_never_resends"] = true
+	_, err = recovered.ResumeReminderGap(t.Context(), int64(orgID), 1, reminderRequests[2])
+	require.NoError(t, err)
+	require.EqualValues(t, 4, providerCalls.Load())
+	var recipient string
+	require.NoError(t, db.Table("task_opened_reminder_delivery").Select("user_id").Where("task_id=?", taskIDs[2]).Scan(&recipient).Error)
+	require.Equal(t, "owned-user", recipient)
+	cases["frozen_reminder_recipients_survive_recovery"] = true
+	// The three remaining original tasks exercise refusal at the real SQL source.
+	for i, change := range []string{"status='canceled'", "status='completed'", "planned_at=DATE_ADD(planned_at,INTERVAL 1 SECOND)", "expire_at=DATE_SUB(NOW(3),INTERVAL 1 SECOND)"} {
+		require.NoError(t, db.Exec("UPDATE assessment_task SET "+change+" WHERE id=?", taskIDs[i+3]).Error)
+		_, err = recovered.InspectReminderGap(t.Context(), int64(orgID), 1, govapp.ReminderGapRecoveryRequest{TaskID: taskIDs[i+3], SourceProtocol: govapp.TransactionReminderSource, ExpectedScheduleRevision: 1, OpenedBefore: cutoff})
+		require.Error(t, err)
+	}
+	require.EqualValues(t, 4, providerCalls.Load())
+	// End the isolated corrupt-schedule counterfactual before normal deliveries.
+	require.NoError(t, db.Exec("UPDATE assessment_task SET status='canceled' WHERE id=?", taskIDs[5]).Error)
+	cases["closed_or_changed_task_refuses_new_send"] = true
+	facade := govapp.NewFacade(govapp.FacadeDeps{CurrentReminderGapRecovery: gov.NewCurrentReminderRecovery(db, nil), CurrentReminderGapRecoveryEnabled: false})
+	_, found, err := facade.(govapp.ReminderGapRecovery).ResolveReminderGap(t.Context(), int64(orgID), 1, reminderRequests[0])
+	require.NoError(t, err)
+	require.True(t, found)
+	cases["receipts_readable_with_writes_disabled"] = true
+	gapTool := os.Getenv("QS_M3_RECOVERY_ANSWERSHEET")
+	gapEnv := []string{"MYSQL_DSN=" + cfg.FormatDSN(), "MONGO_URI=" + os.Getenv("QS_M3_HOST_MONGO_URI"), "MONGO_DB=" + mongoDB.Name(), "M6_QS03_GRPC_ENDPOINT=" + listener.Addr().String(), "M6_QS03_CA_FILE=" + certPath, "M6_QS03_CERT_FILE=" + certPath, "M6_QS03_KEY_FILE=" + keyPath, "M6_QS03_SERVER_NAME=127.0.0.1"}
+	gapArgs := []string{"--answersheet-id", strconv.FormatUint(answer.GetId(), 10), "--org-id", strconv.FormatUint(orgID, 10), "--accepted-before", cutoff.Format(time.RFC3339Nano)}
+	gapInspect := runTool(gapTool, 0, gapEnv, nil, append([]string{"--mode", "inspect"}, gapArgs...)...)
+	var gap struct {
+		SourceFingerprint string `json:"source_fingerprint"`
+		EventID           string `json:"event_id"`
+	}
+	require.NoError(t, json.Unmarshal(gapInspect, &gap))
+	require.NotEmpty(t, gap.SourceFingerprint)
+	gapRequest := uuid.NewString()
+	applyArgs := append(append([]string{}, gapArgs...), "--mode", "apply", "--source-fingerprint", gap.SourceFingerprint, "--audit-dir", audit, "--request-id", gapRequest, "--operator", "owned-m3c", "--reason", "owned original transaction recovery", "--external-result-reviewed")
+	unknownReceipt := runTool(gapTool, 2, gapEnv, nil, applyArgs...)
+	require.Contains(t, string(unknownReceipt), `"effect_outcome":"unknown"`)
+	require.EqualValues(t, 1, ensureCalls.Load())
+	runTool(gapTool, 0, nil, nil, "--mode", "reconcile", "--audit-dir", audit, "--request-id", gapRequest)
+	require.EqualValues(t, 1, ensureCalls.Load())
+	cases["answersheet_operator_original_request_response_loss"] = true
+
+	// Serialize only fresh owned connection selectors in a private child file.
+	private := t.TempDir()
+	require.NoError(t, os.Chmod(private, 0700))
+	child := m3cChildConfig{DSN: cfg.FormatDSN(), MongoURI: os.Getenv("QS_M3_HOST_MONGO_URI"), MongoDB: mongoDB.Name(), Redis: addr, Namespace: namespace, Endpoint: listener.Addr().String(), Cert: certPath, Key: keyPath, Observer: os.Getenv("QS_M3_HOST_OBSERVER_OPTIONS"), Marker: filepath.Join(private, "first-delivery.json"), Hold: true}
+	executable, err := os.Executable()
+	require.NoError(t, err)
+	type worker struct {
+		cmd  *exec.Cmd
+		done chan error
+		log  *os.File
+	}
+	workers := []*worker{}
+	start := func(conf m3cChildConfig) *worker {
+		t.Helper()
+		path := filepath.Join(private, uuid.NewString()+".json")
+		m3cPrivateJSON(t, path, conf)
+		log, err := os.OpenFile(path+".log", os.O_CREATE|os.O_WRONLY, 0600)
+		require.NoError(t, err)
+		cmd := exec.Command(executable, "-test.run=^TestM3RecoveryWorkerProcess$", "-test.timeout=5m", "-test.v")
+		cmd.Env = append(os.Environ(), "QS_M3C_WORKER_CHILD="+path)
+		cmd.Stdout = log
+		cmd.Stderr = log
+		require.NoError(t, cmd.Start())
+		w := &worker{cmd, make(chan error, 1), log}
+		go func() { w.done <- cmd.Wait() }()
+		workers = append(workers, w)
+		return w
+	}
+	t.Cleanup(func() {
+		for _, w := range workers {
+			if w.cmd.ProcessState == nil {
+				_ = w.cmd.Process.Signal(syscall.SIGTERM)
+				select {
+				case <-w.done:
+				case <-time.After(20 * time.Second):
+					_ = w.cmd.Process.Kill()
+					<-w.done
+				}
+			}
+			_ = w.log.Close()
+		}
+	})
+	phase.Store(3)
+	first := start(child)
+	select {
+	case request := <-held:
+		require.Equal(t, answer.GetId(), request.AnswerSheetId)
+	case e := <-first.done:
+		t.Fatalf("actual Worker exited before original effect: %v", e)
+	case <-time.After(2 * time.Minute):
+		t.Fatal("actual Worker did not reach original intake")
+	}
+	var firstMarker m3cDeliveryMarker
+	m3cEventually(t, func() bool {
+		raw, e := os.ReadFile(child.Marker)
+		return e == nil && json.Unmarshal(raw, &firstMarker) == nil
+	})
+	require.Equal(t, gap.EventID, firstMarker.EventID)
+	require.NoError(t, first.cmd.Process.Kill())
+	exit := <-first.done
+	require.Error(t, exit)
+	require.Equal(t, syscall.SIGKILL, first.cmd.ProcessState.Sys().(syscall.WaitStatus).Signal())
+	cases["worker_sigkill_after_effect_before_ack"] = true
+	brokerID := m3cBroker(t, "id")
+	m3cBroker(t, "kill")
+	require.Equal(t, "137", m3cBroker(t, "exit"))
+	m3cBroker(t, "start")
+	require.Equal(t, brokerID, m3cBroker(t, "id"))
+	cases["same_owned_broker_sigkill_restart"] = true
+	phase.Store(4)
+	child.Hold = false
+	child.Marker = filepath.Join(private, "second-delivery.json")
+	second := start(child)
+	require.NotEqual(t, first.cmd.Process.Pid, second.cmd.Process.Pid)
+	var secondMarker m3cDeliveryMarker
+	m3cEventually(t, func() bool {
+		raw, e := os.ReadFile(child.Marker)
+		return e == nil && json.Unmarshal(raw, &secondMarker) == nil
+	})
+	require.Equal(t, firstMarker, secondMarker)
+	cases["actual_original_wire_redelivery_after_restart"] = true
+	m3cEventually(t, func() bool {
+		result, e := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answer.GetId()})
+		if e != nil || result.GetAssessmentStatus() != "evaluated" {
+			return false
+		}
+		count, e := mongoDB.Collection("reports").CountDocuments(t.Context(), bson.M{})
+		return e == nil && count == 1
+	})
+	evaluated, err := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answer.GetId()})
+	require.NoError(t, err)
+	assertRowCount(t, db, "assessment", "answer_sheet_id=?", 1, answer.GetId())
+	assertRowCount(t, db, "runtime_checkpoint", "scope=? AND assessment_id=?", 1, "evaluation_run", evaluated.GetAssessmentId())
+	assertRowCount(t, db, "evaluation_outcome", "assessment_id=?", 1, evaluated.GetAssessmentId())
+	cases["one_assessment_run_outcome_and_report"] = true
+	require.GreaterOrEqual(t, ensureCalls.Load(), int64(3))
+	require.Equal(t, float64(1), rank())
+	require.EqualValues(t, 4, providerCalls.Load())
+	cases["late_original_delivery_preserves_rank_and_notification_counts"] = true
+	// Conflicting original evidence must fail the whole day without replacing it.
+	_, err = mongoDB.Collection("rm_tx_execution").UpdateMany(t.Context(), bson.M{"owner": "qs.mongo"}, bson.M{"$set": bson.M{"plan_digest": make([]byte, 32)}})
+	require.NoError(t, err)
+	source, err := redishot.NewMongoDaySource(mongoDB)
+	require.NoError(t, err)
+	_, err = source.Capture(t.Context(), day)
+	require.Error(t, err)
+	require.Equal(t, float64(1), rank())
+	cases["conflicting_source_refuses_whole_rebuild"] = true
+	for _, table := range []string{"rm_outbox", "ai_messaging_outbox"} {
+		var count int64
+		require.NoError(t, db.Table(table).Count(&count).Error)
+		require.Zero(t, count)
+	}
+	count, err := mongoDB.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{})
+	require.NoError(t, err)
+	require.Zero(t, count)
+	require.NoError(t, second.cmd.Process.Signal(syscall.SIGTERM))
+	select {
+	case e := <-second.done:
+		require.NoError(t, e)
+	case <-time.After(30 * time.Second):
+		t.Fatal("actual Worker failed to drain")
+	}
+	// Cleanup assertions run before the exported receipt; t.Cleanup still owns
+	// safety cleanup on every earlier failure. The outer fixture removes resources.
+	require.NoError(t, c.Cleanup())
+	require.NoError(t, normal.Close(t.Context()))
+	require.NoError(t, mongoDB.Drop(t.Context()))
+	_, err = sqlDB.ExecContext(t.Context(), "DROP DATABASE `"+dbName+"`")
+	require.NoError(t, err)
+	sha, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
+	require.NoError(t, err)
+	require.Len(t, cases, 14)
+	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
+	rawReceipt, err := json.Marshal(receipt)
+	require.NoError(t, err)
+	fmt.Println("M3C_QS_RECOVERY_RECEIPT " + string(rawReceipt))
+}
