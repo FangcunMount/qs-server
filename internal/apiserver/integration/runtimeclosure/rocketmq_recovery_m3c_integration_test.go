@@ -29,6 +29,7 @@ import (
 
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	intakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
 	apphot "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
@@ -37,6 +38,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	operatorDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/answersheetgap"
 	redishot "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
 	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	ledger "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/notification"
@@ -67,6 +69,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -284,7 +287,7 @@ func m3cBroker(t *testing.T, action string) string {
 	invoke := func(args ...string) string {
 		ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 		defer cancel()
-		raw, err := exec.CommandContext(ctx, "docker", args...).Output()
+		raw, err := exec.CommandContext(ctx, "docker", append([]string{"--host=unix:///var/run/docker.sock"}, args...)...).Output()
 		require.NoError(t, err)
 		return strings.TrimSpace(string(raw))
 	}
@@ -422,6 +425,9 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	var phase atomic.Int32
 	phase.Store(1)
 	var ensureCalls atomic.Int64
+	var reminderVisits sync.Map
+	var ensureMu sync.Mutex
+	var ensureInputs []*evaluationpb.EnsureAssessmentRequest
 	held := make(chan *evaluationpb.EnsureAssessmentRequest, 1)
 	var heldOnce sync.Once
 	certPath, keyPath := os.Getenv("QS_M3_RECOVERY_CERT"), os.Getenv("QS_M3_RECOVERY_KEY")
@@ -433,8 +439,14 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.True(t, roots.AppendCertsFromPEM(ca))
 	server := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots})), grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (any, error) {
 		response, e := next(ctx, req)
+		if r, ok := req.(*internalpb.ProcessTaskOpenedReminderRequest); ok && e == nil {
+			reminderVisits.Store(r.OpeningEventId, true)
+		}
 		if v, ok := req.(*evaluationpb.EnsureAssessmentRequest); ok && e == nil {
 			ensureCalls.Add(1)
+			ensureMu.Lock()
+			ensureInputs = append(ensureInputs, proto.Clone(v).(*evaluationpb.EnsureAssessmentRequest))
+			ensureMu.Unlock()
 			if phase.CompareAndSwap(1, 2) {
 				return nil, status.Error(codes.Unavailable, "owned response loss after original intake commit")
 			}
@@ -584,6 +596,12 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(gapInspect, &gap))
 	require.NotEmpty(t, gap.SourceFingerprint)
+	gapSource, err := answersheetgap.New(mongoDB, db)
+	require.NoError(t, err)
+	originalPlan, err := gapSource.CaptureOriginalRecovery(t.Context(), answer.GetId(), orgID, cutoff, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, gap.SourceFingerprint, originalPlan.SourceFingerprint)
+	originalWireHash := sha256.Sum256(originalPlan.Message().Input().Payload)
 	gapRequest := uuid.NewString()
 	applyArgs := append(append([]string{}, gapArgs...), "--mode", "apply", "--source-fingerprint", gap.SourceFingerprint, "--audit-dir", audit, "--request-id", gapRequest, "--operator", "owned-m3c", "--reason", "owned original transaction recovery", "--external-result-reviewed")
 	unknownReceipt := runTool(gapTool, 2, gapEnv, nil, applyArgs...)
@@ -652,6 +670,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		return e == nil && json.Unmarshal(raw, &firstMarker) == nil
 	})
 	require.Equal(t, gap.EventID, firstMarker.EventID)
+	require.Equal(t, hex.EncodeToString(originalWireHash[:]), firstMarker.WireSHA)
 	require.NoError(t, first.cmd.Process.Kill())
 	exit := <-first.done
 	require.Error(t, exit)
@@ -694,7 +713,21 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		require.EqualValues(t, 1, count)
 	}
 	cases["one_assessment_run_outcome_and_report"] = true
+	m3cEventually(t, func() bool {
+		for _, req := range reminderRequests {
+			if _, ok := reminderVisits.Load(req.OpeningEventID); !ok {
+				return false
+			}
+		}
+		return ensureCalls.Load() >= 3
+	})
 	require.GreaterOrEqual(t, ensureCalls.Load(), int64(3))
+	ensureMu.Lock()
+	inputs := append([]*evaluationpb.EnsureAssessmentRequest(nil), ensureInputs...)
+	ensureMu.Unlock()
+	for _, input := range inputs {
+		require.True(t, proto.Equal(inputs[0], input), "original EnsureAssessment request changed on late delivery")
+	}
 	require.Equal(t, float64(1), rank())
 	require.EqualValues(t, 4, providerCalls.Load())
 	cases["late_original_delivery_preserves_rank_and_notification_counts"] = true
@@ -705,6 +738,14 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.NoError(t, err)
 	_, err = source.Capture(t.Context(), day)
 	require.Error(t, err)
+	require.Equal(t, float64(1), rank())
+	corruptArgs := append([]string(nil), hotArgs...)
+	for i := range corruptArgs {
+		if i > 0 && corruptArgs[i-1] == "--request-id" {
+			corruptArgs[i] = uuid.NewString()
+		}
+	}
+	runTool(hotTool, 1, nil, toolInput, corruptArgs...)
 	require.Equal(t, float64(1), rank())
 	cases["conflicting_source_refuses_whole_rebuild"] = true
 	for _, table := range []string{"rm_outbox", "ai_messaging_outbox"} {
