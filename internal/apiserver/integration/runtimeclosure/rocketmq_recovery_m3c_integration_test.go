@@ -44,8 +44,10 @@ import (
 	ledger "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/notification"
 	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	gov "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechat "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -232,7 +234,7 @@ func (p m3cProvider) SendSubscribeMessageWithReceipt(ctx context.Context, _, _ s
 	if e != nil {
 		return wechat.SubscribeSendReceipt{}, e
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	var result wechat.SubscribeSendReceipt
 	e = json.NewDecoder(response.Body).Decode(&result)
 	return result, e
@@ -366,7 +368,9 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	_, err = mongoDB.Collection("rm_tx_binding").InsertOne(t.Context(), bson.M{"_id": mg.Owner, "store_id": mg.StoreID, "writer_epoch": mg.WriterEpoch, "schema_version": 1})
 	require.NoError(t, err)
 	locks := newTestLocks(redisClient, "apiserver", namespace+":locks")
-	c := container.NewContainerWithOptions(db, mongoDB, redisClient, container.ContainerOptions{EventSubsystem: events, Transactions: &container.EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, CacheSubsystem: newRuntimeCacheSubsystem(redisClient), LockSubsystem: locks, PlanEntryBaseURL: "https://collection.example.test/entry", Silent: true})
+	resilience, err := resiliencesubsystem.New(resiliencesubsystem.Options{InstanceID: "owned-m3c-api", Backpressure: apiserveroptions.NewBackpressureOptions(), Locks: locks})
+	require.NoError(t, err)
+	c := container.NewContainerWithOptions(db, mongoDB, redisClient, container.ContainerOptions{EventSubsystem: events, Transactions: &container.EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, CacheSubsystem: newRuntimeCacheSubsystem(redisClient), LockSubsystem: locks, Resilience: resilience, PlanEntryBaseURL: "https://collection.example.test/entry", Silent: true})
 	require.NoError(t, normal.Start())
 	require.NoError(t, c.Initialize())
 	require.NoError(t, c.StartEventSubsystem(t.Context()))

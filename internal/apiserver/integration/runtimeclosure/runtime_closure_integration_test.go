@@ -353,6 +353,9 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	var answerMessage *rmtransport.Received
 	if delivery != nil && delivery.Covers(eventcatalog.AnswerSheetSubmitted) {
 		answerMessage, err = delivery.Wait(t, eventcatalog.AnswerSheetSubmitted)
+		if err == nil && (answerMessage == nil || answerMessage.ID == "") {
+			t.Fatal("delivered AnswerSheet must retain its event identity")
+		}
 	} else {
 		answerMessage = capture.Wait(t, eventcatalog.AnswerSheetSubmitted)
 		err = answerHandler(t.Context(), eventcatalog.AnswerSheetSubmitted, answerMessage.Payload)
@@ -461,6 +464,9 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	var reportMessage *rmtransport.Received
 	if delivery != nil && delivery.Covers(eventcatalog.InterpretationReportGenerated) {
 		reportMessage, err = delivery.Wait(t, eventcatalog.InterpretationReportGenerated)
+		if err == nil && (reportMessage == nil || reportMessage.ID == "") {
+			t.Fatal("delivered report must retain its event identity")
+		}
 	} else {
 		reportMessage = capture.Wait(t, eventcatalog.InterpretationReportGenerated)
 		err = reportHandler(t.Context(), eventcatalog.InterpretationReportGenerated, reportMessage.Payload)
