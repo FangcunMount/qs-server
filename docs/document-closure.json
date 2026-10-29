@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 46,
+      "expected_count": 47,
       "budgeted": false
     }
   },
@@ -13780,6 +13780,52 @@
           "summary": "Finish precise final CI and fixed-host tool delivery; retain the original operation journal and production scope before any controlled recovery.",
           "exit_criteria": "Record precise final source / CI and installation evidence, then review operational scope separately from full M6 acceptance."
         }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/hotrank_day_rebuild/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/hotrank_day_rebuild/main.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/modelcatalog/hotrank/source.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/modelcatalog/hotrank/transaction_source.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "No per-document production evidence has been recorded in this initial skeleton."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-HOST-M3A-HOTRANK",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Current-source Mongo CI and later real Redis/RocketMQ recovery acceptance are separate from production operation.",
+          "exit_criteria": "Record exact-SHA Mongo CI; retain pending M3-C and production boundaries until separately verified."
+        }
+      ],
+      "notes": [
+        "Restored from original M3 stash ec4315344c4fd0aaa7575b6d125c8b5f0734d1a7; source and local tests are reviewed separately from CI and production. No existing database or Redis operation is authorized."
       ]
     },
     {

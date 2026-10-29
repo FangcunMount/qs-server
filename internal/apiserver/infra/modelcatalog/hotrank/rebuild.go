@@ -72,7 +72,8 @@ return 1
 `)
 
 // RebuildSnapshot must contain a complete day, never a selected account or ID page.
-// Only the original durable acceptance and matching original Outbox can supply it.
+// Only durable acceptance and its matching original transaction evidence (or
+// historical version-1 Outbox) can supply it.
 type RebuildSnapshot struct {
 	Day                  string                   `json:"day"`
 	CapturedAt           time.Time                `json:"captured_at"`
