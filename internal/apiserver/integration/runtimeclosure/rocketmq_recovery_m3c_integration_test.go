@@ -364,6 +364,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	require.NoError(t, err)
 	locks := newTestLocks(redisClient, "apiserver", namespace+":locks")
 	c := container.NewContainerWithOptions(db, mongoDB, redisClient, container.ContainerOptions{EventSubsystem: events, Transactions: &container.EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, CacheSubsystem: newRuntimeCacheSubsystem(redisClient), LockSubsystem: locks, PlanEntryBaseURL: "https://collection.example.test/entry", Silent: true})
+	require.NoError(t, normal.Start())
 	require.NoError(t, c.Initialize())
 	require.NoError(t, c.StartEventSubsystem(t.Context()))
 	t.Cleanup(func() {
@@ -679,7 +680,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		if e != nil || result.GetAssessmentStatus() != "evaluated" {
 			return false
 		}
-		count, e := mongoDB.Collection("reports").CountDocuments(t.Context(), bson.M{})
+		count, e := mongoDB.Collection("interpret_report_artifacts").CountDocuments(t.Context(), bson.M{})
 		return e == nil && count == 1
 	})
 	evaluated, err := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answer.GetId()})
@@ -687,6 +688,11 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	assertRowCount(t, db, "assessment", "answer_sheet_id=?", 1, answer.GetId())
 	assertRowCount(t, db, "runtime_checkpoint", "scope=? AND assessment_id=?", 1, "evaluation_run", evaluated.GetAssessmentId())
 	assertRowCount(t, db, "evaluation_outcome", "assessment_id=?", 1, evaluated.GetAssessmentId())
+	for _, name := range []string{"report_generations", "interpretation_runs", "interpret_report_artifacts"} {
+		count, err := mongoDB.Collection(name).CountDocuments(t.Context(), bson.M{})
+		require.NoError(t, err)
+		require.EqualValues(t, 1, count)
+	}
 	cases["one_assessment_run_outcome_and_report"] = true
 	require.GreaterOrEqual(t, ensureCalls.Load(), int64(3))
 	require.Equal(t, float64(1), rank())
