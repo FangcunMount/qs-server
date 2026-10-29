@@ -59,6 +59,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	generic "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	workerprocess "github.com/FangcunMount/qs-server/internal/worker/process"
@@ -734,7 +735,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		m3cPrivateJSON(t, path, conf)
 		log, err := os.OpenFile(path+".log", os.O_CREATE|os.O_WRONLY, 0600)
 		require.NoError(t, err)
-		cmd := exec.Command(executable, "-test.run=^TestM3RecoveryWorkerProcess$", "-test.timeout=5m", "-test.v")
+		cmd := exec.Command(executable, "-test.run=^TestM3RecoveryWorkerProcess$", "-test.timeout=10m", "-test.v")
 		cmd.Env = append(os.Environ(), "QS_M3C_WORKER_CHILD="+path)
 		cmd.Stdout = log
 		cmd.Stderr = log
@@ -790,6 +791,26 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	exit := <-first.done
 	require.Error(t, exit)
 	require.Equal(t, syscall.SIGKILL, first.cmd.ProcessState.Sys().(syscall.WaitStatus).Signal())
+	// A real killed Worker cannot release its production five-minute Redis
+	// suppression lease. Observe the actual remaining TTL and wait for natural
+	// expiry; never shorten the production policy or delete the key to pass.
+	workerRedis := redis.NewClient(&redis.Options{Addr: addr, DB: 1})
+	t.Cleanup(func() { _ = workerRedis.Close() })
+	leaseKeys := []string{}
+	leaseScan := workerRedis.Scan(t.Context(), 0, "*answersheet:processing:"+strconv.FormatUint(answer.GetId(), 10), 100).Iterator()
+	for leaseScan.Next(t.Context()) {
+		leaseKeys = append(leaseKeys, leaseScan.Val())
+	}
+	require.NoError(t, leaseScan.Err())
+	require.Len(t, leaseKeys, 1, "actual killed Worker processing lease is required")
+	processingLease, err := workerRedis.PTTL(t.Context(), leaseKeys[0]).Result()
+	require.NoError(t, err)
+	capability, ok := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+	require.True(t, ok)
+	require.Positive(t, processingLease)
+	require.LessOrEqual(t, processingLease, capability.Spec.DefaultTTL)
+	processingExpiresAt := time.Now().Add(processingLease)
+	fmt.Printf("M3C_REAL_PROCESSING_LEASE_MS %d\n", processingLease.Milliseconds())
 	cases["worker_sigkill_after_effect_before_ack"] = true
 	brokerID := m3cBroker(t, "id")
 	m3cBroker(t, "kill")
@@ -877,13 +898,21 @@ redelivery:
 		require.EqualValues(t, 1, count)
 	}
 	cases["one_assessment_run_outcome_and_report"] = true
-	m3cEventually(t, func() bool {
+	// Keep the production lease and existing redelivery/backoff policy. The
+	// deadline follows the observed expiry plus a bounded delivery margin.
+	lateDeliveryBudget := time.Until(processingExpiresAt.Add(2 * time.Minute))
+	require.Positive(t, lateDeliveryBudget)
+	require.Eventually(t, func() bool {
 		for _, req := range reminderRequests {
 			if _, ok := reminderVisits.Load(req.OpeningEventID); !ok {
 				return false
 			}
 		}
 		return ensureCalls.Load() >= 3
+	}, lateDeliveryBudget, 200*time.Millisecond)
+	m3cEventually(t, func() bool {
+		remaining, e := workerRedis.Exists(t.Context(), leaseKeys[0]).Result()
+		return e == nil && remaining == 0
 	})
 	require.GreaterOrEqual(t, ensureCalls.Load(), int64(3))
 	ensureMu.Lock()
@@ -938,7 +967,7 @@ redelivery:
 	sha, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
 	require.Len(t, cases, 14)
-	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
+	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
 	rawReceipt, err := json.Marshal(receipt)
 	require.NoError(t, err)
 	fmt.Println("M3C_QS_RECOVERY_RECEIPT " + string(rawReceipt))
