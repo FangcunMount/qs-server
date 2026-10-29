@@ -3,6 +3,7 @@ package taskopen
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -38,6 +39,27 @@ func TestRecoveryOpeningUsesOriginalPrivateArtifactAndWire(t *testing.T) {
 	changed = o.Task
 	changed.ScheduleRevision++
 	require.False(t, o.MatchesCurrent(&changed))
+	for _, field := range []string{"planned", "scale", "enrollment", "sequence", "due", "defined"} {
+		t.Run(field, func(t *testing.T) {
+			changed := o.Task
+			clock := changed.PlannedAt.Add(time.Second)
+			switch field {
+			case "planned":
+				changed.PlannedAt = clock
+			case "scale":
+				changed.ScaleCode = "other-scale"
+			case "enrollment":
+				changed.EnrollmentID++
+			case "sequence":
+				changed.Seq++
+			case "due":
+				changed.DueAt = &clock
+			case "defined":
+				changed.ScheduleDefinedAt = &clock
+			}
+			require.False(t, o.MatchesCurrent(&changed))
+		})
+	}
 }
 
 func TestRecoveryOpeningRejectsChangedRequestOrWire(t *testing.T) {

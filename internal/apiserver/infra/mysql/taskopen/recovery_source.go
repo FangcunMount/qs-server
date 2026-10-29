@@ -34,7 +34,14 @@ type RecoveryOpening struct {
 }
 
 func (o RecoveryOpening) MatchesCurrent(task *repository.AssessmentTaskPO) bool {
-	return task != nil && task.ID == o.Task.ID && task.OrgID == o.Task.OrgID && task.PlanID == o.Task.PlanID && task.TesteeID == o.Task.TesteeID && task.ScheduleRevision == o.Task.ScheduleRevision && task.Status == domain.TaskStatusOpened.String() && sameOptionalClock(task.OpenAt, o.Task.OpenAt) && sameOptionalClock(task.ExpireAt, o.Task.ExpireAt) && task.EntryURL == o.Task.EntryURL
+	if task == nil || task.ID != o.Task.ID || task.OrgID != o.Task.OrgID || task.PlanID != o.Task.PlanID || task.TesteeID != o.Task.TesteeID || task.ScheduleRevision != o.Task.ScheduleRevision || task.Status != domain.TaskStatusOpened.String() || !sameOptionalClock(task.OpenAt, o.Task.OpenAt) || !sameOptionalClock(task.ExpireAt, o.Task.ExpireAt) || task.EntryURL != o.Task.EntryURL {
+		return false
+	}
+	// Match the same stable input as the production opening recovery. A silent
+	// edit without a revision bump must not authorize a different task schedule.
+	current, err := (frozenOpening{Task: *task}).inputHash()
+	original, originalErr := (frozenOpening{Task: o.Task}).inputHash()
+	return err == nil && originalErr == nil && current == original
 }
 
 // readRecoveryOpening reuses the production opening artifact and consumer-wire

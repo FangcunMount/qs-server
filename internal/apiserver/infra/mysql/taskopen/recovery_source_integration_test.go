@@ -87,7 +87,7 @@ func TestCurrentReminderSourceReadsCommittedRootWithoutOutbox(t *testing.T) {
 }
 
 func TestCurrentReminderSourceRejectsConflictsAndMissingEvidence(t *testing.T) {
-	for _, name := range []string{"prepared", "missing_witness", "wrong_witness", "wrong_owner", "wrong_request_link", "changed_plan", "changed_task", "changed_binding"} {
+	for _, name := range []string{"prepared", "missing_witness", "wrong_witness", "wrong_owner", "wrong_request_link", "changed_plan", "changed_task", "changed_schedule_without_revision", "changed_binding"} {
 		t.Run(name, func(t *testing.T) {
 			ctx, db, source, o := currentOpeningNativeFixture(t)
 			var err error
@@ -106,6 +106,8 @@ func TestCurrentReminderSourceRejectsConflictsAndMissingEvidence(t *testing.T) {
 				err = db.Exec("UPDATE rm_tx_execution SET plan=?", []byte(`{}`)).Error
 			case "changed_task":
 				err = db.Exec("UPDATE assessment_task SET entry_url='other-entry'").Error
+			case "changed_schedule_without_revision":
+				err = db.Exec("UPDATE assessment_task SET planned_at=DATE_ADD(planned_at, INTERVAL 1 SECOND)").Error
 			case "changed_binding":
 				err = db.Exec("UPDATE rm_tx_binding SET schema_version=99").Error
 			}
