@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "fff8c57e5fd6d0adb7523372237b083a8ad10788",
+    "sha": "a20223853885d9874b1ab98488a4a954b7de15a0",
     "verified_on": "2026-10-29"
   },
   "status_policy": {
@@ -11002,7 +11002,8 @@
       ],
       "notes": [
         "2026-10-29 host-retirement M2 current receipt source review 5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af; prior global baseline {\"sha\": \"46f28f91241ac65c1ac37dd0f09d9e5b548fb143\", \"verified_on\": \"2026-10-29\"}. M1 main merged into the M2 branch; deleted development document stays deleted. Metrics distinguish current command admission, interpretation business ACK and transaction confirmation. Five targeted Go packages and paired probe compilation passed; native MySQL/Broker and production evidence remain separately pending. Historical verification and production/signoff fields unchanged.",
-        "2026-10-29 host-retirement M3-A source review fff8c57e5fd6d0adb7523372237b083a8ad10788; prior global source_baseline {\"sha\": \"5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af\", \"verified_on\": \"2026-10-29\"}. Original stash and third-parent files were imported and checked against the uploaded inventory. Local hotrank/CLI race, architecture/config, tagged compile/vet, targeted lint and actionlint passed. Mongo CI remains pending at this review; no real Redis/Broker, production, DB or M3-B/M3-C acceptance is claimed. Historical verification and production fields retain attribution."
+        "2026-10-29 host-retirement M3-A source review fff8c57e5fd6d0adb7523372237b083a8ad10788; prior global source_baseline {\"sha\": \"5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af\", \"verified_on\": \"2026-10-29\"}. Original stash and third-parent files were imported and checked against the uploaded inventory. Local hotrank/CLI race, architecture/config, tagged compile/vet, targeted lint and actionlint passed. Mongo CI remains pending at this review; no real Redis/Broker, production, DB or M3-B/M3-C acceptance is claimed. Historical verification and production fields retain attribution.",
+        "2026-10-29 host-retirement M3-B source-only review a20223853885d9874b1ab98488a4a954b7de15a0; previous global source_baseline {\"sha\": \"fff8c57e5fd6d0adb7523372237b083a8ad10788\", \"verified_on\": \"2026-10-29\"}. Current AnswerSheet gap source/inspection is separate from Broker confirmation, business effect and actual recovery authorization. Native CI pending at review; reminder persistent recovery and M3-C remain pending. No source/command/native/production history is reassigned."
       ]
     },
     {
@@ -11938,7 +11939,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "fff8c57e5fd6d0adb7523372237b083a8ad10788",
+        "source_sha": "a20223853885d9874b1ab98488a4a954b7de15a0",
         "verified_on": "2026-10-29"
       },
       "fact_sources": [
@@ -12656,7 +12657,8 @@
         "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate.",
         "Declared109/42 followupc1d4a79f76fe7f868cfd8320270c80280d24b5bf. Prior current binding retained: {\"source_baseline\": {\"sha\": \"9304ba3d97c269f546f2749296574e06f7709d12\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}}. Compiled migration resources and explicit accepted/rejected pairs tested; no native DDL installation claimed. First docs-facts caught missing migration README current-head attribution and old108 text; corrected without modifying historical receipts or earlier migrations. Deferred native component and full-worker/Broker evidence remain pending; production unchanged.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned.",
-        "2026-10-29 source-only review of host-retirement M3-A CI delta fff8c57e5fd6d0adb7523372237b083a8ad10788. Previous source review {\"source_sha\": \"7558fd73ee863f86a1b0186d8fc4bc43fb8f4387\", \"verified_on\": \"2026-10-26\"} is retained here. The CI change adds the stacked M2 PR base and three isolated hotrank source tests, and labels the existing NSQ hotrank/attention step as historical. Existing migration, offline and metadata selectors, assertions, argv, resources and command contracts are unchanged. This updates source review only: all verification objects, production evidence, signoffs and their original source/date fields are unchanged; none are re-signed or rerun by this note."
+        "2026-10-29 source-only review of host-retirement M3-A CI delta fff8c57e5fd6d0adb7523372237b083a8ad10788. Previous source review {\"source_sha\": \"7558fd73ee863f86a1b0186d8fc4bc43fb8f4387\", \"verified_on\": \"2026-10-26\"} is retained here. The CI change adds the stacked M2 PR base and three isolated hotrank source tests, and labels the existing NSQ hotrank/attention step as historical. Existing migration, offline and metadata selectors, assertions, argv, resources and command contracts are unchanged. This updates source review only: all verification objects, production evidence, signoffs and their original source/date fields are unchanged; none are re-signed or rerun by this note.",
+        "2026-10-29 source-only review of M3-B CI delta a20223853885d9874b1ab98488a4a954b7de15a0; preserve prior source review {\"source_sha\": \"fff8c57e5fd6d0adb7523372237b083a8ad10788\", \"verified_on\": \"2026-10-29\"}. The workflow adds only the stacked M3-A PR base and a required zero-skip current AnswerSheet source step on fresh random Mongo/MySQL databases. Existing migration/offline/metadata selectors, assertions, argv and budgets are unchanged. All command/native verification, production and signoff objects retain original source/date attribution; no such result is rerun or re-signed here."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -12768,7 +12770,20 @@
         "source_sha": null,
         "verified_on": null
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/scanner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/recovery.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/transaction_source.go"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -12787,6 +12802,9 @@
           "summary": "Production scope and operational evidence have not been recorded.",
           "exit_criteria": "Review a fixed production window and retain read-only output before promoting the audit."
         }
+      ],
+      "notes": [
+        "2026-10-29 host-retirement M3-B AnswerSheet source review a20223853885d9874b1ab98488a4a954b7de15a0. Current v2 original execution/witness and frozen wire are read in one Mongo snapshot; no retired publishing collection fallback. Local race and source checks passed, native Mongo/MySQL CI pending at this review. missing_committed is local acceptance only; deleted Assessments are not new gaps. Original CLI operation journal and Intake identity stay in use. Existing verification/production records retain original attribution. Reminder missing-batch recovery remains disabled and unimplemented for current transactions; no Relay restart or production action."
       ]
     },
     {
@@ -13762,6 +13780,14 @@
         {
           "kind": "source",
           "path": "scripts/testing/m6-qs03-original-recovery-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/scanner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/answersheetgap/transaction_source.go"
         }
       ],
       "verification": [],
@@ -13782,6 +13808,9 @@
           "summary": "Finish precise final CI and fixed-host tool delivery; retain the original operation journal and production scope before any controlled recovery.",
           "exit_criteria": "Record precise final source / CI and installation evidence, then review operational scope separately from full M6 acceptance."
         }
+      ],
+      "notes": [
+        "2026-10-29 host-retirement M3-B AnswerSheet source review a20223853885d9874b1ab98488a4a954b7de15a0. Current v2 original execution/witness and frozen wire are read in one Mongo snapshot; no retired publishing collection fallback. Local race and source checks passed, native Mongo/MySQL CI pending at this review. missing_committed is local acceptance only; deleted Assessments are not new gaps. Original CLI operation journal and Intake identity stay in use. Existing verification/production records retain original attribution. Reminder missing-batch recovery remains disabled and unimplemented for current transactions; no Relay restart or production action."
       ]
     },
     {
@@ -14148,7 +14177,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "fff8c57e5fd6d0adb7523372237b083a8ad10788",
+        "source_sha": "a20223853885d9874b1ab98488a4a954b7de15a0",
         "verified_on": "2026-10-29"
       },
       "fact_sources": [
@@ -14749,7 +14778,8 @@
         "M3 T04 schema-only batch: 106/41 frozen protocol resources and a separate native CI selector reviewed; original metadata carrier job and offline protection implementation unchanged. Local native build only; database execution pending CI. No production DDL or business acceptance.",
         "Merged main39cb018 verified public MySQL TLS baseline with M3 separate transaction schema. Preserve TLS connector/maintenance and explicit transaction binding/root ownership. Post-merge local source tests passed; full merged-head CI pending, previous green CI remains bound to b31fa2c34.",
         "M3 T24 scoped native-fixture review: previous source baseline and document binding preserved here, not relabelled as current native acceptance: {\"source_baseline\": {\"sha\": \"dcd231e48fed37a2f6262d891273b2641e39d030\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"f899d5cb4b19ed15e5dbe741fd42b3d804370784\", \"verified_on\": \"2026-10-19\"}}. Only readiness test synchronization/child-test attribution changed; client release remains required and actual server processlist must drain within one second. Original CI failure did not distinguish query error from nonzero thread count; its root cause remains unknown. Tag compilation passed; exact native CI pending; production tool/limits/schema unchanged.",
-        "2026-10-29 source-only review of host-retirement M3-A CI delta fff8c57e5fd6d0adb7523372237b083a8ad10788. Previous source review {\"source_sha\": \"7558fd73ee863f86a1b0186d8fc4bc43fb8f4387\", \"verified_on\": \"2026-10-26\"} is retained here. The CI change adds the stacked M2 PR base and three isolated hotrank source tests, and labels the existing NSQ hotrank/attention step as historical. Existing migration, offline and metadata selectors, assertions, argv, resources and command contracts are unchanged. This updates source review only: all verification objects, production evidence, signoffs and their original source/date fields are unchanged; none are re-signed or rerun by this note."
+        "2026-10-29 source-only review of host-retirement M3-A CI delta fff8c57e5fd6d0adb7523372237b083a8ad10788. Previous source review {\"source_sha\": \"7558fd73ee863f86a1b0186d8fc4bc43fb8f4387\", \"verified_on\": \"2026-10-26\"} is retained here. The CI change adds the stacked M2 PR base and three isolated hotrank source tests, and labels the existing NSQ hotrank/attention step as historical. Existing migration, offline and metadata selectors, assertions, argv, resources and command contracts are unchanged. This updates source review only: all verification objects, production evidence, signoffs and their original source/date fields are unchanged; none are re-signed or rerun by this note.",
+        "2026-10-29 source-only review of M3-B CI delta a20223853885d9874b1ab98488a4a954b7de15a0; preserve prior source review {\"source_sha\": \"fff8c57e5fd6d0adb7523372237b083a8ad10788\", \"verified_on\": \"2026-10-29\"}. The workflow adds only the stacked M3-A PR base and a required zero-skip current AnswerSheet source step on fresh random Mongo/MySQL databases. Existing migration/offline/metadata selectors, assertions, argv and budgets are unchanged. All command/native verification, production and signoff objects retain original source/date attribution; no such result is rerun or re-signed here."
       ],
       "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -14886,7 +14916,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "fff8c57e5fd6d0adb7523372237b083a8ad10788",
+        "source_sha": "a20223853885d9874b1ab98488a4a954b7de15a0",
         "verified_on": "2026-10-29"
       },
       "fact_sources": [
@@ -15327,7 +15357,8 @@
         "M3 T14 source-only inventory review: previous verified binding retained as JSON {\"source_sha\": \"d789337e42ee4cdc6ca6311202abec29f1ccff80\", \"verified_on\": \"2026-10-21\"}. Explicit108/42 adds the command sequence unique index without rewriting prior migrations, offline protection or approval. No native migration/production result is rebound to this candidate.",
         "Current109/42 resource pair reviewc1d4a79f76fe7f868cfd8320270c80280d24b5bf; previous verified binding retained: {\"source_sha\": \"840961581eb318e63830db16004cade57d87cd13\", \"verified_on\": \"2026-10-21\"}. Only target inventory/document attribution changes; offline approval, identity, backup/restore, file consumption and runtime boundary code unchanged. No native or production execution claimed.",
         "T24-D source-only110/43 review. Preserve prior binding {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}. Add only host deny governance and explicit schema pair; old migrations, offline authorization/identity/backup/restore remain unchanged. Native CI pending; no production or system result reassigned.",
-        "2026-10-29 source-only review of host-retirement M3-A CI delta fff8c57e5fd6d0adb7523372237b083a8ad10788. Previous source review {\"source_sha\": \"7558fd73ee863f86a1b0186d8fc4bc43fb8f4387\", \"verified_on\": \"2026-10-26\"} is retained here. The CI change adds the stacked M2 PR base and three isolated hotrank source tests, and labels the existing NSQ hotrank/attention step as historical. Existing migration, offline and metadata selectors, assertions, argv, resources and command contracts are unchanged. This updates source review only: all verification objects, production evidence, signoffs and their original source/date fields are unchanged; none are re-signed or rerun by this note."
+        "2026-10-29 source-only review of host-retirement M3-A CI delta fff8c57e5fd6d0adb7523372237b083a8ad10788. Previous source review {\"source_sha\": \"7558fd73ee863f86a1b0186d8fc4bc43fb8f4387\", \"verified_on\": \"2026-10-26\"} is retained here. The CI change adds the stacked M2 PR base and three isolated hotrank source tests, and labels the existing NSQ hotrank/attention step as historical. Existing migration, offline and metadata selectors, assertions, argv, resources and command contracts are unchanged. This updates source review only: all verification objects, production evidence, signoffs and their original source/date fields are unchanged; none are re-signed or rerun by this note.",
+        "2026-10-29 source-only review of M3-B CI delta a20223853885d9874b1ab98488a4a954b7de15a0; preserve prior source review {\"source_sha\": \"fff8c57e5fd6d0adb7523372237b083a8ad10788\", \"verified_on\": \"2026-10-29\"}. The workflow adds only the stacked M3-A PR base and a required zero-skip current AnswerSheet source step on fresh random Mongo/MySQL databases. Existing migration/offline/metadata selectors, assertions, argv and budgets are unchanged. All command/native verification, production and signoff objects retain original source/date attribution; no such result is rerun or re-signed here."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
