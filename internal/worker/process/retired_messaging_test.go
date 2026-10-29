@@ -1,14 +1,15 @@
 package process
 
 import (
-	"github.com/FangcunMount/qs-server/pkg/app"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/pkg/app"
+	"github.com/spf13/viper"
+
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
