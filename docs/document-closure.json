@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "46f28f91241ac65c1ac37dd0f09d9e5b548fb143",
+    "sha": "5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af",
     "verified_on": "2026-10-29"
   },
   "status_policy": {
@@ -9784,6 +9784,9 @@
           "summary": "AnswerSheet effect scanning and original-message recovery capabilities exist, but their production scheduler, API, cursor and authorization composition is not established.",
           "exit_criteria": "Bind a bounded production scan and authorized original-identity recovery path, and retain persistence, concurrency, failure and target-environment evidence."
         }
+      ],
+      "notes": [
+        "2026-10-29 host-retirement M2 current receipt source review 5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af; prior global baseline {\"sha\": \"46f28f91241ac65c1ac37dd0f09d9e5b548fb143\", \"verified_on\": \"2026-10-29\"}. M1 main merged into the M2 branch; deleted development document stays deleted. Metrics distinguish current command admission, interpretation business ACK and transaction confirmation. Five targeted Go packages and paired probe compilation passed; native MySQL/Broker and production evidence remain separately pending. Historical verification and production/signoff fields unchanged."
       ]
     },
     {
@@ -10996,6 +10999,9 @@
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
         }
+      ],
+      "notes": [
+        "2026-10-29 host-retirement M2 current receipt source review 5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af; prior global baseline {\"sha\": \"46f28f91241ac65c1ac37dd0f09d9e5b548fb143\", \"verified_on\": \"2026-10-29\"}. M1 main merged into the M2 branch; deleted development document stays deleted. Metrics distinguish current command admission, interpretation business ACK and transaction confirmation. Five targeted Go packages and paired probe compilation passed; native MySQL/Broker and production evidence remain separately pending. Historical verification and production/signoff fields unchanged."
       ]
     },
     {
