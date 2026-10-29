@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
-	"github.com/FangcunMount/reliable-messaging/transaction"
 	"strconv"
 	"time"
 
@@ -54,6 +53,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttransport.Deps {

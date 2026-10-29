@@ -12,11 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	mysqlboundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
-	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/taskopen"
-	"github.com/FangcunMount/reliable-messaging/transaction"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -46,8 +41,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/answersheetgap"
 	redishot "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
 	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	mysqlboundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	ledger "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/notification"
+	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	gov "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/taskopen"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -64,6 +62,7 @@ import (
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	workerprocess "github.com/FangcunMount/qs-server/internal/worker/process"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -220,11 +219,11 @@ func (r m3cTesteeLookup) GetByID(ctx context.Context, id uint64) (*testeeapp.Tes
 type m3cIdentity struct{ changed atomic.Bool }
 
 func (r *m3cIdentity) ListLinkedUsers(context.Context, string) ([]iambridge.MiniProgramLinkedUser, error) {
-	id := "owned-user"
+	users := []iambridge.MiniProgramLinkedUser{{UserID: "owned-user", Relations: []string{"self"}}}
 	if r.changed.Load() {
-		id = "different-current-user"
+		users = append(users, iambridge.MiniProgramLinkedUser{UserID: "new-current-user", Relations: []string{"self"}})
 	}
-	return []iambridge.MiniProgramLinkedUser{{UserID: id, Relations: []string{"self"}}}, nil
+	return users, nil
 }
 func (*m3cIdentity) ReadCandidates(_ context.Context, _, app string, users []string) ([]iambridge.MiniProgramRecipientCandidate, error) {
 	out := []iambridge.MiniProgramRecipientCandidate{}
@@ -481,12 +480,16 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		taskIDs = append(taskIDs, taskID)
 	}
 	var providerCalls atomic.Int64
+	var unexpectedRecipient atomic.Bool
 	var unknown atomic.Bool
 	providerHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := io.Copy(io.Discard, r.Body)
-		if err != nil {
+		var message wechat.SubscribeMessage
+		if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
 			w.WriteHeader(500)
 			return
+		}
+		if message.ToUser != "owned-user-openid" {
+			unexpectedRecipient.Store(true)
 		}
 		n := providerCalls.Add(1)
 		if unknown.Load() {
@@ -657,6 +660,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	_, err = recovered.ResumeReminderGap(t.Context(), int64(orgID), 1, reminderRequests[2])
 	require.NoError(t, err)
 	require.EqualValues(t, 4, providerCalls.Load())
+	require.False(t, unexpectedRecipient.Load(), "recovery expanded the original frozen recipient set")
 	var recipient string
 	require.NoError(t, db.Table("task_opened_reminder_delivery").Select("user_id").Where("task_id=?", taskIDs[2]).Scan(&recipient).Error)
 	require.Equal(t, "owned-user", recipient)
@@ -668,6 +672,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		require.Error(t, err)
 	}
 	require.EqualValues(t, 4, providerCalls.Load())
+	require.False(t, unexpectedRecipient.Load(), "recovery expanded the original frozen recipient set")
 	// End the isolated corrupt-schedule counterfactual before normal deliveries.
 	require.NoError(t, db.Exec("UPDATE assessment_task SET status='canceled' WHERE id=?", taskIDs[5]).Error)
 	cases["closed_or_changed_task_refuses_new_send"] = true
@@ -820,6 +825,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	}
 	require.Equal(t, float64(1), rank())
 	require.EqualValues(t, 4, providerCalls.Load())
+	require.False(t, unexpectedRecipient.Load(), "recovery expanded the original frozen recipient set")
 	cases["late_original_delivery_preserves_rank_and_notification_counts"] = true
 	// Conflicting original evidence must fail the whole day without replacing it.
 	_, err = mongoDB.Collection("rm_tx_execution").UpdateMany(t.Context(), bson.M{"owner": "qs.mongo"}, bson.M{"$set": bson.M{"plan_digest": make([]byte, 32)}})
