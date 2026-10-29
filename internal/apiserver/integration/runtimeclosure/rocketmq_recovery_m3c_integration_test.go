@@ -423,6 +423,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	t.Setenv("QS_SERVER_TEST_MONGO_URI", os.Getenv("QS_M3_HOST_MONGO_URI"))
 	t.Setenv("QS_SERVER_TEST_MONGO_DB_PREFIX", "qs_m3c_recovery_test")
 	var phase atomic.Int32
+	type reportRPCContextKey struct{}
 	reportClaimHeld := make(chan struct{})
 	var claimTransactions, claimCommits sync.Map
 	var reportTrapped atomic.Bool
@@ -437,8 +438,8 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	// callback AFTER commit. SIGKILL cancels that request, leaving a genuine
 	// durable running claim, without changing rows, clocks or business results.
 	monitor := &mongoevent.CommandMonitor{
-		Started: func(_ context.Context, e *mongoevent.CommandStartedEvent) {
-			if phase.Load() != 3 {
+		Started: func(ctx context.Context, e *mongoevent.CommandStartedEvent) {
+			if phase.Load() != 3 || ctx.Value(reportRPCContextKey{}) == nil {
 				return
 			}
 			key := txnKey(e.Command)
@@ -457,7 +458,9 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		Succeeded: func(ctx context.Context, e *mongoevent.CommandSucceededEvent) {
 			if _, ok := claimCommits.LoadAndDelete(e.RequestID); ok && reportTrapped.CompareAndSwap(false, true) {
 				close(reportClaimHeld)
-				<-ctx.Done()
+				// WithTransaction commits with a cancellation-stripped context,
+				// but preserves Value. Follow the actual original gRPC request.
+				<-ctx.Value(reportRPCContextKey{}).(context.Context).Done()
 			}
 		},
 	}
@@ -604,6 +607,9 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 				case <-ticker.C:
 				}
 			}
+		}
+		if _, ok := req.(*interpretationpb.GenerateReportFromOutcomeRequest); ok && phase.Load() == 3 {
+			ctx = context.WithValue(ctx, reportRPCContextKey{}, ctx)
 		}
 		response, e := next(ctx, req)
 		if r, ok := req.(*internalpb.ProcessTaskOpenedReminderRequest); ok && e == nil {
