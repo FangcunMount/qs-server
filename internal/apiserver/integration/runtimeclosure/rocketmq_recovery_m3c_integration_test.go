@@ -702,7 +702,9 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	unknownReceipt := runTool(gapTool, 2, gapEnv, nil, applyArgs...)
 	require.Contains(t, string(unknownReceipt), `"effect_outcome":"unknown"`)
 	require.EqualValues(t, 1, ensureCalls.Load())
-	runTool(gapTool, 0, nil, nil, "--mode", "reconcile", "--audit-dir", audit, "--request-id", gapRequest)
+	reconciled := runTool(gapTool, 2, nil, nil, "--mode", "reconcile", "--audit-dir", audit, "--request-id", gapRequest)
+	require.Contains(t, string(reconciled), `"no_repeat_effect":true`)
+	require.Contains(t, string(reconciled), `"effect_outcome":"unknown"`)
 	require.EqualValues(t, 1, ensureCalls.Load())
 	cases["answersheet_operator_original_request_response_loss"] = true
 
