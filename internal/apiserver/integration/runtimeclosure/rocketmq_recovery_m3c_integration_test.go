@@ -325,6 +325,8 @@ func m3cBroker(t *testing.T, action string) string {
 		return invoke("inspect", "--format", "{{.State.ExitCode}}", broker)
 	case "health":
 		return invoke("inspect", "--format", "{{.State.Health.Status}}", broker)
+	case "topics":
+		return invoke("exec", broker, "java", "-Xms32m", "-Xmx128m", "-XX:MaxDirectMemorySize=32m", "-cp", "/opt/rocketmq/conf:/opt/rocketmq/lib/*", "org.apache.rocketmq.tools.command.MQAdminStartup", "topicList", "-n", "nameserver:9876")
 	case "kill":
 		return invoke("kill", "--signal=KILL", broker)
 	case "start":
@@ -810,6 +812,25 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		_ = conn.Close()
 		return true
 	})
+	// NameServer registration is a separate readiness fact. Read the original
+	// manifest and wait until every provisioned physical topic reappears; do
+	// not update/recreate topics after the crash or substitute a new Broker.
+	routeBytes, err := os.ReadFile(mq.RocketMQ.RoutesFile)
+	require.NoError(t, err)
+	manifest, err := transport.ParseRouteManifest(routeBytes)
+	require.NoError(t, err)
+	m3cEventually(t, func() bool {
+		present := map[string]bool{}
+		for _, topic := range strings.Fields(m3cBroker(t, "topics")) {
+			present[topic] = true
+		}
+		for _, route := range manifest.Routes {
+			if !present[route.PhysicalTopic] {
+				return false
+			}
+		}
+		return true
+	})
 	cases["same_owned_broker_sigkill_restart"] = true
 	phase.Store(4)
 	child.Hold = false
@@ -817,10 +838,24 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	second := start(child)
 	require.NotEqual(t, first.cmd.Process.Pid, second.cmd.Process.Pid)
 	var secondMarker m3cDeliveryMarker
-	m3cEventually(t, func() bool {
+	redeliveryDeadline := time.NewTimer(2 * time.Minute)
+	defer redeliveryDeadline.Stop()
+	redeliveryPoll := time.NewTicker(200 * time.Millisecond)
+	defer redeliveryPoll.Stop()
+redelivery:
+	for {
 		raw, e := os.ReadFile(child.Marker)
-		return e == nil && json.Unmarshal(raw, &secondMarker) == nil
-	})
+		if e == nil && json.Unmarshal(raw, &secondMarker) == nil {
+			break redelivery
+		}
+		select {
+		case e := <-second.done:
+			t.Fatalf("replacement Worker exited before original redelivery: %v", e)
+		case <-redeliveryDeadline.C:
+			t.Fatal("replacement Worker did not observe original redelivery")
+		case <-redeliveryPoll.C:
+		}
+	}
 	require.Equal(t, firstMarker, secondMarker)
 	cases["actual_original_wire_redelivery_after_restart"] = true
 	m3cEventually(t, func() bool {
