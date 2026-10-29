@@ -12,6 +12,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	mysqlboundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
+	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/taskopen"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"io"
 	"net"
 	"net/http"
@@ -326,6 +330,67 @@ func m3cBroker(t *testing.T, action string) string {
 	return ""
 }
 
+// Export only equality/status diagnostics, never private artifacts or links.
+func m3cOpeningDiagnostic(t *testing.T, db *gorm.DB, owner *mysqlboundary.Committer, org int64, id string, index int) {
+	t.Helper()
+	values := map[string]any{"index": index}
+	var current planrepo.AssessmentTaskPO
+	currentErr := db.Table("assessment_task").Where("id=?", id).Take(&current).Error
+	values["current_read"] = currentErr == nil
+	r, err := owner.Find(t.Context(), fmt.Sprintf("org:%d", org), "task-open/"+id+"/1")
+	values["original_lookup"] = err == nil
+	if err == nil {
+		plan := r.Execution.Plan
+		artifact, err := mysqlboundary.Artifact(plan)
+		values["artifact_valid"] = err == nil
+		var original struct{ Task planrepo.AssessmentTaskPO }
+		if err == nil && json.Unmarshal(artifact, &original) == nil && currentErr == nil {
+			a, b := original.Task, current
+			values["current_opened"] = b.Status == "opened"
+			values["identity_equal"] = a.ID == b.ID && a.OrgID == b.OrgID && a.PlanID == b.PlanID && a.TesteeID == b.TesteeID
+			values["revision_equal"] = a.ScheduleRevision == b.ScheduleRevision
+			values["entry_equal"] = a.EntryURL == b.EntryURL
+			equalClock := func(a, b *time.Time) bool {
+				if a == nil || b == nil {
+					return a == nil && b == nil
+				}
+				return a.Equal(*b)
+			}
+			values["open_clock_equal"] = equalClock(a.OpenAt, b.OpenAt)
+			values["expiry_equal"] = equalClock(a.ExpireAt, b.ExpireAt)
+			values["planned_equal"] = a.PlannedAt.Equal(b.PlannedAt)
+			values["due_equal"] = equalClock(a.DueAt, b.DueAt)
+			values["defined_equal"] = equalClock(a.ScheduleDefinedAt, b.ScheduleDefinedAt)
+			values["stable_fields_equal"] = a.EnrollmentID == b.EnrollmentID && a.Seq == b.Seq && a.ScaleCode == b.ScaleCode
+			values["full_current_match"] = (taskopen.RecoveryOpening{Task: a}).MatchesCurrent(&b)
+		}
+		branches := plan.Input().Branches
+		values["single_branch"] = len(branches) == 1
+		if len(branches) == 1 {
+			values["logical_destination"] = branches[0].Message.Input().Destination == "qs.plan.task"
+		}
+		refs := r.Execution.References()
+		if len(refs) == 1 {
+			ref := refs[0]
+			key := transaction.ExecutionKey(ref.Owner, ref.OperationID, ref.WriterEpoch, ref.Fence)
+			branch := transaction.BranchKey(ref.BranchID)
+			var state transaction.State
+			err := db.Raw("SELECT state FROM rm_tx_execution WHERE execution_key=?", key[:]).Scan(&state).Error
+			values["execution_committed"] = err == nil && state == transaction.Committed
+			var witness struct {
+				Reference []byte
+				State     transaction.State
+			}
+			err = db.Raw("SELECT reference,state FROM rm_tx_witness WHERE execution_key=? AND branch_key=?", key[:], branch[:]).Take(&witness).Error
+			expected, e := transaction.EncodeReference(ref)
+			values["witness_exact"] = err == nil && e == nil && bytes.Equal(expected, witness.Reference)
+			values["resolves_commit"] = transaction.Resolve(ref, &transaction.Evidence{Reference: ref, ExecutionState: state, BranchState: witness.State}) == transaction.Commit
+		}
+	}
+	raw, _ := json.Marshal(values)
+	fmt.Println("M3C_OPENING_DIAGNOSTIC " + string(raw))
+}
+
 func TestM3HostRetirementRecovery(t *testing.T) {
 	require.True(t, strings.HasPrefix(os.Getenv("QS_M3_FIXTURE_PROJECT"), "rocketmq-m2-"))
 	for _, key := range []string{"QS_M3_HOST_DSN", "QS_M3_HOST_MONGO_URI", "QS_M3_RECOVERY_REDIS", "QS_M3_RECOVERY_CERT", "QS_M3_RECOVERY_KEY"} {
@@ -555,7 +620,10 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	for i, taskIndex := range []int{0, 1, 2, 7} {
 		req := govapp.ReminderGapRecoveryRequest{TaskID: taskIDs[taskIndex], SourceProtocol: govapp.TransactionReminderSource, ExpectedScheduleRevision: 1, OpenedBefore: cutoff}
 		inspection, err := recovery.InspectReminderGap(t.Context(), int64(orgID), 1, req)
-		require.NoError(t, err)
+		if err != nil {
+			m3cOpeningDiagnostic(t, db, events.MySQLTransactionOwner(), int64(orgID), req.TaskID, i)
+		}
+		require.NoError(t, err, "original reminder index=%d", i)
 		req.RequestID = uuid.NewString()
 		req.OpeningEventID = inspection.OpeningEventID
 		req.SourceFingerprint = inspection.SourceFingerprint
