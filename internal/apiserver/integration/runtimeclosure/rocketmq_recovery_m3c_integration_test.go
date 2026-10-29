@@ -964,6 +964,34 @@ redelivery:
 	// deadline follows the observed expiry plus a bounded delivery margin.
 	lateDeliveryBudget := time.Until(recoveryDeadline)
 	require.Positive(t, lateDeliveryBudget)
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+		// Read only this test's original event and owned Redis key. Emit counts
+		// and technical states, never fixture credentials, payloads or DSNs.
+		visited := make([]bool, len(reminderRequests))
+		for i, req := range reminderRequests {
+			_, visited[i] = reminderVisits.Load(req.OpeningEventID)
+		}
+		var deadLetters []struct {
+			DeliveryAttempts int
+			RetryDisposition string
+			LastError        string
+		}
+		deadErr := db.Table("event_delivery_dead_letter").Select("delivery_attempts,retry_disposition,last_error").Where("event_id=?", gap.EventID).Limit(10).Find(&deadLetters).Error
+		var held []struct {
+			Status             string
+			RetryDisposition   string
+			ReplayAttemptCount int
+		}
+		holdErr := db.Table("retry_event_hold").Select("status,retry_disposition,replay_attempt_count").Where("event_id=?", gap.EventID).Limit(10).Find(&held).Error
+		ttl, redisErr := workerRedis.PTTL(context.Background(), leaseKeys[0]).Result()
+		encoded, _ := json.Marshal(map[string]any{"ensure_calls": ensureCalls.Load(), "reminder_visits": visited,
+			"dead_letters": deadLetters, "dead_letter_read_ok": deadErr == nil, "held_deliveries": held, "hold_read_ok": holdErr == nil,
+			"worker_lock_pttl_ms": ttl.Milliseconds(), "redis_read_ok": redisErr == nil, "provider_calls": providerCalls.Load()})
+		fmt.Println("M3C_COMPLETION_DIAGNOSTIC " + string(encoded))
+	}()
 	require.Eventually(t, func() bool {
 		for _, req := range reminderRequests {
 			if _, ok := reminderVisits.Load(req.OpeningEventID); !ok {
