@@ -30,6 +30,7 @@ import (
 	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	testeeapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	intakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
 	apphot "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
@@ -42,9 +43,9 @@ import (
 	redishot "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
 	mysqlActor "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	ledger "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/notification"
-	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	gov "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechat "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
@@ -193,6 +194,23 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 	cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	require.NoError(t, sub.Close(cleanup))
+}
+
+// This is the same narrow trusted read-model mapping used by the production
+// reminder consumer; an operator-facing query requires an operator snapshot.
+type m3cTesteeLookup struct {
+	get func(context.Context, uint64) (*actorreadmodel.TesteeRow, error)
+}
+
+func (r m3cTesteeLookup) GetByID(ctx context.Context, id uint64) (*testeeapp.TesteeResult, error) {
+	row, err := r.get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil || row.ID != id {
+		return nil, errors.New("original testee unavailable")
+	}
+	return &testeeapp.TesteeResult{ID: row.ID, OrgID: row.OrgID, ProfileID: row.ProfileID, Source: row.Source}, nil
 }
 
 type m3cIdentity struct{ changed atomic.Bool }
@@ -370,7 +388,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	locks := newTestLocks(redisClient, "apiserver", namespace+":locks")
 	resilience, err := resiliencesubsystem.New(resiliencesubsystem.Options{InstanceID: "owned-m3c-api", Backpressure: apiserveroptions.NewBackpressureOptions(), Locks: locks})
 	require.NoError(t, err)
-	c := container.NewContainerWithOptions(db, mongoDB, redisClient, container.ContainerOptions{EventSubsystem: events, Transactions: &container.EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, CacheSubsystem: newRuntimeCacheSubsystem(redisClient), LockSubsystem: locks, Resilience: resilience, PlanEntryBaseURL: "https://collection.example.test/entry", Silent: true})
+	c := container.NewContainerWithOptions(db, mongoDB, redisClient, container.ContainerOptions{TaskOpenedReminderEnabled: true, EventSubsystem: events, Transactions: &container.EventTransactionBindings{MySQL: events.MySQLTransactionOwner(), Mongo: events.MongoTransactionOwner(), Routes: routes}, CacheSubsystem: newRuntimeCacheSubsystem(redisClient), LockSubsystem: locks, Resilience: resilience, PlanEntryBaseURL: "https://collection.example.test/entry", Silent: true})
 	require.NoError(t, normal.Start())
 	require.NoError(t, c.Initialize())
 	require.NoError(t, c.StartEventSubsystem(t.Context()))
@@ -421,7 +439,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	provider := m3cProvider{providerHTTP.URL}
 	reminder := &m3cReminder{}
 	newReminder := func() notification.TaskOpenedReminderService {
-		return notification.NewTaskOpenedReminderService(planapp.NewTaskReminderStateReader(planrepo.NewTaskRepository(db)), deps.Actor.TesteeQueryService, identity, freeze, ledger.NewReminderDeliveryLedger(db), nil, provider, provider, nil, nil, &notification.Config{AppID: "owned-app", AppSecret: "owned-fixture", PagePath: "pages/task/index", TaskOpenedTemplateID: "owned-template"})
+		return notification.NewTaskOpenedReminderService(c.PlanModule.TaskReminderStateReader, m3cTesteeLookup{get: c.ActorModule.ReadModel.GetTestee}, identity, freeze, ledger.NewReminderDeliveryLedger(db), nil, provider, provider, c.PlanModule.TaskNotificationContextReader, c.PublishedModelTitleResolver(), &notification.Config{AppID: "owned-app", AppSecret: "owned-fixture", PagePath: "pages/task/index", TaskOpenedTemplateID: "owned-template"})
 	}
 	reminder.set(newReminder())
 	journey := intakejourney.NewService(deps.Survey.AnswerSheetScoringService, deps.Plan.TaskAssessmentResolver, deps.Plan.CommandService, deps.Evaluation.IntakeService, deps.Interpretation.ReportStatusReporter, deps.Survey.SubmissionReader)
