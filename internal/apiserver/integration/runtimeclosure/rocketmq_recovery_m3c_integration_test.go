@@ -599,9 +599,10 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 	executable, err := os.Executable()
 	require.NoError(t, err)
 	type worker struct {
-		cmd  *exec.Cmd
-		done chan error
-		log  *os.File
+		cmd      *exec.Cmd
+		done     chan error
+		log      *os.File
+		doneFlag atomic.Bool
 	}
 	workers := []*worker{}
 	start := func(conf m3cChildConfig) *worker {
@@ -615,14 +616,14 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		cmd.Stdout = log
 		cmd.Stderr = log
 		require.NoError(t, cmd.Start())
-		w := &worker{cmd, make(chan error, 1), log}
-		go func() { w.done <- cmd.Wait() }()
+		w := &worker{cmd: cmd, done: make(chan error, 1), log: log}
+		go func() { err := cmd.Wait(); w.doneFlag.Store(true); w.done <- err }()
 		workers = append(workers, w)
 		return w
 	}
 	t.Cleanup(func() {
 		for _, w := range workers {
-			if w.cmd.ProcessState == nil {
+			if !w.doneFlag.Load() {
 				_ = w.cmd.Process.Signal(syscall.SIGTERM)
 				select {
 				case <-w.done:
