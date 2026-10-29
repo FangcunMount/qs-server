@@ -857,6 +857,48 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		}
 		return true
 	})
+	// A NameServer topic list can be populated while the Proxy still returns
+	// TOPIC_NOT_FOUND. Reuse the existing authenticated read-only route probe
+	// for every actual Worker/hotrank physical input before starting a client.
+	var routeCommand []string
+	require.NoError(t, json.Unmarshal([]byte(os.Getenv("QS_M3_RECOVERY_ROUTE_PROBE")), &routeCommand))
+	require.Len(t, routeCommand, 2)
+	workerMQ := m3cLoadMQ(t, os.Getenv("QS_M3_HOST_OBSERVER_OPTIONS"))
+	workerConnection, err := workerMQ.RocketMQ.Load(nil, 2, 5*time.Second)
+	require.NoError(t, err)
+	readyTopics := map[string]bool{}
+	criticalInput := false
+	for _, route := range manifest.Routes {
+		if route.Subscription == "qs-worker" || route.Subscription == "qs-apiserver-modelcatalog-hot-rank-v1" {
+			readyTopics[route.PhysicalTopic] = true
+			criticalInput = criticalInput || (route.Topic == "qs.evaluation.lifecycle" && route.Owner == "qs.mongo")
+		}
+	}
+	require.True(t, criticalInput)
+	require.NotEmpty(t, readyTopics)
+	proxyDeadline := time.Now().Add(2 * time.Minute)
+	for topic := range readyTopics {
+		probePath := filepath.Join(private, uuid.NewString()+"-route.json")
+		m3cPrivateJSON(t, probePath, map[string]string{"endpoint": workerConnection.Endpoint, "accesskey": workerConnection.AccessKey, "secretkey": workerConnection.SecretKey, "topic": topic, "ca": workerMQ.RocketMQ.CAFile})
+		for {
+			remaining := time.Until(proxyDeadline)
+			require.Positive(t, remaining, "actual authenticated Proxy routes did not become ready")
+			ctx, cancel := context.WithTimeout(t.Context(), remaining)
+			cmd := exec.CommandContext(ctx, routeCommand[0], routeCommand[1], "--config", probePath, "--mode", "route-read", "--require-ready", "--id", "owned-restarted-route")
+			raw, e := cmd.Output()
+			cancel()
+			if e == nil {
+				require.Contains(t, string(raw), `"proxy_route"`)
+				break
+			}
+			select {
+			case <-time.After(time.Second):
+			case <-t.Context().Done():
+				t.Fatal(t.Context().Err())
+			}
+		}
+	}
+	fmt.Printf("M3C_ACTUAL_PROXY_ROUTES_READY %d\n", len(readyTopics))
 	cases["same_owned_broker_sigkill_restart"] = true
 	phase.Store(4)
 	child.Hold = false
@@ -1012,7 +1054,7 @@ redelivery:
 	sha, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
 	require.Len(t, cases, 14)
-	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
+	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
 	rawReceipt, err := json.Marshal(receipt)
 	require.NoError(t, err)
 	fmt.Println("M3C_QS_RECOVERY_RECEIPT " + string(rawReceipt))
