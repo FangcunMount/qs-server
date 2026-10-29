@@ -31,16 +31,15 @@ case "${1:-}" in
         if [ "${2:-}" = -T ]; then
           cat <<'CONFIG'
 server_name worker.fangcunmount.cn;
-server_name nsqd.fangcunmount.cn;
 proxy_pass http://prometheus:9090;
-proxy_pass http://nsqd:4151;
-proxy_pass http://nsqlookupd:4161;
-location = /stats {}
-location = /nodes {}
+location = /metrics {}
+location = /readyz {}
 CONFIG
         fi
         ;;
       getent)
+        # The final deployment has no NSQ DNS records. Fail any stale lookup.
+        [ "${3:-}" = prometheus ] || exit 69
         printf '%s\n' '172.20.0.10 STREAM upstream'
         ;;
       *)
@@ -78,9 +77,6 @@ case "$url" in
       ready=3
     fi
     printf '{"data":{"result":[{"value":[1,"%s"]}]}}\n' "$ready"
-    ;;
-  *nsqd.fangcunmount.cn*/stats)
-    printf '%s\n' '{"topics":[]}'
     ;;
   *)
     exit 68

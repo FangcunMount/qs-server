@@ -9,7 +9,6 @@ PUBLIC_COLLECTION_METRICS_URL="${PUBLIC_COLLECTION_METRICS_URL:-https://collect.
 PUBLIC_COLLECTION_READY_URL="${PUBLIC_COLLECTION_READY_URL:-https://collect.fangcunmount.cn/perf/readyz}"
 PUBLIC_WORKER_METRICS_URL="${PUBLIC_WORKER_METRICS_URL:-https://worker.fangcunmount.cn/metrics}"
 PUBLIC_WORKER_READY_URL="${PUBLIC_WORKER_READY_URL:-https://worker.fangcunmount.cn/readyz}"
-PUBLIC_NSQD_STATS_URL="${PUBLIC_NSQD_STATS_URL:-https://nsqd.fangcunmount.cn/stats}"
 EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
 EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"
 READY_PROBE_ATTEMPTS="${READY_PROBE_ATTEMPTS:-12}"
@@ -61,7 +60,7 @@ preflight() {
 
 verify_internal_dns() {
   local name
-  for name in prometheus nsqd nsqlookupd; do
+  for name in prometheus; do
     if ! run_privileged docker exec "$NGINX_CONTAINER" getent ahostsv4 "$name" >/dev/null 2>&1; then
       echo "Nginx cannot resolve observability upstream ${name} on its Docker networks" >&2
       return 1
@@ -76,12 +75,9 @@ verify_effective_config() {
   local required
   for required in \
     'server_name worker.fangcunmount.cn;' \
-    'server_name nsqd.fangcunmount.cn;' \
     'http://prometheus:9090' \
-    'http://nsqd:4151' \
-    'http://nsqlookupd:4161' \
-    'location = /stats' \
-    'location = /nodes'; do
+    'location = /metrics' \
+    'location = /readyz'; do
     if ! grep -Fq "$required" <<<"$effective"; then
       echo "Effective Nginx observability config is missing: $required" >&2
       return 1
@@ -170,7 +166,6 @@ verify_public_routes() {
   probe_ready_replicas "$PUBLIC_COLLECTION_READY_URL" collect.fangcunmount.cn "$EXPECTED_COLLECTION_REPLICAS"
   probe_url "$PUBLIC_WORKER_METRICS_URL" worker.fangcunmount.cn 'qs_runtime_component_ready'
   probe_ready_replicas "$PUBLIC_WORKER_READY_URL" worker.fangcunmount.cn "$EXPECTED_WORKER_REPLICAS"
-  probe_url "$PUBLIC_NSQD_STATS_URL" nsqd.fangcunmount.cn '"topics"'
   echo "Public K6 observability route probes passed"
 }
 

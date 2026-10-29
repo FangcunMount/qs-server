@@ -955,7 +955,7 @@ func loadConfig(t *testing.T, path string, target any) {
 			t.Fatalf("ValidateRawSettings(%s) error = %v", path, err)
 		}
 	}
-	if err := v.Unmarshal(target); err != nil {
+	if err := app.DecodeOptions(v, target); err != nil {
 		t.Fatalf("Unmarshal(%s) error = %v", path, err)
 	}
 	if aware, ok := target.(app.RuntimeConfigContextAware); ok {

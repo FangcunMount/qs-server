@@ -111,10 +111,7 @@ services:
       - TZ=Asia/Shanghai
       - ENV=${ENV:-prod}
       # 消息队列配置
-      - MESSAGING_PROVIDER=${MESSAGING_PROVIDER:-nsq}
-      - NSQ_ADDR=${NSQ_ADDR:-nsq:4150}
-      - NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_ADDR:-nsqlookupd:4161}
-      - RABBITMQ_URL=${RABBITMQ_URL:-}
+      - MESSAGING_PROVIDER=rocketmq
       # gRPC 客户端配置
       - GRPC_APISERVER_ADDR=${GRPC_APISERVER_ADDR:-qs-apiserver:9090}
       # 数据库配置
