@@ -897,7 +897,20 @@ redelivery:
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	}
-	cases["one_assessment_run_outcome_and_report"] = true
+	var originalOutcome struct {
+		ID              string
+		EvaluationRunID string
+	}
+	require.NoError(t, db.Table("evaluation_outcome").Select("id,evaluation_run_id").Where("assessment_id=?", evaluated.GetAssessmentId()).Take(&originalOutcome).Error)
+	require.NotEmpty(t, originalOutcome.ID)
+	require.NotEmpty(t, originalOutcome.EvaluationRunID)
+	originalReports := map[string]any{}
+	for _, name := range []string{"report_generations", "interpretation_runs", "interpret_report_artifacts"} {
+		var document bson.M
+		require.NoError(t, mongoDB.Collection(name).FindOne(t.Context(), bson.M{}).Decode(&document))
+		originalReports[name] = document["_id"]
+		require.NotNil(t, originalReports[name])
+	}
 	// Keep the production lease and existing redelivery/backoff policy. The
 	// deadline follows the observed expiry plus a bounded delivery margin.
 	lateDeliveryBudget := time.Until(processingExpiresAt.Add(2 * time.Minute))
@@ -957,6 +970,31 @@ redelivery:
 	case <-time.After(30 * time.Second):
 		t.Fatal("actual Worker failed to drain")
 	}
+	// Recheck persistent identities and counts AFTER the late original request
+	// finished and the real Worker drained. Earlier pre-replay counts alone
+	// cannot establish no duplicate business effect.
+	finalAssessment, err := assessmentService.ResolveAssessmentByAnswerSheetID(t.Context(), &evaluationpb.ResolveAssessmentByAnswerSheetIDRequest{AnswerSheetId: answer.GetId()})
+	require.NoError(t, err)
+	require.Equal(t, evaluated.GetAssessmentId(), finalAssessment.GetAssessmentId())
+	require.Equal(t, "evaluated", finalAssessment.GetAssessmentStatus())
+	assertRowCount(t, db, "assessment", "answer_sheet_id=?", 1, answer.GetId())
+	assertRowCount(t, db, "runtime_checkpoint", "scope=? AND assessment_id=?", 1, "evaluation_run", evaluated.GetAssessmentId())
+	assertRowCount(t, db, "evaluation_outcome", "assessment_id=?", 1, evaluated.GetAssessmentId())
+	finalOutcome := originalOutcome
+	require.NoError(t, db.Table("evaluation_outcome").Select("id,evaluation_run_id").Where("assessment_id=?", evaluated.GetAssessmentId()).Take(&finalOutcome).Error)
+	require.Equal(t, originalOutcome, finalOutcome)
+	for name, originalID := range originalReports {
+		count, e := mongoDB.Collection(name).CountDocuments(t.Context(), bson.M{})
+		require.NoError(t, e)
+		require.EqualValues(t, 1, count)
+		var document bson.M
+		require.NoError(t, mongoDB.Collection(name).FindOne(t.Context(), bson.M{}).Decode(&document))
+		require.Equal(t, originalID, document["_id"], "late delivery replaced the original report identity")
+	}
+	require.Equal(t, float64(1), rank())
+	require.EqualValues(t, 4, providerCalls.Load())
+	require.False(t, unexpectedRecipient.Load())
+	cases["one_assessment_run_outcome_and_report"] = true
 	// Cleanup assertions run before the exported receipt; t.Cleanup still owns
 	// safety cleanup on every earlier failure. The outer fixture removes resources.
 	require.NoError(t, c.Cleanup())
