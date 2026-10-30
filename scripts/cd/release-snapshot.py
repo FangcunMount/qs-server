@@ -291,7 +291,31 @@ def collect(sudo_docker=False):
                 if release and re.fullmatch(r"[0-9a-f]{40}-[0-9]+-[0-9]+", release):
                     manifest = Path('/opt/qs-ai/releases') / release / 'manifest.json'
                     if manifest.is_file():
-                        result["ai_release_manifests"][key] = ai_release_metadata(manifest.parent)
+                        metadata = ai_release_metadata(manifest.parent)
+                        selected_image = metadata.get('loaded_image', {}).get('loaded_image_id') or metadata.get('image_id')
+                        metadata['local_image_present'] = False
+                        if isinstance(selected_image, str) and re.fullmatch(r'sha256:[0-9a-f]{64}', selected_image):
+                            try:
+                                actual = command(*docker, 'image', 'inspect', '--format', '{{.Id}}', selected_image).strip()
+                                metadata['local_image_present'] = actual == selected_image
+                            except subprocess.SubprocessError:
+                                pass
+                        result["ai_release_manifests"][key] = metadata
+            retention = dict(read_only=True, cleanup_executed=False)
+            audit = Path('/var/lib/fangcun-image-retention/qs-ai-last-cleanup.json')
+            retention['audit_exists'] = audit.is_file()
+            try:
+                if audit.is_file():
+                    data = json.loads(audit.read_text())
+                    retention['audit'] = {k:data.get(k) for k in ('status','timestamp','service','error')}
+            except (OSError, ValueError) as error:
+                retention['audit_error_type'] = type(error).__name__
+            # Exact failed production command: list policy only, never execute it.
+            args = ['sudo', '-n', '-l', '--', 'python3', '/tmp/qs-ai-deploy-41108077901-1-retention.py', '--service', 'qs-ai', '--image-ref', 'sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0', '--apply', '--deployment-locked', '--protect-image-id', 'sha256:a14f5fd4823cfda040de3aff9b1de6327df0644666758e924db2364393c31734']
+            query = subprocess.run(args, capture_output=True, text=True, timeout=15)
+            retention['policy_query_returncode'] = query.returncode
+            retention['policy_query_category'] = 'allowed' if query.returncode == 0 else ('not_permitted' if any(v in query.stderr.lower() for v in ('not allowed', 'not permitted', 'not run sudo')) else 'query_unavailable')
+            result['ai_image_retention_observation'] = retention
             result["ai_release_state_available"] = True
             result["ai_failed_release_observation"] = ai_failed_release_observation(docker)
         followup = Path('/opt/qs-ai/schema-maintenance/active-v2.json')
