@@ -98,4 +98,31 @@ func classifyEvidence(db *sql.DB, report map[string]any) {
 		"witness_not_committed": witnessState, "reference_mismatch": reference,
 		"unproven_created_on_or_after_20261028": recent,
 	}
+	// Historical audit only: old publication rows never become current backlog.
+	var missing, legacyExact, legacyConfirmed, accepted, rejected, held, unsettled, handoff uint64
+	err = tx.QueryRowContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */ COUNT(*),
+ COALESCE(SUM(b.message_id IS NOT NULL AND b.body_sha256=o.body_sha256 AND b.kind=o.kind),0),
+ COALESCE(SUM(b.message_id IS NOT NULL AND b.body_sha256=o.body_sha256 AND b.kind=o.kind AND b.stage='confirmed'),0),
+ COALESCE(SUM(o.decision='accepted'),0), COALESCE(SUM(o.decision='rejected'),0),
+ COALESCE(SUM(o.decision='held'),0), COALESCE(SUM(o.decision NOT IN ('accepted','rejected','held')),0),
+ COALESCE(SUM(l.command_id IS NOT NULL AND l.messaging_body_sha256=o.body_sha256),0)
+ FROM ai_messaging_operations o
+ LEFT JOIN ai_messaging_archive a ON a.producer='qs-server' AND a.destination='qs-ai'
+ AND a.message_id=CAST(o.command_id AS BINARY)
+ LEFT JOIN ai_messaging_outbox b ON b.producer='qs-server' AND b.destination='qs-ai'
+ AND b.message_id=CAST(o.command_id AS BINARY)
+ LEFT JOIN ai_messaging_legacy_commands l ON l.command_id=o.command_id
+ WHERE o.retired=FALSE AND o.kind IN (1,2,3,4,5) AND a.message_id IS NULL`).Scan(&missing, &legacyExact, &legacyConfirmed, &accepted, &rejected, &held, &unsettled, &handoff)
+	if err != nil {
+		report["historical_classification_available"] = false
+		return
+	}
+	report["historical_classification_available"] = true
+	report["historical_evidence_counts"] = map[string]uint64{
+		"archive_missing": missing, "matching_legacy_publication": legacyExact,
+		"matching_legacy_publication_confirmed": legacyConfirmed,
+		"admission_accepted":                    accepted, "admission_rejected": rejected,
+		"admission_held": held, "admission_unsettled": unsettled,
+		"matching_original_handoff_evidence": handoff,
+	}
 }
