@@ -251,6 +251,24 @@ def collect(sudo_docker=False):
                     if manifest.is_file():
                         result["ai_release_manifests"][key] = ai_release_metadata(manifest.parent)
             result["ai_release_state_available"] = True
+        checkpoint = Path('/opt/qs-ai/releases/9dce206643d11afc33e27b72ef4429c0e5537e7a-41056013029-1')
+        names = ('manifest.json', 'runtime.json', 'compose.yaml', 'image.env', 'old-state.json', 'handoff-prepared.json', 'verification.json')
+        result['ai_checkpoint_files_present'] = {name: (checkpoint / name).is_file() for name in names}
+        if all(result['ai_checkpoint_files_present'][name] for name in names[:5]):
+            manifest = json.loads((checkpoint / 'manifest.json').read_text())
+            runtime = json.loads((checkpoint / 'runtime.json').read_text())['services']['qs-ai']
+            raw = runtime['environment']['QS_AI_MESSAGING']
+            options = json.loads(raw.replace('$$', '$'))
+            metadata = {'options': raw, 'volumes': runtime.get('volumes', [])}
+            result['ai_checkpoint_binding'] = dict(
+                metadata_digest_matches=hashlib.sha256(json.dumps(metadata, sort_keys=True, separators=(',', ':')).encode()).hexdigest() == manifest.get('messaging_binding_sha256'),
+                rocketmq_enabled=options.get('enabled') is True and options.get('provider') == 'rocketmq',
+                publish_enabled_type_boolean=type(options.get('publish_enabled')) is bool,
+                owner_names=sorted(options.get('transactions', {})),
+                final_route=options.get('transactions', {}).get('ai.mysql', {}).get('route_revision') == 'm3-1',
+                expected_mount_namespaces=all(m['target'].startswith(('/run/qs-ai-jose/', '/run/qs-ai-rocketmq/')) for m in runtime.get('volumes', [])),
+                readonly_bind_mounts=all(m['type'] == 'bind' and m.get('read_only') is True and m.get('bind', {}).get('create_host_path') is False for m in runtime.get('volumes', [])),
+                old_state_exact=(checkpoint / 'old-state.json').read_bytes() == state.read_bytes())
         followup = Path('/opt/qs-ai/schema-maintenance/active-v2.json')
         result['ai_active_schema_followup_exists'] = followup.is_file()
         if result['ai_active_schema_followup_exists']:
