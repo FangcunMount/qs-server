@@ -2,6 +2,10 @@ name: Read-only release snapshot
 on:
   workflow_dispatch:
     inputs:
+      worker_restore_only:
+        description: Restore the previously verified frozen Worker profile after failed deployment
+        type: boolean
+        default: false
       business_observation_only:
         description: Reuse existing read-only application metrics snapshot; return error category only
         type: boolean
@@ -29,7 +33,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true
+    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true
     environment: production
     runs-on:
       group: qlume
@@ -297,3 +301,64 @@ jobs:
       - name: Remove owned local artifacts
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" business-observation.json observation-companion/mq-observation-inspect
+
+  restore-verified-worker:
+    if: inputs.worker_restore_only == true
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRD_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRD_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: restore-verified-worker
+      DEPLOY_NODE_HOSTNAME: serverD
+    steps:
+      - uses: actions/checkout@v6
+      - name: Establish existing deployment SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Restore only the exact verified old Worker profile
+        run: |
+          ssh -F "$RUNNER_SSH_CONFIG" "$RUNNER_SSH_ALIAS" 'python3 -' > worker-restore.json <<'PYRESTORE'
+          import json, pathlib, re, subprocess, time
+          root = pathlib.Path('/opt/fangcun-readable-names/releases/readable-20261028-v2/closed/qs-worker')
+          expected = 'sha256:b637bd1a84a4657b8452332d72629288c54665d9e0bd7faf5d1a1757dd9a72b6'
+          def run(*args):
+              return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=120)
+          docker = ['sudo', '-n', 'docker']
+          compose = docker + ['compose', '-p', 'qs-worker', '--env-file', str(root/'runtime.env'), '-f', str(root/'compose.json')]
+          value = json.loads(run(*compose, 'config', '--format', 'json'))
+          assert set(value['services']) == {'runtime'}
+          service = value['services']['runtime']
+          assert run(*docker, 'image', 'inspect', '--format', '{{.Id}}', service['image']).strip() == expected
+          assert any(v.get('source') == '/data/infra/ssl/mysql/ca-chain.pem' and v.get('target') == '/etc/qlume/mysql/ca-chain.pem' and v.get('read_only') is True for v in service['volumes'])
+          run(*compose, 'up', '-d', '--no-build', '--pull', 'never', '--scale', 'runtime=3', 'runtime')
+          ready = []
+          for attempt in range(20):
+              ids = run(*compose, 'ps', '--status', 'running', '-q', 'runtime').split()
+              ready = []
+              for cid in ids:
+                  try:
+                      assert run(*docker, 'inspect', '--format', '{{.Image}}', cid).strip() == expected
+                      run(*docker, 'exec', cid, 'wget', '-q', '-O', '/dev/null', '-T', '3', 'http://127.0.0.1:9092/readyz')
+                      version = run(*docker, 'exec', cid, '/app/qs-worker', '--version=true', '--config=/app/configs/worker.prod.yaml')
+                      assert re.search(r'gitCommit:\s*f783f40473295dbcd70c7de4f11d25a61d1876c0', version)
+                      ready.append(cid)
+                  except (AssertionError, subprocess.SubprocessError):
+                      pass
+              if len(ids) == len(ready) == 3: break
+              time.sleep(3)
+          assert len(ready) == 3, 'Old Worker profile did not restore three ready replicas'
+          print(json.dumps(dict(restored=True, expected_image=expected, expected_source='f783f40473295dbcd70c7de4f11d25a61d1876c0', ready_replicas=3, operator_database_mutation=False)))
+          PYRESTORE
+      - uses: actions/upload-artifact@v7
+        with:
+          name: worker-restore-${{ github.run_id }}
+          path: worker-restore.json
+          if-no-files-found: error
+      - name: Remove owned SSH key
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}"
