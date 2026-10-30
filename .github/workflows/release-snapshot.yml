@@ -21,7 +21,6 @@ jobs:
       RUNNER_SSH_HOST: ${{ vars[format('{0}_PUBLIC_HOST', matrix.host)] || secrets[format('{0}_PUBLIC_HOST', matrix.host)] || vars[format('{0}_HOST', matrix.host)] }}
       RUNNER_SSH_USER: ${{ vars[format('{0}_USERNAME', matrix.host)] }}
       RUNNER_SSH_PORT: ${{ vars[format('{0}_SSH_PORT', matrix.host)] || '22' }}
-      SUDO_PASSWORD: ${{ secrets[format('{0}_SUDO_PASSWORD', matrix.host)] }}
       RUNNER_SSH_ALIAS: release-snapshot-${{ matrix.host }}
       DEPLOY_NODE_HOSTNAME: ${{ matrix.host == 'SVRA' && 'serverA' || matrix.host == 'SVRB' && 'serverB' || 'serverD' }}
     steps:
@@ -31,7 +30,8 @@ jobs:
       - name: Read running image identities and configuration fingerprints
         run: |
           set -Eeuo pipefail
-          bash scripts/cd/runner-release-snapshot.sh > release-snapshot.json
+          ssh -F "$RUNNER_SSH_CONFIG" -o ConnectTimeout=20 "$RUNNER_SSH_ALIAS" \
+            'python3 - --sudo-docker' < scripts/cd/release-snapshot.py > release-snapshot.json
           python3 -c 'import json; x=json.load(open("release-snapshot.json")); assert x["read_only"] is True and x["containers"]'
       - uses: actions/upload-artifact@v7
         with:
