@@ -53,6 +53,14 @@ def ai_failed_release_observation(docker):
         result['environment_changed_keys'] = sorted(k for k in set(old_env) | set(new_env) if old_env.get(k) != new_env.get(k))
         result['runtime_environment_changed_keys'] = sorted(k for k in set(old_override.get('environment', {})) | set(candidate.get('environment', {})) if old_override.get('environment', {}).get(k) != candidate.get('environment', {}).get(k))
         result['candidate_runtime_keys'] = sorted(candidate)
+        result['home_environment'] = {k: v for k,v in dict(current=old_env.get('HOME'), candidate=new_env.get('HOME')).items() if v is None or re.fullmatch(r'/[a-zA-Z0-9/_.-]{0,100}', v)}
+        old_mq=json.loads(old_env['QS_AI_MESSAGING']);new_mq=json.loads(new_env['QS_AI_MESSAGING'])
+        def leaves(value, prefix=''):
+            if isinstance(value, dict):
+                return {p: v for k,item in value.items() for p,v in leaves(item, prefix+'.'+k).items()}
+            return {prefix:value}
+        old_leaves,new_leaves=leaves(old_mq),leaves(new_mq)
+        result['messaging_changed_paths'] = sorted(k for k in set(old_leaves)|set(new_leaves) if old_leaves.get(k)!=new_leaves.get(k))
         result['old_runtime_keys'] = sorted(old_override)
         result['runtime_service_changed_keys'] = sorted(k for k in set(old_override) | set(candidate) if old_override.get(k) != candidate.get(k))
         result['current_resources'] = {k:current['HostConfig'].get(k) for k in ('Memory','NanoCpus','ReadonlyRootfs')}
@@ -60,11 +68,11 @@ def ai_failed_release_observation(docker):
         result['current_mount_targets'] = sorted(m['Destination'] for m in current['Mounts'])
         f = json.loads((failed / 'failure.json').read_text())
         result['failure'] = {k: f.get(k) for k in ('status','error_type','phase')}
-        events = command(*docker, 'events', '--since', '2026-10-30T17:27:40Z', '--until', '2026-10-30T17:32:10Z', '--filter', 'type=container', '--filter', 'image=sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0', '--format', '{{json .}}')
+        events = command(*docker, 'events', '--since', '2026-10-30T17:27:40Z', '--until', '2026-10-30T17:32:10Z', '--filter', 'type=container', '--format', '{{json .}}')
         result['events'] = []
         for line in events.splitlines()[-100:]:
             e=json.loads(line); a=e.get('Actor',{}).get('Attributes',{})
-            result['events'].append(dict(action=e.get('Action'), time=e.get('time'), exit_code=a.get('exitCode'), name=a.get('name')))
+            result['events'].append(dict(action=e.get('Action'), time=e.get('time'), exit_code=a.get('exitCode'), name=a.get('name'), candidate_image=a.get('image') in ('qs-ai:f9f24abdf98535295c4e3d223675ef6be62115e2', 'sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0')))
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         result['error_type'] = type(error).__name__
     return result
