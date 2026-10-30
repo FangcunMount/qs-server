@@ -269,6 +269,24 @@ def collect(sudo_docker=False):
                 expected_mount_namespaces=all(m['target'].startswith(('/run/qs-ai-jose/', '/run/qs-ai-rocketmq/')) for m in runtime.get('volumes', [])),
                 readonly_bind_mounts=all(m['type'] == 'bind' and m.get('read_only') is True and m.get('bind', {}).get('create_host_path') is False for m in runtime.get('volumes', [])),
                 old_state_exact=(checkpoint / 'old-state.json').read_bytes() == state.read_bytes())
+            candidate = Path('/opt/qs-ai/releases/f9f24abdf98535295c4e3d223675ef6be62115e2-41052693897-1')
+            candidate_runtime = json.loads((candidate / 'runtime.json').read_text())['services']['qs-ai']
+            candidate_env = {k: str(v).replace('$$', '$') for k, v in candidate_runtime['environment'].items() if v is not None}
+            current_env = dict(line.split('=', 1) for line in json.loads(command(*docker, 'inspect', '--format', '{{json .Config.Env}}', 'qs-ai')))
+            candidate_options = json.loads(candidate_env['QS_AI_MESSAGING'])
+            current_options = json.loads(current_env['QS_AI_MESSAGING'])
+            from urllib.parse import urlsplit
+            current_db, candidate_db = [urlsplit(env['QS_AI_DATABASE_URL']) for env in (current_env, candidate_env)]
+            result['ai_candidate_config_comparison'] = dict(
+                database_name_matches=current_db.path == candidate_db.path,
+                database_credentials_match=(current_db.username, current_db.password) == (candidate_db.username, candidate_db.password),
+                database_host_port_matches=(current_db.hostname, current_db.port) == (candidate_db.hostname, candidate_db.port),
+                database_tls_matches=all(current_env.get(k) == candidate_env.get(k) for k in ('QS_AI_DATABASE_TLS_MODE', 'QS_AI_DATABASE_TLS_CA_FILE')),
+                transaction_owner_binding_matches=candidate_options.get('transactions') == current_options.get('transactions'),
+                rocketmq_config_matches=candidate_options.get('rocketmq') == current_options.get('rocketmq'),
+                publish_admission_matches=candidate_options.get('publish_enabled') == current_options.get('publish_enabled'),
+                changed_environment_keys=sorted(k for k, v in candidate_env.items() if current_env.get(k) != v),
+                schema_policy_require_existing=json.loads((candidate / 'manifest.json').read_text()).get('schema_policy') == 'require-existing')
             checks = result['ai_checkpoint_checks'] = {}
             helper = Path('/opt/qs-ai/releases/f9f24abdf98535295c4e3d223675ef6be62115e2-41052693897-1/deploy.py')
             helper_raw = helper.read_bytes()
