@@ -89,6 +89,7 @@ emit_export CD_SOURCE_SHA       "$CD_SOURCE_SHA"
 emit_export CD_RUN_ID           "$CD_RUN_ID"
 emit_export CD_RUN_ATTEMPT      "$CD_RUN_ATTEMPT"
 emit_export DEPLOY_IMAGE_SOURCE "${DEPLOY_IMAGE_SOURCE:-tarball}"
+emit_export DEPLOY_EXPECTED_DIGEST "${DEPLOY_EXPECTED_DIGEST:-}"
 emit_export DEPLOY_PULL_REGISTRY "${DEPLOY_PULL_REGISTRY:-acr}"
 for name in ALIYUN_ACR_REGISTRY ALIYUN_ACR_NAMESPACE ALIYUN_ACR_USERNAME ALIYUN_ACR_PASSWORD; do
   emit_export "$name" "${!name:-}"

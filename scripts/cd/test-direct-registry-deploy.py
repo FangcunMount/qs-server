@@ -13,7 +13,7 @@ FUNCTIONS += SOURCE[SOURCE.index('select_image_from_registry()'):SOURCE.index('s
 
 
 class RegistryDeployTests(unittest.TestCase):
-    def run_selection(self, failure='', service='apiserver'):
+    def run_selection(self, failure='', service='apiserver', digest=''):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             docker = root / 'docker'
@@ -31,7 +31,7 @@ esac
 ''')
             docker.chmod(0o700)
             env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}',
-                       SUDO='', DEPLOY_PULL_REGISTRY='acr', SERVICE=service,
+                       SUDO='', DEPLOY_PULL_REGISTRY='acr', SERVICE=service, DEPLOY_EXPECTED_DIGEST=digest,
                        ROCKETMQ_WORKER_BINDING_REVISION='m4-worker-fixture',
                        ALIYUN_ACR_REGISTRY='acr.example', ALIYUN_ACR_NAMESPACE='qs',
                        ALIYUN_ACR_USERNAME='reader', ALIYUN_ACR_PASSWORD='fake-secret',
@@ -43,9 +43,9 @@ esac
             result = subprocess.run(['bash', '-c', 'set -Eeuo pipefail\n' + FUNCTIONS +
                                      '\nselect_image_from_registry'], env=env,
                                     capture_output=True, text=True, timeout=10)
-            calls = (root / 'calls').read_text()
+            calls = (root / 'calls').read_text() if (root / 'calls').exists() else ''
             self.assertNotIn('fake-secret', calls + result.stdout + result.stderr)
-            self.assertFalse(Path((root / 'auth').read_text()).exists())
+            if (root / 'auth').exists(): self.assertFalse(Path((root / 'auth').read_text()).exists())
             composed = root / 'compose-image.env'
             return result, calls, composed.read_text() if composed.exists() else None
 
@@ -55,6 +55,16 @@ esac
         self.assertIn('pull --platform linux/amd64 acr.example/qs/qs-apiserver:' + 'a' * 40, calls)
         self.assertIn('tag acr.example/qs/qs-apiserver:', calls)
         self.assertEqual(composed, 'DOCKER_IMAGE_QS_APISERVER=ghcr.io/fangcunmount/qs-apiserver:' + 'a' * 40 + '\n')
+
+    def test_pinned_pull_uses_digest_and_rejects_malformed_pin(self):
+        result,calls,composed=self.run_selection(digest='sha256:'+'c'*64)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('acr.example/qs/qs-apiserver@sha256:'+'c'*64,calls)
+        self.assertIn('DOCKER_IMAGE_QS_APISERVER=',composed)
+        result,calls,composed=self.run_selection(digest='latest')
+        self.assertNotEqual(result.returncode,0)
+        self.assertNotIn('pull ',calls)
+        self.assertIsNone(composed)
 
     def test_worker_registry_selection_keeps_frozen_config_revision(self):
         result, calls, composed = self.run_selection(service='worker')
@@ -105,6 +115,35 @@ class UploadContractTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=10)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Missing file:', result.stderr)
+
+
+class BuildOnlyBoundaryTests(unittest.TestCase):
+    def test_all_host_jobs_require_deployment_permission(self):
+        import re
+        workflow = (ROOT / '.github/workflows/cd.yml').read_text()
+        jobs = dict(re.findall(r'^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)', workflow, re.M | re.S))
+        for name in ('deploy-apiserver','deploy-collection','deploy-worker','verify-worker-governance'):
+            with self.subTest(job=name):
+                self.assertIn("needs.plan.outputs.allow_deploy == 'true'", jobs[name])
+        self.assertIn("needs.plan.outputs.allow_build == 'true'", jobs['docker'])
+        self.assertNotIn('runner-upload-and-deploy.sh', jobs['docker'])
+
+    def test_build_only_publication_uses_sha_and_never_latest(self):
+        for latest in ('false', 'true'):
+            with self.subTest(latest=latest), tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp);log=path/'calls';docker=path/'docker'
+                docker.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CALL_LOG\"\n")
+                docker.chmod(0o700)
+                env=dict(os.environ,PATH=f'{path}:{os.environ["PATH"]}',CALL_LOG=str(log),
+                    SERVICE='worker',DEPLOY_REF='main',DEPLOY_SHA='a'*40,WWW_UID='2000',WWW_GID='2000',
+                    DOCKER_REGISTRY='ghcr.io',DOCKER_REPOSITORY='fixture',DOCKERHUB_USERNAME='fixture',
+                    ALIYUN_ACR_REGISTRY='acr.example',ALIYUN_ACR_NAMESPACE='fixture',PUBLISH_LATEST=latest)
+                for script in ('build-image.sh','push-dockerhub.sh','push-acr.sh'):
+                    subprocess.run(['sh',str(ROOT/'scripts/cd'/script)],env=env,cwd=ROOT,check=True,capture_output=True)
+                calls=log.read_text()
+                self.assertIn('org.opencontainers.image.revision='+'a'*40,calls)
+                self.assertIn('pull ghcr.io/fixture/qs-worker:'+'a'*40,calls)
+                self.assertEqual(':latest' in calls, latest=='true')
 
 
 if __name__ == '__main__':

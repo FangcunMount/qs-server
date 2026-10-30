@@ -1,0 +1,44 @@
+name: Read-only release snapshot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [SVRA, SVRB, SVRD]
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets[format('{0}_SSH_KEY', matrix.host)] || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars[format('{0}_PUBLIC_HOST', matrix.host)] || secrets[format('{0}_PUBLIC_HOST', matrix.host)] || vars[format('{0}_HOST', matrix.host)] }}
+      RUNNER_SSH_USER: ${{ vars[format('{0}_USERNAME', matrix.host)] }}
+      RUNNER_SSH_PORT: ${{ vars[format('{0}_SSH_PORT', matrix.host)] || '22' }}
+      RUNNER_SSH_ALIAS: release-snapshot-${{ matrix.host }}
+      DEPLOY_NODE_HOSTNAME: ${{ matrix.host == 'SVRA' && 'serverA' || matrix.host == 'SVRB' && 'serverB' || 'serverD' }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Establish existing release SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Read running image identities and configuration fingerprints
+        run: |
+          set -Eeuo pipefail
+          ssh -F "$RUNNER_SSH_CONFIG" -o ConnectTimeout=20 "$RUNNER_SSH_ALIAS" \
+            'sudo -n python3 -' < scripts/cd/release-snapshot.py > release-snapshot.json
+          python3 -c 'import json; x=json.load(open("release-snapshot.json")); assert x["read_only"] is True and x["containers"]'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-snapshot-${{ matrix.host }}-${{ github.run_id }}
+          path: release-snapshot.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Cleanup private runner SSH key
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" release-snapshot.json
