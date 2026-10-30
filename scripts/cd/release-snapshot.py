@@ -340,7 +340,8 @@ def collect(sudo_docker=False):
             try:
                 args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(checkpoint / 'image.env'),
                         '-f', str(checkpoint / 'compose.yaml'), '-f', str(checkpoint / 'runtime.json')]
-                rendered = json.loads(command(*args, 'config', '--format', 'json'))['services']['qs-ai']
+                rendered_doc = json.loads(command(*args, 'config', '--format', 'json'))
+                rendered = rendered_doc['services']['qs-ai']
                 probe = subprocess.run([*args, 'run', '--rm', '--no-deps', '-T', 'qs-ai',
                     '/app/.venv/bin/python', '-c', MQ_FILE_DIAGNOSTIC], capture_output=True, text=True, timeout=60)
                 diagnostics = [line.split(':', 1)[1] for line in probe.stdout.splitlines() if line.startswith('READ_ONLY_MQ_DIAGNOSTIC:')]
@@ -375,6 +376,23 @@ def collect(sudo_docker=False):
                             'not supported', 'disabled', 'invalid config', 'requested', 'specified', 'conflict',
                         ) if phrase in probe.stderr.lower()])
 
+                if result.get('ai_checkpoint_oneoff_mq_files', {}).get('wrapper_executed') is False:
+                    import copy, tempfile
+                    control = copy.deepcopy(rendered_doc)
+                    for network in control['services']['qs-ai'].get('networks', {}).values():
+                        network.pop('ipv4_address', None)
+                        network.pop('ipv6_address', None)
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', prefix='qs-ai-readonly-address-control-') as temporary:
+                        json.dump(control, temporary);temporary.flush()
+                        control_args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(checkpoint / 'image.env'), '-f', temporary.name]
+                        roundtrip = json.loads(command(*control_args, 'config', '--format', 'json'))
+                        if roundtrip != control:
+                            raise ValueError('Address control changed other configuration')
+                        controlled = subprocess.run([*control_args, 'run', '--rm', '--no-deps', '-T', 'qs-ai',
+                            '/app/.venv/bin/python', '-c', MQ_FILE_DIAGNOSTIC], capture_output=True, text=True, timeout=60)
+                        lines = [line.split(':', 1)[1] for line in controlled.stdout.splitlines() if line.startswith('READ_ONLY_MQ_DIAGNOSTIC:')]
+                        result['ai_checkpoint_dynamic_address_control'] = dict(only_static_addresses_removed=True,
+                            returncode=controlled.returncode, diagnostic=json.loads(lines[0]) if len(lines) == 1 else None)
                 base = json.loads((checkpoint / 'compose.yaml').read_text())['services']['qs-ai']
                 result['ai_checkpoint_networks'] = {key: {k: v for k, v in value.items() if k in ('aliases', 'interface_name', 'ipv4_address', 'ipv6_address', 'mac_address', 'priority', 'gw_priority')} for key, value in base.get('networks', {}).items()}
                 result['ai_checkpoint_network_inventory'] = []
