@@ -843,7 +843,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		return w
 	}
 	t.Cleanup(func() {
-		for _, w := range workers {
+		for index, w := range workers {
 			if !w.doneFlag.Load() {
 				if t.Failed() {
 					_ = w.cmd.Process.Signal(syscall.SIGQUIT)
@@ -856,6 +856,13 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 					_ = w.cmd.Process.Kill()
 					<-w.done
 				}
+			}
+			if input, e := os.Open(w.log.Name()); e == nil {
+				diagnostic := m3cProcessingGateDiagnostics(input, index == 1)
+				_ = input.Close()
+				encoded, e := json.Marshal(diagnostic)
+				require.NoError(t, e)
+				fmt.Println("M3C_WORKER_GATE_DIAGNOSTIC " + string(encoded))
 			}
 			if t.Failed() {
 				// The harness withholds raw Go output and exports only its hash.
