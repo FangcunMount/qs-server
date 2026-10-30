@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 WORKER_ENV_FILE="${WORKER_ENV_FILE:?WORKER_ENV_FILE is required}"
 WORKER_IMAGE_REF="${WORKER_IMAGE_REF:?WORKER_IMAGE_REF is required}"
+WORKER_COMPOSE_FILE="${WORKER_COMPOSE_FILE:?WORKER_COMPOSE_FILE is required}"
+WORKER_COMPOSE_ENV_FILE="${WORKER_COMPOSE_ENV_FILE:?WORKER_COMPOSE_ENV_FILE is required}"
+WORKER_COMPOSE_PROJECT="${WORKER_COMPOSE_PROJECT:-qs-worker}"
+WORKER_COMPOSE_SERVICE="${WORKER_COMPOSE_SERVICE:-runtime}"
 WORKER_NETWORK="${WORKER_NETWORK:-infra-network}"
 WORKER_DEPENDENCY_TIMEOUT_SECONDS="${WORKER_DEPENDENCY_TIMEOUT_SECONDS:-5}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER:-sudo}"
@@ -46,6 +50,36 @@ run_privileged() {
   "$PRIVILEGE_RUNNER" "$@"
 }
 
+verify_mysql_ca_mount() {
+  local ca=/etc/qlume/mysql/ca-chain.pem rendered
+  if [ "$(env_value QS_WORKER_MYSQL_TLS_MODE)" != VERIFY_IDENTITY ] ||
+     [ "$(env_value QS_WORKER_MYSQL_TLS_CA_FILE)" != "$ca" ]; then
+    echo 'Worker MySQL TLS identity verification configuration is unavailable' >&2
+    return 1
+  fi
+  # Inspect the exact candidate model without loading other roles' private env
+  # files. Do not print the model, start the application, or replace replicas.
+  rendered="$(run_privileged docker compose --env-file "$WORKER_COMPOSE_ENV_FILE" \
+    -p "$WORKER_COMPOSE_PROJECT" -f "$WORKER_COMPOSE_FILE" \
+    config --no-env-resolution --format json "$WORKER_COMPOSE_SERVICE")"
+  printf '%s' "$rendered" | python3 -c '
+import json, sys
+model = json.load(sys.stdin)["services"][sys.argv[1]]
+mounts = [v for v in model.get("volumes", []) if v.get("target") == "/etc/qlume/mysql/ca-chain.pem"]
+if len(mounts) != 1 or mounts[0].get("type") != "bind" or mounts[0].get("source") != "/data/infra/ssl/mysql/ca-chain.pem" or mounts[0].get("read_only") is not True or mounts[0].get("bind", {}).get("create_host_path", False):
+    raise SystemExit("Worker candidate MySQL CA mount invalid; no replacement")
+' "$WORKER_COMPOSE_SERVICE"
+  if ! run_privileged docker run --rm --network none --read-only \
+    --cap-drop ALL --security-opt no-new-privileges \
+    --mount "type=bind,src=/data/infra/ssl/mysql/ca-chain.pem,dst=${ca},readonly" \
+    --entrypoint /bin/sh "$WORKER_IMAGE_REF" \
+    -c 'test -r "$1" && test -s "$1"' sh "$ca"; then
+    echo 'Worker candidate MySQL CA unreadable; no replacement' >&2
+    return 1
+  fi
+  echo 'Worker candidate MySQL CA mount and readability verified'
+}
+
 verify_tcp_dependency() {
   local name="$1"
   local endpoint="$2"
@@ -77,6 +111,8 @@ verify() {
     return 1
   fi
   require_positive_integer WORKER_DEPENDENCY_TIMEOUT_SECONDS "$WORKER_DEPENDENCY_TIMEOUT_SECONDS"
+
+  verify_mysql_ca_mount
 
   # MySQL became a startup-critical worker dependency with the durable runtime
   # ledger migration. Probe it before Compose replaces healthy old replicas.

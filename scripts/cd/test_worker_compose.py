@@ -53,6 +53,12 @@ class WorkerCompose(unittest.TestCase):
             self.assertEqual(worker["environment"]["QS_WORKER_MESSAGING_PROVIDER"], "rocketmq")
             self.assertEqual(worker["environment"]["QS_WORKER_MESSAGING_ROCKETMQ_PUBLISH_ENABLED"], "false")
             self.assertFalse(any("NSQ_" in k for k in worker["environment"]))
+            ca_path = worker["environment"]["QS_WORKER_MYSQL_TLS_CA_FILE"]
+            mysql_ca = [m for m in worker["volumes"] if m["target"] == ca_path]
+            self.assertEqual(len(mysql_ca), 1)
+            self.assertEqual(mysql_ca[0]["source"], "/data/infra/ssl/mysql/ca-chain.pem")
+            self.assertTrue(mysql_ca[0]["read_only"])
+            self.assertFalse(mysql_ca[0]["bind"].get("create_host_path", False))
             mounts = [m for m in worker["volumes"] if m["target"].startswith("/etc/qs-worker/rocketmq/")]
             self.assertEqual({m["target"].rsplit("/", 1)[1] for m in mounts},
                              {"credentials.json", "ca.crt", "routes.json"})
