@@ -77,6 +77,11 @@ jobs:
                         containers=[], asset_sha256={}, prometheus_ready=False, grafana_ready=False)
           def run(*args):
               return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=20)
+          result['standard_cli_plugin_directories'] = []
+          for name in ('/usr/local/lib/docker/cli-plugins', '/usr/local/libexec/docker/cli-plugins', '/usr/lib/docker/cli-plugins', '/usr/libexec/docker/cli-plugins'):
+              target = pathlib.Path(name); ancestor = target
+              while not ancestor.exists(): ancestor = ancestor.parent
+              result['standard_cli_plugin_directories'].append(dict(path=name, exists=target.is_dir(), parent_writable=__import__('os').access(ancestor, __import__('os').W_OK), buildx_exists=(target / 'docker-buildx').exists()))
           try:
               if platform.system() != 'Darwin':
                   raise ValueError('Expected Mac mini')
