@@ -6,6 +6,10 @@ on:
         description: 'Read local Mac mini monitoring identity/config hashes only; no SSH or service changes'
         type: boolean
         default: false
+      image_binding_diagnostics:
+        description: Runner-only image metadata diagnosis; no SSH or services
+        type: boolean
+        default: false
       candidate_images:
         description: 'Optional six service SHA/digest/config identities as JSON'
         required: false
@@ -17,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true
+    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true
     environment: production
     runs-on:
       group: qlume
@@ -103,7 +107,7 @@ jobs:
           retention-days: 90
 
   verify-candidates:
-    if: inputs.candidate_images != ''
+    if: inputs.candidate_images != '' && inputs.image_binding_diagnostics != true
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15
@@ -128,3 +132,44 @@ jobs:
           path: candidate-image-verification.json
           if-no-files-found: error
           retention-days: 90
+
+  image-binding-diagnostics:
+    if: inputs.image_binding_diagnostics == true
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare isolated runner registry authentication
+        env:
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+        run: |
+          python3 - <<'PYAUTH'
+          import base64,json,os,pathlib
+          directory=pathlib.Path(os.environ['RUNNER_TEMP'])/('image-binding-auth-'+os.environ['GITHUB_RUN_ID'])
+          directory.mkdir(mode=0o700)
+          auth=base64.b64encode((os.environ['ALIYUN_ACR_USERNAME']+':'+os.environ['ALIYUN_ACR_PASSWORD']).encode()).decode()
+          path=directory/'config.json'
+          with path.open('x') as stream: json.dump({'auths':{os.environ['ALIYUN_ACR_REGISTRY']:{'auth':auth}}},stream)
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'],'a') as stream:stream.write('DOCKER_CONFIG='+str(directory)+'\n')
+          PYAUTH
+      - name: Compare real registry and local image metadata
+        env:
+          CANDIDATE_IMAGES: ${{ inputs.candidate_images }}
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+        run: python3 scripts/cd/diagnose-image-binding.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image-binding-diagnostics-${{ github.run_id }}
+          path: image-binding-diagnostics.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove owned registry authentication
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/image-binding-auth-${GITHUB_RUN_ID}"
