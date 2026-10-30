@@ -12,6 +12,26 @@ import sys
 
 NAMES = re.compile(r"(?:qs-(?:apiserver|collection.*|worker.*|ai|operating-system)|iam-apiserver|qs-ops|ops|prometheus|grafana|nginx)(?:-\d+)?$")
 MATERIAL_TOOL_SHA = '36f3046ed453dfbf8beae684269c94d1a6db0abaa23de51e09d41e462c6a3d5c'
+MQ_FILE_DIAGNOSTIC = """
+import json,os,traceback
+result={'format':'readonly-mq-files/v1','uid':os.geteuid(),'groups':os.getgroups(),'passed':False,'errors':[]}
+try:
+    from qs_ai.maintenance.messaging_preflight import check_keys
+    from qs_ai.config import MessagingOptions
+    check_keys(MessagingOptions.model_validate_json(os.environ.get('QS_AI_MESSAGING','{}')))
+    result['passed']=True
+except Exception as error:
+    seen=set()
+    while error is not None and id(error) not in seen and len(seen)<5:
+        seen.add(id(error));frames=[];tb=error.__traceback__
+        while tb is not None:
+            frames.append({'module':tb.tb_frame.f_globals.get('__name__',''),'function':tb.tb_frame.f_code.co_name})
+            tb=tb.tb_next
+        result['errors'].append({'type':type(error).__name__,'errno':getattr(error,'errno',None),'frames':frames[-4:]})
+        error=error.__cause__ or error.__context__
+print('READ_ONLY_MQ_DIAGNOSTIC:'+json.dumps(result))
+"""
+
 
 
 def ai_release_metadata(directory):
@@ -321,6 +341,19 @@ def collect(sudo_docker=False):
                 args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(checkpoint / 'image.env'),
                         '-f', str(checkpoint / 'compose.yaml'), '-f', str(checkpoint / 'runtime.json')]
                 rendered = json.loads(command(*args, 'config', '--format', 'json'))['services']['qs-ai']
+                probe = subprocess.run([*args, 'run', '--rm', '--no-deps', '-T', 'qs-ai',
+                    '/app/.venv/bin/python', '-c', MQ_FILE_DIAGNOSTIC], capture_output=True, text=True, timeout=60)
+                diagnostics = [line.split(':', 1)[1] for line in probe.stdout.splitlines() if line.startswith('READ_ONLY_MQ_DIAGNOSTIC:')]
+                if len(diagnostics) == 1:
+                    diagnostic = json.loads(diagnostics[0])
+                    if diagnostic.get('format') != 'readonly-mq-files/v1':
+                        raise ValueError('Unexpected diagnostic format')
+                    result['ai_checkpoint_oneoff_mq_files'] = diagnostic
+                else:
+                    result['ai_checkpoint_oneoff_mq_files'] = dict(returncode=probe.returncode,
+                        wrapper_executed=False, permission_denied='permission denied' in probe.stderr.lower(),
+                        image_missing='no such image' in probe.stderr.lower())
+
                 base = json.loads((checkpoint / 'compose.yaml').read_text())['services']['qs-ai']
                 combined = dict(base.get('environment', {}), **runtime['environment'])
                 checks.update(compose_rendered=True, environment_preserved=rendered.get('environment') == combined,
