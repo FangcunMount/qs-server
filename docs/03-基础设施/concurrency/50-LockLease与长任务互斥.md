@@ -114,7 +114,8 @@ Release 使用 token 校验，只释放当前持有者自己的 lease。release 
 ### 6.2 worker AnswerSheet duplicate suppression
 
 - acquire 基础设施失败或 manager 不可用：degraded-open，继续 handler；
-- contention：认为另一个消费者正在处理，记录 duplicate skipped 并返回 nil；
+- contention：在当前 callback 内有界等待并重新 acquire；等待上限为一次默认 5m TTL，同时服从原 handler context 的取消/期限。SDK 续原投递的可见期，等待期间保留共享处理容量，不提前返回 nil/ACK，也不以每次探测消耗 Broker 投递次数；
+- 获取成功后，业务 body 继续使用原调用 context，等待预算不缩短已获取 owner 的业务期限。等待取消/耗尽返回错误，不释放其他 owner 的 token；Redis acquire 基础设施故障仍保留原 degraded-open 语义，已取消的 acquire 不进入业务；
 - 原因：锁用于 best-effort 重复抑制，后续 application/持久化层仍必须可重入。
 
 ### 6.3 leader 与 task lock
