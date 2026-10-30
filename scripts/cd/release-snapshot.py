@@ -368,9 +368,22 @@ def collect(sudo_docker=False):
                             'file exists', 'invalid argument', 'no such file or directory', 'failed to start',
                             'failed to create', 'not found', 'invalid reference', 'unsupported', 'denied',
                             'requires at least', 'unexpected number', 'error response from daemon',
+                            'endpoint', 'already exists', 'ipam', 'pool', 'overlap', 'range', 'bridge',
+                            'sandbox', 'attachable', 'gateway', 'dns', 'bind', 'address', 'host port', 'port',
+                            'duplicate', 'exhausted', 'no available', 'ipv4', 'ipv6', 'interface', 'in use',
+                            'failed to allocate', 'failed to attach', 'failed to add', 'failed to assign',
+                            'not supported', 'disabled', 'invalid config', 'requested', 'specified', 'conflict',
                         ) if phrase in probe.stderr.lower()])
 
                 base = json.loads((checkpoint / 'compose.yaml').read_text())['services']['qs-ai']
+                result['ai_checkpoint_networks'] = {key: {k: v for k, v in value.items() if k in ('aliases', 'interface_name', 'ipv4_address', 'ipv6_address', 'mac_address', 'priority', 'gw_priority')} for key, value in base.get('networks', {}).items()}
+                result['ai_checkpoint_network_inventory'] = []
+                compose_doc = json.loads((checkpoint / 'compose.yaml').read_text())
+                for key in base.get('networks', {}):
+                    network_name = compose_doc['networks'][key].get('name', key)
+                    projection = '{"name":{{json .Name}},"driver":{{json .Driver}},"attachable":{{json .Attachable}},"internal":{{json .Internal}},"ipv6":{{json .EnableIPv6}},"ipam":{{json .IPAM.Config}}}'
+                    result['ai_checkpoint_network_inventory'].append(json.loads(command(*docker, 'network', 'inspect', '--format', projection, network_name)))
+
                 combined = dict(base.get('environment', {}), **runtime['environment'])
                 checks.update(compose_rendered=True, environment_preserved=rendered.get('environment') == combined,
                     image_pinned=rendered.get('image') == manifest['image_id'],
