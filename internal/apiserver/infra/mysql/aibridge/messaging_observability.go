@@ -18,21 +18,32 @@ func MessagingSnapshot(ctx context.Context, db *sql.DB) (map[string]float64, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	values := map[string]float64{}
-	keys := []string{"staged_messages", "due_messages", "awaiting_receipt_messages", "held_messages", "oldest_staged_seconds", "oldest_awaiting_receipt_seconds"}
-	var staged, due, awaiting, held, stagedAge, awaitingAge float64
+	// Current command admission receipts are owned by operations and the exact
+	// committed transaction archive. Retired publication queues are not backlog.
+	var committed, awaiting, held, oldest, invalid float64
 	err = tx.QueryRowContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */
- COALESCE(SUM(stage='staged'),0),
- COALESCE(SUM(stage IN('staged','awaiting_receipt') AND available_at<=UTC_TIMESTAMP(6)),0),
- COALESCE(SUM(stage='awaiting_receipt'),0),COALESCE(SUM(stage='held'),0),
- COALESCE(GREATEST(MAX(CASE WHEN stage='staged' THEN TIMESTAMPDIFF(MICROSECOND,created_at,UTC_TIMESTAMP(6)) END),0)/1000000,0),
- COALESCE(GREATEST(MAX(CASE WHEN stage='awaiting_receipt' THEN TIMESTAMPDIFF(MICROSECOND,created_at,UTC_TIMESTAMP(6)) END),0)/1000000,0)
- FROM ai_messaging_outbox`).Scan(&staged, &due, &awaiting, &held, &stagedAge, &awaitingAge)
+ COUNT(*), COALESCE(SUM(o.decision NOT IN ('accepted','rejected')),0),
+ COALESCE(SUM(o.decision='held'),0),
+ COALESCE(GREATEST(MAX(CASE WHEN o.decision NOT IN ('accepted','rejected') THEN
+ TIMESTAMPDIFF(MICROSECOND,o.created_at,UTC_TIMESTAMP(6)) END),0)/1000000,0),
+ COALESCE(SUM(a.message_id IS NULL OR e.execution_key IS NULL OR w.branch_key IS NULL OR e.state<>'committed' OR w.state<>'committed'
+ OR w.reference<>a.reference),0)
+ FROM ai_messaging_operations o
+ LEFT JOIN ai_messaging_archive a ON a.producer='qs-server' AND a.destination='qs-ai'
+ AND a.message_id=CAST(o.command_id AS BINARY)
+ LEFT JOIN rm_tx_execution e ON e.execution_key=a.execution_key AND e.owner='qs.mysql'
+ LEFT JOIN rm_tx_witness w ON w.execution_key=a.execution_key AND w.branch_key=a.branch_key
+ WHERE o.retired=FALSE AND o.kind IN (1,2,3,4,5)`).Scan(&committed, &awaiting, &held, &oldest, &invalid)
 	if err != nil {
 		return nil, err
 	}
-	for i, v := range []float64{staged, due, awaiting, held, stagedAge, awaitingAge} {
-		values[keys[i]] = v
+	if invalid != 0 {
+		return nil, ErrMessagingLedgerIntegrity
 	}
+	values["committed_commands"] = committed
+	values["awaiting_command_receipts"] = awaiting
+	values["held_command_receipts"] = held
+	values["oldest_awaiting_command_receipt_seconds"] = oldest
 	var inboxHeld float64
 	if err = tx.QueryRowContext(ctx, "SELECT /*+ MAX_EXECUTION_TIME(1000) */ COUNT(*) FROM ai_messaging_inbox WHERE outcome='held'").Scan(&inboxHeld); err != nil {
 		return nil, err

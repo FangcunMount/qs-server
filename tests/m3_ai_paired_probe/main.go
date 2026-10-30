@@ -346,6 +346,13 @@ func run() (result map[string]any) {
 		ctx, end := context.WithTimeout(root, 20*time.Second)
 		response := map[string]any{"ok": true}
 		switch c.Mode {
+		case "metrics":
+			var values map[string]float64
+			values, err = store.MessagingSnapshot(ctx, pool)
+			if err == nil {
+				values["observation_available"] = 1
+				response["metrics"] = values
+			}
 		case "owner_state":
 			stats := shared.Runtime().Stats()
 			response["protocol"] = map[string]any{"ready": stats.Ready, "completed_results": stats.CompletedResults, "half_prepared": stats.HalfPreparedResults, "local_committed": stats.LocalCommittedResults, "final_unknown": stats.FinalUnknownResults, "check_commit": stats.CheckCommit, "check_rollback": stats.CheckRollback}
