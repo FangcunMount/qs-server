@@ -3591,10 +3591,15 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     # transaction codec/schema and transport to the accepted RC source5c2e3cd.
     # Exact-source stable SDK gates and published installation are recorded in T12;
     # host image/native/production acceptance remain separate.
+    # 2026-10-30 rotation candidate48dfcda vs published559c735: 72 files
+    # across NSQ, wire, transaction, message, delivery, storage and the RocketMQ
+    # subscriber are byte-identical. Only private Receive selection is sorted;
+    # ACK/failure handoff is unchanged. This exact pseudo-version is a review
+    # candidate; native proof, formal SDK release and deployment remain separate.
     # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.6\.0\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.6\.1-0\.20261030051625-48dfcdafbf29\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(
