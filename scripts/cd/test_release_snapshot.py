@@ -118,5 +118,32 @@ class SnapshotTests(unittest.TestCase):
             self.assertFalse(result['verified'])
             self.assertEqual(result['error'],'password_required')
 
+    def test_material_password_is_stdin_only_for_the_pinned_readonly_command(self):
+        tool='/opt/fangcun-m4/material-tools/'+module.MATERIAL_TOOL_SHA+'.py'
+        with patch.object(module,'verify_material_tool',return_value=tool), patch.dict(module.os.environ,{'SUDO_PASSWORD':'fixture-secret'}), patch.object(module.subprocess,'run',return_value=module.subprocess.CompletedProcess([],1,'','incorrect password')) as run:
+            result=module.material_observation('ai','m4-readable-20261028-v1','serverA')
+            self.assertEqual(run.call_args.args[0][:7],['sudo','-S','-p','','/usr/bin/python3','-I',tool])
+            self.assertEqual(run.call_args.kwargs['input'],'fixture-secret\n')
+            self.assertNotIn('fixture-secret',json.dumps(result))
+            self.assertEqual(result['error'],'authentication_failed')
+
+    def test_private_ssh_bootstrap_keeps_secret_literal_and_cleans_up(self):
+        import os
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            password="fixture-$(touch "+str(root/'unexpected')+")-'value"
+            (root/'ssh').write_text('#!/bin/bash\nexec bash -s\n')
+            (root/'python3').write_text('#!/bin/bash\nset -eu\ntest "$SUDO_PASSWORD" = "$EXPECTED_SECRET"\ntest "$*" = "- --sudo-docker"\ncat >/dev/null\nprintf \'%s\\n\' \'{"read_only":true}\'\n')
+            for name in ('ssh','python3'): (root/name).chmod(0o700)
+            environment=dict(os.environ,PATH=str(root)+':'+os.environ['PATH'],RUNNER_SSH_CONFIG='fixture',RUNNER_SSH_ALIAS='fixture',RUNNER_TEMP=str(root),SUDO_PASSWORD=password,EXPECTED_SECRET=password)
+            result=subprocess.run(['bash',str(Path(__file__).with_name('run-release-snapshot-ssh.sh'))],env=environment,capture_output=True,text=True,timeout=5)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertTrue(json.loads(result.stdout)['read_only'])
+            self.assertNotIn(password,result.stdout+result.stderr)
+            self.assertFalse((root/'unexpected').exists())
+            self.assertFalse(list(root.glob('release-snapshot.*')))
+
 
 if __name__=='__main__': unittest.main()

@@ -58,13 +58,16 @@ def material_observation(role, revision, host):
             raise ValueError('Invalid material binding')
         tool = verify_material_tool()
         stage = 'installed_verification'
-        args = ['sudo', '-n', '/usr/bin/python3', '-I', tool, '--verify-installed', '--host', host, '--expect-role', role, '--expect-revision', revision]
-        response = subprocess.run(args, capture_output=True, text=True, timeout=30)
+        password = os.environ.get('SUDO_PASSWORD', '')
+        sudo = ['sudo', '-S', '-p', ''] if password else ['sudo', '-n']
+        args = sudo + ['/usr/bin/python3', '-I', tool, '--verify-installed', '--host', host, '--expect-role', role, '--expect-revision', revision]
+        response = subprocess.run(args, input=password + '\n' if password else None, capture_output=True, text=True, timeout=30)
         if response.returncode:
             result['returncode'] = response.returncode
             result['error_stage'] = stage
             result['error'] = ('password_required' if 'password is required' in response.stderr else
                                'command_not_permitted' if 'not allowed to execute' in response.stderr else
+                               'authentication_failed' if 'incorrect password' in response.stderr else
                                'installed_verifier_refused')
             return result
         value = json.loads(response.stdout)
