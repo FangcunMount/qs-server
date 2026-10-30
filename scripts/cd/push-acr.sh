@@ -15,11 +15,10 @@ SRC="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${DEPLOY_SHA}"
 DST_BASE="${ALIYUN_ACR_REGISTRY}/${ALIYUN_ACR_NAMESPACE}/${IMAGE_NAME}"
 
 docker pull "$SRC"
-docker tag "$SRC" "${DST_BASE}:latest"
 docker tag "$SRC" "${DST_BASE}:${DEPLOY_SHA}"
-docker push "${DST_BASE}:latest"
 docker push "${DST_BASE}:${DEPLOY_SHA}"
 
-echo "Image pushed to Aliyun ACR:"
-echo "  - ${DST_BASE}:latest"
-echo "  - ${DST_BASE}:${DEPLOY_SHA}"
+if [ "${PUBLISH_LATEST:-true}" = true ]; then
+  docker tag "$SRC" "${DST_BASE}:latest"
+  docker push "${DST_BASE}:latest"
+fi

@@ -53,6 +53,12 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      operation:
+        description: '部署，或在保持发布冻结时仅构建发布镜像'
+        required: true
+        type: choice
+        options: [deploy, build]
+        default: deploy
       service:
         description: '要部署的服务'
         required: true
@@ -105,6 +111,8 @@ jobs:
     outputs:
       services: ${{ steps.plan.outputs.services }}
       has_services: ${{ steps.plan.outputs.has_services }}
+      allow_build: ${{ steps.plan.outputs.allow_build }}
+      allow_deploy: ${{ steps.plan.outputs.allow_deploy }}
       apiserver: ${{ steps.plan.outputs.apiserver }}
       collection: ${{ steps.plan.outputs.collection }}
       worker: ${{ steps.plan.outputs.worker }}
@@ -153,6 +161,8 @@ jobs:
         id: plan
         env:
           EVENT_NAME: ${{ github.event_name }}
+          DEPLOY_OPERATION: ${{ github.event_name == 'workflow_dispatch' && inputs.operation || 'deploy' }}
+          DEPLOY_PAUSED: ${{ vars.PRODUCTION_DEPLOY_PAUSED }}
           MANUAL_SERVICE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.service || 'all' }}
           LAST_DEPLOYED_SHA: ${{ steps.production_baseline.outputs.last_deployed_sha }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -172,9 +182,10 @@ jobs:
     environment:
       name: production
     if: |
-      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      needs.plan.outputs.allow_build == 'true' &&
       needs.plan.outputs.has_services == 'true'
     env:
+      PUBLISH_LATEST: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'build' && 'false' || 'true' }}
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -224,6 +235,43 @@ jobs:
             DEPLOY_SHA="${DEPLOY_SHA}" \
             BUILD_TIME="${BUILD_TIME}"
 
+
+      - name: Record immutable published image identity
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -Eeuo pipefail
+          . scripts/cd/image-metadata.sh
+          export IMAGE_NAME
+          python3 - <<'PYRECEIPT'
+          import json,os,re,subprocess
+          from pathlib import Path
+          revision=os.environ['DEPLOY_SHA']
+          assert re.fullmatch('[0-9a-f]{40}',revision)
+          name=os.environ['IMAGE_NAME'];identities=[]
+          for registry,namespace in ((os.environ['DOCKER_REGISTRY'],os.environ['DOCKER_REPOSITORY']),
+                                     (os.environ['ALIYUN_ACR_REGISTRY'],os.environ['ALIYUN_ACR_NAMESPACE'])):
+              repository=f'{registry}/{namespace}/{name}'
+              ref=f'{repository}:{revision}'
+              subprocess.run(['docker','pull','--platform','linux/amd64',ref],check=True)
+              x=json.loads(subprocess.check_output(['docker','image','inspect',ref],text=True))[0]
+              assert x['Os']=='linux' and x['Architecture']=='amd64'
+              assert x['Config']['Labels']['org.opencontainers.image.revision']==revision
+              matches=[d for d in x['RepoDigests'] if d.startswith(repository+'@sha256:')]
+              assert len(matches)==1
+              assert re.fullmatch('sha256:[0-9a-f]{64}',matches[0].split('@')[1])
+              identities.append(dict(repository=repository,digest=matches[0].split('@')[1],image_id=x['Id']))
+          assert len({x['image_id'] for x in identities})==1
+          Path('image-receipt.json').write_text(json.dumps(dict(source_sha=revision,service=os.environ['SERVICE'],
+              platform='linux/amd64',registries=identities,deployment_verified=False),indent=2)+'\n')
+          PYRECEIPT
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qs-image-${{ matrix.service }}-${{ env.DEPLOY_SHA }}
+          path: image-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
   deploy-apiserver:
     name: Deploy API Server
     needs: [plan, docker]
@@ -236,7 +284,7 @@ jobs:
       contents: read
     if: |
       always() &&
-      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      needs.plan.outputs.allow_deploy == 'true' &&
       needs.docker.result == 'success' &&
       needs.plan.outputs.apiserver == 'true'
     env:
@@ -384,7 +432,7 @@ jobs:
       contents: read
     if: |
       always() &&
-      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      needs.plan.outputs.allow_deploy == 'true' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
       needs.plan.outputs.collection == 'true'
@@ -500,7 +548,7 @@ jobs:
       contents: read
     if: |
       always() &&
-      vars.PRODUCTION_DEPLOY_PAUSED != 'true' &&
+      needs.plan.outputs.allow_deploy == 'true' &&
       needs.docker.result == 'success' &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
       needs.plan.outputs.worker == 'true'
@@ -644,6 +692,7 @@ jobs:
       contents: read
     if: |
       always() &&
+      needs.plan.outputs.allow_deploy == 'true' &&
       needs.plan.result == 'success' &&
       (needs.plan.outputs.apiserver == 'true' || needs.plan.outputs.collection == 'true' || needs.plan.outputs.worker == 'true') &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
@@ -744,6 +793,12 @@ jobs:
     steps:
       - name: Log deployment status
         run: |
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'build' }}" = true ]; then
+            test "${{ needs.plan.result }}" = success
+            test "${{ needs.docker.result }}" = success
+            echo "Images built and published; no host deployment, verification or full-deploy marker was performed."
+            exit 0
+          fi
           if [ "${{ vars.PRODUCTION_DEPLOY_PAUSED }}" = "true" ]; then
             echo "Production deployment is paused for a coordinated release; inspect image build results separately."
             exit 0

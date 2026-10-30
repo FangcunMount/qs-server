@@ -107,5 +107,34 @@ class UploadContractTests(unittest.TestCase):
             self.assertIn('Missing file:', result.stderr)
 
 
+class BuildOnlyBoundaryTests(unittest.TestCase):
+    def test_all_host_jobs_require_deployment_permission(self):
+        import re
+        workflow = (ROOT / '.github/workflows/cd.yml').read_text()
+        jobs = dict(re.findall(r'^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)', workflow, re.M | re.S))
+        for name in ('deploy-apiserver','deploy-collection','deploy-worker','verify-worker-governance'):
+            with self.subTest(job=name):
+                self.assertIn("needs.plan.outputs.allow_deploy == 'true'", jobs[name])
+        self.assertIn("needs.plan.outputs.allow_build == 'true'", jobs['docker'])
+        self.assertNotIn('runner-upload-and-deploy.sh', jobs['docker'])
+
+    def test_build_only_publication_uses_sha_and_never_latest(self):
+        for latest in ('false', 'true'):
+            with self.subTest(latest=latest), tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp);log=path/'calls';docker=path/'docker'
+                docker.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CALL_LOG\"\n")
+                docker.chmod(0o700)
+                env=dict(os.environ,PATH=f'{path}:{os.environ["PATH"]}',CALL_LOG=str(log),
+                    SERVICE='worker',DEPLOY_REF='main',DEPLOY_SHA='a'*40,WWW_UID='2000',WWW_GID='2000',
+                    DOCKER_REGISTRY='ghcr.io',DOCKER_REPOSITORY='fixture',DOCKERHUB_USERNAME='fixture',
+                    ALIYUN_ACR_REGISTRY='acr.example',ALIYUN_ACR_NAMESPACE='fixture',PUBLISH_LATEST=latest)
+                for script in ('build-image.sh','push-dockerhub.sh','push-acr.sh'):
+                    subprocess.run(['sh',str(ROOT/'scripts/cd'/script)],env=env,cwd=ROOT,check=True,capture_output=True)
+                calls=log.read_text()
+                self.assertIn('org.opencontainers.image.revision='+'a'*40,calls)
+                self.assertIn('pull ghcr.io/fixture/qs-worker:'+'a'*40,calls)
+                self.assertEqual(':latest' in calls, latest=='true')
+
+
 if __name__ == '__main__':
     unittest.main()

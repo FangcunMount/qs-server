@@ -82,3 +82,28 @@ assert_output 'services=["collection"]'
 assert_output 'collection=true'
 assert_output 'apiserver=false'
 assert_output 'worker=false'
+
+# Build-only dispatch publishes a candidate while every host gate stays closed.
+for paused in true false; do
+  : >"$OUTPUT"
+  (cd "$REPO"; EVENT_NAME=workflow_dispatch MANUAL_SERVICE=all DEPLOY_OPERATION=build DEPLOY_PAUSED="$paused" GITHUB_OUTPUT="$OUTPUT" "$SCRIPT_DIR/plan-services.sh")
+  assert_output 'allow_build=true'
+  assert_output 'allow_deploy=false'
+  assert_output 'services=["apiserver","collection","worker"]'
+done
+: >"$OUTPUT"
+(cd "$REPO"; EVENT_NAME=workflow_dispatch MANUAL_SERVICE=worker DEPLOY_OPERATION=deploy DEPLOY_PAUSED=true GITHUB_OUTPUT="$OUTPUT" "$SCRIPT_DIR/plan-services.sh")
+assert_output 'allow_build=false'
+assert_output 'allow_deploy=false'
+: >"$OUTPUT"
+(cd "$REPO"; EVENT_NAME=workflow_dispatch MANUAL_SERVICE=worker DEPLOY_OPERATION=deploy DEPLOY_PAUSED=false GITHUB_OUTPUT="$OUTPUT" "$SCRIPT_DIR/plan-services.sh")
+assert_output 'allow_build=true'
+assert_output 'allow_deploy=true'
+if (cd "$REPO"; EVENT_NAME=workflow_run DEPLOY_OPERATION=build DEPLOY_SHA="$DOCS_SHA" GITHUB_OUTPUT="$OUTPUT" "$SCRIPT_DIR/plan-services.sh"); then
+  echo "automatic build-only mode must be rejected" >&2
+  exit 1
+fi
+if (cd "$REPO"; EVENT_NAME=workflow_dispatch DEPLOY_OPERATION=typo GITHUB_OUTPUT="$OUTPUT" "$SCRIPT_DIR/plan-services.sh"); then
+  echo "invalid release operation must be rejected" >&2
+  exit 1
+fi

@@ -5,6 +5,23 @@ EVENT_NAME="${EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
 MANUAL_SERVICE="${MANUAL_SERVICE:-}"
 DEPLOY_SHA="${DEPLOY_SHA:-${GITHUB_SHA:-}}"
 LAST_DEPLOYED_SHA="${LAST_DEPLOYED_SHA:-}"
+DEPLOY_OPERATION="${DEPLOY_OPERATION:-deploy}"
+DEPLOY_PAUSED="${DEPLOY_PAUSED:-false}"
+case "$DEPLOY_OPERATION" in deploy|build) ;; *) echo "Unsupported release operation" >&2; exit 1 ;; esac
+if [ "$DEPLOY_OPERATION" = build ] && [ "$EVENT_NAME" != workflow_dispatch ]; then
+  echo "Build-only release requires an explicit manual dispatch" >&2
+  exit 1
+fi
+allow_build=false
+allow_deploy=false
+if [ "$DEPLOY_PAUSED" != true ]; then
+  allow_build=true
+  allow_deploy=true
+fi
+if [ "$DEPLOY_OPERATION" = build ]; then
+  allow_build=true
+  allow_deploy=false
+fi
 
 want_apiserver=0
 want_collection=0
@@ -69,6 +86,8 @@ emit_outputs() {
       printf 'apiserver=%s\n' "$(bool_text "$want_apiserver")"
       printf 'collection=%s\n' "$(bool_text "$want_collection")"
       printf 'worker=%s\n' "$(bool_text "$want_worker")"
+      printf 'allow_build=%s\n' "$allow_build"
+      printf 'allow_deploy=%s\n' "$allow_deploy"
     } >>"$GITHUB_OUTPUT"
   fi
 }

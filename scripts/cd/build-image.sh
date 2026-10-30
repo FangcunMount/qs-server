@@ -22,12 +22,17 @@ BUILD_TIME="${BUILD_TIME:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
 BUILD_CACHE_REF="${BUILD_CACHE_REF:-${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:buildcache}"
 CACHE_ARGS="--cache-from type=registry,ref=${BUILD_CACHE_REF} --cache-to type=registry,ref=${BUILD_CACHE_REF},mode=max,ignore-error=true"
 
+# Build-only candidates never advance the mutable latest channel.
+set -- --tag "${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${DEPLOY_SHA}"
+if [ "${PUBLISH_LATEST:-true}" = true ]; then
+  set -- "$@" --tag "${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
+fi
 # shellcheck disable=SC2086
 docker buildx build \
   --file "$DOCKERFILE" \
   --push \
-  --tag "${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest" \
-  --tag "${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${DEPLOY_SHA}" \
+  "$@" \
+  --label "org.opencontainers.image.revision=${DEPLOY_SHA}" \
   --build-arg "VERSION=${DEPLOY_REF}" \
   --build-arg "BUILD_TIME=${BUILD_TIME}" \
   --build-arg "GIT_COMMIT=${DEPLOY_SHA}" \
