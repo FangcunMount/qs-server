@@ -2,6 +2,10 @@ name: Release inspection and verified Worker restore
 on:
   workflow_dispatch:
     inputs:
+      ai_sdk_import_only:
+        description: Compare default and tmp HOME imports in fixed AI image; no network or app startup
+        type: boolean
+        default: false
       worker_preflight_only:
         description: Compare old and repaired Worker CA preflight without replacing services
         type: boolean
@@ -40,7 +44,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true && inputs.worker_preflight_only != true
+    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true && inputs.worker_preflight_only != true && inputs.ai_sdk_import_only != true
     environment: production
     runs-on:
       group: qlume
@@ -449,3 +453,34 @@ jobs:
       - name: Remove owned runner artifacts
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" "${RUNNER_TEMP}/worker-ca-${GITHUB_RUN_ID}.sh" worker-old-compose.yml
+
+  ai-sdk-import-control:
+    if: inputs.ai_sdk_import_only == true
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: ai-sdk-import-control
+      DEPLOY_NODE_HOSTNAME: serverA
+    steps:
+      - uses: actions/checkout@v6
+      - name: Establish existing release SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Compare imports without application startup or any network
+        run: ssh -F "$RUNNER_SSH_CONFIG" -o ConnectTimeout=20 "$RUNNER_SSH_ALIAS" 'python3 -' < scripts/cd/ai-sdk-import-probe.py > ai-sdk-import-probe.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ai-sdk-import-probe-${{ github.run_id }}
+          path: ai-sdk-import-probe.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Cleanup private runner SSH key
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" ai-sdk-import-probe.json
