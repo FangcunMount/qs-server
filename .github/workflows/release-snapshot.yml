@@ -1,7 +1,14 @@
-name: Read-only release snapshot
+name: Release inspection and verified Worker restore
 on:
   workflow_dispatch:
     inputs:
+      worker_preflight_only:
+        description: Compare old and repaired Worker CA preflight without replacing services
+        type: boolean
+        default: false
+      worker_preflight_ref:
+        description: Exact reviewed QS source for non-starting Worker preflight
+        required: false
       worker_restore_only:
         description: Restore the previously verified frozen Worker profile after failed deployment
         type: boolean
@@ -33,7 +40,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true
+    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true && inputs.worker_preflight_only != true
     environment: production
     runs-on:
       group: qlume
@@ -362,3 +369,83 @@ jobs:
       - name: Remove owned SSH key
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}"
+
+  verify-worker-preflight:
+    if: inputs.worker_preflight_only == true
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    env:
+      PREFLIGHT_REF: ${{ inputs.worker_preflight_ref }}
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRD_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRD_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: worker-preflight-serverD
+      DEPLOY_NODE_HOSTNAME: serverD
+      SUDO_PASSWORD: ${{ secrets.SVRD_SUDO_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.worker_preflight_ref }}
+          fetch-depth: 0
+      - name: Validate exact reviewed source and old baseline
+        run: |
+          set -Eeuo pipefail
+          [[ "$PREFLIGHT_REF" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$PREFLIGHT_REF"
+          git merge-base --is-ancestor 2aae87fb54917beec1874f41bf2509910ce0cd8d HEAD
+          git show 2aae87fb54917beec1874f41bf2509910ce0cd8d:build/docker/docker-compose.prod.yml > worker-old-compose.yml
+      - name: Establish existing deployment SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Verify actual ServerD candidate CA without application startup
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          owned="/tmp/qlume-worker-ca-${GITHUB_RUN_ID}"
+          ssh -F "$RUNNER_SSH_CONFIG" "$RUNNER_SSH_ALIAS" "umask 077; mkdir '$owned'"
+          scp -F "$RUNNER_SSH_CONFIG" build/docker/docker-compose.prod.yml "$RUNNER_SSH_ALIAS:$owned/candidate.yml"
+          scp -F "$RUNNER_SSH_CONFIG" worker-old-compose.yml "$RUNNER_SSH_ALIAS:$owned/old.yml"
+          scp -F "$RUNNER_SSH_CONFIG" scripts/cd/verify-worker-dependencies.sh scripts/cd/sudo-selection.sh "$RUNNER_SSH_ALIAS:$owned/"
+          umask 077
+          bootstrap="${RUNNER_TEMP}/worker-ca-${GITHUB_RUN_ID}.sh"
+          {
+            echo 'set -Eeuo pipefail'
+            printf 'export SUDO_PASSWORD=%q\n' "$SUDO_PASSWORD"
+            printf 'owned=%q\n' "$owned"
+            printf 'export PREFLIGHT_REF=%q\n' "$PREFLIGHT_REF"
+            cat <<'BASHNATIVE'
+          trap 'rm -rf "$owned"' EXIT
+          . "$owned/sudo-selection.sh"
+          select_deploy_sudo >&2
+          before=$(sudo -n docker ps --filter label=com.docker.compose.project=qs-worker --filter label=com.docker.compose.service=runtime --format '{{.ID}}' | sort)
+          test "$(printf '%s\n' "$before" | wc -l)" -eq 3
+          image=ghcr.io/fangcunmount/qs-worker:3b8a931e2451e38602e8b26bc623bf8d37a69878
+          sudo -n docker image inspect --format '{{json .RepoDigests}}' "$image" | grep -Fq '@sha256:511d750af70bcca1206c691d57317a5d88a782b25a940df6f0d70b7c124d49dc'
+          printf 'DOCKER_IMAGE_QS_WORKER=%s\nROCKETMQ_WORKER_BINDING_REVISION=m4-readable-20261028-v1\n' "$image" > "$owned/image.env"
+          export PRIVILEGE_RUNNER="$SUDO" WORKER_ENV_FILE=/opt/qs-server/qs-worker/configs/env/config.prod.env
+          export WORKER_IMAGE_REF="$image" WORKER_COMPOSE_ENV_FILE="$owned/image.env"
+          if WORKER_COMPOSE_FILE="$owned/old.yml" bash "$owned/verify-worker-dependencies.sh" verify > "$owned/old.log" 2>&1; then
+            echo 'Old missing-CA template unexpectedly accepted' >&2; exit 1
+          fi
+          grep -Fq 'Worker candidate MySQL CA mount invalid; no replacement' "$owned/old.log"
+          WORKER_COMPOSE_FILE="$owned/candidate.yml" bash "$owned/verify-worker-dependencies.sh" verify > "$owned/candidate.log" 2>&1
+          after=$(sudo -n docker ps --filter label=com.docker.compose.project=qs-worker --filter label=com.docker.compose.service=runtime --format '{{.ID}}' | sort)
+          test "$before" = "$after"
+          while IFS= read -r cid; do
+            sudo -n docker exec "$cid" wget -q -O /dev/null -T 3 http://127.0.0.1:9092/readyz
+          done <<< "$after"
+          printf '{"old_template_rejected":true,"candidate_preflight_passed":true,"worker_ids_unchanged":true,"ready_replicas":3,"application_started":false,"operator_database_mutation":false,"source":"%s"}\n' "$PREFLIGHT_REF"
+          BASHNATIVE
+          } > "$bootstrap"
+          ssh -F "$RUNNER_SSH_CONFIG" "$RUNNER_SSH_ALIAS" 'bash -s' < "$bootstrap" > worker-native-preflight.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: worker-native-preflight-${{ github.run_id }}
+          path: worker-native-preflight.json
+          if-no-files-found: error
+      - name: Remove owned runner artifacts
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" "${RUNNER_TEMP}/worker-ca-${GITHUB_RUN_ID}.sh" worker-old-compose.yml
