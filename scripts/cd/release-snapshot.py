@@ -270,6 +270,22 @@ def collect(sudo_docker=False):
                 readonly_bind_mounts=all(m['type'] == 'bind' and m.get('read_only') is True and m.get('bind', {}).get('create_host_path') is False for m in runtime.get('volumes', [])),
                 old_state_exact=(checkpoint / 'old-state.json').read_bytes() == state.read_bytes())
             checks = result['ai_checkpoint_checks'] = {}
+            helper = Path('/opt/qs-ai/releases/f9f24abdf98535295c4e3d223675ef6be62115e2-41052693897-1/deploy.py')
+            helper_raw = helper.read_bytes()
+            if hashlib.sha256(helper_raw).hexdigest() != '93dd8c1b192361f652cdaa3e74db6f7aa2a6d793c54ad10430ba33386a6f52cd':
+                raise ValueError('Reviewed local validator identity differs')
+            validator = {'__name__': 'read_only_checkpoint_validator', '__file__': str(helper)}
+            exec(compile(helper_raw, str(helper), 'exec'), validator)
+            for key, function, argument in (
+                ('final_owner_policy', 'validate_transaction_binding', options.get('transactions')),
+                ('final_checkpoint_binding', 'require_final_messaging', checkpoint),
+            ):
+                try:
+                    validator[function](argument)  # Pure file/JSON validation; no Docker/DB/network.
+                    checks[key] = True
+                except (ValueError, TypeError, validator['DeploymentError']):
+                    checks[key] = False
+
             for key, module, extra in (
                 ('live_mq_files', 'qs_ai.maintenance.messaging_preflight', ()),
                 ('live_tls_files', 'qs_ai.bootstrap.grpc_probe', ('--check-files',)),
