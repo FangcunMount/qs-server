@@ -1,6 +1,11 @@
 name: Read-only release snapshot
 on:
   workflow_dispatch:
+    inputs:
+      candidate_images:
+        description: 'Optional six service SHA/digest/config identities as JSON'
+        required: false
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -42,3 +47,30 @@ jobs:
       - name: Cleanup private runner SSH key
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" release-snapshot.json
+
+  verify-candidates:
+    if: inputs.candidate_images != ''
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify image identity contracts
+        run: python3 scripts/cd/test_release_images.py
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          username: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+      - name: Read immutable candidate images
+        env:
+          CANDIDATE_IMAGES: ${{ inputs.candidate_images }}
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+        run: python3 scripts/cd/verify-release-images.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: candidate-image-verification-${{ github.run_id }}
+          path: candidate-image-verification.json
+          if-no-files-found: error
+          retention-days: 90

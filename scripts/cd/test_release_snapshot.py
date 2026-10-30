@@ -107,12 +107,16 @@ class SnapshotTests(unittest.TestCase):
         tool='/opt/fangcun-m4/material-tools/'+module.MATERIAL_TOOL_SHA+'.py'
         value=dict(status='verified', read_only=True, activated=False, role='ai', host='serverA',
                    revision='m4-readable-20261028-v1', material_root='/var/lib/fangcun-m4-materials', receipt_sha256='a'*64)
-        with patch.object(module,'verify_material_tool',return_value=tool), patch.object(module,'command',return_value=json.dumps(value)) as run:
+        with patch.object(module,'verify_material_tool',return_value=tool), patch.object(module.subprocess,'run',return_value=module.subprocess.CompletedProcess([],0,json.dumps(value),'')) as run:
             self.assertTrue(module.material_observation('ai',value['revision'],'serverA')['verified'])
-            self.assertEqual(run.call_args.args[:7],('sudo','-n','/usr/bin/python3','-I',tool,'--verify-installed','--host'))
+            self.assertEqual(run.call_args.args[0][:7],['sudo','-n','/usr/bin/python3','-I',tool,'--verify-installed','--host'])
             value['activated']=True
-            run.return_value=json.dumps(value)
+            run.return_value=module.subprocess.CompletedProcess([],0,json.dumps(value),'')
             self.assertFalse(module.material_observation('ai',value['revision'],'serverA')['verified'])
+            run.return_value=module.subprocess.CompletedProcess([],1,'','sudo: a password is required')
+            result=module.material_observation('ai',value['revision'],'serverA')
+            self.assertFalse(result['verified'])
+            self.assertEqual(result['error'],'password_required')
 
 
 if __name__=='__main__': unittest.main()

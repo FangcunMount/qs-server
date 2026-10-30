@@ -52,19 +52,34 @@ def verify_material_tool():
 
 def material_observation(role, revision, host):
     result = dict(role=role, revision=revision, host=host, verified=False)
+    stage = 'tool_identity'
     try:
         if role not in ('iam', 'qs-api', 'ai', 'worker') or not re.fullmatch(r'm4-[a-z0-9][a-z0-9-]{0,59}', revision):
             raise ValueError('Invalid material binding')
         tool = verify_material_tool()
-        value = json.loads(command('sudo', '-n', '/usr/bin/python3', '-I', tool, '--verify-installed', '--host', host, '--expect-role', role, '--expect-revision', revision))
+        stage = 'installed_verification'
+        args = ['sudo', '-n', '/usr/bin/python3', '-I', tool, '--verify-installed', '--host', host, '--expect-role', role, '--expect-revision', revision]
+        response = subprocess.run(args, capture_output=True, text=True, timeout=30)
+        if response.returncode:
+            result['returncode'] = response.returncode
+            result['error_stage'] = stage
+            result['error'] = ('password_required' if 'password is required' in response.stderr else
+                               'command_not_permitted' if 'not allowed to execute' in response.stderr else
+                               'installed_verifier_refused')
+            return result
+        value = json.loads(response.stdout)
         result['verified'] = (value.get('status') == 'verified' and value.get('read_only') is True and value.get('activated') is False
             and (value.get('role'), value.get('revision'), value.get('host')) == (role, revision, host)
             and value.get('material_root') == '/var/lib/fangcun-m4-materials'
             and isinstance(value.get('receipt_sha256'), str) and re.fullmatch(r'[0-9a-f]{64}', value['receipt_sha256']) is not None)
         if result['verified']:
             result['receipt_sha256'] = value['receipt_sha256']
-    except (OSError, ValueError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         result['error'] = 'verification_unavailable'
+        result['error_stage'] = stage
+        result['error_type'] = type(error).__name__
+        if isinstance(error, ValueError) and str(error) in ('Material tool path changed', 'Material tool parent changed', 'Material tool identity changed'):
+            result['reason'] = str(error)
     return result
 
 
@@ -181,6 +196,16 @@ def collect(sudo_docker=False):
                     if manifest.is_file():
                         result["ai_release_manifests"][key] = ai_release_metadata(manifest.parent)
             result["ai_release_state_available"] = True
+        followup = Path('/opt/qs-ai/schema-maintenance/active-v2.json')
+        result['ai_active_schema_followup_exists'] = followup.is_file()
+        if result['ai_active_schema_followup_exists']:
+            value = json.loads(followup.read_text())
+            result['ai_active_schema_followup'] = {k: value.get(k) for k in ('format', 'context_id', 'executor_revision', 'helper_sha256')}
+        operation = Path('/opt/qs-ai/schema-maintenance/operation-v2.json')
+        result['ai_schema_operation_exists'] = operation.is_file()
+        if result['ai_schema_operation_exists']:
+            value = json.loads(operation.read_text())
+            result['ai_schema_operation'] = {k: value.get(k) for k in ('phase', 'kind', 'context_id', 'operation_id')}
     except PermissionError:
         pass
     return result
