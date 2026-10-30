@@ -37,6 +37,39 @@ def ai_release_metadata(directory):
     return result
 
 
+def ai_failed_release_observation(docker):
+    """Fixed incident only; compare in memory and return no credentials or raw logs."""
+    failed = Path('/opt/qs-ai/releases/f9f24abdf98535295c4e3d223675ef6be62115e2-41098705022-1')
+    previous = Path('/opt/qs-ai/releases/9dce206643d11afc33e27b72ef4429c0e5537e7a-41066417763-1')
+    result = dict(read_only=True, failed_release=failed.name)
+    try:
+        current = json.loads(command(*docker, 'inspect', 'qs-ai'))[0]
+        old_env = dict(v.split('=', 1) for v in current['Config']['Env'])
+        candidate = json.loads((failed / 'runtime.json').read_text())['services']['qs-ai']
+        image = json.loads(command(*docker, 'image', 'inspect', 'sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0'))[0]
+        new_env = dict(v.split('=', 1) for v in image['Config'].get('Env', []))
+        new_env.update({k: str(v).replace('$$', '$') for k,v in candidate.get('environment', {}).items()})
+        old_override = json.loads((previous / 'runtime.json').read_text())['services']['qs-ai']
+        result['environment_changed_keys'] = sorted(k for k in set(old_env) | set(new_env) if old_env.get(k) != new_env.get(k))
+        result['runtime_environment_changed_keys'] = sorted(k for k in set(old_override.get('environment', {})) | set(candidate.get('environment', {})) if old_override.get('environment', {}).get(k) != candidate.get('environment', {}).get(k))
+        result['candidate_runtime_keys'] = sorted(candidate)
+        result['old_runtime_keys'] = sorted(old_override)
+        result['runtime_service_changed_keys'] = sorted(k for k in set(old_override) | set(candidate) if old_override.get(k) != candidate.get(k))
+        result['current_resources'] = {k:current['HostConfig'].get(k) for k in ('Memory','NanoCpus','ReadonlyRootfs')}
+        result['candidate_mount_targets'] = sorted(m['target'] for m in candidate.get('volumes', []))
+        result['current_mount_targets'] = sorted(m['Destination'] for m in current['Mounts'])
+        f = json.loads((failed / 'failure.json').read_text())
+        result['failure'] = {k: f.get(k) for k in ('status','error_type','phase')}
+        events = command(*docker, 'events', '--since', '2026-10-30T17:27:40Z', '--until', '2026-10-30T17:32:10Z', '--filter', 'type=container', '--filter', 'image=sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0', '--format', '{{json .}}')
+        result['events'] = []
+        for line in events.splitlines()[-100:]:
+            e=json.loads(line); a=e.get('Actor',{}).get('Attributes',{})
+            result['events'].append(dict(action=e.get('Action'), time=e.get('time'), exit_code=a.get('exitCode'), name=a.get('name')))
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        result['error_type'] = type(error).__name__
+    return result
+
+
 def verify_material_tool():
     path = Path('/opt/fangcun-m4/material-tools') / (MATERIAL_TOOL_SHA + '.py')
     if path.resolve() != path:
@@ -252,6 +285,7 @@ def collect(sudo_docker=False):
                     if manifest.is_file():
                         result["ai_release_manifests"][key] = ai_release_metadata(manifest.parent)
             result["ai_release_state_available"] = True
+            result["ai_failed_release_observation"] = ai_failed_release_observation(docker)
         followup = Path('/opt/qs-ai/schema-maintenance/active-v2.json')
         result['ai_active_schema_followup_exists'] = followup.is_file()
         if result['ai_active_schema_followup_exists']:
