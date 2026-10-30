@@ -312,9 +312,14 @@ def collect(sudo_docker=False):
                 retention['audit_error_type'] = type(error).__name__
             # Exact failed production command: list policy only, never execute it.
             args = ['sudo', '-n', '-l', '--', 'python3', '/tmp/qs-ai-deploy-41108077901-1-retention.py', '--service', 'qs-ai', '--image-ref', 'sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0', '--apply', '--deployment-locked', '--protect-image-id', 'sha256:a14f5fd4823cfda040de3aff9b1de6327df0644666758e924db2364393c31734']
-            query = subprocess.run(args, capture_output=True, text=True, timeout=15)
+            password = os.environ.get('SUDO_PASSWORD', '')
+            if password:
+                args = ['sudo', '-S', '-p', '', '-l', *args[3:]]
+            query = subprocess.run(args, input=password+'\n' if password else None,
+                                   capture_output=True, text=True, timeout=15)
+            retention['policy_query_authenticated'] = bool(password)
             retention['policy_query_returncode'] = query.returncode
-            retention['policy_query_category'] = 'allowed' if query.returncode == 0 else ('not_permitted' if any(v in query.stderr.lower() for v in ('not allowed', 'not permitted', 'not run sudo')) else 'query_unavailable')
+            retention['policy_query_category'] = 'allowed' if query.returncode == 0 else ('not_permitted' if any(v in query.stderr.lower() for v in ('not allowed', 'not permitted', 'not run sudo')) else 'password_required' if 'a password is required' in query.stderr.lower() else 'query_unavailable')
             result['ai_image_retention_observation'] = retention
             result["ai_release_state_available"] = True
             result["ai_failed_release_observation"] = ai_failed_release_observation(docker)
