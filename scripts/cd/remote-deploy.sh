@@ -134,7 +134,9 @@ extract_package() {
 sync_configs() {
   $SUDO rsync -a "$DEPLOY_TMP/configs/" "/opt/qs-server/${CONTAINER_NAME}/configs/"
   $SUDO chown -R "$APP_UID:$APP_GID" "/opt/qs-server/${CONTAINER_NAME}/configs"
+  if [ "$SERVICE" != "collection" ]; then
   $SUDO chown -R "$APP_UID:$APP_GID" "/data/logs/qs-server/${CONTAINER_NAME}"
+  fi
 }
 
 ensure_networks() {

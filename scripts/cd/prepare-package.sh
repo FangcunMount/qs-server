@@ -214,6 +214,7 @@ EOF
       REDIS_HOST REDIS_PORT
 
     cat > "$ENV_FILE" <<EOF
+MYSQL_TLS_CA_REF=${MYSQL_TLS_CA_REF:-}
 # Auto-generated production environment configuration for QS Worker
 # MongoDB split parameter configuration.
 QS_WORKER_MONGODB_HOST=${MONGODB_HOST}:${MONGODB_PORT}

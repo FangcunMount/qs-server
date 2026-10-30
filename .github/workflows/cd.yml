@@ -53,6 +53,9 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      revision:
+        description: Frozen main ancestor with successful push CI; requires reuse_images and deploy
+        required: false
       operation:
         description: '部署，或在保持发布冻结时仅构建发布镜像'
         required: true
@@ -101,7 +104,7 @@ env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_REPOSITORY: fangcunmount
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
-  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.revision || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
 
 jobs:
@@ -134,8 +137,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 0
+
+      - name: Validate frozen service revision
+        env:
+          REQUESTED_REVISION: ${{ inputs.revision }}
+          REUSE_IMAGES: ${{ inputs.reuse_images }}
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          if [ -n "$REQUESTED_REVISION" ]; then
+            [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
+            [[ "$REUSE_IMAGES" == true && "$DEPLOY_OPERATION" == deploy ]]
+            [[ "$REQUESTED_REVISION" =~ ^[0-9a-f]{40}$ ]]
+            git merge-base --is-ancestor "$REQUESTED_REVISION" origin/main
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$REQUESTED_REVISION" --event push --json conclusion --jq 'any(.[]; .conclusion == "success")' | grep -qx true
+          fi
+
+      - name: Test frozen revision and rollout path contracts
+        run: python3 scripts/cd/test_rollout_repair.py
 
       - name: Test deployment lock bootstrap
         run: python3 scripts/cd/test_image_deploy_lock.py
@@ -310,7 +332,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
 
       - name: Verify organization public MySQL policy
@@ -461,7 +483,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
 
       - name: Login ACR (isolated config, no keychain)
@@ -578,7 +600,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
 
       - name: Verify organization public MySQL policy
@@ -724,7 +746,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
 
       - name: Setup verification SSH
