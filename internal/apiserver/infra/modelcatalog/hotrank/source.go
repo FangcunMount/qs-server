@@ -10,6 +10,7 @@ import (
 	"time"
 
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -23,8 +24,8 @@ import (
 
 const DayRebuildIndex = "idx_answersheet_hotrank_day"
 
-// MongoDaySource borrows the host's database. It only reads metadata, never
-// answers, and never writes facts, Outbox state, or a new recovery event.
+// MongoDaySource borrows the host database and emits submission metadata only.
+// It verifies frozen sources without writing facts, messages or recovery events.
 type MongoDaySource struct{ db *mongo.Database }
 
 func NewMongoDaySource(db *mongo.Database) (*MongoDaySource, error) {
@@ -43,9 +44,11 @@ type sourceSheet struct {
 	QuestionnaireVersion string    `bson:"questionnaire_version"`
 	FilledAt             time.Time `bson:"filled_at"`
 	DurableAcceptance    struct {
-		SchemaVersion uint32    `bson:"schema_version"`
-		EventID       string    `bson:"event_id"`
-		AcceptedAt    time.Time `bson:"accepted_at"`
+		SchemaVersion       uint32                    `bson:"schema_version"`
+		EventID             string                    `bson:"event_id"`
+		AcceptedAt          time.Time                 `bson:"accepted_at"`
+		TransactionEvidence *evidence.EventEvidenceV2 `bson:"transaction_evidence"`
+		EventEvidence       *evidence.EventEvidenceV1 `bson:"event_evidence"`
 	} `bson:"durable_acceptance"`
 }
 type sourceIntent struct {
@@ -93,7 +96,7 @@ func (s *MongoDaySource) RequireIndex(ctx context.Context) error {
 
 // Capture reads the whole day in one primary snapshot, including soft-deleted
 // submissions: the existing rank counts submissions, not currently visible rows.
-// An unmarked legacy row, missing original intent or a truncated window rejects
+// An unmarked legacy row, missing original evidence or a truncated window rejects
 // the entire repair. It does not silently lower the source total.
 func (s *MongoDaySource) Capture(ctx context.Context, day string) (RebuildSnapshot, error) {
 	start, err := rebuildDay(day, time.Now())
@@ -134,33 +137,38 @@ func (s *MongoDaySource) Capture(ctx context.Context, day string) (RebuildSnapsh
 	ids := make([]bson.D, 0, len(sheets))
 	seen := map[string]bool{}
 	for _, sheet := range sheets {
-		if sheet.ID == 0 || sheet.OrgID == 0 || sheet.TesteeID == 0 || sheet.FillerID <= 0 || sheet.DurableAcceptance.SchemaVersion != 1 || sheet.DurableAcceptance.EventID == "" || sheet.DurableAcceptance.AcceptedAt.IsZero() || seen[sheet.DurableAcceptance.EventID] {
+		if sheet.ID == 0 || sheet.OrgID == 0 || sheet.TesteeID == 0 || sheet.FillerID <= 0 || (sheet.DurableAcceptance.SchemaVersion != 1 && sheet.DurableAcceptance.SchemaVersion != 2) || sheet.DurableAcceptance.EventID == "" || sheet.DurableAcceptance.AcceptedAt.IsZero() || seen[sheet.DurableAcceptance.EventID] {
 			return RebuildSnapshot{}, ErrRebuildConflict
 		}
 		seen[sheet.DurableAcceptance.EventID] = true
+		if sheet.DurableAcceptance.SchemaVersion == 2 {
+			continue
+		}
 		ids = append(ids, bson.D{{Key: "producer", Value: "qs-server"}, {Key: "message_id", Value: sheet.DurableAcceptance.EventID}, {Key: "destination", Value: "qs.evaluation.lifecycle"}})
 	}
-	if len(ids) == 0 {
-		return snapshot, nil
-	}
-	intents, err := s.db.Collection("rm_outbox").Find(sc, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetHint("_id_").SetLimit(MaxRebuildFacts+1).SetMaxTime(5*time.Second))
+	byID, err := s.transactionIntents(sc, sheets)
 	if err != nil {
 		return RebuildSnapshot{}, err
 	}
-	defer func() { _ = intents.Close(sc) }()
-	var rows []sourceIntent
-	if err := intents.All(sc, &rows); err != nil {
-		return RebuildSnapshot{}, err
-	}
-	if len(rows) != len(sheets) {
-		return RebuildSnapshot{}, fmt.Errorf("original hot rank intent coverage is incomplete")
-	}
-	byID := map[string]sourceIntent{}
-	for _, row := range rows {
-		if _, exists := byID[row.ID]; exists {
-			return RebuildSnapshot{}, ErrRebuildConflict
+	if len(ids) > 0 {
+		intents, err := s.db.Collection("rm_outbox").Find(sc, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetHint("_id_").SetLimit(MaxRebuildFacts+1).SetMaxTime(5*time.Second))
+		if err != nil {
+			return RebuildSnapshot{}, err
 		}
-		byID[row.ID] = row
+		defer func() { _ = intents.Close(sc) }()
+		var rows []sourceIntent
+		if err := intents.All(sc, &rows); err != nil {
+			return RebuildSnapshot{}, err
+		}
+		if len(rows) != len(ids) {
+			return RebuildSnapshot{}, fmt.Errorf("original hot rank intent coverage is incomplete")
+		}
+		for _, row := range rows {
+			if _, exists := byID[row.ID]; exists {
+				return RebuildSnapshot{}, ErrRebuildConflict
+			}
+			byID[row.ID] = row
+		}
 	}
 	for _, sheet := range sheets {
 		row, exists := byID[sheet.DurableAcceptance.EventID]
@@ -173,6 +181,9 @@ func (s *MongoDaySource) Capture(ctx context.Context, day string) (RebuildSnapsh
 		}
 		snapshot.Facts = append(snapshot.Facts, fact)
 		snapshot.OriginalFingerprints[fact.EventID] = hex.EncodeToString(row.Fingerprint)
+		if sheet.DurableAcceptance.SchemaVersion == 2 {
+			snapshot.OriginalFingerprints[fact.EventID] = sheet.DurableAcceptance.TransactionEvidence.Reference.Fingerprint
+		}
 	}
 	return snapshot, nil
 }

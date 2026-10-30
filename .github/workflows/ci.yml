@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, codex/rocketmq-retirement-m2]
 
 permissions:
   contents: read
@@ -971,7 +971,25 @@ jobs:
             -run '^TestCurrentRuntimeClosure$' \
             -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
 
-      - name: Verify hot-rank and attention original-source recovery after broker loss
+      - name: Verify hot-rank reconstruction from current transaction facts
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true
+        run: |
+          set -euo pipefail
+          go test -race -tags=integration -count=1 -timeout=5m -v \
+            -run '^TestHotRank(RebuildFromCurrentTransactionFactsWithoutOutbox|RejectsIncompleteCurrentTransactionDay|MixedHistoricalAndCurrentDay)$' \
+            ./internal/apiserver/infra/modelcatalog/hotrank \
+            | tee "${RUNNER_TEMP}/hotrank-transaction-source.log"
+          for test_name in \
+            TestHotRankRebuildFromCurrentTransactionFactsWithoutOutbox \
+            TestHotRankRejectsIncompleteCurrentTransactionDay \
+            TestHotRankMixedHistoricalAndCurrentDay; do
+            grep -q -- "=== RUN   ${test_name}$" "${RUNNER_TEMP}/hotrank-transaction-source.log"
+            grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/hotrank-transaction-source.log"
+          done
+          if grep -q -- '--- SKIP:' "${RUNNER_TEMP}/hotrank-transaction-source.log"; then exit 1; fi
+
+      - name: Historical NSQ hot-rank and attention source recovery
         env:
           M6_HOTRANK_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true
           M6_HOTRANK_REDIS_ADDRESS: 127.0.0.1:6379
