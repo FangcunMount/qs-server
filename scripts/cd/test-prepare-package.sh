@@ -91,6 +91,7 @@ assert_package_contract() {
   test -x "$package_dir/scripts/cd/verify-worker-dependencies.sh"
   assert_absent "$env_file" "_REDIS_DB="
   if [ "$service" = worker ]; then
+    assert_line "$env_file" "MYSQL_TLS_CA_REF=ba7bfef254a498a683f67bad82f074ac00c418a4"
     assert_line "$env_file" "QS_WORKER_MESSAGING_PROVIDER=rocketmq"
     assert_line "$env_file" "QS_WORKER_MESSAGING_ROCKETMQ_ENDPOINT=127.0.0.1:8081"
     assert_line "$env_file" "QS_WORKER_MESSAGING_ROCKETMQ_CREDENTIALS_FILE=/etc/qs-worker/rocketmq/credentials.json"
@@ -133,7 +134,7 @@ cd "$REPO_ROOT"
 assert_package_contract apiserver
 assert_package_contract collection
 MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_INSTANCE_ID=qs-apiserver-1 ROCKETMQ_PUBLISH_ENABLED=false assert_package_contract apiserver
-MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false ROCKETMQ_WORKER_BINDING_REVISION=proof-v1 assert_package_contract worker
+MYSQL_TLS_CA_REF=ba7bfef254a498a683f67bad82f074ac00c418a4 MESSAGING_PROVIDER_REQUIRED=true MESSAGING_PROVIDER=rocketmq ROCKETMQ_ENDPOINT=127.0.0.1:8081 ROCKETMQ_PUBLISH_ENABLED=false ROCKETMQ_WORKER_BINDING_REVISION=proof-v1 assert_package_contract worker
 
 # Tencent public Redis must fail closed rather than infer TLS from its port.
 redis_tls_dir="$TEST_ROOT/tencent-redis"
