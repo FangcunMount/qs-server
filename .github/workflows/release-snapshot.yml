@@ -33,7 +33,7 @@ jobs:
           ssh -F "$RUNNER_SSH_CONFIG" -o ConnectTimeout=20 "$RUNNER_SSH_ALIAS" \
             'sudo -n python3 -' < scripts/cd/release-snapshot.py > release-snapshot.json
           python3 -c 'import json; x=json.load(open("release-snapshot.json")); assert x["read_only"] is True and x["containers"]'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-snapshot-${{ matrix.host }}-${{ github.run_id }}
           path: release-snapshot.json
