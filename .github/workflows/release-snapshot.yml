@@ -2,6 +2,10 @@ name: Read-only release snapshot
 on:
   workflow_dispatch:
     inputs:
+      deployment_policy_only:
+        description: Read-only ServerA sudo command policy; no root tool execution
+        type: boolean
+        default: false
       monitoring_only:
         description: 'Read local Mac mini monitoring identity/config hashes only; no SSH or service changes'
         type: boolean
@@ -21,7 +25,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true
+    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true
     environment: production
     runs-on:
       group: qlume
@@ -178,3 +182,42 @@ jobs:
       - name: Remove owned registry authentication
         if: always()
         run: rm -rf "${RUNNER_TEMP}/image-binding-auth-${GITHUB_RUN_ID}"
+
+  deployment-policy:
+    if: inputs.deployment_policy_only == true
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: release-policy-serverA
+      DEPLOY_NODE_HOSTNAME: serverA
+      SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Establish existing read-only SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Read allowed Python tool commands without executing them
+        run: |
+          python3 - <<'PYPOLICY'
+          import json, os, pathlib, subprocess
+          result = subprocess.run(['ssh', '-F', os.environ['RUNNER_SSH_CONFIG'], '-o', 'ConnectTimeout=20', os.environ['RUNNER_SSH_ALIAS'], 'sudo -S -p "" -l'], input=os.environ['SUDO_PASSWORD']+'\n', capture_output=True, text=True, timeout=45)
+          commands = [line.strip() for line in result.stdout.splitlines() if '/usr/bin/python3' in line or 'ai-mq-tools' in line or 'material-tools' in line]
+          receipt = dict(read_only=True, root_tool_executed=False, returncode=result.returncode, python_tool_policy=commands)
+          pathlib.Path('deployment-policy.json').write_text(json.dumps(receipt, indent=2)+'\n')
+          if result.returncode: raise SystemExit('Read-only sudo policy query failed; no root tool executed')
+          PYPOLICY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: deployment-policy-${{ github.run_id }}
+          path: deployment-policy.json
+          if-no-files-found: error
+      - name: Remove owned SSH key and policy projection
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" deployment-policy.json
