@@ -25,7 +25,7 @@ def collect():
             continue
         # Fixed projections exclude credentials, Env, logs and application data.
         data = json.loads(command(*docker, "inspect", "--format", '{"Image":{{json .Image}},"Config":{"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}}},"Mounts":{{json .Mounts}}}', cid))
-        image = json.loads(command(*docker, "image", "inspect", "--format", '{"Os":{{json .Os}},"Architecture":{{json .Architecture}},"RepoDigests":{{json .RepoDigests}},"Config":{"Labels":{{json .Config.Labels}}}}', data["Image"]))
+        image = json.loads(command(*docker, "image", "inspect", "--format", '{"Os":{{json .Os}},"Architecture":{{json .Architecture}},"RepoDigests":{{json .RepoDigests}},"RepoTags":{{json .RepoTags}},"Config":{"Labels":{{json .Config.Labels}}}}', data["Image"]))
         mounts = []
         for mount in data.get("Mounts", []):
             item = {k.lower(): mount.get(k) for k in ("Type", "Source", "Destination", "RW")}
@@ -41,7 +41,7 @@ def collect():
             mounts.append(item)
         labels = image.get("Config", {}).get("Labels") or {}
         containers.append({"name": name, "container_id": cid, "image_ref": data["Config"]["Image"],
-                           "image_id": data["Image"], "repo_digests": image.get("RepoDigests", []),
+                           "image_id": data["Image"], "repo_digests": image.get("RepoDigests", []), "repo_tags": image.get("RepoTags", []),
                            "source_sha": labels.get("org.opencontainers.image.revision"),
                            "platform": image["Os"] + "/" + image["Architecture"],
                            "running": data["State"]["Running"],

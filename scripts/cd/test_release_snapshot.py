@@ -46,4 +46,46 @@ class SnapshotTests(unittest.TestCase):
                 module.collect()
 
 
+
+
+class SnapshotTransportTests(unittest.TestCase):
+    def test_existing_password_and_passwordless_paths_keep_json_and_cleanup(self):
+        import os
+        import subprocess
+        import tempfile
+
+        script = Path(__file__).with_name('runner-release-snapshot.sh')
+        for password in ('', "fixture-$(`echo unexpanded`)-'value"):
+            with self.subTest(password_present=bool(password)), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root/'ssh').write_text('#!/bin/bash\nexec bash -s\n')
+                (root/'sudo').write_text('''#!/bin/bash
+set -eu
+if [ "$1" = -S ]; then
+  read -r supplied
+  test "$supplied" = "$SUDO_PASSWORD"
+  test "$2" = -v
+  exit 0
+fi
+if [ "$1" = -n ] && [ "$2" = true ]; then exit 0; fi
+if [ "$1" = -A ]; then
+  test "$("$SUDO_ASKPASS")" = "$SUDO_PASSWORD"
+  printf '%s' "$SUDO_ASKPASS" > "$ASKPASS_RECORD"
+fi
+cat >/dev/null
+printf '%s\\n' '{"read_only":true,"containers":[{"name":"fixture"}]}'
+''')
+                for name in ('ssh','sudo'): (root/name).chmod(0o700)
+                environment = dict(os.environ, PATH=str(root)+':'+os.environ['PATH'],
+                    RUNNER_TEMP=str(root), RUNNER_SSH_CONFIG='fixture', RUNNER_SSH_ALIAS='fixture',
+                    SUDO_PASSWORD=password, ASKPASS_RECORD=str(root/'askpass'))
+                result = subprocess.run(['bash',str(script)],env=environment,text=True,capture_output=True,timeout=10)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertTrue(json.loads(result.stdout)['read_only'])
+                if password:
+                    self.assertNotIn(password,result.stdout+result.stderr)
+                    self.assertFalse(Path((root/'askpass').read_text()).exists())
+                self.assertFalse(list(root.glob('release-snapshot.*')))
+
+
 if __name__=='__main__': unittest.main()
