@@ -273,6 +273,8 @@ def collect(sudo_docker=False):
             for key, module, extra in (
                 ('live_mq_files', 'qs_ai.maintenance.messaging_preflight', ()),
                 ('live_tls_files', 'qs_ai.bootstrap.grpc_probe', ('--check-files',)),
+                ('live_database_exact_head', 'qs_ai.bootstrap.database_check', ('--require-head',)),
+                ('live_grpc_probe', 'qs_ai.bootstrap.grpc_probe', ()),
             ):
                 try:
                     command(*docker, 'exec', 'qs-ai', '/app/.venv/bin/python', '-m', module, *extra)
