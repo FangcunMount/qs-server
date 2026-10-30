@@ -352,7 +352,23 @@ def collect(sudo_docker=False):
                 else:
                     result['ai_checkpoint_oneoff_mq_files'] = dict(returncode=probe.returncode,
                         wrapper_executed=False, permission_denied='permission denied' in probe.stderr.lower(),
-                        image_missing='no such image' in probe.stderr.lower())
+                        image_missing='no such image' in probe.stderr.lower(),
+                        driver_categories=[phrase for phrase in (
+                            'no space left on device', 'read-only file system', 'oci runtime create failed',
+                            'failed to create task', 'failed to create shim task', 'executable file not found',
+                            'exec format error', 'invalid mount', 'not a directory', 'address already in use',
+                            'port is already allocated', 'already in use', 'unknown flag', 'unknown shorthand flag',
+                            'unable to find user', 'unable to find group', 'not manually attachable',
+                            'not attachable', 'invalid endpoint settings', 'failed to set up container networking',
+                            'error while creating mount source path', 'operation not permitted',
+                            'not allowed to execute', 'no matching manifest', 'does not match the specified platform',
+                            'additional property', 'cannot combine', 'conflicting options',
+                            'resource temporarily unavailable', 'too many open files', 'out of memory',
+                            'pull access denied', 'network', 'mount', 'container name', 'python', 'permission',
+                            'file exists', 'invalid argument', 'no such file or directory', 'failed to start',
+                            'failed to create', 'not found', 'invalid reference', 'unsupported', 'denied',
+                            'requires at least', 'unexpected number', 'error response from daemon',
+                        ) if phrase in probe.stderr.lower()])
 
                 base = json.loads((checkpoint / 'compose.yaml').read_text())['services']['qs-ai']
                 combined = dict(base.get('environment', {}), **runtime['environment'])
