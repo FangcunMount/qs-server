@@ -68,6 +68,14 @@ on:
           - apiserver
           - collection
           - worker
+      reuse_images:
+        description: '复用已验收镜像；不重新构建'
+        type: boolean
+        default: false
+      image_digests:
+        description: '复用时必填：服务名到 ACR sha256 digest 的 JSON 对象'
+        required: false
+        default: '{}'
       collection_replicas:
         description: 'Collection 副本数（留空则读取 QS_COLLECTION_REPLICAS，缺失时默认为 2）'
         required: false
@@ -228,6 +236,7 @@ jobs:
           password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
 
       - name: Build and publish ${{ matrix.service }}
+        if: inputs.reuse_images != true
         run: |
           make cd-image \
             SERVICE="${{ matrix.service }}" \
@@ -239,6 +248,8 @@ jobs:
       - name: Record immutable published image identity
         env:
           SERVICE: ${{ matrix.service }}
+          REUSE_IMAGES: ${{ inputs.reuse_images }}
+          EXPECTED_DIGESTS: ${{ inputs.image_digests || '{}' }}
         run: |
           set -Eeuo pipefail
           . scripts/cd/image-metadata.sh
@@ -249,10 +260,14 @@ jobs:
           revision=os.environ['DEPLOY_SHA']
           assert re.fullmatch('[0-9a-f]{40}',revision)
           name=os.environ['IMAGE_NAME'];identities=[]
+          reuse=os.environ['REUSE_IMAGES']=='true'
+          expected=json.loads(os.environ['EXPECTED_DIGESTS']).get(os.environ['SERVICE']) if reuse else None
+          if reuse: assert isinstance(expected,str) and re.fullmatch('sha256:[0-9a-f]{64}',expected)
           for registry,namespace in ((os.environ['DOCKER_REGISTRY'],os.environ['DOCKER_REPOSITORY']),
                                      (os.environ['ALIYUN_ACR_REGISTRY'],os.environ['ALIYUN_ACR_NAMESPACE'])):
               repository=f'{registry}/{namespace}/{name}'
-              ref=f'{repository}:{revision}'
+              is_acr=registry==os.environ['ALIYUN_ACR_REGISTRY']
+              ref=f'{repository}@{expected}' if reuse and is_acr else f'{repository}:{revision}'
               subprocess.run(['docker','pull','--platform','linux/amd64',ref],check=True)
               x=json.loads(subprocess.check_output(['docker','image','inspect',ref],text=True))[0]
               assert x['Os']=='linux' and x['Architecture']=='amd64'
@@ -260,6 +275,7 @@ jobs:
               matches=[d for d in x['RepoDigests'] if d.startswith(repository+'@sha256:')]
               assert len(matches)==1
               assert re.fullmatch('sha256:[0-9a-f]{64}',matches[0].split('@')[1])
+              if reuse and is_acr: assert matches[0].split('@')[1]==expected
               identities.append(dict(repository=repository,digest=matches[0].split('@')[1],image_id=x['Id']))
           assert len({x['image_id'] for x in identities})==1
           Path('image-receipt.json').write_text(json.dumps(dict(source_sha=revision,service=os.environ['SERVICE'],
@@ -389,6 +405,7 @@ jobs:
           CD_RUN_ATTEMPT: ${{ github.run_attempt }}
           RUNNER_SSH_ALIAS: deploy-target-apiserver
           RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+          DEPLOY_EXPECTED_DIGEST: ${{ inputs.reuse_images && fromJSON(inputs.image_digests || '{}').apiserver || '' }}
           SERVICE: apiserver
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -400,7 +417,7 @@ jobs:
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
-          DEPLOY_IMAGE_SOURCE: ${{ needs.plan.outputs.deploy_image_source }}
+          DEPLOY_IMAGE_SOURCE: ${{ inputs.reuse_images && 'registry' || needs.plan.outputs.deploy_image_source }}
           DEPLOY_PULL_REGISTRY: acr
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
@@ -505,6 +522,7 @@ jobs:
           CD_RUN_ATTEMPT: ${{ github.run_attempt }}
           RUNNER_SSH_ALIAS: deploy-target-collection
           RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+          DEPLOY_EXPECTED_DIGEST: ${{ inputs.reuse_images && fromJSON(inputs.image_digests || '{}').collection || '' }}
           SERVICE: collection
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -517,7 +535,7 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           COLLECTION_REPLICAS: ${{ env.COLLECTION_REPLICAS }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
-          DEPLOY_IMAGE_SOURCE: ${{ needs.plan.outputs.deploy_image_source }}
+          DEPLOY_IMAGE_SOURCE: ${{ inputs.reuse_images && 'registry' || needs.plan.outputs.deploy_image_source }}
           DEPLOY_PULL_REGISTRY: acr
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
@@ -651,6 +669,7 @@ jobs:
           # worker 与 apiserver/collection 共用 docker-compose.prod.yml；
           # compose 会解析全文件，qs-apiserver.extra_hosts 仍需 IAM_GRPC_HOST（集群内用 Tailscale）。
           IAM_GRPC_HOST: ${{ vars.SVRB_HOST }}
+          DEPLOY_EXPECTED_DIGEST: ${{ inputs.reuse_images && fromJSON(inputs.image_digests || '{}').worker || '' }}
           SERVICE: worker
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -663,7 +682,7 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
-          DEPLOY_IMAGE_SOURCE: ${{ needs.plan.outputs.deploy_image_source }}
+          DEPLOY_IMAGE_SOURCE: ${{ inputs.reuse_images && 'registry' || needs.plan.outputs.deploy_image_source }}
           DEPLOY_PULL_REGISTRY: acr
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}

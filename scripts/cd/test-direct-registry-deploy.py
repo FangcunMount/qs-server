@@ -13,7 +13,7 @@ FUNCTIONS += SOURCE[SOURCE.index('select_image_from_registry()'):SOURCE.index('s
 
 
 class RegistryDeployTests(unittest.TestCase):
-    def run_selection(self, failure='', service='apiserver'):
+    def run_selection(self, failure='', service='apiserver', digest=''):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             docker = root / 'docker'
@@ -31,7 +31,7 @@ esac
 ''')
             docker.chmod(0o700)
             env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}',
-                       SUDO='', DEPLOY_PULL_REGISTRY='acr', SERVICE=service,
+                       SUDO='', DEPLOY_PULL_REGISTRY='acr', SERVICE=service, DEPLOY_EXPECTED_DIGEST=digest,
                        ROCKETMQ_WORKER_BINDING_REVISION='m4-worker-fixture',
                        ALIYUN_ACR_REGISTRY='acr.example', ALIYUN_ACR_NAMESPACE='qs',
                        ALIYUN_ACR_USERNAME='reader', ALIYUN_ACR_PASSWORD='fake-secret',
@@ -43,9 +43,9 @@ esac
             result = subprocess.run(['bash', '-c', 'set -Eeuo pipefail\n' + FUNCTIONS +
                                      '\nselect_image_from_registry'], env=env,
                                     capture_output=True, text=True, timeout=10)
-            calls = (root / 'calls').read_text()
+            calls = (root / 'calls').read_text() if (root / 'calls').exists() else ''
             self.assertNotIn('fake-secret', calls + result.stdout + result.stderr)
-            self.assertFalse(Path((root / 'auth').read_text()).exists())
+            if (root / 'auth').exists(): self.assertFalse(Path((root / 'auth').read_text()).exists())
             composed = root / 'compose-image.env'
             return result, calls, composed.read_text() if composed.exists() else None
 
@@ -55,6 +55,16 @@ esac
         self.assertIn('pull --platform linux/amd64 acr.example/qs/qs-apiserver:' + 'a' * 40, calls)
         self.assertIn('tag acr.example/qs/qs-apiserver:', calls)
         self.assertEqual(composed, 'DOCKER_IMAGE_QS_APISERVER=ghcr.io/fangcunmount/qs-apiserver:' + 'a' * 40 + '\n')
+
+    def test_pinned_pull_uses_digest_and_rejects_malformed_pin(self):
+        result,calls,composed=self.run_selection(digest='sha256:'+'c'*64)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('acr.example/qs/qs-apiserver@sha256:'+'c'*64,calls)
+        self.assertIn('DOCKER_IMAGE_QS_APISERVER=',composed)
+        result,calls,composed=self.run_selection(digest='latest')
+        self.assertNotEqual(result.returncode,0)
+        self.assertNotIn('pull ',calls)
+        self.assertIsNone(composed)
 
     def test_worker_registry_selection_keeps_frozen_config_revision(self):
         result, calls, composed = self.run_selection(service='worker')

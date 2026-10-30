@@ -304,6 +304,12 @@ select_image_from_registry() {
       ;;
   esac
 
+  if [ -n "${DEPLOY_EXPECTED_DIGEST:-}" ]; then
+    if [ "$pull_registry" != acr ] || ! [[ "$DEPLOY_EXPECTED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      echo "Pinned deployment requires ACR and an exact SHA256 digest" >&2
+      return 1
+    fi
+  fi
   if [ "$pull_registry" = acr ]; then
     # Pull before replacing containers; never leave registry credentials on the host.
     (
@@ -317,6 +323,9 @@ select_image_from_registry() {
       chmod 700 "$auth_dir"
       trap 'rm -rf "$auth_dir"' EXIT
       source_image="${ALIYUN_ACR_REGISTRY}/${ALIYUN_ACR_NAMESPACE}/${IMAGE_NAME}:${IMAGE_TAG}"
+      if [ -n "${DEPLOY_EXPECTED_DIGEST:-}" ]; then
+        source_image="${ALIYUN_ACR_REGISTRY}/${ALIYUN_ACR_NAMESPACE}/${IMAGE_NAME}@${DEPLOY_EXPECTED_DIGEST}"
+      fi
       docker_login_with_token "$ALIYUN_ACR_USERNAME" "$ALIYUN_ACR_PASSWORD" "$ALIYUN_ACR_REGISTRY" "$auth_dir" || exit $?
       started=$(date +%s)
       $SUDO docker --config "$auth_dir" pull --platform linux/amd64 "$source_image" || exit $?
