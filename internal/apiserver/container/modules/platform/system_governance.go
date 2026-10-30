@@ -6,6 +6,7 @@ import (
 
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
@@ -40,6 +41,7 @@ type RESTSystemGovernanceInput struct {
 	EventPublisher            event.EventPublisher
 	ReportResolutionReader    interpretationreadmodel.ReportResolutionReader
 	TaskOpenedReminderEnabled bool
+	TaskOpenedReminderService notification.TaskOpenedReminderService
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -80,8 +82,12 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	var reminderResolver systemgov.ReminderResolver
 	var gapRecoveryStore systemgov.GapRecoveryStore
 	var reminderGapRecovery systemgov.ReminderGapRecovery
+	var currentReminderRecovery systemgov.CurrentReminderGapRecovery
+	currentReminderEnabled := false
 	gapRecoveryEnabled := false
 	if in.MySQLDB != nil {
+		currentReminderRecovery = governanceinfra.NewCurrentReminderRecovery(in.MySQLDB, in.TaskOpenedReminderService)
+		currentReminderEnabled = in.Options != nil && in.Options.Retry != nil && in.Options.Retry.GapRecoveryEnabled && in.TaskOpenedReminderEnabled && in.TaskOpenedReminderService != nil
 		reader := governanceinfra.NewActionAuditStore(in.MySQLDB)
 		pendingReplayAuditReader = reader
 		deliveryReplayReviewReader = reader
@@ -104,27 +110,29 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		}
 	}
 	return systemgov.NewFacade(systemgov.FacadeDeps{
-		EventStatusService:         in.EventStatusService,
-		EventTypeSources:           buildEventTypeSources(in.EventOutboxes),
-		CacheGovernance:            in.CacheGovernance,
-		CachePolicyReloader:        in.CachePolicyReloader,
-		LocalResilienceSnapshot:    in.LocalResilienceSnapshot,
-		CheckpointReader:           NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
-		Metrics:                    metrics,
-		Components:                 components,
-		Registry:                   registry,
-		Actions:                    actions,
-		RetryGovernanceReader:      retryReader,
-		RetryCandidateReader:       retryReader,
-		PendingReplayAuditReader:   pendingReplayAuditReader,
-		DeliveryReplayReviewReader: deliveryReplayReviewReader,
-		ReminderReviewReader:       reminderReviewReader,
-		ReminderResolver:           reminderResolver,
-		DeliveryResolver:           deliveryResolver,
-		GapRecoveryStore:           gapRecoveryStore,
-		GapRecoveryEnabled:         gapRecoveryEnabled,
-		ReminderGapRecovery:        reminderGapRecovery,
-		ReminderGapRecoveryEnabled: gapRecoveryEnabled && in.TaskOpenedReminderEnabled,
+		EventStatusService:                in.EventStatusService,
+		EventTypeSources:                  buildEventTypeSources(in.EventOutboxes),
+		CacheGovernance:                   in.CacheGovernance,
+		CachePolicyReloader:               in.CachePolicyReloader,
+		LocalResilienceSnapshot:           in.LocalResilienceSnapshot,
+		CheckpointReader:                  NewCheckpointGovernanceReader(checkpoint.NewRepository(in.MySQLDB)),
+		Metrics:                           metrics,
+		Components:                        components,
+		Registry:                          registry,
+		Actions:                           actions,
+		RetryGovernanceReader:             retryReader,
+		RetryCandidateReader:              retryReader,
+		PendingReplayAuditReader:          pendingReplayAuditReader,
+		DeliveryReplayReviewReader:        deliveryReplayReviewReader,
+		ReminderReviewReader:              reminderReviewReader,
+		ReminderResolver:                  reminderResolver,
+		DeliveryResolver:                  deliveryResolver,
+		GapRecoveryStore:                  gapRecoveryStore,
+		GapRecoveryEnabled:                gapRecoveryEnabled,
+		ReminderGapRecovery:               reminderGapRecovery,
+		ReminderGapRecoveryEnabled:        gapRecoveryEnabled && in.TaskOpenedReminderEnabled,
+		CurrentReminderGapRecovery:        currentReminderRecovery,
+		CurrentReminderGapRecoveryEnabled: currentReminderEnabled,
 	})
 }
 

@@ -177,6 +177,7 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 		EventPublisher:            c.eventPublisher,
 		ReportResolutionReader:    resolutionReader,
 		TaskOpenedReminderEnabled: c.TaskOpenedReminderEnabled(),
+		TaskOpenedReminderService: c.TaskOpenedReminderService,
 	})
 }
 

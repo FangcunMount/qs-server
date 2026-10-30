@@ -40,27 +40,29 @@ type MetricsClient interface {
 
 // FacadeDeps 线缆s 治理数据源。
 type FacadeDeps struct {
-	EventStatusService         appEventing.StatusService
-	EventTypeSources           []EventTypeStatusSource
-	CacheGovernance            cachegovernance.Facade
-	LocalResilienceSnapshot    func() resilience.RuntimeSnapshot
-	CheckpointReader           CheckpointStatusReader
-	Metrics                    MetricsClient
-	Components                 *govcomponent.Adapter
-	Actions                    *ActionExecutor
-	Registry                   *ActionRegistry
-	CachePolicyReloader        CachePolicyReloader
-	RetryGovernanceReader      RetryGovernanceReader
-	RetryCandidateReader       RetryCandidateReader
-	PendingReplayAuditReader   PendingReplayAuditReader
-	DeliveryReplayReviewReader DeliveryReplayReviewReader
-	ReminderReviewReader       ReminderReviewReader
-	ReminderResolver           ReminderResolver
-	DeliveryResolver           DeliveryResolver
-	GapRecoveryStore           GapRecoveryStore
-	GapRecoveryEnabled         bool
-	ReminderGapRecovery        ReminderGapRecovery
-	ReminderGapRecoveryEnabled bool
+	EventStatusService                appEventing.StatusService
+	EventTypeSources                  []EventTypeStatusSource
+	CacheGovernance                   cachegovernance.Facade
+	LocalResilienceSnapshot           func() resilience.RuntimeSnapshot
+	CheckpointReader                  CheckpointStatusReader
+	Metrics                           MetricsClient
+	Components                        *govcomponent.Adapter
+	Actions                           *ActionExecutor
+	Registry                          *ActionRegistry
+	CachePolicyReloader               CachePolicyReloader
+	RetryGovernanceReader             RetryGovernanceReader
+	RetryCandidateReader              RetryCandidateReader
+	PendingReplayAuditReader          PendingReplayAuditReader
+	DeliveryReplayReviewReader        DeliveryReplayReviewReader
+	ReminderReviewReader              ReminderReviewReader
+	ReminderResolver                  ReminderResolver
+	DeliveryResolver                  DeliveryResolver
+	GapRecoveryStore                  GapRecoveryStore
+	GapRecoveryEnabled                bool
+	ReminderGapRecovery               ReminderGapRecovery
+	ReminderGapRecoveryEnabled        bool
+	CurrentReminderGapRecovery        CurrentReminderGapRecovery
+	CurrentReminderGapRecoveryEnabled bool
 }
 
 type facade struct {
