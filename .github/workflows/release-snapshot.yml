@@ -2,6 +2,10 @@ name: Read-only release snapshot
 on:
   workflow_dispatch:
     inputs:
+      business_observation_only:
+        description: Reuse existing read-only application metrics snapshot; return error category only
+        type: boolean
+        default: false
       deployment_policy_only:
         description: Read-only ServerA sudo command policy; no root tool execution
         type: boolean
@@ -25,7 +29,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true
+    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true
     environment: production
     runs-on:
       group: qlume
@@ -223,3 +227,73 @@ jobs:
       - name: Remove owned SSH key and policy projection
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" deployment-policy.json
+
+  build-business-observation:
+    if: inputs.business_observation_only == true
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.identity.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile existing read-only snapshot companion
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o mq-observation-inspect ./scripts/oneoff/mq_observation_inspect
+      - id: identity
+        run: echo "digest=$(sha256sum mq-observation-inspect | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mq-observation-inspect-${{ github.run_id }}
+          path: mq-observation-inspect
+          if-no-files-found: error
+
+  business-observation:
+    if: inputs.business_observation_only == true
+    needs: build-business-observation
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: business-observation-serverA
+      DEPLOY_NODE_HOSTNAME: serverA
+      EXPECTED_DIGEST: ${{ needs.build-business-observation.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: mq-observation-inspect-${{ github.run_id }}
+          path: observation-companion
+      - name: Establish existing read-only SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Run bounded snapshot as the existing application UID
+        run: |
+          python3 - <<'PYREAD'
+          import hashlib, json, os, pathlib, shlex, subprocess
+          binary = pathlib.Path('observation-companion/mq-observation-inspect')
+          assert hashlib.sha256(binary.read_bytes()).hexdigest() == os.environ['EXPECTED_DIGEST']
+          run = os.environ['GITHUB_RUN_ID']; assert run.isdecimal()
+          temporary = '/tmp/qs-mq-observation-' + run
+          script = 'set -eu; umask 077; p=' + shlex.quote(temporary) + """; trap 'rm -f "$p"' EXIT; cat > "$p"; chmod 0700 "$p"; "$p" """
+          command = shlex.join(['sudo', '-n', 'docker', 'exec', '--user', '2000:2000', '-i', 'qs-apiserver', 'sh', '-c', script])
+          with binary.open('rb') as stream:
+              result = subprocess.run(['ssh', '-F', os.environ['RUNNER_SSH_CONFIG'], os.environ['RUNNER_SSH_ALIAS'], command], stdin=stream, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+          assert result.returncode == 0
+          value = json.loads(result.stdout); assert value['read_only'] is True and value['mutation'] is False
+          pathlib.Path('business-observation.json').write_text(json.dumps(value, indent=2)+'\n')
+          PYREAD
+      - uses: actions/upload-artifact@v7
+        with:
+          name: business-observation-${{ github.run_id }}
+          path: business-observation.json
+          if-no-files-found: error
+      - name: Remove owned local artifacts
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" business-observation.json observation-companion/mq-observation-inspect
