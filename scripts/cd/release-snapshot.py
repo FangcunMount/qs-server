@@ -12,31 +12,12 @@ import sys
 
 NAMES = re.compile(r"(?:qs-(?:apiserver|collection.*|worker.*|ai|operating-system)|iam-apiserver|qs-ops|ops|prometheus|grafana|nginx)(?:-\d+)?$")
 MATERIAL_TOOL_SHA = '36f3046ed453dfbf8beae684269c94d1a6db0abaa23de51e09d41e462c6a3d5c'
-MQ_FILE_DIAGNOSTIC = """
-import json,os,traceback
-result={'format':'readonly-mq-files/v1','uid':os.geteuid(),'groups':os.getgroups(),'passed':False,'errors':[]}
-try:
-    from qs_ai.maintenance.messaging_preflight import check_keys
-    from qs_ai.config import MessagingOptions
-    check_keys(MessagingOptions.model_validate_json(os.environ.get('QS_AI_MESSAGING','{}')))
-    result['passed']=True
-except Exception as error:
-    seen=set()
-    while error is not None and id(error) not in seen and len(seen)<5:
-        seen.add(id(error));frames=[];tb=error.__traceback__
-        while tb is not None:
-            frames.append({'module':tb.tb_frame.f_globals.get('__name__',''),'function':tb.tb_frame.f_code.co_name})
-            tb=tb.tb_next
-        result['errors'].append({'type':type(error).__name__,'errno':getattr(error,'errno',None),'frames':frames[-4:]})
-        error=error.__cause__ or error.__context__
-print('READ_ONLY_MQ_DIAGNOSTIC:'+json.dumps(result))
-"""
 
 
 
 def ai_release_metadata(directory):
     manifest = json.loads((directory / 'manifest.json').read_text())
-    result = {k: manifest.get(k) for k in ('revision', 'image_id', 'image_ref', 'schema_policy', 'digest')}
+    result = {k: manifest.get(k) for k in ('revision', 'image_id', 'image_ref', 'schema_policy', 'digest', 'provenance')}
     receipt_path = directory / 'loaded-image.json'
     result['loaded_receipt_exists'] = receipt_path.is_file()
     image_env = (directory / 'image.env').read_text()
@@ -271,145 +252,6 @@ def collect(sudo_docker=False):
                     if manifest.is_file():
                         result["ai_release_manifests"][key] = ai_release_metadata(manifest.parent)
             result["ai_release_state_available"] = True
-        checkpoint = Path('/opt/qs-ai/releases/9dce206643d11afc33e27b72ef4429c0e5537e7a-41056013029-1')
-        names = ('manifest.json', 'runtime.json', 'compose.yaml', 'image.env', 'old-state.json', 'handoff-prepared.json', 'verification.json')
-        result['ai_checkpoint_files_present'] = {name: (checkpoint / name).is_file() for name in names}
-        if all(result['ai_checkpoint_files_present'][name] for name in names[:5]):
-            manifest = json.loads((checkpoint / 'manifest.json').read_text())
-            runtime = json.loads((checkpoint / 'runtime.json').read_text())['services']['qs-ai']
-            raw = runtime['environment']['QS_AI_MESSAGING']
-            options = json.loads(raw.replace('$$', '$'))
-            metadata = {'options': raw, 'volumes': runtime.get('volumes', [])}
-            result['ai_checkpoint_binding'] = dict(
-                metadata_digest_matches=hashlib.sha256(json.dumps(metadata, sort_keys=True, separators=(',', ':')).encode()).hexdigest() == manifest.get('messaging_binding_sha256'),
-                rocketmq_enabled=options.get('enabled') is True and options.get('provider') == 'rocketmq',
-                publish_enabled_type_boolean=type(options.get('publish_enabled')) is bool,
-                owner_names=sorted(options.get('transactions', {})),
-                final_route=options.get('transactions', {}).get('ai.mysql', {}).get('route_revision') == 'm3-1',
-                expected_mount_namespaces=all(m['target'].startswith(('/run/qs-ai-jose/', '/run/qs-ai-rocketmq/')) for m in runtime.get('volumes', [])),
-                readonly_bind_mounts=all(m['type'] == 'bind' and m.get('read_only') is True and m.get('bind', {}).get('create_host_path') is False for m in runtime.get('volumes', [])),
-                old_state_exact=(checkpoint / 'old-state.json').read_bytes() == state.read_bytes())
-            candidate = Path('/opt/qs-ai/releases/f9f24abdf98535295c4e3d223675ef6be62115e2-41052693897-1')
-            candidate_runtime = json.loads((candidate / 'runtime.json').read_text())['services']['qs-ai']
-            candidate_env = {k: str(v).replace('$$', '$') for k, v in candidate_runtime['environment'].items() if v is not None}
-            current_env = dict(line.split('=', 1) for line in json.loads(command(*docker, 'inspect', '--format', '{{json .Config.Env}}', 'qs-ai')))
-            candidate_options = json.loads(candidate_env['QS_AI_MESSAGING'])
-            current_options = json.loads(current_env['QS_AI_MESSAGING'])
-            from urllib.parse import urlsplit
-            current_db, candidate_db = [urlsplit(env['QS_AI_DATABASE_URL']) for env in (current_env, candidate_env)]
-            result['ai_candidate_config_comparison'] = dict(
-                database_name_matches=current_db.path == candidate_db.path,
-                database_credentials_match=(current_db.username, current_db.password) == (candidate_db.username, candidate_db.password),
-                database_host_port_matches=(current_db.hostname, current_db.port) == (candidate_db.hostname, candidate_db.port),
-                database_tls_matches=all(current_env.get(k) == candidate_env.get(k) for k in ('QS_AI_DATABASE_TLS_MODE', 'QS_AI_DATABASE_TLS_CA_FILE')),
-                transaction_owner_binding_matches=candidate_options.get('transactions') == current_options.get('transactions'),
-                messaging_semantics_match=candidate_options == current_options,
-                messaging_material_mounts_match=sorted((m['source'], m['target']) for m in candidate_runtime.get('volumes', []) if m['target'].startswith(('/run/qs-ai-jose/', '/run/qs-ai-rocketmq/'))) == sorted((m['source'], m['target']) for m in runtime.get('volumes', [])),
-                rocketmq_config_matches=candidate_options.get('rocketmq') == current_options.get('rocketmq'),
-                publish_admission_matches=candidate_options.get('publish_enabled') == current_options.get('publish_enabled'),
-                changed_environment_keys=sorted(k for k, v in candidate_env.items() if current_env.get(k) != v),
-                schema_policy_require_existing=json.loads((candidate / 'manifest.json').read_text()).get('schema_policy') == 'require-existing')
-            checks = result['ai_checkpoint_checks'] = {}
-            helper = Path('/opt/qs-ai/releases/f9f24abdf98535295c4e3d223675ef6be62115e2-41052693897-1/deploy.py')
-            helper_raw = helper.read_bytes()
-            if hashlib.sha256(helper_raw).hexdigest() != '93dd8c1b192361f652cdaa3e74db6f7aa2a6d793c54ad10430ba33386a6f52cd':
-                raise ValueError('Reviewed local validator identity differs')
-            validator = {'__name__': 'read_only_checkpoint_validator', '__file__': str(helper)}
-            exec(compile(helper_raw, str(helper), 'exec'), validator)
-            for key, function, argument in (
-                ('final_owner_policy', 'validate_transaction_binding', options.get('transactions')),
-                ('final_checkpoint_binding', 'require_final_messaging', checkpoint),
-            ):
-                try:
-                    validator[function](argument)  # Pure file/JSON validation; no Docker/DB/network.
-                    checks[key] = True
-                except (ValueError, TypeError, validator['DeploymentError']):
-                    checks[key] = False
-
-            for key, module, extra in (
-                ('live_mq_files', 'qs_ai.maintenance.messaging_preflight', ()),
-                ('live_tls_files', 'qs_ai.bootstrap.grpc_probe', ('--check-files',)),
-                ('live_database_exact_head', 'qs_ai.bootstrap.database_check', ('--require-head',)),
-                ('live_grpc_probe', 'qs_ai.bootstrap.grpc_probe', ()),
-            ):
-                try:
-                    command(*docker, 'exec', 'qs-ai', '/app/.venv/bin/python', '-m', module, *extra)
-                    checks[key] = True
-                except subprocess.SubprocessError:
-                    checks[key] = False
-            try:
-                args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(checkpoint / 'image.env'),
-                        '-f', str(checkpoint / 'compose.yaml'), '-f', str(checkpoint / 'runtime.json')]
-                rendered_doc = json.loads(command(*args, 'config', '--format', 'json'))
-                rendered = rendered_doc['services']['qs-ai']
-                probe = subprocess.run([*args, 'run', '--rm', '--no-deps', '-T', 'qs-ai',
-                    '/app/.venv/bin/python', '-c', MQ_FILE_DIAGNOSTIC], capture_output=True, text=True, timeout=60)
-                diagnostics = [line.split(':', 1)[1] for line in probe.stdout.splitlines() if line.startswith('READ_ONLY_MQ_DIAGNOSTIC:')]
-                if len(diagnostics) == 1:
-                    diagnostic = json.loads(diagnostics[0])
-                    if diagnostic.get('format') != 'readonly-mq-files/v1':
-                        raise ValueError('Unexpected diagnostic format')
-                    result['ai_checkpoint_oneoff_mq_files'] = diagnostic
-                else:
-                    result['ai_checkpoint_oneoff_mq_files'] = dict(returncode=probe.returncode,
-                        wrapper_executed=False, permission_denied='permission denied' in probe.stderr.lower(),
-                        image_missing='no such image' in probe.stderr.lower(),
-                        driver_categories=[phrase for phrase in (
-                            'no space left on device', 'read-only file system', 'oci runtime create failed',
-                            'failed to create task', 'failed to create shim task', 'executable file not found',
-                            'exec format error', 'invalid mount', 'not a directory', 'address already in use',
-                            'port is already allocated', 'already in use', 'unknown flag', 'unknown shorthand flag',
-                            'unable to find user', 'unable to find group', 'not manually attachable',
-                            'not attachable', 'invalid endpoint settings', 'failed to set up container networking',
-                            'error while creating mount source path', 'operation not permitted',
-                            'not allowed to execute', 'no matching manifest', 'does not match the specified platform',
-                            'additional property', 'cannot combine', 'conflicting options',
-                            'resource temporarily unavailable', 'too many open files', 'out of memory',
-                            'pull access denied', 'network', 'mount', 'container name', 'python', 'permission',
-                            'file exists', 'invalid argument', 'no such file or directory', 'failed to start',
-                            'failed to create', 'not found', 'invalid reference', 'unsupported', 'denied',
-                            'requires at least', 'unexpected number', 'error response from daemon',
-                            'endpoint', 'already exists', 'ipam', 'pool', 'overlap', 'range', 'bridge',
-                            'sandbox', 'attachable', 'gateway', 'dns', 'bind', 'address', 'host port', 'port',
-                            'duplicate', 'exhausted', 'no available', 'ipv4', 'ipv6', 'interface', 'in use',
-                            'failed to allocate', 'failed to attach', 'failed to add', 'failed to assign',
-                            'not supported', 'disabled', 'invalid config', 'requested', 'specified', 'conflict',
-                        ) if phrase in probe.stderr.lower()])
-
-                if result.get('ai_checkpoint_oneoff_mq_files', {}).get('wrapper_executed') is False:
-                    import copy, tempfile
-                    control = copy.deepcopy(rendered_doc)
-                    for network in control['services']['qs-ai'].get('networks', {}).values():
-                        network.pop('ipv4_address', None)
-                        network.pop('ipv6_address', None)
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', prefix='qs-ai-readonly-address-control-') as temporary:
-                        json.dump(control, temporary);temporary.flush()
-                        control_args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(checkpoint / 'image.env'), '-f', temporary.name]
-                        roundtrip = json.loads(command(*control_args, 'config', '--format', 'json'))
-                        if roundtrip != control:
-                            raise ValueError('Address control changed other configuration')
-                        controlled = subprocess.run([*control_args, 'run', '--rm', '--no-deps', '-T', 'qs-ai',
-                            '/app/.venv/bin/python', '-c', MQ_FILE_DIAGNOSTIC], capture_output=True, text=True, timeout=60)
-                        lines = [line.split(':', 1)[1] for line in controlled.stdout.splitlines() if line.startswith('READ_ONLY_MQ_DIAGNOSTIC:')]
-                        result['ai_checkpoint_dynamic_address_control'] = dict(only_static_addresses_removed=True,
-                            returncode=controlled.returncode, diagnostic=json.loads(lines[0]) if len(lines) == 1 else None)
-                base = json.loads((checkpoint / 'compose.yaml').read_text())['services']['qs-ai']
-                result['ai_checkpoint_networks'] = {key: {k: v for k, v in value.items() if k in ('aliases', 'interface_name', 'ipv4_address', 'ipv6_address', 'mac_address', 'priority', 'gw_priority')} for key, value in base.get('networks', {}).items()}
-                result['ai_checkpoint_network_inventory'] = []
-                compose_doc = json.loads((checkpoint / 'compose.yaml').read_text())
-                for key in base.get('networks', {}):
-                    network_name = compose_doc['networks'][key].get('name', key)
-                    projection = '{"name":{{json .Name}},"driver":{{json .Driver}},"attachable":{{json .Attachable}},"internal":{{json .Internal}},"ipv6":{{json .EnableIPv6}},"ipam":{{json .IPAM.Config}}}'
-                    result['ai_checkpoint_network_inventory'].append(json.loads(command(*docker, 'network', 'inspect', '--format', projection, network_name)))
-
-                combined = dict(base.get('environment', {}), **runtime['environment'])
-                checks.update(compose_rendered=True, environment_preserved=rendered.get('environment') == combined,
-                    image_pinned=rendered.get('image') == manifest['image_id'],
-                    command_preserved=rendered.get('command') == base.get('command'),
-                    entrypoint_preserved=rendered.get('entrypoint') == base.get('entrypoint'))
-            except (ValueError, KeyError, OSError, subprocess.SubprocessError):
-                checks['compose_rendered'] = False
-
         followup = Path('/opt/qs-ai/schema-maintenance/active-v2.json')
         result['ai_active_schema_followup_exists'] = followup.is_file()
         if result['ai_active_schema_followup_exists']:
