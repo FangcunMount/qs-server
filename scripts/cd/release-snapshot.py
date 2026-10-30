@@ -283,6 +283,8 @@ def collect(sudo_docker=False):
                 database_host_port_matches=(current_db.hostname, current_db.port) == (candidate_db.hostname, candidate_db.port),
                 database_tls_matches=all(current_env.get(k) == candidate_env.get(k) for k in ('QS_AI_DATABASE_TLS_MODE', 'QS_AI_DATABASE_TLS_CA_FILE')),
                 transaction_owner_binding_matches=candidate_options.get('transactions') == current_options.get('transactions'),
+                messaging_semantics_match=candidate_options == current_options,
+                messaging_material_mounts_match=sorted((m['source'], m['target']) for m in candidate_runtime.get('volumes', []) if m['target'].startswith(('/run/qs-ai-jose/', '/run/qs-ai-rocketmq/'))) == sorted((m['source'], m['target']) for m in runtime.get('volumes', [])),
                 rocketmq_config_matches=candidate_options.get('rocketmq') == current_options.get('rocketmq'),
                 publish_admission_matches=candidate_options.get('publish_enabled') == current_options.get('publish_enabled'),
                 changed_environment_keys=sorted(k for k, v in candidate_env.items() if current_env.get(k) != v),
