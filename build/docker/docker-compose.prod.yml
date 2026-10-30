@@ -142,6 +142,12 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: /data/infra/ssl/mysql/ca-chain.pem
+        target: /etc/qlume/mysql/ca-chain.pem
+        read_only: true
+        bind:
+          create_host_path: false
       - /data/infra/ssl/redis/ca-chain.pem:/etc/qlume/redis/ca-chain.pem:ro
       - /opt/qs-server/qs-worker/configs:/app/configs:ro
       - /data/logs/qs-server/qs-worker:/data/logs/qs
