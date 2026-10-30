@@ -14,6 +14,7 @@ import (
 	planrepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/taskopen"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -27,8 +28,8 @@ type CurrentReminderRecovery struct {
 	now     func() time.Time
 }
 
-func NewCurrentReminderRecovery(db *gorm.DB, service notification.TaskOpenedReminderService) *CurrentReminderRecovery {
-	source := taskopen.NewRecoverySource(db)
+func NewCurrentReminderRecovery(db *gorm.DB, service notification.TaskOpenedReminderService, artifact func(transaction.FrozenPlan) ([]byte, error)) *CurrentReminderRecovery {
+	source := taskopen.NewRecoverySource(db, artifact)
 	return &CurrentReminderRecovery{db: db, service: service, capture: source.Capture, now: time.Now}
 }
 

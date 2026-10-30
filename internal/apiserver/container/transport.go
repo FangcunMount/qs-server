@@ -53,6 +53,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttransport.Deps {
@@ -162,7 +163,12 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 	if c.ReportModule != nil {
 		resolutionReader = c.ReportModule.ReportResolutionReader()
 	}
+	var openingArtifact func(transaction.FrozenPlan) ([]byte, error)
+	if c.transactions != nil && c.transactions.MySQL != nil {
+		openingArtifact = c.transactions.MySQL.Artifact
+	}
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
+		TaskOpeningArtifact:       openingArtifact,
 		Options:                   c.systemGovernanceOptions,
 		EventStatusService:        eventStatus,
 		EventOutboxes:             outboxes,

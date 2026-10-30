@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	txmysql "github.com/FangcunMount/reliable-messaging/storage/transaction/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -48,7 +49,7 @@ func currentOpeningNativeFixture(t *testing.T) (context.Context, *gorm.DB, *Reco
 	_, err = pool.ExecContext(ctx, "INSERT INTO rm_tx_binding(owner,store_id,writer_epoch,schema_version) VALUES(?,?,?,1)", []byte("qs.mysql"), []byte("owned-reminder"), []byte("fixture"))
 	require.NoError(t, err)
 	plan := recoveryPlanFixture(t)
-	o, err := readRecoveryOpening(plan)
+	o, err := readRecoveryOpening(plan, boundary.Artifact)
 	require.NoError(t, err)
 	store, err := txmysql.New(pool, transaction.Binding{Owner: "qs.mysql", StoreID: "owned-reminder", WriterEpoch: "fixture"})
 	require.NoError(t, err)
@@ -64,7 +65,7 @@ func currentOpeningNativeFixture(t *testing.T) (context.Context, *gorm.DB, *Reco
 		}
 		return guard.CommitWitness(ctx)
 	}))
-	source := NewRecoverySource(db)
+	source := NewRecoverySource(db, boundary.Artifact)
 	source.now = func() time.Time { return o.Request.Intent.OpenAt.Add(time.Minute) }
 	return ctx, db, source, o
 }

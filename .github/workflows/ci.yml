@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, codex/rocketmq-retirement-m2, codex/rocketmq-retirement-m3a, codex/rocketmq-retirement-m3b]
+    branches: [main, codex/rocketmq-retirement-m2, codex/rocketmq-retirement-m3a, codex/rocketmq-retirement-m3b, codex/rocketmq-retirement-m3-reminder]
 
 permissions:
   contents: read

@@ -102,7 +102,7 @@ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,org_id BIGINT NOT NULL,task_id VAR
 	task.ID = meta.FromUint64(100)
 	require.NoError(t, db.Create(&task).Error)
 	effect := &currentReminderEffectFixture{db: db, mode: "complete"}
-	store := NewCurrentReminderRecovery(db, effect)
+	store := NewCurrentReminderRecovery(db, effect, nil)
 	o := taskopen.RecoveryOpening{Task: task, Request: notification.TaskOpenedReminderRequest{OpeningEventID: "original-opening", Intent: notification.TaskOpenedReminderIntent{OrgID: 7, TaskID: "100", TesteeID: "300", ScheduleRevision: 1, OpenAt: at}}, Fingerprint: strings.Repeat("ab", 32)}
 	store.capture = func(context.Context, int64, uint64, uint32, time.Time) (taskopen.RecoveryOpening, error) {
 		return o, nil
@@ -119,7 +119,7 @@ func TestCurrentReminderRecoveryKeepsOriginalRequestAndKnownReceipt(t *testing.T
 	require.Equal(t, true, result.Result["audit_terminal"])
 	require.EqualValues(t, 1, effect.boundaries.Load())
 	// Reconstruct the coordinator as after restart; no new effect on exact replay.
-	resumed := NewCurrentReminderRecovery(db, effect)
+	resumed := NewCurrentReminderRecovery(db, effect, nil)
 	resumed.capture = store.capture
 	_, err = resumed.ResumeReminderGap(ctx, 7, 11, req)
 	require.NoError(t, err)
@@ -178,7 +178,7 @@ func TestCurrentReminderRecoveryResumesFrozenOriginalRecipients(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, app.ActionAuditStatusPendingReconciliation, result.Status)
 	effect.mode = "complete"
-	resumed := NewCurrentReminderRecovery(db, effect)
+	resumed := NewCurrentReminderRecovery(db, effect, nil)
 	resumed.capture = store.capture
 	result, err = resumed.ResumeReminderGap(ctx, 7, 11, req)
 	require.NoError(t, err)
