@@ -1249,7 +1249,9 @@ jobs:
         run: bash scripts/cd/test-export-image.sh
 
       - name: Validate deployment planning contract
-        run: bash scripts/cd/test-plan-services.sh
+        run: |
+          bash scripts/cd/test-plan-services.sh
+          python3 scripts/cd/test_rollout_repair.py
 
       - name: Validate production network exposure contract
         run: bash scripts/cd/test-production-compose-network-exposure.sh
