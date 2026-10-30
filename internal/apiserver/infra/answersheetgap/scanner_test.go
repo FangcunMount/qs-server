@@ -43,6 +43,7 @@ func validOriginal(t *testing.T) (sheetRow, outboxRow) {
 	t.Helper()
 	sheet := sheetRow{DomainID: 42, OrgID: 501, TesteeID: 601, FillerID: 701, QuestionnaireCode: "QNR", QuestionnaireVer: "1.0.0"}
 	sheet.DurableAcceptance.EventID = "evt-42"
+	sheet.DurableAcceptance.SchemaVersion = 1
 	sheet.Admission = &struct {
 		Purpose        string `bson:"purpose"`
 		ModelKind      string `bson:"model_kind"`

@@ -1,6 +1,10 @@
 # QS-03 单份原答卷测评效果恢复
 
-此命令只修复原标准答卷已持久接单、原 Outbox 已确认，但从未存在 Assessment 的缺口。复用正常 Worker 的原事件解码及 EnsureAssessment 请求映射，经现有 mTLS／生产 ACL、Journey 和 Intake 原事务创建唯一测评及下游意图。**不向原 topic 广播，不重置 Outbox，不调用模型，不修复已接单 Run，也不补发热度或微信。**
+此命令只修复原答卷已持久接单、但从未存在 Assessment 的缺口。v2 从同一 Mongo 主库快照验证冻结事务计划、精确已提交 witness、原 wire 与 Admission，不要求旧发布表，也不把本地提交称为 Broker 确认。v1 仍要求历史 Outbox 的原发布确认。
+
+两条路径均复用正常 Worker 的原事件解码及 EnsureAssessment 请求映射，经现有 mTLS／生产 ACL、Journey 和 Intake 原事务创建唯一测评及下游意图。**不向原 topic 广播，不重置消息状态，不调用模型，不修复已接单 Run，也不补发热度或微信。**
+
+已存在的 Assessment（包括软删除行）均禁止再次恢复。缺失、未提交、版本混用或冲突的原凭证不降级到旧 Outbox；检查失败即拒绝。v2 review fingerprint 绑定原凭证与消息，不受后来 Broker 观察字段更新影响。现库运行需要单独运维授权，本轮仅在 CI 自建的 Mongo/MySQL 验证 source，不执行生产恢复。
 
 ## 使用条件
 
