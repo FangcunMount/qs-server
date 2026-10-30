@@ -843,7 +843,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 		return w
 	}
 	t.Cleanup(func() {
-		for _, w := range workers {
+		for index, w := range workers {
 			if !w.doneFlag.Load() {
 				if t.Failed() {
 					_ = w.cmd.Process.Signal(syscall.SIGQUIT)
@@ -856,6 +856,13 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 					_ = w.cmd.Process.Kill()
 					<-w.done
 				}
+			}
+			if input, e := os.Open(w.log.Name()); e == nil {
+				diagnostic := m3cProcessingGateDiagnostics(input, index == 1)
+				_ = input.Close()
+				encoded, e := json.Marshal(diagnostic)
+				require.NoError(t, e)
+				fmt.Println("M3C_WORKER_GATE_DIAGNOSTIC " + string(encoded))
 			}
 			if t.Failed() {
 				// The harness withholds raw Go output and exports only its hash.
@@ -1155,6 +1162,9 @@ redelivery:
 		return e == nil && remaining == 0
 	})
 	require.GreaterOrEqual(t, ensureCalls.Load(), int64(3))
+	var terminalAnswerSheets int64
+	require.NoError(t, db.WithContext(t.Context()).Table("event_delivery_dead_letter").Where("JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.eventType'))=?", eventcatalog.AnswerSheetSubmitted).Count(&terminalAnswerSheets).Error)
+	require.Zero(t, terminalAnswerSheets, "processing contention must not terminalize the original committed answer-sheet delivery")
 	ensureMu.Lock()
 	inputs := append([]*evaluationpb.EnsureAssessmentRequest(nil), ensureInputs...)
 	ensureMu.Unlock()

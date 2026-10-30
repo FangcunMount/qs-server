@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -271,7 +272,9 @@ func TestHandleAnswerSheetSubmitted_LockContentionRetriesAfterHolderExit(t *test
 	key := answerSheetProcessingLockKey(deps, answerSheetID)
 	mr.SetTTL(key, 5*time.Minute)
 	payload := mustBuildAnswerSheetSubmittedPayload(t, answerSheetID)
-	if err := handler(context.Background(), "answersheet.submitted", payload); !errors.Is(err, ErrAnswerSheetProcessingInProgress) {
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	if err := handler(ctx, "answersheet.submitted", payload); !errors.Is(err, ErrAnswerSheetProcessingInProgress) || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("contended handler error = %v, want retryable lock contention", err)
 	}
 
@@ -454,7 +457,9 @@ func TestHandleAnswerSheetSubmitted_LockContentionUsesInjectedObserver(t *testin
 		},
 	})
 
-	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 902)); !errors.Is(err, ErrAnswerSheetProcessingInProgress) {
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	if err := handler(ctx, "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 902)); !errors.Is(err, ErrAnswerSheetProcessingInProgress) {
 		t.Fatalf("handler error = %v, want retryable lock contention", err)
 	}
 	if client.calculateCalls != 0 {
@@ -477,7 +482,9 @@ func TestAnswerSheetRunnerContentionReturnsRetryableError(t *testing.T) {
 		}},
 	}
 	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{})
-	err := gate.Run(context.Background(), deps, "event-contended", 42, func(context.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	err := gate.Run(ctx, deps, "event-contended", 42, func(context.Context) error {
 		bodyCalls++
 		return nil
 	})
@@ -678,4 +685,151 @@ func (r *workerGateRecordingObserver) has(outcome resilience.Outcome) bool {
 		}
 	}
 	return false
+}
+
+func TestAnswerSheetGateWaitsInSameCallbackUntilLeaseExpires(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := &fakeWorkerInternalClient{}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClientWithAddr(t, mr.Addr()))
+	key := answerSheetProcessingLockKey(deps, 902)
+	if err := mr.Set(key, "killed-owner"); err != nil {
+		t.Fatal(err)
+	}
+	mr.SetTTL(key, 5*time.Minute)
+	entered := make(chan struct{}, 1)
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{
+		acquire: func(ctx context.Context, d *Dependencies, id uint64) (*redisadapter.Lease, bool, error) {
+			lease, ok, err := acquireProcessingLock(ctx, d, id)
+			if !ok {
+				select {
+				case entered <- struct{}{}:
+				default:
+				}
+			}
+			return lease, ok, err
+		},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	var calls atomic.Int32
+	done := make(chan error, 1)
+	go func() {
+		done <- gate.Run(ctx, deps, "event", 902, func(context.Context) error { calls.Add(1); return nil })
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("callback returned before old lease expired: %v", err)
+	default:
+	}
+	if calls.Load() != 0 {
+		t.Fatal("business ran before old lease expired")
+	}
+	if value, err := mr.Get(key); err != nil || value != "killed-owner" {
+		t.Fatal("old owner key changed")
+	}
+	mr.FastForward(5 * time.Minute)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("business calls=%d", calls.Load())
+	}
+	if mr.Exists(key) {
+		t.Fatal("replacement must release only its acquired token")
+	}
+}
+
+func TestAnswerSheetGateCancellationDoesNotRunBusinessOrReleaseOtherOwner(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	deps := &Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), LockRunner: runnerStub{run: func(context.Context, locklease.WorkloadID, string, time.Duration, func(context.Context) error) (locklease.RunResult, error) {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		return locklease.RunResult{}, nil
+	}}}
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- gate.Run(ctx, deps, "event", 1, func(context.Context) error { t.Error("business ran under another owner's lease"); return nil })
+	}()
+	<-entered
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cancel did not drain wait")
+	}
+}
+
+func TestAnswerSheetGateKeepsOriginalBusinessDeadlineAfterWaiting(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Minute)
+	defer cancel()
+	deadline, _ := ctx.Deadline()
+	var calls atomic.Int32
+	deps := &Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), LockRunner: runnerStub{run: func(ctx context.Context, _ locklease.WorkloadID, _ string, _ time.Duration, body func(context.Context) error) (locklease.RunResult, error) {
+		if calls.Add(1) == 1 {
+			return locklease.RunResult{}, nil
+		}
+		return locklease.RunResult{Acquired: true}, body(ctx)
+	}}}
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{})
+	err := gate.Run(ctx, deps, "event", 42, func(bodyCtx context.Context) error {
+		actual, ok := bodyCtx.Deadline()
+		if !ok || !actual.Equal(deadline) {
+			t.Error("wait budget shortened business deadline")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("acquire attempts=%d", calls.Load())
+	}
+}
+
+func TestAnswerSheetGateCancellationDuringAcquireCannotDegradeIntoBusiness(t *testing.T) {
+	entered := make(chan struct{})
+	deps := newAnswerSheetHandlerTestDeps(&fakeWorkerInternalClient{}, newAnswerSheetTestRedisClient(t))
+	gate := newAnswerSheetDuplicateSuppressionGate(answerSheetProcessingGateHooks{acquire: func(ctx context.Context, _ *Dependencies, _ uint64) (*redisadapter.Lease, bool, error) {
+		close(entered)
+		<-ctx.Done()
+		return nil, false, ctx.Err()
+	}})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- gate.Run(ctx, deps, "event", 42, func(context.Context) error { t.Error("cancelled acquire ran business"); return nil })
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("acquire fixture was not reached")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("acquire cancellation did not drain")
+	}
 }
