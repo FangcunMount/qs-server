@@ -269,6 +269,29 @@ def collect(sudo_docker=False):
                 expected_mount_namespaces=all(m['target'].startswith(('/run/qs-ai-jose/', '/run/qs-ai-rocketmq/')) for m in runtime.get('volumes', [])),
                 readonly_bind_mounts=all(m['type'] == 'bind' and m.get('read_only') is True and m.get('bind', {}).get('create_host_path') is False for m in runtime.get('volumes', [])),
                 old_state_exact=(checkpoint / 'old-state.json').read_bytes() == state.read_bytes())
+            checks = result['ai_checkpoint_checks'] = {}
+            for key, module, extra in (
+                ('live_mq_files', 'qs_ai.maintenance.messaging_preflight', ()),
+                ('live_tls_files', 'qs_ai.bootstrap.grpc_probe', ('--check-files',)),
+            ):
+                try:
+                    command(*docker, 'exec', 'qs-ai', '/app/.venv/bin/python', '-m', module, *extra)
+                    checks[key] = True
+                except subprocess.SubprocessError:
+                    checks[key] = False
+            try:
+                args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(checkpoint / 'image.env'),
+                        '-f', str(checkpoint / 'compose.yaml'), '-f', str(checkpoint / 'runtime.json')]
+                rendered = json.loads(command(*args, 'config', '--format', 'json'))['services']['qs-ai']
+                base = json.loads((checkpoint / 'compose.yaml').read_text())['services']['qs-ai']
+                combined = dict(base.get('environment', {}), **runtime['environment'])
+                checks.update(compose_rendered=True, environment_preserved=rendered.get('environment') == combined,
+                    image_pinned=rendered.get('image') == manifest['image_id'],
+                    command_preserved=rendered.get('command') == base.get('command'),
+                    entrypoint_preserved=rendered.get('entrypoint') == base.get('entrypoint'))
+            except (ValueError, KeyError, OSError, subprocess.SubprocessError):
+                checks['compose_rendered'] = False
+
         followup = Path('/opt/qs-ai/schema-maintenance/active-v2.json')
         result['ai_active_schema_followup_exists'] = followup.is_file()
         if result['ai_active_schema_followup_exists']:
