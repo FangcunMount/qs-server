@@ -2,8 +2,12 @@
 import base64, hashlib, json, os, pathlib, subprocess
 
 
+LAST = None
+
 def call(args):
-    return subprocess.run(args, capture_output=True, text=True, timeout=120)
+    global LAST
+    LAST = subprocess.run(args, capture_output=True, text=True, timeout=120)
+    return LAST
 
 
 def required(value):
@@ -60,5 +64,18 @@ for name in ['iam', 'qs-operating-system']:
         row['phase'] = 'complete'
     except Exception as error:
         row['error_type'] = type(error).__name__
+        if LAST is not None:
+            row['command_returncode'] = LAST.returncode
+            row['error_categories'] = [v for v in (
+                'permission denied','unauthorized','denied','not found','no such','no builder',
+                'failed to resolve','manifest unknown','no such manifest','certificate','tls',
+                'context','keychain','error getting credentials','cannot connect','connection refused',
+                'timeout','unknown flag','buildx','missing','reference does not exist',
+                'manifest does not exist','proxy','service unavailable','requested access',
+                'forbidden','unauthenticated','failed to initialize','failed to read',
+                'configuration file','docker-credential','resource temporarily','x509','eof',
+                'no space left','unsupported','invalid reference','429','403','401','404',
+                'no output','failed to create','invalid character','unexpected status',
+            ) if v in LAST.stderr.lower()]
 pathlib.Path('image-binding-diagnostics.json').write_text(json.dumps(result, indent=2) + '\n')
 print(json.dumps({'isolated_buildx_available_before': result['isolated_buildx_available_before'], 'isolated_buildx_available_after': result['isolated_buildx_available_after'], 'passed': {k:v['passed'] for k,v in result['images'].items()}}))
