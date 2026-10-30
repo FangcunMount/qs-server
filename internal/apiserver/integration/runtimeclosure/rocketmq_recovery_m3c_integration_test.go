@@ -1162,6 +1162,9 @@ redelivery:
 		return e == nil && remaining == 0
 	})
 	require.GreaterOrEqual(t, ensureCalls.Load(), int64(3))
+	var terminalAnswerSheets int64
+	require.NoError(t, db.WithContext(t.Context()).Table("event_delivery_dead_letter").Where("JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.eventType'))=?", eventcatalog.AnswerSheetSubmitted).Count(&terminalAnswerSheets).Error)
+	require.Zero(t, terminalAnswerSheets, "processing contention must not terminalize the original committed answer-sheet delivery")
 	ensureMu.Lock()
 	inputs := append([]*evaluationpb.EnsureAssessmentRequest(nil), ensureInputs...)
 	ensureMu.Unlock()

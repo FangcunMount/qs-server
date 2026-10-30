@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"reflect"
 	"strconv"
+	"time"
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -19,13 +20,14 @@ import (
 type answerSheetProcessingGateMode string
 
 const (
-	answerSheetProcessingGateModeLocked         answerSheetProcessingGateMode = "locked"
-	answerSheetProcessingGateModeContendedRetry answerSheetProcessingGateMode = "contended_retry"
-	answerSheetProcessingGateModeDegraded       answerSheetProcessingGateMode = "degraded"
+	answerSheetProcessingGateModeLocked        answerSheetProcessingGateMode = "locked"
+	answerSheetProcessingGateModeContendedWait answerSheetProcessingGateMode = "contended_wait"
+	answerSheetProcessingGateModeDegraded      answerSheetProcessingGateMode = "degraded"
 )
 
-// ErrAnswerSheetProcessingInProgress makes a contended best-effort lock a
-// transport retry, not proof that the other holder committed the assessment.
+// ErrAnswerSheetProcessingInProgress identifies an outstanding processing lease.
+// The gate waits within the current callback before a bounded retryable error;
+// contention never proves that the other holder committed the assessment.
 var ErrAnswerSheetProcessingInProgress = errors.New("answersheet processing is in progress")
 
 type answerSheetProcessingGateHooks struct {
@@ -136,7 +138,63 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, u
 	return env, answerSheetID, &data, nil
 }
 
+// Run retains the current callback while a prior processing lease remains.
+// The transport keeps renewing visibility; waiting does not consume another
+// broker delivery attempt. Capacity remains owned until this callback returns.
 func (g answerSheetDuplicateSuppressionGate) Run(
+	ctx context.Context, deps *Dependencies, eventID string, answerSheetID uint64,
+	fn func(context.Context) error,
+) error {
+	capability, ok := locklease.Lookup(locklease.WorkloadAnswersheetProcessing)
+	if !ok || capability.Spec.DefaultTTL <= 0 {
+		return errors.New("answersheet processing lease policy unavailable")
+	}
+	var waitDeadline time.Time
+	cancelled := func() error {
+		if waitDeadline.IsZero() {
+			return ctx.Err()
+		}
+		deps.Logger.Info("answersheet processing lease wait cancelled")
+		return errors.Join(ErrAnswerSheetProcessingInProgress, ctx.Err())
+	}
+	for {
+		if ctx.Err() != nil {
+			return cancelled()
+		}
+		// The business callback keeps the caller's real deadline. The waiting
+		// budget must never expire a just-acquired owner's business operation.
+		err := g.runOnce(ctx, deps, eventID, answerSheetID, func(runCtx context.Context) error {
+			if runCtx.Err() != nil {
+				return runCtx.Err()
+			}
+			return fn(runCtx)
+		})
+		if !errors.Is(err, ErrAnswerSheetProcessingInProgress) {
+			if err == nil && !waitDeadline.IsZero() {
+				deps.Logger.Info("answersheet processing lease wait complete")
+			}
+			return err
+		}
+		if waitDeadline.IsZero() {
+			waitDeadline = time.Now().Add(capability.Spec.DefaultTTL)
+			deps.Logger.Info("answersheet processing waiting for lease")
+		}
+		remaining := time.Until(waitDeadline)
+		if remaining <= 0 {
+			deps.Logger.Info("answersheet processing lease wait exhausted")
+			return err
+		}
+		timer := time.NewTimer(min(time.Second, remaining))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return cancelled()
+		case <-timer.C:
+		}
+	}
+}
+
+func (g answerSheetDuplicateSuppressionGate) runOnce(
 	ctx context.Context,
 	deps *Dependencies,
 	eventID string,
@@ -154,6 +212,9 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 			fn,
 		)
 		if errors.Is(err, locklease.ErrLeaseAcquireFailed) {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			observability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
 			g.observe(ctx, resilience.OutcomeDegradedOpen)
 			deps.Logger.Warn("answersheet processing gate degraded",
@@ -171,11 +232,11 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 		}
 		if !result.Acquired {
 			g.observe(ctx, resilience.OutcomeLockContention)
-			deps.Logger.Info("answersheet processing deferred for retry",
+			deps.Logger.Debug("answersheet processing lease contended",
 				slog.String("event_id", eventID),
 				slog.String("answersheet_id", answerSheetIDStr),
 				slog.String("lock_key", lockKey),
-				slog.String("lock_mode", string(answerSheetProcessingGateModeContendedRetry)),
+				slog.String("lock_mode", string(answerSheetProcessingGateModeContendedWait)),
 			)
 			return fmt.Errorf("%w: answersheet_id=%d", ErrAnswerSheetProcessingInProgress, answerSheetID)
 		}
@@ -205,6 +266,9 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 
 	lease, acquired, err := g.hooks.acquire(ctx, deps, answerSheetID)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		observability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
 		g.observe(ctx, resilience.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
@@ -219,11 +283,11 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 	}
 	if !acquired {
 		g.observe(ctx, resilience.OutcomeLockContention)
-		deps.Logger.Info("answersheet processing deferred for retry",
+		deps.Logger.Debug("answersheet processing lease contended",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
 			slog.String("lock_key", lockKey),
-			slog.String("lock_mode", string(answerSheetProcessingGateModeContendedRetry)),
+			slog.String("lock_mode", string(answerSheetProcessingGateModeContendedWait)),
 		)
 		return fmt.Errorf("%w: answersheet_id=%d", ErrAnswerSheetProcessingInProgress, answerSheetID)
 	}
