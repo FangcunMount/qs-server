@@ -103,7 +103,7 @@ def collect(sudo_docker=False):
         if not NAMES.fullmatch(name):
             continue
         # Fixed projections exclude credentials, Env, logs and application data.
-        data = json.loads(command(*docker, "inspect", "--format", '{"Image":{{json .Image}},"Config":{"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}}},"Mounts":{{json .Mounts}}}', cid))
+        data = json.loads(command(*docker, "inspect", "--format", '{"Image":{{json .Image}},"Config":{"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}},"HealthStatus":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}},"Mounts":{{json .Mounts}}}', cid))
         image = json.loads(command(*docker, "image", "inspect", "--format", '{"Os":{{json .Os}},"Architecture":{{json .Architecture}},"RepoDigests":{{json .RepoDigests}},"RepoTags":{{json .RepoTags}},"Config":{"Labels":{{json .Config.Labels}}}}', data["Image"]))
         mounts = []
         for mount in data.get("Mounts", []):
@@ -133,7 +133,7 @@ def collect(sudo_docker=False):
                            "source_sha": labels.get("org.opencontainers.image.revision"),
                            "platform": image["Os"] + "/" + image["Architecture"],
                            "running": data["State"]["Running"],
-                           "health": data["State"].get("Health", {}).get("Status"),
+                           "health": data["State"].get("HealthStatus"),
                            "mounts": mounts})
         material_role = 'iam' if name == 'iam-apiserver' else 'qs-api' if name == 'qs-apiserver' else 'ai' if name == 'qs-ai' else 'worker' if name.startswith('qs-worker') else None
         revisions = {part for mount in mounts for part in mount['source'].split('/') if re.fullmatch(r'm4-[a-z0-9][a-z0-9-]{0,59}', part) and mount['source'].startswith('/var/lib/fangcun-m4-materials/')}
