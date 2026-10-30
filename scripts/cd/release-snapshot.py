@@ -171,6 +171,36 @@ def collect(sudo_docker=False):
                 except OSError as error:
                     item['error_type'] = type(error).__name__
                 native['configuration_files'].append(item)
+            native['rendered_configuration_available'] = False
+            try:
+                if any(not p.is_relative_to('/opt/fangcun-readable-names/releases/readable-20261028-v2') or '..' in p.parts for p in files):
+                    raise ValueError('Unexpected native profile namespace')
+                args = [*docker, 'compose', '-p', 'qs-ai', '--env-file', str(files[0].parent / 'runtime.env')]
+                for path in files:
+                    args += ['-f', str(path)]
+                config = json.loads(command(*args, 'config', '--format', 'json'))
+                service = config['services']['qs-ai']
+                projection = '{"Env":{{json .Config.Env}},"User":{{json .Config.User}},"Cmd":{{json .Config.Cmd}},"Entrypoint":{{json .Config.Entrypoint}}}'
+                actual = json.loads(command(*docker, 'inspect', '--format', projection, cid))
+                base = json.loads(command(*docker, 'image', 'inspect', '--format', projection, data['Image']))
+                desired_env = dict(item.split('=', 1) for item in base['Env'])
+                for key, value in service.get('environment', {}).items():
+                    if value is None:
+                        desired_env.pop(key, None)
+                    else:
+                        desired_env[key] = str(value).replace('$$', '$')
+                actual_env = dict(item.split('=', 1) for item in actual['Env'])
+                native.update(rendered_configuration_available=True,
+                    rendered_configuration_sha256=hashlib.sha256(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+                    rendered_service_names=sorted(config['services']), image_matches=service['image'] == data['Image'],
+                    environment_matches=desired_env == actual_env,
+                    environment_mismatched_keys=sorted(k for k in set(desired_env) | set(actual_env) if desired_env.get(k) != actual_env.get(k)),
+                    configured_user=service.get('user'), command_is_null=service.get('command') is None,
+                    entrypoint_is_null=service.get('entrypoint') is None,
+                    command_matches=(service.get('command') if service.get('command') is not None else base['Cmd']) == actual['Cmd'],
+                    entrypoint_matches=(service.get('entrypoint') if service.get('entrypoint') is not None else base['Entrypoint']) == actual['Entrypoint'])
+            except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+                native['render_error_type'] = type(error).__name__
             containers[-1].update(reported_git_commit=None, ready=False)
             try:
                 version = command(*docker, 'exec', cid, '/app/.venv/bin/python', '-c', 'import os; print(os.environ.get("QS_AI_RELEASE_SHA", "unknown"))').strip()
