@@ -3596,10 +3596,13 @@ def priority_infrastructure_doc_contract_issues() -> list[Issue]:
     # subscriber are byte-identical. Only private Receive selection is sorted;
     # ACK/failure handoff is unchanged. This exact pseudo-version is a review
     # candidate; native proof, formal SDK release and deployment remain separate.
+    # Published Go v0.6.1 fixes source48dfcda; downloaded module/runtime files
+    # match the tested candidate. Host lease recovery remains QS-owned;
+    # candidate and stable native receipts are recorded separately.
     # component-base v0.8.2 adds MySQL TLS only and has no messaging/signaling packages; the old v0.6.11
     # contract is exercised only by independently built historical fixtures.
     if not (
-        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.6\.1-0\.20261030051625-48dfcdafbf29\s*$", go_mod, flags=re.M)
+        re.search(r"^\s*github\.com/FangcunMount/reliable-messaging\s+v0\.6\.1\s*$", go_mod, flags=re.M)
         and re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.8\.2\s*$", go_mod, flags=re.M)
     ):
         issues.append(
