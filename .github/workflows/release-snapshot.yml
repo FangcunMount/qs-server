@@ -2,6 +2,10 @@ name: Read-only release snapshot
 on:
   workflow_dispatch:
     inputs:
+      monitoring_only:
+        description: 'Read local Mac mini monitoring identity/config hashes only; no SSH or service changes'
+        type: boolean
+        default: false
       candidate_images:
         description: 'Optional six service SHA/digest/config identities as JSON'
         required: false
@@ -13,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
+    if: inputs.monitoring_only != true
     environment: production
     runs-on:
       group: qlume
@@ -48,6 +53,54 @@ jobs:
       - name: Cleanup private runner SSH key
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" release-snapshot.json
+
+  monitoring:
+    if: inputs.monitoring_only == true
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    steps:
+      - name: Read local monitoring runtime identity and asset hashes
+        run: |
+          python3 - <<'PY'
+          import datetime, hashlib, json, pathlib, platform, socket, subprocess, urllib.request
+          runtime = pathlib.Path.home() / 'infra-monitoring'
+          private = pathlib.Path.home() / '.config/infra-monitoring'
+          result = dict(read_only=True, deployment_verified=False, host=socket.gethostname(),
+                        observed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        runtime_present=runtime.is_dir(), private_env_present=(private / 'runtime.env').is_file(),
+                        containers=[], asset_sha256={}, prometheus_ready=False, grafana_ready=False)
+          def run(*args):
+              return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=20)
+          try:
+              if platform.system() != 'Darwin':
+                  raise ValueError('Expected Mac mini')
+              result['memory_bytes'] = int(run('sysctl', '-n', 'hw.memsize'))
+              ids = run('docker', 'ps', '-a', '-q', '--filter', 'label=com.docker.compose.project=macmini-monitoring').split()
+              for cid in ids:
+                  template = '{"name":{{json .Name}},"image_id":{{json .Image}},"running":{{json .State.Running}},"mounts":{{json .Mounts}}}'
+                  result['containers'].append(json.loads(run('docker', 'inspect', '--format', template, cid)))
+              for pattern in ('config/rules/*.yml', 'config/grafana/dashboards/event*.json', 'config/prometheus.yml'):
+                  for path in sorted(runtime.glob(pattern)):
+                      if not path.is_symlink() and path.is_file() and path.stat().st_size <= 1048576:
+                          result['asset_sha256'][str(path.relative_to(runtime))] = hashlib.sha256(path.read_bytes()).hexdigest()
+              for name, url in (('prometheus_ready', 'http://127.0.0.1:19090/-/ready'), ('grafana_ready', 'http://127.0.0.1:13000/api/health')):
+                  try:
+                      with urllib.request.urlopen(url, timeout=5) as response:
+                          result[name] = response.status == 200
+                  except Exception:
+                      pass
+          except Exception as error:
+              result['unavailable_type'] = type(error).__name__
+          pathlib.Path('monitoring-snapshot.json').write_text(json.dumps(result, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: monitoring-snapshot-${{ github.run_id }}
+          path: monitoring-snapshot.json
+          if-no-files-found: error
+          retention-days: 90
 
   verify-candidates:
     if: inputs.candidate_images != ''
