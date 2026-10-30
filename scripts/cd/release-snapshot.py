@@ -159,6 +159,18 @@ def collect(sudo_docker=False):
             projection = '{"user":{{json .Config.User}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},"project":{{json (index .Config.Labels "com.docker.compose.project")}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"compose_files":{{json (index .Config.Labels "com.docker.compose.project.config_files")}}}'
             containers[-1]['handoff_runtime'] = json.loads(command(*docker, 'inspect', '--format', projection, cid))
             containers[-1]['handoff_runtime']['effective_uid'] = command(*docker, 'exec', cid, 'id', '-u').strip()
+            native = containers[-1]['handoff_runtime']
+            native['reader_uid'] = os.geteuid()
+            native['configuration_files'] = []
+            files = [Path(p) for p in native['compose_files'].split(',')]
+            for path in [*files, files[0].parent / 'runtime.env']:
+                item = dict(path=str(path), readable=os.access(path, os.R_OK))
+                try:
+                    info = path.stat()
+                    item.update(uid=info.st_uid, mode=oct(stat.S_IMODE(info.st_mode)), size=info.st_size)
+                except OSError as error:
+                    item['error_type'] = type(error).__name__
+                native['configuration_files'].append(item)
             containers[-1].update(reported_git_commit=None, ready=False)
             try:
                 version = command(*docker, 'exec', cid, '/app/.venv/bin/python', '-c', 'import os; print(os.environ.get("QS_AI_RELEASE_SHA", "unknown"))').strip()
