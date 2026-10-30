@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
+    environment: production
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64]

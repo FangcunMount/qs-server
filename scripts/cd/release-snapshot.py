@@ -96,6 +96,7 @@ def collect(sudo_docker=False):
     ids = command(*docker, "ps", "--no-trunc", "--format", "{{.ID}} {{.Names}}")
     containers = []
     materials = {}
+    material_auth_failed = False
     for row in ids.splitlines():
         cid, name = row.split(maxsplit=1)
         if not NAMES.fullmatch(name):
@@ -136,7 +137,13 @@ def collect(sudo_docker=False):
         material_role = 'iam' if name == 'iam-apiserver' else 'qs-api' if name == 'qs-apiserver' else 'ai' if name == 'qs-ai' else 'worker' if name.startswith('qs-worker') else None
         revisions = {part for mount in mounts for part in mount['source'].split('/') if re.fullmatch(r'm4-[a-z0-9][a-z0-9-]{0,59}', part) and mount['source'].startswith('/var/lib/fangcun-m4-materials/')}
         if material_role and len(revisions) == 1 and material_role not in materials:
-            materials[material_role] = material_observation(material_role, revisions.pop(), 'serverD' if material_role == 'worker' else 'serverA')
+            revision = revisions.pop()
+            host = 'serverD' if material_role == 'worker' else 'serverA'
+            if material_auth_failed:
+                materials[material_role] = dict(role=material_role, revision=revision, host=host, verified=False, error='authentication_not_retried')
+            else:
+                materials[material_role] = material_observation(material_role, revision, host)
+                material_auth_failed = materials[material_role].get('error') == 'authentication_failed'
         if name == 'iam-apiserver':
             containers[-1].update(reported_git_commit=None, ready=False)
             try:
