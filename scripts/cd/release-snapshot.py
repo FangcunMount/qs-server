@@ -6,10 +6,66 @@ import os
 from pathlib import Path
 import re
 import socket
+import stat
 import subprocess
 import sys
 
 NAMES = re.compile(r"(?:qs-(?:apiserver|collection.*|worker.*|ai|operating-system)|iam-apiserver|qs-ops|ops|prometheus|grafana|nginx)(?:-\d+)?$")
+MATERIAL_TOOL_SHA = '36f3046ed453dfbf8beae684269c94d1a6db0abaa23de51e09d41e462c6a3d5c'
+
+
+def ai_release_metadata(directory):
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    result = {k: manifest.get(k) for k in ('revision', 'image_id', 'image_ref', 'schema_policy', 'digest')}
+    receipt_path = directory / 'loaded-image.json'
+    result['loaded_receipt_exists'] = receipt_path.is_file()
+    image_env = (directory / 'image.env').read_text()
+    if re.fullmatch(r'QS_AI_IMAGE=(?:sha256:[0-9a-f]{64}|qs-ai:[0-9a-f]{40})\n?', image_env):
+        result['image_env_reference'] = image_env.strip().split('=', 1)[1]
+    else:
+        result['image_env_reference_valid'] = False
+    if result['loaded_receipt_exists']:
+        receipt = json.loads(receipt_path.read_text())
+        result['loaded_image'] = {k: receipt.get(k) for k in ('version', 'revision', 'source_image_id', 'loaded_image_id', 'archive_sha256', 'registry_digest')}
+        identity = receipt.get('identity', {})
+        identity_matches = manifest.get('image_identity') == identity if manifest.get('image_identity') is not None else manifest['image_id'] == identity.get('config_sha256')
+        result['loaded_scalar_binding_valid'] = (receipt.get('version') == 1 and identity_matches
+            and receipt.get('revision') == manifest['revision'] and receipt.get('source_image_id') == manifest['image_id']
+            and receipt.get('archive_sha256') == manifest.get('archive_sha256') and receipt.get('registry_digest') == manifest.get('digest')
+            and image_env == 'QS_AI_IMAGE=' + receipt.get('loaded_image_id', '') + '\n')
+    return result
+
+
+def verify_material_tool():
+    path = Path('/opt/fangcun-m4/material-tools') / (MATERIAL_TOOL_SHA + '.py')
+    if path.resolve() != path:
+        raise ValueError('Material tool path changed')
+    for parent in path.parents:
+        info = parent.stat()
+        if info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError('Material tool parent changed')
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or stat.S_IMODE(info.st_mode) != 0o555 or not 0 < info.st_size <= 65536 or hashlib.sha256(path.read_bytes()).hexdigest() != MATERIAL_TOOL_SHA:
+        raise ValueError('Material tool identity changed')
+    return str(path)
+
+
+def material_observation(role, revision, host):
+    result = dict(role=role, revision=revision, host=host, verified=False)
+    try:
+        if role not in ('iam', 'qs-api', 'ai', 'worker') or not re.fullmatch(r'm4-[a-z0-9][a-z0-9-]{0,59}', revision):
+            raise ValueError('Invalid material binding')
+        tool = verify_material_tool()
+        value = json.loads(command('sudo', '-n', '/usr/bin/python3', '-I', tool, '--verify-installed', '--host', host, '--expect-role', role, '--expect-revision', revision))
+        result['verified'] = (value.get('status') == 'verified' and value.get('read_only') is True and value.get('activated') is False
+            and (value.get('role'), value.get('revision'), value.get('host')) == (role, revision, host)
+            and value.get('material_root') == '/var/lib/fangcun-m4-materials'
+            and isinstance(value.get('receipt_sha256'), str) and re.fullmatch(r'[0-9a-f]{64}', value['receipt_sha256']) is not None)
+        if result['verified']:
+            result['receipt_sha256'] = value['receipt_sha256']
+    except (OSError, ValueError, subprocess.SubprocessError):
+        result['error'] = 'verification_unavailable'
+    return result
 
 
 def command(*args):
@@ -21,6 +77,7 @@ def collect(sudo_docker=False):
     command(*docker, "version", "--format", "{{.Server.Version}}")
     ids = command(*docker, "ps", "--no-trunc", "--format", "{{.ID}} {{.Names}}")
     containers = []
+    materials = {}
     for row in ids.splitlines():
         cid, name = row.split(maxsplit=1)
         if not NAMES.fullmatch(name):
@@ -58,6 +115,31 @@ def collect(sudo_docker=False):
                            "running": data["State"]["Running"],
                            "health": data["State"].get("Health", {}).get("Status"),
                            "mounts": mounts})
+        material_role = 'iam' if name == 'iam-apiserver' else 'qs-api' if name == 'qs-apiserver' else 'ai' if name == 'qs-ai' else 'worker' if name.startswith('qs-worker') else None
+        revisions = {part for mount in mounts for part in mount['source'].split('/') if re.fullmatch(r'm4-[a-z0-9][a-z0-9-]{0,59}', part) and mount['source'].startswith('/var/lib/fangcun-m4-materials/')}
+        if material_role and len(revisions) == 1 and material_role not in materials:
+            materials[material_role] = material_observation(material_role, revisions.pop(), 'serverD' if material_role == 'worker' else 'serverA')
+        if name == 'iam-apiserver':
+            containers[-1].update(reported_git_commit=None, ready=False)
+            try:
+                version = command(*docker, 'exec', cid, 'curl', '-fsS', '--max-time', '5', 'http://127.0.0.1:9080/version')
+                commits = re.findall(r'"gitCommit"\s*:\s*"([0-9a-f]{40})"', version)
+                if len(commits) == 1:
+                    containers[-1]['reported_git_commit'] = commits[0]
+                command(*docker, 'exec', cid, 'curl', '-fsS', '--max-time', '5', '-o', '/dev/null', 'http://127.0.0.1:9080/readyz')
+                containers[-1]['ready'] = True
+            except subprocess.SubprocessError:
+                pass
+        if name == 'qs-ai':
+            containers[-1].update(reported_git_commit=None, ready=False)
+            try:
+                version = command(*docker, 'exec', cid, '/app/.venv/bin/python', '-c', 'import os; print(os.environ.get("QS_AI_RELEASE_SHA", "unknown"))').strip()
+                if re.fullmatch(r'[0-9a-f]{40}', version):
+                    containers[-1]['reported_git_commit'] = version
+                command(*docker, 'exec', cid, '/app/.venv/bin/python', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/readyz", timeout=5).close()')
+                containers[-1]['ready'] = True
+            except subprocess.SubprocessError:
+                pass
         # The same fixed early-exit version and readiness commands used by runtime-evidence.py.
         role = "worker" if name.startswith("qs-worker") else "collection-server" if name.startswith("qs-collection") else "apiserver" if name == "qs-apiserver" else None
         if role:
@@ -84,7 +166,7 @@ def collect(sudo_docker=False):
     if not containers:
         raise ValueError("No release containers found")
     result = {"host": socket.gethostname(), "observed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "read_only": True, "business_acceptance_verified": False, "containers": containers}
+              "read_only": True, "business_acceptance_verified": False, "containers": containers, "installed_materials": materials}
     state = Path('/opt/qs-ai/state.json')
     result["ai_release_state_available"] = False
     try:
@@ -97,9 +179,7 @@ def collect(sudo_docker=False):
                 if release and re.fullmatch(r"[0-9a-f]{40}-[0-9]+-[0-9]+", release):
                     manifest = Path('/opt/qs-ai/releases') / release / 'manifest.json'
                     if manifest.is_file():
-                        values2 = json.loads(manifest.read_text())
-                        result["ai_release_manifests"][key] = {k: values2.get(k) for k in
-                            ("revision", "image_id", "image_ref", "schema_policy")}
+                        result["ai_release_manifests"][key] = ai_release_metadata(manifest.parent)
             result["ai_release_state_available"] = True
     except PermissionError:
         pass

@@ -77,5 +77,42 @@ class SnapshotTests(unittest.TestCase):
         self.assertFalse(result['ai_release_state_available'])
         self.assertTrue(result['containers'][0]['running'])
 
+    def test_loaded_image_mapping_requires_every_existing_release_binding(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identity = {'config_sha256': 'sha256:'+'a'*64, 'private': 'not-exported'}
+            manifest = dict(revision='b'*40, image_id='sha256:'+'a'*64, archive_sha256='c'*64,
+                            digest='sha256:'+'d'*64, image_identity=identity)
+            receipt = dict(version=1, revision=manifest['revision'], source_image_id=manifest['image_id'],
+                           loaded_image_id='sha256:'+'e'*64, archive_sha256=manifest['archive_sha256'],
+                           registry_digest=manifest['digest'], identity=identity)
+            (root/'manifest.json').write_text(json.dumps(manifest))
+            (root/'image.env').write_text('QS_AI_IMAGE='+receipt['loaded_image_id']+'\n')
+            (root/'loaded-image.json').write_text(json.dumps(receipt))
+            result = module.ai_release_metadata(root)
+            self.assertTrue(result['loaded_scalar_binding_valid'])
+            self.assertNotIn('not-exported', json.dumps(result))
+            receipt['archive_sha256']='f'*64
+            (root/'loaded-image.json').write_text(json.dumps(receipt))
+            self.assertFalse(module.ai_release_metadata(root)['loaded_scalar_binding_valid'])
+            (root/'loaded-image.json').unlink()
+            self.assertFalse(module.ai_release_metadata(root)['loaded_receipt_exists'])
+            (root/'image.env').write_text('PASSWORD=private\n')
+            result=module.ai_release_metadata(root)
+            self.assertFalse(result['image_env_reference_valid'])
+            self.assertNotIn('private',json.dumps(result))
+
+    def test_material_read_uses_only_the_installed_digest_selected_verifier(self):
+        tool='/opt/fangcun-m4/material-tools/'+module.MATERIAL_TOOL_SHA+'.py'
+        value=dict(status='verified', read_only=True, activated=False, role='ai', host='serverA',
+                   revision='m4-readable-20261028-v1', material_root='/var/lib/fangcun-m4-materials', receipt_sha256='a'*64)
+        with patch.object(module,'verify_material_tool',return_value=tool), patch.object(module,'command',return_value=json.dumps(value)) as run:
+            self.assertTrue(module.material_observation('ai',value['revision'],'serverA')['verified'])
+            self.assertEqual(run.call_args.args[:7],('sudo','-n','/usr/bin/python3','-I',tool,'--verify-installed','--host'))
+            value['activated']=True
+            run.return_value=json.dumps(value)
+            self.assertFalse(module.material_observation('ai',value['revision'],'serverA')['verified'])
+
 
 if __name__=='__main__': unittest.main()
