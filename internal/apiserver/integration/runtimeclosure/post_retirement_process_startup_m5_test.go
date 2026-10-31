@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -62,7 +63,7 @@ func TestM5PostRetirementRootChild(t *testing.T) {
 	require.Equal(t, cfg.Source, version.Get().GitCommit, "must use compiled exact source")
 	switch {
 	case cfg.API != nil && cfg.Collection == nil && cfg.Worker == nil:
-		require.True(t, strings.Contains(cfg.API.MySQLOptions.Database, "test"))
+		require.True(t, regexp.MustCompile(`^qs_runtime_closure_[0-9]+$`).MatchString(cfg.API.MySQLOptions.Database))
 		require.False(t, cfg.API.MigrationOptions.Enabled)
 		viper.Set("mongodb.database", cfg.API.MongoDBOptions.Database)
 		require.NoError(t, apiprocess.Run(&apiconfig.Config{Options: cfg.API}))
@@ -117,12 +118,11 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 	sha := strings.TrimSpace(string(source))
 	require.Len(t, sha, 40)
 	private := t.TempDir()
-	binary := filepath.Join(private, "owned-root-test")
-	buildCtx, cancelBuild := context.WithTimeout(t.Context(), 90*time.Second)
-	build := exec.CommandContext(buildCtx, "go", "test", "-c", "-race", "-tags=integration,m3_host_runtime", "-ldflags=-X github.com/FangcunMount/qs-server/pkg/version.GitCommit="+sha, "-o", binary, ".")
-	output, err := build.CombinedOutput()
-	cancelBuild()
-	require.NoError(t, err, "owned process-root build: %s", output)
+	// The existing native harness already links this race binary with the exact
+	// source SHA. Reuse it rather than starting a nested build in the proof.
+	require.Equal(t, sha, version.Get().GitCommit)
+	binary, err := os.Executable()
+	require.NoError(t, err)
 	ca := tlsfixture.New(t)
 	serverPair := ca.Issue(t, "server.test", false)
 	roots := x509.NewCertPool()
