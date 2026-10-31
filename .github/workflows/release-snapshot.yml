@@ -110,7 +110,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: FangcunMount/infra
-          ref: b5f44f27f81ac541f51b903e7431fd82098bda76
+          ref: 7468688adc55d1c515caae9b6f67f2f9d89bb65f
           path: .retention-infra
       - uses: actions/checkout@v6
         with:

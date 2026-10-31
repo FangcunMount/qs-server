@@ -8,7 +8,7 @@ import shlex
 import subprocess
 
 HELPER_SHA = '53ec1f1e093aca37ad671a50d37203b87757f2daea7f78d03e96df7c51474324'
-INSTALL_SHA = 'b05a3ce9146828e5cbfc7f5fae3fb949a1356ee85b9861c5a0a21f8bd15b1b92'
+INSTALL_SHA = '59cbb812c2b06c424a86c4da3d844a9c20732959e5e497656491d1dbfa532fd8'
 operation = os.environ['RETENTION_OPERATION']
 host = os.environ['DEPLOY_NODE_HOSTNAME']
 run = os.environ['GITHUB_RUN_ID']
