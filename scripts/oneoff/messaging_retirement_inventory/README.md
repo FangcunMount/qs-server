@@ -1,6 +1,6 @@
 # 宿主工程退役：只读责任核对
 
-该工具仅核对固定 `iam.mysql` / `qs.mysql` 原发布表的存在性、结构哈希和原状态字节分组。使用目标进程已有的明确数据库与 VERIFY_IDENTITY TLS 绑定，在有界、REPEATABLE READ / READ ONLY 事务内读取；不安装 schema、不启动 Relay、不回放或修改业务状态。
+该工具仅核对固定 `iam.mysql` / `qs.mysql` 原发布表的存在性、结构哈希、实际 schema head 和原状态字节分组。版本头缺失、多行或 dirty 都会使核对失败；记录实际 head 不表示该版本已获退役批准。使用目标进程已有的明确数据库与 VERIFY_IDENTITY TLS 绑定，在有界、REPEATABLE READ / READ ONLY 事务内读取；不安装 schema、不启动 Relay、不回放或修改业务状态。
 
 `publication_closed_rows` 只表示状态恰为 `published` / `confirmed`，不是业务效果完成、ACK、历史引用关闭或删表许可。NULL、大小写不同、尾随空格和未知状态都属于未关闭。缺表、缺状态字段、超时或身份不可读会失败，行数保持 null，不能据此推断零积压。结构哈希也不等于已验证历史正文及全部业务约束。
 

@@ -18,6 +18,7 @@ func TestUnavailableInventoryNeverBecomesEmptyOrDeletionApproval(t *testing.T) {
 			defer func() { _ = db.Close() }()
 			mock.ExpectBegin()
 			mock.ExpectQuery("SELECT DATABASE").WillReturnRows(sqlmock.NewRows([]string{"name", "version", "uuid"}).AddRow("fixture", "8.0.36", "fixture-uuid"))
+			mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*MIN\\(version\\)").WillReturnRows(sqlmock.NewRows([]string{"count", "version", "dirty"}).AddRow(1, 110, false))
 			q := mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.tables").WithArgs("rm_outbox")
 			switch failure {
 			case "missing":
@@ -62,6 +63,7 @@ func TestFailedTransactionReleaseInvalidatesCompletedMeasurements(t *testing.T) 
 	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT DATABASE").WillReturnRows(sqlmock.NewRows([]string{"name", "version", "uuid"}).AddRow("fixture", "8.0.36", "fixture-uuid"))
+	mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*MIN\\(version\\)").WillReturnRows(sqlmock.NewRows([]string{"count", "version", "dirty"}).AddRow(1, 110, false))
 	for _, name := range []string{"rm_outbox", "ai_messaging_outbox"} {
 		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.tables").WithArgs(name).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(sqlmock.NewRows([]string{"name", "ddl"}).AddRow(name, "CREATE TABLE fixture"))
@@ -74,5 +76,30 @@ func TestFailedTransactionReleaseInvalidatesCompletedMeasurements(t *testing.T) 
 	}
 	if err = mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAmbiguousMissingOrDirtySchemaHeadCannotBecomeComplete(t *testing.T) {
+	for _, state := range []struct {
+		rows    int
+		version any
+		dirty   bool
+	}{{0, nil, false}, {2, 110, false}, {1, 110, true}} {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT DATABASE").WillReturnRows(sqlmock.NewRows([]string{"name", "version", "uuid"}).AddRow("fixture", "8.0.36", "fixture-uuid"))
+		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*MIN\\(version\\)").WillReturnRows(sqlmock.NewRows([]string{"count", "version", "dirty"}).AddRow(state.rows, state.version, state.dirty))
+		mock.ExpectRollback()
+		r, err := collect(context.Background(), db, "qs.mysql", "fixture")
+		if err == nil || r.Complete || !r.TransactionReleased || len(r.Tables) != 0 || r.DropAuthorized {
+			t.Fatal(r, err)
+		}
+		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Fatal(err)
+		}
+		_ = db.Close()
 	}
 }

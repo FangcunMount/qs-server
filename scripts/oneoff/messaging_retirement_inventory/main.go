@@ -59,6 +59,8 @@ type report struct {
 	PoolReleased        bool          `json:"pool_released"`
 	Binding             string        `json:"database_binding_sha256"`
 	Version             string        `json:"mysql_version"`
+	SchemaHead          *uint64       `json:"schema_head"`
+	SchemaDirty         *bool         `json:"schema_dirty"`
 	Tables              []tableReport `json:"tables"`
 	Boundary            string        `json:"boundary"`
 }
@@ -92,6 +94,15 @@ func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (r report,
 		return r, errors.New("database identity unavailable")
 	}
 	r.Binding = hash(endpoint + "\x00" + name + "\x00" + uuid)
+	var headRows, head uint64
+	var dirty bool
+	if err = tx.QueryRowContext(ctx, "SELECT /*+ MAX_EXECUTION_TIME(2000) */ COUNT(*),MIN(version),COALESCE(MAX(dirty),1) FROM schema_migrations").Scan(&headRows, &head, &dirty); err != nil || headRows != 1 || head == 0 {
+		return r, errors.New("migration head unavailable or ambiguous")
+	}
+	r.SchemaHead, r.SchemaDirty = &head, &dirty
+	if dirty {
+		return r, errors.New("migration head is dirty")
+	}
 	for _, table := range tables {
 		t := tableReport{Name: table.Name, ClosedState: table.Closed}
 		r.Tables = append(r.Tables, t)

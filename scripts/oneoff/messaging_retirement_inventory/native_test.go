@@ -50,6 +50,12 @@ func TestRetirementInventoryOwnedNativeMySQL(t *testing.T) {
 	}
 	db := sql.OpenDB(connector)
 	defer func() { _ = db.Close() }()
+	if _, err = db.ExecContext(ctx, "CREATE TABLE schema_migrations (version BIGINT PRIMARY KEY,dirty BOOLEAN NOT NULL) ENGINE=InnoDB"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.ExecContext(ctx, "INSERT INTO schema_migrations VALUES (110,FALSE)"); err != nil {
+		t.Fatal(err)
+	}
 	for _, table := range []object{{"rm_outbox", "state", "published"}, {"domain_event_outbox", "status", "published"}, {"ai_messaging_outbox", "stage", "confirmed"}} {
 		_, err = db.ExecContext(ctx, "CREATE TABLE `"+table.Name+"` (`"+table.State+"` VARCHAR(40) NULL) ENGINE=InnoDB")
 		if err != nil {
@@ -62,7 +68,7 @@ func TestRetirementInventoryOwnedNativeMySQL(t *testing.T) {
 	}
 	for _, owner := range []string{"qs.mysql", "iam.mysql"} {
 		r, e := collect(ctx, db, owner, cfg.Addr)
-		if e != nil || !r.Complete || !r.TransactionReleased || db.Stats().InUse != 0 || r.DropAuthorized || r.BusinessVerified || r.ExportVerified || r.WritersExcluded {
+		if e != nil || !r.Complete || !r.TransactionReleased || db.Stats().InUse != 0 || r.DropAuthorized || r.BusinessVerified || r.ExportVerified || r.WritersExcluded || r.SchemaHead == nil || *r.SchemaHead != 110 || r.SchemaDirty == nil || *r.SchemaDirty {
 			t.Fatal(r, e)
 		}
 		for _, table := range r.Tables {
@@ -70,6 +76,26 @@ func TestRetirementInventoryOwnedNativeMySQL(t *testing.T) {
 				t.Fatal("state byte partition failed", table)
 			}
 		}
+	}
+	for _, values := range []string{"", "(110,FALSE),(111,FALSE)", "(110,TRUE)"} {
+		if _, err = db.ExecContext(ctx, "DELETE FROM schema_migrations"); err != nil {
+			t.Fatal(err)
+		}
+		if values != "" {
+			if _, err = db.ExecContext(ctx, "INSERT INTO schema_migrations VALUES "+values); err != nil {
+				t.Fatal(err)
+			}
+		}
+		r, e := collect(ctx, db, "qs.mysql", cfg.Addr)
+		if e == nil || r.Complete || len(r.Tables) != 0 || !r.TransactionReleased || db.Stats().InUse != 0 {
+			t.Fatal("ambiguous/dirty head was accepted", r, e)
+		}
+	}
+	if _, err = db.ExecContext(ctx, "DELETE FROM schema_migrations"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.ExecContext(ctx, "INSERT INTO schema_migrations VALUES (110,FALSE)"); err != nil {
+		t.Fatal(err)
 	}
 	ro, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if err != nil {
