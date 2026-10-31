@@ -93,6 +93,8 @@ import (
 type m3cChildConfig struct {
 	DSN, MongoURI, MongoDB, Redis, Namespace, Endpoint, Cert, Key, Observer string
 	Marker                                                                  string
+	CA                                                                      string
+	MetricsPort                                                             int
 	Hold                                                                    bool
 }
 
@@ -131,7 +133,11 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 	port, err := strconv.Atoi(rp)
 	require.NoError(t, err)
 	opts := workeroptions.NewOptions()
-	opts.Metrics.Enable = false
+	opts.Metrics.Enable = cfg.MetricsPort > 0
+	opts.Metrics.BindAddress = "127.0.0.1"
+	if cfg.MetricsPort > 0 {
+		opts.Metrics.BindPort = cfg.MetricsPort
+	}
 	opts.Worker.Concurrency = 4
 	opts.Worker.ServiceName = "qs-worker"
 	opts.Worker.EventConfigPath = "../../../../configs/events.yaml"
@@ -160,6 +166,9 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 	opts.GRPC.ApiserverAddr = cfg.Endpoint
 	opts.GRPC.Insecure = false
 	opts.GRPC.TLSCAFile = cfg.Cert
+	if cfg.CA != "" {
+		opts.GRPC.TLSCAFile = cfg.CA
+	}
 	opts.GRPC.TLSCertFile = cfg.Cert
 	opts.GRPC.TLSKeyFile = cfg.Key
 	opts.GRPC.TLSServerName = "127.0.0.1"
@@ -1192,11 +1201,14 @@ redelivery:
 	runTool(hotTool, 1, nil, toolInput, corruptArgs...)
 	require.Equal(t, float64(1), rank())
 	cases["conflicting_source_refuses_whole_rebuild"] = true
-	for _, table := range []string{"rm_outbox", "ai_messaging_outbox"} {
+	for _, table := range []string{"rm_outbox"} {
 		var count int64
 		require.NoError(t, db.Table(table).Count(&count).Error)
 		require.Zero(t, count)
 	}
+	var retiredPublisherTables int64
+	require.NoError(t, db.Raw("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='ai_messaging_outbox'").Scan(&retiredPublisherTables).Error)
+	require.Zero(t, retiredPublisherTables, "current recovery must work after publisher-table retirement")
 	count, err := mongoDB.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{})
 	require.NoError(t, err)
 	require.Zero(t, count)
@@ -1237,13 +1249,37 @@ redelivery:
 	// safety cleanup on every earlier failure. The outer fixture removes resources.
 	require.NoError(t, c.Cleanup())
 	require.NoError(t, normal.Close(t.Context()))
+	protected := map[string]int64{}
+	for _, table := range []string{"assessment", "runtime_checkpoint", "evaluation_outcome", "rm_tx_binding", "rm_tx_request", "rm_tx_execution", "rm_tx_witness", "ai_messaging_archive", "ai_messaging_operations", "ai_messaging_inbox", "ai_messaging_admission", "rm_outbox", "task_opened_reminder_batch", "task_opened_reminder_delivery"} {
+		var count int64
+		require.NoError(t, db.Table(table).Count(&count).Error)
+		protected[table] = count
+	}
+	startupDuration := m5StartProcessRoots(t, child)
+	for table, before := range protected {
+		var after int64
+		require.NoError(t, db.Table(table).Count(&after).Error)
+		require.Equal(t, before, after, "process startup changed retained facts in %s", table)
+	}
+	var retiredTableCount int
+	require.NoError(t, sqlDB.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=? AND table_name='ai_messaging_outbox'", dbName).Scan(&retiredTableCount))
+	require.Zero(t, retiredTableCount)
+	for name, originalID := range originalReports {
+		count, e := mongoDB.Collection(name).CountDocuments(t.Context(), bson.M{})
+		require.NoError(t, e)
+		require.EqualValues(t, 1, count)
+		var document bson.M
+		require.NoError(t, mongoDB.Collection(name).FindOne(t.Context(), bson.M{}).Decode(&document))
+		require.Equal(t, originalID, document["_id"])
+	}
+	require.EqualValues(t, 4, providerCalls.Load())
 	require.NoError(t, mongoDB.Drop(t.Context()))
 	_, err = sqlDB.ExecContext(t.Context(), "DROP DATABASE `"+dbName+"`")
 	require.NoError(t, err)
 	sha, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
 	require.Len(t, cases, 14)
-	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "api_lease_recovery_started": leaseStarted, "api_lease_recovery_drained": true, "report_claim_observed": true, "report_lease_ttl_ms": reportLease.Milliseconds(), "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true}
+	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "api_lease_recovery_started": leaseStarted, "api_lease_recovery_drained": true, "report_claim_observed": true, "report_lease_ttl_ms": reportLease.Milliseconds(), "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true, "post_retirement_api_root_ready": true, "post_retirement_collection_root_ready": true, "post_retirement_worker_root_ready": true, "post_retirement_three_roots_concurrently_ready": true, "post_retirement_process_startup_seconds": int(startupDuration.Seconds()) + 1, "post_retirement_retained_fact_counts_unchanged": true, "process_smoke_typed_options_not_CLI_or_system_login": true}
 	rawReceipt, err := json.Marshal(receipt)
 	require.NoError(t, err)
 	fmt.Println("M3C_QS_RECOVERY_RECEIPT " + string(rawReceipt))

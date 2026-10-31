@@ -96,8 +96,26 @@ try:
         value["inventory_complete"] = False
     value["diagnostic_source_sha"] = os.environ["GITHUB_SHA"]
     value["workflow_run"] = os.environ["GITHUB_RUN_ID"]
+    if owner == "qs.mysql" and value["inventory_complete"]:
+        for table in value.get("tables", []):
+            original = table.get("empty_publisher_export")
+            if original is None:
+                continue
+            assert table["name"] == "ai_messaging_outbox" and table["rows"] == 0
+            assert original["rows"] == 0 and original["body_wire_eof"] is True
+            assert original["schema_dependency_visibility_verified"] is True
+            ddl = original["original_ddl"].encode()
+            assert hashlib.sha256(ddl).hexdigest() == table["show_create_table_sha256"]
+            assert original["jsonl_sha256"] == hashlib.sha256(b"").hexdigest()
+            # No nonempty body stream can reach an artifact. These two private
+            # files are evidence of this exact empty source, not restore proof.
+            for filename, data in [("messaging-retirement-original-ai-publisher.sql", ddl),
+                                   ("messaging-retirement-original-ai-publisher.jsonl", b"")]:
+                descriptor = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(descriptor, "wb") as exported:
+                    exported.write(data)
     Path("messaging-retirement-inventory.json").write_text(json.dumps(value, indent=2) + "\n")
-except (ValueError, KeyError, AssertionError):
+except (ValueError, KeyError, AssertionError, OSError):
     # Retain an unavailable receipt, without copying untrusted response contents.
     value = dict(owner=owner, read_only=None, mutation=None, read_only_requested=True,
                  inventory_complete=False, drop_authorized=False, tables=None,

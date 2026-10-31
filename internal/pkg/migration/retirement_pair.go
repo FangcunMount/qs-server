@@ -152,7 +152,7 @@ type pairStoreState struct {
 	dirty    bool
 }
 
-func schemaVisible(ctx context.Context, db retirementSQLReader, name string, pristine bool) error {
+func schemaVisible(ctx context.Context, db retirementSQLReader, name string, pristine bool, requiredPrivileges ...string) error {
 	q, cancel := retirementContext(ctx)
 	defer cancel()
 	rows, e := db.QueryContext(q, "SHOW GRANTS FOR CURRENT_USER")
@@ -198,6 +198,11 @@ func schemaVisible(ctx context.Context, db retirementSQLReader, name string, pri
 	}
 	if rows.Err() != nil || !visible {
 		return retirementError("mysql schema-wide visibility unproven")
+	}
+	for _, privilege := range requiredPrivileges {
+		if !granted["ALL PRIVILEGES"] && !granted[privilege] {
+			return retirementError("required mysql migration privilege unproven")
+		}
 	}
 	return nil
 }
@@ -295,6 +300,11 @@ func observeSQLPair(ctx context.Context, db retirementSQLReader, name string, re
 	for _, n := range retirementSQLNames {
 		if _, ok := catalog[n]; ok {
 			return s, retirementError("installed mysql retirement target present")
+		}
+	}
+	if s.version >= emptyAIPublisherSQLVersion {
+		if _, exists := catalog["ai_messaging_outbox"]; exists {
+			return s, retirementError("retired AI publisher table reappeared")
 		}
 	}
 	if s.version >= 103 {

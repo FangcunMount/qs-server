@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+    "sha": "1031b88a2d64c10637ea1a606bb42c69da62b5fc",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -78,8 +78,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 110,
-        "version_count": 110
+        "max_version": 111,
+        "version_count": 111
       },
       "mongodb": {
         "max_version": 44,
@@ -11052,7 +11052,7 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+        "source_sha": "01eaeac9652aab43b340165bcff94401fe3e4b69",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -11079,6 +11079,22 @@
         {
           "kind": "source",
           "path": "scripts/cd/test-verify-observability-nginx.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/empty_ai_publisher*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000111_retire_empty_ai_publisher.*.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/retirement_driver.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/resources.go"
         }
       ],
       "verification": [
@@ -11087,6 +11103,20 @@
           "command": "bash scripts/cd/test-verify-observability-nginx.sh",
           "result": "passed",
           "source_sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration -count=1",
+          "result": "passed",
+          "source_sha": "1ec20234db727bc7ca93d1f6c1f2914756cda7af",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
           "verified_on": "2026-10-31"
         }
       ],
@@ -11126,7 +11156,19 @@
         "2026-10-30 release-snapshot Action runtime correction 39cfcc8342e989dd705f0914294d04ef8c06c694. Previous source baseline retained as JSON {\"sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"}. Final-head Deployment Contracts rejected the newly introduced retired upload-artifact v4 before running contracts. Corrected only that new workflow to the repository-required v7; existing runtime contract and pinned actionlint pass without relaxing policy. The failure is retained; no production, database or application source change. New full PR/main CI remains pending.",
         "2026-10-30 source-only review546c7428a6ae605dfe4b8e13f94e6375e1470d06: guard Collection stdout-only config sync from nonexistent host log ownership; retain Worker MYSQL_TLS_CA_REF; validate frozen successful main-ancestor service revision separately from workflow_sha deployment tooling. Prior source review {\"source_sha\": null, \"verified_on\": null} and global source baseline {\"sha\": \"39cfcc8342e989dd705f0914294d04ef8c06c694\", \"verified_on\": \"2026-10-30\"} retained. Eleven offline gate/config-sync cases, actual package regression and actionlint passed. Initial documentation check failed source attribution and is retained; this corrects source attribution only. Historical verification/native/production records remain unchanged. Final PR/main CI and resumed replica deployment remain pending.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
-        "2026-10-30 source-only review b99c7354ae9677a8911af20cf8da8e626217a033: Worker candidate now binds the pinned MySQL CA read-only with create_host_path=false; existing dependency preflight inspects exact candidate Compose without other roles' env-file expansion, checks CA readability under a network-none non-app entrypoint, then preserves the original greeting check before replacement. Prior source review {\"source_sha\": \"401d0d830818eafe49e7a30122137c1a5fcefd9b\", \"verified_on\": \"2026-10-30\"} and global source baseline {\"sha\": \"401d0d830818eafe49e7a30122137c1a5fcefd9b\", \"verified_on\": \"2026-10-30\"} retained. Actual package/Compose model, frozen-gate11 cases, valid bind and missing/writable/wrong-source/auto-create/unreadable rejection cases passed. Actual Worker rollout41092174237 failed missing CA after replacement; exact frozen old profile restore41093158309 verified three ready replicas. This source note does not reassign those runtime results or historical validation. Native non-starting ServerD control41094409036 passed old-template rejection and repaired-candidate CA readability/greeting; the same three restored old Worker IDs stayed ready. Final PR/main CI and resumed Worker publication remain pending; no DB mutation or business replay."
+        "2026-10-30 source-only review b99c7354ae9677a8911af20cf8da8e626217a033: Worker candidate now binds the pinned MySQL CA read-only with create_host_path=false; existing dependency preflight inspects exact candidate Compose without other roles' env-file expansion, checks CA readability under a network-none non-app entrypoint, then preserves the original greeting check before replacement. Prior source review {\"source_sha\": \"401d0d830818eafe49e7a30122137c1a5fcefd9b\", \"verified_on\": \"2026-10-30\"} and global source baseline {\"sha\": \"401d0d830818eafe49e7a30122137c1a5fcefd9b\", \"verified_on\": \"2026-10-30\"} retained. Actual package/Compose model, frozen-gate11 cases, valid bind and missing/writable/wrong-source/auto-create/unreadable rejection cases passed. Actual Worker rollout41092174237 failed missing CA after replacement; exact frozen old profile restore41093158309 verified three ready replicas. This source note does not reassign those runtime results or historical validation. Native non-starting ServerD control41094409036 passed old-template rejection and repaired-candidate CA readability/greeting; the same three restored old Worker IDs stayed ready. Final PR/main CI and resumed Worker publication remain pending; no DB mutation or business replay.",
+        "2026-10-31 source-only review 0a3d35eb7a5091b6690a7c07af28151629b2cd96; prior reviewed source a6a6a2ce4d1d3846ae23cfde5168135dd2eb31e0 retained. Adds explicit application-env selection to the canonical offline CLI and exact binary read-only preview to the existing inventory workflow. Default action remains read-only; apply/approval and owner guards are unchanged. Unit transport/default/credential binding checks pass locally; final CI and actual preview pending. Historical native/command/production evidence remains on its original source and is not re-signed.",
+        "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
+        "M5 controlled process-startup fixture source e3d42a7de13766c68602b27b0848186dbd5af772; prior global baseline 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a retained. The M3-C fixture now additionally builds a source-stamped race test child and enters actual release API/Collection process roots after business drain with migration disabled; controlled mTLS IAM, isolated databases/Redis, health/drain and retained-count assertions. Local tagged compile/no-op child entry passed; actual startup remains pending. Typed options are not CLI/config-decoder or system-login acceptance. Existing14/native/production evidence remains on its original source; no new signoff.",
+        "Controlled process fixture follow-up4401a2f8a69cde5de168adef60c4e2ae89dd3bfe extends the existing Worker test child with optional CA/metrics input (default earlier behavior retained) and additionally requires a third real Worker process with readyz.summary.ready, all three process roots concurrently alive, and ordered drain. Tagged compile passed on the preceding source; current actual startup/native result still pending, not production/CLI/login acceptance.",
+        "Fixture follow-up f11b498b9f6347aef4c3958f1021212bbef5d770 reads the actual /readyz redis.summary.ready envelope and retains both original reminder batch/delivery counts around process startup. Previous global source4401a2f8a69cde5de168adef60c4e2ae89dd3bfe and its successful docs check remain historical; local tagged child compile passes. No native startup result yet.",
+        "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
+        "Controlled startup fixture source9f4b8825ce6ae54aa17f81a9aedf1bde79846907; preserve previous global f11b498b9f6347aef4c3958f1021212bbef5d770 and failed exact source47b7e1d6ba5da163fc0c15141188851b78d110a8/run41184781027. New child incorrectly required substring test although the existing allocator always creates qs_runtime_closure_<digits>; use the exact real prefix, not a broader owner check. Reuse the original exact-SHA-linked race binary and emit only bounded technical failure labels. Tagged compile passes; actual native startup remains pending and this failed run does not count as fourteen passed cases. Original704 native/production evidence unchanged.",
+        "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged.",
+        "Startup fixture/diagnostic source59036b6cf750a6738c608e16bdccf178a3d77526; previous global 9f4b8825ce6ae54aa17f81a9aedf1bde79846907 retained. Second native source8183/run41186033788 failed in actual API resource preparation; bounded labels identify api/resources, no timeout/race, precise cause still unverified. Correct Worker relative catalog directory and enable existing production gRPC Auth/ACL in the fixture. Optional owned-trace CMS encryption transports ciphertext/hashed metadata only; private key stays on this cloud workspace, no plaintext log upload. Actual local encrypt/decrypt/refusal and tagged child tests pass. No new native/startup acceptance or production repair is claimed; prior failed and passed evidence remains source-bound.",
+        "Private fixture connection sourcef539ee114e244e9187474350b54dee995fa6c7ac; previous global 59036b6cf750a6738c608e16bdccf178a3d77526 retained. Actual local option-JSON roundtrip proves production Password json:- is correctly omitted; the new private startup wrapper had therefore lost the owned MySQL password. Preserve/validate the existing owned DSN only in the0600 private file and restore the child connection from it; public redaction remains unchanged. Exact binding/missing-secret/refusal and crypto/child unit tests pass. Actual positive native startup still pending; no failed run is reclassified as accepted.",
+        "Source-only drain diagnostic review 1f5dc8eadff3b3132619c7e1973a55551f1194e7; previous global e28be8761e995ed93271a01d63b054c19e382edf retained. Verified source237918/run41189393198 report ZIP25d0269479805652f7eaa93408db98683adaecfe786bf820e38e6d8eeb0db1ba: no timeout/race; all three roots reached health and concurrent liveness; failure at line406 while asserting SIGTERM drain exit success. Role and exact exit cause unavailable because earlier capture covered startup only. Add exact role plus bounded drain_exit/drain_deadline and encrypted owned trace on drain failure, preserving exit-zero assertion and30s budget. Local tagged child/private connection regression passed. No fix or new native acceptance claimed; prior verification/signoffs unchanged.",
+        "Source-only fixture readiness review 1031b88a2d64c10637ea1a606bb42c69da62b5fc; prior global 1f5dc8eadff3b3132619c7e1973a55551f1194e7 retained. Run41191118955/f27aaf9d5 report215909e3557f713df14f7e3193021ddf4e828a509511365592df5e6d27cba213 and encrypted artifact0e06d1c4ae503182f8a8a2b9ccc6d5106da6bcaef223e567d64440208ac841d7 verified/decrypted in original workspace. Worker drain_exit code-1, no timeout/race/panic; actual Worker online marker and shutdown signal-handler marker absent. Source runtime_bootstrap starts Redis metrics before subscribing/entering Run. The fixture had sent SIGTERM on Redis readiness alone. Require both Redis ready and the existing real Worker online log marker, preserving30s/exit-zero assertions and all14 business cases. Local tagged tests pass; actual positive native pending. Production runtime/SDK/config behavior unchanged; historical evidence/signoffs stay source-bound."
       ]
     },
     {
@@ -12068,7 +12110,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+        "source_sha": "e28be8761e995ed93271a01d63b054c19e382edf",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -12555,6 +12597,13 @@
           "result": "passed",
           "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -12793,7 +12842,12 @@
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
         "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
-        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff."
+        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff.",
+        "2026-10-31 source-only review 0a3d35eb7a5091b6690a7c07af28151629b2cd96; prior reviewed source a6a6a2ce4d1d3846ae23cfde5168135dd2eb31e0 retained. Adds explicit application-env selection to the canonical offline CLI and exact binary read-only preview to the existing inventory workflow. Default action remains read-only; apply/approval and owner guards are unchanged. Unit transport/default/credential binding checks pass locally; final CI and actual preview pending. Historical native/command/production evidence remains on its original source and is not re-signed.",
+        "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
+        "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
+        "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged.",
+        "Source-only original-ledger fixture review e28be8761e995ed93271a01d63b054c19e382edf; prior verified 01eaeac9652aab43b340165bcff94401fe3e4b69 retained. Actual read-only export41189102683 has ledger DDL hash e663736774931e5f988b7fa72a0849fa725ae3ba97f083df404b676d64b616ee, while earlier fixture used a different default collation. Reproduce the exact observed0900 ledger only in the owned native pair before original capture, require this hash, then rehearse the same three interrupted states. Earlier75 native recovery remains valid only for its original fixture; new native hash-equivalent rehearsal pending. All production/command/native/signoff evidence remains on its original source; no new production restore or deletion permission."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -14329,7 +14383,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+        "source_sha": "01eaeac9652aab43b340165bcff94401fe3e4b69",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -14860,6 +14914,13 @@
           "result": "passed",
           "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
           "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -14944,7 +15005,11 @@
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
         "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
-        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff."
+        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff.",
+        "2026-10-31 source-only review 0a3d35eb7a5091b6690a7c07af28151629b2cd96; prior reviewed source a6a6a2ce4d1d3846ae23cfde5168135dd2eb31e0 retained. Adds explicit application-env selection to the canonical offline CLI and exact binary read-only preview to the existing inventory workflow. Default action remains read-only; apply/approval and owner guards are unchanged. Unit transport/default/credential binding checks pass locally; final CI and actual preview pending. Historical native/command/production evidence remains on its original source and is not re-signed.",
+        "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
+        "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
+        "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged."
       ],
       "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15081,7 +15146,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+        "source_sha": "e28be8761e995ed93271a01d63b054c19e382edf",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15355,6 +15420,13 @@
           "result": "passed",
           "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15529,7 +15601,12 @@
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
         "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
-        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff."
+        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff.",
+        "2026-10-31 source-only review 0a3d35eb7a5091b6690a7c07af28151629b2cd96; prior reviewed source a6a6a2ce4d1d3846ae23cfde5168135dd2eb31e0 retained. Adds explicit application-env selection to the canonical offline CLI and exact binary read-only preview to the existing inventory workflow. Default action remains read-only; apply/approval and owner guards are unchanged. Unit transport/default/credential binding checks pass locally; final CI and actual preview pending. Historical native/command/production evidence remains on its original source and is not re-signed.",
+        "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
+        "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
+        "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged.",
+        "Source-only original-ledger fixture review e28be8761e995ed93271a01d63b054c19e382edf; prior verified 01eaeac9652aab43b340165bcff94401fe3e4b69 retained. Actual read-only export41189102683 has ledger DDL hash e663736774931e5f988b7fa72a0849fa725ae3ba97f083df404b676d64b616ee, while earlier fixture used a different default collation. Reproduce the exact observed0900 ledger only in the owned native pair before original capture, require this hash, then rehearse the same three interrupted states. Earlier75 native recovery remains valid only for its original fixture; new native hash-equivalent rehearsal pending. All production/command/native/signoff evidence remains on its original source; no new production restore or deletion permission."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15842,7 +15919,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+        "source_sha": "01eaeac9652aab43b340165bcff94401fe3e4b69",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15949,6 +16026,13 @@
           "result": "passed",
           "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
           "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15986,7 +16070,11 @@
       ],
       "notes": [
         "Preserves null/unavailable evidence; database mutations and deletion authorization are always false.",
-        "Transaction rollback and owned pool release must succeed before the CLI can report a complete inventory. Cleanup uncertainty is not deletion evidence."
+        "Transaction rollback and owned pool release must succeed before the CLI can report a complete inventory. Cleanup uncertainty is not deletion evidence.",
+        "2026-10-31 source-only review 0a3d35eb7a5091b6690a7c07af28151629b2cd96; prior reviewed source a6a6a2ce4d1d3846ae23cfde5168135dd2eb31e0 retained. Adds explicit application-env selection to the canonical offline CLI and exact binary read-only preview to the existing inventory workflow. Default action remains read-only; apply/approval and owner guards are unchanged. Unit transport/default/credential binding checks pass locally; final CI and actual preview pending. Historical native/command/production evidence remains on its original source and is not re-signed.",
+        "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
+        "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
+        "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged."
       ]
     }
   ],

@@ -191,6 +191,16 @@ jobs:
           go test -tags=integration -count=1 -v ./scripts/oneoff/messaging_retirement_inventory -run '^TestRetirementInventoryOwnedNativeMySQL$' | tee "$RUNNER_TEMP/messaging-retirement-native.log"
           grep -q -- '--- PASS: TestRetirementInventoryOwnedNativeMySQL ' "$RUNNER_TEMP/messaging-retirement-native.log"
           if grep -q -- '--- SKIP:' "$RUNNER_TEMP/messaging-retirement-native.log"; then exit 1; fi
+          export QS_M5_NATIVE_REPORT="$RUNNER_TEMP/m5-empty-ai-publisher-native.json"
+          go test -tags=integration -count=1 -v ./internal/pkg/migration -run '^TestM5EmptyAIPublisherOwnedNativeMySQL$' | tee "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"
+          grep -q -- '--- PASS: TestM5EmptyAIPublisherOwnedNativeMySQL ' "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"; then exit 1; fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: m5-empty-ai-publisher-native-${{ github.run_id }}
+          path: ${{ runner.temp }}/m5-empty-ai-publisher-native.json
+          if-no-files-found: warn
 
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
@@ -425,7 +435,14 @@ jobs:
         env:
           QS_STORE_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
-        run: go test ./internal/apiserver/infra/mysql/actor/store -run TestMySQLStore -count=1 -v
+        run: |
+          set -Eeuo pipefail
+          go test ./internal/apiserver/infra/mysql/actor/store -run TestMySQLStore -count=1 -v | tee "$RUNNER_TEMP/actor-store-transactions.log"
+          for required in TestMySQLStoreAssignmentLifecycle TestMySQLStoreTransferRollsBackAuditFailure TestMySQLStoreConcurrentReplay TestMySQLStoreConcurrentDeactivationAndAssignment TestMySQLStoreEntryCurrentReadAfterTransfer; do
+            grep -q -- "=== RUN   $required$" "$RUNNER_TEMP/actor-store-transactions.log"
+            grep -q -- "--- PASS: $required " "$RUNNER_TEMP/actor-store-transactions.log"
+          done
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/actor-store-transactions.log"; then exit 1; fi
       - name: Verify testee store ownership and transaction rollback
         env:
           QS_TESTEE_STORE_REQUIRE_MYSQL: 'true'
@@ -662,7 +679,9 @@ jobs:
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
       - name: Verify schema pair forward migration and disabled DDL guards
+        id: pair_native
         env:
+          QS_M5_PAIR_RESTORE_PROOF: ${{ runner.temp }}/m5-empty-publisher-pair-restore.json
           QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           QS_M3_REQUIRE_DATABASE: '1'
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
@@ -679,6 +698,9 @@ jobs:
             TestHistoricalEvidenceNativeSchemaObjectRestoreWithSyntheticNonNull \
             TestHistoricalEvidenceNativeDirtyObjectBackupRestore \
             TestSchemaPairNativeColdBootstrapAndRestart \
+            TestSchemaPairNativeActorStoreFullMigrationChain \
+            TestSchemaPairNativeM5RetiredPublisherReappearanceRejected \
+            TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility \
             TestDisabledDDLNativeValidatesCurrentHeadsAndNeverCreatesMetadata; do
             if ! grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/schema-pair.log"; then
               echo "Required schema pair test did not pass: ${test_name}" >&2
@@ -689,6 +711,14 @@ jobs:
             echo 'Schema pair verification must not skip' >&2
             exit 1
           fi
+
+      - uses: actions/upload-artifact@v7
+        if: steps.pair_native.outcome == 'success'
+        with:
+          name: m5-empty-publisher-pair-restore-${{ github.run_id }}
+          path: ${{ runner.temp }}/m5-empty-publisher-pair-restore.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Verify approved offline execution and interrupted paired DDL
         env:

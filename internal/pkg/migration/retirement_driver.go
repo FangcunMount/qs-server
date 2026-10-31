@@ -147,7 +147,9 @@ func (d *retirementDatabaseDriver) Run(reader io.Reader) error {
 			return err
 		}
 		var err error
-		if d.offline {
+		if d.backend == BackendMySQL && d.version == emptyAIPublisherSQLVersion {
+			err = d.runEmptyAIPublisherStep(raw)
+		} else if d.offline {
 			err = d.runOfflineStep(raw)
 		} else {
 			err = d.Driver.Run(bytes.NewReader(raw))

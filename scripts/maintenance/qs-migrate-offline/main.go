@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"io"
 	"os"
 	"os/signal"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"github.com/FangcunMount/qs-server/pkg/version"
 	mysql "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -26,6 +26,7 @@ type arguments struct {
 	binding                                                    initialBindingArguments
 	mysqlDatabase, mongoDatabase, approvalFile, approvalSHA256 string
 	apply                                                      bool
+	applicationEnvironment                                     bool
 	timeout                                                    time.Duration
 }
 
@@ -38,6 +39,7 @@ func parseArguments(args []string) (arguments, error) {
 	flags.StringVar(&out.approvalFile, "approval-file", "", "private reviewed offline-upgrade JSON")
 	flags.StringVar(&out.approvalSHA256, "approval-sha256", "", "approved raw file digest")
 	flags.BoolVar(&out.apply, "apply", false, "consume approval and execute embedded migrations")
+	flags.BoolVar(&out.applicationEnvironment, "application-env", false, "explicitly reuse the running QS application connection environment")
 	flags.DurationVar(&out.timeout, "timeout", 15*time.Minute, "total connection/migration deadline, at most 30m")
 	registerInitialBindingFlags(flags, &out.binding)
 	if err := flags.Parse(args); err != nil {
@@ -75,11 +77,15 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 	if !validBuildIdentity(version.GitCommit) {
 		return errors.New("compiled source identity required")
 	}
-	dsn, err := mysql.ParseDSN(getenv("QS_OFFLINE_MYSQL_DSN"))
+	mysqlInput, mongoInput, err := connectionInputs(a, getenv)
+	if err != nil {
+		return err
+	}
+	dsn, err := mysql.ParseDSN(mysqlInput)
 	if err != nil || dsn.DBName != a.mysqlDatabase {
 		return errors.New("selected MySQL binding rejected")
 	}
-	uri := getenv("QS_OFFLINE_MONGO_URI")
+	uri := mongoInput
 	if uri == "" {
 		return errors.New("explicit Mongo binding required")
 	}
