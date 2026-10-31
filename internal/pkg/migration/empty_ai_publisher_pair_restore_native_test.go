@@ -16,8 +16,14 @@ import (
 
 // Rehearse the reviewed original-DDL/metadata steps only in the owned test pair.
 // This is not an installed recovery tool, force/down API or production approval.
-func rehearseM5OriginalEmptyRestore(ctx context.Context, n nativeSchemaPair, ddl, ddlHash, sqlIdentity, mongoIdentity string, runtimeStarted bool) error {
-	if runtimeStarted || !strings.HasPrefix(n.cfg.MySQLDatabase, "qs_m5_restore_test_") || retirementHash([]byte(ddl)) != ddlHash {
+type m5OriginalLedger struct {
+	Version       uint
+	Dirty         bool
+	SchemaDDLHash string
+}
+
+func rehearseM5OriginalEmptyRestore(ctx context.Context, n nativeSchemaPair, ddl, ddlHash, sqlIdentity, mongoIdentity string, original m5OriginalLedger, runtimeStarted bool) error {
+	if runtimeStarted || original.Version != 110 || original.Dirty || !retirementHashRE.MatchString(original.SchemaDDLHash) || !strings.HasPrefix(n.cfg.MySQLDatabase, "qs_m5_restore_test_") || retirementHash([]byte(ddl)) != ddlHash {
 		return errors.New("owned original material and no runtime start required")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -25,6 +31,10 @@ func rehearseM5OriginalEmptyRestore(ctx context.Context, n nativeSchemaPair, ddl
 	a, b, err := pairIdentity(ctx, n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
 	if err != nil || a != sqlIdentity || b != mongoIdentity {
 		return errors.New("original owner identity changed")
+	}
+	var metadataName, metadataDDL string
+	if err := n.db.QueryRowContext(ctx, "SHOW CREATE TABLE schema_migrations").Scan(&metadataName, &metadataDDL); err != nil || retirementHash([]byte(metadataDDL)) != original.SchemaDDLHash {
+		return errors.New("original metadata structure changed")
 	}
 	var sqlState struct {
 		version uint
@@ -67,17 +77,30 @@ func rehearseM5OriginalEmptyRestore(ctx context.Context, n nativeSchemaPair, ddl
 	if err := n.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM ai_messaging_outbox").Scan(&count); err != nil || count != 0 {
 		return errors.New("original empty stream not restored")
 	}
-	// The concrete operator plan must separately approve this exact guarded state
-	// repair after re-reading server activity; never call a generic Force method.
-	result, err := n.db.ExecContext(ctx, "UPDATE schema_migrations SET version=110,dirty=FALSE WHERE version=111 AND dirty=?", sqlState.dirty)
+	// The concrete operator plan must separately approve this exact original ledger
+	// replay after re-reading server activity; never call a generic Force method.
+	tx, err := n.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var lockedVersion uint
+	var lockedDirty bool
+	if err := tx.QueryRowContext(ctx, "SELECT version,dirty FROM schema_migrations FOR UPDATE").Scan(&lockedVersion, &lockedDirty); err != nil || lockedVersion != 111 || lockedDirty != sqlState.dirty {
+		return errors.New("interrupted metadata changed before original replay")
+	}
+	result, err := tx.ExecContext(ctx, "DELETE FROM schema_migrations WHERE version=? AND dirty=?", lockedVersion, lockedDirty)
 	if err != nil {
 		return err
 	}
 	changed, err := result.RowsAffected()
 	if err != nil || changed != 1 {
-		return errors.New("exact metadata repair not confirmed")
+		return errors.New("exact original ledger replacement not confirmed")
 	}
-	return nil
+	if _, err := tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,dirty) VALUES(?,?)", original.Version, original.Dirty); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T) {
@@ -125,6 +148,21 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 			if err := n.db.QueryRowContext(t.Context(), "SHOW CREATE TABLE ai_messaging_outbox").Scan(&name, &ddl); err != nil {
 				t.Fatal(err)
 			}
+			var original m5OriginalLedger
+			var metaName, metaDDL string
+			if err := n.db.QueryRowContext(t.Context(), "SHOW CREATE TABLE schema_migrations").Scan(&metaName, &metaDDL); err != nil {
+				t.Fatal(err)
+			}
+			original.SchemaDDLHash = retirementHash([]byte(metaDDL))
+			if err := n.db.QueryRowContext(t.Context(), "SELECT version,dirty FROM schema_migrations").Scan(&original.Version, &original.Dirty); err != nil {
+				t.Fatal(err)
+			}
+			originalRaw, err := json.Marshal(original)
+			if err != nil {
+				t.Fatal(err)
+			}
+			report["original_complete_ledger"] = original
+			report["original_complete_ledger_sha256"] = retirementHash(originalRaw)
 			hash := retirementHash([]byte(ddl))
 			a, b, err := pairIdentity(t.Context(), n.db, n.client, n.cfg.MySQLDatabase, n.cfg.MongoDatabase)
 			if err != nil {
@@ -155,7 +193,7 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 				ddl, hash, a, b string
 				started         bool
 			}{{ddl, hash, a, b, true}, {ddl + " ", hash, a, b, false}, {ddl, hash, strings.Repeat("0", 64), b, false}} {
-				if err := rehearseM5OriginalEmptyRestore(t.Context(), n, negative.ddl, negative.hash, negative.a, negative.b, negative.started); err == nil {
+				if err := rehearseM5OriginalEmptyRestore(t.Context(), n, negative.ddl, negative.hash, negative.a, negative.b, original, negative.started); err == nil {
 					t.Fatal("invalid recovery evidence accepted")
 				}
 				var version uint
@@ -168,7 +206,7 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := rehearseM5OriginalEmptyRestore(t.Context(), n, ddl, hash, a, b, false); err == nil {
+				if err := rehearseM5OriginalEmptyRestore(t.Context(), n, ddl, hash, a, b, original, false); err == nil {
 					t.Fatal("nonempty restoration overwrote original facts")
 				}
 				var body, wire []byte
@@ -181,7 +219,7 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 				}
 			}
 			restoredAt := time.Now()
-			if err := rehearseM5OriginalEmptyRestore(t.Context(), n, ddl, hash, a, b, false); err != nil {
+			if err := rehearseM5OriginalEmptyRestore(t.Context(), n, ddl, hash, a, b, original, false); err != nil {
 				t.Fatal(err)
 			}
 			if err := n.preflight(t, old).VerifyComplete(t.Context()); err != nil {

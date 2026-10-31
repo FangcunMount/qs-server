@@ -46,12 +46,23 @@ type tableReport struct {
 	EmptyExport *emptyPublisherExport `json:"empty_publisher_export,omitempty"`
 }
 
+type originalLedgerRow struct {
+	Version uint64 `json:"version"`
+	Dirty   bool   `json:"dirty"`
+}
+type originalSchemaLedger struct {
+	OriginalDDL string              `json:"original_ddl"`
+	DDLHash     string              `json:"show_create_table_sha256"`
+	Rows        []originalLedgerRow `json:"rows"`
+}
+
 type emptyPublisherExport struct {
-	OriginalDDL          string `json:"original_ddl"`
-	Rows                 uint64 `json:"rows"`
-	EOF                  bool   `json:"body_wire_eof"`
-	StreamSHA256         string `json:"jsonl_sha256"`
-	DependenciesVerified bool   `json:"schema_dependency_visibility_verified"`
+	OriginalDDL          string                `json:"original_ddl"`
+	Rows                 uint64                `json:"rows"`
+	EOF                  bool                  `json:"body_wire_eof"`
+	StreamSHA256         string                `json:"jsonl_sha256"`
+	DependenciesVerified bool                  `json:"schema_dependency_visibility_verified"`
+	OriginalLedger       *originalSchemaLedger `json:"original_schema_ledger"`
 }
 
 type report struct {
@@ -152,11 +163,71 @@ func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (r report,
 			if unexpected || readErr != nil || closeErr != nil {
 				return r, errors.New("empty publisher original stream did not confirm EOF")
 			}
-			target.EmptyExport = &emptyPublisherExport{OriginalDDL: ddl, EOF: true, StreamSHA256: hash(""), DependenciesVerified: true}
+			ledger, err := readOriginalSchemaLedger(ctx, tx, head)
+			if err != nil {
+				return r, err
+			}
+			target.EmptyExport = &emptyPublisherExport{OriginalDDL: ddl, EOF: true, StreamSHA256: hash(""), DependenciesVerified: true, OriginalLedger: ledger}
 		}
 	}
 	r.Complete = true
 	return r, nil
+}
+
+// Preserve both fields of the exact original version ledger. This does not
+// install a repair API or authorize replay/Force; the companion stays read-only.
+func readOriginalSchemaLedger(ctx context.Context, tx *sql.Tx, head uint64) (*originalSchemaLedger, error) {
+	columns, err := tx.QueryContext(ctx, "SELECT COLUMN_NAME,DATA_TYPE,COLUMN_TYPE,IS_NULLABLE,COLUMN_KEY FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='schema_migrations' ORDER BY ORDINAL_POSITION")
+	if err != nil {
+		return nil, errors.New("original ledger columns unavailable")
+	}
+	count := 0
+	valid := true
+	for columns.Next() {
+		var name, kind, typ, nullable, key string
+		if columns.Scan(&name, &kind, &typ, &nullable, &key) != nil {
+			valid = false
+			break
+		}
+		switch count {
+		case 0:
+			valid = valid && name == "version" && kind == "bigint" && nullable == "NO" && key == "PRI"
+		case 1:
+			valid = valid && name == "dirty" && kind == "tinyint" && typ == "tinyint(1)" && nullable == "NO"
+		default:
+			valid = false
+		}
+		count++
+	}
+	readErr := columns.Err()
+	closeErr := columns.Close()
+	if readErr != nil || closeErr != nil || !valid || count != 2 {
+		return nil, errors.New("complete original ledger shape unproven")
+	}
+	var name, ddl string
+	if err := tx.QueryRowContext(ctx, "SHOW CREATE TABLE schema_migrations").Scan(&name, &ddl); err != nil || name != "schema_migrations" || ddl == "" {
+		return nil, errors.New("original ledger structure unavailable")
+	}
+	rows, err := tx.QueryContext(ctx, "SELECT version,dirty FROM schema_migrations LIMIT 2")
+	if err != nil {
+		return nil, errors.New("original ledger rows unavailable")
+	}
+	original := &originalSchemaLedger{OriginalDDL: ddl, DDLHash: hash(ddl)}
+	for rows.Next() {
+		var version uint64
+		var dirty int64
+		if rows.Scan(&version, &dirty) != nil || version != head || dirty != 0 {
+			valid = false
+			break
+		}
+		original.Rows = append(original.Rows, originalLedgerRow{Version: version, Dirty: false})
+	}
+	readErr = rows.Err()
+	closeErr = rows.Close()
+	if readErr != nil || closeErr != nil || !valid || len(original.Rows) != 1 {
+		return nil, errors.New("complete original ledger rows unproven")
+	}
+	return original, nil
 }
 
 func run() (result report, resultErr error) {

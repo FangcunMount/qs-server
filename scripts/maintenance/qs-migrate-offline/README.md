@@ -84,7 +84,7 @@ sha256sum /private/task-owned/qs-migrate-offline
 
 | `m6_task_entry_token_with_transport_evidence` | 仅 `103/40 → 105/40`；保护Task旧列，记录传输证据表原先不存在，并执行main原SQL104建表；不切换Broker |
 
-六个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
+七个对象 scope 均要求相应真实隔离恢复与启动 receipt；不要求用完整双库备份替代具名对象保护。所有 scope 继续要求完整源码/资源摘要、双库身份、冻结、runtime 未启动、单次文件消费、30天材料保留以及30分钟/60分钟预算。`backup_retention_days` 在此表示已批准保护材料的保留期。对象 scope 不授予恢复 API、任意 schema 回退或 dirty 清理权限。
 
 本入口不提供旧格式兼容：旧 `backup_pair_manifest_sha256` / `backup_pair_location` 字段、缺失 scope、未知 scope、对象 scope 的其他版本组合直接拒绝。
 
