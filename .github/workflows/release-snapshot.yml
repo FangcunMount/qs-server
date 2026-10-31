@@ -124,9 +124,12 @@ jobs:
         if: always()
         with:
           name: messaging-retirement-${{ matrix.owner }}-${{ github.run_id }}
-          path: messaging-retirement-inventory.json
+          path: |
+            messaging-retirement-inventory.json
+            messaging-retirement-original-ai-publisher.sql
+            messaging-retirement-original-ai-publisher.jsonl
           if-no-files-found: error
           retention-days: 30
       - name: Remove owned local key and companion
         if: always()
-        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json messaging-retirement-original-ai-publisher.sql messaging-retirement-original-ai-publisher.jsonl inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory

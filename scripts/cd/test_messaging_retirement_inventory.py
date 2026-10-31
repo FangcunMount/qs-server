@@ -17,7 +17,7 @@ SCRIPT = Path(__file__).with_name("run-messaging-retirement-inventory.py")
 
 
 class InventoryTransportTest(unittest.TestCase):
-    def execute(self, *, owner="qs.mysql", available=True, authorized=False, corrupt=False, process_failed=False):
+    def execute(self, *, owner="qs.mysql", available=True, authorized=False, corrupt=False, process_failed=False, empty_export=False):
         with tempfile.TemporaryDirectory() as temporary:
             previous = Path.cwd()
             self.addCleanup(os.chdir, previous)
@@ -29,10 +29,16 @@ class InventoryTransportTest(unittest.TestCase):
             env = dict(INVENTORY_OWNER=owner, EXPECTED_DIGEST="0" * 64 if corrupt else hashlib.sha256(binary).hexdigest(),
                        EXPECTED_MONGO_DIGEST="0" * 64 if corrupt else hashlib.sha256(binary).hexdigest(),
                        GITHUB_SHA="a" * 40, GITHUB_RUN_ID="12345", RUNNER_SSH_CONFIG="isolated-config", RUNNER_SSH_ALIAS="isolated-alias")
-            report = dict(owner=owner, read_only=True, mutation=False, drop_authorized=authorized,
+            report = dict(owner=owner, read_only=True, mutation=False, drop_authorized=authorized, original_body_export_verified=False,
                           transaction_released=True, pool_released=True,
                           cursors_released=True, count_read_concern="snapshot",
                           inventory_complete=available, source_sha="a" * 40, rows=None if not available else 0)
+            if empty_export:
+                ddl = "CREATE TABLE `ai_messaging_outbox` (body BLOB,wire BLOB)"
+                report["tables"] = [dict(name="ai_messaging_outbox", rows=0,
+                    show_create_table_sha256=hashlib.sha256(ddl.encode()).hexdigest(),
+                    empty_publisher_export=dict(original_ddl=ddl, rows=0, body_wire_eof=True, schema_dependency_visibility_verified=True,
+                                               jsonl_sha256=hashlib.sha256(b"").hexdigest()))]
             with patch.dict(os.environ, env), patch("subprocess.run", return_value=CompletedProcess([], 0 if available and not process_failed else 1, json.dumps(report).encode())) as transport:
                 error = None
                 try:
@@ -42,6 +48,8 @@ class InventoryTransportTest(unittest.TestCase):
                 output = Path("messaging-retirement-inventory.json")
                 saved = json.loads(output.read_text()) if output.exists() else None
                 calls = transport.call_args_list
+                self.last_exports = {path.name: (path.read_bytes(), path.stat().st_mode & 0o777)
+                                     for path in Path.cwd().glob("messaging-retirement-original-*")}
             os.chdir(previous)
         return error, saved, calls
 
@@ -89,6 +97,17 @@ class InventoryTransportTest(unittest.TestCase):
         self.assertIn("incomplete", error)
         self.assertFalse(saved["inventory_complete"])
         self.assertFalse(saved["process_completed_successfully"])
+
+    def test_only_complete_successful_empty_stream_can_be_saved_as_original(self):
+        error, saved, _ = self.execute(empty_export=True)
+        self.assertIsNone(error)
+        self.assertFalse(saved["original_body_export_verified"])
+        self.assertEqual(self.last_exports["messaging-retirement-original-ai-publisher.jsonl"], (b"", 0o600))
+        self.assertEqual(self.last_exports["messaging-retirement-original-ai-publisher.sql"][1], 0o600)
+        for options in (dict(process_failed=True), dict(available=False), dict(authorized=True)):
+            error, _, _ = self.execute(empty_export=True, **options)
+            self.assertIsNotNone(error)
+            self.assertFalse(self.last_exports)
 
     def test_actual_ai_payload_preserves_classified_errors_without_private_values(self):
         _, _, calls = self.execute(owner="ai.mysql")

@@ -106,3 +106,5 @@ M3 宿主验收的旧 Readiness 原生夹具在 CI39941425800 的 dirty_version_
 ### 2026-10-31 消息候选集合原生核对
 
 共享 `m4-metadata-readiness-native-proof.sh` 的 MySQL 模式仍要求原三项 selector，预算及接收格式不变。Mongo 模式追加固定 `rm_outbox` 的快照状态计数，必须同时运行原元数据测试和新增只读账户测试，任一缺席、失败或跳过均失败。新探针的源码、原生 CI 与现网读取分别记录，不改写本页原权限/readiness/历史退役证据。
+
+SQL111 候选的删除保护/原 DDL 恢复在共享 MySQL CI 后续独立 selector 中验证，仅使用另行创建的自有 namespace。原权限/readiness 工具的查询、预算、固定历史目标和原生 selector 不变；该新增测试不授权生产 DDL。

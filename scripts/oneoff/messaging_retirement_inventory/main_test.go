@@ -68,6 +68,11 @@ func TestFailedTransactionReleaseInvalidatesCompletedMeasurements(t *testing.T) 
 		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.tables").WithArgs(name).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(sqlmock.NewRows([]string{"name", "ddl"}).AddRow(name, "CREATE TABLE fixture"))
 		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*COALESCE").WillReturnRows(sqlmock.NewRows([]string{"total", "closed", "other", "null"}).AddRow(0, 0, 0, 0))
+		if name == "ai_messaging_outbox" {
+			mock.ExpectQuery("SHOW GRANTS FOR CURRENT_USER").WillReturnRows(sqlmock.NewRows([]string{"grant"}).AddRow("GRANT ALL PRIVILEGES ON *.* TO 'fixture'@'%'"))
+			mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.routines").WillReturnRows(sqlmock.NewRows([]string{"dependencies", "foreign_keys"}).AddRow(0, true))
+			mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*body,wire").WillReturnRows(sqlmock.NewRows([]string{"body", "wire"}))
+		}
 	}
 	mock.ExpectRollback().WillReturnError(errors.New("connection lost during release"))
 	r, err := collect(context.Background(), db, "qs.mysql", "fixture")
@@ -98,6 +103,40 @@ func TestAmbiguousMissingOrDirtySchemaHeadCannotBecomeComplete(t *testing.T) {
 			t.Fatal(r, err)
 		}
 		if err = mock.ExpectationsWereMet(); err != nil {
+			t.Fatal(err)
+		}
+		_ = db.Close()
+	}
+}
+
+func TestEmptyOriginalExportRequiresActualSuccessfulEOF(t *testing.T) {
+	for _, unexpectedRow := range []bool{false, true} {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT DATABASE").WillReturnRows(sqlmock.NewRows([]string{"name", "version", "uuid"}).AddRow("fixture", "8.0.36", "fixture-uuid"))
+		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*MIN\\(version\\)").WillReturnRows(sqlmock.NewRows([]string{"count", "version", "dirty"}).AddRow(1, 110, false))
+		for _, name := range []string{"rm_outbox", "ai_messaging_outbox"} {
+			mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.tables").WithArgs(name).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+			mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(sqlmock.NewRows([]string{"name", "ddl"}).AddRow(name, "CREATE TABLE fixture"))
+			mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*COALESCE").WillReturnRows(sqlmock.NewRows([]string{"total", "closed", "other", "null"}).AddRow(0, 0, 0, 0))
+		}
+		mock.ExpectQuery("SHOW GRANTS FOR CURRENT_USER").WillReturnRows(sqlmock.NewRows([]string{"grant"}).AddRow("GRANT ALL PRIVILEGES ON *.* TO 'fixture'@'%'"))
+		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.routines").WillReturnRows(sqlmock.NewRows([]string{"dependencies", "foreign_keys"}).AddRow(0, true))
+		stream := mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*body,wire")
+		if unexpectedRow {
+			stream.WillReturnRows(sqlmock.NewRows([]string{"body", "wire"}).AddRow([]byte("private-body"), []byte("private-wire")))
+		} else {
+			stream.WillReturnError(errors.New("stream unavailable"))
+		}
+		mock.ExpectRollback()
+		r, err := collect(context.Background(), db, "qs.mysql", "fixture")
+		if err == nil || r.Complete || r.Tables[1].EmptyExport != nil || r.ExportVerified {
+			t.Fatal("unknown stream became an empty export", r, err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Fatal(err)
 		}
 		_ = db.Close()

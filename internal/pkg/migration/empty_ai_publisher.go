@@ -11,6 +11,27 @@ import (
 
 const emptyAIPublisherSQLVersion = 111
 
+const emptyPublisherDependenciesQuery = "SELECT /*+ MAX_EXECUTION_TIME(2000) */ (SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.events WHERE event_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.key_column_usage WHERE referenced_table_schema=DATABASE() AND referenced_table_name='ai_messaging_outbox'),@@SESSION.foreign_key_checks"
+
+// VerifyEmptyAIPublisherDependencies performs only reads. A narrow empty-table
+// retirement cannot discard attached programs or unreviewed schema dependencies;
+// incomplete metadata visibility is not proof of their absence.
+func VerifyEmptyAIPublisherDependencies(ctx context.Context, db retirementSQLReader, name string) error {
+	if err := schemaVisible(ctx, db, name, true); err != nil {
+		return err
+	}
+	return emptyPublisherDependenciesAbsent(ctx, db)
+}
+
+func emptyPublisherDependenciesAbsent(ctx context.Context, db retirementSQLReader) error {
+	var dependencies uint64
+	var foreignKeys bool
+	if err := db.QueryRowContext(ctx, emptyPublisherDependenciesQuery).Scan(&dependencies, &foreignKeys); err != nil || dependencies != 0 || !foreignKeys {
+		return retirementError("publisher schema programs, dependencies or visibility require separate review")
+	}
+	return nil
+}
+
 // The surrounding driver has already verified the exact embedded body, dirty
 // version, selected connection and paired database identity. Count and DROP must
 // share one session's table lock; a prior read-only receipt is insufficient.
@@ -20,6 +41,9 @@ func (d *retirementDatabaseDriver) runEmptyAIPublisherStep(raw []byte) (runErr e
 	}
 	ctx, cancel := context.WithTimeout(d.ctx, 8*time.Second)
 	defer cancel()
+	if err := VerifyEmptyAIPublisherDependencies(ctx, d.sqlConn, d.database); err != nil {
+		return err
+	}
 	var originalWait uint64
 	if err := d.sqlConn.QueryRowContext(ctx, "SELECT @@SESSION.lock_wait_timeout").Scan(&originalWait); err != nil {
 		return retirementError("publisher lock wait configuration unavailable")
@@ -58,6 +82,9 @@ func (d *retirementDatabaseDriver) runEmptyAIPublisherStep(raw []byte) (runErr e
 		return retirementError("publisher exclusive table lock unavailable")
 	}
 	locked = true
+	if err := emptyPublisherDependenciesAbsent(ctx, d.sqlConn); err != nil {
+		return err
+	}
 	var count uint64
 	if err := d.sqlConn.QueryRowContext(ctx, "SELECT /*+ MAX_EXECUTION_TIME(2000) */ COUNT(*) FROM `ai_messaging_outbox`").Scan(&count); err != nil {
 		return retirementError("publisher empty-state proof unavailable")

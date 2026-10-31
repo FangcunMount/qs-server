@@ -57,11 +57,15 @@ func TestRetirementInventoryOwnedNativeMySQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, table := range []object{{"rm_outbox", "state", "published"}, {"domain_event_outbox", "status", "published"}, {"ai_messaging_outbox", "stage", "confirmed"}} {
-		_, err = db.ExecContext(ctx, "CREATE TABLE `"+table.Name+"` (`"+table.State+"` VARCHAR(40) NULL) ENGINE=InnoDB")
+		extra := ""
+		if table.Name == "ai_messaging_outbox" {
+			extra = ",body MEDIUMBLOB NULL,wire MEDIUMBLOB NULL"
+		}
+		_, err = db.ExecContext(ctx, "CREATE TABLE `"+table.Name+"` (`"+table.State+"` VARCHAR(40) NULL"+extra+") ENGINE=InnoDB")
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = db.ExecContext(ctx, "INSERT INTO `"+table.Name+"` VALUES (?),(NULL),('future'),(?),(?)", table.Closed, strings.ToUpper(table.Closed), table.Closed+" ")
+		_, err = db.ExecContext(ctx, "INSERT INTO `"+table.Name+"` (`"+table.State+"`) VALUES (?),(NULL),('future'),(?),(?)", table.Closed, strings.ToUpper(table.Closed), table.Closed+" ")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,6 +109,15 @@ func TestRetirementInventoryOwnedNativeMySQL(t *testing.T) {
 	_ = ro.Rollback()
 	if denied == nil {
 		t.Fatal("native MySQL did not enforce read-only transaction")
+	}
+	// Separate empty-stream fixture; the five original-state cases above have
+	// already been verified and are not bootstrap/business responsibilities.
+	if _, err = db.ExecContext(ctx, "DELETE FROM ai_messaging_outbox"); err != nil {
+		t.Fatal(err)
+	}
+	empty, err := collect(ctx, db, "qs.mysql", cfg.Addr)
+	if err != nil || !empty.Complete || empty.Tables[1].EmptyExport == nil || !empty.Tables[1].EmptyExport.EOF || empty.Tables[1].EmptyExport.StreamSHA256 != hash("") {
+		t.Fatal("empty original stream export unproven", err)
 	}
 	if _, err = db.ExecContext(ctx, "DROP TABLE ai_messaging_outbox"); err != nil {
 		t.Fatal(err)

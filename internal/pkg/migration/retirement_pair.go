@@ -297,6 +297,11 @@ func observeSQLPair(ctx context.Context, db retirementSQLReader, name string, re
 			return s, retirementError("installed mysql retirement target present")
 		}
 	}
+	if s.version >= emptyAIPublisherSQLVersion {
+		if _, exists := catalog["ai_messaging_outbox"]; exists {
+			return s, retirementError("retired AI publisher table reappeared")
+		}
+	}
 	if s.version >= 103 {
 		for _, name := range retiredMaintenanceSQLTables {
 			if _, exists := catalog[name]; exists {

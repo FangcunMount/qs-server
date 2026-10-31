@@ -37,10 +37,13 @@ func TestEmptyPublisherGuardRejectsRecordsAndReleasesItsSession(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = conn.Close() }()
-			d := &retirementDatabaseDriver{backend: BackendMySQL, version: 111, ctx: ctx, sqlConn: conn}
+			d := &retirementDatabaseDriver{backend: BackendMySQL, version: 111, ctx: ctx, sqlConn: conn, database: "fixture"}
+			mock.ExpectQuery("SHOW GRANTS FOR CURRENT_USER").WillReturnRows(sqlmock.NewRows([]string{"grant"}).AddRow("GRANT ALL PRIVILEGES ON *.* TO 'fixture'@'%'"))
+			mock.ExpectQuery(emptyPublisherDependenciesQuery).WillReturnRows(sqlmock.NewRows([]string{"dependencies", "foreign_keys"}).AddRow(0, true))
 			mock.ExpectQuery("SELECT @@SESSION.lock_wait_timeout").WillReturnRows(sqlmock.NewRows([]string{"wait"}).AddRow(600))
 			mock.ExpectExec("SET SESSION lock_wait_timeout = 2").WillReturnResult(sqlmock.NewResult(0, 0))
 			mock.ExpectExec("LOCK TABLES `ai_messaging_outbox` WRITE").WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectQuery(emptyPublisherDependenciesQuery).WillReturnRows(sqlmock.NewRows([]string{"dependencies", "foreign_keys"}).AddRow(0, true))
 			count := mock.ExpectQuery("SELECT /*+ MAX_EXECUTION_TIME(2000) */ COUNT(*) FROM `ai_messaging_outbox`")
 			switch mode {
 			case "query_error":

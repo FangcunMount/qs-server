@@ -64,6 +64,7 @@ func TestM5EmptyAIPublisherOwnedNativeMySQL(t *testing.T) {
 		NonemptyRejected      []string `json:"nonempty_rejected"`
 		ProtectedPreserved    bool     `json:"protected_fixture_facts_preserved"`
 		LockContentionRefused bool     `json:"lock_contention_refused"`
+		TriggerPreserved      bool     `json:"unreviewed_trigger_preserved"`
 		Passed                bool     `json:"passed"`
 	}{FixtureOnly: true, ExecutionSource: os.Getenv("GITHUB_SHA"), MySQLVersion: version, NonemptyRejected: []string{}}
 	t.Cleanup(func() {
@@ -125,7 +126,7 @@ func TestM5EmptyAIPublisherOwnedNativeMySQL(t *testing.T) {
 		if err := conn.QueryRowContext(ctx, "SELECT @@SESSION.lock_wait_timeout").Scan(&beforeWait); err != nil {
 			t.Fatal(err)
 		}
-		d := &retirementDatabaseDriver{backend: BackendMySQL, version: 111, ctx: ctx, sqlConn: conn}
+		d := &retirementDatabaseDriver{backend: BackendMySQL, version: 111, ctx: ctx, sqlConn: conn, database: owned}
 		err = d.runEmptyAIPublisherStep(raw)
 		var guard, statement any
 		var afterWait uint64
@@ -188,6 +189,21 @@ func TestM5EmptyAIPublisherOwnedNativeMySQL(t *testing.T) {
 			report.NonemptyRejected = append(report.NonemptyRejected, state)
 		})
 	}
+	t.Run("unreviewed_trigger_preserved", func(t *testing.T) {
+		create(t)
+		defer drop(t)
+		if _, err := db.ExecContext(ctx, "CREATE TRIGGER m5_owned_probe BEFORE INSERT ON ai_messaging_outbox FOR EACH ROW SET NEW.error_code='owned-original'"); err != nil {
+			t.Fatal(err)
+		}
+		if err := run(t); err == nil {
+			t.Fatal("unreviewed trigger was accepted")
+		}
+		var count int
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema=DATABASE() AND trigger_name='m5_owned_probe'").Scan(&count); err != nil || count != 1 {
+			t.Fatal("original trigger lost", err)
+		}
+		report.TriggerPreserved = true
+	})
 	t.Run("bounded_external_read_lock", func(t *testing.T) {
 		create(t)
 		defer drop(t)

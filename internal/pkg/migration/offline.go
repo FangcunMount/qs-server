@@ -93,6 +93,7 @@ const (
 	offlineProtectionLegacyMaintenanceTables            = "m4_legacy_maintenance_tables"
 	offlineProtectionTaskEntryToken                     = "m6_task_entry_token"
 	offlineProtectionTaskEntryTokenAndTransportEvidence = "m6_task_entry_token_with_transport_evidence"
+	offlineProtectionM5EmptyAIPublisher                 = "m5_qs_empty_ai_publisher"
 )
 
 // InspectOffline reads only identities and guarded installed migration metadata.
@@ -123,6 +124,11 @@ func inspectOffline(ctx context.Context, db *sql.DB, client *mongo.Client, cfg P
 	p, err := preflightCompatibilityPair(ctx, db, client, cfg, r)
 	if err != nil {
 		return nil, OfflineSnapshot{}, err
+	}
+	if p.initialSQLVersion < emptyAIPublisherSQLVersion && r.sql.head >= emptyAIPublisherSQLVersion {
+		if err := VerifyEmptyAIPublisherDependencies(ctx, db, cfg.MySQLDatabase); err != nil {
+			return nil, OfflineSnapshot{}, err
+		}
 	}
 	return p, OfflineSnapshot{
 		SourceSHA: cfg.ExpectedSourceSHA, MigrationResourcesSHA256: r.sha256,
@@ -162,6 +168,9 @@ func validOfflineProtectionScope(a offlineAuthorization) bool {
 	case offlineProtectionTaskEntryTokenAndTransportEvidence:
 		return a.InitialMySQLVersion == 103 && a.InitialMongoVersion == 40 &&
 			a.TargetMySQLVersion == 105 && a.TargetMongoVersion == 40
+	case offlineProtectionM5EmptyAIPublisher:
+		return a.InitialMySQLVersion == 110 && a.InitialMongoVersion == 44 &&
+			a.TargetMySQLVersion == 111 && a.TargetMongoVersion == 44
 	default:
 		return false
 	}

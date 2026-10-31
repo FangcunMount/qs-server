@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/database"
+	migrationpkg "github.com/FangcunMount/qs-server/internal/pkg/migration"
 	mysql "github.com/go-sql-driver/mysql"
 )
 
@@ -34,14 +35,23 @@ func objects(owner string) (string, []object, error) {
 }
 
 type tableReport struct {
-	Name        string  `json:"name"`
-	Available   bool    `json:"available"`
-	Rows        *uint64 `json:"rows"`
-	Closed      *uint64 `json:"publication_closed_rows"`
-	Unclosed    *uint64 `json:"other_or_null_state_rows"`
-	NullStates  *uint64 `json:"null_state_rows"`
-	SchemaHash  string  `json:"show_create_table_sha256"`
-	ClosedState string  `json:"publication_closed_state"`
+	Name        string                `json:"name"`
+	Available   bool                  `json:"available"`
+	Rows        *uint64               `json:"rows"`
+	Closed      *uint64               `json:"publication_closed_rows"`
+	Unclosed    *uint64               `json:"other_or_null_state_rows"`
+	NullStates  *uint64               `json:"null_state_rows"`
+	SchemaHash  string                `json:"show_create_table_sha256"`
+	ClosedState string                `json:"publication_closed_state"`
+	EmptyExport *emptyPublisherExport `json:"empty_publisher_export,omitempty"`
+}
+
+type emptyPublisherExport struct {
+	OriginalDDL          string `json:"original_ddl"`
+	Rows                 uint64 `json:"rows"`
+	EOF                  bool   `json:"body_wire_eof"`
+	StreamSHA256         string `json:"jsonl_sha256"`
+	DependenciesVerified bool   `json:"schema_dependency_visibility_verified"`
 }
 
 type report struct {
@@ -125,6 +135,25 @@ func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (r report,
 			return r, errors.New("inconsistent state partition")
 		}
 		target.Available, target.Rows, target.Closed, target.Unclosed, target.NullStates = true, &total, &closed, &other, &null
+		if owner == "qs.mysql" && table.Name == "ai_messaging_outbox" && total == 0 {
+			if err := migrationpkg.VerifyEmptyAIPublisherDependencies(ctx, tx, name); err != nil {
+				return r, err
+			}
+			// Only an actually empty original stream can leave the application.
+			// The same repeatable-read snapshot supplies the count and EOF;
+			// an unexpected row is refused before any body is decoded/exported.
+			rows, readErr := tx.QueryContext(ctx, "SELECT /*+ MAX_EXECUTION_TIME(2000) */ body,wire FROM ai_messaging_outbox LIMIT 1")
+			if readErr != nil {
+				return r, errors.New("empty publisher original stream unavailable")
+			}
+			unexpected := rows.Next()
+			readErr = rows.Err()
+			closeErr := rows.Close()
+			if unexpected || readErr != nil || closeErr != nil {
+				return r, errors.New("empty publisher original stream did not confirm EOF")
+			}
+			target.EmptyExport = &emptyPublisherExport{OriginalDDL: ddl, EOF: true, StreamSHA256: hash(""), DependenciesVerified: true}
+		}
 	}
 	r.Complete = true
 	return r, nil

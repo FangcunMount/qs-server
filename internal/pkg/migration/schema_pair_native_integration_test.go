@@ -124,6 +124,26 @@ func (n nativeSchemaPair) heads(t *testing.T) (uint, bool, uint, bool) {
 	return sqlVersion, sqlDirty, mongoHead.Version, mongoHead.Dirty
 }
 
+func TestSchemaPairNativeM5RetiredPublisherReappearanceRejected(t *testing.T) {
+	n := openNativeSchemaPair(t)
+	r, err := compiledMigrationResources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.approve(t, r)
+	n.runBoth(t, n.preflight(t, r))
+	if _, err := n.db.ExecContext(t.Context(), "CREATE TABLE ai_messaging_outbox (id INT PRIMARY KEY)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := preflightCompatibilityPair(t.Context(), n.db, n.client, n.cfg, r); err == nil {
+		t.Fatal("retired publisher reappearance accepted")
+	}
+	var rows int
+	if err := n.db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM ai_messaging_outbox").Scan(&rows); err != nil || rows != 0 {
+		t.Fatal("reappearance inspection mutated target", err)
+	}
+}
+
 func currentNativeSchemaPair(t *testing.T) (nativeSchemaPair, *migrationResources) {
 	t.Helper()
 	r, err := compiledMigrationResources()
