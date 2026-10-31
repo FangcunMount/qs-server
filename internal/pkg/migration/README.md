@@ -550,3 +550,11 @@ Mongo44显式安装原`uk_answersheet_submit_intent`唯一部分索引，键为w
 SQL111 仅针对 `ai_messaging_outbox`，独立于此前基础设施 M4-A/M4-B/M4-C。它要求配对资源、数据库身份、dirty/clean 进度和同一连接的 WRITE 锁内零行证明；直接运行 SQL 资源拒绝。非空、缺表、锁/权限未知或会话释放失败均停止。普通 down 拒绝，原结构恢复必须使用逐字原 DDL 和明确的配对/固定镜像边界。
 
 原生 CI 必须在自有 MySQL8.0.36 验证已确认与未确认、未知及 NULL 记录均保全，正文/wire 与受保护事实不变，并保存仅属于该夹具的原 DDL/恢复哈希。旧迁移资源不改写；fixture 证明不等于生产执行或回退已验收。当前生产仍以独立只读回执为准，SQL111 未因此获准执行。
+
+## M5 原事务元数据只读观察
+
+`ObserveOfflineProtocol` 在已安装110/44或111/44上借用原SQL/Mongo连接，验证原版本/库身份及两个owner binding，复用正式SDK `ObserveProtocol` 与宿主native-limit只读读取。它不执行schema/租约/凭证写入，不启动Broker客户端、Checker或业务进程；`qs-migrate-offline --protocol-observation --timeout=30s` 为独立显式只读入口，与apply/批准/binding操作互斥。
+
+结果保留数据库采样时间、绑定摘要和实际未决计数；缺失/损坏或读取失败显示不可用，不能转成零。两个backend各自观察，不是跨库原子快照；不证明Broker积压、业务ACK、所有写者停止或owner已可退出。报告不签发停写或恢复批准，SQL111仍只经过已有受控offline apply。迁移字节、当前事务/历史记录和原Force/down拒绝均保持。
+
+既有schema-pair原生CI新增必需 `TestSchemaPairNativeM5ProtocolReadOnly`，真实读取110/44与111/44，验证reserved责任不会被隐藏、完整原行/文档读取前后未变、非法/缺失binding不可用。实际运行结果须按精确源码和制品独立登记，未执行不算通过。
