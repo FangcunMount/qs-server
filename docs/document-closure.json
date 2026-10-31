@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6efd394602a1f754d32a4980d92bcb521964b0ed",
+    "sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -14329,7 +14329,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -14853,6 +14853,13 @@
           "result": "passed",
           "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15835,7 +15842,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6efd394602a1f754d32a4980d92bcb521964b0ed",
+        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15858,6 +15865,18 @@
         {
           "kind": "source",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-metadata-readiness-native-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
         }
       ],
       "verification": [
@@ -15902,6 +15921,34 @@
           "source_sha": "6efd394602a1f754d32a4980d92bcb521964b0ed",
           "verified_on": "2026-10-31",
           "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./scripts/oneoff/mongodb_metadata_profile",
+          "source_sha": "4dfe885eaabc44f61340c5850bb2e6f0b20d9277",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_messaging_retirement_inventory.py -v",
+          "source_sha": "4dfe885eaabc44f61340c5850bb2e6f0b20d9277",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "source_sha": "4dfe885eaabc44f61340c5850bb2e6f0b20d9277",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15923,18 +15970,18 @@
           "exit_criteria": "Record exact-source required native CI with zero skips."
         },
         {
-          "id": "HOST-M5-02",
-          "kind": "production",
-          "severity": "medium",
-          "summary": "Mongo historical dependencies are outside this MySQL inventory.",
-          "exit_criteria": "Independently review original Mongo references and exact retained records before any retirement."
-        },
-        {
           "id": "HOST-M5-03",
           "kind": "production",
           "severity": "medium",
           "summary": "Publication state does not close business responsibilities, references or backups.",
           "exit_criteria": "Supply original body export/restore, writer exclusion, business closure and rollback-boundary evidence before a concrete deletion review."
+        },
+        {
+          "id": "HOST-M5-02",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "New Mongo snapshot-state native case and production collection inventory pending.",
+          "exit_criteria": "Exact-source existing authenticated Mongo native selectors must RUN/PASS without skips; then preserve exact read-only production receipt. No deletion inference."
         }
       ],
       "notes": [
