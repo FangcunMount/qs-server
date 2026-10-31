@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99",
+    "sha": "447e605ded52af0c753b6dad150e4ace8ed60a98",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -15148,7 +15148,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99",
+        "source_sha": "447e605ded52af0c753b6dad150e4ace8ed60a98",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15187,6 +15187,14 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/statistics_cold_start_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/m5_maintenance_container.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test_m5_maintenance_container.py"
         }
       ],
       "verification": [
@@ -15609,7 +15617,9 @@
         "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
         "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged.",
         "Source-only original-ledger fixture review e28be8761e995ed93271a01d63b054c19e382edf; prior verified 01eaeac9652aab43b340165bcff94401fe3e4b69 retained. Actual read-only export41189102683 has ledger DDL hash e663736774931e5f988b7fa72a0849fa725ae3ba97f083df404b676d64b616ee, while earlier fixture used a different default collation. Reproduce the exact observed0900 ledger only in the owned native pair before original capture, require this hash, then rehearse the same three interrupted states. Earlier75 native recovery remains valid only for its original fixture; new native hash-equivalent rehearsal pending. All production/command/native/signoff evidence remains on its original source; no new production restore or deletion permission.",
-        "Source-only maintenance transport review 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99; old verified e28be8761e995ed93271a01d63b054c19e382edf and global 1031b88a2d64c10637ea1a606bb42c69da62b5fc retained. Default helper reads fixed original API metadata and checks sudo command permissions; explicit stage creates only an owned idle UID2000 container with selected DB env/private600 temporary file, same immutable image/network and read-only borrowed mounts. No application or DB client is invoked. Existing names/uncertain states retained; optional readonly inventory target validates image/role/idle command. Local4 helper,8 inventory and2 snapshot contracts pass; local actionlint has noShellCheck. Added required owned Docker lifecycle proof to existing Deployment Contracts; actual native transport and production permissions pending. Core1031 actual14case/full-root proof remains on its original source; no production staging/freeze/DDL/restore or new signoff."
+        "Source-only maintenance transport review 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99; old verified e28be8761e995ed93271a01d63b054c19e382edf and global 1031b88a2d64c10637ea1a606bb42c69da62b5fc retained. Default helper reads fixed original API metadata and checks sudo command permissions; explicit stage creates only an owned idle UID2000 container with selected DB env/private600 temporary file, same immutable image/network and read-only borrowed mounts. No application or DB client is invoked. Existing names/uncertain states retained; optional readonly inventory target validates image/role/idle command. Local4 helper,8 inventory and2 snapshot contracts pass; local actionlint has noShellCheck. Added required owned Docker lifecycle proof to existing Deployment Contracts; actual native transport and production permissions pending. Core1031 actual14case/full-root proof remains on its original source; no production staging/freeze/DDL/restore or new signoff.",
+        "Source-only health-command boundary review 5995d813346d5c2c43f2839396490362ea0215bf; former verified 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99/global 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99 retained. Explicitly disable image healthcheck as well as entrypoint, validate NONE health metadata on stage/inventory, and extend required owned Docker smoke to preserve a private consumed-marker fixture after name-collision refusal. Local4 helper tests pass; native transport/current CI pending. No production staging/DDL or new native claim; original1031 runtime proof unchanged.",
+        "Source-only native fixture correction 447e605ded52af0c753b6dad150e4ace8ed60a98; former review 5995d813346d5c2c43f2839396490362ea0215bf/global 5995d813346d5c2c43f2839396490362ea0215bf retained. First transport CI41196326278/job124523116425 failed at source-name guard before creating fixtures. Optional docker inspect had ignored nonzero exit and could return truthy JSON[] for absent names; now absence uses actual exit status. Native source additionally uses its own run-attempt namespace, with no source override exposed by production CLI. Existing container refusal/ownership guards and private-marker preservation remain. Local4 helper contracts pass, native CI rerun pending; no fabricated pass or production action."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15922,7 +15932,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99",
+        "source_sha": "447e605ded52af0c753b6dad150e4ace8ed60a98",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15957,6 +15967,14 @@
         {
           "kind": "source",
           "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/m5_maintenance_container.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test_m5_maintenance_container.py"
         }
       ],
       "verification": [
@@ -16078,7 +16096,9 @@
         "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
         "Source-only recovery fixture review 6119575acf6f56912e106147ffcd3afd44a05fee; prior verified 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a and global baseline f11b498b9f6347aef4c3958f1021212bbef5d770 retained. Existing paired native CI adds a required zero-skip original empty target/110-44 compatibility rehearsal and artifact with measured isolated restore durations. Three controlled interrupted111 states, pre-runtime/material/identity/nonempty refusals and retained transaction/admission/reminder counts are tested; helper is test-only, not a production repair or Force/down entrypoint. Tagged compile and local actionlint passed; actual new native and process-startup results pending. Historical source/command/native/production/signoff attribution unchanged.",
         "Combined source review 01eaeac9652aab43b340165bcff94401fe3e4b69 preserves prior global 6119575acf6f56912e106147ffcd3afd44a05fee. Incorporates actual allocator prefix and linked native binary startup fix, bounded private-log-free diagnostics, original complete version-ledger DDL/two-field row export, and a test-only exact-original ledger transaction replay after object recovery (not numeric Force/dirty clearing). Required owned metadata gate adds unknown-column refusal; paired CI requires interrupted-state recovery and old110/44 compatibility plus measured fixture durations. Local ordinary units/tag compile/actionlint pass; all new native/startup results remain pending. Historical verification/signoffs remain source-bound and unchanged.",
-        "Source-only maintenance transport review 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99; old verified 01eaeac9652aab43b340165bcff94401fe3e4b69 and global 1031b88a2d64c10637ea1a606bb42c69da62b5fc retained. Default helper reads fixed original API metadata and checks sudo command permissions; explicit stage creates only an owned idle UID2000 container with selected DB env/private600 temporary file, same immutable image/network and read-only borrowed mounts. No application or DB client is invoked. Existing names/uncertain states retained; optional readonly inventory target validates image/role/idle command. Local4 helper,8 inventory and2 snapshot contracts pass; local actionlint has noShellCheck. Added required owned Docker lifecycle proof to existing Deployment Contracts; actual native transport and production permissions pending. Core1031 actual14case/full-root proof remains on its original source; no production staging/freeze/DDL/restore or new signoff."
+        "Source-only maintenance transport review 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99; old verified 01eaeac9652aab43b340165bcff94401fe3e4b69 and global 1031b88a2d64c10637ea1a606bb42c69da62b5fc retained. Default helper reads fixed original API metadata and checks sudo command permissions; explicit stage creates only an owned idle UID2000 container with selected DB env/private600 temporary file, same immutable image/network and read-only borrowed mounts. No application or DB client is invoked. Existing names/uncertain states retained; optional readonly inventory target validates image/role/idle command. Local4 helper,8 inventory and2 snapshot contracts pass; local actionlint has noShellCheck. Added required owned Docker lifecycle proof to existing Deployment Contracts; actual native transport and production permissions pending. Core1031 actual14case/full-root proof remains on its original source; no production staging/freeze/DDL/restore or new signoff.",
+        "Source-only health-command boundary review 5995d813346d5c2c43f2839396490362ea0215bf; former verified 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99/global 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99 retained. Explicitly disable image healthcheck as well as entrypoint, validate NONE health metadata on stage/inventory, and extend required owned Docker smoke to preserve a private consumed-marker fixture after name-collision refusal. Local4 helper tests pass; native transport/current CI pending. No production staging/DDL or new native claim; original1031 runtime proof unchanged.",
+        "Source-only native fixture correction 447e605ded52af0c753b6dad150e4ace8ed60a98; former review 5995d813346d5c2c43f2839396490362ea0215bf/global 5995d813346d5c2c43f2839396490362ea0215bf retained. First transport CI41196326278/job124523116425 failed at source-name guard before creating fixtures. Optional docker inspect had ignored nonzero exit and could return truthy JSON[] for absent names; now absence uses actual exit status. Native source additionally uses its own run-attempt namespace, with no source override exposed by production CLI. Existing container refusal/ownership guards and private-marker preservation remain. Local4 helper contracts pass, native CI rerun pending; no fabricated pass or production action."
       ]
     }
   ],
