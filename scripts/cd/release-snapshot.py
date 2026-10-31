@@ -14,6 +14,42 @@ NAMES = re.compile(r"(?:qs-(?:apiserver|collection.*|worker.*|ai|operating-syste
 MATERIAL_TOOL_SHA = '36f3046ed453dfbf8beae684269c94d1a6db0abaa23de51e09d41e462c6a3d5c'
 
 
+def retention_installation_observation(docker):
+    """Read policy/inventory only. Never install a helper or run cleanup."""
+    result = dict(read_only=True, cleanup_executed=False, helper_installed=False)
+    helper = Path('/usr/local/libexec/fangcun/image-retention.py')
+    try:
+        result['helper_installed'] = helper.is_file()
+        if helper.is_file():
+            info = helper.lstat()
+            result['helper'] = dict(uid=info.st_uid, mode=oct(stat.S_IMODE(info.st_mode)),
+                                  symlink=helper.is_symlink(), sha256=hashlib.sha256(helper.read_bytes()).hexdigest())
+        result['paths'] = []
+        for p in (helper.parent, Path('/var/lib/fangcun-image-retention'), Path('/var/lib/fangcun-image-retention/deploy.lock')):
+            try:
+                info = p.lstat()
+                result['paths'].append(dict(path=str(p), uid=info.st_uid, mode=oct(stat.S_IMODE(info.st_mode)), inode=info.st_ino, symlink=p.is_symlink()))
+            except FileNotFoundError:
+                result['paths'].append(dict(path=str(p), missing=True))
+        ids = command(*docker, 'image', 'ls', '-aq', '--no-trunc').split()
+        if len(set(ids)) > 500:
+            raise ValueError('Inventory bound exceeded')
+        result['images'] = []
+        for image_id in sorted(set(ids)):
+            image = json.loads(command(*docker, 'image', 'inspect', '--format', '{"Id":{{json .Id}},"RepoTags":{{json .RepoTags}},"Created":{{json .Created}}}', image_id))
+            result['images'].append(image)
+        password = os.environ.get('SUDO_PASSWORD', '')
+        args = ['sudo', '-S', '-p', '', '-l'] if password else ['sudo', '-n', '-l']
+        policy = subprocess.run(args, input=password+'\n' if password else None, capture_output=True, text=True, timeout=15)
+        result['policy_returncode'] = policy.returncode
+        result['installation_policy'] = [line.strip() for line in policy.stdout.splitlines()
+            if re.search(r'/(?:usr/)?(?:s?bin)/(?:install|cp|mv|mkdir|chown|chmod|python3)(?:\s|$)', line)
+            or re.fullmatch(r'\s*\([^\n]*\)\s*(?:NOPASSWD:\s*)?ALL\s*', line)]
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        result['error_type'] = type(error).__name__
+    return result
+
+
 
 def ai_release_metadata(directory):
     manifest = json.loads((directory / 'manifest.json').read_text())
@@ -335,6 +371,7 @@ def collect(sudo_docker=False):
             result['ai_schema_operation'] = {k: value.get(k) for k in ('phase', 'kind', 'context_id', 'operation_id')}
     except PermissionError:
         pass
+    result['retention_installation_observation'] = retention_installation_observation(docker)
     return result
 
 
