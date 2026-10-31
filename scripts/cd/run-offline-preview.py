@@ -7,6 +7,8 @@ import re
 import shlex
 import subprocess
 
+from m5_maintenance_container import resolve_inventory_target
+
 source = os.environ["GITHUB_SHA"]
 run_id = os.environ["GITHUB_RUN_ID"]
 if not re.fullmatch(r"[0-9a-f]{40}", source) or not run_id.isdecimal():
@@ -19,7 +21,11 @@ temporary = "/tmp/qs-offline-preview-" + run_id
 script = ("set -eu; umask 077; p=" + shlex.quote(temporary)
           + '; trap \'rm -f "$p"\' EXIT; cat > "$p"; chmod 0700 "$p"; "$p" '
           + "--application-env --mysql-database=qs --mongo-database=qs --timeout=30s")
-command = ["sudo", "-n", "docker", "exec", "--user", "2000:2000", "-i", "qs-apiserver", "sh", "-c", script]
+try:
+    target = resolve_inventory_target("qs.mysql", "qs-apiserver")
+except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
+    raise SystemExit("Owned maintenance transport unavailable; no offline plan authorized") from None
+command = ["sudo", "-n", "docker", "exec", "--user", "2000:2000", "-i", target, "sh", "-c", script]
 report = dict(read_only_requested=True, inventory_complete=False, mutation=None,
               source_sha=source, binary_sha256=digest, workflow_run=run_id, snapshot=None)
 try:

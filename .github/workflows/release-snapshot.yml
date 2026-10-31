@@ -10,12 +10,71 @@ on:
         description: Exact reviewed source SHA, required for messaging inventory
         type: string
         required: false
+      maintenance_transport:
+        description: Explicit M5 Docker permission preflight or idle container staging; no application/DB execution
+        type: choice
+        options: [none, preflight, stage]
+        default: none
+      maintenance_image_id:
+        description: Reviewed original QS API local immutable image ID (sha256); required for maintenance transport
+        type: string
+        required: false
+      maintenance_container:
+        description: Optional already staged owned QS maintenance container for inventory with API stopped
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
   group: production-deploy
   cancel-in-progress: false
 jobs:
+  maintenance-transport:
+    if: inputs.maintenance_transport != 'none' && inputs.maintenance_transport != ''
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: qs-m5-maintenance-serverA
+      DEPLOY_NODE_HOSTNAME: serverA
+      REVIEWED_SOURCE: ${{ inputs.reviewed_source }}
+      MAINTENANCE_IMAGE: ${{ inputs.maintenance_image_id }}
+      MAINTENANCE_MODE: ${{ inputs.maintenance_transport }}
+      INVENTORY_REQUESTED: ${{ inputs.messaging_retirement_inventory }}
+      EXISTING_MAINTENANCE: ${{ inputs.maintenance_container }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify separate exact-source maintenance operation
+        run: |
+          test "$REVIEWED_SOURCE" = "$GITHUB_SHA"
+          test "$INVENTORY_REQUESTED" != true
+          test -z "$EXISTING_MAINTENANCE"
+          [[ "$MAINTENANCE_IMAGE" =~ ^sha256:[0-9a-f]{64}$ ]]
+          case "$MAINTENANCE_MODE" in preflight|stage) ;; *) exit 1 ;; esac
+      - name: Establish existing release SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Explicit maintenance transport only
+        run: |
+          set -Eeuo pipefail
+          arguments=(python3 - --expected-image-id "$MAINTENANCE_IMAGE" --operation-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
+          if [ "$MAINTENANCE_MODE" = stage ]; then arguments+=(--stage); fi
+          ssh -F "$RUNNER_SSH_CONFIG" -o ConnectTimeout=20 "$RUNNER_SSH_ALIAS" "${arguments[@]}" \
+            < scripts/cd/m5_maintenance_container.py > m5-maintenance-transport.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: m5-maintenance-transport-${{ github.run_id }}
+          path: m5-maintenance-transport.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove only owned local SSH key and receipt
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" m5-maintenance-transport.json
   snapshot:
     if: inputs.messaging_retirement_inventory != true
     runs-on:
@@ -118,6 +177,8 @@ jobs:
       EXPECTED_DIGEST: ${{ needs.inventory-reader.outputs.digest }}
       EXPECTED_MONGO_DIGEST: ${{ needs.inventory-reader.outputs.mongo_digest }}
       EXPECTED_OFFLINE_DIGEST: ${{ needs.inventory-reader.outputs.offline_digest }}
+      QS_MAINTENANCE_CONTAINER: ${{ inputs.maintenance_container }}
+      QS_MAINTENANCE_IMAGE_ID: ${{ inputs.maintenance_image_id }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
