@@ -81,9 +81,11 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o qs-migrate-offline ./scripts/maintenance/qs-migrate-offline
       - id: identity
         run: |
-          echo "digest=$(sha256sum messaging-retirement-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "mongo_digest=$(sha256sum messaging-retirement-mongo-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "offline_digest=$(sha256sum qs-migrate-offline | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          {
+            echo "digest=$(sha256sum messaging-retirement-inventory | cut -d ' ' -f1)"
+            echo "mongo_digest=$(sha256sum messaging-retirement-mongo-inventory | cut -d ' ' -f1)"
+            echo "offline_digest=$(sha256sum qs-migrate-offline | cut -d ' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
           name: messaging-retirement-reader-${{ github.run_id }}
