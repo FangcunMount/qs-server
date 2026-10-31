@@ -306,6 +306,7 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 	collection.GRPCClient.TLSKeyFile = cp.KeyFile
 	collection.GRPCClient.TLSServerName = "127.0.0.1"
 	type process struct {
+		role   string
 		cmd    *exec.Cmd
 		done   chan error
 		log    *os.File
@@ -335,7 +336,7 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 		cmd.Stderr = log
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		require.NoError(t, cmd.Start())
-		child := &process{cmd: cmd, done: make(chan error, 1), log: log}
+		child := &process{role: name, cmd: cmd, done: make(chan error, 1), log: log}
 		go func() { err := cmd.Wait(); child.exited.Store(true); child.done <- err }()
 		t.Cleanup(func() {
 			if !child.exited.Load() {
@@ -403,9 +404,15 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 		require.NoError(t, p.cmd.Process.Signal(syscall.SIGTERM))
 		select {
 		case e := <-p.done:
-			require.NoError(t, e)
+			if e != nil {
+				raw, _ := os.ReadFile(p.log.Name())
+				m5StartupDiagnostic(p.role, "drain_exit", e, raw)
+			}
+			require.NoError(t, e, "owned %s drain failed", p.role)
 		case <-time.After(30 * time.Second):
-			t.Fatal("owned process did not drain")
+			raw, _ := os.ReadFile(p.log.Name())
+			m5StartupDiagnostic(p.role, "drain_deadline", nil, raw)
+			t.Fatalf("owned %s did not drain", p.role)
 		}
 		require.NoError(t, p.log.Close())
 	}
