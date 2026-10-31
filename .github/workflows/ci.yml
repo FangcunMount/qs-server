@@ -1281,6 +1281,18 @@ jobs:
           python3 scripts/cd/test_release_snapshot.py
           python3 scripts/cd/test_messaging_retirement_inventory.py -v
 
+      - name: Test owned stopped-source maintenance transport
+        run: |
+          python3 scripts/cd/test_m5_maintenance_container.py -v
+          python3 scripts/cd/test_m5_maintenance_container.py --native
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: m5-maintenance-transport-native-${{ github.run_id }}
+          path: m5-maintenance-transport-native.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Validate deployment image export contract
         run: bash scripts/cd/test-export-image.sh
 

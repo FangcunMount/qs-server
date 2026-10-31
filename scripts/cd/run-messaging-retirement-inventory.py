@@ -7,10 +7,16 @@ import re
 import shlex
 import subprocess
 
+from m5_maintenance_container import resolve_inventory_target
+
 owner = os.environ["INVENTORY_OWNER"]
 containers = {"iam.mysql": "iam-apiserver", "qs.mysql": "qs-apiserver", "ai.mysql": "qs-ai", "qs.mongo": "qs-apiserver"}
 if owner not in containers or not re.fullmatch(r"[0-9a-f]{40}", os.environ["GITHUB_SHA"]):
     raise SystemExit("Explicit fixed owner and source required")
+try:
+    containers[owner] = resolve_inventory_target(owner, containers[owner])
+except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
+    raise SystemExit("Owned maintenance transport unavailable; no complete inventory inferred") from None
 
 if owner == "ai.mysql":
     # Reuse the installed, tested historical messaging audit and its TLS policy.

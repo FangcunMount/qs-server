@@ -29,3 +29,17 @@ M4 实际部署和回读完成前不执行现网核对。即使报告完整且�
 同一已审核 SHA 的 `release-snapshot.yml` 另固定构建原离线执行器，并在 `qs.mysql` 分支以应用 UID 执行 `--application-env` 默认只读预览；独立保存源码、二进制摘要、实际 110/44、候选 111/44、嵌入资源及所选双库身份。只接收执行器真实的 `read_only: true` / `snapshot` 输出；进程失败、非只读或身份/版本不符均为不可用。它不生成批准、停写、修改版本或执行 DDL。
 
 空表保护材料还包含同一只读快照中的完整原 `schema_migrations` 账本：验证恰好 version/dirty 两列的实际类型、单行 clean 原值，并保存原 DDL/哈希。未知列、dirty/多行或释放失败使整体材料不完整；不是仅按预期目标数字重建版本。具体恢复只可在独立审定、原对象复原和保留事实核对后事务回放完整原账本，不提供通用 Force/down 或生产修复授权。
+
+## 停机后的维护传输
+
+默认运输仍在原应用容器中执行。全部 QS 进程停止后，需要独立的维护容器，不能把停机前快照冒充同窗口保护材料。
+
+[维护传输入口](../../cd/m5_maintenance_container.py)固定从原 `qs-apiserver` 的本地不可变 image ID、数据库环境和只读借用挂载/网络派生配置。默认仅 inspect 及 `sudo -l` 核实必要 Docker 命令权限，不创建容器或连接数据库。显式 `--stage` 才创建并启动 `qs-m5-maintenance-<run>-<attempt>`，PID1只运行 sleep，固定UID2000，不运行应用或数据库客户端。原镜像ID来自运行快照；不接收服务tag或另一宿主名称。凭据只经过0700临时目录中的0600 env文件，不进入argv、输出或制品；临时文件在创建后移除。原API已经停止也可派生运输，原挂载只读，独立/tmp用于固定维护程序和私有批准。原API必须符合既有Compose的 `infra-network` 与 `qs-network` 双网络合同；维护入口仅连接固定数据库 `infra-network`，不复制业务网络或API别名，缺失/额外网络仍拒绝。这里的原镜像ID严格指同主机Docker快照的容器 `.Image`，不能用OCI config digest代替。
+
+`release-snapshot.yml` 的 `maintenance_transport=preflight|stage` 与 `maintenance_image_id` 提供单独的显式入口，要求 reviewed_source 等于实际工作流SHA；不能与 messaging inventory 或已有维护容器参数混用。该入口使用普通SSH用户的Python和原有sudo Docker权限，不申请通用root Python权限。已有 `SVRA_SUDO_PASSWORD` 通过0700/0600本地临时引导文件及SSH私密stdin传递，仅固定Docker命令使用sudo；不在参数、输出或制品中传密码，也不以root执行Python。错误只输出固定分类，不回显Docker原始stderr。独立维护预检不触发三主机旧快照步骤。preflight只验证权限；stage保持新建的空闲容器及其操作标签，不签发停写或数据库批准。
+
+后续只读盘点单独设置 `messaging_retirement_inventory=true`、`maintenance_container` 和相同 `maintenance_image_id`。仅QS MySQL/Mongo可切换到该容器；运输在执行前复核所有权标签、image ID、UID、只读挂载及固定空闲命令。默认只读离线检查同样支持该运输，原110/44与目标111/44校验不变；IAM/AI继续使用各自原应用。写执行只可使用原canonical执行器的私有批准入口；这里没有自动apply、恢复或生成批准的功能。
+
+镜像原健康命令也显式禁用；容器形状复核要求只有固定空闲命令和 NONE 健康配置。已有名称或不确定的中间状态必须保留并拒绝复用；不自动删除容器、旧批准或消费标记。维护结束后，具名责任人先核验并归档原保护材料、批准原文/摘要、消费标记及实际结果，按批准保留至少30天，才可明确清理这一次操作拥有的维护容器。首次新runtime之后禁止回放旧原账本。生产停写、owner确认观察排空、实际恢复和删除仍须独立审查。
+
+既有 Deployment Contracts CI 另在独占Docker资源中验证真正停止的源容器仍可建立维护传输，UID/秘密筛选/挂载只读/原应用入口不运行/旧操作拒复用和自有资源释放。该测试不启动数据库、不证明生产sudo权限或停写，不计入原生业务14项。
