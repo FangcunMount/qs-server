@@ -9,8 +9,9 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	schedule "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
 	eventport "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
@@ -40,7 +41,7 @@ func freeze(q port.FailureRequest, resolver catalog.TopicResolver) (eventport.Re
 	}
 	f := frozenFailure{Version: 2, Assessment: repository.NewAssessmentMapper().ToPO(q.Assessment), Run: snapshot(q.Run)}
 	if q.FutureRetry != nil {
-		prepared, err := standard.PrepareIntents([]assessment.DomainEvent{q.FutureRetry}, resolver, "api-server")
+		prepared, err := eventmessage.PrepareIntents([]assessment.DomainEvent{q.FutureRetry}, resolver, "api-server")
 		if err != nil {
 			return eventport.Request{}, err
 		}
@@ -107,8 +108,8 @@ func (f frozenFailure) validate() error {
 	if err != nil {
 		return err
 	}
-	ref := standard.ReferenceFromMessage(m)
-	envelope, err := standard.VerifyReference(*f.Future, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(m)
+	envelope, err := eventmessage.VerifyReference(*f.Future, ref.Fingerprint, ref)
 	if err != nil {
 		return err
 	}

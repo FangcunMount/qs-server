@@ -15,7 +15,8 @@ import (
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	answersheetdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	sheetmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	interpretmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
@@ -137,7 +138,7 @@ func verifyRow(row standardEventRow, ref evidence.StandardReference) (*domainwir
 	if token[0].Value != row.Producer || token[1].Value != row.MessageID || token[2].Value != row.Destination || len(row.Fingerprint) != 32 {
 		return nil, driftf("standard row identity conflict")
 	}
-	envelope, err := standard.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), ref)
+	envelope, err := eventmessage.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), ref)
 	return envelope, conflict(err)
 }
 
@@ -148,7 +149,7 @@ func verifyStoredRow(row standardEventRow) (*domainwire.Envelope, error) {
 	if err != nil {
 		return nil, conflict(err)
 	}
-	return verifyRow(row, standard.ReferenceFromMessage(msg))
+	return verifyRow(row, eventmessage.ReferenceFromMessage(msg))
 }
 func countEvidence(result *appaudit.BatchResult, proof *evidence.EventEvidenceV1) {
 	if result.EvidenceClasses == nil {

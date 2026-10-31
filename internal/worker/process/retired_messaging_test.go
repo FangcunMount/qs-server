@@ -70,7 +70,7 @@ func TestFinalWorkerKeepsSharedConsumptionAndProcessingBudget(t *testing.T) {
 	if err := s.validateFinalMessaging(); err != nil {
 		t.Fatal(err)
 	}
-	if s.workerMaxInFlight() != 48 || s.loadedSubscriberConfig().NSQMessageTimeout != o.Messaging.NSQMessageTimeout {
+	if s.workerMaxInFlight() != 48 || s.loadedSubscriberConfig().HandlerTimeout != o.Messaging.NSQMessageTimeout {
 		t.Fatal("retirement changed the current consumption/deadline budget")
 	}
 }

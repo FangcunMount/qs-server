@@ -14,7 +14,8 @@ import (
 	notification "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -69,8 +70,8 @@ func readRecoveryOpening(plan transaction.FrozenPlan, artifact func(transaction.
 	if err != nil {
 		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
 	}
-	ref := standard.ReferenceFromMessage(wire)
-	env, err := standard.VerifyReference(m, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(wire)
+	env, err := eventmessage.VerifyReference(m, ref.Fingerprint, ref)
 	if err != nil || m.Destination != "qs.plan.task" || m.EventType != domain.EventTypeTaskOpenedReminderRequested || env.AggregateType != domain.AggregateTypeTask || env.AggregateID != f.Task.ID.String() || !bytes.Equal(env.Data, f.Reminder) {
 		return RecoveryOpening{}, ErrUnsafeRecoveryOpening
 	}

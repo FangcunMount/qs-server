@@ -10,7 +10,8 @@ import (
 
 	evalevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -51,7 +52,7 @@ func verifyCommittedStandard(row committedStandardRow, record *domainoutcome.Rec
 	if evidence.BusinessBindingSHA256 != record.BusinessBindingSHA256() {
 		return fmt.Errorf("canonical business binding changed")
 	}
-	inner, err := standard.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), *evidence.Reference)
+	inner, err := eventmessage.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), *evidence.Reference)
 	if err != nil {
 		return err
 	}
@@ -190,8 +191,8 @@ func (r *consistencyReadModel) ReadOutboxBatch(ctx context.Context, afterID, upp
 			batch.Conflicts = append(batch.Conflicts, evaluationconsistency.ReverseConflict{MessageID: row.MessageID, Reason: "invalid standard message fields"})
 			continue
 		}
-		ref := standard.ReferenceFromMessage(msg)
-		inner, err := standard.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), ref)
+		ref := eventmessage.ReferenceFromMessage(msg)
+		inner, err := eventmessage.VerifyReference(row.input(), hex.EncodeToString(row.Fingerprint), ref)
 		if err != nil {
 			batch.Conflicts = append(batch.Conflicts, evaluationconsistency.ReverseConflict{MessageID: row.MessageID, Reason: err.Error()})
 			continue

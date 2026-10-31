@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -58,15 +57,6 @@ func TestTransactionConstructorIsInertAndUsesExactBinding(t *testing.T) {
 	o := options.NewMessagingOptions()
 	o.Provider = "rocketmq"
 	o.RocketMQ = &options.RocketMQOptions{Endpoint: "127.0.0.1:1", CredentialsFile: filepath.Join(dir, "credentials.json"), CAFile: filepath.Join(dir, "ca.crt"), RoutesFile: filepath.Join(dir, "routes.json"), PublishEnabled: &disabled, Transactions: map[string]options.TransactionOptions{owner: {StoreID: binding.StoreID, WriterEpoch: binding.WriterEpoch, RouteRevision: "m3-1"}}}
-	if _, err := NewSDKWirePublisher(o); err == nil {
-		t.Fatal("legacy Outbox wire publisher accepted transaction owners")
-	}
-	bindings := o.RocketMQ.Transactions
-	o.RocketMQ.Transactions = nil
-	if _, err := NewSDKWirePublisher(o); err == nil || !strings.Contains(err.Error(), "legacy Outbox wire publisher retired") {
-		t.Fatal("missing owner map silently selected legacy publication for transaction routes", err)
-	}
-	o.RocketMQ.Transactions = bindings
 	native, err := NewSQLNativeLimits(pool, binding, "m3-1")
 	if err != nil {
 		t.Fatal(err)

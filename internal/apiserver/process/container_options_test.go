@@ -181,22 +181,3 @@ func TestAPIServerBuildContainerOptionsUsesResourceStageCacheSubsystem(t *testin
 		t.Fatalf("CacheSubsystem = %#v, want %#v", got.CacheSubsystem, subsystem)
 	}
 }
-
-func TestBuildEventProfileOptionsMapsOutboxRelayOptions(t *testing.T) {
-	opts := apiserveroptions.NewOptions()
-	opts.OutboxRelay.Mongo.PublishWorkers = 64
-	opts.OutboxRelay.Assessment.PublishWorkers = 12
-	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
-	if err != nil {
-		t.Fatalf("CreateConfigFromOptions() error = %v", err)
-	}
-
-	mongoProfile, assessmentProfile := buildEventProfileOptions(cfg)
-
-	if mongoProfile.PublishWorkers != 64 {
-		t.Fatalf("Mongo PublishWorkers = %d, want 64", mongoProfile.PublishWorkers)
-	}
-	if assessmentProfile.PublishWorkers != 12 {
-		t.Fatalf("Assessment PublishWorkers = %d, want 12", assessmentProfile.PublishWorkers)
-	}
-}

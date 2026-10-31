@@ -14,7 +14,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -65,7 +66,7 @@ func (evidenceTopicResolver) GetTopicForEvent(kind string) (string, bool) {
 	return "test." + kind, true
 }
 func (s *eventStagerStub) PrepareReference(evt event.DomainEvent) (evidence.StandardReference, error) {
-	return standard.PrepareReference(evt, evidenceTopicResolver{}, "api-server")
+	return eventmessage.PrepareReference(evt, evidenceTopicResolver{}, "api-server")
 }
 
 func (s *eventStagerStub) Stage(_ context.Context, events ...event.DomainEvent) error {

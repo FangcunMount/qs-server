@@ -96,7 +96,7 @@ func TestTransactionSubsystemBorrowsBothOriginalStoresWithoutStartingOrInstallin
 	require.True(t, s.MySQLTransactionOwner().HasTopic("qs.mysql.idle-topic"), "idle owner failed to register all configured transaction topics")
 	require.False(t, s.MySQLTransactionOwner().Runtime().Stats().Ready)
 	require.False(t, s.MongoTransactionOwner().Runtime().Stats().Ready)
-	require.Empty(t, s.profiles, "transaction mode must not construct a publication Outbox/Relay")
+	require.Empty(t, s.Outboxes(), "transaction mode must not construct a publication Outbox/Relay")
 	require.Nil(t, s.Profile(eventcatalog.OutboxProfileAssessmentMySQL).Stager)
 	require.Nil(t, s.Profile(eventcatalog.OutboxProfileMongoDomain).Stager)
 	require.NoError(t, mock.ExpectationsWereMet(), "constructor performed database I/O")

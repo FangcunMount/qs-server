@@ -13,10 +13,10 @@ type MessagingOptions struct {
 	// Enabled 是否启用消息队列
 	Enabled bool `json:"enabled" mapstructure:"enabled"`
 
-	// Provider 消息队列提供者，支持 NSQ 和 RocketMQ 普通消息。
+	// Provider 消息队列提供者，当前宿主只支持 RocketMQ。
 	Provider string `json:"provider" mapstructure:"provider"`
 
-	// NSQ 配置
+	// Retained decoding fields reject stale host configuration; no NSQ client is constructed.
 	NSQAddr              string   `json:"nsq_addr" mapstructure:"nsq-addr"`
 	NSQLookupdAddr       string   `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
 	NSQDHTTPEndpoints    []string `json:"nsqd_http_endpoints" mapstructure:"nsqd-http-endpoints"`
@@ -58,9 +58,7 @@ func (o *TransportDeliveryOptions) Validate(path string) []error {
 func NewMessagingOptions() *MessagingOptions {
 	return &MessagingOptions{
 		Enabled:              false, // 默认不启用，避免配置错误导致服务不可用
-		Provider:             "nsq",
-		NSQAddr:              "127.0.0.1:4150",
-		NSQLookupdAddr:       "127.0.0.1:4161",
+		Provider:             "rocketmq",
 		PrimaryWorkerChannel: "qs-worker",
 		Delivery:             NewTransportDeliveryOptions(),
 	}
@@ -75,13 +73,7 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "messaging.enabled", o.Enabled,
 		"Enable message queue for event publishing")
 	fs.StringVar(&o.Provider, "messaging.provider", o.Provider,
-		"Message queue provider (nsq, rocketmq)")
-	fs.StringVar(&o.NSQAddr, "messaging.nsq-addr", o.NSQAddr,
-		"NSQ daemon address for publishing")
-	fs.StringVar(&o.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.NSQLookupdAddr,
-		"NSQ lookupd address (optional for apiserver)")
-	fs.StringSliceVar(&o.NSQDHTTPEndpoints, "messaging.nsqd-http-endpoints", o.NSQDHTTPEndpoints,
-		"Explicit nsqd HTTP URLs for durable channel preparation")
+		"Message queue provider (rocketmq)")
 	fs.StringVar(&o.PrimaryWorkerChannel, "messaging.primary-worker-channel", o.PrimaryWorkerChannel,
 		"Durable channel used by the primary Worker consumers")
 	if o.Delivery == nil {
@@ -99,25 +91,12 @@ func (o *MessagingOptions) Validate() []error {
 	if o.Provider != "rocketmq" && o.RocketMQ != nil && len(o.RocketMQ.Transactions) > 0 {
 		errs = append(errs, fmt.Errorf("transactions require explicit RocketMQ provider"))
 	}
-	if o.Provider != "nsq" && o.Provider != "rocketmq" {
-		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq, rocketmq)", o.Provider))
+	if o.Provider != "rocketmq" {
+		return append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: rocketmq); NSQ is retired", o.Provider))
 	}
-
-	if o.Provider == "rocketmq" {
+	if o.Enabled {
 		if err := o.RocketMQ.Validate(); err != nil {
 			errs = append(errs, err)
-		}
-	}
-	if !o.Enabled {
-		return errs
-	}
-
-	if o.Provider == "nsq" {
-		if o.NSQAddr == "" {
-			errs = append(errs, fmt.Errorf("nsq-addr is required when using NSQ"))
-		}
-		if len(o.NSQDHTTPEndpoints) == 0 || o.PrimaryWorkerChannel == "" {
-			errs = append(errs, fmt.Errorf("explicit nsqd-http-endpoints and primary-worker-channel are required when using NSQ"))
 		}
 	}
 

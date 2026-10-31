@@ -13,8 +13,9 @@ import (
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	run "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	schedule "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -149,7 +150,7 @@ func freezeReportFailure(q app.CommitFailureRequest, resolver catalog.TopicResol
 			AssessmentID: q.Association.AssessmentID.String(), OutcomeID: q.OutcomeID.String(), TesteeID: q.Association.TesteeID,
 			ExpectedAttempt: r.Attempt(), AttemptOrigin: string(retrygovernance.AttemptOriginAutomatic), Mode: "next_attempt", RequestedAt: due,
 		})
-		prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, resolver, "api-server")
+		prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, resolver, "api-server")
 		if err != nil {
 			return port.Request{}, err
 		}
@@ -159,7 +160,7 @@ func freezeReportFailure(q app.CommitFailureRequest, resolver catalog.TopicResol
 		if err != nil {
 			return port.Request{}, err
 		}
-		proof, err := evidence.NewStandard(standard.ReferenceFromMessage(prepared[0].Message), binding)
+		proof, err := evidence.NewStandard(eventmessage.ReferenceFromMessage(prepared[0].Message), binding)
 		if err != nil {
 			return port.Request{}, err
 		}
@@ -281,12 +282,12 @@ func (f frozenReportCommit) validate() error {
 	if err != nil {
 		return err
 	}
-	ref := standard.ReferenceFromMessage(m)
+	ref := eventmessage.ReferenceFromMessage(m)
 	proof := terminal.RetryEventEvidence()
 	if proof.Reference == nil || *proof.Reference != ref || proof.EventID != d.RetryEventID || f.Future.Scope != fmt.Sprintf("org:%d", f.Association.OrgID) {
 		return transaction.ErrBinding
 	}
-	envelope, err := standard.VerifyReference(*f.Future, ref.Fingerprint, ref)
+	envelope, err := eventmessage.VerifyReference(*f.Future, ref.Fingerprint, ref)
 	if err != nil {
 		return err
 	}

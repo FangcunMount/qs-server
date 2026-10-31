@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/iamauth"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
@@ -38,7 +38,7 @@ func TestSDKSubscriberRaisesIAMVersionWatermarkOnEphemeralChannel(t *testing.T) 
 		t.Fatalf("initial IAM committed version proof = %d, %v", version, err)
 	}
 	loader := iamauth.NewSnapshotLoader(nil, iamauth.SnapshotLoaderOptions{VersionGuard: guard})
-	subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
+	subscriber, err := newLegacySDKDeliverySubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), FailedHandoffGroup: group,
 	}, 1, 2,
 		func(_ context.Context, failed legacy.FailedHandoff) error {

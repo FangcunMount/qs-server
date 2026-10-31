@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -28,7 +29,7 @@ func TestOriginalPlanRejectsWrongPrimaryFenceRootAndExpiredCallback(t *testing.T
 	p, err := freeze(fixtureRequest("root-proof"), fixtureResolver{})
 	require.NoError(t, err)
 	e := transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1"}
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(p.Input().Branches[0].Message), e.References()[0], strings.Repeat("a", 64), time.Now().UTC())
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(p.Input().Branches[0].Message), e.References()[0], strings.Repeat("a", 64), time.Now().UTC())
 	require.NoError(t, err)
 	_, err = OriginalPlan(t.Context(), pool, proof)
 	require.ErrorIs(t, err, transaction.ErrTransactionRequired)

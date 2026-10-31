@@ -21,14 +21,15 @@ import (
 	"time"
 
 	apphot "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
-	prepare "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	redishot "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog/hotrank"
-	stage "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
+	stage "github.com/FangcunMount/qs-server/internal/testutil/legacymongooutbox"
 	"github.com/FangcunMount/reliable-messaging/outbox"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
@@ -143,7 +144,7 @@ func TestHotRankDayRecoveryAfterActualNSQConfirmationLoss(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	prepared, err := prepare.PrepareIntents(events, catalog, "qs-apiserver")
+	prepared, err := eventmessage.PrepareIntents(events, catalog, "qs-apiserver")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,7 +8,8 @@ import (
 	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	eventport "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
@@ -67,8 +68,8 @@ func (c *Committer) readExecution(e transaction.Execution) (frozenOpening, error
 	if err != nil {
 		return f, err
 	}
-	ref := standard.ReferenceFromMessage(m)
-	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(m)
+	envelope, err := eventmessage.VerifyReference(consumer, ref.Fingerprint, ref)
 	if err != nil {
 		return f, err
 	}

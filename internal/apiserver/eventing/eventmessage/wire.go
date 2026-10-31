@@ -1,4 +1,4 @@
-package standardoutbox
+package eventmessage
 
 import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -6,9 +6,8 @@ import (
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
 
-// EncodeWire preserves the complete NSQ transport envelope consumed by the
-// current QS Worker. The SDK NSQ publisher sends Message.Payload verbatim, so
-// its durable payload must be this wire value, not just the domain event JSON.
+// EncodeWire preserves the Revision2 envelope used by frozen transaction plans
+// and historical references. The transport provider does not change its bytes.
 func EncodeWire(evt event.DomainEvent, source string) ([]byte, error) {
 	payload, err := domainwire.EncodeEvent(evt)
 	if err != nil {

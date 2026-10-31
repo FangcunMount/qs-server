@@ -540,3 +540,7 @@ T25-C3 的受控原库 fixture 新增已处置 notice 的重导入验证：保�
 ### M3 T29：答卷幂等索引改为离线安装
 
 Mongo44显式安装原`uk_answersheet_submit_intent`唯一部分索引，键为writer_id/idempotency_key，保持原unique和partialFilterExpression；不重写旧迁移。既有同定义索引幂等保留，冲突或重复数据导致离线升级失败并保持停写，不自动修复事实。当前完整目标110/44；110/43仅是已声明的前置版本对，不是当前runtime启动目标。事务composition root借用已安装原库的无DDL构造器；非事务路径保留原行为。生产105前置、实际安装、具名批准与system验收仍独立。已接受责任存在时不得运行相关down迁移。
+
+### 2026-10-31 宿主退役 M4 复核
+
+本批未新增或执行数据库迁移、修复、重投或删除。当前发布构建检查三个实际进程的依赖图，禁止 NSQ、发布型 Relay 及历史测试夹具进入生产；旧 Relay runtime closure 明确在固定历史源码运行。重试交接夹具改用中立 `eventmessage` 编码与 Reference 校验，原身份、wire、计划/receipt 格式、原事务原子性与人工恢复权限保持。历史命令和生产证据保留原提交归属，不由本次源码复核补为当前验收。

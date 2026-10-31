@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
@@ -158,7 +158,7 @@ func TestWorkerUnknownEventProcessChild(t *testing.T) {
 		})
 	}
 	observer := &workerSettlementObserver{}
-	subscriber, err := newFastSDKWorkerSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: "nsqlookupd:4161", NSQMessageTimeout: 5 * time.Second,
 	}, 5, 500*time.Millisecond, recorder)
 	if err != nil {

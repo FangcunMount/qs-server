@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	mysqlstandard "github.com/FangcunMount/qs-server/internal/testutil/legacymysqloutbox"
 	"github.com/FangcunMount/reliable-messaging/message"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -20,43 +19,15 @@ func (s *deadLetterRecorderStub) RecordDeadLetter(_ context.Context, record Dead
 	return s.err
 }
 
-func TestNewNSQConfigPreservesDefaultAndAppliesExplicitMessageTimeout(t *testing.T) {
-	t.Parallel()
-
-	defaultConfig, err := newNSQConfig(0)
-	if err != nil {
-		t.Fatal(err)
+func TestSDKDeliverySubscriberRejectsRetiredProviderBeforeResources(t *testing.T) {
+	failed := func(context.Context, rmtransport.Failure) error { return nil }
+	for _, provider := range []string{"", "nsq", "unknown"} {
+		if _, err := NewSDKDeliverySubscriber(SubscriberConfig{Provider: provider}, 1, 8, failed); err == nil {
+			t.Fatalf("retired or missing provider accepted: %q", provider)
+		}
 	}
-	if defaultConfig.MsgTimeout != 0 {
-		t.Fatalf("default NSQ message timeout = %s, want server-negotiated zero value", defaultConfig.MsgTimeout)
-	}
-	if _, err := newNSQConfig(-time.Second); err == nil {
-		t.Fatal("negative NSQ message timeout accepted")
-	}
-	config, err := newNSQConfig(6 * time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if config.MsgTimeout != 6*time.Minute {
-		t.Fatalf("NSQ message timeout = %s, want 6m", config.MsgTimeout)
-	}
-}
-
-func TestSDKDeliverySubscriberRequiresDurableFailureHandlerWithoutConnecting(t *testing.T) {
-	config := SubscriberConfig{Provider: "nsq", NSQLookupdAddr: "127.0.0.1:4161"}
-	if _, err := NewSDKDeliverySubscriber(config, 1, 8, nil); err == nil {
-		t.Fatal("missing durable failure handler accepted")
-	}
-	failed := func(context.Context, legacy.FailedHandoff) error { return nil }
-	if _, err := NewSDKDeliverySubscriber(config, 1, 9, failed); err == nil {
-		t.Fatal("attempt budget above governance limit accepted")
-	}
-	subscriber, err := NewSDKDeliverySubscriber(config, 1, 8, failed)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := subscriber.Close(); err != nil {
-		t.Fatalf("close unused subscriber: %v", err)
+	if _, err := NewSDKDeliverySubscriber(SubscriberConfig{Provider: "rocketmq"}, 1, 8, nil); err == nil {
+		t.Fatal("missing provider-aware durable failure handler accepted")
 	}
 }
 

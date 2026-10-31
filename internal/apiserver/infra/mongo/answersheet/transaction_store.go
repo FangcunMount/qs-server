@@ -10,7 +10,8 @@ import (
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -175,7 +176,7 @@ func (s *RocketMQSubmissionStore) confirmSubmission(ctx context.Context, po Answ
 	}
 	frozen, frozenBinding, err := readSubmissionPlan(winner.Execution.Plan, s.runtime.Routes())
 	if err != nil || frozen.DomainID != po.DomainID || frozen.ID != po.ID || frozenBinding != binding || !frozen.DurableAcceptance.AcceptedAt.Equal(a.AcceptedAt) ||
-		proof.Reference != standard.ReferenceFromMessage(winner.Execution.Plan.Input().Branches[0].Message) || !proof.RecordedAt.Equal(a.AcceptedAt) {
+		proof.Reference != eventmessage.ReferenceFromMessage(winner.Execution.Plan.Input().Branches[0].Message) || !proof.RecordedAt.Equal(a.AcceptedAt) {
 		return ErrSubmissionUnresolved
 	}
 	e, err := s.authority.Evidence(ctx, ref)

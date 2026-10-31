@@ -1,6 +1,6 @@
 //go:build reliable_messaging_m4 && reliable_messaging_m4_integration
 
-package standardoutbox
+package legacymongooutbox
 
 import (
 	"context"
@@ -39,7 +39,7 @@ func TestStandardMongoScheduledRetryUsesOriginalTransactionAndDueTime(t *testing
 		t.Fatal(err)
 	}
 	collection := db.Collection("rm_outbox")
-	wire, err := eventcatalog.Load("../../../../../configs/events.yaml")
+	wire, err := eventcatalog.Load("../../../../configs/events.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

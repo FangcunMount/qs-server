@@ -6,7 +6,8 @@ import (
 	"time"
 
 	domainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -106,7 +107,7 @@ func TestOriginalRetryRequiresExactUnconsumedDueAuthority(t *testing.T) {
 func TestOriginalIntentChecksWireAndConfirmation(t *testing.T) {
 	_, run, d, now := retryFixture()
 	evt := domainevent.NewRetryRequestedEvent(domainevent.RequestedInput{OrgID: d.OrgID, AssessmentID: d.AssessmentID, TesteeID: d.TesteeID, EventID: *run.RetryEventID, RequestedAt: now, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt"})
-	body, err := standardoutbox.EncodeWire(evt, "qs-apiserver")
+	body, err := eventmessage.EncodeWire(evt, "qs-apiserver")
 	require.NoError(t, err)
 	input := message.Input{Producer: "qs-server", ID: evt.EventID(), Destination: "qs.evaluation.lifecycle", EventType: EvaluationRetry, Scope: "org:3", SchemaVersion: "v1", ContentType: "application/json", OccurredAt: now.Format(time.RFC3339Nano), Payload: body}
 	original, err := message.New(input)

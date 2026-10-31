@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
@@ -68,7 +68,7 @@ func TestDirectEventWireThroughRealNSQ(t *testing.T) {
 		Mode: PublishModeMQ, Source: SourceAPIServer,
 	})
 	require.NoError(t, route.Publish(ctx, evt))
-	want, err := standardoutbox.EncodeWire(evt, SourceAPIServer)
+	want, err := eventmessage.EncodeWire(evt, SourceAPIServer)
 	require.NoError(t, err)
 	select {
 	case raw := <-received:
@@ -122,7 +122,7 @@ func TestStandardWireThroughRealNSQ(t *testing.T) {
 		},
 		Data: map[string]any{"org_id": 1, "assessment_id": 1},
 	}
-	wire, err := standardoutbox.EncodeWire(evt, SourceAPIServer)
+	wire, err := eventmessage.EncodeWire(evt, SourceAPIServer)
 	require.NoError(t, err)
 	intent, err := message.New(message.Input{
 		Producer: "qs-server", ID: evt.EventID(), Destination: topic,

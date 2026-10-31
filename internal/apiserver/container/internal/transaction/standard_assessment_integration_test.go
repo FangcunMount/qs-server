@@ -21,6 +21,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	legacymysqloutbox "github.com/FangcunMount/qs-server/internal/testutil/legacymysqloutbox"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
@@ -62,7 +63,7 @@ events:
     handler: evaluation_requested_handler
 `))
 	require.NoError(t, err)
-	stager, err := mysqlstandard.NewStager(eventcatalog.NewCatalog(config), eventruntime.SourceAPIServer)
+	stager, err := legacymysqloutbox.NewStager(eventcatalog.NewCatalog(config), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	repo := assessmentcache.NewInvalidatingAssessmentRepository(assessmentmysql.NewAssessmentRepository(db), nil)
 	runner := NewMySQLRunner(db)

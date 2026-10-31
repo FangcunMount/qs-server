@@ -1,4 +1,4 @@
-package standardoutbox
+package eventmessage
 
 import (
 	"bytes"

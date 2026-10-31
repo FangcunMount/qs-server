@@ -11,7 +11,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ func TestOpeningPlanPreservesFirstEntryWithoutExposingItInReminderWire(t *testin
 	plan, err := shared.Freeze(q, taskRoutes{}, "qs.mysql", "m3-1")
 	require.NoError(t, err)
 	require.Len(t, plan.Input().Branches, 1)
-	wire, err := standard.EncodeWire(q.Events[0], "api-server")
+	wire, err := eventmessage.EncodeWire(q.Events[0], "api-server")
 	require.NoError(t, err)
 	require.Equal(t, wire, plan.Input().Branches[0].Wire)
 	require.NotContains(t, string(wire), task.GetEntryURL())

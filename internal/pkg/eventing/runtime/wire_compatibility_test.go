@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -72,7 +72,7 @@ func TestDurableEventWireCompatibility(t *testing.T) {
 			if _, recognized, err := legacy.Decode([]byte(old.Payload)); err != nil || recognized {
 				t.Fatalf("domain JSON alone unexpectedly carries transport identity: recognized=%v err=%v", recognized, err)
 			}
-			newWire, err := standardoutbox.EncodeWire(evt, SourceAPIServer)
+			newWire, err := eventmessage.EncodeWire(evt, SourceAPIServer)
 			if err != nil {
 				t.Fatal(err)
 			}

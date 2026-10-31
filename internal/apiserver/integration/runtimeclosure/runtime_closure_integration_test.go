@@ -97,14 +97,6 @@ type runtimeClosureScenario struct {
 	skipReportWaitClosure bool
 }
 
-// TestCurrentRuntimeClosure exercises the ordinary, current-time path through
-// Actor, AssessmentEntry, Plan, AnswerSheet, Assessment, Evaluation,
-// Interpretation and report-wait using real application services,
-// repositories, durable outboxes and worker handlers.
-func TestCurrentRuntimeClosure(t *testing.T) {
-	runCurrentRuntimeClosure(t, newCapturedStandardEventSubsystem)
-}
-
 func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFactory, scenarios ...runtimeClosureScenario) {
 	var scenario runtimeClosureScenario
 	if len(scenarios) > 0 {
@@ -177,11 +169,9 @@ func runCurrentRuntimeClosure(t *testing.T, eventFactory runtimeClosureEventFact
 	}
 	capture := newCapturedMQPublisher()
 	eventing, delivery, err := eventFactory(t, eventsubsystem.Options{
-		MySQLDB: gormDB, MongoDB: mongoDB, OpsRedis: redisClient,
+		MySQLDB: gormDB, MongoDB: mongoDB,
 		Catalog: eventcatalog.NewCatalog(events), WirePublisher: capture, PublisherMode: eventruntime.PublishModeMQ,
-		Mongo:      eventsubsystem.ProfileOptions{PublishWorkers: 1},
-		Assessment: eventsubsystem.ProfileOptions{PublishWorkers: 1},
-		Consumers:  map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
+		Consumers: map[string]eventsubsystem.ConsumerOptions{"modelcatalog.hot_rank_projection": {Enabled: false}},
 	}, sqlDB)
 	if err != nil {
 		t.Fatalf("build event subsystem: %v", err)

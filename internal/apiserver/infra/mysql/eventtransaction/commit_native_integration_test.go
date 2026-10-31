@@ -16,7 +16,8 @@ import (
 
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	outcomerepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -176,7 +177,7 @@ func TestM3MySQLOriginalEventRoot(t *testing.T) {
 		q.Events = []event.DomainEvent{event.New("evaluation.outcome.committed", "Assessment", "42", eventpayload.EvaluationOutcomeCommittedData{OrgID: 7, AssessmentID: 42, TesteeID: 8, OutcomeID: "901", EvaluationRunID: input.RunID, CommittedAt: input.EvaluatedAt})}
 		r, err := c.Reserve(t.Context(), q)
 		require.NoError(t, err)
-		input.CommittedTransactionEvidence, err = evidence.NewTransactional(standard.ReferenceFromMessage(r.Execution.Plan.Input().Branches[0].Message), r.Execution.References()[0], domainoutcome.BusinessBindingSHA256(input), input.EvaluatedAt)
+		input.CommittedTransactionEvidence, err = evidence.NewTransactional(eventmessage.ReferenceFromMessage(r.Execution.Plan.Input().Branches[0].Message), r.Execution.References()[0], domainoutcome.BusinessBindingSHA256(input), input.EvaluatedAt)
 		require.NoError(t, err)
 		record, err := domainoutcome.NewRecord(input)
 		require.NoError(t, err)

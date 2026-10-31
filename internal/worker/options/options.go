@@ -56,7 +56,7 @@ type MetricsOptions struct {
 // MessagingOptions 消息队列配置
 type MessagingOptions struct {
 	RocketMQ *genericoptions.RocketMQOptions `json:"rocketmq" mapstructure:"rocketmq"`
-	// Provider 消息队列提供者；v1.0 仅支持 NSQ。
+	// Provider 当前宿主只支持 RocketMQ。
 	Provider string `json:"provider" mapstructure:"provider"`
 	// NSQ 配置
 	NSQAddr           string           `json:"nsq_addr" mapstructure:"nsq-addr"`
@@ -135,10 +135,7 @@ func NewOptions() *Options {
 		MySQL:   genericoptions.NewMySQLOptions(),
 		MongoDB: genericoptions.NewMongoDBOptions(),
 		Messaging: &MessagingOptions{
-			Provider:          "nsq",
-			NSQAddr:           "localhost:4150",
-			NSQLookupdAddr:    "localhost:4161",
-			NSQDHTTPEndpoints: []string{"http://localhost:4151"},
+			Provider:          "rocketmq",
 			NSQMessageTimeout: 4 * time.Minute,
 			Delivery:          genericoptions.NewTransportDeliveryOptions(),
 		},
@@ -207,15 +204,9 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	}
 	o.Messaging.RocketMQ.AddFlags(messagingFS, "messaging.rocketmq")
 	messagingFS.StringVar(&o.Messaging.Provider, "messaging.provider", o.Messaging.Provider,
-		"Message queue provider (nsq)")
-	messagingFS.StringVar(&o.Messaging.NSQAddr, "messaging.nsq-addr", o.Messaging.NSQAddr,
-		"NSQ daemon address")
-	messagingFS.StringVar(&o.Messaging.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.Messaging.NSQLookupdAddr,
-		"NSQ lookupd address")
-	messagingFS.StringSliceVar(&o.Messaging.NSQDHTTPEndpoints, "messaging.nsqd-http-endpoints", o.Messaging.NSQDHTTPEndpoints,
-		"Explicit nsqd HTTP URLs for durable channel preparation")
+		"Message queue provider (rocketmq)")
 	messagingFS.DurationVar(&o.Messaging.NSQMessageTimeout, "messaging.nsq-message-timeout", o.Messaging.NSQMessageTimeout,
-		"NSQ server-side message timeout; must cover the longest worker handler RPC")
+		"Legacy option name for the RocketMQ handler deadline; must cover the longest worker RPC")
 	if o.Messaging.Delivery == nil {
 		o.Messaging.Delivery = genericoptions.NewTransportDeliveryOptions()
 	}
@@ -324,19 +315,15 @@ func (o *Options) Validate() []error {
 			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and %d", retrygovernance.HardMaxDeliveryAttempts))
 		}
 	}
-	if o.Messaging != nil && o.Messaging.Provider != "nsq" && o.Messaging.Provider != "rocketmq" {
-		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: nsq, rocketmq)", o.Messaging.Provider))
+	if o.Messaging != nil && o.Messaging.Provider != "rocketmq" {
+		errs = append(errs, fmt.Errorf("unsupported messaging provider: %s (supported: rocketmq); NSQ is retired", o.Messaging.Provider))
 	}
 	if o.Messaging != nil && o.Messaging.Provider == "rocketmq" {
 		if err := o.Messaging.RocketMQ.Validate(); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	if o.Messaging != nil && o.Messaging.Provider == "nsq" {
-		if len(o.Messaging.NSQDHTTPEndpoints) == 0 {
-			errs = append(errs, fmt.Errorf("messaging.nsqd-http-endpoints is required for NSQ channel preparation"))
-		}
-	}
+
 	// The existing deadline also bounds the RocketMQ handler. Keep it longer
 	// than its downstream RPC so transport redelivery cannot race that call.
 	if o.Messaging != nil {

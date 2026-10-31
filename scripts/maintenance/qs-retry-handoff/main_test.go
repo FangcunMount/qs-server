@@ -13,8 +13,9 @@ import (
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing/retrydispatch"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -38,7 +39,7 @@ func fixture(t *testing.T) (model.HandoffReview, []string, string) {
 		BaseEvent: event.BaseEvent{ID: "private-event-id", EventTypeValue: "evaluation.retry.requested", OccurredAtValue: at, AggregateTypeValue: "Evaluation", AggregateIDValue: "41"},
 		Data:      payload.EvaluationRequestedData{OrgID: 7, AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: at},
 	}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{e}, routes{}, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{e}, routes{}, "api-server")
 	require.NoError(t, err)
 	plan, err := model.New(model.Authority{Owner: "qs.mysql", OrgID: 7, Kind: model.Evaluation, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: [32]byte{1}}, prepared[0].Message.Input(), at)
 	require.NoError(t, err)

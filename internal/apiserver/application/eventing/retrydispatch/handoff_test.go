@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	root "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -164,7 +165,7 @@ func TestOfflineHandoffRetainsConfirmedPrefixAndStopsAtFirstUnknown(t *testing.T
 			BaseEvent: event.BaseEvent{ID: fmt.Sprintf("original-%d", id), EventTypeValue: "evaluation.retry.requested", OccurredAtValue: first.DueAt(), AggregateTypeValue: "Evaluation", AggregateIDValue: a.SubjectID},
 			Data:      payload.EvaluationRequestedData{OrgID: a.OrgID, AssessmentID: int64(id), TesteeID: a.TesteeID, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: first.DueAt()},
 		}
-		prepared, err := standard.PrepareIntents([]event.DomainEvent{e}, routes{}, "api-server")
+		prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{e}, routes{}, "api-server")
 		require.NoError(t, err)
 		plan, err := model.New(a, prepared[0].Message.Input(), first.DueAt())
 		require.NoError(t, err)

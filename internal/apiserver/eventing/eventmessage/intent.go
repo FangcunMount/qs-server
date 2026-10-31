@@ -1,4 +1,4 @@
-package standardoutbox
+package eventmessage
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ type PreparedIntent struct {
 	DueAt   time.Time
 }
 
-// PrepareIntents keeps QS routing, organization scope and original NSQ wire
+// PrepareIntents keeps QS routing, organization scope and immutable event wire
 // identical across its MySQL and Mongo host-owned transactions.
 func PrepareIntents(events []event.DomainEvent, resolver eventcatalog.TopicResolver, source string) ([]PreparedIntent, error) {
 	if resolver == nil || source == "" {

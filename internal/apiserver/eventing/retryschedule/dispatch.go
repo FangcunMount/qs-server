@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -109,7 +109,7 @@ func DispatchProof(r Record, e transaction.Execution, readers ...ArtifactReader)
 	if len(refs) != 1 {
 		return nil, ErrInvalid
 	}
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(e.Plan.Input().Branches[0].Message), refs[0], r.Plan.BindingDigest(), d.SelectedAt)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(e.Plan.Input().Branches[0].Message), refs[0], r.Plan.BindingDigest(), d.SelectedAt)
 	if err != nil {
 		return nil, err
 	}

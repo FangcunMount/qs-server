@@ -13,7 +13,6 @@ import (
 	"time"
 
 	appintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	assessmentmysql "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlstandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
@@ -21,6 +20,8 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	legacymysqloutbox "github.com/FangcunMount/qs-server/internal/testutil/legacymysqloutbox"
+	standardoutbox "github.com/FangcunMount/qs-server/internal/testutil/legacyoutbox"
 	"github.com/FangcunMount/reliable-messaging/relay"
 	sdkmysql "github.com/FangcunMount/reliable-messaging/storage/mysql"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
@@ -70,7 +71,7 @@ events:
     handler: evaluation_requested_handler
 `))
 	require.NoError(t, err)
-	stager, err := mysqlstandard.NewStager(eventcatalog.NewCatalog(parsedCatalog), eventruntime.SourceAPIServer)
+	stager, err := legacymysqloutbox.NewStager(eventcatalog.NewCatalog(parsedCatalog), eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	repo := assessmentmysql.NewAssessmentRepository(db)
 	intake := appintake.NewService(repo, proofModelValidator{}, NewMySQLRunner(db), stager)

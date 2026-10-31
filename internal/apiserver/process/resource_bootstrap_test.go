@@ -233,9 +233,6 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if eventOptions.MySQLDB != &mysqlDB || eventOptions.MongoDB != &mongoDB || eventOptions.Catalog != catalog || eventOptions.WirePublisher != publisher {
 		t.Fatalf("event subsystem options mismatch: %#v", eventOptions)
 	}
-	if eventOptions.MySQLLimiter != resilience.Backpressure("mysql") || eventOptions.MongoLimiter != resilience.Backpressure("mongo") {
-		t.Fatal("event subsystem did not receive shared resilience backpressure instances")
-	}
 }
 
 func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T) {

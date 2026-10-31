@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -31,7 +31,7 @@ func TestPreparedRetryUsesExactOriginalWireAndBoundPrivateArtifact(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, f.Bytes(), raw)
 	refs := (transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1"}).References()
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(branch.Message), refs[0], f.BindingDigest(), at)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(branch.Message), refs[0], f.BindingDigest(), at)
 	require.NoError(t, err)
 	require.NoError(t, (Record{Plan: f, State: DispatchCommitted, Version: 2, Proof: proof}).Validate())
 	proof.BusinessBindingSHA256 = string(bytes.Repeat([]byte{'0'}, 64))
@@ -55,7 +55,7 @@ func TestDispatchProofForAnotherFirstWireCannotCloseOriginalSchedule(t *testing.
 	require.NoError(t, err)
 	b := p.Input().Branches[0]
 	ref := (transaction.Execution{Plan: p, Fence: 1, WriterEpoch: "m3-1"}).References()[0]
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(b.Message), ref, f.BindingDigest(), at)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(b.Message), ref, f.BindingDigest(), at)
 	require.NoError(t, err)
 	require.ErrorIs(t, f.ValidateDispatchProof(proof), ErrInvalid)
 	require.ErrorIs(t, (Record{Plan: f, State: DispatchCommitted, Version: 1}).Validate(), ErrInvalid)

@@ -8,7 +8,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -68,7 +69,7 @@ func (b *boundaryStub) Find(context.Context, string, string) (transaction.Reserv
 func (b *boundaryStub) Reserve(_ context.Context, q port.Request) (transaction.Reservation, error) {
 	b.q = q
 	b.reserves++
-	intents, err := standard.PrepareIntents(q.Events, routes{}, "api-server")
+	intents, err := eventmessage.PrepareIntents(q.Events, routes{}, "api-server")
 	require.NoError(b.t, err)
 	require.Len(b.t, intents, 1)
 	in := intents[0].Message.Input()

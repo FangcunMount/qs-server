@@ -32,7 +32,7 @@ func TestMQRuntimeMissingTechnicalCoverageRefusesBeforeTransport(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	for _, table := range []string{"ai_messaging_admission", "ai_messaging_aggregates", "ai_messaging_evaluation_states", "ai_messaging_inbox", "ai_messaging_failures", "ai_messaging_outbox", "ai_messaging_operations", "ai_messaging_quarantine", "ai_messaging_observations"} {
+	for _, table := range []string{"ai_messaging_admission", "ai_messaging_aggregates", "ai_messaging_evaluation_states", "ai_messaging_inbox", "ai_messaging_failures", "ai_messaging_operations", "ai_messaging_quarantine", "ai_messaging_observations"} {
 		query := "CREATE TABLE `" + name + "`." + table + " LIKE `" + sourceSchema + "`." + table
 		if table == "ai_messaging_operations" {
 			// LIKE renames CHECK constraints. Preserve the exact registered
@@ -70,6 +70,10 @@ func TestMQRuntimeMissingTechnicalCoverageRefusesBeforeTransport(t *testing.T) {
 	}
 	if _, err = source.Exec("INSERT INTO `" + name + "`.ai_messaging_observations SELECT * FROM `" + sourceSchema + "`.ai_messaging_observations WHERE kind='duplicate_event'"); err != nil {
 		t.Fatal(err)
+	}
+	var legacyTableCount int
+	if err = db.QueryRow("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='ai_messaging_outbox'").Scan(&legacyTableCount); err != nil || legacyTableCount != 0 {
+		t.Fatal("current preflight fixture unexpectedly depends on retired publishing storage", err)
 	}
 	if err = runtime.preflightStorage(t.Context()); err != nil {
 		t.Fatal("complete schema refused", err)

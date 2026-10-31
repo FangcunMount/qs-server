@@ -10,8 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	events "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	storeport "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
@@ -111,8 +112,8 @@ func (s *governedRetryService) authorizeScheduled(ctx context.Context, command G
 
 func scheduledRetryEvidence(f model.Frozen) (*evidence.EventEvidenceV1, error) {
 	msg := f.Message()
-	ref := standard.ReferenceFromMessage(msg)
-	wire, err := standard.VerifyReference(msg.Input(), ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(msg)
+	wire, err := eventmessage.VerifyReference(msg.Input(), ref.Fingerprint, ref)
 	if err != nil {
 		return nil, err
 	}

@@ -11,7 +11,8 @@ import (
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	answersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	basemongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	sheetmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	interpretmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
@@ -48,14 +49,14 @@ func (f auditFacts) FindByAssessmentID(context.Context, meta.ID) (*evaluationfac
 }
 func eventRow(t *testing.T, evt event.DomainEvent, binding string) (*evidence.EventEvidenceV1, bson.M) {
 	t.Helper()
-	intents, err := standard.PrepareIntents([]event.DomainEvent{evt}, auditResolver{}, "api-server")
+	intents, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, auditResolver{}, "api-server")
 	if err != nil {
 		t.Fatal(err)
 	}
 	msg := intents[0].Message
 	in := msg.Input()
 	fp := msg.Fingerprint()
-	ref := standard.ReferenceFromMessage(msg)
+	ref := eventmessage.ReferenceFromMessage(msg)
 	proof, err := evidence.NewStandard(ref, binding)
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +237,7 @@ func TestScannerPagesActualCompoundBSONIdentitiesAndResumes(t *testing.T) {
 			}
 			in := msg.Input()
 			fp := msg.Fingerprint()
-			docs = append(docs, bson.M{"_id": identity(standard.ReferenceFromMessage(msg)), "producer": in.Producer, "message_id": in.ID, "destination": in.Destination, "event_type": in.EventType, "fingerprint": fp[:]})
+			docs = append(docs, bson.M{"_id": identity(eventmessage.ReferenceFromMessage(msg)), "producer": in.Producer, "message_id": in.ID, "destination": in.Destination, "event_type": in.EventType, "fingerprint": fp[:]})
 		}
 	}
 	mustInsertMany(t, ctx, db.Collection("rm_outbox"), docs)

@@ -9,8 +9,8 @@ import (
 func TestOptionsRejectRetiredRabbitMQProvider(t *testing.T) {
 	opts := NewOptions()
 	opts.Messaging.Provider = "rabbitmq"
-	if !containsWorkerValidationError(opts.Validate(), "supported: nsq") {
-		t.Fatal("Worker accepted RabbitMQ despite NSQ-only support")
+	if !containsWorkerValidationError(opts.Validate(), "supported: rocketmq") {
+		t.Fatal("Worker accepted RabbitMQ despite RocketMQ-only support")
 	}
 }
 

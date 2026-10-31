@@ -3,7 +3,8 @@ package interpretation
 import (
 	"context"
 	"errors"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"strconv"
 	"time"
 
@@ -90,7 +91,7 @@ func (a *retryDispatchAuthority) ValidateDispatchAuthority(ctx context.Context, 
 	if result.MatchedCount != 1 {
 		return transaction.ErrStaleExecution
 	}
-	if proof := run.RetryEventEvidence(); proof == nil || proof.Reference == nil || proof.EventID != f.Message().Input().ID || *proof.Reference != standard.ReferenceFromMessage(f.Message()) {
+	if proof := run.RetryEventEvidence(); proof == nil || proof.Reference == nil || proof.EventID != f.Message().Input().ID || *proof.Reference != eventmessage.ReferenceFromMessage(f.Message()) {
 		return errors.Join(transaction.ErrBinding, model.ErrConflict)
 	}
 	return nil

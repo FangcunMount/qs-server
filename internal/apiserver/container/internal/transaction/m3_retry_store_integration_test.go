@@ -25,8 +25,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	mongorepo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	mongostore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
@@ -65,7 +66,7 @@ func retryRoutes(t *testing.T) *catalog.Catalog {
 
 func retryFrozen(t *testing.T, a model.Authority, evt event.DomainEvent, due time.Time) model.Frozen {
 	t.Helper()
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, retryRoutes(t), "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, retryRoutes(t), "api-server")
 	require.NoError(t, err)
 	f, err := model.New(a, prepared[0].Message.Input(), due)
 	require.NoError(t, err)
@@ -264,11 +265,11 @@ func TestM3RetryMongoStore(t *testing.T) {
 	require.NotNil(t, decision)
 	require.NotNil(t, decision.NextAttemptAt)
 	evt := interpretation.NewInterpretationRetryRequestedEvent(interpretation.RetryRequestedEventInput{OrgID: 7, GenerationID: g.ID().String(), RunID: run.ID().String(), AssessmentID: "41", OutcomeID: "71", TesteeID: 9, ExpectedAttempt: run.Attempt(), AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: *decision.NextAttemptAt})
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, retryRoutes(t), "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, retryRoutes(t), "api-server")
 	require.NoError(t, err)
 	business, err := eventevidencebinding.Retry(evt.Data)
 	require.NoError(t, err)
-	reference, err := evidence.NewStandard(standard.ReferenceFromMessage(prepared[0].Message), business)
+	reference, err := evidence.NewStandard(eventmessage.ReferenceFromMessage(prepared[0].Message), business)
 	require.NoError(t, err)
 	require.NoError(t, run.AttachRetryEventEvidence(reference))
 	digest, err := model.DecisionDigest(run.RetryDecision())

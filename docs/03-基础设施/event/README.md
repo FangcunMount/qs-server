@@ -1,6 +1,6 @@
 # QS Event 与 Signal
 
-QS 保留业务事实、原事务、消费幂等和恢复许可；`reliable-messaging v0.5.0` 提供冻结计划、事务发送、精确 witness、Checker 与 RocketMQ 传输，继续以 SDK 嵌入宿主。
+QS 保留业务事实、原事务、消费幂等和恢复许可；`reliable-messaging v0.6.1` 提供冻结计划、事务发送、精确 witness、Checker 与 RocketMQ 传输，继续以 SDK 嵌入宿主。
 
 ```text
 冻结计划 → 全部分支半消息 → 原业务根事务（业务＋witness）

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	events "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -121,7 +121,7 @@ func fixture(t *testing.T) (*Dispatcher, *storeFixture, *ownerFixture, *authorit
 	t.Helper()
 	at := time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC)
 	e := event.Event[payload.EvaluationRequestedData]{BaseEvent: event.BaseEvent{ID: "retry-first", EventTypeValue: "evaluation.retry.requested", OccurredAtValue: at, AggregateTypeValue: "Evaluation", AggregateIDValue: "41"}, Data: payload.EvaluationRequestedData{OrgID: 7, AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: at}}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{e}, routes{}, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{e}, routes{}, "api-server")
 	require.NoError(t, err)
 	f, err := model.New(model.Authority{Owner: "qs.mysql", OrgID: 7, Kind: model.Evaluation, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: [32]byte{1}}, prepared[0].Message.Input(), at)
 	require.NoError(t, err)

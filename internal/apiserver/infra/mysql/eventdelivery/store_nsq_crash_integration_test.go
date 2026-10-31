@@ -17,7 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	legacywire "github.com/FangcunMount/reliable-messaging/wire/legacy"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"github.com/nsqio/go-nsq"

@@ -7,7 +7,8 @@ import (
 	"fmt"
 
 	appaudit "github.com/FangcunMount/qs-server/internal/apiserver/application/mongoconsistency"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -65,7 +66,7 @@ func (s *Scanner) checkTransactionEvidence(ctx context.Context, proof *evidence.
 		if err != nil || actual != ref {
 			continue
 		}
-		if standard.ReferenceFromMessage(branch.Message) != proof.Reference {
+		if eventmessage.ReferenceFromMessage(branch.Message) != proof.Reference {
 			return driftf("transaction original metadata differs")
 		}
 		consumer := branch.Message.Input()
@@ -74,8 +75,8 @@ func (s *Scanner) checkTransactionEvidence(ctx context.Context, proof *evidence.
 		if err != nil {
 			return conflict(err)
 		}
-		wireRef := standard.ReferenceFromMessage(m)
-		envelope, err := standard.VerifyReference(consumer, wireRef.Fingerprint, wireRef)
+		wireRef := eventmessage.ReferenceFromMessage(m)
+		envelope, err := eventmessage.VerifyReference(consumer, wireRef.Fingerprint, wireRef)
 		if err != nil {
 			return conflict(err)
 		}

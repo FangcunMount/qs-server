@@ -6,7 +6,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -25,7 +26,7 @@ func transactionLifecycleProof(t *testing.T, kind string) *evidence.EventEvidenc
 	ref, err := plan.Reference("generated", 1, "m3-1")
 	require.NoError(t, err)
 	legacy := fixtureProof(t, kind, "fixture-business-binding")
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(m), ref, legacy.BusinessBindingSHA256, at)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(m), ref, legacy.BusinessBindingSHA256, at)
 	require.NoError(t, err)
 	return proof
 }

@@ -1,4 +1,4 @@
-package standardoutbox
+package legacymysqloutbox
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -55,7 +55,7 @@ func (s *Stager) stageAt(ctx context.Context, dueAt time.Time, events []event.Do
 	if err != nil {
 		return err
 	}
-	prepared, err := standardoutbox.PrepareIntents(events, s.resolver, s.source)
+	prepared, err := eventmessage.PrepareIntents(events, s.resolver, s.source)
 	if err != nil {
 		return err
 	}

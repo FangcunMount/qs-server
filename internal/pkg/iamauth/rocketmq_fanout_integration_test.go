@@ -19,7 +19,6 @@ import (
 	hosttransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
-	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	mysqldsn "github.com/go-sql-driver/mysql"
 )
 
@@ -98,11 +97,7 @@ func TestM3RocketMQIAMFanoutChild(t *testing.T) {
 		t.Fatal("owned subscriber config missing")
 	}
 	var unexpected atomic.Bool
-	sub, err := hosttransport.NewSDKDeliverySubscriber(hosttransport.SubscriberConfig{Provider: "rocketmq", RocketMQ: &config, NSQMessageTimeout: 5 * time.Second}, 2, 3,
-		func(context.Context, legacy.FailedHandoff) error {
-			unexpected.Store(true)
-			return errors.New("unexpected NSQ handoff")
-		},
+	sub, err := hosttransport.NewSDKDeliverySubscriber(hosttransport.SubscriberConfig{Provider: "rocketmq", RocketMQ: &config, HandlerTimeout: 5 * time.Second}, 2, 3,
 		func(context.Context, rmtransport.Failure) error {
 			unexpected.Store(true)
 			return errors.New("unexpected RocketMQ handoff")

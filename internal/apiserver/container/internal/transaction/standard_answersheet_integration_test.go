@@ -16,14 +16,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
-	mongostandard "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	mongostandard "github.com/FangcunMount/qs-server/internal/testutil/legacymongooutbox"
 	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -99,7 +100,7 @@ events:
 
 	sheet := standardSubmissionSheet(t, 90010001, "accepted")
 	submitted := sheet.Events()[0]
-	wire, err := standardoutbox.EncodeWire(submitted, eventruntime.SourceAPIServer)
+	wire, err := eventmessage.EncodeWire(submitted, eventruntime.SourceAPIServer)
 	require.NoError(t, err)
 	fingerprint, err := submitport.Fingerprint(sheet)
 	require.NoError(t, err)

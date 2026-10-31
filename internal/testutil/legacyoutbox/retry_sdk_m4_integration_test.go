@@ -1,6 +1,6 @@
 //go:build reliable_messaging_m4 && reliable_messaging_m4_integration
 
-package standardoutbox
+package legacyoutbox
 
 import (
 	"context"
