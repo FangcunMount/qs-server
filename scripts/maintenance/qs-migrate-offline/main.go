@@ -28,6 +28,7 @@ type arguments struct {
 	apply                                                      bool
 	applicationEnvironment                                     bool
 	protocolObservation                                        bool
+	ownerDrain                                                 ownerDrainArguments
 	timeout                                                    time.Duration
 }
 
@@ -44,6 +45,7 @@ func parseArguments(args []string) (arguments, error) {
 	flags.DurationVar(&out.timeout, "timeout", 15*time.Minute, "total connection/migration deadline, at most 30m")
 	flags.BoolVar(&out.protocolObservation, "protocol-observation", false, "read original QS transaction primaries without sending or mutating")
 	registerInitialBindingFlags(flags, &out.binding)
+	registerOwnerDrainFlags(flags, &out.ownerDrain)
 	if err := flags.Parse(args); err != nil {
 		return out, err
 	}
@@ -59,6 +61,9 @@ func parseArguments(args []string) (arguments, error) {
 		return out, errors.New("initial binding requires explicit timeout at most 2m")
 	}
 	if err := out.binding.validate(out.apply, out.approvalFile, out.approvalSHA256); err != nil {
+		return out, err
+	}
+	if err := out.ownerDrain.validate(out); err != nil {
 		return out, err
 	}
 	return out, nil
@@ -121,6 +126,9 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 		return err
 	}
 	pair := migration.PairConfig{MySQLDatabase: a.mysqlDatabase, MongoDatabase: a.mongoDatabase, ExpectedSourceSHA: version.GitCommit}
+	if a.ownerDrain.enabled {
+		return runOwnerDrain(ctx, db, client, pair, a.ownerDrain, output)
+	}
 	if a.binding.action != "" {
 		return runInitialBinding(ctx, db, client, pair, a.binding, output)
 	}

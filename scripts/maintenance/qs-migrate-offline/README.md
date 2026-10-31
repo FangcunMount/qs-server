@@ -2,7 +2,7 @@
 
 源码位于 `scripts/maintenance/qs-migrate-offline/`，可由 `make build-maintenance` 或下文的独立命令构建。
 
-`qs-migrate-offline` 只拥有两条数据库连接和一次已批准的嵌入式 up 执行。默认只读；不启动 API、Collection、Worker、业务 Container、Scheduler、relay、NSQ、索引自动 reconcile 或种子数据。它不是业务服务、备份工具、恢复工具或全局维护框架。
+`qs-migrate-offline` 默认只拥有两条数据库连接和一次已批准的嵌入式 up 执行。默认只读；不启动 API、Collection、Worker、业务 Container、Scheduler、relay、NSQ、索引自动 reconcile 或种子数据。独立显式的`--owner-drain`模式仅注册暂停新发送的原生事务Checker，可能持久化正式SDK回查/恢复审计，不能标为只读。它不是业务服务、备份工具、恢复工具或全局维护框架。
 
 完整停写、按批准范围的保护与恢复、逐对象责任和首个 runtime 启动边界由 [One-off、恢复与生产证据](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)维护。本文只定义执行器输入与输出。
 
@@ -176,3 +176,17 @@ SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRI
 `no_observed_unresolved` 仅说明本次原主库元数据与native-limit未观察到未决状态，不证明Broker、业务ACK、写者排除或owner可停机。报告固定 `runtime_frozen=false`、`broker_pending_known=false`，不能独立消费为批准。最后owner的在途发送/回查、排空/退出及同窗口材料仍须独立核实。不会自动reconcile、重投或清理凭证。
 
 原 `release-snapshot.yml` 在 `messaging_retirement_inventory=true` 时可显式选 `protocol_observation=true`，通过同一已校验维护容器读取，保存独立 `messaging-retirement-protocol.json`。默认不执行协议观察，原schema预览和清单语义不变。
+
+## M5 独立维护 owner
+
+显式`--owner-drain`与apply、binding、protocol-observation互斥。另要求`--owner-drain-config`为原应用JSON绝对路径、`--owner-drain-config-sha256`为其原字节摘要、`--owner-drain-operation=<digits-attempt>`为新操作，以及`--owner-drain-mysql-identity`/`--owner-drain-mongo-identity`为canonical已核双库身份。生产沿用`--application-env --mysql-database=qs --mongo-database=qs --timeout=30m`；隔离测试仅使用已分配库的显式连接与实际身份。拒绝非110/44、原binding不符或同operation复用，不建表/修改binding。
+
+读取原`messaging.rocketmq`，沿既有Viper时长和literal owner解码保留原routes、凭据和每实例预算，仅在内存将新发送准入设false。分别复用正式SDK的原SQL/Mongo store、native-limit与事务Runtime，无NORMAL发布者、Reserve/Execute入口、业务消费者、HTTP/gRPC、模型、调度或业务Container。它是临时第二组Checker，重叠期间不宣称全主机回查worker数量与原来相同；编排须记录旧/维护两组实例、资源/并发上界，保持原每实例预算和Broker回查参数，并尽快完成旧实例排空。
+
+原业务停止前先验证维护Checker实际注册、原库观测可用新鲜，保留原owner到交接成立。停止原API后调度/业务生产均退出，维护Checker仍可依据原凭证回复Broker并持久化正向恢复审计。没有新业务执行或凭证删除，但SDK正常维护可能转移协议状态；因此同窗口静态保护在维护owner最终退出后捕获。
+
+状态写入新0700目录`$TMPDIR/qs-owner-drain-<operation>/status.json`，0600原子替换；包含实际源码、配置摘要、时间、两owner协议/SDK/保护状态，默认没有停写或批准结论。仅在同目录新0600单链接普通文件`stop.json`声明精确operation、独立receipt摘要，且`writers_stopped`与`replacement_owner_ready`恰一个为true时，才审查退出。声明本身不是写者排除证据；操作者须绑定实际全写者退出或原owner恢复就绪回执。
+
+最终退出还要求新鲜可用的原主库样本、所有未决项/年龄为零、native-limit=false及SDK实际active_sends/running_checks/queued_checks为零。停止后状态明确stopped及实际SDK/sampler退出，独立canonical观察仍须再读。SIGTERM、操作者断线或deadline单独不会关闭仍有责任的最后Checker；expiry标记使本次执行资格失效，保持资源到受审移交/退出。关闭不完整继续保留借用池和其他owner，不把进程超时解释为已排空。状态陈旧、丢失或错误皆停止资格，不复用旧JSON。
+
+本批具体生产编排、额外维护资源、原六实例退出、同窗口保护/恢复及首业务启动点由infra执行包审查。新增原生CLI用真实隔离Broker/MySQL/Mongo验证，不能用包级测试或导入成功代替生产交接。

@@ -558,3 +558,7 @@ SQL111 仅针对 `ai_messaging_outbox`，独立于此前基础设施 M4-A/M4-B/M
 结果保留数据库采样时间、绑定摘要和实际未决计数；缺失/损坏或读取失败显示不可用，不能转成零。两个backend各自观察，不是跨库原子快照；不证明Broker积压、业务ACK、所有写者停止或owner已可退出。报告不签发停写或恢复批准，SQL111仍只经过已有受控offline apply。迁移字节、当前事务/历史记录和原Force/down拒绝均保持。
 
 既有schema-pair原生CI新增必需 `TestSchemaPairNativeM5ProtocolReadOnly`，真实读取110/44与111/44，验证reserved责任不会被隐藏、完整原行/文档读取前后未变、非法/缺失binding不可用。实际运行结果须按精确源码和制品独立登记，未执行不算通过。
+
+### M5 独立原库身份读取
+
+`InspectPairIdentity`复用原canonical UUID/selected-database及Mongo集群身份算法，仅借用既有连接读取，不检查或修改版本账本。因此维护Checker交接或中断恢复可在执行其他操作前先拒绝错误目标；完整schema、原材料、停写和首次启动边界仍须由各自入口验证，不能把身份匹配当作迁移/恢复许可。独立`qs-migrate-offline --owner-drain`只在原110/44注册暂停新发送的Checker，可能写正式SDK恢复审计，不属于只读观察；默认inspect/protocol行为和原迁移资源不变。
