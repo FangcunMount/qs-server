@@ -136,9 +136,13 @@ probe_ready_replicas() {
   local url="$1"
   local host="$2"
   local expected="$3"
+  local metrics_url="$4"
   local attempt
   for attempt in $(seq 1 "$READY_PROBE_ATTEMPTS"); do
-    if probe_ready_replicas_once "$url" "$host" "$expected"; then
+    # A replaced target can be ready before discovery/federation has a sample.
+    # Both facts must converge within the existing per-service attempt budget.
+    if probe_url "$metrics_url" "$host" 'qs_runtime_component_ready' &&
+      probe_ready_replicas_once "$url" "$host" "$expected"; then
       if [ "$attempt" -gt 1 ]; then
         echo "Observability probe ${url} converged after ${attempt}/${READY_PROBE_ATTEMPTS} attempts"
       fi
@@ -162,10 +166,8 @@ verify_public_routes() {
   esac
   require_positive_integer READY_PROBE_ATTEMPTS "$READY_PROBE_ATTEMPTS"
   require_nonnegative_integer READY_PROBE_INTERVAL_SECONDS "$READY_PROBE_INTERVAL_SECONDS"
-  probe_url "$PUBLIC_COLLECTION_METRICS_URL" collect.fangcunmount.cn 'qs_runtime_component_ready'
-  probe_ready_replicas "$PUBLIC_COLLECTION_READY_URL" collect.fangcunmount.cn "$EXPECTED_COLLECTION_REPLICAS"
-  probe_url "$PUBLIC_WORKER_METRICS_URL" worker.fangcunmount.cn 'qs_runtime_component_ready'
-  probe_ready_replicas "$PUBLIC_WORKER_READY_URL" worker.fangcunmount.cn "$EXPECTED_WORKER_REPLICAS"
+  probe_ready_replicas "$PUBLIC_COLLECTION_READY_URL" collect.fangcunmount.cn "$EXPECTED_COLLECTION_REPLICAS" "$PUBLIC_COLLECTION_METRICS_URL"
+  probe_ready_replicas "$PUBLIC_WORKER_READY_URL" worker.fangcunmount.cn "$EXPECTED_WORKER_REPLICAS" "$PUBLIC_WORKER_METRICS_URL"
   echo "Public K6 observability route probes passed"
 }
 
