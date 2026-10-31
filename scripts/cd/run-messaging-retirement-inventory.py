@@ -69,7 +69,7 @@ else:
     run_id = os.environ["GITHUB_RUN_ID"]
     if not run_id.isdecimal():
         raise SystemExit("Explicit run identity required")
-    temporary = "/tmp/messaging-retirement-inventory-" + run_id
+    temporary = "/tmp/messaging-retirement-inventory-" + run_id + "-" + owner.replace(".", "-")
     script = ("set -eu; umask 077; p=" + shlex.quote(temporary)
               + '; trap \'rm -f "$p"\' EXIT; cat > "$p"; chmod 0700 "$p"; "$p" '
               + shlex.quote("--messaging-retirement-inventory" if owner == "qs.mongo" else owner))

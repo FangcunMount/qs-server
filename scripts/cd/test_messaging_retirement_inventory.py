@@ -60,6 +60,8 @@ class InventoryTransportTest(unittest.TestCase):
                 self.assertIn("/app/.venv/bin/python -", command[-1])
             if owner == "qs.mongo":
                 self.assertIn("--messaging-retirement-inventory", command[-1])
+            if owner != "ai.mysql":
+                self.assertIn("12345-" + owner.replace(".", "-"), command[-1])
 
     def test_partial_evidence_is_preserved_but_fails(self):
         error, saved, _ = self.execute(available=False)
