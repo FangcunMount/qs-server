@@ -3,10 +3,12 @@
 package runtimeclosure
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -45,10 +47,57 @@ import (
 
 // Real process roots after the owned business fixture; not an end-user login.
 type m5RootConfig struct {
-	Source     string
+	Source string
+	// Private file only: public option JSON deliberately omits database passwords.
+	MySQLDSN   string `json:"mysql_dsn,omitempty"`
 	API        *apioptions.Options
 	Collection *collectionoptions.Options
 	Worker     *m3cChildConfig
+}
+
+func restoreM5PrivateAPIConnection(cfg *m5RootConfig) error {
+	if cfg.API == nil || cfg.MySQLDSN == "" {
+		return errors.New("private owned MySQL connection required")
+	}
+	dsn, err := driver.ParseDSN(cfg.MySQLDSN)
+	if err != nil {
+		return errors.New("private owned MySQL connection invalid")
+	}
+	host, _, err := net.SplitHostPort(dsn.Addr)
+	if err != nil || !net.ParseIP(host).IsLoopback() || dsn.Net != "tcp" || dsn.DBName != cfg.API.MySQLOptions.Database || dsn.Addr != cfg.API.MySQLOptions.Host || dsn.User != cfg.API.MySQLOptions.Username || dsn.Passwd == "" {
+		return errors.New("private owned MySQL binding changed")
+	}
+	cfg.API.MySQLOptions.Password = dsn.Passwd
+	return nil
+}
+
+func TestM5PrivateRootConnectionSurvivesPublicOptionRedaction(t *testing.T) {
+	api := apioptions.NewOptions()
+	api.MySQLOptions.Host = "127.0.0.1:3306"
+	api.MySQLOptions.Username = "owned"
+	api.MySQLOptions.Database = "qs_runtime_closure_123"
+	api.MySQLOptions.Password = "owned-private:@/mysql"
+	public, err := json.Marshal(api)
+	require.NoError(t, err)
+	require.False(t, bytes.Contains(public, []byte(api.MySQLOptions.Password)))
+	dsn := driver.NewConfig()
+	dsn.Net = "tcp"
+	dsn.Addr = api.MySQLOptions.Host
+	dsn.User = api.MySQLOptions.Username
+	dsn.Passwd = api.MySQLOptions.Password
+	dsn.DBName = api.MySQLOptions.Database
+	raw, err := json.Marshal(m5RootConfig{API: api, MySQLDSN: dsn.FormatDSN()})
+	require.NoError(t, err)
+	var child m5RootConfig
+	require.NoError(t, json.Unmarshal(raw, &child))
+	require.Empty(t, child.API.MySQLOptions.Password)
+	require.NoError(t, restoreM5PrivateAPIConnection(&child))
+	require.Equal(t, api.MySQLOptions.Password, child.API.MySQLOptions.Password)
+	child.MySQLDSN = ""
+	require.Error(t, restoreM5PrivateAPIConnection(&child))
+	child.MySQLDSN = dsn.FormatDSN()
+	child.API.MySQLOptions.Database = "foreign"
+	require.Error(t, restoreM5PrivateAPIConnection(&child))
 }
 
 func TestM5PostRetirementRootChild(t *testing.T) {
@@ -65,6 +114,7 @@ func TestM5PostRetirementRootChild(t *testing.T) {
 	case cfg.API != nil && cfg.Collection == nil && cfg.Worker == nil:
 		require.True(t, regexp.MustCompile(`^qs_runtime_closure_[0-9]+$`).MatchString(cfg.API.MySQLOptions.Database), "owned_runtime_namespace_required")
 		require.False(t, cfg.API.MigrationOptions.Enabled)
+		require.NoError(t, restoreM5PrivateAPIConnection(&cfg))
 		viper.Set("mongodb.database", cfg.API.MongoDBOptions.Database)
 		require.NoError(t, apiprocess.Run(&apiconfig.Config{Options: cfg.API}))
 	case cfg.Collection != nil && cfg.API == nil && cfg.Worker == nil:
@@ -333,7 +383,7 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 		t.Fatalf("owned %s health unavailable\n%s", name, raw)
 		return nil
 	}
-	ap := start("api", m5RootConfig{Source: sha, API: api}, api.InsecureServing.BindPort)
+	ap := start("api", m5RootConfig{Source: sha, API: api, MySQLDSN: cfg.DSN}, api.InsecureServing.BindPort)
 	co := start("collection", m5RootConfig{Source: sha, Collection: collection}, collection.InsecureServing.BindPort)
 	workerConfig := cfg
 	wp := ca.Issue(t, "qs-worker.svc", false)
