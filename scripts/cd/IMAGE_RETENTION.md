@@ -11,8 +11,8 @@ ACR 直拉路径仍在同一锁内完成拉取，并映射为现有 Compose 镜�
 - 每个服务保留当前成功版本及最近两个不同的成功镜像 ID；重复部署和回滚按成功执行顺序更新。
 - 保护所有现有容器（包含停止的容器）的镜像引用。
 - 首次接入保护现存最新三个镜像及替换前容器使用的镜像；这些只记录为 bootstrap，不能当作成功发布证据。
-  积累三个成功版本后取消 bootstrap 保护。因此过渡期/容器引用可能使保留数量超过三个。
-- 同一镜像的 ACR/GHCR 标签合并计算；只删除当前服务允许仓库中的旧标签。
+  积累三个成功版本后取消 bootstrap 保护。显式 `--protect-image-id` 仍持续保护指定镜像，不随 bootstrap 到期。因此过渡期/容器引用可能使保留数量超过三个。
+- 同一镜像的 ACR/GHCR 标签和导入后的 `仓库@sha256:…` 别名合并计算；只删除当前服务允许仓库中的旧标签。
   带未知仓库别名的镜像、无标签镜像、工具镜像和数据卷均不参与本脚本的删除。
 - 使用 `docker image rm --no-prune`，不强制删除，不运行全局 system/image prune。
 
@@ -27,10 +27,13 @@ ACR 直拉路径仍在同一锁内完成拉取，并映射为现有 Compose 镜�
 
 独立调用默认只预览，不更新记录也不删除；省略 `--deployment-locked`，让脚本自己取得同一把锁。
 该内部参数仅供已经持锁的发布入口使用。独立调用的 image-ref 必须是已完成验证且正在运行的版本。
-例如在首次新版发布初始化目录后：
+四个仓库统一使用 `/usr/local/libexec/fangcun/image-retention.py`。文件须为 root 所有的 0755 普通文件，
+整条父目录链不可由非 root 改写，且文件内容必须与发布包逐字节一致。缺失、不同或不可信只告警，
+不执行清理。调用使用 `/usr/bin/python3 -I`；不得允许 root 执行 `/tmp/*` 或上传包里的任意 Python。
+升级时先审核并安装固定副本和限定 sudo 命令。IAM 当前位于 serverA，后台位于 serverB，Worker 位于 serverD。
 
 ```bash
-sudo python3 /path/to/image-retention.py --service SERVICE --image-ref REPOSITORY:TAG
+sudo -n /usr/bin/python3 -I /usr/local/libexec/fangcun/image-retention.py --service SERVICE --image-ref REPOSITORY:TAG
 ```
 
 需要应用预览时增加 `--apply`。成功记录写入失败时不删除；删除遇到引用冲突或容器状态变化时停止并记录失败。
@@ -80,3 +83,7 @@ worker发布现在只接受消费专用RocketMQ配置，冻结文件版本在同
 
 M4 D03：新部署材料使用root管理的 `/var/lib/fangcun-m4-materials`，容器内文件路径和原密钥保持。
 原目录、冻结镜像/发布资产及共享锁保留；生产CD继续暂停，八实例重建与最终发布单独验收。
+
+2026-10-31 源码修复：digest 别名按仓库名识别；未知仓库别名仍拒绝进入删除范围；
+显式回退 ID 在三个成功版本后仍保留；失败输出有界类别。定向测试和隔离 Docker 对照属于本地证据，
+不能作为生产固定清理器安装或清理完成证据。未改变业务数据库、应用镜像或容器回滚边界。

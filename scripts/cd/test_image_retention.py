@@ -72,6 +72,36 @@ class RetentionTests(unittest.TestCase):
         self.images[0]["RepoTags"] = []
         self.assertNotIn(self.images[0], self.select()[2])
 
+    def test_loaded_digest_alias_is_same_repository(self):
+        self.images[3]["RepoTags"].append(m.ACR + "qs-ai@" + image(4)["Id"])
+        _, keep, _ = self.select()
+        self.assertIn(image(4)["Id"], keep)
+
+    def test_digest_alias_does_not_expand_deletion_scope(self):
+        self.images[0]["RepoTags"].append("unrelated/tool@" + image(1)["Id"])
+        self.assertNotIn(self.images[0], self.select()[2])
+
+    def test_malformed_digest_alias_fails_closed(self):
+        self.images[3]["RepoTags"].append(m.ACR + "qs-ai@sha256:invalid")
+        with self.assertRaises(ValueError):
+            self.select()
+
+    def test_explicit_recovery_protected_after_three_successes(self):
+        state = {"successful": [image(2)["Id"], image(1)["Id"]], "bootstrap": []}
+        _, keep, delete = m.select(
+            self.images, set(), "qs-ai", image(4)["Id"], "qs-ai:v4", state, [image(3)["Id"]]
+        )
+        self.assertIn(image(3)["Id"], keep)
+        self.assertNotIn(self.images[2], delete)
+
+    def test_operator_recovery_tags_survive_expired_bootstrap(self):
+        self.images[0]["RepoTags"].append("qs-ai:fallback-schema40-fixed")
+        self.images[1]["RepoTags"].append("qs-ai:m6-rollback-fixed")
+        state = {"successful": [image(n)["Id"] for n in (4, 5, 6)], "bootstrap": []}
+        _, keep, delete = self.select(state=state)
+        self.assertTrue({image(1)["Id"], image(2)["Id"]} <= keep)
+        self.assertFalse({image(1)["Id"], image(2)["Id"]} & {x["Id"] for x in delete})
+
     def test_global_lock_contention(self):
         with tempfile.TemporaryDirectory() as directory:
             lockpath = Path(directory) / "lock"
@@ -227,6 +257,8 @@ class RetentionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("::warning::", result.stderr)
         self.assertIn("deployed", result.stdout)
+        self.assertIn("/usr/local/libexec/fangcun/image-retention.py", helper.read_text())
+        self.assertNotIn('python3 "$SCRIPT_DIR/image-retention.py"', helper.read_text())
 
 
 if __name__ == "__main__":
