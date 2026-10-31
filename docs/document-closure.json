@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+    "sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -15819,7 +15819,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+        "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15858,6 +15858,20 @@
           "result": "passed",
           "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
           "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_messaging_retirement_inventory.py -v",
+          "result": "passed",
+          "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15894,7 +15908,8 @@
         }
       ],
       "notes": [
-        "Preserves null/unavailable evidence; database mutations and deletion authorization are always false."
+        "Preserves null/unavailable evidence; database mutations and deletion authorization are always false.",
+        "Transaction rollback and owned pool release must succeed before the CLI can report a complete inventory. Cleanup uncertainty is not deletion evidence."
       ]
     }
   ],
