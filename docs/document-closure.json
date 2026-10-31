@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+    "sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -78,8 +78,8 @@
   "machine_contracts": {
     "migrations": {
       "mysql": {
-        "max_version": 110,
-        "version_count": 110
+        "max_version": 111,
+        "version_count": 111
       },
       "mongodb": {
         "max_version": 44,
@@ -11052,7 +11052,7 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+        "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -11079,6 +11079,22 @@
         {
           "kind": "source",
           "path": "scripts/cd/test-verify-observability-nginx.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/empty_ai_publisher*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/migrations/mysql/000111_retire_empty_ai_publisher.*.sql"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/retirement_driver.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/resources.go"
         }
       ],
       "verification": [
@@ -11087,6 +11103,20 @@
           "command": "bash scripts/cd/test-verify-observability-nginx.sh",
           "result": "passed",
           "source_sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration -count=1",
+          "result": "passed",
+          "source_sha": "1ec20234db727bc7ca93d1f6c1f2914756cda7af",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
           "verified_on": "2026-10-31"
         }
       ],
@@ -12068,7 +12098,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+        "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -12555,6 +12585,13 @@
           "result": "passed",
           "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -14329,7 +14366,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+        "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -14860,6 +14897,13 @@
           "result": "passed",
           "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
           "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15081,7 +15125,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+        "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15355,6 +15399,13 @@
           "result": "passed",
           "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -15842,7 +15893,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+        "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15948,6 +15999,13 @@
           "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
           "result": "passed",
           "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./internal/pkg/migration ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "00987cca65c960d7546364f45e192dab66dbc3a5",
           "verified_on": "2026-10-31"
         }
       ],
