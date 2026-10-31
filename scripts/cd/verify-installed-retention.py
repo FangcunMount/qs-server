@@ -1,7 +1,7 @@
 """Remote, unprivileged coordinator for the installed hash-bound retention CLI.
 
-Plan is read-only. Verify applies only an empty deletion plan, under the original
-host lock, preserving the actual pre-release images and every container reference.
+Plan is read-only. Verify applies only the exact reviewed deletion plan, under
+the original host lock, preserving pre-release images and every container reference.
 """
 import fcntl
 import hashlib
@@ -47,7 +47,8 @@ def runtime():
 
 
 def main():
-    operation, host = sys.argv[1:]
+    operation, host = sys.argv[1:3]
+    reviewed = json.loads(sys.argv[3]) if len(sys.argv) == 4 else None
     report = dict(operation=operation, host=host, status='in_progress', read_only=operation=='plan-installed',
                   business_database_operations=False, application_restarted=False, roles={})
     phase = 'arguments'
@@ -99,23 +100,45 @@ def main():
                     fallback_local_present=True, current_running_healthy=True)
                 commands[service] = command
             if operation == 'verify-installed':
-                phase = 'reviewed_empty_deletion_plan'
-                assert all(not row['preview']['candidates'] for row in report['roles'].values())
+                phase = 'exact_reviewed_deletion_plan'
+                assert reviewed['format'] == 'reviewed-retention-plan/v1' and reviewed['helper_sha256'] == SHA
+                expected = reviewed['hosts'][host]
+                assert set(expected) == set(report['roles'])
+                approved_ids, approved_tags = set(), set()
+                for service, row in report['roles'].items():
+                    plan = expected[service]
+                    assert row['current'] == plan['current'] and row['protected_previous'] == plan['protected_previous']
+                    assert row['preview']['candidates'] == plan['candidates']
+                    assert sorted(row['preview']['keep']) == plan['keep']
+                    for candidate in plan['candidates']:
+                        approved_ids.add(candidate['id'])
+                        approved_tags.update(candidate['tags'])
                 for service, command in commands.items():
                     phase = 'apply_' + service
-                    # Reconfirm the empty candidate set immediately before apply.
+                    # Reconfirm the exact candidates before each role's apply.
                     preview = json.loads(run(command))
-                    assert not preview['candidates']
+                    assert preview['candidates'] == expected[service]['candidates']
                     assert set(preview['keep']) == set(report['roles'][service]['preview']['keep'])
                     audit = json.loads(run(command + ['--apply']))
-                    assert audit['status'] == 'success' and not audit['candidates'] and not audit['removed_tags']
+                    tags = {tag for candidate in expected[service]['candidates'] for tag in candidate['tags']}
+                    assert audit['status'] == 'success' and audit['candidates'] == expected[service]['candidates']
+                    assert set(audit['removed_tags']) == tags
                     report['roles'][service]['audit'] = audit
             phase = 'runtime_and_all_image_preservation'
             assert runtime() == before
-            assert sorted(set(run(DOCKER + ['image', 'ls', '-aq', '--no-trunc']).split())) == all_ids
+            after_ids = set(run(DOCKER + ['image', 'ls', '-aq', '--no-trunc']).split())
+            removed = set(all_ids) - after_ids
+            if operation == 'verify-installed':
+                assert removed <= approved_ids and set(all_ids) - approved_ids <= after_ids
+                report.update(deleted_image_ids=sorted(removed),
+                    removed_tags=sum(len(v['audit']['removed_tags']) for v in report['roles'].values()),
+                    all_other_images_preserved=True, reviewed_from_run=reviewed['reviewed_from_run'])
+            else:
+                assert after_ids == set(all_ids)
+                report.update(all_images_preserved=True, removed_tags=0)
             assert (lock.stat().st_dev, lock.stat().st_ino) == identity
-            report.update(status='success', all_container_states_unchanged=True, all_images_preserved=True,
-                          original_lock_inode_unchanged=True, removed_tags=0)
+            report.update(status='success', all_container_states_unchanged=True,
+                          original_lock_inode_unchanged=True)
     except Exception as error:
         report.update(status='failed', phase=phase, error_type=type(error).__name__)
         if isinstance(error, subprocess.CalledProcessError):

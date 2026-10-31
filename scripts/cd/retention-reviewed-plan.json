@@ -1,0 +1,95 @@
+{
+  "format": "reviewed-retention-plan/v1",
+  "reviewed_from_run": 41162149270,
+  "helper_sha256": "53ec1f1e093aca37ad671a50d37203b87757f2daea7f78d03e96df7c51474324",
+  "hosts": {
+    "serverA": {
+      "iam": {
+        "current": "sha256:46930b3677e96a7de18b907ae3e1a9e6fe1559f71398e78af33f023a4039c3fd",
+        "protected_previous": "sha256:450f5c5872a247f04053116fbfb04ccd440315c4f3ed0fe9bd0353b2ed25b04b",
+        "keep": [
+          "sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab",
+          "sha256:174bdb37268121ed81b317722869b5b5fca39d61988d8331e4d114596c03c056",
+          "sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0",
+          "sha256:450f5c5872a247f04053116fbfb04ccd440315c4f3ed0fe9bd0353b2ed25b04b",
+          "sha256:46930b3677e96a7de18b907ae3e1a9e6fe1559f71398e78af33f023a4039c3fd",
+          "sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d",
+          "sha256:821cfa3613e12d6ab39c469c45c9d959e1184a8277efb61070c9fcfc369df47d",
+          "sha256:af7d417252600549ea64c3ed1be50bdce2714054f072426223458b74ee34e57c",
+          "sha256:d5e51ec9bef40a609251ba35068b89374e5e1caa5124b53f4aab22151552ea97"
+        ],
+        "candidates": []
+      },
+      "qs-apiserver": {
+        "current": "sha256:821cfa3613e12d6ab39c469c45c9d959e1184a8277efb61070c9fcfc369df47d",
+        "protected_previous": "sha256:5940b75bae8eff01b6649584450fe86665ac4e185a643aae17539d7ea05de4e2",
+        "keep": [
+          "sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab",
+          "sha256:174bdb37268121ed81b317722869b5b5fca39d61988d8331e4d114596c03c056",
+          "sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0",
+          "sha256:46930b3677e96a7de18b907ae3e1a9e6fe1559f71398e78af33f023a4039c3fd",
+          "sha256:5940b75bae8eff01b6649584450fe86665ac4e185a643aae17539d7ea05de4e2",
+          "sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d",
+          "sha256:821cfa3613e12d6ab39c469c45c9d959e1184a8277efb61070c9fcfc369df47d",
+          "sha256:af7d417252600549ea64c3ed1be50bdce2714054f072426223458b74ee34e57c",
+          "sha256:cad2637d28cac055eebcd908922009b27d1b3a2e12f395c8aa99e920cc2759bf"
+        ],
+        "candidates": []
+      },
+      "qs-collection-server": {
+        "current": "sha256:174bdb37268121ed81b317722869b5b5fca39d61988d8331e4d114596c03c056",
+        "protected_previous": "sha256:d139bfe81bba7fce5af87a69444d0b24fed0848aa66d3dff2251f6dd32fd0846",
+        "keep": [
+          "sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab",
+          "sha256:174bdb37268121ed81b317722869b5b5fca39d61988d8331e4d114596c03c056",
+          "sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0",
+          "sha256:46930b3677e96a7de18b907ae3e1a9e6fe1559f71398e78af33f023a4039c3fd",
+          "sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d",
+          "sha256:821cfa3613e12d6ab39c469c45c9d959e1184a8277efb61070c9fcfc369df47d",
+          "sha256:af7d417252600549ea64c3ed1be50bdce2714054f072426223458b74ee34e57c",
+          "sha256:d139bfe81bba7fce5af87a69444d0b24fed0848aa66d3dff2251f6dd32fd0846"
+        ],
+        "candidates": []
+      },
+      "qs-ai": {
+        "current": "sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0",
+        "protected_previous": "sha256:a14f5fd4823cfda040de3aff9b1de6327df0644666758e924db2364393c31734",
+        "keep": [
+          "sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab",
+          "sha256:174bdb37268121ed81b317722869b5b5fca39d61988d8331e4d114596c03c056",
+          "sha256:18a39e862a82bfb9b503a3dd93639688bc45016caa2c7f1bf9081953b4523fa0",
+          "sha256:46930b3677e96a7de18b907ae3e1a9e6fe1559f71398e78af33f023a4039c3fd",
+          "sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d",
+          "sha256:821cfa3613e12d6ab39c469c45c9d959e1184a8277efb61070c9fcfc369df47d",
+          "sha256:9bb743e6268bb7e74736d5670d21ce8547631415113f59771ebdc45eec1ca9ae",
+          "sha256:a14f5fd4823cfda040de3aff9b1de6327df0644666758e924db2364393c31734",
+          "sha256:af7d417252600549ea64c3ed1be50bdce2714054f072426223458b74ee34e57c"
+        ],
+        "candidates": []
+      }
+    },
+    "serverB": {
+      "qs-operating-system": {
+        "current": "sha256:6cb564aab2c1961129051ebea4a82c81e89b0b694165f7473092b6a9b62433bd",
+        "protected_previous": "sha256:9133db6a3838693c3e09627371582fa021915ebc9226c456f47c092fe2492263",
+        "keep": [
+          "sha256:0d23285b357da8cd45bade2c76d192ee5d183c894b1623251c247d57c3104418",
+          "sha256:0f56b750f350e6d3598aa3c36560889f54cd72b07d986f8424718db51a0e3d7e",
+          "sha256:6cb564aab2c1961129051ebea4a82c81e89b0b694165f7473092b6a9b62433bd",
+          "sha256:9133db6a3838693c3e09627371582fa021915ebc9226c456f47c092fe2492263",
+          "sha256:bcf299982ef53f165a9dcea10f748b4c1b9fbca0279d4f2a03b1bf5f6be516cd",
+          "sha256:e993801195eaf6cd7e56dfea1397483a06cd46d98f848f903e802d76c1db0ada",
+          "sha256:f3a9284e389da5ccde7a68f99b9ed08bd9f9d0505f8b0c31a7b8bb89ad4eddce"
+        ],
+        "candidates": [
+          {
+            "id": "sha256:c0eaa17b7d23588ad9b492f22c7c1452c24f0ae43975b32a773e3e54e41754ed",
+            "tags": [
+              "crpi-x3r4i68cpfmwtcll.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-operating-system:sha-952adbaf73f23f959feb0148a7b2f646baa6bd79"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -34,7 +34,8 @@ def remote(code, *args):
 
 
 if operation in ('plan-installed', 'verify-installed'):
-    result = json.loads(remote(Path('scripts/cd/verify-installed-retention.py').read_text(), operation, host))
+    review = Path('scripts/cd/retention-reviewed-plan.json').read_text() if operation == 'verify-installed' else '{}'
+    result = json.loads(remote(Path('scripts/cd/verify-installed-retention.py').read_text(), operation, host, review))
     assert result['status'] == 'success'
     Path('retention-closeout.json').write_text(json.dumps(result, indent=2)+'\n')
     raise SystemExit(0)
