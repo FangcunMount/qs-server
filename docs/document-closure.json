@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e81878e39d60b5bd116953b3d63326203487ee03",
+    "sha": "3bd7390b21d6ce48ed3b05cee291550c34abda99",
     "verified_on": "2026-11-01"
   },
   "status_policy": {
@@ -12113,7 +12113,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "eb6452a9fa8dd4688ce33c992ef45e023c324d29",
+        "source_sha": "3bd7390b21d6ce48ed3b05cee291550c34abda99",
         "verified_on": "2026-11-01"
       },
       "fact_sources": [
@@ -12868,7 +12868,12 @@
         "M5 complete retained material and separate pre-start restore source review 3f35e5f9583186b47e07953fcdc9405dca6ed2fb; previous binding {\"source_sha\": \"fde1f93f772ce433b9024f2e63eb06c9fb208ced\", \"verified_on\": \"2026-10-31\"}; previous global {\"sha\": \"fde1f93f772ce433b9024f2e63eb06c9fb208ced\", \"verified_on\": \"2026-10-31\"}. Full SQL-column/BSON multisets, object definitions and complete original110 ledger are bound to canonical pair/resources. Explicit readonly original export/inspection remains separate from independently approved one-use restoration. Restore checks all retained facts and known interrupted111 states, restores only exact original empty target, then transactionally replays captured full110 ledger; no generic Force/down or automatic retry/dirty clearing. Coordinator must independently prove exclusion and first-start boundary; after first business start only111 forward route. Local race passed and integration compiled only; real CLI/Broker/database CI pending, no production restore/release or prior evidence rebound. Existing migration bytes and previous verification/signoffs retained.",
         "M5 close-result guard review 6c927948049836b24314e72ad2418afda86262b0; previous binding {\"source_sha\": \"3f35e5f9583186b47e07953fcdc9405dca6ed2fb\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"296d1752fa74a4b09e54a6b218a0f4c97254048e\", \"verified_on\": \"2026-11-01\"}. CI41219365688 Lint Code/job124590506889 found three unchecked close/hash-writer results. Retained reader propagates rows.Close failures; private stop read refuses qualification on Close failure; SHA writer explicitly cannot fail. Local package race and golangci-lint passed. No migration/resource/business semantics changed, no gate weakened, actual CI/native/production pending; prior failed fixture/run remains on original source.",
         "M5 administrator activity source review b7893b1fb99cf9378ad7d6308facf2d14df4e582; previous binding {\"source_sha\": \"6c927948049836b24314e72ad2418afda86262b0\", \"verified_on\": \"2026-11-01\"}; previous global {\"sha\": \"549ad91a9cfd25e98aaf430cb9dd034601979ecf\", \"verified_on\": \"2026-11-01\"}. Review limited to additive ci.yml native selector and artifact plus separately selected readonly db-ops activity job; this document implementation/command behavior is unchanged. Existing native/paired/resource/protection gates retained. Local Go race/lint, old SSH27/readiness13/inventory8 Python contracts and new activity4 contracts passed; integration compiled only. Native held-DDL positive control and real activity run pending. Actual existing admin visibility run41222747868 at be2e4e8d passed target/direct global grants without account/permission/role mutation, not an activity/production freeze claim. No source/CI/production evidence or signoff rebound.",
-        "M5 installed-fixture/input review eb6452a9fa8dd4688ce33c992ef45e023c324d29; previous binding {\"source_sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"}. Native run41221979796/job124598257458 correctly rejected a retained-baseline fixture carrying consumed bootstrap authorization and an original-export fixture using an invalid operation ID. Clear only test bootstrap fields after actual installation and use unique digits-attempt IDs. Original-export CLI now rejects invalid IDs before credential/connection access. Production installed-only/operation/material/restore guards and all migration bytes retained. Local package race and integration compilation passed; actual restored CLI and complete baseline rerun pending, first refusal preserved. Separately native owner13+CLI9 run41222119780/source25a4b36b999568806f73335b8824a588f9865338 passed with raw artifact13051136918 ZIPac9e2304d535b2b14f0ab21da8e955cee951b74c83416456bbc9d5222919b250 verified; not relabelled as this source or production acceptance."
+        "M5 installed-fixture/input review eb6452a9fa8dd4688ce33c992ef45e023c324d29; previous binding {\"source_sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"}. Native run41221979796/job124598257458 correctly rejected a retained-baseline fixture carrying consumed bootstrap authorization and an original-export fixture using an invalid operation ID. Clear only test bootstrap fields after actual installation and use unique digits-attempt IDs. Original-export CLI now rejects invalid IDs before credential/connection access. Production installed-only/operation/material/restore guards and all migration bytes retained. Local package race and integration compilation passed; actual restored CLI and complete baseline rerun pending, first refusal preserved. Separately native owner13+CLI9 run41222119780/source25a4b36b999568806f73335b8824a588f9865338 passed with raw artifact13051136918 ZIPac9e2304d535b2b14f0ab21da8e955cee951b74c83416456bbc9d5222919b250 verified; not relabelled as this source or production acceptance.",
+        {
+          "source_sha": "3bd7390b21d6ce48ed3b05cee291550c34abda99",
+          "verified_on": "2026-11-01",
+          "summary": "Qualification-only fixture adds an actual owned MySQL COMMIT reply-loss case invoking a frozen clean4620d11e main binary with the production SHA256; no production source or migration bytes change. Local integration compilation passed; actual network-fault proof remains pending and is not relabeled as main CI or production recovery."
+        }
       ]
     },
     {
@@ -15169,7 +15174,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
+        "source_sha": "3bd7390b21d6ce48ed3b05cee291550c34abda99",
         "verified_on": "2026-11-01"
       },
       "fact_sources": [
@@ -15678,6 +15683,11 @@
           "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
           "verified_on": "2026-11-01",
           "summary": "Explicit forward owner registration separately requires clean SQL111/Mongo44, while original owner requires110/44; owned CLI integration now exercises both heads. Local race/config workflow contracts, integration compilation and lint passed; native forward proof and production window remain pending."
+        },
+        {
+          "source_sha": "3bd7390b21d6ce48ed3b05cee291550c34abda99",
+          "verified_on": "2026-11-01",
+          "summary": "Qualification-only fixture adds an actual owned MySQL COMMIT reply-loss case invoking a frozen clean4620d11e main binary with the production SHA256; no production source or migration bytes change. Local integration compilation passed; actual network-fault proof remains pending and is not relabeled as main CI or production recovery."
         }
       ]
     },
