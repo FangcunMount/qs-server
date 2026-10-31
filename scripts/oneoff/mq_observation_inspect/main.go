@@ -3,7 +3,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -126,4 +128,74 @@ func classifyEvidence(db *sql.DB, report map[string]any) {
 		"admission_accepted":                    accepted, "admission_rejected": rejected,
 		"admission_held": held, "admission_unsettled": unsettled,
 	}
+	classifyHistoricalFacts(ctx, tx, report)
+}
+
+// No identities or payloads leave the process. Receipt admission, projection,
+// and original transaction evidence remain separate observations.
+func classifyHistoricalFacts(ctx context.Context, tx *sql.Tx, report map[string]any) {
+	rows, err := tx.QueryContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */
+ SHA2(CONCAT_WS('|',o.command_id,o.kind,o.body_sha256,o.organization_id,
+ o.resource_id,o.aggregate_key,o.aggregate_sequence,o.decision,o.code,
+ COALESCE(o.receipt_id,''),COALESCE(SHA2(o.receipt,256),''),o.created_at,
+ COALESCE(CAST(o.decided_at AS CHAR),'')),256),o.kind,o.decision,
+ o.receipt_id IS NOT NULL AND o.decided_at IS NOT NULL AND o.receipt IS NOT NULL AND OCTET_LENGTH(o.receipt)>0,
+ COALESCE(i.message_id IS NOT NULL AND i.kind=6 AND i.aggregate_key=o.aggregate_key
+ AND i.body_sha256=SHA2(o.receipt,256) AND i.body=o.receipt AND i.outcome='stored',FALSE),
+ COALESCE(r.organization_id=o.organization_id AND r.session_id IS NOT NULL AND r.projection IS NOT NULL AND r.version>0,FALSE),
+ COALESCE(r.organization_id=o.organization_id AND r.status IN ('completed','cancelled') AND r.version>0
+ AND r.projection IS NOT NULL AND EXISTS(SELECT 1 FROM ai_bridge_events v WHERE v.request_id=r.request_id AND v.version=r.version),FALSE),
+ COALESCE(es.organization_id=o.organization_id AND es.version>0,FALSE)
+ FROM ai_messaging_operations o
+ LEFT JOIN ai_messaging_archive a ON a.producer='qs-server' AND a.destination='qs-ai' AND a.message_id=CAST(o.command_id AS BINARY)
+ LEFT JOIN ai_messaging_inbox i ON i.producer='qs-ai' AND i.message_id=o.receipt_id
+ LEFT JOIN ai_bridge_requests r ON r.request_id=o.aggregate_key
+ LEFT JOIN ai_messaging_evaluation_states es ON es.run_id=o.resource_id
+ WHERE o.retired=FALSE AND o.kind IN (1,2,3,4,5) AND a.message_id IS NULL
+ ORDER BY o.command_id LIMIT 1001`)
+	if err != nil {
+		report["historical_fact_audit_available"] = false
+		var driverError *mysql.MySQLError
+		if errors.As(err, &driverError) {
+			report["historical_fact_mysql_error_number"] = driverError.Number
+		}
+		return
+	}
+	defer func() { _ = rows.Close() }()
+	counts := map[string]uint64{}
+	groups := map[int32]map[string]uint64{}
+	digest := sha256.New()
+	for rows.Next() {
+		var hash, decision string
+		var kind int32
+		var receipt, inbox, projection, terminal, evaluation bool
+		if err = rows.Scan(&hash, &kind, &decision, &receipt, &inbox, &projection, &terminal, &evaluation); err != nil || counts["rows"] >= 1000 {
+			report["historical_fact_audit_available"] = false
+			return
+		}
+		_, _ = digest.Write([]byte(hash + "\n"))
+		counts["rows"]++
+		for name, ok := range map[string]bool{"receipt_metadata_present": receipt, "receipt_matches_stored_inbox": inbox,
+			"workflow_projection_present": projection, "terminal_workflow_projection_with_event_version": terminal,
+			"evaluation_state_present": evaluation} {
+			if ok {
+				counts[name]++
+			}
+		}
+		if groups[kind] == nil {
+			groups[kind] = map[string]uint64{}
+		}
+		if decision != "accepted" && decision != "rejected" && decision != "held" && decision != "" {
+			decision = "unknown"
+		}
+		groups[kind][decision]++
+	}
+	if rows.Err() != nil {
+		report["historical_fact_audit_available"] = false
+		return
+	}
+	report["historical_fact_audit_available"] = true
+	report["historical_fact_counts"] = counts
+	report["historical_kind_decisions"] = groups
+	report["historical_cohort_sha256"] = hex.EncodeToString(digest.Sum(nil))
 }
