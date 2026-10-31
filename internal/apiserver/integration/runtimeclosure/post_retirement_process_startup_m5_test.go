@@ -63,7 +63,7 @@ func TestM5PostRetirementRootChild(t *testing.T) {
 	require.Equal(t, cfg.Source, version.Get().GitCommit, "must use compiled exact source")
 	switch {
 	case cfg.API != nil && cfg.Collection == nil && cfg.Worker == nil:
-		require.True(t, regexp.MustCompile(`^qs_runtime_closure_[0-9]+$`).MatchString(cfg.API.MySQLOptions.Database))
+		require.True(t, regexp.MustCompile(`^qs_runtime_closure_[0-9]+$`).MatchString(cfg.API.MySQLOptions.Database), "owned_runtime_namespace_required")
 		require.False(t, cfg.API.MigrationOptions.Enabled)
 		viper.Set("mongodb.database", cfg.API.MongoDBOptions.Database)
 		require.NoError(t, apiprocess.Run(&apiconfig.Config{Options: cfg.API}))
@@ -98,6 +98,29 @@ func (*m5StartupIAM) GetCommittedPolicyVersion(context.Context, *authzv4.GetComm
 }
 func (*m5StartupIAM) ListProfiles(context.Context, *identityv2.ListProfilesRequest) (*identityv2.ListProfilesResponse, error) {
 	return &identityv2.ListProfilesResponse{}, nil
+}
+
+// Only fixed technical labels leave the private child log.
+func m5StartupDiagnostic(role, phase string, err error, raw []byte) {
+	code := -1
+	if exit, ok := err.(*exec.ExitError); ok {
+		code = exit.ExitCode()
+	}
+	stage := "unknown"
+	for _, entry := range [][2]string{{"prepare resources", "resources"}, {"initialize container", "container"}, {"initialize integrations", "integrations"}, {"initialize transports", "transports"}, {"start background runtimes", "runtime"}, {"register shutdown callback", "shutdown"}} {
+		if strings.Contains(string(raw), entry[0]) {
+			stage = entry[1]
+		}
+	}
+	reason := "process_exit"
+	for _, entry := range [][2]string{{"owned_runtime_namespace_required", "owned_namespace"}, {"must use compiled exact source", "compiled_source"}, {"paired migration preflight rejected", "schema_pair"}, {"IAM health check failed", "iam"}, {"IAM AuthZ v3 startup probe failed", "iam"}, {"failed to initialize MySQL", "database"}, {"failed to initialize MongoDB", "database"}} {
+		if strings.Contains(string(raw), entry[0]) {
+			reason = entry[1]
+			break
+		}
+	}
+	diagnostic, _ := json.Marshal(map[string]any{"role": role, "phase": phase, "stage": stage, "reason": reason, "exit_code": code})
+	fmt.Println("M5_PROCESS_STARTUP_DIAGNOSTIC " + string(diagnostic))
 }
 
 func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
@@ -271,6 +294,7 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 			select {
 			case err := <-child.done:
 				raw, _ := os.ReadFile(log.Name())
+				m5StartupDiagnostic(name, "startup_exit", err, raw)
 				t.Fatalf("owned %s exited before health: %v\n%s", name, err, raw)
 			default:
 			}
@@ -295,6 +319,7 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 			time.Sleep(200 * time.Millisecond)
 		}
 		raw, _ := os.ReadFile(log.Name())
+		m5StartupDiagnostic(name, "health_deadline", nil, raw)
 		t.Fatalf("owned %s health unavailable\n%s", name, raw)
 		return nil
 	}
