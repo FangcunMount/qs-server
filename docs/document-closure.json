@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
+    "sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -11052,8 +11052,8 @@
       "owner": "interfaces",
       "doc_status": "needs_review",
       "verified": {
-        "source_sha": "b99c7354ae9677a8911af20cf8da8e626217a033",
-        "verified_on": "2026-10-30"
+        "source_sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+        "verified_on": "2026-10-31"
       },
       "fact_sources": [
         {
@@ -11071,9 +11071,25 @@
         {
           "kind": "source",
           "path": "scripts/testing/check-production-messaging-deps.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/verify-observability-nginx.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test-verify-observability-nginx.sh"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "bash scripts/cd/test-verify-observability-nginx.sh",
+          "result": "passed",
+          "source_sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+          "verified_on": "2026-10-31"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
