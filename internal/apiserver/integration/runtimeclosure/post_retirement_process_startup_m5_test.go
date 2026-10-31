@@ -371,6 +371,10 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 						} `json:"redis"`
 					}
 					ready = ready && json.NewDecoder(response.Body).Decode(&state) == nil && state.Redis.Summary.Ready
+					// Redis governance becomes ready before subscriptions and the
+					// signal manager. Wait for the real Run boundary before SIGTERM.
+					startupLog, _ := os.ReadFile(log.Name())
+					ready = ready && bytes.Contains(startupLog, []byte("Worker started, waiting for events"))
 				}
 				_ = response.Body.Close()
 				if ready {
