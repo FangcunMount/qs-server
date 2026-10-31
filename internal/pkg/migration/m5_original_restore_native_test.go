@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,7 +95,7 @@ func TestSchemaPairNativeM5OriginalRestoreCLI(t *testing.T) {
 			if !ok || json.Unmarshal(raw, &baseline) != nil || !baseline.Complete {
 				t.Fatal("actual CLI full baseline refused")
 			}
-			_, raw, ok = invoke("--capture-original-operation", "owned-m5-restore-cli")
+			_, raw, ok = invoke("--capture-original-operation", fmt.Sprintf("%d-1", time.Now().UnixNano()))
 			var material M5OriginalMaterial
 			if !ok || json.Unmarshal(raw, &material) != nil || !reflect.DeepEqual(material.Baseline.Objects, baseline.Objects) {
 				t.Fatal("actual original export failed")

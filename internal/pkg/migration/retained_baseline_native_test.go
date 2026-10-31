@@ -21,6 +21,9 @@ func TestSchemaPairNativeM5RetainedFullBaseline(t *testing.T) {
 	}
 	n.approve(t, r)
 	n.runBoth(t, n.preflight(t, r))
+	// Installed-only readers must not receive the fixture's consumed pristine
+	// bootstrap capability. Keep production's reject-bootstrap boundary intact.
+	n.cfg.BootstrapAuthorizationFile, n.cfg.BootstrapAuthorizationSHA256 = "", ""
 	_, err = n.db.ExecContext(t.Context(), "CREATE TABLE m5_retained_fixture(id BIGINT PRIMARY KEY, original_bytes BLOB NULL, original_time DATETIME(6), exact_number DECIMAL(20,6)); INSERT INTO m5_retained_fixture VALUES(1,NULL,'2026-10-31 01:02:03.123456',123.456789),(2,X'0001FF','2026-10-31 01:02:03.123457',0.000001)")
 	if err != nil {
 		t.Fatal(err)

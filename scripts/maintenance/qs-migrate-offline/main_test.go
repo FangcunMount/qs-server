@@ -77,10 +77,13 @@ func TestOriginalRestoreRequiresSeparatePrivateMaterialAndApproval(t *testing.T)
 	if a, err := parseArguments(append(material, "--restore-apply", "--restore-approval-file=/private/approval.json", "--restore-approval-sha256="+strings.Repeat("b", 64))); err != nil || !a.restore.apply {
 		t.Fatal(a, err)
 	}
-	if _, err := parseArguments(append(base, "--capture-original-operation=owned-m5")); err != nil {
+	if _, err := parseArguments(append(base, "--capture-original-operation=12345-1")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseArguments(append(base, "--capture-original-operation=owned-m5", "--retained-baseline")); err == nil {
+	if _, err := parseArguments(append(base, "--capture-original-operation=owned-m5")); err == nil {
+		t.Fatal("invalid original operation reached connection boundary")
+	}
+	if _, err := parseArguments(append(base, "--capture-original-operation=12345-1", "--retained-baseline")); err == nil {
 		t.Fatal("ambiguous original capture accepted")
 	}
 }

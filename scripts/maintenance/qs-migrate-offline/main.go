@@ -83,7 +83,7 @@ func parseArguments(args []string) (arguments, error) {
 	if err := out.restore.validate(out); err != nil {
 		return out, err
 	}
-	if out.originalOperation != "" && (out.apply || out.protocolObservation || out.retainedBaseline || out.ownerDrain.enabled || out.binding.action != "" || out.restore.original != "" || out.timeout > 2*time.Minute) {
+	if out.originalOperation != "" && (!drainOperation.MatchString(out.originalOperation) || out.apply || out.protocolObservation || out.retainedBaseline || out.ownerDrain.enabled || out.binding.action != "" || out.restore.original != "" || out.timeout > 2*time.Minute) {
 		return out, errors.New("separate bounded original capture required")
 	}
 	return out, nil
