@@ -15,6 +15,8 @@ import tempfile
 
 
 SOURCE = "qs-apiserver"
+DATABASE_NETWORK = "infra-network"
+SOURCE_NETWORKS = frozenset({"infra-network", "qs-network"})
 LABEL = "com.fangcunmount.qs-m5.operation"
 SLEEP = "exec sleep 2147483647"
 ID = re.compile(r"[0-9a-f]{64}")
@@ -57,12 +59,14 @@ def source_configuration(source, expected_image, operation):
             or source.get("Name") != "/" + SOURCE or source.get("Image") != expected_image):
         raise Refused("source_identity_mismatch")
     networks = list(source.get("NetworkSettings", {}).get("Networks", {}))
-    if (len(networks) != 1 or networks[0] in {"host", "none", "bridge"}
-            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", networks[0])):
+    # Production API joins both networks in the existing Compose contract.
+    # Maintenance needs only the fixed database network, never API aliases or
+    # the business-facing qs-network. Unknown/missing networks still refuse.
+    if set(networks) != SOURCE_NETWORKS or DATABASE_NETWORK not in networks:
         raise Refused("source_network_ambiguous")
     if any(m.get("Destination") in {"/", "/tmp"} for m in source.get("Mounts", [])):
         raise Refused("source_private_mount_conflict")
-    return ("qs-m5-maintenance-" + operation, networks[0],
+    return ("qs-m5-maintenance-" + operation, DATABASE_NETWORK,
             selected_environment(source["Config"]["Env"]))
 
 

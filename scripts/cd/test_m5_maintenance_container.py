@@ -16,7 +16,7 @@ def source():
                 Config=dict(Env=["QS_APISERVER_MYSQL_DATABASE=qs",
                                  "QS_APISERVER_MYSQL_PASSWORD=owned=canary#value",
                                  "QS_APISERVER_MONGODB_DATABASE=qs", "JWT_SECRET=not-copied"]),
-                NetworkSettings=dict(Networks={"infra-network": {}}),
+                NetworkSettings=dict(Networks={"infra-network": {}, "qs-network": {}}),
                 HostConfig={}, Mounts=[], State=dict(Running=False))
 
 
@@ -81,6 +81,7 @@ class MaintenanceTransportTest(unittest.TestCase):
         name, network, env = m.source_configuration(s, s["Image"], "123-1")
         self.assertEqual(name, "qs-m5-maintenance-123-1")
         self.assertEqual(network, "infra-network")
+        self.assertNotIn("qs-network", m.create_arguments(s, s["Image"], "123-1", "/private/env"))
         self.assertNotIn("JWT_SECRET", env)
         args = m.create_arguments(s, s["Image"], "123-1", "/private/env")
         self.assertEqual(args[-3:], [s["Image"], "-c", m.SLEEP])
@@ -147,6 +148,9 @@ def native():
     if docker("inspect", name, allow_failure=True):
         raise RuntimeError("maintenance name already occupied")
     network = "qs-m5-native-" + operation
+    # Production has no network override; this fixture owns one isolated DB network.
+    m.DATABASE_NETWORK = network
+    m.SOURCE_NETWORKS = frozenset({network})
     tag = "qs-m5-owned-image:" + operation
     made_source = made_network = made_image = False
     source_id = ""
