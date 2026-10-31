@@ -144,6 +144,12 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 			n := openNativeSchemaPairWithPrefix(t, "qs_m5_restore_test")
 			n.approve(t, old)
 			n.runBoth(t, n.preflight(t, old))
+			// Reproduce the exact original ledger structure observed in the read-only
+			// production export41189102683, only in this independently owned pair.
+			// Fresh fixture defaults differ; a matching target DDL alone is insufficient.
+			if _, err := n.db.ExecContext(t.Context(), "ALTER TABLE schema_migrations DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"); err != nil {
+				t.Fatal(err)
+			}
 			var name, ddl string
 			if err := n.db.QueryRowContext(t.Context(), "SHOW CREATE TABLE ai_messaging_outbox").Scan(&name, &ddl); err != nil {
 				t.Fatal(err)
@@ -154,6 +160,9 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 				t.Fatal(err)
 			}
 			original.SchemaDDLHash = retirementHash([]byte(metaDDL))
+			if original.SchemaDDLHash != "e663736774931e5f988b7fa72a0849fa725ae3ba97f083df404b676d64b616ee" {
+				t.Fatal("owned ledger differs from reviewed original export41189102683")
+			}
 			if err := n.db.QueryRowContext(t.Context(), "SELECT version,dirty FROM schema_migrations").Scan(&original.Version, &original.Dirty); err != nil {
 				t.Fatal(err)
 			}
