@@ -679,7 +679,9 @@ jobs:
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
       - name: Verify schema pair forward migration and disabled DDL guards
+        id: pair_native
         env:
+          QS_M5_PAIR_RESTORE_PROOF: ${{ runner.temp }}/m5-empty-publisher-pair-restore.json
           QS_M3_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true
           QS_M3_REQUIRE_DATABASE: '1'
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
@@ -698,6 +700,7 @@ jobs:
             TestSchemaPairNativeColdBootstrapAndRestart \
             TestSchemaPairNativeActorStoreFullMigrationChain \
             TestSchemaPairNativeM5RetiredPublisherReappearanceRejected \
+            TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility \
             TestDisabledDDLNativeValidatesCurrentHeadsAndNeverCreatesMetadata; do
             if ! grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/schema-pair.log"; then
               echo "Required schema pair test did not pass: ${test_name}" >&2
@@ -708,6 +711,14 @@ jobs:
             echo 'Schema pair verification must not skip' >&2
             exit 1
           fi
+
+      - uses: actions/upload-artifact@v7
+        if: steps.pair_native.outcome == 'success'
+        with:
+          name: m5-empty-publisher-pair-restore-${{ github.run_id }}
+          path: ${{ runner.temp }}/m5-empty-publisher-pair-restore.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Verify approved offline execution and interrupted paired DDL
         env:
