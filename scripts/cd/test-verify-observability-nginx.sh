@@ -9,6 +9,8 @@ FAKE_BIN="$TEST_ROOT/bin"
 FAKE_RUNNER="$FAKE_BIN/fake-privileged"
 FAKE_CURL="$FAKE_BIN/curl"
 WORKER_READY_ATTEMPT_FILE="$TEST_ROOT/worker-ready-attempt"
+METRICS_ATTEMPT_ROOT="$TEST_ROOT/metrics"
+mkdir -p "$METRICS_ATTEMPT_ROOT"
 mkdir -p "$FAKE_BIN"
 
 cat >"$FAKE_RUNNER" <<'EOF'
@@ -60,6 +62,17 @@ set -Eeuo pipefail
 url="${@: -1}"
 case "$url" in
   */metrics)
+    host=${url#https://}; host=${host%%/*}
+    counter="$METRICS_ATTEMPT_ROOT/$host"
+    attempt=0
+    if [ -r "$counter" ]; then attempt=$(cat "$counter"); fi
+    attempt=$((attempt + 1))
+    printf '%s\n' "$attempt" >"$counter"
+    if [ "$attempt" -le "${FAKE_METRICS_CURL_FAILURES:-0}" ]; then exit 22; fi
+    if [ "${FAKE_METRICS_MISSING:-0}" = 1 ] || [ "$attempt" -le "${FAKE_METRICS_DELAY:-0}" ]; then
+      printf '%s\n' 'unrelated_metric 1'
+      exit 0
+    fi
     printf '%s\n' 'qs_runtime_component_ready 1'
     ;;
   *collect.fangcunmount.cn*/readyz)
@@ -73,7 +86,7 @@ case "$url" in
     attempt=$((attempt + 1))
     printf '%s\n' "$attempt" >"$WORKER_READY_ATTEMPT_FILE"
     ready=2
-    if [ "${FAKE_ALWAYS_STALE:-0}" != 1 ] && [ "$attempt" -ge 3 ]; then
+    if [ "${FAKE_ALWAYS_STALE:-0}" != 1 ] && [ "$attempt" -ge "${FAKE_READY_AT:-3}" ]; then
       ready=3
     fi
     printf '{"data":{"result":[{"value":[1,"%s"]}]}}\n' "$ready"
@@ -90,6 +103,11 @@ run_verifier() {
     PATH="$FAKE_BIN:$PATH" \
     PRIVILEGE_RUNNER="$FAKE_RUNNER" \
     WORKER_READY_ATTEMPT_FILE="$WORKER_READY_ATTEMPT_FILE" \
+    METRICS_ATTEMPT_ROOT="$METRICS_ATTEMPT_ROOT" \
+    FAKE_METRICS_DELAY="${FAKE_METRICS_DELAY:-0}" \
+    FAKE_METRICS_CURL_FAILURES="${FAKE_METRICS_CURL_FAILURES:-0}" \
+    FAKE_METRICS_MISSING="${FAKE_METRICS_MISSING:-0}" \
+    FAKE_READY_AT="${FAKE_READY_AT:-3}" \
     FAKE_ALWAYS_STALE="${FAKE_ALWAYS_STALE:-0}" \
     EXPECTED_COLLECTION_REPLICAS=2 \
     EXPECTED_WORKER_REPLICAS=3 \
@@ -110,4 +128,25 @@ if FAKE_ALWAYS_STALE=1 READY_PROBE_ATTEMPTS=2 run_verifier >"$TEST_ROOT/failure.
 fi
 grep -Fq 'did not converge after 2 attempts' "$TEST_ROOT/failure.log"
 
-echo '[OK] public observability gate retries bounded replica convergence and fails closed'
+for failure in empty-response curl-error; do
+  rm -f "$WORKER_READY_ATTEMPT_FILE" "$METRICS_ATTEMPT_ROOT/"*
+  if [ "$failure" = empty-response ]; then
+    convergence_output="$(FAKE_METRICS_DELAY=2 FAKE_READY_AT=1 run_verifier 2>&1)"
+  else
+    convergence_output="$(FAKE_METRICS_CURL_FAILURES=2 FAKE_READY_AT=1 run_verifier 2>&1)"
+  fi
+  grep -Fq 'Public K6 observability route probes passed' <<<"$convergence_output"
+  test "$(cat "$METRICS_ATTEMPT_ROOT/worker.fangcunmount.cn")" = 3
+  test "$(cat "$METRICS_ATTEMPT_ROOT/collect.fangcunmount.cn")" = 3
+done
+
+rm -f "$WORKER_READY_ATTEMPT_FILE" "$METRICS_ATTEMPT_ROOT/"*
+if FAKE_METRICS_MISSING=1 FAKE_READY_AT=1 READY_PROBE_ATTEMPTS=2 run_verifier >"$TEST_ROOT/missing-metrics.log" 2>&1; then
+  echo 'observability gate accepted absent metrics' >&2
+  exit 1
+fi
+grep -Fq 'did not contain qs_runtime_component_ready' "$TEST_ROOT/missing-metrics.log"
+test "$(cat "$METRICS_ATTEMPT_ROOT/collect.fangcunmount.cn")" = 2
+test ! -e "$WORKER_READY_ATTEMPT_FILE"
+
+echo '[OK] public observability gate shares bounded metrics/readiness convergence and fails closed'
