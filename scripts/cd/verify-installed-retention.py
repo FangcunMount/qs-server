@@ -42,7 +42,7 @@ def run(args):
 
 def runtime():
     ids = sorted(run(DOCKER + ['ps', '-aq']).split())
-    template = '{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"status":{{json .State.Status}},"started":{{json .State.StartedAt}},"restarts":{{json .RestartCount}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}'
+    template = '{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"status":{{json .State.Status}},"started":{{json .State.StartedAt}},"restarts":{{json .RestartCount}},"health":{{with index .State "Health"}}{{json .Status}}{{else}}null{{end}}}'
     return [json.loads(line) for line in run(DOCKER + ['inspect', '--format', template, *ids]).splitlines()]
 
 
