@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6090af5226d9096da1107b7eb8cc16c805393e72",
+    "sha": "32627920429d8fda3bf42cac6cd609c2958a72ce",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -15148,7 +15148,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6090af5226d9096da1107b7eb8cc16c805393e72",
+        "source_sha": "32627920429d8fda3bf42cac6cd609c2958a72ce",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15199,6 +15199,14 @@
         {
           "kind": "source",
           "path": "scripts/cd/run-m5-maintenance-ssh.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/offline_protocol.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/offline_protocol_native_test.go"
         }
       ],
       "verification": [
@@ -15625,7 +15633,8 @@
         "Source-only health-command boundary review 5995d813346d5c2c43f2839396490362ea0215bf; former verified 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99/global 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99 retained. Explicitly disable image healthcheck as well as entrypoint, validate NONE health metadata on stage/inventory, and extend required owned Docker smoke to preserve a private consumed-marker fixture after name-collision refusal. Local4 helper tests pass; native transport/current CI pending. No production staging/DDL or new native claim; original1031 runtime proof unchanged.",
         "Source-only native fixture correction 447e605ded52af0c753b6dad150e4ace8ed60a98; former review 5995d813346d5c2c43f2839396490362ea0215bf/global 5995d813346d5c2c43f2839396490362ea0215bf retained. First transport CI41196326278/job124523116425 failed at source-name guard before creating fixtures. Optional docker inspect had ignored nonzero exit and could return truthy JSON[] for absent names; now absence uses actual exit status. Native source additionally uses its own run-attempt namespace, with no source override exposed by production CLI. Existing container refusal/ownership guards and private-marker preservation remain. Local4 helper contracts pass, native CI rerun pending; no fabricated pass or production action.",
         "Source-only review 0c1c40a9e888e5f71874dd0b5a1193da49f7e432 preserves the existing private password-based Docker sudo transport, with fixed bounded refusal categories. Production read-only preflight41197177504 failed: old snapshot used noninteractive root Python on ServerA/ServerB, maintenance refusal was unclassified; no staging/DB query/DDL occurred. Separate maintenance preflight now avoids unrelated legacy snapshot jobs and runs only ordinary SSH Python with existing fixed Docker sudo rights. Local helper5/inventory8/snapshot2 tests passed; an initial added negative test attempted an OS environment NUL and was corrected to a dictionary test double. Native51be fixture pass and core1073 main CI/image publication remain evidence at their original source; final candidate native/CI/production permission preflight pending. Historical verification and signoff objects unchanged. Previous source_baseline 447e605ded52af0c753b6dad150e4ace8ed60a98 retained.",
-        "Source-only correction 6090af5226d9096da1107b7eb8cc16c805393e72 binds production source networks to exact existing Compose infra-network+qs-network, with maintenance joining only fixed infra-network. Prior preflight41197851868 refused source_network_ambiguous before staging because one-network assumption disagreed with production Compose; prior41197780799 correctly refused mismatched input OCI config digest. Exact original snapshot41175362334 container Image4185fd2487b8539dbb2d7882056068042f21dc8a4c5327247c46021ce9ae574b now supplies input, distinct from OCI config84f592.... No network/identity gate weakened; extra/missing networks still refuse, no network override in production CLI. Native db797 CI41197784005/job124527358625 artifact13041765295 ZIP840cbe5fec3e5b0c58b40ccc5d7d36a21231e04a337628564aaf4ba35cbde635 verified separately; fixture execution source retained in report. Latest native/full CI/actual permission preflight pending, all existing DB state and runtime unchanged. Previous source baseline 0c1c40a9e888e5f71874dd0b5a1193da49f7e432 preserved."
+        "Source-only correction 6090af5226d9096da1107b7eb8cc16c805393e72 binds production source networks to exact existing Compose infra-network+qs-network, with maintenance joining only fixed infra-network. Prior preflight41197851868 refused source_network_ambiguous before staging because one-network assumption disagreed with production Compose; prior41197780799 correctly refused mismatched input OCI config digest. Exact original snapshot41175362334 container Image4185fd2487b8539dbb2d7882056068042f21dc8a4c5327247c46021ce9ae574b now supplies input, distinct from OCI config84f592.... No network/identity gate weakened; extra/missing networks still refuse, no network override in production CLI. Native db797 CI41197784005/job124527358625 artifact13041765295 ZIP840cbe5fec3e5b0c58b40ccc5d7d36a21231e04a337628564aaf4ba35cbde635 verified separately; fixture execution source retained in report. Latest native/full CI/actual permission preflight pending, all existing DB state and runtime unchanged. Previous source baseline 0c1c40a9e888e5f71874dd0b5a1193da49f7e432 preserved.",
+        "Source review 32627920429d8fda3bf42cac6cd609c2958a72ce adds an explicitly bounded read-only protocol observation through the existing offline binary and SSH transport. Both original primary bindings feed the unchanged SDK ObserveProtocol and existing host native-limit readers. Counts/timestamps and binding hashes exclude plans, References and wire; independent observations do not certify Broker pending, ACK, writer freeze or owner stop. Apply, approval boundaries, source migration bytes and fixed1073 application images remain unchanged. Original local draft bf059e5906362b7f27e79acacd70239ae0054480 passed local Go race packages,14 Python transport tests and integration-tag compilation before executor disconnection; its final docs-facts outcome is unavailable. This independent remote candidate was recreated against merged bd5db2e4fdf5cb74172b140bfdad2db990b6d2f6 using reviewed repository files and adds bounded phase reporting; it is not a byte-identical export or a rerun of the local draft. Actual remote CI/native110/44+111/44 validation pending. User named shujie as both data and recovery owner, without approving any existing database write. Previous source baseline 6090af5226d9096da1107b7eb8cc16c805393e72 and all historical verification/signoff objects remain attributed to their original executions."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15938,7 +15947,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6090af5226d9096da1107b7eb8cc16c805393e72",
+        "source_sha": "32627920429d8fda3bf42cac6cd609c2958a72ce",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15985,6 +15994,14 @@
         {
           "kind": "source",
           "path": "scripts/cd/run-m5-maintenance-ssh.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/offline_protocol.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/migration/offline_protocol_native_test.go"
         }
       ],
       "verification": [
@@ -16110,7 +16127,8 @@
         "Source-only health-command boundary review 5995d813346d5c2c43f2839396490362ea0215bf; former verified 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99/global 2253a6736d3b6f3bdd6269a91afeb9f0eac8ab99 retained. Explicitly disable image healthcheck as well as entrypoint, validate NONE health metadata on stage/inventory, and extend required owned Docker smoke to preserve a private consumed-marker fixture after name-collision refusal. Local4 helper tests pass; native transport/current CI pending. No production staging/DDL or new native claim; original1031 runtime proof unchanged.",
         "Source-only native fixture correction 447e605ded52af0c753b6dad150e4ace8ed60a98; former review 5995d813346d5c2c43f2839396490362ea0215bf/global 5995d813346d5c2c43f2839396490362ea0215bf retained. First transport CI41196326278/job124523116425 failed at source-name guard before creating fixtures. Optional docker inspect had ignored nonzero exit and could return truthy JSON[] for absent names; now absence uses actual exit status. Native source additionally uses its own run-attempt namespace, with no source override exposed by production CLI. Existing container refusal/ownership guards and private-marker preservation remain. Local4 helper contracts pass, native CI rerun pending; no fabricated pass or production action.",
         "Source-only review 0c1c40a9e888e5f71874dd0b5a1193da49f7e432 preserves the existing private password-based Docker sudo transport, with fixed bounded refusal categories. Production read-only preflight41197177504 failed: old snapshot used noninteractive root Python on ServerA/ServerB, maintenance refusal was unclassified; no staging/DB query/DDL occurred. Separate maintenance preflight now avoids unrelated legacy snapshot jobs and runs only ordinary SSH Python with existing fixed Docker sudo rights. Local helper5/inventory8/snapshot2 tests passed; an initial added negative test attempted an OS environment NUL and was corrected to a dictionary test double. Native51be fixture pass and core1073 main CI/image publication remain evidence at their original source; final candidate native/CI/production permission preflight pending. Historical verification and signoff objects unchanged. Previous source_baseline 447e605ded52af0c753b6dad150e4ace8ed60a98 retained.",
-        "Source-only correction 6090af5226d9096da1107b7eb8cc16c805393e72 binds production source networks to exact existing Compose infra-network+qs-network, with maintenance joining only fixed infra-network. Prior preflight41197851868 refused source_network_ambiguous before staging because one-network assumption disagreed with production Compose; prior41197780799 correctly refused mismatched input OCI config digest. Exact original snapshot41175362334 container Image4185fd2487b8539dbb2d7882056068042f21dc8a4c5327247c46021ce9ae574b now supplies input, distinct from OCI config84f592.... No network/identity gate weakened; extra/missing networks still refuse, no network override in production CLI. Native db797 CI41197784005/job124527358625 artifact13041765295 ZIP840cbe5fec3e5b0c58b40ccc5d7d36a21231e04a337628564aaf4ba35cbde635 verified separately; fixture execution source retained in report. Latest native/full CI/actual permission preflight pending, all existing DB state and runtime unchanged. Previous source baseline 0c1c40a9e888e5f71874dd0b5a1193da49f7e432 preserved."
+        "Source-only correction 6090af5226d9096da1107b7eb8cc16c805393e72 binds production source networks to exact existing Compose infra-network+qs-network, with maintenance joining only fixed infra-network. Prior preflight41197851868 refused source_network_ambiguous before staging because one-network assumption disagreed with production Compose; prior41197780799 correctly refused mismatched input OCI config digest. Exact original snapshot41175362334 container Image4185fd2487b8539dbb2d7882056068042f21dc8a4c5327247c46021ce9ae574b now supplies input, distinct from OCI config84f592.... No network/identity gate weakened; extra/missing networks still refuse, no network override in production CLI. Native db797 CI41197784005/job124527358625 artifact13041765295 ZIP840cbe5fec3e5b0c58b40ccc5d7d36a21231e04a337628564aaf4ba35cbde635 verified separately; fixture execution source retained in report. Latest native/full CI/actual permission preflight pending, all existing DB state and runtime unchanged. Previous source baseline 0c1c40a9e888e5f71874dd0b5a1193da49f7e432 preserved.",
+        "Source review 32627920429d8fda3bf42cac6cd609c2958a72ce adds an explicitly bounded read-only protocol observation through the existing offline binary and SSH transport. Both original primary bindings feed the unchanged SDK ObserveProtocol and existing host native-limit readers. Counts/timestamps and binding hashes exclude plans, References and wire; independent observations do not certify Broker pending, ACK, writer freeze or owner stop. Apply, approval boundaries, source migration bytes and fixed1073 application images remain unchanged. Original local draft bf059e5906362b7f27e79acacd70239ae0054480 passed local Go race packages,14 Python transport tests and integration-tag compilation before executor disconnection; its final docs-facts outcome is unavailable. This independent remote candidate was recreated against merged bd5db2e4fdf5cb74172b140bfdad2db990b6d2f6 using reviewed repository files and adds bounded phase reporting; it is not a byte-identical export or a rerun of the local draft. Actual remote CI/native110/44+111/44 validation pending. User named shujie as both data and recovery owner, without approving any existing database write. Previous source baseline 6090af5226d9096da1107b7eb8cc16c805393e72 and all historical verification/signoff objects remain attributed to their original executions."
       ]
     }
   ],
