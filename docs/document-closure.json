@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "eb6452a9fa8dd4688ce33c992ef45e023c324d29",
+    "sha": "e81878e39d60b5bd116953b3d63326203487ee03",
     "verified_on": "2026-11-01"
   },
   "status_policy": {
@@ -14397,7 +14397,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b7893b1fb99cf9378ad7d6308facf2d14df4e582",
+        "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
         "verified_on": "2026-11-01"
       },
       "fact_sources": [
@@ -15031,7 +15031,12 @@
       "review_history": [
         "T25-C2 initial binding source review at d7aa4ddd16460d25a82d6116413b547a9f37d836. Preserve prior binding {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Only separately selected initial owner maintenance and required CLI selector added; ordinary migration authorization, protection, runtime boundary and metadata-profile commands unchanged. Native CLI compiled only locally; real CI pending, no production reassignment.",
         "Source review limited to additive ci.yml native selectors/artifact at 3f35e5f9583186b47e07953fcdc9405dca6ed2fb; previous binding {\"source_sha\": \"32627920429d8fda3bf42cac6cd609c2958a72ce\", \"verified_on\": \"2026-10-31\"}. Inventory and metadata-profile implementation/commands are unchanged. Added required separate full retained-baseline and actual pre-start restore CLI proofs with explicit no-skip checks; existing pair/native selectors and profile gates retained. Source review and local compilation only; real CI/production pending. Historical execution and signoff attribution unchanged.",
-        "M5 administrator activity source review b7893b1fb99cf9378ad7d6308facf2d14df4e582; previous binding {\"source_sha\": \"3f35e5f9583186b47e07953fcdc9405dca6ed2fb\", \"verified_on\": \"2026-11-01\"}; previous global {\"sha\": \"549ad91a9cfd25e98aaf430cb9dd034601979ecf\", \"verified_on\": \"2026-11-01\"}. New independent m5-activity-admin/--m5-activity mode, actual one-row ledger including dirty111,14 bounded sequential reads, pinned own PFS thread mapping, NULL-owner locks retained, exact identity/direct metadata grants, original safe SSH/admin Secret transport and strict armored receipt. Original clean100 readiness/inventory and no-role-activation semantics unchanged; corrected their stale SSH/member-count documentation against actual source. Local Go race/lint, old SSH27/readiness13/inventory8 Python contracts and new activity4 contracts passed; integration compiled only. Native held-DDL positive control and real activity run pending. Actual existing admin visibility run41222747868 at be2e4e8d passed target/direct global grants without account/permission/role mutation, not an activity/production freeze claim. No source/CI/production evidence or signoff rebound."
+        "M5 administrator activity source review b7893b1fb99cf9378ad7d6308facf2d14df4e582; previous binding {\"source_sha\": \"3f35e5f9583186b47e07953fcdc9405dca6ed2fb\", \"verified_on\": \"2026-11-01\"}; previous global {\"sha\": \"549ad91a9cfd25e98aaf430cb9dd034601979ecf\", \"verified_on\": \"2026-11-01\"}. New independent m5-activity-admin/--m5-activity mode, actual one-row ledger including dirty111,14 bounded sequential reads, pinned own PFS thread mapping, NULL-owner locks retained, exact identity/direct metadata grants, original safe SSH/admin Secret transport and strict armored receipt. Original clean100 readiness/inventory and no-role-activation semantics unchanged; corrected their stale SSH/member-count documentation against actual source. Local Go race/lint, old SSH27/readiness13/inventory8 Python contracts and new activity4 contracts passed; integration compiled only. Native held-DDL positive control and real activity run pending. Actual existing admin visibility run41222747868 at be2e4e8d passed target/direct global grants without account/permission/role mutation, not an activity/production freeze claim. No source/CI/production evidence or signoff rebound.",
+        {
+          "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
+          "verified_on": "2026-11-01",
+          "summary": "Reviewed dedicated M5 admin activity job in exact17-job workflow inventory, all operation/database exclusion combinations and pre-checkout revision/empty archive gate; configcontract race suite passed. Actual readonly admin receipt41225913119 completed on110 with zero active/transaction/metadata lock observations, not a freeze proof."
+        }
       ]
     },
     {
@@ -15164,7 +15169,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "eb6452a9fa8dd4688ce33c992ef45e023c324d29",
+        "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
         "verified_on": "2026-11-01"
       },
       "fact_sources": [
@@ -15668,7 +15673,12 @@
         "M5 close-result guard review 6c927948049836b24314e72ad2418afda86262b0; previous binding {\"source_sha\": \"3f35e5f9583186b47e07953fcdc9405dca6ed2fb\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"296d1752fa74a4b09e54a6b218a0f4c97254048e\", \"verified_on\": \"2026-11-01\"}. CI41219365688 Lint Code/job124590506889 found three unchecked close/hash-writer results. Retained reader propagates rows.Close failures; private stop read refuses qualification on Close failure; SHA writer explicitly cannot fail. Local package race and golangci-lint passed. No migration/resource/business semantics changed, no gate weakened, actual CI/native/production pending; prior failed fixture/run remains on original source.",
         "Live original-to-maintenance handoff fixture review 549ad91a9cfd25e98aaf430cb9dd034601979ecf; previous binding {\"source_sha\": \"6c927948049836b24314e72ad2418afda86262b0\", \"verified_on\": \"2026-11-01\"}; previous global {\"sha\": \"6c927948049836b24314e72ad2418afda86262b0\", \"verified_on\": \"2026-11-01\"}. Keep both original SDKs live through independent CLI registration, require actual Ready, then normal original SDK stops while CLI remains Ready; only that CLI answers released original Broker checks. Ninth mandatory flag records actual overlap, not a replacement for production evidence. Runtime/tool behavior unchanged; native-tag compilation passed locally, real nine-field proof pending. Earlier failed combined fixture and all original-source receipts remain attributed; no pass manufactured.",
         "M5 administrator activity source review b7893b1fb99cf9378ad7d6308facf2d14df4e582; previous binding {\"source_sha\": \"549ad91a9cfd25e98aaf430cb9dd034601979ecf\", \"verified_on\": \"2026-11-01\"}; previous global {\"sha\": \"549ad91a9cfd25e98aaf430cb9dd034601979ecf\", \"verified_on\": \"2026-11-01\"}. Review limited to additive ci.yml native selector and artifact plus separately selected readonly db-ops activity job; this document implementation/command behavior is unchanged. Existing native/paired/resource/protection gates retained. Local Go race/lint, old SSH27/readiness13/inventory8 Python contracts and new activity4 contracts passed; integration compiled only. Native held-DDL positive control and real activity run pending. Actual existing admin visibility run41222747868 at be2e4e8d passed target/direct global grants without account/permission/role mutation, not an activity/production freeze claim. No source/CI/production evidence or signoff rebound.",
-        "M5 installed-fixture/input review eb6452a9fa8dd4688ce33c992ef45e023c324d29; previous binding {\"source_sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"}. Native run41221979796/job124598257458 correctly rejected a retained-baseline fixture carrying consumed bootstrap authorization and an original-export fixture using an invalid operation ID. Clear only test bootstrap fields after actual installation and use unique digits-attempt IDs. Original-export CLI now rejects invalid IDs before credential/connection access. Production installed-only/operation/material/restore guards and all migration bytes retained. Local package race and integration compilation passed; actual restored CLI and complete baseline rerun pending, first refusal preserved. Separately native owner13+CLI9 run41222119780/source25a4b36b999568806f73335b8824a588f9865338 passed with raw artifact13051136918 ZIPac9e2304d535b2b14f0ab21da8e955cee951b74c83416456bbc9d5222919b250 verified; not relabelled as this source or production acceptance."
+        "M5 installed-fixture/input review eb6452a9fa8dd4688ce33c992ef45e023c324d29; previous binding {\"source_sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"b7893b1fb99cf9378ad7d6308facf2d14df4e582\", \"verified_on\": \"2026-11-01\"}. Native run41221979796/job124598257458 correctly rejected a retained-baseline fixture carrying consumed bootstrap authorization and an original-export fixture using an invalid operation ID. Clear only test bootstrap fields after actual installation and use unique digits-attempt IDs. Original-export CLI now rejects invalid IDs before credential/connection access. Production installed-only/operation/material/restore guards and all migration bytes retained. Local package race and integration compilation passed; actual restored CLI and complete baseline rerun pending, first refusal preserved. Separately native owner13+CLI9 run41222119780/source25a4b36b999568806f73335b8824a588f9865338 passed with raw artifact13051136918 ZIPac9e2304d535b2b14f0ab21da8e955cee951b74c83416456bbc9d5222919b250 verified; not relabelled as this source or production acceptance.",
+        {
+          "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
+          "verified_on": "2026-11-01",
+          "summary": "Explicit forward owner registration separately requires clean SQL111/Mongo44, while original owner requires110/44; owned CLI integration now exercises both heads. Local race/config workflow contracts, integration compilation and lint passed; native forward proof and production window remain pending."
+        }
       ]
     },
     {
