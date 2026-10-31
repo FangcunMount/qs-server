@@ -44,15 +44,16 @@ CI for exact SHA
 - 自动部署必须校验目标 SHA 没有被更新提交取代；手动部署仍须记录调用者、输入、environment 和审批。
 - self-hosted runner 的网络、SSH、Docker 权限和工具版本属于环境前置条件，不能写死为当前事实。
 
-两个有界只读入口只接受手工派发，必须在 checkout 前提交 `governance_confirm=<完整 GitHub SHA>` 且 `backup_name` 为空；不匹配时不进入携带数据库 Secret 的读取步骤。它们使用 production Environment 和 Mac mini 自托管 runner，但 source SHA 只标识工具源码，不是生产应用部署身份。
+这些有界只读入口只接受手工派发，必须在 checkout 前提交 `governance_confirm=<完整 GitHub SHA>` 且 `backup_name` 为空；不匹配时不进入携带数据库 Secret 的读取步骤。它们使用 production Environment 和 Mac mini 自托管 runner，但 source SHA 只标识工具源码，不是生产应用部署身份。
 
 | operation / database | 只读入口及连接来源 | 证据边界 |
 | --- | --- | --- |
-| `retirement-inventory-admin` / `mysql` | 固定 `root@47.94.204.124:22`、现有 metadata 管理员身份；`--inventory` 六成员包调用独立 `--retirement-inventory` | clean100、九张 InnoDB、固定11条业务计数与前后身份；15 reads＋3 controls，只读RR，5秒单条／45秒总。差异保留，不签清理资格或停写，M7退出工具 |
-| `metadata-readiness-admin` / `mysql` | 固定 `root@47.94.204.124:22` 接收器，现有 `MYSQL_METADATA_ADMIN_*`；六成员静态 Linux 包使用独立 `--metadata-readiness` 模式 | 绑定读取前后数据库身份、限定目录及 readiness 读取；原五成员权限 profile 保持独立 |
+| `retirement-inventory-admin` / `mysql` | 固定 `ubuntu@154.8.167.1:22`、现有 metadata 管理员身份；`--inventory` 五成员包调用独立 `--retirement-inventory` | clean100、九张 InnoDB、固定11条业务计数与前后身份；15 reads＋3 controls，只读RR，5秒单条／45秒总。差异保留，不签清理资格或停写，M7退出工具 |
+| `metadata-readiness-admin` / `mysql` | 固定 `ubuntu@154.8.167.1:22` 接收器，现有 `MYSQL_METADATA_ADMIN_*`；五成员静态 Linux 包使用独立 `--metadata-readiness` 模式 | 绑定读取前后数据库身份、限定目录及 readiness 读取；原四成员权限 profile 保持独立 |
+| `m5-activity-admin` / `mysql` | 同一可信ubuntu/serverA sudo接收器、现有metadata管理员、独立`--activity`五成员包和`--m5-activity`二进制模式 | 14次有界顺序读取原身份/实际单行账本、PFS/MDL/自身thread映射、QS会话/事务/metadata锁/EVENT；保留非零和dirty，不改变原clean100 profile，不签停写或迁移 |
 | `metadata-visibility-admin-profile` / `mongodb` | 用户已配置的 `root@003-ysj` 解析为固定 `root@81.70.102.15:22`，借用现有身份和可信 known_hosts；保留现有 `MONGODB_*`，认证库固定 `admin` | Mac mini 原生 reader 使用独占 loopback SSH tunnel；仅观测固定 qs / rs0 / member / migration / UUID 目标的身份、FCV、TTL monitor 和认证元数据，不执行日常备份脚本 |
 
-`complete` 只证明本次已声明的有界读取和 owned 连接释放。metadata count、digest、权限及 FCV 不证明对象无业务责任、完整 namespace 导出、备份对可恢复或停写 RPO=0，也不授权停写、恢复、DDL 或删除。`system.profile` 的业务恢复排除范围另须保留定义、索引和计数回执，生产集合继续保留。两个 reader 均不初始化业务容器、迁移 runner、消息消费者或发送端点；现用 backup、validate、restore、status 和 scheduled job 使用各自原入口。
+`complete` 只证明本次已声明的有界读取和 owned 连接释放。metadata count、digest、权限及 FCV 不证明对象无业务责任、完整 namespace 导出、备份对可恢复或停写 RPO=0，也不授权停写、恢复、DDL 或删除。`system.profile` 的业务恢复排除范围另须保留定义、索引和计数回执，生产集合继续保留。这些 reader 均不初始化业务容器、迁移 runner、消息消费者或发送端点；现用 backup、validate、restore、status 和 scheduled job 使用各自原入口。
 
 MySQL 独立 readiness 回执为 V2。两个历史列在同一连接、只读 REPEATABLE READ 快照内按主键读取；双表 MAX 上界、实际 InnoDB／unsigned 单列主键、每页1000行、每表最多512个非空页及最终 EOF 都须验证。边界参数使用精确十进制转换，避免 uint64 最大值丢失。`query_count=19+assessment_pages+outcome_pages` 包含固定 SHOW GRANTS 尝试；隔离级别、开始和 ROLLBACK 三条事务控制单独计数，不沿用历史18条计数。保持单条5秒、整体45秒预算；任何截断、未知形状、分页或释放失败均丢弃完整测量。ROLLBACK 成功后另读实时 clean100 和原连接身份，Conn、DB和连接池释放全部成功才允许 complete。旧五查询权限模式保持独立，历史V1回执不由新接收器重新解释为V2成功。
 
@@ -122,3 +123,5 @@ workflow 成功后若未写入证据台账，只能称为“run 成功”，不�
 ### M3 固定镜像预置
 
 `rocketmq-m3-image-cache.yml`仅允许main精确workflow SHA手动执行，在原qlume组的旧Mac mini运行。保留`PRODUCTION_DEPLOY_PAUSED=true`，使用已合并、固定SHA的infra缓存工具和固定计划，只向serverA/serverD拉取五个已发布digest并核对原容器保持；不调用部署脚本、启动业务或迁移数据库。复用既有ACR/SSH/SUDO Secrets，经SSH stdin临时传递，正常及失败均清理临时认证、runner密钥，另有always幂等清理步骤；只上传摘要回执。实际缓存和业务切换分开验收，M3总进度以[infra执行总表](https://github.com/FangcunMount/infra/blob/main/docs/server/rocketmq-m3-execution.md)为准。
+
+M5固定镜像构建另用`m5-build-images.yml`：只允许已成功main push CI的精确main祖先，先核Production Deploy仍disabled_manually；复用原三registry发布实现且PUBLISH_LATEST=false，保存registry digest/engine ID/源码回执，无SSH、迁移或应用部署步骤。构建成功不签发布/恢复资格。

@@ -17,6 +17,7 @@ on:
           - metadata-visibility-profile
           - metadata-visibility-admin-profile
           - metadata-readiness-admin
+          - m5-activity-admin
           - retirement-inventory-admin
           - cbpt-audit
           - cbpt-archive
@@ -90,7 +91,7 @@ permissions:
 # bounded metadata-only operations use the diagnostic group. New/unknown
 # operations default to the production lock; their job must also reject them.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'metadata-readiness-admin' || github.event.inputs.operation == 'retirement-inventory-admin' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'metadata-readiness-admin' || github.event.inputs.operation == 'm5-activity-admin' || github.event.inputs.operation == 'retirement-inventory-admin' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
   cancel-in-progress: false
 
 jobs:
@@ -402,6 +403,83 @@ jobs:
           set -Eeuo pipefail
           [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
           python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --readiness --archive "qs-mysql-metadata-readiness-${GITHUB_RUN_ID}.tar.gz"
+
+  mysql-m5-activity-admin:
+    name: Read Only M5 QS Database Activity
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'm5-activity-admin' && github.event.inputs.database == 'mysql'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Validate exact reviewed readiness revision and empty archive input
+        env:
+          PROFILE_REVIEW_SOURCE_SHA: ${{ github.event.inputs.governance_confirm }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$PROFILE_REVIEW_SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$PROFILE_REVIEW_SOURCE_SHA" == "$GITHUB_SHA" ]] || { echo "M5 activity source revision mismatch" >&2; exit 1; }
+          [[ -z "$PROFILE_ARCHIVE_INPUT" ]] || { echo "M5 activity does not accept backup input" >&2; exit 1; }
+
+      - name: Checkout immutable readiness source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
+      - name: Set up Go for the read-only readiness reader
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check and package read-only readiness reader
+        id: package
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          GOMAXPROCS=2 go test -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile
+          python3 -B scripts/dbops/test-mysql-m5-activity.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+          profile_package=$(mktemp -d "$RUNNER_TEMP/qs-m5-activity-package.XXXXXX")
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-m5-activity.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
+          cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/mysql-m5-activity.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
+          profile_archive="qs-mysql-m5-activity-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 mysql-metadata-profile.py mysql-m5-activity.py cbpt-cleanup.py receipt-transport.py
+          echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Read fixed MySQL metadata and readiness over trusted SSH
+        env:
+          PROFILE_OPERATION: ${{ github.event.inputs.operation }}
+          PROFILE_DATABASE: ${{ github.event.inputs.database }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+          PROFILE_SOURCE_SHA: ${{ github.sha }}
+          PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          PROFILE_EXPECTED_TARGET_HASH: '8249a6ecd31f7c85b5efccf757138700a0c0eecc8fe792a77153b6dadf524a16'
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
+          python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --activity --archive "qs-mysql-m5-activity-${GITHUB_RUN_ID}.tar.gz"
 
   mysql-retirement-inventory-admin:
     name: Read Only MySQL Retirement Counts

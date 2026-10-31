@@ -1,12 +1,12 @@
 # MySQL 只读元数据诊断
 
-无 argv 的原权限模式只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合，不读取业务记录。独立 readiness 模式只读取明确限定的目录和分页标量分类。新增 inventory 模式只返回固定退役对象的标量计数。三个模式均不激活角色、不替代现有删除门禁，也不证明清理资格。
+无 argv 的原权限模式只读诊断当前 session 的 SHOW GRANTS，以及固定 RDS 角色的潜在权限集合，不读取业务记录。独立 readiness 模式只读取明确限定的目录和分页标量分类。新增 inventory 模式只返回固定退役对象的标量计数。四个模式均不激活角色、不替代现有删除门禁，也不证明清理资格。
 
 工作流提供两个独立的只读入口：`metadata-visibility-profile` 使用现有应用账号；`metadata-visibility-admin-profile` 使用 production 环境中的 `MYSQL_METADATA_ADMIN_USERNAME`、`MYSQL_METADATA_ADMIN_PASSWORD`，复用既有 host/port/database，并保持上述生产目标 hash 校验。管理员 Secret 缺失时停止，绝不回落到应用账号。CBPT 清理四个入口固定使用这组管理员身份，但原有全局元数据、依赖、锁、内容与恢复证明门禁不变。新工作流 source SHA 必须重新归档和隔离恢复，原归档及证明保留。 CBPT 手工入口必须提交 `governance_confirm`，在 checkout 和执行前核对实际 GitHub SHA，防止派发期间分支移动导致执行未审查版本。
 
-固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。无 argv 时执行本页原权限 profile；另行声明的两个固定诊断 argv 为 `--metadata-readiness`、`--retirement-inventory`，均只允许单独使用。没有命令行业务参数；其它 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
+固定输入：PROFILE_SOURCE_SHA（40 位小写十六进制）、PROFILE_RUN_ID（GitHub run-attempt 数字格式）、PROFILE_EXPECTED_TARGET_HASH（64 位小写十六进制），以及 MYSQL_HOST/PORT/USERNAME/PASSWORD/DATABASE 五项环境变量。无 argv 时执行本页原权限 profile；另行声明的三个固定诊断 argv 为 `--metadata-readiness`、`--retirement-inventory`、`--m5-activity`，均只允许单独使用。没有命令行业务参数；其它 argv 或格式不合法时只输出固定失败。workflow 将预先验证的生产 target hash 作为固定绑定传入；不包含生产连接或凭据。
 
-`metadata-readiness-admin` / `database=mysql` 使用独立 `--metadata-readiness` 模式，只接受固定 `qs` 目标及 clean 100。派发必须在 checkout 前验证完整 `governance_confirm` 等于 GitHub SHA，且 `backup_name` 为空；只使用现有 metadata 管理员 Secret，缺失时停止。SSH 控制器使用显式 `--readiness` 与六成员包，原五成员权限 profile 的格式和行为保持独立。
+`metadata-readiness-admin` / `database=mysql` 使用独立 `--metadata-readiness` 模式，只接受固定 `qs` 目标及 clean 100。派发必须在 checkout 前验证完整 `governance_confirm` 等于 GitHub SHA，且 `backup_name` 为空；只使用现有 metadata 管理员 Secret，缺失时停止。SSH 控制器使用显式 `--readiness` 与五成员包，原四成员权限 profile 的格式和行为保持独立。
 
 readiness 当前只接收 `format_version=2`；旧 V1 文件作为历史证据保留，不由当前接收器兼容解析或改写。无 argv 的原五查询权限 profile 及其格式保持独立。V2 成功要求完整读取两个历史 JSON 列、确认一致快照、释放只读事务及 pinned Conn，并关闭 owned DB pool。只输出限定目录的 count/digest、全 schema EVENT 观测、线程/事务/metadata lock 标量、仪表可用性、主键和快照验证布尔、页数、EOF，以及历史列的守恒计数分布；不输出行 ID、上界、JSON 内容、SQL、账号、角色或目录名称。失败不保留 measurements，失败阶段及释放字段保持明确未知/失败。`diagnostic_only=true`、`readiness_only=true`、`freeze_verified=false` 固定不变；一致快照和观测零值不证明停止所有写入、完整备份或 RPO=0，也不授权结构退役。
 
@@ -67,7 +67,7 @@ UTF-8 JSON 每个 byte 映射到私用字符 U+E000..U+E0FF，以 U+E100/U+E101 
 
 ## 固定退役盘点
 
-`retirement-inventory-admin` / `database=mysql` 是独立 `--retirement-inventory` 入口。它沿同一已核目标 hash、管理员 Secret 和固定 SSH route；先验证 `governance_confirm` 等于实际 GitHub SHA、`backup_name` 为空，再 checkout、构建和读取 Secret。不试探其它账号，不回落应用身份，不接受任意 SQL、对象名或目标版本。SSH `--inventory` / `--receive-inventory` 的六成员包为原五成员加 `mysql-retirement-inventory.py`；原五查询 profile、readiness V2 和 inventory V1 的 flag、包及回执互不兼容，任何交叉模式或额外参数均拒绝。
+`retirement-inventory-admin` / `database=mysql` 是独立 `--retirement-inventory` 入口。它沿同一已核目标 hash、管理员 Secret 和固定 SSH route；先验证 `governance_confirm` 等于实际 GitHub SHA、`backup_name` 为空，再 checkout、构建和读取 Secret。不试探其它账号，不回落应用身份，不接受任意 SQL、对象名或目标版本。SSH `--inventory` / `--receive-inventory` 的五成员包为原四成员加 `mysql-retirement-inventory.py`；原五查询 profile、readiness V2 和 inventory V1 的 flag、包及回执互不兼容，任何交叉模式或额外参数均拒绝。
 
 固定11条业务读取覆盖九张 InnoDB BASE TABLE：`testee`、`operators`、五张历史维护表，以及 `ai_bridge_requests`、`ai_bridge_request_assessments`。缺对象或非 InnoDB 不变成零值。tags 输出 SQL NULL／JSON null／空数组／非空数组／其它形状的守恒分区；roles 与 effective_roles 仅作 MySQL 规范 JSON 二进制空安全比较。历史状态按固定词汇分组，其它状态只计 `unknown`，不输出原值；保留五表总量和内部孤儿引用计数。AI 同时覆盖所有 payload 的期望 assessment 关系（保留重复条目）和实际关系，分别计非法期望 ID、缺关系、孤儿、零 ID及多余关系。三个 actor 字段要求 JSON STRING，org/testee 是正数且规范 uint64 十进制，subject 是非空、最多128字节且无 NUL 的 opaque 字符串；合法 payload 与已索引 identity 作逐字节比较，不把 subject 当数字。该盘点不验证 stored request_hash、所有运行环境或实际业务授权。
 
@@ -108,3 +108,14 @@ M3 宿主验收的旧 Readiness 原生夹具在 CI39941425800 的 dirty_version_
 共享 `m4-metadata-readiness-native-proof.sh` 的 MySQL 模式仍要求原三项 selector，预算及接收格式不变。Mongo 模式追加固定 `rm_outbox` 的快照状态计数，必须同时运行原元数据测试和新增只读账户测试，任一缺席、失败或跳过均失败。新探针的源码、原生 CI 与现网读取分别记录，不改写本页原权限/readiness/历史退役证据。
 
 SQL111 候选的删除保护/原 DDL 恢复在共享 MySQL CI 后续独立 selector 中验证，仅使用另行创建的自有 namespace。原权限/readiness 工具的查询、预算、固定历史目标和原生 selector 不变；该新增测试不授权生产 DDL。
+
+
+## M5 独立服务器活动读取
+
+`db-ops.yml operation=m5-activity-admin / database=mysql`显式选择`--m5-activity`，仍要求checkout前精确`governance_confirm`与空backup_name，复用现有`MYSQL_METADATA_ADMIN_*`、public VERIFY_IDENTITY/CA及固定target hash。可信SSH为`ubuntu@154.8.167.1:22`并复用既有sudo Python接收器；五成员包只增加`mysql-m5-activity.py`。凭据经私有stdin运输，0600临时信封在数据库连接前删除，日志只输出严格schema/类型白名单的非秘密回执。不新增账号、权限或角色激活，也不复用普通backup/status入口。
+
+它是独立活动观察，不改变原readiness/inventory的clean100门禁。读取当前完整单行账本，保留实际版本及dirty（含110或中断111）；14次固定查询复核前后原会话/库身份、直接全局元数据权限、PFS/MDL仪表及当前会话到PFS THREAD_ID的唯一映射，再取得QS其他会话、活动线程、InnoDB事务/修改事务、已持有/待决metadata锁、启用EVENT和数据库epoch微秒。NULL owner的锁仍计入，缺少当前thread映射/仪表/权限一律失败，不把NULL比较丢掉的行签成零。所有读均有原5秒单条/45秒总预算；成功必须释放Conn及owned DB pool。
+
+回执固定`read_only=true,m5_activity_only=true,freeze_verified=false,observations_atomic=false`。这些是顺序元数据样本，不是原子快照；不对跨查询计数做守恒推断，非零按原数保留。读取/释放失败丢弃measurements，保留严格错误类别和MySQL数字码。完整读取不等于无写者、无DDL、业务排空、首次启动未发生、备份可恢复或允许迁移；窗口须独立组合原写者/部署锁/生命周期与数据库回执，并按实际阶段校验原110/44或已知中断111。不会改账本、清dirty、KILL会话或清理任何业务/ACK/调度。
+
+必需`TestM5ActivityAdminOwnedNativeMySQL`在guard绑定的独占MySQL8.0.36中，实际持表锁并启动被阻塞DDL，要求观察到非零待决锁、持有锁和活动线程；另验证受限身份拒绝、110及dirty111如实读取且原账本未被reader改写。夹具账号、DDL及dirty变更只属于该独占库。源码/编译与本地mock不算真实原生通过；结果按精确CI/artifact独立记录，不冒充生产验收。

@@ -2,7 +2,7 @@
 
 源码位于 `scripts/maintenance/qs-migrate-offline/`，可由 `make build-maintenance` 或下文的独立命令构建。
 
-`qs-migrate-offline` 只拥有两条数据库连接和一次已批准的嵌入式 up 执行。默认只读；不启动 API、Collection、Worker、业务 Container、Scheduler、relay、NSQ、索引自动 reconcile 或种子数据。它不是业务服务、备份工具、恢复工具或全局维护框架。
+`qs-migrate-offline` 默认只拥有两条数据库连接和一次已批准的嵌入式 up 执行。默认只读；不启动 API、Collection、Worker、业务 Container、Scheduler、relay、NSQ、索引自动 reconcile 或种子数据。独立显式的`--owner-drain`模式仅注册暂停新发送的原生事务Checker，可能持久化正式SDK回查/恢复审计，不能标为只读。它不是业务服务、备份工具、恢复工具或全局维护框架。
 
 完整停写、按批准范围的保护与恢复、逐对象责任和首个 runtime 启动边界由 [One-off、恢复与生产证据](../../../docs/03-基础设施/migration-recovery/20-One-off、恢复与生产证据.md#7-m4-离线退役维护窗口)维护。本文只定义执行器输入与输出。
 
@@ -176,3 +176,38 @@ SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRI
 `no_observed_unresolved` 仅说明本次原主库元数据与native-limit未观察到未决状态，不证明Broker、业务ACK、写者排除或owner可停机。报告固定 `runtime_frozen=false`、`broker_pending_known=false`，不能独立消费为批准。最后owner的在途发送/回查、排空/退出及同窗口材料仍须独立核实。不会自动reconcile、重投或清理凭证。
 
 原 `release-snapshot.yml` 在 `messaging_retirement_inventory=true` 时可显式选 `protocol_observation=true`，通过同一已校验维护容器读取，保存独立 `messaging-retirement-protocol.json`。默认不执行协议观察，原schema预览和清单语义不变。
+
+## M5 独立维护 owner
+
+显式`--owner-drain`与apply、binding、protocol-observation互斥。另要求`--owner-drain-config`为原应用JSON绝对路径、`--owner-drain-config-sha256`为其原字节摘要、`--owner-drain-operation=<digits-attempt>`为新操作，以及`--owner-drain-mysql-identity`/`--owner-drain-mongo-identity`为canonical已核双库身份。生产沿用`--application-env --mysql-database=qs --mongo-database=qs --timeout=30m`；隔离测试仅使用已分配库的显式连接与实际身份。拒绝非110/44、原binding不符或同operation复用，不建表/修改binding。
+
+读取原`messaging.rocketmq`，沿既有Viper时长和literal owner解码保留原routes、凭据和每实例预算，仅在内存将新发送准入设false。分别复用正式SDK的原SQL/Mongo store、native-limit与事务Runtime，无NORMAL发布者、Reserve/Execute入口、业务消费者、HTTP/gRPC、模型、调度或业务Container。它是临时第二组Checker，重叠期间不宣称全主机回查worker数量与原来相同；编排须记录旧/维护两组实例、资源/并发上界，保持原每实例预算和Broker回查参数，并尽快完成旧实例排空。
+
+原业务停止前先验证维护Checker实际注册、原库观测可用新鲜，保留原owner到交接成立。停止原API后调度/业务生产均退出，维护Checker仍可依据原凭证回复Broker并持久化正向恢复审计。没有新业务执行或凭证删除，但SDK正常维护可能转移协议状态；因此同窗口静态保护在维护owner最终退出后捕获。
+
+状态写入新0700目录`$TMPDIR/qs-owner-drain-<operation>/status.json`，0600原子替换；包含实际源码、配置摘要、时间、两owner协议/SDK/保护状态，默认没有停写或批准结论。仅在同目录新0600单链接普通文件`stop.json`声明精确operation、独立receipt摘要，且`writers_stopped`与`replacement_owner_ready`恰一个为true时，才审查退出。声明本身不是写者排除证据；操作者须绑定实际全写者退出或原owner恢复就绪回执。
+
+最终退出还要求新鲜可用的原主库样本、所有未决项/年龄为零、native-limit=false及SDK实际active_sends/running_checks/queued_checks为零。停止后状态明确stopped及实际SDK/sampler退出，独立canonical观察仍须再读。SIGTERM、操作者断线或deadline单独不会关闭仍有责任的最后Checker；expiry标记使本次执行资格失效，保持资源到受审移交/退出。关闭不完整继续保留借用池和其他owner，不把进程超时解释为已排空。状态陈旧、丢失或错误皆停止资格，不复用旧JSON。
+
+本批具体生产编排、额外维护资源、原六实例退出、同窗口保护/恢复及首业务启动点由infra执行包审查。新增原生CLI用真实隔离Broker/MySQL/Mongo验证，不能用包级测试或导入成功代替生产交接。
+
+## M5 同窗口完整保护与原状恢复
+
+`--retained-baseline --timeout=2m`只读枚举所选QS的全部SQL表/视图和Mongo集合/视图/index。逐行覆盖SQL全部列（服务端BINARY/HEX保留NULL、字节、微秒和十进制差异），逐文档覆盖原BSON；对完整行摘要多重集排序再摘要，保留重复数量，不导出业务内容。每对象默认上限100万行，显式`--baseline-max-rows`只可收紧；超过预算、权限、超时或非空Mongo TTL集合均失败且`complete=false`，从不把前缀或未知当作零。system.profile仅保留诊断定义，不签为业务内容保护。跨库快照不原子，实际写者排除及两次稳定基线由协调窗口独立证明。
+
+`--capture-original-operation=<新操作> --timeout=2m`独立只读导出逐字原目标DDL、完整单行110/clean账本及上述全量基线；输出重定向到新0600私有文件并保全原字节。只接受原110/44、受核原目标/账本DDL摘要、空目标和当前完整迁移资源；不是备份整库或停写声明。
+
+`--restore-original=<原私有文件> --restore-original-sha256=<原字节摘要> --timeout=2m`默认只检查实际中断状态，接受111 dirty（DDL前或后）与111 clean首次启动前，以及完整原110；绕过clean-head入口仅用于此严格原材料检查。重新核对canonical库身份、完整账本恰一行、Mongo44、所有保留对象定义和完整内容，并输出实际state摘要。任一新增/缺失/改变的保留资产拒绝，已有目标必须逐项等于原空对象，不覆盖非空表。
+
+实际恢复另加`--restore-apply --restore-approval-file=<独立0600批准> --restore-approval-sha256=<独立原字节摘要>`；与原SQL111批准互斥，不存在Force/down入口。批准格式为`M5RestoreApproval`，kind固定`qs_m5_original_empty_restore`，绑定原材料、实际state、精确源码、停写/首次启动边界/执行审查回执、具名数据与恢复责任人及UTC一小时恢复预算；`runtime_frozen`和`runtime_not_started`只是经外层真实回执支持的声明。材料最多1MiB、批准保持32KiB，拒绝重复/未知JSON字段、symlink、共享/可写路径或复用consumed凭证。
+
+输入和完整主库状态在消费批准前再次实读。只在目标缺失时执行原逐字DDL，完整复核目标和保留资产后，单个SERIALIZABLE根内锁定完整实际111账本，精确DELETE一行并INSERT捕获的完整原110/clean行；事务失败回滚，commit未知保留未知，不重试。最后独立复核全量原对象和110/44。DDL已成功而账本失败时保留实际111 dirty/clean，重新只读检查并另签下一次独立恢复，不手工清dirty。工具不证明全主机排他或首次启动尚未发生；外层必须通过infra `pre-start-repair`及持久首次启动边界调用。任何业务runtime首次启动尝试后禁用旧材料回放，只准111兼容前向修复。
+
+必需真实隔离CI `TestSchemaPairNativeM5RetainedFullBaseline`与`TestSchemaPairNativeM5OriginalRestoreCLI`覆盖完整原字节差异、预算/TTL拒绝、实际独立CLI三种中断、首次启动/停写声明及变化事实拒绝、实际ledger INSERT权限故障后的事务回滚及一次性批准。测试报告严格属于自有数据库，不构成生产恢复验收；实际CI结论按精确提交记录。
+
+原生CLI还必须先与两原SDK同时保持ready，随后确认原SDK正常停止、维护SDK仍活跃，再释放Broker回查并取得正向恢复审计与实际进程退出；该重叠交接是第9个显式必需回执字段，不用“旧owner先死、维护进程再启动”的夹具冒充生产顺序。原消费者13项先独立运行，避免CLI已提交夹具消息污染其pre-commit观察。
+
+
+R2首次业务启动后的维护交接必须显式加`--owner-drain-forward`，只接受clean111/44；默认`--owner-drain`仍仅接受原clean110/44，不自动猜版本，也不接受dirty111。二者沿同一原配置/身份/binding及暂停新发送的SDK路径，保持原每实例预算，不执行DDL或账本修复。状态的`forward_only`和`registered_mysql_version`标明模式及注册时验证的SQL head，不代替当前schema复读。新业务首次启动后，协调器继续持原首次启动屏障，先证明111维护Checker真实ready，再停止/替换旧新实例；只用已固定111兼容镜像前向修复，不回放110材料。最后交还ready的业务owner并安全停止维护owner。
+
+原生CLI在原110模式的实际恢复/保留断言之后，由自有SDK夹具显式模拟111头，验证默认入口拒绝、显式forward真实双owner注册/ready/安全退出，且原业务事实保持单次、没有新half或版本改写；此模拟头不计为真实SQL111执行或完整schema-pair验收。完整SQL111与三中断原状恢复由独立真实schema-pair门禁覆盖，不能互相替代。

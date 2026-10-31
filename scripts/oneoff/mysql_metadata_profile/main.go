@@ -415,6 +415,9 @@ func mysqlConfig(c connection) *mysql.Config {
 	return x
 }
 func run(args []string, get func(string) string, out io.Writer) int {
+	if len(args) == 1 && args[0] == "--m5-activity" {
+		return runM5Activity(get, out)
+	}
 	if len(args) == 1 && args[0] == "--metadata-readiness" {
 		return runReadiness(get, out)
 	}

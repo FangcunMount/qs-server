@@ -131,6 +131,10 @@ func (r *TransactionRuntime) Stats() rocketmq.TransactionStats {
 	return stats
 }
 
+// SDKStats reports registration and actual Checker activity independently of
+// the host's closed new-send gate. It exposes no sender or mutable state.
+func (r *TransactionRuntime) SDKStats() rocketmq.TransactionStats { return r.sender.Stats() }
+
 // ReviewProtection cannot open configured admission or restart a stopping owner.
 // The maintenance caller records its named review; no review ID is a metric label.
 func (r *TransactionRuntime) ReviewProtection(generation uint64, review string) error {

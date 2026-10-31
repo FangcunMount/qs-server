@@ -44,6 +44,9 @@ func TestTransactionPauseKeepsCheckerAndGatesBothEntryPoints(t *testing.T) {
 	if runtime.Stats().Ready {
 		t.Fatal("startup ignored closed host admission")
 	}
+	if !runtime.SDKStats().Ready {
+		t.Fatal("paused host hid live Checker registration")
+	}
 	if _, err := runtime.Reserve(ctx, transaction.Request{}, transaction.FrozenPlan{}); !errors.Is(err, ErrTransactionAdmissionClosed) {
 		t.Fatal(err)
 	}

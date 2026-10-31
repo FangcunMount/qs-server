@@ -1,0 +1,108 @@
+name: M5 immutable images while deployment frozen
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Exact main ancestor with successful push CI
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Fixed reviewed main source and frozen production writer
+        env:
+          REVISION: ${{ inputs.revision }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$REVISION" origin/main
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$REVISION" --event push --json conclusion --jq 'any(.[]; .conclusion == "success")' | grep -qx true
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/cd.yml" --jq .state)" = disabled_manually
+  images:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [apiserver, collection, worker]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SERVICE: ${{ matrix.service }}
+      DEPLOY_SHA: ${{ inputs.revision }}
+      DEPLOY_REF: main
+      DOCKER_REGISTRY: ghcr.io
+      DOCKER_REPOSITORY: fangcunmount
+      PUBLISH_LATEST: 'false'
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+      ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.revision }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          username: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+      - name: Publish immutable SHA only
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
+          make cd-image SERVICE="$SERVICE" DEPLOY_REF="$DEPLOY_REF" DEPLOY_SHA="$DEPLOY_SHA" BUILD_TIME="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      - name: Verify registry digest and engine identity
+        run: |
+          set -euo pipefail
+          . scripts/cd/image-metadata.sh
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          from pathlib import Path
+          sha=os.environ['DEPLOY_SHA']; rows=[]
+          for registry,namespace in ((os.environ['DOCKER_REGISTRY'],os.environ['DOCKER_REPOSITORY']),(os.environ['ALIYUN_ACR_REGISTRY'],os.environ['ALIYUN_ACR_NAMESPACE'])):
+              repo=f"{registry}/{namespace}/{os.environ['IMAGE_NAME']}"
+              ref=f'{repo}:{sha}'
+              subprocess.run(['docker','pull','--platform','linux/amd64',ref],check=True)
+              x=json.loads(subprocess.check_output(['docker','image','inspect',ref],text=True))[0]
+              assert x['Os']=='linux' and x['Architecture']=='amd64'
+              assert x['Config']['Labels']['org.opencontainers.image.revision']==sha
+              digests=[v.split('@')[1] for v in x['RepoDigests'] if v.startswith(repo+'@sha256:')]
+              assert len(digests)==1 and re.fullmatch('sha256:[0-9a-f]{64}',digests[0])
+              rows.append(dict(repository=repo,digest=digests[0],image_id=x['Id']))
+          assert len({r['image_id'] for r in rows})==1
+          Path('image-receipt.json').write_text(json.dumps(dict(source_sha=sha,service=os.environ['SERVICE'],platform='linux/amd64',registries=rows,deployment_verified=False,latest_published=False),indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qs-m5-image-${{ matrix.service }}-${{ inputs.revision }}
+          path: image-receipt.json
+          if-no-files-found: error
+          retention-days: 30
