@@ -38,3 +38,15 @@ func TestOfflineInvalidInputDoesNotReadCredentialsOrConnect(t *testing.T) {
 		t.Fatal(err, reads)
 	}
 }
+
+func TestOfflineProtocolActionIsBoundedAndCannotApply(t *testing.T) {
+	base := []string{"--mysql-database=qs", "--mongo-database=qs", "--protocol-observation", "--timeout=30s"}
+	if a, err := parseArguments(base); err != nil || !a.protocolObservation || a.apply {
+		t.Fatal(a, err)
+	}
+	for _, extra := range [][]string{{"--apply", "--approval-file=/tmp/approval", "--approval-sha256=" + strings.Repeat("a", 64)}, {"--timeout=2m"}, {"--approval-file=/tmp/approval"}} {
+		if _, err := parseArguments(append(append([]string{}, base...), extra...)); err == nil {
+			t.Fatal("ambiguous observation accepted", extra)
+		}
+	}
+}

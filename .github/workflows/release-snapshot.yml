@@ -6,6 +6,10 @@ on:
         description: Bounded read-only retained messaging inventory; no backup, replay, retirement or DDL
         type: boolean
         default: false
+      protocol_observation:
+        description: Read original QS protocol metadata; never certifies Broker backlog or writer exclusion
+        type: boolean
+        default: false
       reviewed_source:
         description: Exact reviewed source SHA, required for messaging inventory
         type: string
@@ -48,6 +52,7 @@ jobs:
       MAINTENANCE_MODE: ${{ inputs.maintenance_transport }}
       SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
       INVENTORY_REQUESTED: ${{ inputs.messaging_retirement_inventory }}
+      PROTOCOL_REQUESTED: ${{ inputs.protocol_observation }}
       EXISTING_MAINTENANCE: ${{ inputs.maintenance_container }}
     steps:
       - uses: actions/checkout@v6
@@ -55,6 +60,7 @@ jobs:
         run: |
           test "$REVIEWED_SOURCE" = "$GITHUB_SHA"
           test "$INVENTORY_REQUESTED" != true
+          test "$PROTOCOL_REQUESTED" != true
           test -z "$EXISTING_MAINTENANCE"
           [[ "$MAINTENANCE_IMAGE" =~ ^sha256:[0-9a-f]{64}$ ]]
           case "$MAINTENANCE_MODE" in preflight|stage) ;; *) exit 1 ;; esac
@@ -190,6 +196,11 @@ jobs:
       - name: Inspect the exact canonical offline plan without applying or approving it
         if: matrix.owner == 'qs.mysql'
         run: python3 scripts/cd/run-offline-preview.py
+      - name: Read original QS transaction primaries without sending or mutating
+        if: matrix.owner == 'qs.mysql' && inputs.protocol_observation == true
+        env:
+          PROTOCOL_OBSERVATION: 'true'
+        run: python3 scripts/cd/run-offline-preview.py
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -199,8 +210,9 @@ jobs:
             messaging-retirement-original-ai-publisher.sql
             messaging-retirement-original-ai-publisher.jsonl
             messaging-retirement-offline-preview.json
+            messaging-retirement-protocol.json
           if-no-files-found: error
           retention-days: 30
       - name: Remove owned local key and companion
         if: always()
-        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json messaging-retirement-original-ai-publisher.sql messaging-retirement-original-ai-publisher.jsonl messaging-retirement-offline-preview.json inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory inventory-companion/qs-migrate-offline
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json messaging-retirement-original-ai-publisher.sql messaging-retirement-original-ai-publisher.jsonl messaging-retirement-offline-preview.json messaging-retirement-protocol.json inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory inventory-companion/qs-migrate-offline
