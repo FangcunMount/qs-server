@@ -1225,6 +1225,9 @@ jobs:
         run: bash scripts/cd/test-github-action-runtimes.sh
 
 
+      - name: Test image retention policy
+        run: python3 scripts/cd/test_image_retention.py
+
       - name: Test deployment lock bootstrap
         run: python3 scripts/cd/test_image_deploy_lock.py
 

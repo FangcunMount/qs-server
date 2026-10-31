@@ -42,7 +42,28 @@ acquire_image_deploy_lock() {
 
 retain_successful_image() {
   local image_ref="$1"
-  if ! $SUDO python3 "$SCRIPT_DIR/image-retention.py" \
+  # The deploy package is writable by deploy. Never execute its Python file as
+  # root; the host administrator installs an identical, root-owned copy.
+  local trusted_helper="/usr/local/libexec/fangcun/image-retention.py"
+  if [ -L "$trusted_helper" ] || [ ! -f "$trusted_helper" ] || \
+      [ "$(stat -c '%u:%a' "$trusted_helper" 2>/dev/null)" != "0:755" ] || \
+      [ "$(stat -c '%u:%a' "$(dirname "$trusted_helper")" 2>/dev/null)" != "0:755" ] || \
+      ! cmp -s "$SCRIPT_DIR/image-retention.py" "$trusted_helper"; then
+    echo "::warning::Trusted image retention helper missing, untrusted or differs; skip cleanup." >&2
+    return 0
+  fi
+  local ancestor
+  ancestor=$(dirname "$trusted_helper")
+  while :; do
+    if [ -L "$ancestor" ] || [ "$(stat -c '%u' "$ancestor")" != 0 ] || \
+        [ -n "$(find "$ancestor" -maxdepth 0 -perm /022 -print)" ]; then
+      echo '::warning::Untrusted image retention parent; skip cleanup.' >&2
+      return 0
+    fi
+    [ "$ancestor" = / ] && break
+    ancestor=$(dirname "$ancestor")
+  done
+  if ! $SUDO /usr/bin/python3 -I "$trusted_helper" \
       --service "${IMAGE_NAME##*/}" --image-ref "$image_ref" --apply --deployment-locked "${RETENTION_PREVIOUS_IDS[@]}"; then
     echo "::warning::Deployment succeeded, but image retention failed; inspect the server retention audit." >&2
   fi
