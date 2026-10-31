@@ -27,6 +27,7 @@ type arguments struct {
 	mysqlDatabase, mongoDatabase, approvalFile, approvalSHA256 string
 	apply                                                      bool
 	applicationEnvironment                                     bool
+	protocolObservation                                        bool
 	timeout                                                    time.Duration
 }
 
@@ -41,6 +42,7 @@ func parseArguments(args []string) (arguments, error) {
 	flags.BoolVar(&out.apply, "apply", false, "consume approval and execute embedded migrations")
 	flags.BoolVar(&out.applicationEnvironment, "application-env", false, "explicitly reuse the running QS application connection environment")
 	flags.DurationVar(&out.timeout, "timeout", 15*time.Minute, "total connection/migration deadline, at most 30m")
+	flags.BoolVar(&out.protocolObservation, "protocol-observation", false, "read original QS transaction primaries without sending or mutating")
 	registerInitialBindingFlags(flags, &out.binding)
 	if err := flags.Parse(args); err != nil {
 		return out, err
@@ -49,6 +51,9 @@ func parseArguments(args []string) (arguments, error) {
 		(out.apply && (out.approvalFile == "" || out.approvalSHA256 == "")) ||
 		(!out.apply && (out.approvalFile != "" || out.approvalSHA256 != "")) {
 		return out, errors.New("explicit selected databases and bounded offline action required")
+	}
+	if out.protocolObservation && (out.apply || out.binding.action != "" || out.timeout > time.Minute) {
+		return out, errors.New("bounded read-only protocol action required")
 	}
 	if out.binding.action != "" && out.timeout > 2*time.Minute {
 		return out, errors.New("initial binding requires explicit timeout at most 2m")
@@ -118,6 +123,10 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 	pair := migration.PairConfig{MySQLDatabase: a.mysqlDatabase, MongoDatabase: a.mongoDatabase, ExpectedSourceSHA: version.GitCommit}
 	if a.binding.action != "" {
 		return runInitialBinding(ctx, db, client, pair, a.binding, output)
+	}
+	if a.protocolObservation {
+		observation, err := migration.ObserveOfflineProtocol(ctx, db, client, pair)
+		return errors.Join(err, json.NewEncoder(output).Encode(observation))
 	}
 	if !a.apply {
 		snapshot, err := migration.InspectOffline(ctx, db, client, pair)

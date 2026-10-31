@@ -9,6 +9,11 @@ import subprocess
 
 from m5_maintenance_container import resolve_inventory_target
 
+protocol_mode = os.environ.get("PROTOCOL_OBSERVATION", "false")
+if protocol_mode not in {"true", "false"}:
+    raise SystemExit("Explicit read-only observation mode required")
+protocol_mode = protocol_mode == "true"
+receipt_name = "messaging-retirement-protocol.json" if protocol_mode else "messaging-retirement-offline-preview.json"
 source = os.environ["GITHUB_SHA"]
 run_id = os.environ["GITHUB_RUN_ID"]
 if not re.fullmatch(r"[0-9a-f]{40}", source) or not run_id.isdecimal():
@@ -17,10 +22,11 @@ binary = Path("inventory-companion/qs-migrate-offline").read_bytes()
 digest = hashlib.sha256(binary).hexdigest()
 if digest != os.environ["EXPECTED_OFFLINE_DIGEST"]:
     raise SystemExit("Offline inspector identity mismatch")
-temporary = "/tmp/qs-offline-preview-" + run_id
+temporary = "/tmp/qs-offline-preview-" + run_id + ("-protocol" if protocol_mode else "")
 script = ("set -eu; umask 077; p=" + shlex.quote(temporary)
           + '; trap \'rm -f "$p"\' EXIT; cat > "$p"; chmod 0700 "$p"; "$p" '
-          + "--application-env --mysql-database=qs --mongo-database=qs --timeout=30s")
+          + "--application-env --mysql-database=qs --mongo-database=qs --timeout=30s"
+          + (" --protocol-observation" if protocol_mode else ""))
 try:
     target = resolve_inventory_target("qs.mysql", "qs-apiserver")
 except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
@@ -32,6 +38,8 @@ try:
     result = subprocess.run(["ssh", "-F", os.environ["RUNNER_SSH_CONFIG"], os.environ["RUNNER_SSH_ALIAS"], shlex.join(command)],
                             input=binary, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
     output = json.loads(result.stdout)
+    if protocol_mode and type(output) is dict and output.get("phase") in {"input", "pair_inspection", "qs_mysql_binding", "qs_mysql_protocol", "qs_mongo_binding", "qs_mongo_protocol", "complete"}:
+        report["error_phase"] = output["phase"] if result.returncode else None
     assert result.returncode == 0 and output["read_only"] is True
     snapshot = output["snapshot"]
     assert snapshot["source_sha"] == source
@@ -40,8 +48,18 @@ try:
     assert (snapshot["target_mysql_version"], snapshot["target_mongo_version"]) == (111, 44)
     for key in ("migration_resources_sha256", "mysql_identity_sha256", "mongo_cluster_sha256"):
         assert re.fullmatch(r"[0-9a-f]{64}", snapshot[key])
+    if protocol_mode:
+        assert output["available"] is True and output["mutation"] is False
+        assert output["runtime_frozen"] is False and output["broker_pending_known"] is False
+        for name, owner in (("qs_mysql", "qs.mysql"), ("qs_mongo", "qs.mongo")):
+            assert output[name]["owner"] == owner
+            assert re.fullmatch(r"[0-9a-f]{64}", output[name]["binding_sha256"])
+            assert type(output[name]["no_observed_unresolved"]) is bool
+        assert type(output["no_observed_unresolved"]) is bool
+        assert output["no_observed_unresolved"] == (output["qs_mysql"]["no_observed_unresolved"] and output["qs_mongo"]["no_observed_unresolved"])
+        report["protocol_observation"] = output
     report.update(read_only=True, mutation=False, inventory_complete=True, snapshot=snapshot)
 except (ValueError, KeyError, TypeError, AssertionError, subprocess.TimeoutExpired):
-    Path("messaging-retirement-offline-preview.json").write_text(json.dumps(report, indent=2) + "\n")
+    Path(receipt_name).write_text(json.dumps(report, indent=2) + "\n")
     raise SystemExit("Canonical read-only preview unavailable; no execution authorized") from None
-Path("messaging-retirement-offline-preview.json").write_text(json.dumps(report, indent=2) + "\n")
+Path(receipt_name).write_text(json.dumps(report, indent=2) + "\n")

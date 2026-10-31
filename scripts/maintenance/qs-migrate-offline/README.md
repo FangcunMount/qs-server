@@ -166,3 +166,13 @@ Mongo44将原运行期`uk_answersheet_submit_intent`索引安装移至受批准�
 SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRITE 锁内确认零行才设置会话绑定。非空（含 confirmed/NULL/未知）、缺表、权限/锁/读取未知均停止。失败可能留下 dirty 111；禁止自动 force 或重新启用旧发布器。普通 down 拒绝，须按审查的原 DDL、实际配对状态和兼容镜像边界恢复。自有夹具的原 DDL/结构恢复报告只是隔离证据；与现网原结构/零行、恢复和启动材料绑定后，才进入具体执行批准，不能倒签为已备份现网。
 
 本批窄范围退出还要求完整元数据可见性，并在执行前及目标锁内复核 schema 例程/触发器/事件及指向目标的外键依赖均无未审查对象、外键检查开启。只读离线检查与空流材料生成也执行该依赖检查；失败保留未知，不删除附属对象或按表空推断无依赖。
+
+## M5 事务凭证只读观察
+
+显式使用 `--application-env --mysql-database=qs --mongo-database=qs --protocol-observation --timeout=30s`。与 apply、批准文件和初始 binding 操作互斥，仅接受已安装110/44或111/44，不建表、不修改 binding、不调用Broker，不启动发送器、Checker或业务进程。沿用原数据库TLS/身份，外层deadline最多1分钟，协议观察内部预算15秒。
+
+依次读取原 `qs.mysql`、`qs.mongo` binding，复用正式SDK `ObserveProtocol` 和宿主native-limit reader。只输出计数、数据库采样时间和binding摘要，排除计划、Reference、消息身份与原文。两库样本不是跨库原子快照。保留reserved/preparing、确认审计缺口、无时间缺口、未跟踪abort、未观察commit、冲突和年龄；不能解释为Broker积压。非零保持原计数；读取失败整体available和no_observed_unresolved为false，尚未取得的owner对象为null；仅保留固定错误阶段，不输出provider原始错误。
+
+`no_observed_unresolved` 仅说明本次原主库元数据与native-limit未观察到未决状态，不证明Broker、业务ACK、写者排除或owner可停机。报告固定 `runtime_frozen=false`、`broker_pending_known=false`，不能独立消费为批准。最后owner的在途发送/回查、排空/退出及同窗口材料仍须独立核实。不会自动reconcile、重投或清理凭证。
+
+原 `release-snapshot.yml` 在 `messaging_retirement_inventory=true` 时可显式选 `protocol_observation=true`，通过同一已校验维护容器读取，保存独立 `messaging-retirement-protocol.json`。默认不执行协议观察，原schema预览和清单语义不变。

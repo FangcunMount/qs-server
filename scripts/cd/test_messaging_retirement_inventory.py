@@ -202,6 +202,40 @@ class CanonicalOfflinePreviewTest(unittest.TestCase):
                 finally:
                     os.chdir(previous)
 
+    def test_protocol_mode_preserves_unresolved_and_never_turns_unknown_into_zero(self):
+        for mode in ("zero", "unresolved", "unavailable", "false-freeze", "missing-owner", "mismatched-zero", "failed"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                previous = Path.cwd()
+                try:
+                    os.chdir(temporary)
+                    Path("inventory-companion").mkdir()
+                    binary = b"owned-protocol-inspector"
+                    Path("inventory-companion/qs-migrate-offline").write_bytes(binary)
+                    env = dict(GITHUB_SHA="a"*40, GITHUB_RUN_ID="12345", EXPECTED_OFFLINE_DIGEST=hashlib.sha256(binary).hexdigest(), RUNNER_SSH_CONFIG="fixture", RUNNER_SSH_ALIAS="fixture", PROTOCOL_OBSERVATION="true")
+                    snapshot = dict(source_sha="a"*40, mysql_database="qs", mongo_database="qs", mysql_version=110, mongo_version=44, target_mysql_version=111, target_mongo_version=44, migration_resources_sha256="c"*64, mysql_identity_sha256="d"*64, mongo_cluster_sha256="e"*64)
+                    zero = mode != "unresolved"
+                    response = dict(read_only=True, mutation=False, available=mode!="unavailable", runtime_frozen=mode=="false-freeze", broker_pending_known=False, no_observed_unresolved=zero, snapshot=snapshot, phase="qs_mysql_protocol" if mode=="failed" else "complete")
+                    for key, owner in (("qs_mysql", "qs.mysql"), ("qs_mongo", "qs.mongo")):
+                        response[key] = dict(owner=owner, binding_sha256="f"*64, no_observed_unresolved=zero)
+                    if mode=="missing-owner": response["qs_mongo"] = None
+                    if mode=="mismatched-zero": response["qs_mongo"]["no_observed_unresolved"] = False
+                    error = None
+                    with patch.dict(os.environ, env), patch("subprocess.run", return_value=CompletedProcess([], 1 if mode=="failed" else 0, json.dumps(response).encode())) as transport:
+                        try: runpy.run_path(str(SCRIPT.with_name("run-offline-preview.py")), run_name="__main__")
+                        except SystemExit as exc: error = str(exc)
+                    saved = json.loads(Path("messaging-retirement-protocol.json").read_text())
+                    valid = mode in {"zero", "unresolved"}
+                    self.assertEqual(error is None, valid)
+                    self.assertEqual(saved["inventory_complete"], valid)
+                    self.assertIn("--protocol-observation", transport.call_args.args[0][-1])
+                    self.assertNotIn("--apply", transport.call_args.args[0][-1])
+                    self.assertNotIn("--approval", transport.call_args.args[0][-1])
+                    if valid: self.assertEqual(saved["protocol_observation"]["no_observed_unresolved"], zero)
+                    else: self.assertIsNone(saved["mutation"])
+                    if mode=="failed": self.assertEqual(saved["error_phase"], "qs_mysql_protocol")
+                finally:
+                    os.chdir(previous)
+
 
 if __name__ == "__main__":
     unittest.main()
