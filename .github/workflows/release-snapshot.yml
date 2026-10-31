@@ -1,6 +1,15 @@
 name: Read-only release snapshot
 on:
   workflow_dispatch:
+    inputs:
+      messaging_retirement_inventory:
+        description: Bounded read-only retained messaging inventory; no backup, replay, retirement or DDL
+        type: boolean
+        default: false
+      reviewed_source:
+        description: Exact reviewed source SHA, required for messaging inventory
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -8,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
+    if: inputs.messaging_retirement_inventory != true
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64]
@@ -42,3 +52,73 @@ jobs:
       - name: Cleanup private runner SSH key
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" release-snapshot.json
+
+  inventory-reader:
+    if: inputs.messaging_retirement_inventory == true
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.identity.outputs.digest }}
+    steps:
+      - name: Refuse unreviewed source
+        env:
+          REVIEWED_SOURCE: ${{ inputs.reviewed_source }}
+        run: test "$REVIEWED_SOURCE" = "$GITHUB_SHA"
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check and build the fixed-owner read-only reader
+        run: |
+          set -Eeuo pipefail
+          go test -count=1 ./scripts/oneoff/messaging_retirement_inventory
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X main.sourceSHA=$GITHUB_SHA" -o messaging-retirement-inventory ./scripts/oneoff/messaging_retirement_inventory
+      - id: identity
+        run: echo "digest=$(sha256sum messaging-retirement-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: messaging-retirement-reader-${{ github.run_id }}
+          path: messaging-retirement-inventory
+          if-no-files-found: error
+
+  messaging-inventory:
+    if: inputs.messaging_retirement_inventory == true
+    needs: inventory-reader
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        owner: [iam.mysql, qs.mysql, ai.mysql]
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+      RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+      RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || '22' }}
+      RUNNER_SSH_ALIAS: messaging-retirement-serverA
+      DEPLOY_NODE_HOSTNAME: serverA
+      INVENTORY_OWNER: ${{ matrix.owner }}
+      EXPECTED_DIGEST: ${{ needs.inventory-reader.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: messaging-retirement-reader-${{ github.run_id }}
+          path: inventory-companion
+      - name: Establish existing read-only SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Read retained messaging facts without changing application or database state
+        run: python3 scripts/cd/run-messaging-retirement-inventory.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: messaging-retirement-${{ matrix.owner }}-${{ github.run_id }}
+          path: messaging-retirement-inventory.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove owned local key and companion
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json inventory-companion/messaging-retirement-inventory
