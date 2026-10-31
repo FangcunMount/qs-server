@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f11b498b9f6347aef4c3958f1021212bbef5d770",
+    "sha": "9f4b8825ce6ae54aa17f81a9aedf1bde79846907",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -11161,7 +11161,8 @@
         "Source-only follow-up 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a; prior review 0a3d35eb7a5091b6690a7c07af28151629b2cd96 retained. Required hosted actionlint found SC2129 in three identity-output redirects; grouped redirects without changing binary build, identity or execution arguments. Local actionlint lacks ShellCheck and had not covered that hosted check. Actual canonical read-only preview at d3c977740cdb2e063fde0db49dcc05bfca6cbfe2/run41183082546 passed; its source/date remain unchanged. No new native, production startup or DDL result is claimed.",
         "M5 controlled process-startup fixture source e3d42a7de13766c68602b27b0848186dbd5af772; prior global baseline 7c3976f62d5a23dca6d79406f1755ea5cfd2e21a retained. The M3-C fixture now additionally builds a source-stamped race test child and enters actual release API/Collection process roots after business drain with migration disabled; controlled mTLS IAM, isolated databases/Redis, health/drain and retained-count assertions. Local tagged compile/no-op child entry passed; actual startup remains pending. Typed options are not CLI/config-decoder or system-login acceptance. Existing14/native/production evidence remains on its original source; no new signoff.",
         "Controlled process fixture follow-up4401a2f8a69cde5de168adef60c4e2ae89dd3bfe extends the existing Worker test child with optional CA/metrics input (default earlier behavior retained) and additionally requires a third real Worker process with readyz.summary.ready, all three process roots concurrently alive, and ordered drain. Tagged compile passed on the preceding source; current actual startup/native result still pending, not production/CLI/login acceptance.",
-        "Fixture follow-up f11b498b9f6347aef4c3958f1021212bbef5d770 reads the actual /readyz redis.summary.ready envelope and retains both original reminder batch/delivery counts around process startup. Previous global source4401a2f8a69cde5de168adef60c4e2ae89dd3bfe and its successful docs check remain historical; local tagged child compile passes. No native startup result yet."
+        "Fixture follow-up f11b498b9f6347aef4c3958f1021212bbef5d770 reads the actual /readyz redis.summary.ready envelope and retains both original reminder batch/delivery counts around process startup. Previous global source4401a2f8a69cde5de168adef60c4e2ae89dd3bfe and its successful docs check remain historical; local tagged child compile passes. No native startup result yet.",
+        "Controlled startup fixture source9f4b8825ce6ae54aa17f81a9aedf1bde79846907; preserve previous global f11b498b9f6347aef4c3958f1021212bbef5d770 and failed exact source47b7e1d6ba5da163fc0c15141188851b78d110a8/run41184781027. New child incorrectly required substring test although the existing allocator always creates qs_runtime_closure_<digits>; use the exact real prefix, not a broader owner check. Reuse the original exact-SHA-linked race binary and emit only bounded technical failure labels. Tagged compile passes; actual native startup remains pending and this failed run does not count as fourteen passed cases. Original704 native/production evidence unchanged."
       ]
     },
     {
