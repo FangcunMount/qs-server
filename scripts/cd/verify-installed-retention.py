@@ -30,7 +30,14 @@ DOCKER = ['sudo', '-n', '/usr/bin/docker']
 
 
 def run(args):
-    return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=40).strip()
+    result = subprocess.run(args, text=True, capture_output=True, timeout=40)
+    if result.returncode:
+        error = subprocess.CalledProcessError(result.returncode, args)
+        # All invocations here are fixed metadata queries or the frozen helper;
+        # arguments never contain environment values, payloads or credentials.
+        error.stderr = result.stderr[-512:]
+        raise error
+    return result.stdout.strip()
 
 
 def runtime():
@@ -68,7 +75,9 @@ def main():
         with lock.open('r') as stream:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
             assert (lock.stat().st_dev, lock.stat().st_ino) == identity
+            phase = 'container_metadata'
             before = runtime()
+            phase = 'image_inventory'
             all_ids = sorted(set(run(DOCKER + ['image', 'ls', '-aq', '--no-trunc']).split()))
             live = {row['name'].lstrip('/'): row for row in before}
             commands = {}
@@ -109,6 +118,8 @@ def main():
                           original_lock_inode_unchanged=True, removed_tags=0)
     except Exception as error:
         report.update(status='failed', phase=phase, error_type=type(error).__name__)
+        if isinstance(error, subprocess.CalledProcessError):
+            report.update(command=error.cmd[:4], returncode=error.returncode, metadata_error=error.stderr)
     print(json.dumps(report))
     return 0 if report['status'] == 'success' else 1
 
