@@ -239,9 +239,11 @@ func TestM5OwnerDrainCLI(t *testing.T) {
 		}
 	})
 	type sample struct {
-		Phase   string `json:"phase"`
-		Expired bool   `json:"expired"`
-		Owners  []struct {
+		Phase                  string `json:"phase"`
+		Expired                bool   `json:"expired"`
+		ForwardOnly            bool   `json:"forward_only"`
+		RegisteredMySQLVersion uint64 `json:"registered_mysql_version"`
+		Owners                 []struct {
 			SDK      rocketmq.TransactionStats       `json:"sdk"`
 			Protocol transaction.ProtocolObservation `json:"protocol"`
 		} `json:"owners"`
@@ -321,6 +323,77 @@ func TestM5OwnerDrainCLI(t *testing.T) {
 	for i := range calls {
 		require.EqualValues(t, 1, calls[i].Load())
 	}
+	// The original110 mode above has now fully verified its retained heads and
+	// facts. Only this owned SDK fixture explicitly simulates a published111
+	// ledger below; real SQL111/whole-pair restoration is a separate native gate.
+	changed, err := data.pool.ExecContext(t.Context(), "UPDATE schema_migrations SET version=111 WHERE version=110 AND dirty=FALSE")
+	require.NoError(t, err)
+	affected, err := changed.RowsAffected()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, affected)
+	forwardOp := fmt.Sprintf("%d-2", time.Now().UnixNano())
+	forwardArgs := append([]string{}, command.Args[1:]...)
+	for i, arg := range forwardArgs {
+		if strings.HasPrefix(arg, "--owner-drain-operation=") {
+			forwardArgs[i] = "--owner-drain-operation=" + forwardOp
+		}
+	}
+	newCommand := func(args []string) *exec.Cmd {
+		c := exec.Command(binary, args...)
+		c.Env = command.Env
+		c.Stdout, c.Stderr = log, log
+		return c
+	}
+	require.Error(t, newCommand(forwardArgs).Run(), "default original110 owner accepted111")
+	forwardDir := filepath.Join(dir, "qs-owner-drain-"+forwardOp)
+	_, err = os.Stat(forwardDir)
+	require.True(t, os.IsNotExist(err), "refused default mode registered owners or reused operation")
+	forwardCommand := newCommand(append(forwardArgs, "--owner-drain-forward"))
+	require.NoError(t, forwardCommand.Start())
+	forwardDone, forwardExited := make(chan error, 1), make(chan struct{})
+	go func() { forwardDone <- forwardCommand.Wait(); close(forwardExited) }()
+	t.Cleanup(func() {
+		select {
+		case <-forwardExited:
+		default:
+			_ = forwardCommand.Process.Kill()
+			<-forwardExited
+		}
+	})
+	readForward := func() (s sample) {
+		raw, e := os.ReadFile(filepath.Join(forwardDir, "status.json"))
+		if e == nil {
+			_ = json.Unmarshal(raw, &s)
+		}
+		return s
+	}
+	require.Eventually(t, func() bool {
+		s := readForward()
+		return s.ForwardOnly && s.RegisteredMySQLVersion == 111 && len(s.Owners) == 2 && s.Owners[0].SDK.Ready && s.Owners[1].SDK.Ready
+	}, 40*time.Second, 100*time.Millisecond)
+	forwardStop := []byte(`{"operation_id":"` + forwardOp + `","writers_stopped":true,"replacement_owner_ready":false,"receipt_sha256":"` + strings.Repeat("b", 64) + `"}`)
+	require.NoError(t, os.WriteFile(filepath.Join(forwardDir, "stop.json"), forwardStop, 0600))
+	select {
+	case e := <-forwardDone:
+		require.NoError(t, e)
+	case <-time.After(40 * time.Second):
+		t.Fatal("explicit111 forward owner did not stop after actual idle proof")
+	}
+	f := readForward()
+	require.Equal(t, "stopped", f.Phase)
+	require.True(t, f.ForwardOnly)
+	for _, o := range f.Owners {
+		require.True(t, o.SDK.Stopped)
+		require.Zero(t, o.SDK.HalfPreparedResults)
+	}
+	require.NoError(t, data.pool.QueryRowContext(t.Context(), "SELECT version,dirty FROM schema_migrations").Scan(&head, &dirty))
+	require.Equal(t, 111, head)
+	require.False(t, dirty)
+	require.NoError(t, data.pool.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM m5_drain_facts").Scan(&facts))
+	require.Equal(t, 1, facts)
+	n, err = data.documents.Collection("m5_drain_facts").CountDocuments(t.Context(), bson.D{})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
 	receipt, err := json.Marshal(map[string]any{"source_sha": source, "passed": 9, "failed": 0, "skipped": 0, "owner_count": 2, "actual_CLI": true, "config_and_pair_bound": true, "actual_Broker_unknown_final_and_recovery": true, "unresolved_signal_stop_refused": true, "no_new_halves": true, "original_business_facts_single": true, "original110_44_retained": true, "actual_SDK_and_process_exit": true, "live_original_overlap_before_old_close": true, "production_or_system_acceptance": false})
 	require.NoError(t, err)
 	fmt.Println("M5_QS_OWNER_DRAIN_CLI_RECEIPT " + string(receipt))

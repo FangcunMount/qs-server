@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,16 +11,43 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/FangcunMount/reliable-messaging/transport/rocketmq"
 )
 
+func TestOwnerDrainHeadRejectsDirtyWrongOrGenericVersionBeforeStoreAccess(t *testing.T) {
+	for _, fixture := range []struct {
+		rows, head, expected uint64
+		dirty                bool
+	}{{1, 111, 110, false}, {1, 110, 111, false}, {1, 111, 111, true}, {2, 111, 111, false}, {1, 112, 112, false}} {
+		db, m, e := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		if e != nil {
+			t.Fatal(e)
+		}
+		m.ExpectQuery("SELECT COUNT(*),MIN(version),COALESCE(MAX(dirty),1) FROM schema_migrations").WillReturnRows(sqlmock.NewRows([]string{"rows", "head", "dirty"}).AddRow(fixture.rows, fixture.head, fixture.dirty))
+		if drainHead(context.Background(), db, nil, fixture.expected) == nil {
+			t.Fatal("unsafe owner registration head accepted", fixture)
+		}
+		if m.ExpectationsWereMet() != nil {
+			t.Fatal("unexpected activity beyond refused head")
+		}
+		_ = db.Close()
+	}
+}
+
 func TestOwnerDrainRequiresIndependentReviewedAction(t *testing.T) {
 	base := []string{"--mysql-database=qs", "--mongo-database=qs", "--owner-drain", "--owner-drain-config=/app/config.json", "--owner-drain-config-sha256=" + strings.Repeat("a", 64), "--owner-drain-operation=123-1", "--owner-drain-mysql-identity=" + strings.Repeat("b", 64), "--owner-drain-mongo-identity=" + strings.Repeat("c", 64)}
 	if a, err := parseArguments(base); err != nil || !a.ownerDrain.enabled {
 		t.Fatal(a, err)
+	}
+	if a, err := parseArguments(append(append([]string{}, base...), "--owner-drain-forward")); err != nil || !a.ownerDrain.forward {
+		t.Fatal(a, err)
+	}
+	if _, err := parseArguments([]string{"--mysql-database=qs", "--mongo-database=qs", "--owner-drain-forward"}); err == nil {
+		t.Fatal("forward owner must be explicit separate owner action")
 	}
 	for _, extra := range [][]string{{"--protocol-observation", "--timeout=30s"}, {"--apply", "--approval-file=/tmp/x", "--approval-sha256=" + strings.Repeat("a", 64)}, {"--owner-drain-operation=../reuse"}, {"--mongo-database="}, {"--owner-drain=false"}} {
 		if _, err := parseArguments(append(append([]string{}, base...), extra...)); err == nil {

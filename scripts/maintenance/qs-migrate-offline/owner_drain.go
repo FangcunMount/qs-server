@@ -35,6 +35,7 @@ import (
 // business Container, consumers, schedulers, new sends, DDL or binding writes.
 type ownerDrainArguments struct {
 	enabled                      bool
+	forward                      bool
 	config, configSHA, operation string
 	mysqlIdentity, mongoIdentity string
 }
@@ -44,6 +45,7 @@ var drainDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func registerOwnerDrainFlags(f *flag.FlagSet, d *ownerDrainArguments) {
 	f.BoolVar(&d.enabled, "owner-drain", false, "explicitly register paused native owner Checkers; may persist recovery audits")
+	f.BoolVar(&d.forward, "owner-drain-forward", false, "explicit post-start forward owner on clean111/44; default owner mode remains110/44")
 	f.StringVar(&d.config, "owner-drain-config", "", "exact reviewed original JSON application config")
 	f.StringVar(&d.configSHA, "owner-drain-config-sha256", "", "reviewed original config raw digest")
 	f.StringVar(&d.operation, "owner-drain-operation", "", "unique digits-attempt identity; never reuse")
@@ -53,7 +55,7 @@ func registerOwnerDrainFlags(f *flag.FlagSet, d *ownerDrainArguments) {
 
 func (d ownerDrainArguments) validate(a arguments) error {
 	if !d.enabled {
-		if d.config != "" || d.configSHA != "" || d.operation != "" || d.mysqlIdentity != "" || d.mongoIdentity != "" {
+		if d.forward || d.config != "" || d.configSHA != "" || d.operation != "" || d.mysqlIdentity != "" || d.mongoIdentity != "" {
 			return errors.New("owner drain requires explicit action")
 		}
 		return nil
@@ -106,6 +108,8 @@ type drainReport struct {
 	SourceSHA                  string             `json:"source_sha"`
 	ConfigSHA                  string             `json:"config_sha256"`
 	Operation                  string             `json:"operation_id"`
+	ForwardOnly                bool               `json:"forward_only"`
+	RegisteredMySQLVersion     uint64             `json:"registered_mysql_version"`
 	Phase                      string             `json:"phase"`
 	SampledAt                  time.Time          `json:"sampled_at"`
 	Owners                     []drainOwnerReport `json:"owners"`
@@ -156,11 +160,11 @@ func readDrainStop(path, operation string) (accepted bool) {
 	return err == nil && drainStopRequest(raw, operation)
 }
 
-func drainHead(ctx context.Context, db *sql.DB, documents *mongo.Database) error {
+func drainHead(ctx context.Context, db *sql.DB, documents *mongo.Database, expected uint64) error {
 	var rows, version uint64
 	var dirty bool
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*),MIN(version),COALESCE(MAX(dirty),1) FROM schema_migrations").Scan(&rows, &version, &dirty); err != nil || rows != 1 || version != 110 || dirty {
-		return errors.New("original clean SQL110 required")
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*),MIN(version),COALESCE(MAX(dirty),1) FROM schema_migrations").Scan(&rows, &version, &dirty); err != nil || rows != 1 || (expected != 110 && expected != 111) || version != expected || dirty {
+		return errors.New("reviewed clean QS SQL head required")
 	}
 	n, err := documents.Collection("schema_migrations").CountDocuments(ctx, bson.D{})
 	var head struct {
@@ -266,7 +270,11 @@ func runOwnerDrain(ctx context.Context, db *sql.DB, client *mongo.Client, pair m
 	if err != nil || mysqlIdentity != a.mysqlIdentity || mongoIdentity != a.mongoIdentity {
 		return errors.New("reviewed original pair identity differs")
 	}
-	if err = drainHead(ctx, db, client.Database(pair.MongoDatabase)); err != nil {
+	expected := uint64(110)
+	if a.forward {
+		expected = 111
+	}
+	if err = drainHead(ctx, db, client.Database(pair.MongoDatabase), expected); err != nil {
 		return err
 	}
 	owners, err := drainOwners(ctx, db, client.Database(pair.MongoDatabase), o)
@@ -301,7 +309,7 @@ func runOwnerDrain(ctx context.Context, db *sql.DB, client *mongo.Client, pair m
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		r := drainReport{SourceSHA: pair.ExpectedSourceSHA, ConfigSHA: a.configSHA, Operation: a.operation, Phase: "checking", SampledAt: time.Now().UTC(), Available: true, NoObservedUnresolved: true, RecoveryAuditsMayBeWritten: true, Expired: ctx.Err() != nil}
+		r := drainReport{SourceSHA: pair.ExpectedSourceSHA, ConfigSHA: a.configSHA, Operation: a.operation, ForwardOnly: a.forward, RegisteredMySQLVersion: expected, Phase: "checking", SampledAt: time.Now().UTC(), Available: true, NoObservedUnresolved: true, RecoveryAuditsMayBeWritten: true, Expired: ctx.Err() != nil}
 		for i, owner := range owners {
 			q, c := context.WithTimeout(context.Background(), 15*time.Second)
 			p, e := owner.reader.ObserveProtocol(q)

@@ -82,18 +82,19 @@ func TestMetadataProfileInputsExcludeEveryOtherDBOpsJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The retired redis-cli-image job is replaced by the verified host reader.
-	if len(workflow.Jobs) != 16 {
+	if len(workflow.Jobs) != 17 {
 		t.Fatal("db-ops job inventory changed; review metadata exclusion")
 	}
 	if _, exists := workflow.Jobs["redis-cli-image"]; exists {
 		t.Fatal("retired Redis client image job must not return")
 	}
-	for _, operation := range []string{"metadata-visibility-profile", "metadata-visibility-admin-profile", "metadata-readiness-admin", "retirement-inventory-admin"} {
+	for _, operation := range []string{"metadata-visibility-profile", "metadata-visibility-admin-profile", "metadata-readiness-admin", "retirement-inventory-admin", "m5-activity-admin"} {
 		for _, database := range []string{"mysql", "mongodb", "redis", "all"} {
 			for name, job := range workflow.Jobs {
 				got := metadataJobEligible(t, job.If, operation, database)
 				want := name == "mysql-metadata-visibility-profile" && database == "mysql" && (operation == "metadata-visibility-profile" || operation == "metadata-visibility-admin-profile")
 				want = want || (name == "mysql-metadata-readiness-admin" && database == "mysql" && operation == "metadata-readiness-admin")
+				want = want || (name == "mysql-m5-activity-admin" && database == "mysql" && operation == "m5-activity-admin")
 				want = want || (name == "mysql-retirement-inventory-admin" && database == "mysql" && operation == "retirement-inventory-admin")
 				want = want || (name == "mongodb-metadata-admin-profile" && database == "mongodb" && operation == "metadata-visibility-admin-profile")
 				if got != want {
@@ -128,6 +129,7 @@ func TestBoundedMetadataReadinessRequiresDispatchAndReviewedRevision(t *testing.
 		name, operation, database, confirmKey, backupKey string
 	}{
 		{"mysql-metadata-readiness-admin", "metadata-readiness-admin", "mysql", "PROFILE_REVIEW_SOURCE_SHA", "PROFILE_ARCHIVE_INPUT"},
+		{"mysql-m5-activity-admin", "m5-activity-admin", "mysql", "PROFILE_REVIEW_SOURCE_SHA", "PROFILE_ARCHIVE_INPUT"},
 		{"mysql-retirement-inventory-admin", "retirement-inventory-admin", "mysql", "PROFILE_REVIEW_SOURCE_SHA", "PROFILE_ARCHIVE_INPUT"},
 		{"mongodb-metadata-admin-profile", "metadata-visibility-admin-profile", "mongodb", "MONGO_PROFILE_CONFIRM_SHA", "MONGO_PROFILE_ARCHIVE_INPUT"},
 	} {

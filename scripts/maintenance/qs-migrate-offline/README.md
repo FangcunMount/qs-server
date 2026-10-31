@@ -206,3 +206,8 @@ SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRI
 必需真实隔离CI `TestSchemaPairNativeM5RetainedFullBaseline`与`TestSchemaPairNativeM5OriginalRestoreCLI`覆盖完整原字节差异、预算/TTL拒绝、实际独立CLI三种中断、首次启动/停写声明及变化事实拒绝、实际ledger INSERT权限故障后的事务回滚及一次性批准。测试报告严格属于自有数据库，不构成生产恢复验收；实际CI结论按精确提交记录。
 
 原生CLI还必须先与两原SDK同时保持ready，随后确认原SDK正常停止、维护SDK仍活跃，再释放Broker回查并取得正向恢复审计与实际进程退出；该重叠交接是第9个显式必需回执字段，不用“旧owner先死、维护进程再启动”的夹具冒充生产顺序。原消费者13项先独立运行，避免CLI已提交夹具消息污染其pre-commit观察。
+
+
+R2首次业务启动后的维护交接必须显式加`--owner-drain-forward`，只接受clean111/44；默认`--owner-drain`仍仅接受原clean110/44，不自动猜版本，也不接受dirty111。二者沿同一原配置/身份/binding及暂停新发送的SDK路径，保持原每实例预算，不执行DDL或账本修复。状态的`forward_only`和`registered_mysql_version`标明模式及注册时验证的SQL head，不代替当前schema复读。新业务首次启动后，协调器继续持原首次启动屏障，先证明111维护Checker真实ready，再停止/替换旧新实例；只用已固定111兼容镜像前向修复，不回放110材料。最后交还ready的业务owner并安全停止维护owner。
+
+原生CLI在原110模式的实际恢复/保留断言之后，由自有SDK夹具显式模拟111头，验证默认入口拒绝、显式forward真实双owner注册/ready/安全退出，且原业务事实保持单次、没有新half或版本改写；此模拟头不计为真实SQL111执行或完整schema-pair验收。完整SQL111与三中断原状恢复由独立真实schema-pair门禁覆盖，不能互相替代。
