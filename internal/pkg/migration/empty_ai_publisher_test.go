@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,17 +18,20 @@ func TestEmptyPublisherGuardRejectsRecordsAndReleasesItsSession(t *testing.T) {
 	}
 	for _, mode := range []string{"empty", "nonempty", "query_error", "cancelled", "ddl_error", "unlock_error"} {
 		t.Run(mode, func(t *testing.T) {
-			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			matcher := sqlmock.QueryMatcherFunc(func(expected, actual string) error {
+				err := sqlmock.QueryMatcherEqual.Match(expected, actual)
+				if err == nil && mode == "cancelled" && strings.HasPrefix(actual, "SELECT /*+ MAX_EXECUTION_TIME(2000) */ COUNT(*)") {
+					cancel()
+				}
+				return err
+			})
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(matcher))
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() { _ = db.Close() }()
-			ctx := context.Background()
-			cancel := func() {}
-			if mode == "cancelled" {
-				ctx, cancel = context.WithTimeout(ctx, 10*time.Millisecond)
-			}
-			defer cancel()
 			conn, err := db.Conn(context.Background())
 			if err != nil {
 				t.Fatal(err)
