@@ -23,20 +23,31 @@ OPERATION = re.compile(r"[0-9]{1,20}-[0-9]{1,4}")
 NAME = re.compile(r"qs-m5-maintenance-[0-9]{1,20}-[0-9]{1,4}")
 
 
+class Refused(ValueError):
+    """Only fixed error categories may leave the private transport."""
+
+
+def sudo_input():
+    value = os.environ.get("SUDO_PASSWORD", "").encode("utf-8", errors="strict")
+    if len(value) > 4096 or any(c in value for c in (b"\n", b"\r", b"\x00")):
+        raise Refused("sudo_credential_invalid")
+    return {"input": value + b"\n"} if value else {}
+
+
 def selected_environment(values):
     result = {}
     for value in values:
         if not isinstance(value, str):
-            raise ValueError("invalid original environment")
+            raise Refused("source_environment_invalid")
         key, separator, content = value.partition("=")
         if not re.fullmatch(r"QS_APISERVER_(MYSQL|MONGODB)_[A-Z0-9_]+", key):
             continue
         if not separator or key in result or any(c in content for c in "\x00\r\n"):
-            raise ValueError("database environment cannot be copied losslessly")
+            raise Refused("source_environment_lossy")
         result[key] = content
     for family in ("MYSQL", "MONGODB"):
         if result.get("QS_APISERVER_" + family + "_DATABASE") != "qs":
-            raise ValueError("explicit original QS database required")
+            raise Refused("explicit_qs_database_required")
     return result
 
 
@@ -44,13 +55,13 @@ def source_configuration(source, expected_image, operation):
     if (not IMAGE.fullmatch(expected_image) or not OPERATION.fullmatch(operation)
             or not ID.fullmatch(source.get("Id", ""))
             or source.get("Name") != "/" + SOURCE or source.get("Image") != expected_image):
-        raise ValueError("reviewed QS source identity required")
+        raise Refused("source_identity_mismatch")
     networks = list(source.get("NetworkSettings", {}).get("Networks", {}))
     if (len(networks) != 1 or networks[0] in {"host", "none", "bridge"}
             or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", networks[0])):
-        raise ValueError("one explicit original application network required")
+        raise Refused("source_network_ambiguous")
     if any(m.get("Destination") in {"/", "/tmp"} for m in source.get("Mounts", [])):
-        raise ValueError("private maintenance filesystem must not be borrowed")
+        raise Refused("source_private_mount_conflict")
     return ("qs-m5-maintenance-" + operation, networks[0],
             selected_environment(source["Config"]["Env"]))
 
@@ -68,11 +79,11 @@ def create_arguments(source, image, operation, env_file):
         arguments += ["--dns", address]
     for domain in host.get("DnsSearch") or []:
         if not re.fullmatch(r"[A-Za-z0-9.][A-Za-z0-9.-]{0,252}", domain):
-            raise ValueError("unrecognized original DNS search domain")
+            raise Refused("source_dns_search_invalid")
         arguments += ["--dns-search", domain]
     for entry in host.get("ExtraHosts") or []:
         if not re.fullmatch(r"[A-Za-z0-9_.-]+:(?:[0-9a-fA-F:.]+|host-gateway)", entry):
-            raise ValueError("unrecognized original host mapping")
+            raise Refused("source_host_mapping_invalid")
         arguments += ["--add-host", entry]
     arguments += [image, "-c", SLEEP]
     return arguments
@@ -84,24 +95,26 @@ def inspect(execute, name, optional=False):
         return None
     value = json.loads(result.stdout)
     if not isinstance(value, list) or len(value) != 1:
-        raise ValueError("one Docker identity required")
+        raise Refused("docker_identity_ambiguous")
     return value[0]
 
 
 def prepare(image, operation, *, stage=False, docker_prefix=None):
-    prefix = docker_prefix or ["sudo", "-n", shutil.which("docker") or "/usr/bin/docker"]
+    private_input = sudo_input() if docker_prefix is None else {}
+    authentication = ["sudo", "-S", "-p", ""] if private_input else ["sudo", "-n"]
+    prefix = docker_prefix or [*authentication, shutil.which("docker") or "/usr/bin/docker"]
 
     def execute(arguments, optional=False):
         value = subprocess.run(prefix + arguments, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, timeout=30, check=False)
+                               stderr=subprocess.DEVNULL, timeout=30, check=False, **private_input)
         if value.returncode and not optional:
-            raise ValueError("Docker maintenance operation refused")
+            raise Refused("docker_operation_refused")
         return value
 
     source = inspect(execute, SOURCE)
     name, network, environment = source_configuration(source, image, operation)
     if inspect(execute, name, optional=True) is not None:
-        raise ValueError("existing maintenance state must be preserved")
+        raise Refused("existing_operation_preserved")
     with tempfile.TemporaryDirectory(prefix="qs-m5-private-") as private:
         env_file = Path(private) / "database.env"
         descriptor = os.open(env_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -113,15 +126,15 @@ def prepare(image, operation, *, stage=False, docker_prefix=None):
             # do not certify actual staging, application freeze or DB readiness.
             for command in (arguments, ["start", name],
                             ["exec", "--user", "2000:2000", name, "sh", "-c", "true"]):
-                permission = subprocess.run(["sudo", "-n", "-l", "--", prefix[-1]] + command,
+                permission = subprocess.run([*authentication, "-l", "--", prefix[-1]] + command,
                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                            timeout=10, check=False)
+                                            timeout=10, check=False, **private_input)
                 if permission.returncode:
-                    raise ValueError("required maintenance Docker permission unavailable")
+                    raise Refused("docker_permission_unavailable")
         else:
             created = execute(arguments).stdout.decode().strip()
             if not ID.fullmatch(created):
-                raise ValueError("maintenance creation outcome unknown; preserve state")
+                raise Refused("creation_outcome_unknown")
             # Never remove/reuse an old operation or erase an approval marker.
             # A staging error deliberately retains this newly owned container.
             actual = inspect(execute, created)
@@ -131,12 +144,12 @@ def prepare(image, operation, *, stage=False, docker_prefix=None):
                     or actual["Config"].get("Healthcheck", {}).get("Test") != ["NONE"]
                     or actual["Config"]["Labels"].get(LABEL) != operation
                     or any(m.get("RW") for m in actual.get("Mounts", []))):
-                raise ValueError("maintenance shape mismatch; preserve owned container")
+                raise Refused("created_shape_mismatch")
             if inspect(execute, SOURCE)["Id"] != source["Id"]:
-                raise ValueError("original source changed; preserve owned container")
+                raise Refused("source_changed")
             execute(["start", created])
             if not inspect(execute, created)["State"]["Running"]:
-                raise ValueError("maintenance shell not running; preserve owned container")
+                raise Refused("idle_process_not_running")
     return dict(read_only_preflight=not stage, container_created=stage,
                 maintenance_container=name, source_container_id=source["Id"],
                 source_image_id=image, network=network,
@@ -193,8 +206,10 @@ def main():
     args = parser.parse_args()
     try:
         result = prepare(args.expected_image_id, args.operation_id, stage=args.stage)
+    except Refused as error:
+        raise SystemExit("QS maintenance transport refused: " + str(error)) from None
     except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
-        raise SystemExit("QS maintenance transport refused; preserve any existing operation") from None
+        raise SystemExit("QS maintenance transport refused: metadata_or_transport_unavailable") from None
     print(json.dumps(result, sort_keys=True))
 
 

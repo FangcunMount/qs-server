@@ -46,6 +46,7 @@ jobs:
       REVIEWED_SOURCE: ${{ inputs.reviewed_source }}
       MAINTENANCE_IMAGE: ${{ inputs.maintenance_image_id }}
       MAINTENANCE_MODE: ${{ inputs.maintenance_transport }}
+      SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
       INVENTORY_REQUESTED: ${{ inputs.messaging_retirement_inventory }}
       EXISTING_MAINTENANCE: ${{ inputs.maintenance_container }}
     steps:
@@ -62,10 +63,7 @@ jobs:
       - name: Explicit maintenance transport only
         run: |
           set -Eeuo pipefail
-          arguments=(python3 - --expected-image-id "$MAINTENANCE_IMAGE" --operation-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
-          if [ "$MAINTENANCE_MODE" = stage ]; then arguments+=(--stage); fi
-          ssh -F "$RUNNER_SSH_CONFIG" -o ConnectTimeout=20 "$RUNNER_SSH_ALIAS" "${arguments[@]}" \
-            < scripts/cd/m5_maintenance_container.py > m5-maintenance-transport.json
+          bash scripts/cd/run-m5-maintenance-ssh.sh > m5-maintenance-transport.json
       - uses: actions/upload-artifact@v7
         with:
           name: m5-maintenance-transport-${{ github.run_id }}
@@ -76,7 +74,7 @@ jobs:
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" m5-maintenance-transport.json
   snapshot:
-    if: inputs.messaging_retirement_inventory != true
+    if: inputs.messaging_retirement_inventory != true && (inputs.maintenance_transport == 'none' || inputs.maintenance_transport == '')
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64]

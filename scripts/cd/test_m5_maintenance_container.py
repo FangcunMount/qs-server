@@ -49,6 +49,33 @@ class MaintenanceTransportTest(unittest.TestCase):
         self.assertTrue(files and all(not p.exists() for p in files))
         self.assertFalse(any(a[:2] in [["docker", "create"], ["docker", "start"]] for a in calls))
 
+    def test_password_mode_is_private_stdin_and_permissions_are_list_only(self):
+        secret = "private-sudo-canary"
+        calls = []
+
+        def invoke(args, **kwargs):
+            calls.append(args)
+            self.assertNotIn(secret, " ".join(args))
+            self.assertEqual(kwargs.get("input"), (secret + "\n").encode())
+            self.assertEqual(args[:4], ["sudo", "-S", "-p", ""])
+            if "inspect" in args:
+                if args[-1] == m.SOURCE:
+                    return subprocess.CompletedProcess(args, 0, json.dumps([source()]).encode())
+                return subprocess.CompletedProcess(args, 1, b"[]")
+            self.assertEqual(args[4:6], ["-l", "--"])
+            return subprocess.CompletedProcess(args, 0, b"")
+
+        with patch.dict(os.environ, {"SUDO_PASSWORD": secret}), patch.object(m.subprocess, "run", side_effect=invoke):
+            receipt = m.prepare(source()["Image"], "123-1")
+        self.assertFalse(receipt["container_created"])
+        self.assertFalse(receipt["database_queried"])
+        self.assertNotIn(secret, json.dumps(receipt))
+        for bad in ("secret\nsecond", "secret\r", "secret\0", "x" * 4097):
+            with patch.object(m.os, "environ", {"SUDO_PASSWORD": bad}), patch.object(m.subprocess, "run") as run:
+                with self.assertRaisesRegex(m.Refused, "sudo_credential_invalid"):
+                    m.prepare(source()["Image"], "123-1")
+                run.assert_not_called()
+
     def test_stopped_source_fixed_entrypoint_and_private_env_only(self):
         s = source()
         name, network, env = m.source_configuration(s, s["Image"], "123-1")
