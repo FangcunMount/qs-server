@@ -137,13 +137,17 @@ func drainStopRequest(raw []byte, operation string) bool {
 	return len(raw) <= 4096 && json.Unmarshal(raw, &r) == nil && r.Operation == operation && r.WritersStopped != r.ReplacementReady && drainDigest.MatchString(r.Receipt)
 }
 
-func readDrainStop(path, operation string) bool {
+func readDrainStop(path, operation string) (accepted bool) {
 	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if err != nil {
 		return false
 	}
 	f := os.NewFile(uintptr(fd), path)
-	defer f.Close()
+	defer func() {
+		if f.Close() != nil {
+			accepted = false
+		}
+	}()
 	var s unix.Stat_t
 	if unix.Fstat(fd, &s) != nil || s.Mode&unix.S_IFMT != unix.S_IFREG || s.Mode&0777 != 0600 || s.Nlink != 1 || s.Uid != uint32(os.Geteuid()) || s.Size > 4096 {
 		return false

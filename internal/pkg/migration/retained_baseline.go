@@ -74,7 +74,7 @@ func scanSQLDigests(ctx context.Context, tx *sql.Tx, query string, maxRows int) 
 	if err != nil {
 		return "", 0, err
 	}
-	defer rows.Close()
+	defer func() { err = errors.Join(err, rows.Close()) }()
 	columns, err := rows.Columns()
 	if err != nil {
 		return "", 0, err
@@ -238,7 +238,7 @@ func captureMongoRetained(ctx context.Context, documents *mongo.Database, maxRow
 		sort.Strings(keys)
 		h := sha256.New()
 		for _, key := range keys {
-			fmt.Fprintf(h, "%d:%s:%d:", len(key), key, len(definitions[key]))
+			_, _ = fmt.Fprintf(h, "%d:%s:%d:", len(key), key, len(definitions[key]))
 			_, _ = h.Write(definitions[key])
 		}
 		r.DefinitionSHA256 = hex.EncodeToString(h.Sum(nil))
