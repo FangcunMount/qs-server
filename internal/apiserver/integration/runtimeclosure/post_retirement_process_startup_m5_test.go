@@ -233,6 +233,8 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 	api.GRPCOptions.MTLS.CAFile = ca.CAFile
 	api.GRPCOptions.MTLS.Enabled = true
 	api.GRPCOptions.MTLS.RequireClientCert = true
+	api.GRPCOptions.Auth.Enabled = true
+	api.GRPCOptions.ACL.Enabled = true
 	api.GRPCOptions.ACL.ConfigFile = "configs/grpc-acl.prod.yaml"
 	collection := collectionoptions.NewOptions()
 	collection.GenericServerRunOptions.Mode = "release"
@@ -270,6 +272,11 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 		cmd := exec.Command(binary, "-test.run=^TestM5PostRetirementRootChild$", "-test.v")
 		cmd.Dir, e = filepath.Abs("../../../..")
 		require.NoError(t, e)
+		// The existing Worker child resolves its event catalog from the package
+		// directory, while API/Collection roots resolve repository configs.
+		if root.Worker != nil {
+			cmd.Dir = ""
+		}
 		cmd.Env = append(os.Environ(), "QS_M5_ROOT_CHILD="+p)
 		cmd.Stdout = log
 		cmd.Stderr = log
