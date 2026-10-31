@@ -728,6 +728,9 @@ func run(rd io.Reader, wr io.Writer) (code int) {
 	return 1
 }
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--messaging-retirement-inventory" {
+		os.Exit(runRetirement(os.Stdout))
+	}
 	if len(os.Args) != 1 {
 		os.Exit(1)
 	}

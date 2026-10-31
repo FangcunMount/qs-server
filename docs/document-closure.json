@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b97248ef34496a22e69d4e6ed185818c208c0806",
+    "sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 47,
+      "expected_count": 48,
       "budgeted": false
     }
   },
@@ -12068,7 +12068,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
+        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -12792,7 +12792,8 @@
         "2026-10-29 M3-C source-only review 1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f; prior verified object {\"source_sha\": \"936b78ba6fd9bb4baef567bc748bd54a365ac68c\", \"verified_on\": \"2026-10-29\"}. Only the CI pull_request base list changed among this document's fact sources, adding the reminder branch as an entry for the stacked recovery PR. Migration resources, clean heads, offline flags, metadata guards and job commands are unchanged. This is a source review, not rerun native/command or production evidence; all historical verification, production, gaps and signoffs retain attribution.",
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
-        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
+        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -14328,7 +14329,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
+        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -14852,6 +14853,13 @@
           "result": "passed",
           "source_sha": "7558fd73ee863f86a1b0186d8fc4bc43fb8f4387",
           "verified_on": "2026-10-26"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
+          "verified_on": "2026-10-31"
         }
       ],
       "production_evidence": {
@@ -14935,7 +14943,8 @@
         "2026-10-29 M3-C source-only review 1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f; prior verified object {\"source_sha\": \"936b78ba6fd9bb4baef567bc748bd54a365ac68c\", \"verified_on\": \"2026-10-29\"}. Only the CI pull_request base list changed among this document's fact sources, adding the reminder branch as an entry for the stacked recovery PR. Migration resources, clean heads, offline flags, metadata guards and job commands are unchanged. This is a source review, not rerun native/command or production evidence; all historical verification, production, gaps and signoffs retain attribution.",
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
-        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
+        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff."
       ],
       "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15072,7 +15081,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
+        "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15519,7 +15528,8 @@
         "2026-10-29 M3-C source-only review 1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f; prior verified object {\"source_sha\": \"936b78ba6fd9bb4baef567bc748bd54a365ac68c\", \"verified_on\": \"2026-10-29\"}. Only the CI pull_request base list changed among this document's fact sources, adding the reminder branch as an entry for the stacked recovery PR. Migration resources, clean heads, offline flags, metadata guards and job commands are unchanged. This is a source review, not rerun native/command or production evidence; all historical verification, production, gaps and signoffs retain attribution.",
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
         "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
-        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
+        "Source review 4e77fbe53351cebc741b9f803c41dedf04ee6611: the existing MySQL metadata CI adds a sequential read-only messaging inventory test in its owned fixture. Existing migration/offline/metadata implementation and selectors are unchanged. Historical command, native and production evidence retain their exact source; no new production signoff."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15824,6 +15834,159 @@
       "review_note": "Original CLI development run39990541142 on aa977fc790104f636f4d301163a5eb8df6e7831a passed60/0/0 with cleanup. Readonly inventory source208fb8ff has only local pure/race/lint and tagged compile so far; do not reuse the earlier native report for this new behavior. Prior review marker preserved: {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Historical checks retain their own exact source attribution.",
       "notes": [
         "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
+      ]
+    },
+    {
+      "path": "scripts/oneoff/messaging_retirement_inventory/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "0a89e7504ab90500afca3e904a97250b9ec54f5a",
+        "verified_on": "2026-10-31"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/messaging_retirement_inventory/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/run-messaging-retirement-inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/cd/test_messaging_retirement_inventory.py"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/release-snapshot.yml"
+        },
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mongodb_metadata_profile/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/m4-metadata-readiness-native-proof.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/test-m4-metadata-readiness-native-proof.py"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_messaging_retirement_inventory.py -v",
+          "result": "passed",
+          "source_sha": "4e77fbe53351cebc741b9f803c41dedf04ee6611",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "go test ./scripts/oneoff/messaging_retirement_inventory -count=1",
+          "result": "passed",
+          "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "python3 scripts/cd/test_messaging_retirement_inventory.py -v",
+          "result": "passed",
+          "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_messaging_retirement_inventory.py -v",
+          "result": "passed",
+          "source_sha": "4c3c86bc6660157c130092a5ed109990a75ac465",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_messaging_retirement_inventory.py -v",
+          "source_sha": "6efd394602a1f754d32a4980d92bcb521964b0ed",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "go test -p=2 ./scripts/oneoff/mongodb_metadata_profile",
+          "source_sha": "4dfe885eaabc44f61340c5850bb2e6f0b20d9277",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_messaging_retirement_inventory.py -v",
+          "source_sha": "4dfe885eaabc44f61340c5850bb2e6f0b20d9277",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "source_sha": "4dfe885eaabc44f61340c5850bb2e6f0b20d9277",
+          "verified_on": "2026-10-31",
+          "result": "passed"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py",
+          "result": "passed",
+          "source_sha": "218d6a9776f64cee1fc80f91ff7101786e0f2749",
+          "verified_on": "2026-10-31"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "No production database inventory, body export, writer exclusion or deletion authorized. M4 deployment must be verified first.",
+          "Local unit/transport/syntax checks do not replace required native MySQL acceptance."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "HOST-M5-01",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Owned native MySQL acceptance is not yet run on this new source.",
+          "exit_criteria": "Record exact-source required native CI with zero skips."
+        },
+        {
+          "id": "HOST-M5-03",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Publication state does not close business responsibilities, references or backups.",
+          "exit_criteria": "Supply original body export/restore, writer exclusion, business closure and rollback-boundary evidence before a concrete deletion review."
+        },
+        {
+          "id": "HOST-M5-02",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "New Mongo snapshot-state native case and production collection inventory pending.",
+          "exit_criteria": "Exact-source existing authenticated Mongo native selectors must RUN/PASS without skips; then preserve exact read-only production receipt. No deletion inference."
+        }
+      ],
+      "notes": [
+        "Preserves null/unavailable evidence; database mutations and deletion authorization are always false.",
+        "Transaction rollback and owned pool release must succeed before the CLI can report a complete inventory. Cleanup uncertainty is not deletion evidence."
       ]
     }
   ],

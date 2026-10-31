@@ -58,6 +58,14 @@ class NativeSelectorProofTests(unittest.TestCase):
                 ])
                 self.assertNotEqual(result.returncode, 0)
 
+    def test_every_mongo_selector_must_run_and_pass(self):
+        names = ("TestMongoMetadataProfileNativeOwnedReplicaSet", "TestRetirementMongoNativeOwnedReplicaSet")
+        events = [{"Action": action, "Test": name} for name in names for action in ("run", "pass")]
+        result, _ = self.run_fixture("mongodb", events)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        incomplete, _ = self.run_fixture("mongodb", events[:2])
+        self.assertNotEqual(incomplete.returncode, 0)
+
     def test_go_failure_is_not_overridden_by_matching_events(self):
         name = "TestMongoMetadataProfileNativeOwnedReplicaSet"
         result, _ = self.run_fixture("mongodb", [

@@ -11,8 +11,8 @@ case "${1:-}" in
   mongodb)
     [[ "${QS_MONGO_METADATA_NATIVE_REQUIRED:-}" == 1 ]] || { echo 'MongoDB native fixture is required' >&2; exit 1; }
     package=./scripts/oneoff/mongodb_metadata_profile
-    selector='^TestMongoMetadataProfileNativeOwnedReplicaSet$'
-    expected='["TestMongoMetadataProfileNativeOwnedReplicaSet"]'
+    selector='^(TestMongoMetadataProfileNativeOwnedReplicaSet|TestRetirementMongoNativeOwnedReplicaSet)$'
+    expected='["TestMongoMetadataProfileNativeOwnedReplicaSet", "TestRetirementMongoNativeOwnedReplicaSet"]'
     ;;
   *) echo 'native proof requires mysql or mongodb' >&2; exit 1 ;;
 esac

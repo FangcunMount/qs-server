@@ -188,6 +188,9 @@ jobs:
           QS_METADATA_PROFILE_NATIVE_UUID="$(docker exec --env MYSQL_PWD="$MYSQL_PASSWORD" "$MYSQL_CONTAINER" mysql -uroot -N -e 'SELECT @@server_uuid')"
           export QS_METADATA_PROFILE_NATIVE_UUID
           make test-metadata-readiness-mysql-native
+          go test -tags=integration -count=1 -v ./scripts/oneoff/messaging_retirement_inventory -run '^TestRetirementInventoryOwnedNativeMySQL$' | tee "$RUNNER_TEMP/messaging-retirement-native.log"
+          grep -q -- '--- PASS: TestRetirementInventoryOwnedNativeMySQL ' "$RUNNER_TEMP/messaging-retirement-native.log"
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/messaging-retirement-native.log"; then exit 1; fi
 
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
@@ -1246,6 +1249,7 @@ jobs:
         run: |
           python3 scripts/cd/test-direct-registry-deploy.py
           python3 scripts/cd/test_release_snapshot.py
+          python3 scripts/cd/test_messaging_retirement_inventory.py -v
 
       - name: Validate deployment image export contract
         run: bash scripts/cd/test-export-image.sh
