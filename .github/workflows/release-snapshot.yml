@@ -58,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.identity.outputs.digest }}
+      mongo_digest: ${{ steps.identity.outputs.mongo_digest }}
     steps:
       - name: Refuse unreviewed source
         env:
@@ -73,12 +74,18 @@ jobs:
           set -Eeuo pipefail
           go test -count=1 ./scripts/oneoff/messaging_retirement_inventory
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X main.sourceSHA=$GITHUB_SHA" -o messaging-retirement-inventory ./scripts/oneoff/messaging_retirement_inventory
+          go test -count=1 ./scripts/oneoff/mongodb_metadata_profile
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X main.retirementSourceSHA=$GITHUB_SHA" -o messaging-retirement-mongo-inventory ./scripts/oneoff/mongodb_metadata_profile
       - id: identity
-        run: echo "digest=$(sha256sum messaging-retirement-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "digest=$(sha256sum messaging-retirement-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "mongo_digest=$(sha256sum messaging-retirement-mongo-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
           name: messaging-retirement-reader-${{ github.run_id }}
-          path: messaging-retirement-inventory
+          path: |
+            messaging-retirement-inventory
+            messaging-retirement-mongo-inventory
           if-no-files-found: error
 
   messaging-inventory:
@@ -92,7 +99,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        owner: [iam.mysql, qs.mysql, ai.mysql]
+        owner: [iam.mysql, qs.mysql, ai.mysql, qs.mongo]
     env:
       RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
       RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
@@ -102,6 +109,7 @@ jobs:
       DEPLOY_NODE_HOSTNAME: serverA
       INVENTORY_OWNER: ${{ matrix.owner }}
       EXPECTED_DIGEST: ${{ needs.inventory-reader.outputs.digest }}
+      EXPECTED_MONGO_DIGEST: ${{ needs.inventory-reader.outputs.mongo_digest }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
@@ -121,4 +129,4 @@ jobs:
           retention-days: 30
       - name: Remove owned local key and companion
         if: always()
-        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json inventory-companion/messaging-retirement-inventory
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory

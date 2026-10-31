@@ -25,10 +25,13 @@ class InventoryTransportTest(unittest.TestCase):
             Path("inventory-companion").mkdir()
             binary = b"isolated-fixture"
             Path("inventory-companion/messaging-retirement-inventory").write_bytes(binary)
+            Path("inventory-companion/messaging-retirement-mongo-inventory").write_bytes(binary)
             env = dict(INVENTORY_OWNER=owner, EXPECTED_DIGEST="0" * 64 if corrupt else hashlib.sha256(binary).hexdigest(),
+                       EXPECTED_MONGO_DIGEST="0" * 64 if corrupt else hashlib.sha256(binary).hexdigest(),
                        GITHUB_SHA="a" * 40, GITHUB_RUN_ID="12345", RUNNER_SSH_CONFIG="isolated-config", RUNNER_SSH_ALIAS="isolated-alias")
             report = dict(owner=owner, read_only=True, mutation=False, drop_authorized=authorized,
                           transaction_released=True, pool_released=True,
+                          cursors_released=True, count_read_concern="snapshot",
                           inventory_complete=available, source_sha="a" * 40, rows=None if not available else 0)
             with patch.dict(os.environ, env), patch("subprocess.run", return_value=CompletedProcess([], 0 if available and not process_failed else 1, json.dumps(report).encode())) as transport:
                 error = None
@@ -43,7 +46,7 @@ class InventoryTransportTest(unittest.TestCase):
         return error, saved, calls
 
     def test_fixed_owners_use_application_uid_without_database_arguments(self):
-        for owner, container in [("qs.mysql", "qs-apiserver"), ("iam.mysql", "iam-apiserver"), ("ai.mysql", "qs-ai")]:
+        for owner, container in [("qs.mysql", "qs-apiserver"), ("iam.mysql", "iam-apiserver"), ("ai.mysql", "qs-ai"), ("qs.mongo", "qs-apiserver")]:
             error, saved, calls = self.execute(owner=owner)
             self.assertIsNone(error)
             self.assertFalse(saved["drop_authorized"])
@@ -55,6 +58,8 @@ class InventoryTransportTest(unittest.TestCase):
             self.assertNotIn("PASSWORD", command[-1])
             if owner == "ai.mysql":
                 self.assertIn("/app/.venv/bin/python -", command[-1])
+            if owner == "qs.mongo":
+                self.assertIn("--messaging-retirement-inventory", command[-1])
 
     def test_partial_evidence_is_preserved_but_fails(self):
         error, saved, _ = self.execute(available=False)

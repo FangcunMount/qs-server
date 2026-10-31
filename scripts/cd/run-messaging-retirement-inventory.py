@@ -8,7 +8,7 @@ import shlex
 import subprocess
 
 owner = os.environ["INVENTORY_OWNER"]
-containers = {"iam.mysql": "iam-apiserver", "qs.mysql": "qs-apiserver", "ai.mysql": "qs-ai"}
+containers = {"iam.mysql": "iam-apiserver", "qs.mysql": "qs-apiserver", "ai.mysql": "qs-ai", "qs.mongo": "qs-apiserver"}
 if owner not in containers or not re.fullmatch(r"[0-9a-f]{40}", os.environ["GITHUB_SHA"]):
     raise SystemExit("Explicit fixed owner and source required")
 
@@ -61,8 +61,10 @@ print(json.dumps(report))
 """
     args = ["sudo", "-n", "docker", "exec", "--user", "10001:10001", "-i", containers[owner], "/app/.venv/bin/python", "-"]
 else:
-    binary = Path("inventory-companion/messaging-retirement-inventory").read_bytes()
-    if hashlib.sha256(binary).hexdigest() != os.environ["EXPECTED_DIGEST"]:
+    filename = "messaging-retirement-mongo-inventory" if owner == "qs.mongo" else "messaging-retirement-inventory"
+    binary = (Path("inventory-companion") / filename).read_bytes()
+    digest_key = "EXPECTED_MONGO_DIGEST" if owner == "qs.mongo" else "EXPECTED_DIGEST"
+    if hashlib.sha256(binary).hexdigest() != os.environ[digest_key]:
         raise SystemExit("Inventory companion identity mismatch")
     run_id = os.environ["GITHUB_RUN_ID"]
     if not run_id.isdecimal():
@@ -70,7 +72,7 @@ else:
     temporary = "/tmp/messaging-retirement-inventory-" + run_id
     script = ("set -eu; umask 077; p=" + shlex.quote(temporary)
               + '; trap \'rm -f "$p"\' EXIT; cat > "$p"; chmod 0700 "$p"; "$p" '
-              + shlex.quote(owner))
+              + shlex.quote("--messaging-retirement-inventory" if owner == "qs.mongo" else owner))
     args = ["sudo", "-n", "docker", "exec", "--user", "2000:2000", "-i", containers[owner], "sh", "-c", script]
     payload = binary
 
@@ -84,7 +86,11 @@ try:
     if owner != "ai.mysql":
         assert value["source_sha"] == os.environ["GITHUB_SHA"]
         if value["inventory_complete"]:
-            assert value["transaction_released"] is True and value["pool_released"] is True
+            assert value["pool_released"] is True
+            if owner == "qs.mongo":
+                assert value["cursors_released"] is True and value["count_read_concern"] == "snapshot"
+            else:
+                assert value["transaction_released"] is True
     value["process_completed_successfully"] = result.returncode == 0
     if result.returncode:
         value["inventory_complete"] = False
