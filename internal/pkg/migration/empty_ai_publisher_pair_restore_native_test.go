@@ -180,6 +180,7 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 					t.Fatal(err)
 				}
 			}
+			restoredAt := time.Now()
 			if err := rehearseM5OriginalEmptyRestore(t.Context(), n, ddl, hash, a, b, false); err != nil {
 				t.Fatal(err)
 			}
@@ -197,6 +198,7 @@ func TestSchemaPairNativeM5OriginalEmptyRestoreAndOldCompatibility(t *testing.T)
 				}
 			}
 			report["original_and_restored_DDL_sha256"] = hash
+			report[state+"_restore_and_compatibility_elapsed_ms"] = time.Since(restoredAt).Milliseconds()
 		})
 	}
 	if t.Failed() {
