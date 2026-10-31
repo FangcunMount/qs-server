@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+    "sha": "4c3c86bc6660157c130092a5ed109990a75ac465",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -15819,7 +15819,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+        "source_sha": "4c3c86bc6660157c130092a5ed109990a75ac465",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15871,6 +15871,13 @@
           "command": "python3 scripts/cd/test_messaging_retirement_inventory.py -v",
           "result": "passed",
           "source_sha": "f57f048200d0c1d006e2eb6bfd35fbc5e6333c84",
+          "verified_on": "2026-10-31"
+        },
+        {
+          "kind": "command",
+          "command": "python3 -B scripts/cd/test_messaging_retirement_inventory.py -v",
+          "result": "passed",
+          "source_sha": "4c3c86bc6660157c130092a5ed109990a75ac465",
           "verified_on": "2026-10-31"
         }
       ],
