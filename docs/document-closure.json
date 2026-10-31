@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6c927948049836b24314e72ad2418afda86262b0",
+    "sha": "549ad91a9cfd25e98aaf430cb9dd034601979ecf",
     "verified_on": "2026-11-01"
   },
   "status_policy": {
@@ -15155,7 +15155,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6c927948049836b24314e72ad2418afda86262b0",
+        "source_sha": "549ad91a9cfd25e98aaf430cb9dd034601979ecf",
         "verified_on": "2026-11-01"
       },
       "fact_sources": [
@@ -15214,6 +15214,10 @@
         {
           "kind": "source",
           "path": "internal/pkg/migration/offline_protocol_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/container/owner_drain_cli_native_test.go"
         }
       ],
       "verification": [
@@ -15652,7 +15656,8 @@
         "M5 paused-owner source review fde1f93f772ce433b9024f2e63eb06c9fb208ced; previous binding {\"source_sha\": \"32627920429d8fda3bf42cac6cd609c2958a72ce\", \"verified_on\": \"2026-10-31\"}. New canonical identity-only reader has no schema mutation. Explicit owner-drain action validates raw original JSON config, literal owner bindings and canonical pair identities, registers existing SDK owners with new-send gate closed, and retains Checkers on unresolved/cancelled stop. It starts no business Container, scheduler or consumers and does not install schema; normal SDK recovery audits/state transitions may occur and are not labelled readonly. Per-instance limits unchanged; temporary old/maintenance overlap requires explicit resource accounting in infra. Local working-tree package race passed and native-tag compilation passed before commit; actual CLI/Broker proof and production are pending. Existing migration resource bytes and all prior native/production evidence keep original attribution. No gate or signoff relaxed.",
         "Correct global source-review baseline to match the reviewed owner-drain source; previous global {\"sha\": \"32627920429d8fda3bf42cac6cd609c2958a72ce\", \"verified_on\": \"2026-10-31\"}. First candidate CI41216648348 Docs Hygiene & Facts failed baseline drift; no gate weakened or historical native/production verification rebound.",
         "M5 complete retained material and separate pre-start restore source review 3f35e5f9583186b47e07953fcdc9405dca6ed2fb; previous binding {\"source_sha\": \"fde1f93f772ce433b9024f2e63eb06c9fb208ced\", \"verified_on\": \"2026-10-31\"}; previous global {\"sha\": \"fde1f93f772ce433b9024f2e63eb06c9fb208ced\", \"verified_on\": \"2026-10-31\"}. Full SQL-column/BSON multisets, object definitions and complete original110 ledger are bound to canonical pair/resources. Explicit readonly original export/inspection remains separate from independently approved one-use restoration. Restore checks all retained facts and known interrupted111 states, restores only exact original empty target, then transactionally replays captured full110 ledger; no generic Force/down or automatic retry/dirty clearing. Coordinator must independently prove exclusion and first-start boundary; after first business start only111 forward route. Local race passed and integration compiled only; real CLI/Broker/database CI pending, no production restore/release or prior evidence rebound. Existing migration bytes and previous verification/signoffs retained.",
-        "M5 close-result guard review 6c927948049836b24314e72ad2418afda86262b0; previous binding {\"source_sha\": \"3f35e5f9583186b47e07953fcdc9405dca6ed2fb\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"296d1752fa74a4b09e54a6b218a0f4c97254048e\", \"verified_on\": \"2026-11-01\"}. CI41219365688 Lint Code/job124590506889 found three unchecked close/hash-writer results. Retained reader propagates rows.Close failures; private stop read refuses qualification on Close failure; SHA writer explicitly cannot fail. Local package race and golangci-lint passed. No migration/resource/business semantics changed, no gate weakened, actual CI/native/production pending; prior failed fixture/run remains on original source."
+        "M5 close-result guard review 6c927948049836b24314e72ad2418afda86262b0; previous binding {\"source_sha\": \"3f35e5f9583186b47e07953fcdc9405dca6ed2fb\", \"verified_on\": \"2026-11-01\"} and global {\"sha\": \"296d1752fa74a4b09e54a6b218a0f4c97254048e\", \"verified_on\": \"2026-11-01\"}. CI41219365688 Lint Code/job124590506889 found three unchecked close/hash-writer results. Retained reader propagates rows.Close failures; private stop read refuses qualification on Close failure; SHA writer explicitly cannot fail. Local package race and golangci-lint passed. No migration/resource/business semantics changed, no gate weakened, actual CI/native/production pending; prior failed fixture/run remains on original source.",
+        "Live original-to-maintenance handoff fixture review 549ad91a9cfd25e98aaf430cb9dd034601979ecf; previous binding {\"source_sha\": \"6c927948049836b24314e72ad2418afda86262b0\", \"verified_on\": \"2026-11-01\"}; previous global {\"sha\": \"6c927948049836b24314e72ad2418afda86262b0\", \"verified_on\": \"2026-11-01\"}. Keep both original SDKs live through independent CLI registration, require actual Ready, then normal original SDK stops while CLI remains Ready; only that CLI answers released original Broker checks. Ninth mandatory flag records actual overlap, not a replacement for production evidence. Runtime/tool behavior unchanged; native-tag compilation passed locally, real nine-field proof pending. Earlier failed combined fixture and all original-source receipts remain attributed; no pass manufactured."
       ]
     },
     {
