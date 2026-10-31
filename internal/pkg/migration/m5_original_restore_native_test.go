@@ -193,4 +193,5 @@ func TestSchemaPairNativeM5OriginalRestoreCLI(t *testing.T) {
 	}
 	raw, _ := json.Marshal(report)
 	t.Log("M5_QS_ORIGINAL_RESTORE_CLI_RECEIPT " + string(raw))
+	t.Run("actual_frozen_main_commit_reply_lost", testM5FrozenMainCommitReplyLost)
 }
