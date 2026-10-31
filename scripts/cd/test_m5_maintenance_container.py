@@ -104,12 +104,18 @@ def native():
                                 timeout=120, check=False)
         if result.returncode and not allow_failure:
             raise RuntimeError("owned Docker smoke failed")
+        if result.returncode:
+            return ""
         return result.stdout.decode().strip()
 
-    # Refuse an existing source rather than replacing unrelated runner resources.
+    operation = os.environ.get("GITHUB_RUN_ID", str(os.getpid())) + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+    if not m.OPERATION.fullmatch(operation):
+        raise RuntimeError("owned native operation required")
+    # The fixture gets its own source namespace; the production CLI still has
+    # no source override and remains fixed to qs-apiserver.
+    m.SOURCE = "qs-m5-native-api-" + operation
     if docker("inspect", m.SOURCE, allow_failure=True):
         raise RuntimeError("source name already occupied")
-    operation = str(os.getpid()) + "-1"
     name = "qs-m5-maintenance-" + operation
     if docker("inspect", name, allow_failure=True):
         raise RuntimeError("maintenance name already occupied")
