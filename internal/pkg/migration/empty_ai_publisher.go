@@ -17,7 +17,7 @@ const emptyPublisherDependenciesQuery = "SELECT /*+ MAX_EXECUTION_TIME(2000) */ 
 // retirement cannot discard attached programs or unreviewed schema dependencies;
 // incomplete metadata visibility is not proof of their absence.
 func VerifyEmptyAIPublisherDependencies(ctx context.Context, db retirementSQLReader, name string) error {
-	if err := schemaVisible(ctx, db, name, true); err != nil {
+	if err := schemaVisible(ctx, db, name, true, "DROP", "LOCK TABLES"); err != nil {
 		return err
 	}
 	return emptyPublisherDependenciesAbsent(ctx, db)
@@ -63,7 +63,7 @@ func (d *retirementDatabaseDriver) runEmptyAIPublisherStep(raw []byte) (runErr e
 		var mysqlErr *sqlmysql.MySQLError
 		// Preparation may not have happened (e.g. a nonempty table). Only the
 		// server's exact absent-statement code is an expected cleanup result.
-		if err != nil && !(errors.As(err, &mysqlErr) && mysqlErr.Number == 1243) {
+		if err != nil && (!errors.As(err, &mysqlErr) || mysqlErr.Number != 1243) {
 			cleanupErr = errors.Join(cleanupErr, err)
 		}
 		_, err = d.sqlConn.ExecContext(cleanupCtx, "SET SESSION lock_wait_timeout = ?", originalWait)

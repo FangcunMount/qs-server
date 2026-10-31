@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -297,47 +296,6 @@ func TestMySQLStoreEntryCurrentReadAfterTransfer(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestMySQLStoreFullMigrationChain(t *testing.T) {
-	db := isolatedMySQL(t)
-	paths, err := filepath.Glob("../../../../../pkg/migration/migrations/mysql/*.up.sql")
-	if err != nil || len(paths) == 0 {
-		t.Fatal("migration chain not found")
-	}
-	versions := map[string]bool{}
-	for _, path := range paths {
-		version := strings.SplitN(filepath.Base(path), "_", 2)[0]
-		if versions[version] {
-			t.Fatalf("duplicate migration version %s", version)
-		}
-		versions[version] = true
-		sql, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = db.Exec(string(sql)).Error; err != nil {
-			t.Fatalf("migration %s: %v", filepath.Base(path), err)
-		}
-	}
-	for _, table := range []string{"actor_stores", "clinician_store_history", "operators", "operator_retirement_tasks", "operator_recovery_archives", "testee_store_history"} {
-		if !db.Migrator().HasTable(table) {
-			t.Fatalf("missing %s", table)
-		}
-	}
-	for _, table := range []string{"testee_store_migration_manifests", "testee_store_migration_items", "testee_store_migration_reversions", "operator_retirement_manifests", "clinician_operator_binding_archive"} {
-		if db.Migrator().HasTable(table) {
-			t.Fatalf("retired maintenance table remains: %s", table)
-		}
-	}
-	if db.Migrator().HasTable("staff") || db.Migrator().HasColumn("clinician", "operator_id") {
-		t.Fatal("retired operator structure remains")
-	}
-	for table, column := range map[string]string{"clinician": "store_id", "assessment_entry": "invalidated_at"} {
-		if !db.Migrator().HasColumn(table, column) {
-			t.Fatalf("missing %s.%s", table, column)
-		}
 	}
 }
 

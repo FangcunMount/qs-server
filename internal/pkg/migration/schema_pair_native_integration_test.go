@@ -328,3 +328,25 @@ func TestSchemaPairNativeFailedFutureDDLDoesNotAdvanceOtherBackend(t *testing.T)
 		})
 	}
 }
+
+// These are the original Actor full-chain schema assertions. They execute the
+// current canonical paired migrator instead of a raw SQL-file replay.
+func TestSchemaPairNativeActorStoreFullMigrationChain(t *testing.T) {
+	n := openNativeSchemaPair(t)
+	r, err := compiledMigrationResources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.approve(t, r)
+	n.runBoth(t, n.preflight(t, r))
+	for _, table := range []string{"actor_stores", "clinician_store_history", "operators", "operator_retirement_tasks", "operator_recovery_archives", "testee_store_history"} {
+		assertMySQLTable(t, n.db, n.cfg.MySQLDatabase, table, true)
+	}
+	for _, table := range []string{"testee_store_migration_manifests", "testee_store_migration_items", "testee_store_migration_reversions", "operator_retirement_manifests", "clinician_operator_binding_archive", "staff"} {
+		assertMySQLTable(t, n.db, n.cfg.MySQLDatabase, table, false)
+	}
+	assertMySQLColumn(t, n.db, n.cfg.MySQLDatabase, "clinician", "operator_id", false)
+	assertMySQLColumn(t, n.db, n.cfg.MySQLDatabase, "clinician", "store_id", true)
+	assertMySQLColumn(t, n.db, n.cfg.MySQLDatabase, "assessment_entry", "invalidated_at", true)
+	assertMySQLTable(t, n.db, n.cfg.MySQLDatabase, "ai_messaging_outbox", false)
+}

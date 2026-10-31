@@ -435,7 +435,14 @@ jobs:
         env:
           QS_STORE_REQUIRE_MYSQL: 'true'
           QS_SERVER_TEST_MYSQL_DSN: 'root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true'
-        run: go test ./internal/apiserver/infra/mysql/actor/store -run TestMySQLStore -count=1 -v
+        run: |
+          set -Eeuo pipefail
+          go test ./internal/apiserver/infra/mysql/actor/store -run TestMySQLStore -count=1 -v | tee "$RUNNER_TEMP/actor-store-transactions.log"
+          for required in TestMySQLStoreAssignmentLifecycle TestMySQLStoreTransferRollsBackAuditFailure TestMySQLStoreConcurrentReplay TestMySQLStoreConcurrentDeactivationAndAssignment TestMySQLStoreEntryCurrentReadAfterTransfer; do
+            grep -q -- "=== RUN   $required$" "$RUNNER_TEMP/actor-store-transactions.log"
+            grep -q -- "--- PASS: $required " "$RUNNER_TEMP/actor-store-transactions.log"
+          done
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/actor-store-transactions.log"; then exit 1; fi
       - name: Verify testee store ownership and transaction rollback
         env:
           QS_TESTEE_STORE_REQUIRE_MYSQL: 'true'
@@ -689,6 +696,8 @@ jobs:
             TestHistoricalEvidenceNativeSchemaObjectRestoreWithSyntheticNonNull \
             TestHistoricalEvidenceNativeDirtyObjectBackupRestore \
             TestSchemaPairNativeColdBootstrapAndRestart \
+            TestSchemaPairNativeActorStoreFullMigrationChain \
+            TestSchemaPairNativeM5RetiredPublisherReappearanceRejected \
             TestDisabledDDLNativeValidatesCurrentHeadsAndNeverCreatesMetadata; do
             if ! grep -q -- "--- PASS: ${test_name} " "${RUNNER_TEMP}/schema-pair.log"; then
               echo "Required schema pair test did not pass: ${test_name}" >&2
