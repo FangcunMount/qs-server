@@ -1,11 +1,15 @@
 """Exercise the real inventory transport without SSH or a Docker daemon."""
 import hashlib
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
 import runpy
 import tempfile
 import unittest
+import types
+import sys
 from unittest.mock import patch
 from subprocess import CompletedProcess
 
@@ -66,13 +70,74 @@ class InventoryTransportTest(unittest.TestCase):
     def test_transport_cannot_return_deletion_approval(self):
         error, saved, _ = self.execute(authorized=True)
         self.assertIn("unavailable", error)
-        self.assertIsNone(saved)
+        self.assertFalse(saved["inventory_complete"])
+        self.assertFalse(saved["drop_authorized"])
+        self.assertIsNone(saved["mutation"])
+        self.assertFalse(saved["receipt_validated"])
 
     def test_process_failure_cannot_preserve_a_complete_claim(self):
         error, saved, _ = self.execute(process_failed=True)
         self.assertIn("incomplete", error)
         self.assertFalse(saved["inventory_complete"])
         self.assertFalse(saved["process_completed_successfully"])
+
+    def test_actual_ai_payload_preserves_classified_errors_without_private_values(self):
+        _, _, calls = self.execute(owner="ai.mysql")
+        payload = calls[0].kwargs["input"]
+        for failure in ["binding", "query", "close", "none"]:
+            with self.subTest(failure=failure):
+                closed = []
+                class URL:
+                    def get_secret_value(self):
+                        return "mysql+asyncmy://private-user:private-password@host/db"
+                class Settings:
+                    database_url = None if failure == "binding" else URL()
+                    database_tls_mode = "VERIFY_IDENTITY"
+                    database_tls_ca_file = "/original/ca.pem"
+                class Database:
+                    def __init__(self, url, **kwargs):
+                        self.url, self.kwargs = url, kwargs
+                        assert kwargs["tls_mode"] == "VERIFY_IDENTITY"
+                        assert kwargs["tls_ca_file"] == "/original/ca.pem"
+                    async def close(self):
+                        closed.append(True)
+                        if failure == "close":
+                            raise RuntimeError("private close details")
+                async def inventory(db, **kwargs):
+                    if failure == "query":
+                        error = RuntimeError("private query parameters")
+                        error.orig = Exception(1045, "private password")
+                        raise error
+                    return {"complete": True, "sections": {}}
+                modules = {}
+                for name in ["qs_ai", "qs_ai.config", "qs_ai.infrastructure", "qs_ai.infrastructure.persistence",
+                             "qs_ai.infrastructure.persistence.mysql", "qs_ai.infrastructure.persistence.mysql.database",
+                             "qs_ai.maintenance", "qs_ai.maintenance.messaging_audit"]:
+                    modules[name] = types.ModuleType(name)
+                    modules[name].__path__ = []
+                modules["qs_ai.config"].Settings = Settings
+                module = modules["qs_ai.infrastructure.persistence.mysql.database"]
+                module.Database, module.Transactions = Database, lambda db: db
+                modules["qs_ai.maintenance.messaging_audit"].inventory = inventory
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.dict(sys.modules, modules), contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+                    try:
+                        exec(compile(payload, "actual-ai-inventory-payload", "exec"), {})
+                    except SystemExit as error:
+                        self.assertEqual(error.code, 1)
+                value = json.loads(output.getvalue())
+                self.assertNotIn("private", output.getvalue() + errors.getvalue())
+                self.assertFalse(value["drop_authorized"])
+                if failure == "none":
+                    self.assertTrue(value["inventory_complete"])
+                    self.assertEqual(value["phase"], "complete")
+                else:
+                    self.assertFalse(value["inventory_complete"])
+                    self.assertEqual(value["error_phase"], {"binding":"application_binding", "query":"inventory_query", "close":"pool_release"}[failure])
+                if failure == "query":
+                    self.assertEqual(value["driver_code"], 1045)
+                    self.assertTrue(value["pool_released"])
+                self.assertEqual(len(closed), 0 if failure == "binding" else 1)
 
 
 if __name__ == "__main__":
