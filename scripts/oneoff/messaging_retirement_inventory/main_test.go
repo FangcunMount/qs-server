@@ -53,3 +53,26 @@ func TestUnsupportedOwnersRefuseBeforeDatabaseUse(t *testing.T) {
 		}
 	}
 }
+
+func TestFailedTransactionReleaseInvalidatesCompletedMeasurements(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT DATABASE").WillReturnRows(sqlmock.NewRows([]string{"name", "version", "uuid"}).AddRow("fixture", "8.0.36", "fixture-uuid"))
+	for _, name := range []string{"rm_outbox", "ai_messaging_outbox"} {
+		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*information_schema.tables").WithArgs(name).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+		mock.ExpectQuery("SHOW CREATE TABLE").WillReturnRows(sqlmock.NewRows([]string{"name", "ddl"}).AddRow(name, "CREATE TABLE fixture"))
+		mock.ExpectQuery("SELECT /\\*\\+ MAX_EXECUTION_TIME.*COALESCE").WillReturnRows(sqlmock.NewRows([]string{"total", "closed", "other", "null"}).AddRow(0, 0, 0, 0))
+	}
+	mock.ExpectRollback().WillReturnError(errors.New("connection lost during release"))
+	r, err := collect(context.Background(), db, "qs.mysql", "fixture")
+	if err == nil || r.Complete || r.TransactionReleased || r.DropAuthorized {
+		t.Fatal(r, err)
+	}
+	if err = mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

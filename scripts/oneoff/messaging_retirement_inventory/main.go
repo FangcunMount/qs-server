@@ -45,20 +45,22 @@ type tableReport struct {
 }
 
 type report struct {
-	SourceSHA        string        `json:"source_sha"`
-	Owner            string        `json:"owner"`
-	ObservedAt       string        `json:"observed_at"`
-	ReadOnly         bool          `json:"read_only"`
-	Mutation         bool          `json:"mutation"`
-	Complete         bool          `json:"inventory_complete"`
-	DropAuthorized   bool          `json:"drop_authorized"`
-	ExportVerified   bool          `json:"original_body_export_verified"`
-	BusinessVerified bool          `json:"business_responsibility_closed"`
-	WritersExcluded  bool          `json:"writers_excluded"`
-	Binding          string        `json:"database_binding_sha256"`
-	Version          string        `json:"mysql_version"`
-	Tables           []tableReport `json:"tables"`
-	Boundary         string        `json:"boundary"`
+	SourceSHA           string        `json:"source_sha"`
+	Owner               string        `json:"owner"`
+	ObservedAt          string        `json:"observed_at"`
+	ReadOnly            bool          `json:"read_only"`
+	Mutation            bool          `json:"mutation"`
+	Complete            bool          `json:"inventory_complete"`
+	DropAuthorized      bool          `json:"drop_authorized"`
+	ExportVerified      bool          `json:"original_body_export_verified"`
+	BusinessVerified    bool          `json:"business_responsibility_closed"`
+	WritersExcluded     bool          `json:"writers_excluded"`
+	TransactionReleased bool          `json:"transaction_released"`
+	PoolReleased        bool          `json:"pool_released"`
+	Binding             string        `json:"database_binding_sha256"`
+	Version             string        `json:"mysql_version"`
+	Tables              []tableReport `json:"tables"`
+	Boundary            string        `json:"boundary"`
 }
 
 func hash(value string) string {
@@ -66,9 +68,9 @@ func hash(value string) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (report, error) {
+func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (r report, err error) {
 	_, tables, err := objects(owner)
-	r := report{SourceSHA: sourceSHA, Owner: owner, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), ReadOnly: true,
+	r = report{SourceSHA: sourceSHA, Owner: owner, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), ReadOnly: true,
 		Tables: []tableReport{}, Boundary: "Stored metadata only. Exact publication-state bytes are not business ACK, reference closure, writer exclusion, backup or deletion approval."}
 	if err != nil {
 		return r, err
@@ -77,7 +79,14 @@ func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (report, e
 	if err != nil {
 		return r, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() {
+		if releaseErr := tx.Rollback(); releaseErr != nil {
+			r.Complete = false
+			err = errors.Join(err, errors.New("read-only transaction release unavailable"))
+		} else {
+			r.TransactionReleased = true
+		}
+	}()
 	var name, uuid string
 	if err = tx.QueryRowContext(ctx, "SELECT DATABASE(),VERSION(),@@server_uuid").Scan(&name, &r.Version, &uuid); err != nil || name == "" || uuid == "" {
 		return r, errors.New("database identity unavailable")
@@ -110,7 +119,7 @@ func collect(ctx context.Context, db *sql.DB, owner, endpoint string) (report, e
 	return r, nil
 }
 
-func run() (report, error) {
+func run() (result report, resultErr error) {
 	if len(os.Args) != 2 || !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(sourceSHA) {
 		return report{}, errors.New("exact source and one fixed owner are required")
 	}
@@ -134,7 +143,14 @@ func run() (report, error) {
 		return report{}, errors.New("owner connector unavailable")
 	}
 	db := sql.OpenDB(connector)
-	defer func() { _ = db.Close() }()
+	defer func() {
+		if releaseErr := db.Close(); releaseErr != nil {
+			result.Complete = false
+			resultErr = errors.Join(resultErr, errors.New("owned pool release unavailable"))
+		} else {
+			result.PoolReleased = true
+		}
+	}()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

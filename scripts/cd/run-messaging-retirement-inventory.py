@@ -26,12 +26,12 @@ async def run():
     db=Database(url,pool_size=1,max_overflow=0)
     try:
         result=await inventory(Transactions(db),max_rows=10000)
-        print(json.dumps(dict(read_only=True,mutation=False,owner='ai.mysql',
-            inventory_complete=result['complete'],drop_authorized=False,
-            original_body_export_verified=False,business_responsibility_closed=False,
-            writers_excluded=False,result=result)))
     finally:
         await db.close()
+    print(json.dumps(dict(read_only=True,mutation=False,owner='ai.mysql',
+        inventory_complete=result['complete'],drop_authorized=False,
+        original_body_export_verified=False,business_responsibility_closed=False,
+        writers_excluded=False,result=result)))
 try:
     asyncio.run(run())
 except Exception:
@@ -61,6 +61,11 @@ try:
     assert value["drop_authorized"] is False
     if owner != "ai.mysql":
         assert value["source_sha"] == os.environ["GITHUB_SHA"]
+        if value["inventory_complete"]:
+            assert value["transaction_released"] is True and value["pool_released"] is True
+    value["process_completed_successfully"] = result.returncode == 0
+    if result.returncode:
+        value["inventory_complete"] = False
     value["diagnostic_source_sha"] = os.environ["GITHUB_SHA"]
     value["workflow_run"] = os.environ["GITHUB_RUN_ID"]
     Path("messaging-retirement-inventory.json").write_text(json.dumps(value, indent=2) + "\n")

@@ -62,7 +62,7 @@ func TestRetirementInventoryOwnedNativeMySQL(t *testing.T) {
 	}
 	for _, owner := range []string{"qs.mysql", "iam.mysql"} {
 		r, e := collect(ctx, db, owner, cfg.Addr)
-		if e != nil || !r.Complete || r.DropAuthorized || r.BusinessVerified || r.ExportVerified || r.WritersExcluded {
+		if e != nil || !r.Complete || !r.TransactionReleased || db.Stats().InUse != 0 || r.DropAuthorized || r.BusinessVerified || r.ExportVerified || r.WritersExcluded {
 			t.Fatal(r, e)
 		}
 		for _, table := range r.Tables {

@@ -13,7 +13,7 @@ SCRIPT = Path(__file__).with_name("run-messaging-retirement-inventory.py")
 
 
 class InventoryTransportTest(unittest.TestCase):
-    def execute(self, *, owner="qs.mysql", available=True, authorized=False, corrupt=False):
+    def execute(self, *, owner="qs.mysql", available=True, authorized=False, corrupt=False, process_failed=False):
         with tempfile.TemporaryDirectory() as temporary:
             previous = Path.cwd()
             self.addCleanup(os.chdir, previous)
@@ -24,8 +24,9 @@ class InventoryTransportTest(unittest.TestCase):
             env = dict(INVENTORY_OWNER=owner, EXPECTED_DIGEST="0" * 64 if corrupt else hashlib.sha256(binary).hexdigest(),
                        GITHUB_SHA="a" * 40, GITHUB_RUN_ID="12345", RUNNER_SSH_CONFIG="isolated-config", RUNNER_SSH_ALIAS="isolated-alias")
             report = dict(owner=owner, read_only=True, mutation=False, drop_authorized=authorized,
+                          transaction_released=True, pool_released=True,
                           inventory_complete=available, source_sha="a" * 40, rows=None if not available else 0)
-            with patch.dict(os.environ, env), patch("subprocess.run", return_value=CompletedProcess([], 0 if available else 1, json.dumps(report).encode())) as transport:
+            with patch.dict(os.environ, env), patch("subprocess.run", return_value=CompletedProcess([], 0 if available and not process_failed else 1, json.dumps(report).encode())) as transport:
                 error = None
                 try:
                     runpy.run_path(str(SCRIPT), run_name="__main__")
@@ -66,6 +67,12 @@ class InventoryTransportTest(unittest.TestCase):
         error, saved, _ = self.execute(authorized=True)
         self.assertIn("unavailable", error)
         self.assertIsNone(saved)
+
+    def test_process_failure_cannot_preserve_a_complete_claim(self):
+        error, saved, _ = self.execute(process_failed=True)
+        self.assertIn("incomplete", error)
+        self.assertFalse(saved["inventory_complete"])
+        self.assertFalse(saved["process_completed_successfully"])
 
 
 if __name__ == "__main__":
