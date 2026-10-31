@@ -5,7 +5,7 @@ on:
       retention_operation:
         description: Stage reviewed retention files, or install/verify only Worker where existing admin permission allows
         type: choice
-        options: [none, stage, install-worker, verify-worker]
+        options: [none, stage, install-worker, verify-worker, plan-installed, verify-installed]
         default: none
       ai_sdk_import_only:
         description: Compare default and tmp HOME imports in fixed AI image; no network or app startup
@@ -96,7 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: ${{ fromJSON(inputs.retention_operation == 'stage' && '["SVRA","SVRB","SVRD"]' || '["SVRD"]') }}
+        host: ${{ fromJSON(inputs.retention_operation == 'stage' && '["SVRA","SVRB","SVRD"]' || (inputs.retention_operation == 'plan-installed' || inputs.retention_operation == 'verify-installed') && '["SVRA","SVRB"]' || '["SVRD"]') }}
     env:
       RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets[format('{0}_SSH_KEY', matrix.host)] || secrets.SVRA_SSH_KEY }}
       RUNNER_SSH_HOST: ${{ vars[format('{0}_PUBLIC_HOST', matrix.host)] || secrets[format('{0}_PUBLIC_HOST', matrix.host)] || vars[format('{0}_HOST', matrix.host)] }}
@@ -122,6 +122,7 @@ jobs:
       - name: Run exact bounded retention operation
         run: python3 scripts/cd/run-retention-closeout.py
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: retention-closeout-${{ matrix.host }}-${{ github.run_id }}
           path: retention-closeout.json

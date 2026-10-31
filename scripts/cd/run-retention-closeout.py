@@ -12,9 +12,9 @@ INSTALL_SHA = '59cbb812c2b06c424a86c4da3d844a9c20732959e5e497656491d1dbfa532fd8'
 operation = os.environ['RETENTION_OPERATION']
 host = os.environ['DEPLOY_NODE_HOSTNAME']
 run = os.environ['GITHUB_RUN_ID']
-assert operation in ('stage', 'install-worker', 'verify-worker')
+assert operation in ('stage', 'install-worker', 'verify-worker', 'plan-installed', 'verify-installed')
 assert host in ('serverA', 'serverB', 'serverD') and run.isdecimal()
-assert operation == 'stage' or host == 'serverD'
+assert operation in ('stage', 'plan-installed', 'verify-installed') or host == 'serverD'
 directory = '/tmp/qlume-retention-install-' + run + '-' + host
 ssh = ['ssh', '-F', os.environ['RUNNER_SSH_CONFIG'], '-o', 'ConnectTimeout=20', os.environ['RUNNER_SSH_ALIAS']]
 
@@ -23,8 +23,21 @@ def remote(code, *args):
     result = subprocess.run([*ssh, shlex.join(['python3', '-c', code, *args])],
         text=True, capture_output=True, timeout=90)
     if result.returncode:
+        try:
+            failure = json.loads(result.stdout)
+            if failure.get('status') == 'failed':
+                Path('retention-closeout.json').write_text(json.dumps(failure, indent=2)+'\n')
+        except (ValueError, AttributeError):
+            pass
         raise SystemExit('Bounded retention operation failed; inspect its current phase, no raw stderr exported')
     return result.stdout
+
+
+if operation in ('plan-installed', 'verify-installed'):
+    result = json.loads(remote(Path('scripts/cd/verify-installed-retention.py').read_text(), operation, host))
+    assert result['status'] == 'success'
+    Path('retention-closeout.json').write_text(json.dumps(result, indent=2)+'\n')
+    raise SystemExit(0)
 
 
 helper = Path('.retention-qs/scripts/cd/image-retention.py')
