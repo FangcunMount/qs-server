@@ -190,3 +190,17 @@ SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRI
 最终退出还要求新鲜可用的原主库样本、所有未决项/年龄为零、native-limit=false及SDK实际active_sends/running_checks/queued_checks为零。停止后状态明确stopped及实际SDK/sampler退出，独立canonical观察仍须再读。SIGTERM、操作者断线或deadline单独不会关闭仍有责任的最后Checker；expiry标记使本次执行资格失效，保持资源到受审移交/退出。关闭不完整继续保留借用池和其他owner，不把进程超时解释为已排空。状态陈旧、丢失或错误皆停止资格，不复用旧JSON。
 
 本批具体生产编排、额外维护资源、原六实例退出、同窗口保护/恢复及首业务启动点由infra执行包审查。新增原生CLI用真实隔离Broker/MySQL/Mongo验证，不能用包级测试或导入成功代替生产交接。
+
+## M5 同窗口完整保护与原状恢复
+
+`--retained-baseline --timeout=2m`只读枚举所选QS的全部SQL表/视图和Mongo集合/视图/index。逐行覆盖SQL全部列（服务端BINARY/HEX保留NULL、字节、微秒和十进制差异），逐文档覆盖原BSON；对完整行摘要多重集排序再摘要，保留重复数量，不导出业务内容。每对象默认上限100万行，显式`--baseline-max-rows`只可收紧；超过预算、权限、超时或非空Mongo TTL集合均失败且`complete=false`，从不把前缀或未知当作零。system.profile仅保留诊断定义，不签为业务内容保护。跨库快照不原子，实际写者排除及两次稳定基线由协调窗口独立证明。
+
+`--capture-original-operation=<新操作> --timeout=2m`独立只读导出逐字原目标DDL、完整单行110/clean账本及上述全量基线；输出重定向到新0600私有文件并保全原字节。只接受原110/44、受核原目标/账本DDL摘要、空目标和当前完整迁移资源；不是备份整库或停写声明。
+
+`--restore-original=<原私有文件> --restore-original-sha256=<原字节摘要> --timeout=2m`默认只检查实际中断状态，接受111 dirty（DDL前或后）与111 clean首次启动前，以及完整原110；绕过clean-head入口仅用于此严格原材料检查。重新核对canonical库身份、完整账本恰一行、Mongo44、所有保留对象定义和完整内容，并输出实际state摘要。任一新增/缺失/改变的保留资产拒绝，已有目标必须逐项等于原空对象，不覆盖非空表。
+
+实际恢复另加`--restore-apply --restore-approval-file=<独立0600批准> --restore-approval-sha256=<独立原字节摘要>`；与原SQL111批准互斥，不存在Force/down入口。批准格式为`M5RestoreApproval`，kind固定`qs_m5_original_empty_restore`，绑定原材料、实际state、精确源码、停写/首次启动边界/执行审查回执、具名数据与恢复责任人及UTC一小时恢复预算；`runtime_frozen`和`runtime_not_started`只是经外层真实回执支持的声明。材料最多1MiB、批准保持32KiB，拒绝重复/未知JSON字段、symlink、共享/可写路径或复用consumed凭证。
+
+输入和完整主库状态在消费批准前再次实读。只在目标缺失时执行原逐字DDL，完整复核目标和保留资产后，单个SERIALIZABLE根内锁定完整实际111账本，精确DELETE一行并INSERT捕获的完整原110/clean行；事务失败回滚，commit未知保留未知，不重试。最后独立复核全量原对象和110/44。DDL已成功而账本失败时保留实际111 dirty/clean，重新只读检查并另签下一次独立恢复，不手工清dirty。工具不证明全主机排他或首次启动尚未发生；外层必须通过infra `pre-start-repair`及持久首次启动边界调用。任何业务runtime首次启动尝试后禁用旧材料回放，只准111兼容前向修复。
+
+必需真实隔离CI `TestSchemaPairNativeM5RetainedFullBaseline`与`TestSchemaPairNativeM5OriginalRestoreCLI`覆盖完整原字节差异、预算/TTL拒绝、实际独立CLI三种中断、首次启动/停写声明及变化事实拒绝、实际ledger INSERT权限故障后的事务回滚及一次性批准。测试报告严格属于自有数据库，不构成生产恢复验收；实际CI结论按精确提交记录。

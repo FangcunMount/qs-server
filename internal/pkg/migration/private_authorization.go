@@ -10,6 +10,10 @@ import (
 
 // Both approval consumers use the same stable, private-file boundary.
 func readPrivateRetirementAuthorization(path, expectedSHA256 string) ([]byte, error) {
+	return readPrivateRetirementFile(path, expectedSHA256, 32768)
+}
+
+func readPrivateRetirementFile(path, expectedSHA256 string, limit int64) ([]byte, error) {
 	if !retirementHashRE.MatchString(expectedSHA256) || !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return nil, retirementError("pristine bootstrap explicit authorization required")
 	}
@@ -29,7 +33,7 @@ func readPrivateRetirementAuthorization(path, expectedSHA256 string) ([]byte, er
 		}
 	}
 	info, e := os.Lstat(path)
-	if e != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Sys().(*syscall.Stat_t).Nlink != 1 || (info.Sys().(*syscall.Stat_t).Uid != 0 && info.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid())) || info.Size() < 1 || info.Size() > 32768 {
+	if e != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Sys().(*syscall.Stat_t).Nlink != 1 || (info.Sys().(*syscall.Stat_t).Uid != 0 && info.Sys().(*syscall.Stat_t).Uid != uint32(os.Getuid())) || info.Size() < 1 || info.Size() > limit {
 		return nil, retirementError("bootstrap private file rejected")
 	}
 	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
@@ -41,11 +45,11 @@ func readPrivateRetirementAuthorization(path, expectedSHA256 string) ([]byte, er
 		_ = f.Close()
 		return nil, retirementError("bootstrap private file changed")
 	}
-	raw, e := io.ReadAll(io.LimitReader(f, 32769))
+	raw, e := io.ReadAll(io.LimitReader(f, limit+1))
 	after, statErr := f.Stat()
 	closeErr := f.Close()
 	current, pathErr := os.Lstat(path)
-	if e != nil || statErr != nil || closeErr != nil || pathErr != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || len(raw) > 32768 || retirementHash(raw) != expectedSHA256 {
+	if e != nil || statErr != nil || closeErr != nil || pathErr != nil || !os.SameFile(opened, after) || !os.SameFile(after, current) || after.Mode().Perm() != 0600 || after.Sys().(*syscall.Stat_t).Nlink != 1 || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || int64(len(raw)) > limit || retirementHash(raw) != expectedSHA256 {
 		return nil, retirementError("bootstrap raw authorization hash mismatch")
 	}
 	return raw, nil

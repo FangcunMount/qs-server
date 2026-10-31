@@ -29,6 +29,10 @@ type arguments struct {
 	applicationEnvironment                                     bool
 	protocolObservation                                        bool
 	ownerDrain                                                 ownerDrainArguments
+	retainedBaseline                                           bool
+	baselineMaxRows                                            int
+	originalOperation                                          string
+	restore                                                    originalRestoreArguments
 	timeout                                                    time.Duration
 }
 
@@ -46,6 +50,10 @@ func parseArguments(args []string) (arguments, error) {
 	flags.BoolVar(&out.protocolObservation, "protocol-observation", false, "read original QS transaction primaries without sending or mutating")
 	registerInitialBindingFlags(flags, &out.binding)
 	registerOwnerDrainFlags(flags, &out.ownerDrain)
+	flags.BoolVar(&out.retainedBaseline, "retained-baseline", false, "complete bounded readonly hashes of all retained QS objects")
+	flags.IntVar(&out.baselineMaxRows, "baseline-max-rows", 1000000, "complete per-object row budget; exceeding it fails, never truncates")
+	registerOriginalRestoreFlags(flags, &out.restore)
+	flags.StringVar(&out.originalOperation, "capture-original-operation", "", "export exact original110/44 empty-target/full-ledger/private protection material")
 	if err := flags.Parse(args); err != nil {
 		return out, err
 	}
@@ -65,6 +73,18 @@ func parseArguments(args []string) (arguments, error) {
 	}
 	if err := out.ownerDrain.validate(out); err != nil {
 		return out, err
+	}
+	if out.retainedBaseline && (out.apply || out.protocolObservation || out.ownerDrain.enabled || out.binding.action != "" || out.timeout > 2*time.Minute || out.baselineMaxRows < 1 || out.baselineMaxRows > 1000000) {
+		return out, errors.New("separate bounded readonly retained baseline required")
+	}
+	if !out.retainedBaseline && out.baselineMaxRows != 1000000 {
+		return out, errors.New("baseline row budget requires explicit action")
+	}
+	if err := out.restore.validate(out); err != nil {
+		return out, err
+	}
+	if out.originalOperation != "" && (out.apply || out.protocolObservation || out.retainedBaseline || out.ownerDrain.enabled || out.binding.action != "" || out.restore.original != "" || out.timeout > 2*time.Minute) {
+		return out, errors.New("separate bounded original capture required")
 	}
 	return out, nil
 }
@@ -128,6 +148,21 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 	pair := migration.PairConfig{MySQLDatabase: a.mysqlDatabase, MongoDatabase: a.mongoDatabase, ExpectedSourceSHA: version.GitCommit}
 	if a.ownerDrain.enabled {
 		return runOwnerDrain(ctx, db, client, pair, a.ownerDrain, output)
+	}
+	if a.originalOperation != "" {
+		material, err := migration.CaptureM5OriginalMaterial(ctx, db, client, pair, a.originalOperation)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(output).Encode(material)
+	}
+	if a.retainedBaseline {
+		baseline, err := migration.CaptureRetainedBaseline(ctx, db, client, pair, a.baselineMaxRows)
+		return errors.Join(err, json.NewEncoder(output).Encode(baseline))
+	}
+	if a.restore.original != "" {
+		result, err := migration.RunM5OriginalRestore(ctx, db, client, migration.M5RestoreConfig{Pair: pair, OriginalFile: a.restore.original, OriginalSHA256: a.restore.originalSHA, Apply: a.restore.apply, AuthorizationFile: a.restore.approval, AuthorizationSHA256: a.restore.approvalSHA})
+		return errors.Join(err, json.NewEncoder(output).Encode(result))
 	}
 	if a.binding.action != "" {
 		return runInitialBinding(ctx, db, client, pair, a.binding, output)
