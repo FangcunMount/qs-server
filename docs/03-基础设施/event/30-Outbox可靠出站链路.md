@@ -22,7 +22,13 @@
 
 ## 保留资产与退出范围
 
-M4 已移除仅服务旧中间链路的 NSQ runtime、拓扑 HTTP 预检、发布扫描、旧 Stage/ACK rearm/payload reader、旧一体化探针及其孤立合同。新的负向用例只用 SQL 预置历史事实，不执行退役发布器。
+此前 infra 迁移阶段 M4 已移除仅服务旧中间链路的 NSQ runtime、拓扑 HTTP 预检、发布扫描、旧 Stage/ACK rearm/payload reader、旧一体化探针及其孤立合同。新的负向用例只用 SQL 预置历史事实，不执行退役发布器。
+
+本轮宿主工程退役 M4 将共用编码、Reference 与不可变证据校验迁入 `eventmessage`；原 Revision2 wire、指纹和冻结计划不改写。无生产调用的标准 Profile 构造及 Relay supervisor 已从当前源码删除。仍需回归的旧 Stager、发布策略和 NSQ 适配只供 `internal/testutil/legacy*` 历史夹具使用，实际三个进程的依赖图门禁禁止链接这些夹具、NSQ 驱动及发布型 Relay。SDK 的公开兼容能力不删除。
+
+原 `TestCurrentRuntimeClosure` 属于旧 Relay 机制，现固定在 `f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d` 运行并明确标注历史；旧 NSQ 手工证明入口也复用固定历史工作树。当前主机协议验收继续使用 M3-C 原生 RocketMQ 用例，不能把历史证明计为本轮当前运行验收。
+
+QS AI bridge 的当前启动检查不再要求旧 `ai_messaging_outbox`；准入、operations 退役约束、Inbox、失败审计、隔离和技术观察的检查继续保留。旧表的只读审计入口仍按实际存在情况核验，移除启动依赖不等于允许删除历史数据。
 
 只读数据库审计、准入 revision/CAS、离线正式镜像预检、历史 schema/备份、SDK 通用兼容测试和开发依赖保留。旧状态查询仅用于保留资产审计，不能当成新事务队列指标。没有自动删表、卷、业务历史或事务证据。
 

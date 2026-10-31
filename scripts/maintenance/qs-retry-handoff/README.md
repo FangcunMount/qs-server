@@ -75,3 +75,7 @@ MySQL使用服务器只读Repeatable Read事务；Mongo在新snapshot事务中�
 | 1 | 参数、绑定、schema/原集合、读取或清理不可用；不能解释为空 |
 
 盘点同样先持久化私有started，再记录完成时间、计数及核验结果。stdout只有固定状态和总量，不含wire、原ID或连接信息。`--inventory`与`--apply`互斥，不接受停写声明冒充自动停写；所有输出仍为`cutover_authorized=false`。
+
+### 2026-10-31 宿主退役 M4 复核
+
+本批未新增或执行数据库迁移、修复、重投或删除。当前发布构建检查三个实际进程的依赖图，禁止 NSQ、发布型 Relay 及历史测试夹具进入生产；旧 Relay runtime closure 明确在固定历史源码运行。重试交接夹具改用中立 `eventmessage` 编码与 Reference 校验，原身份、wire、计划/receipt 格式、原事务原子性与人工恢复权限保持。历史命令和生产证据保留原提交归属，不由本次源码复核补为当前验收。

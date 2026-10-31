@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "4f45c1b26edd73773a6f702a58d6efb377c4af25",
+    "sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
     "verified_on": "2026-10-31"
   },
   "status_policy": {
@@ -7475,7 +7475,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/standardoutbox/stager.go"
+          "path": "internal/testutil/legacymysqloutbox/stager.go"
         },
         {
           "kind": "source",
@@ -7553,6 +7553,9 @@
           "summary": "No current production evidence proves the effective 150/48/100 budgets, timeouts, instance topology or safe dependency capacity.",
           "exit_criteria": "Capture deployed SHA, effective configuration per instance, dependency capacity metrics, observed peaks and accountable signoff."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -8416,11 +8419,27 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/reference.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/intent.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/sdk_delivery_subscriber.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/check-production-messaging-deps.py"
         }
       ],
       "verification": [
@@ -8477,6 +8496,9 @@
           "summary": "Current exact-SHA production topology and lifecycle evidence is absent.",
           "exit_criteria": "Attach exact deployed SHA, effective infrastructure configuration, readiness evidence, and an observation timestamp."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -8491,7 +8513,7 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
+          "path": "scripts/testing/run-retired-outbox-contracts.sh"
         },
         {
           "kind": "source",
@@ -8519,11 +8541,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -8582,6 +8604,9 @@
           "summary": "Current exact-SHA terminal settlement and dead-letter production evidence is absent.",
           "exit_criteria": "Attach deployed SHA, effective broker settings, dead-letter persistence evidence, and an observation timestamp."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -8640,11 +8665,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -8701,6 +8726,9 @@
           "summary": "Current exact-SHA event-contract and consumer compatibility evidence is absent.",
           "exit_criteria": "Attach deployed SHA, effective event catalog, consumer compatibility smoke, and an observation timestamp."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -8715,19 +8743,19 @@
       "fact_sources": [
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
+          "path": "scripts/testing/run-retired-outbox-contracts.sh"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/post_commit_wake_m4.go"
+          "path": "internal/testutil/legacyoutbox/post_commit_wake_m4.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mongo/standardoutbox/stager.go"
+          "path": "internal/testutil/legacymongooutbox/stager.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/standardoutbox/stager.go"
+          "path": "internal/testutil/legacymysqloutbox/stager.go"
         },
         {
           "kind": "source",
@@ -8739,15 +8767,31 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         },
         {
           "kind": "source",
           "path": "internal/apiserver/infra/answersheetgap/scanner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/reference.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/intent.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/sdk_delivery_subscriber.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/check-production-messaging-deps.py"
         }
       ],
       "verification": [
@@ -8825,6 +8869,9 @@
           "summary": "R4 candidate removes the registered one-time retirement implementations. This active document still requires a source-grounded rewrite; expired command and selector evidence is retained in the original B Git snapshot, not re-labelled as current verification. Runtime and production acceptance remain unknown.",
           "exit_criteria": "Rewrite the document against the retained permanent source and the actual five production exit receipts; preserve historical evidence separately and obtain a fresh document source review."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -8871,11 +8918,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         },
         {
           "kind": "source",
@@ -9211,7 +9258,8 @@
         "Current worker native candidate 8e52d8de7a6bec278a581475211345e4b73ecea4 adds bounded dispatch counts and explicit real runtime fixture. Original bindings retained: {\"source_baseline\": {\"sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"c1d4a79f76fe7f868cfd8320270c80280d24b5bf\", \"verified_on\": \"2026-10-23\"}}. Source/compile/lint and33 two-package race tests verified; docs baseline first failed after new source and is corrected here. Native worker gate still running; historical native/production sources unchanged.",
         "Integrated worker source 9b78c5403f16e77f9a84ba6222e1c572d65d3898. Preserve previous binding {\"source_baseline\": {\"sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"8e52d8de7a6bec278a581475211345e4b73ecea4\", \"verified_on\": \"2026-10-23\"}}. Source8fb35d344 complete MySQL matrix39846389533:3x7,0failure/skip,exact receipts/cleanup verified. First real runtime run39846170583 failed initial paused-delivery observation at1ae0ebd; no race/timeout,all owned cleanup true,root cause remains unknown. New9b78 requires actual per-group receive readiness and safe bounded diagnostics; current development run39848361009 pending,not passed. No production or final T22 assertion.",
         "Current source baseline d85535bc726737a2a8d6e96a6e79128c0fae2b67 including the explicitly tracked native fixture; production code7ffae747096956d36e59461ec706d98acca45fd6 exposes only the existing bounded RocketMQ receive error stream; previous binding retained {\"source_baseline\": {\"sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"9b78c5403f16e77f9a84ba6222e1c572d65d3898\", \"verified_on\": \"2026-10-23\"}}. Integrated candidate adds inert real frozen-wire contract and confirmed half/final seed assertions. Runtime39849972277 still failed first hold with readiness/half/final confirmed,no transport errors or consume outcomes,all owned cleanup; root cause unresolved. Nextd855 fixture observes60s for serial3 logical/max2 physical long polls at one shared slot,records actual latency; fixture RPC/handler3m within host default9m,production unchanged. Source only until native proof; historical checks and production not relabeled.",
-        "Frozen worker source 93968428287c2980c4d73743112bf3bbcad0f6e1 verified by39853362567 onMySQL8.0.36/8.0.44/8.4.11,each11 actual cases (4 workerContainer/runtime/Broker +7 originalMySQL/lease/SIGKILL),0failed/skipped,exact SDK tx.2/no replace,sourceclean andallownedcleanup. Paused observations7504/29776/29804ms; not a production SLA. Original20s andone60s failed observations retained; no claim all earlier scheduling causes resolved. Source/fixture scope is actual worker with owned loopback business RPC,not complete apiserver/provider/system. Prior binding retained {\"baseline\": {\"sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}}. Current73 targetedrace/88docs/lint passed; fullcurrentheadCI/merge still required."
+        "Frozen worker source 93968428287c2980c4d73743112bf3bbcad0f6e1 verified by39853362567 onMySQL8.0.36/8.0.44/8.4.11,each11 actual cases (4 workerContainer/runtime/Broker +7 originalMySQL/lease/SIGKILL),0failed/skipped,exact SDK tx.2/no replace,sourceclean andallownedcleanup. Paused observations7504/29776/29804ms; not a production SLA. Original20s andone60s failed observations retained; no claim all earlier scheduling causes resolved. Source/fixture scope is actual worker with owned loopback business RPC,not complete apiserver/provider/system. Prior binding retained {\"baseline\": {\"sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}, \"verified\": {\"source_sha\": \"d85535bc726737a2a8d6e96a6e79128c0fae2b67\", \"verified_on\": \"2026-10-23\"}}. Current73 targetedrace/88docs/lint passed; fullcurrentheadCI/merge still required.",
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -9254,11 +9302,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         },
         {
           "kind": "source",
@@ -9399,7 +9447,8 @@
         "M3 T24 host observability WIP: actual published tx.4, default /metrics cached collector, original-primary snapshot, initial observation before Producer registration, latched generation review and actual sampler shutdown ownership. Target race, lint and docs pass; native actual dual-owner/Broker guard profile pending. Preserve existing gaps and production evidence; no full old page re-signoff.",
         "QS configured-open startup now uses an independent host startup hold/release; protection no longer turns successful Checker registration into startup failure. Preserve explicit pause made during startup and reject reopening stopped owners. Target race/subsystem and lint passed; configured-open native revision pending. Broker restart fixture warms actual consume-only route readiness before owner registration; no production RPC budget increase. Prior paused-owner native21 pass remains scoped to its original SHA; full473 matrix8.0.44 passes21,8.0.36/8.4.11 fail at next-owner start with fixed other/0 diagnostic, root cause not yet established.",
         "Owned native fixture readiness21e7de: full294 run39948283390 passed21/0/0 on8.0.44 and8.4.11;8.0.36 failed at consume-only Subscribe before new owner registration, cleanup verified, root cause not established. Add bounded read-only signed QueryRoute for all seven physical routes/account roles after actual owned Broker restart before creating any new clients; no executor/half/client startup retries, production RPC timeout change or SDK source mutation. Signature golden/race and tagged lint passed; current exact-SHA native pending. Prior root baseline retained {\"sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Historical native/production evidence is not relabelled.",
-        "Owned readiness09cce run39952347643 passes8.0.36/8.0.44 each21/0/0;8.4.11 fails fixed QueryRoute TOPIC_NOT_FOUND40402 at preflight, before next owner registration; all owned cleanup/parameters restored. This proves missing actual authenticated route readiness, not a MySQL failure or unique explanation of earlier failures. Proxy5.5.1 TopicRouteService caches missing routes and refreshAfterWrite is20s; the previous10-attempt/two-second loop can finish before that first async refresh despite its45s outer context. Correct the read-only owned restart readiness to90s overall/46 attempts with original3s per-query budget. No production SDK timeout,half/executor retry,resource/schema/SDK change. Signature/race and tagged lint passed; corrected exact-source full native pending. Prior root baseline retained {\"sha\": \"21e7de49536ded254c583f0213bec6f8246cb780\", \"verified_on\": \"2026-10-23\"}. Historical evidence unchanged."
+        "Owned readiness09cce run39952347643 passes8.0.36/8.0.44 each21/0/0;8.4.11 fails fixed QueryRoute TOPIC_NOT_FOUND40402 at preflight, before next owner registration; all owned cleanup/parameters restored. This proves missing actual authenticated route readiness, not a MySQL failure or unique explanation of earlier failures. Proxy5.5.1 TopicRouteService caches missing routes and refreshAfterWrite is20s; the previous10-attempt/two-second loop can finish before that first async refresh despite its45s outer context. Correct the read-only owned restart readiness to90s overall/46 attempts with original3s per-query budget. No production SDK timeout,half/executor retry,resource/schema/SDK change. Signature/race and tagged lint passed; corrected exact-source full native pending. Prior root baseline retained {\"sha\": \"21e7de49536ded254c583f0213bec6f8246cb780\", \"verified_on\": \"2026-10-23\"}. Historical evidence unchanged.",
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -9446,11 +9495,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -9528,6 +9577,9 @@
           "summary": "R4 candidate removes the registered one-time retirement implementations. This active document still requires a source-grounded rewrite; expired command and selector evidence is retained in the original B Git snapshot, not re-labelled as current verification. Runtime and production acceptance remain unknown.",
           "exit_criteria": "Rewrite the document against the retained permanent source and the actual five production exit receipts; preserve historical evidence separately and obtain a fresh document source review."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -9574,11 +9626,11 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         }
       ],
       "verification": [
@@ -9637,6 +9689,9 @@
           "summary": "Repository acceptance is not a current exact-SHA production acceptance.",
           "exit_criteria": "Attach deployed SHA, effective configuration, target-environment smoke, operational observations, and an observation timestamp."
         }
+      ],
+      "notes": [
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -9667,7 +9722,7 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4.go"
+          "path": "scripts/testing/run-retired-outbox-contracts.sh"
         },
         {
           "kind": "source",
@@ -9707,15 +9762,31 @@
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+          "path": "internal/testutil/legacyoutbox/supervisor_m4_observe_test.go"
         },
         {
           "kind": "source",
           "path": "internal/apiserver/infra/answersheetgap/scanner.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/reference.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/intent.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/sdk_delivery_subscriber.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/check-production-messaging-deps.py"
         }
       ],
       "verification": [
@@ -9789,7 +9860,8 @@
         }
       ],
       "notes": [
-        "2026-10-29 host-retirement M2 current receipt source review 5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af; prior global baseline {\"sha\": \"46f28f91241ac65c1ac37dd0f09d9e5b548fb143\", \"verified_on\": \"2026-10-29\"}. M1 main merged into the M2 branch; deleted development document stays deleted. Metrics distinguish current command admission, interpretation business ACK and transaction confirmation. Five targeted Go packages and paired probe compilation passed; native MySQL/Broker and production evidence remain separately pending. Historical verification and production/signoff fields unchanged."
+        "2026-10-29 host-retirement M2 current receipt source review 5d3b935bdc986aa51d04868f3a4d8f6b6eeca1af; prior global baseline {\"sha\": \"46f28f91241ac65c1ac37dd0f09d9e5b548fb143\", \"verified_on\": \"2026-10-29\"}. M1 main merged into the M2 branch; deleted development document stays deleted. Metrics distinguish current command admission, interpretation business ACK and transaction confirmation. Five targeted Go packages and paired probe compilation passed; native MySQL/Broker and production evidence remain separately pending. Historical verification and production/signoff fields unchanged.",
+        "2026-10-31 host-retirement M4: retired publication helpers moved to explicit legacy test fixtures, removed profile/supervisor proofs remain bound to immutable f77bd0feb3a3559c0a1bfc5493451ae0fba25c5d via the historical runner. Prior verification and production evidence remain historical, not rerun or transferred to this candidate."
       ]
     },
     {
@@ -10983,7 +11055,24 @@
         "source_sha": "b99c7354ae9677a8911af20cf8da8e626217a033",
         "verified_on": "2026-10-30"
       },
-      "fact_sources": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/reference.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/eventmessage/intent.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/sdk_delivery_subscriber.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/testing/check-production-messaging-deps.py"
+        }
+      ],
       "verification": [],
       "production_evidence": {
         "level": "none",
@@ -11963,7 +12052,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f45c1b26edd73773a6f702a58d6efb377c4af25",
+        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -12686,7 +12775,8 @@
         "2026-10-29 source-only review of current transaction reminder recovery CI delta 936b78ba6fd9bb4baef567bc748bd54a365ac68c; preserve prior source review {\"source_sha\": \"a20223853885d9874b1ab98488a4a954b7de15a0\", \"verified_on\": \"2026-10-29\"}. The workflow adds the stacked M3-B PR base and seven required zero-skip current reminder source/recovery tests on fresh random MySQL databases, including eight source conflicts and concurrent operation uniqueness. Existing migration/offline/metadata selectors, assertions, argv, resources and budgets are unchanged. All historical command/native verification, production evidence and signoff objects retain their original source/date fields and are not re-signed or rerun here.",
         "2026-10-29 M3-C source-only review 1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f; prior verified object {\"source_sha\": \"936b78ba6fd9bb4baef567bc748bd54a365ac68c\", \"verified_on\": \"2026-10-29\"}. Only the CI pull_request base list changed among this document's fact sources, adding the reminder branch as an entry for the stacked recovery PR. Migration resources, clean heads, offline flags, metadata guards and job commands are unchanged. This is a source review, not rerun native/command or production evidence; all historical verification, production, gaps and signoffs retain attribution.",
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
-        "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending."
+        "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -14222,7 +14312,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f45c1b26edd73773a6f702a58d6efb377c4af25",
+        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -14828,7 +14918,8 @@
         "2026-10-29 source-only review of current transaction reminder recovery CI delta 936b78ba6fd9bb4baef567bc748bd54a365ac68c; preserve prior source review {\"source_sha\": \"a20223853885d9874b1ab98488a4a954b7de15a0\", \"verified_on\": \"2026-10-29\"}. The workflow adds the stacked M3-B PR base and seven required zero-skip current reminder source/recovery tests on fresh random MySQL databases, including eight source conflicts and concurrent operation uniqueness. Existing migration/offline/metadata selectors, assertions, argv, resources and budgets are unchanged. All historical command/native verification, production evidence and signoff objects retain their original source/date fields and are not re-signed or rerun here.",
         "2026-10-29 M3-C source-only review 1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f; prior verified object {\"source_sha\": \"936b78ba6fd9bb4baef567bc748bd54a365ac68c\", \"verified_on\": \"2026-10-29\"}. Only the CI pull_request base list changed among this document's fact sources, adding the reminder branch as an entry for the stacked recovery PR. Migration resources, clean heads, offline flags, metadata guards and job commands are unchanged. This is a source review, not rerun native/command or production evidence; all historical verification, production, gaps and signoffs retain attribution.",
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
-        "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending."
+        "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
       ],
       "review_note": " Redis TLS review: the added CA preflight precedes runtime configuration sync; image retention and AI/MQ checks keep their prior behavior. Redis status alone uses the pinned-CA host reader; MySQL/Mongo inventory and metadata branches remain unchanged. This source review does not claim Redis production cutover. Redis host-reader migration removes only the old client-image job. The sixteen remaining job conditions still exclude metadata operations from unrelated jobs; full configcontract tests passed. Reviewed additive make build-maintenance inventory: one new offline future-handoff command; all existing command arguments, code, Docker packaging and historical acceptance unchanged. Prior source review marker preserved: {\"source_sha\": \"5a5095e8786ae667566be1a8eebc0aef76e27ff9\", \"verified_on\": \"2026-10-23\"}. Earlier global source baseline preserved: {\"sha\": \"ad51a102ef19298ef9e1bb2ad8e41986f706268d\", \"verified_on\": \"2026-10-23\"}. This is source review, not a rerun of historical native/production checks. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -14965,7 +15056,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "4f45c1b26edd73773a6f702a58d6efb377c4af25",
+        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
         "verified_on": "2026-10-31"
       },
       "fact_sources": [
@@ -15411,7 +15502,8 @@
         "2026-10-29 source-only review of current transaction reminder recovery CI delta 936b78ba6fd9bb4baef567bc748bd54a365ac68c; preserve prior source review {\"source_sha\": \"a20223853885d9874b1ab98488a4a954b7de15a0\", \"verified_on\": \"2026-10-29\"}. The workflow adds the stacked M3-B PR base and seven required zero-skip current reminder source/recovery tests on fresh random MySQL databases, including eight source conflicts and concurrent operation uniqueness. Existing migration/offline/metadata selectors, assertions, argv, resources and budgets are unchanged. All historical command/native verification, production evidence and signoff objects retain their original source/date fields and are not re-signed or rerun here.",
         "2026-10-29 M3-C source-only review 1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f; prior verified object {\"source_sha\": \"936b78ba6fd9bb4baef567bc748bd54a365ac68c\", \"verified_on\": \"2026-10-29\"}. Only the CI pull_request base list changed among this document's fact sources, adding the reminder branch as an entry for the stacked recovery PR. Migration resources, clean heads, offline flags, metadata guards and job commands are unchanged. This is a source review, not rerun native/command or production evidence; all historical verification, production, gaps and signoffs retain attribution.",
         "2026-10-30 scoped source review4967d83cf5064d46c8493d5853793aef1112da8c; previous verified marker retained as JSON {\"source_sha\": \"1ed7cbdc0aaf240b4c17347b1d4a0af2db16cd1f\", \"verified_on\": \"2026-10-29\"}. The CI diff adds only the two read-only snapshot contract tests to existing Deployment Contracts. The remote-deploy diff accepts an optional exact ACR digest before the existing pull/tag and leaves the original shared lock, retention protection, MQ/material preflight and schema/maintenance paths unchanged. This is source review only: historical command/native/production attribution is not rebound, and no migration, cleanup, runtime activation or production acceptance is claimed.",
-        "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending."
+        "2026-10-30 source-only review 401d0d830818eafe49e7a30122137c1a5fcefd9b: CI adds execution of eleven frozen-revision/config-sync regressions to existing Deployment Contracts; existing native/offline/database selectors and assertions are unchanged. Preserve previous source review {\"source_sha\": \"4967d83cf5064d46c8493d5853793aef1112da8c\", \"verified_on\": \"2026-10-30\"} and global baseline {\"sha\": \"546c7428a6ae605dfe4b8e13f94e6375e1470d06\", \"verified_on\": \"2026-10-30\"}. This is source attribution only, not a re-run or re-signing of historical command/native/production evidence. Local image-retention16 and registry7 passed; local MQ helper suite16/17 passed with one missing-rsync environment failure retained. Final PR/main CI and replica rollout remain pending.",
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
       ],
       "review_note": "RocketMQ ordinary transport, additive audit schema and offline binding reviewed; production and business acceptance remain independently unverified. M4 C06 review is limited to the ci.yml delta: added a disposable production worker Compose render job; existing database migration, offline protection, metadata and required-test jobs are byte-identical. No migration/metadata implementation or production permission changed. This review does not claim their production execution. M4 D04 host material guard source review; prior binding {\"source_sha\": \"4d871f4974e95186f50071590a8bec88e60cbade\", \"verified_on\": \"2026-10-25\"}. Only deployment guard/returned frozen revision and required host call-order tests changed; earlier domain facts and production signoffs retained. Source/local tests pass; real root fault matrix, full CI and production installation separately gated. CD paused.",
       "review_history": [
@@ -15622,8 +15714,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "208fb8ff558c96d4b86227d6fcaa91113c47763a",
-        "verified_on": "2026-10-24"
+        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
+        "verified_on": "2026-10-31"
       },
       "fact_sources": [
         {
@@ -15713,7 +15805,10 @@
           "exit_criteria": "Verify original first bytes/authority/deadline, DB root atomicity, old claimer exclusion, partial/unknown outcomes and cleanup through isolated Actions before production cutover."
         }
       ],
-      "review_note": "Original CLI development run39990541142 on aa977fc790104f636f4d301163a5eb8df6e7831a passed60/0/0 with cleanup. Readonly inventory source208fb8ff has only local pure/race/lint and tagged compile so far; do not reuse the earlier native report for this new behavior. Prior review marker preserved: {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Historical checks retain their own exact source attribution."
+      "review_note": "Original CLI development run39990541142 on aa977fc790104f636f4d301163a5eb8df6e7831a passed60/0/0 with cleanup. Readonly inventory source208fb8ff has only local pure/race/lint and tagged compile so far; do not reuse the earlier native report for this new behavior. Prior review marker preserved: {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Historical checks retain their own exact source attribution.",
+      "notes": [
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
+      ]
     }
   ],
   "initial_review_baseline": {
@@ -19447,11 +19542,27 @@
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe.go"
+            "path": "internal/pkg/messagingruntime/transaction_metrics.go"
           },
           {
             "kind": "source",
-            "path": "internal/apiserver/eventing/standardoutbox/supervisor_m4_observe_test.go"
+            "path": "internal/pkg/messagingruntime/transaction_metrics_http_test.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mysql/eventtransaction/root.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mongo/eventtransaction/root.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/eventing/eventmessage/reference.go"
+          },
+          {
+            "kind": "source",
+            "path": "scripts/testing/check-production-messaging-deps.py"
           }
         ],
         "non_cached_tests": [
@@ -19522,7 +19633,7 @@
         "dimensions": {
           "runtime": {
             "review_state": "conditional",
-            "rationale": "Composition and runtime sources for event, Outbox and MQ delivery exist, but current environment lifecycle behavior is not attested.",
+            "rationale": "Composition and runtime sources for event, Outbox and MQ delivery exist, but current environment lifecycle behavior is not attested. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -19551,7 +19662,7 @@
           },
           "contract": {
             "review_state": "conditional",
-            "rationale": "Versioned repository contracts for event, Outbox and MQ delivery are identifiable, but the full boundary and failure semantics are not yet signed.",
+            "rationale": "Versioned repository contracts for event, Outbox and MQ delivery are identifiable, but the full boundary and failure semantics are not yet signed. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -19580,7 +19691,7 @@
           },
           "data": {
             "review_state": "conditional",
-            "rationale": "Data ownership and failure semantics for event, Outbox and MQ delivery are documented from repository sources, with unresolved environment or historical-state limits.",
+            "rationale": "Data ownership and failure semantics for event, Outbox and MQ delivery are documented from repository sources, with unresolved environment or historical-state limits. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -19609,7 +19720,7 @@
           },
           "security": {
             "review_state": "conditional",
-            "rationale": "Static controls and boundaries for event, Outbox and MQ delivery are source-traceable; runtime negative and effective-configuration evidence remains incomplete.",
+            "rationale": "Static controls and boundaries for event, Outbox and MQ delivery are source-traceable; runtime negative and effective-configuration evidence remains incomplete. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -19638,7 +19749,7 @@
           },
           "test": {
             "review_state": "conditional",
-            "rationale": "Current message-aware relay observation, source-derived store matrix, process and Worker integration regressions plus standardoutbox/subsystem/catalog race pass locally. Real storage/Broker/handoff and effect recovery environment evidence remains unbound.",
+            "rationale": "Current message-aware relay observation, source-derived store matrix, process and Worker integration regressions plus standardoutbox/subsystem/catalog race pass locally. Real storage/Broker/handoff and effect recovery environment evidence remains unbound. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [
               {
                 "kind": "command",
@@ -19680,7 +19791,7 @@
           },
           "operations": {
             "review_state": "conditional",
-            "rationale": "Repository operations paths for event, Outbox and MQ delivery are source-traceable, but no target-environment operation was run and retained.",
+            "rationale": "Repository operations paths for event, Outbox and MQ delivery are source-traceable, but no target-environment operation was run and retained. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [
               {
                 "kind": "source_selector",
@@ -19716,7 +19827,7 @@
           },
           "production": {
             "review_state": "blocked",
-            "rationale": "The linked ledger entries explicitly include this topic, but remain historical, expired for current-state eligibility and without a current effective-config attestation.",
+            "rationale": "The linked ledger entries explicitly include this topic, but remain historical, expired for current-state eligibility and without a current effective-config attestation. Host-retirement M4 anchors current transaction roots, immutable references and executable dependency checks; retained verification/signoff remains historical and is not upgraded by this source review.",
             "evidence": [],
             "gaps": [
               {

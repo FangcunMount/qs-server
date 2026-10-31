@@ -98,3 +98,7 @@ acceptance require separate runtime evidence.
 当前接收器固定为已核验的腾讯云 serverA / Linux AMD64。维护包仅携带该目标所需的 AMD64 二进制，保留原 32 MiB 解包上限；不会通过扩大输入上限容纳无关架构。
 
 M3 宿主验收的旧 Readiness 原生夹具在 CI39941425800 的 dirty_version_rejected 处报 native_readiness_connection_not_released，随后触发父测试 FailNow。该条件同时包含查询失败及剩余线程非零，原记录未区分两者，不能确认具体原因或倒签为连接泄漏/服务端延迟。此次仅修正测试同步假设：client Conn/DB/pool 释放仍须为真，另在原测试 context 内最多一秒观察该自有用户的 server processlist 真正归零；查询错误或超时仍失败，不重跑 reader、不 KILL 连接、不修改任何生产查询预算。reader 显式借用当前子测试；只编译通过，当前 SHA 的完整 required 原生 CI 仍待完成，旧失败不改成成功。
+
+### 2026-10-31 宿主退役 M4 复核
+
+本批未新增或执行数据库迁移、修复、重投或删除。当前发布构建检查三个实际进程的依赖图，禁止 NSQ、发布型 Relay 及历史测试夹具进入生产；旧 Relay runtime closure 明确在固定历史源码运行。重试交接夹具改用中立 `eventmessage` 编码与 Reference 校验，原身份、wire、计划/receipt 格式、原事务原子性与人工恢复权限保持。历史命令和生产证据保留原提交归属，不由本次源码复核补为当前验收。

@@ -385,8 +385,10 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
         "report_status_reporter": ("internal/pkg/reportstatus/reporter.go",),
         "report_status_cache": ("internal/pkg/reportstatus/cache.go",),
         "delivery_replay": ("internal/apiserver/application/systemgovernance/delivery_replay.go",),
-        "mysql_outbox_store": ("internal/apiserver/infra/mysql/standardoutbox/stager.go",),
-        "mongo_outbox_store": ("internal/apiserver/infra/mongo/standardoutbox/stager.go",),
+        "mysql_transaction_root": ("internal/apiserver/infra/mysql/eventtransaction/root.go",),
+        "mongo_transaction_root": ("internal/apiserver/infra/mongo/eventtransaction/root.go",),
+        "immutable_message_reference": ("internal/apiserver/eventing/eventmessage/reference.go",),
+        "production_messaging_graph": ("scripts/testing/check-production-messaging-deps.py",),
         "outbox_atomicity": ("internal/pkg/architecture/uow_outbox_ratchet_test.go",),
     },
     "cache_redis_signal": {
