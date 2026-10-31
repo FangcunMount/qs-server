@@ -102,6 +102,9 @@ func (*m5StartupIAM) ListProfiles(context.Context, *identityv2.ListProfilesReque
 
 // Only fixed technical labels leave the private child log.
 func m5StartupDiagnostic(role, phase string, err error, raw []byte) {
+	if captureErr := encryptM5StartupDiagnostic(role, raw); captureErr != nil {
+		fmt.Println("M5 encrypted fixture diagnostic unavailable")
+	}
 	code := -1
 	if exit, ok := err.(*exec.ExitError); ok {
 		code = exit.ExitCode()
