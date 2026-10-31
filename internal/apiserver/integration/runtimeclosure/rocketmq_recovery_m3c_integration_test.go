@@ -93,6 +93,8 @@ import (
 type m3cChildConfig struct {
 	DSN, MongoURI, MongoDB, Redis, Namespace, Endpoint, Cert, Key, Observer string
 	Marker                                                                  string
+	CA                                                                      string
+	MetricsPort                                                             int
 	Hold                                                                    bool
 }
 
@@ -131,7 +133,11 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 	port, err := strconv.Atoi(rp)
 	require.NoError(t, err)
 	opts := workeroptions.NewOptions()
-	opts.Metrics.Enable = false
+	opts.Metrics.Enable = cfg.MetricsPort > 0
+	opts.Metrics.BindAddress = "127.0.0.1"
+	if cfg.MetricsPort > 0 {
+		opts.Metrics.BindPort = cfg.MetricsPort
+	}
 	opts.Worker.Concurrency = 4
 	opts.Worker.ServiceName = "qs-worker"
 	opts.Worker.EventConfigPath = "../../../../configs/events.yaml"
@@ -160,6 +166,9 @@ func TestM3RecoveryWorkerProcess(t *testing.T) {
 	opts.GRPC.ApiserverAddr = cfg.Endpoint
 	opts.GRPC.Insecure = false
 	opts.GRPC.TLSCAFile = cfg.Cert
+	if cfg.CA != "" {
+		opts.GRPC.TLSCAFile = cfg.CA
+	}
 	opts.GRPC.TLSCertFile = cfg.Cert
 	opts.GRPC.TLSKeyFile = cfg.Key
 	opts.GRPC.TLSServerName = "127.0.0.1"
@@ -1270,7 +1279,7 @@ redelivery:
 	sha, err := exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
 	require.Len(t, cases, 14)
-	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "api_lease_recovery_started": leaseStarted, "api_lease_recovery_drained": true, "report_claim_observed": true, "report_lease_ttl_ms": reportLease.Milliseconds(), "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true, "post_retirement_api_root_ready": true, "post_retirement_collection_root_ready": true, "post_retirement_process_startup_seconds": int(startupDuration.Seconds()) + 1, "post_retirement_retained_fact_counts_unchanged": true, "process_smoke_typed_options_not_CLI_or_system_login": true}
+	receipt := map[string]any{"source_sha": strings.TrimSpace(string(sha)), "passed": len(cases), "failed": 0, "skipped": 0, "cases": cases, "real_redis": true, "proxy_routes_ready": true, "proxy_routes_checked": len(readyTopics), "processing_lease_observed": true, "processing_lease_ttl_ms": processingLease.Milliseconds(), "broker_sigkill": true, "worker_sigkill": true, "controlled_provider": true, "worker_pids_distinct": true, "api_lease_recovery_started": leaseStarted, "api_lease_recovery_drained": true, "report_claim_observed": true, "report_lease_ttl_ms": reportLease.Milliseconds(), "owned_databases_dropped": true, "no_existing_storage": true, "no_production": true, "post_retirement_api_root_ready": true, "post_retirement_collection_root_ready": true, "post_retirement_worker_root_ready": true, "post_retirement_three_roots_concurrently_ready": true, "post_retirement_process_startup_seconds": int(startupDuration.Seconds()) + 1, "post_retirement_retained_fact_counts_unchanged": true, "process_smoke_typed_options_not_CLI_or_system_login": true}
 	rawReceipt, err := json.Marshal(receipt)
 	require.NoError(t, err)
 	fmt.Println("M3C_QS_RECOVERY_RECEIPT " + string(rawReceipt))

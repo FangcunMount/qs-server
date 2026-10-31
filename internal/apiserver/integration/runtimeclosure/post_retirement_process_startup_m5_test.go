@@ -47,6 +47,7 @@ type m5RootConfig struct {
 	Source     string
 	API        *apioptions.Options
 	Collection *collectionoptions.Options
+	Worker     *m3cChildConfig
 }
 
 func TestM5PostRetirementRootChild(t *testing.T) {
@@ -60,13 +61,20 @@ func TestM5PostRetirementRootChild(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &cfg))
 	require.Equal(t, cfg.Source, version.Get().GitCommit, "must use compiled exact source")
 	switch {
-	case cfg.API != nil && cfg.Collection == nil:
+	case cfg.API != nil && cfg.Collection == nil && cfg.Worker == nil:
 		require.True(t, strings.Contains(cfg.API.MySQLOptions.Database, "test"))
 		require.False(t, cfg.API.MigrationOptions.Enabled)
 		viper.Set("mongodb.database", cfg.API.MongoDBOptions.Database)
 		require.NoError(t, apiprocess.Run(&apiconfig.Config{Options: cfg.API}))
-	case cfg.Collection != nil && cfg.API == nil:
+	case cfg.Collection != nil && cfg.API == nil && cfg.Worker == nil:
 		require.NoError(t, collectionprocess.Run(&collectionconfig.Config{Options: cfg.Collection}))
+	case cfg.Worker != nil && cfg.API == nil && cfg.Collection == nil:
+		raw, err := json.Marshal(cfg.Worker)
+		require.NoError(t, err)
+		path := filepath.Join(t.TempDir(), "worker.json")
+		require.NoError(t, os.WriteFile(path, raw, 0600))
+		t.Setenv("QS_M3C_WORKER_CHILD", path)
+		TestM3RecoveryWorkerProcess(t)
 	default:
 		t.Fatal("exactly one owned root required")
 	}
@@ -226,6 +234,10 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 		exited atomic.Bool
 	}
 	start := func(name string, root m5RootConfig, httpPort int) *process {
+		healthPath := "/healthz"
+		if root.Worker != nil {
+			healthPath = "/readyz"
+		}
 		b, e := json.Marshal(root)
 		require.NoError(t, e)
 		p := filepath.Join(private, name+".json")
@@ -262,10 +274,19 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 				t.Fatalf("owned %s exited before health: %v\n%s", name, err, raw)
 			default:
 			}
-			response, e := client.Get(fmt.Sprintf("http://127.0.0.1:%d/healthz", httpPort))
+			response, e := client.Get(fmt.Sprintf("http://127.0.0.1:%d%s", httpPort, healthPath))
 			if e == nil {
+				ready := response.StatusCode == http.StatusOK
+				if root.Worker != nil {
+					var state struct {
+						Summary struct {
+							Ready bool `json:"ready"`
+						} `json:"summary"`
+					}
+					ready = ready && json.NewDecoder(response.Body).Decode(&state) == nil && state.Summary.Ready
+				}
 				_ = response.Body.Close()
-				if response.StatusCode == http.StatusOK {
+				if ready {
 					return child
 				}
 			}
@@ -277,7 +298,21 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 	}
 	ap := start("api", m5RootConfig{Source: sha, API: api}, api.InsecureServing.BindPort)
 	co := start("collection", m5RootConfig{Source: sha, Collection: collection}, collection.InsecureServing.BindPort)
-	for _, p := range []*process{co, ap} {
+	workerConfig := cfg
+	wp := ca.Issue(t, "qs-worker.svc", false)
+	workerConfig.CA = ca.CAFile
+	workerConfig.Cert = wp.CertFile
+	workerConfig.Key = wp.KeyFile
+	workerConfig.Endpoint = collection.GRPCClient.Endpoint
+	workerConfig.MetricsPort = freePort()
+	workerConfig.Hold = false
+	workerConfig.Marker = filepath.Join(private, "post-startup-worker-marker.json")
+	wo := start("worker", m5RootConfig{Source: sha, Worker: &workerConfig}, workerConfig.MetricsPort)
+	// Require all roots to remain alive concurrently before stopping any of them.
+	for _, p := range []*process{wo, co, ap} {
+		require.False(t, p.exited.Load(), "owned root exited before complete process-set observation")
+	}
+	for _, p := range []*process{wo, co, ap} {
 		require.NoError(t, p.cmd.Process.Signal(syscall.SIGTERM))
 		select {
 		case e := <-p.done:
