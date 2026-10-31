@@ -3,7 +3,8 @@ package mongoconsistency
 import (
 	"context"
 	"errors"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -56,13 +57,13 @@ func storedRowFixture(t *testing.T, kind string) standardEventRow {
 	evt := event.New(kind, "Test", "1", struct {
 		OrgID int64 `json:"org_id"`
 	}{1})
-	intents, err := standard.PrepareIntents([]event.DomainEvent{evt}, storedRowTestResolver{}, "api-server")
+	intents, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, storedRowTestResolver{}, "api-server")
 	if err != nil {
 		t.Fatal(err)
 	}
 	msg := intents[0].Message
 	in, fingerprint := msg.Input(), msg.Fingerprint()
-	token, err := bson.Marshal(identity(standard.ReferenceFromMessage(msg)))
+	token, err := bson.Marshal(identity(eventmessage.ReferenceFromMessage(msg)))
 	if err != nil {
 		t.Fatal(err)
 	}

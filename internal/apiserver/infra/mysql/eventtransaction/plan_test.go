@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -28,7 +28,7 @@ func fixtureRequest(key string) port.Request {
 
 func TestPlanPreservesArtifactAndOriginalConsumerWire(t *testing.T) {
 	q := fixtureRequest("frozen")
-	wire, err := standard.EncodeWire(q.Events[0], "api-server")
+	wire, err := eventmessage.EncodeWire(q.Events[0], "api-server")
 	require.NoError(t, err)
 	p, err := freeze(q, fixtureResolver{})
 	require.NoError(t, err)

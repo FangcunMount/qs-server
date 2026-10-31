@@ -18,7 +18,8 @@ import (
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
-	standardoutbox "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -446,7 +447,7 @@ func (s *commitEventStagerStub) PrepareReference(evt event.DomainEvent) (eventev
 	if err != nil {
 		return eventevidence.StandardReference{}, err
 	}
-	return standardoutbox.PrepareReference(evt, eventcatalog.NewCatalog(config), "api-server")
+	return eventmessage.PrepareReference(evt, eventcatalog.NewCatalog(config), "api-server")
 }
 
 type retryCommitRunner struct{}
@@ -502,7 +503,7 @@ func TestCommitCallbackRetryKeepsOriginalEventAndReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, err := standardoutbox.PrepareReference(stager.events[1], eventcatalog.NewCatalog(cfg), "api-server")
+	actual, err := eventmessage.PrepareReference(stager.events[1], eventcatalog.NewCatalog(cfg), "api-server")
 	if err != nil {
 		t.Fatal(err)
 	}

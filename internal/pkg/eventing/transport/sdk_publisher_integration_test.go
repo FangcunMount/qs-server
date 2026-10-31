@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 )
@@ -24,7 +24,7 @@ func TestSDKNSQPublisherRetainsQSApplicationIdentity(t *testing.T) {
 	createNSQTopicAndChannel(t, topic, channel)
 
 	received := make(chan rmtransport.Received, 1)
-	subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
+	subscriber, err := newLegacySDKDeliverySubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"),
 	}, 1, 2, func(_ context.Context, failed legacy.FailedHandoff) error {
 		return fmt.Errorf("unexpected failed handoff for %s", failed.Topic)

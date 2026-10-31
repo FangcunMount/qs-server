@@ -18,11 +18,11 @@ type fastSDKWorkerSubscriber struct {
 	failed func(context.Context, legacy.FailedHandoff) error
 }
 
-func newFastSDKWorkerSubscriber(config SubscriberConfig, attempts int, delay time.Duration, recorder DeadLetterRecorder) (*fastSDKWorkerSubscriber, error) {
+func newFastSDKWorkerSubscriber(config legacySubscriberConfig, attempts int, delay time.Duration, recorder DeadLetterRecorder) (*fastSDKWorkerSubscriber, error) {
 	return newFastSDKWorkerSubscriberWithRetry(config, attempts, rmnsq.Backoff{BaseDelay: delay, MaxDelay: delay}, recorder)
 }
 
-func newFastSDKWorkerSubscriberWithRetry(config SubscriberConfig, attempts int, retry rmnsq.Backoff, recorder DeadLetterRecorder) (*fastSDKWorkerSubscriber, error) {
+func newFastSDKWorkerSubscriberWithRetry(config legacySubscriberConfig, attempts int, retry rmnsq.Backoff, recorder DeadLetterRecorder) (*fastSDKWorkerSubscriber, error) {
 	driver, err := newNSQConfig(config.NSQMessageTimeout)
 	if err != nil {
 		return nil, err

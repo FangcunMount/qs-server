@@ -13,7 +13,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -231,8 +232,8 @@ func (c *committer) recordForExecution(execution transaction.Execution) (*domain
 	if err != nil {
 		return nil, nil, err
 	}
-	ref := standard.ReferenceFromMessage(original)
-	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(original)
+	envelope, err := eventmessage.VerifyReference(consumer, ref.Fingerprint, ref)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -240,7 +241,7 @@ func (c *committer) recordForExecution(execution transaction.Execution) (*domain
 	if json.Unmarshal(envelope.Data, &body) != nil || envelope.AggregateID != in.AssessmentID.String() || body.OrgID != in.OrgID || body.AssessmentID != int64(in.AssessmentID.Uint64()) || body.TesteeID != in.TesteeID || body.OutcomeID != in.ID.String() || body.EvaluationRunID != in.RunID || !body.CommittedAt.Equal(in.EvaluatedAt) {
 		return nil, nil, transaction.ErrInvalidPlan
 	}
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(branches[0].Message), refs[0], domainoutcome.BusinessBindingSHA256(in), in.EvaluatedAt)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(branches[0].Message), refs[0], domainoutcome.BusinessBindingSHA256(in), in.EvaluatedAt)
 	if err != nil {
 		return nil, nil, err
 	}

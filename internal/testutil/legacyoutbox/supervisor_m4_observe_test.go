@@ -1,4 +1,4 @@
-package standardoutbox
+package legacyoutbox
 
 import (
 	"context"

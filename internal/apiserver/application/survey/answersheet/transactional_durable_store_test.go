@@ -8,7 +8,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -236,7 +237,7 @@ func (evidenceTopicResolver) GetTopicForEvent(kind string) (string, bool) {
 	return "test." + kind, true
 }
 func (s *durableStoreStagerStub) PrepareReference(evt event.DomainEvent) (evidence.StandardReference, error) {
-	return standard.PrepareReference(evt, evidenceTopicResolver{}, "api-server")
+	return eventmessage.PrepareReference(evt, evidenceTopicResolver{}, "api-server")
 }
 
 type durableStorePostCommitStub struct {

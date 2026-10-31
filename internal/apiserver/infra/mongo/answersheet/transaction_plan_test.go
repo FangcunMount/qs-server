@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -77,8 +77,8 @@ func TestTransactionSubmissionPlanFreezesBSONAndOriginalWire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	originalRef := standard.ReferenceFromMessage(original)
-	if _, err := standard.VerifyReference(in, originalRef.Fingerprint, originalRef); err != nil {
+	originalRef := eventmessage.ReferenceFromMessage(original)
+	if _, err := eventmessage.VerifyReference(in, originalRef.Fingerprint, originalRef); err != nil {
 		t.Fatal(err)
 	}
 	if originalRef.Fingerprint == proof.Reference.Fingerprint {

@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -142,7 +143,7 @@ func transactionIntent(sheet sourceSheet, row rankExecution) (sourceIntent, erro
 		if branch.ID != ref.BranchID {
 			continue
 		}
-		if standard.ReferenceFromMessage(branch.Message) != proof.Reference {
+		if eventmessage.ReferenceFromMessage(branch.Message) != proof.Reference {
 			return sourceIntent{}, ErrRebuildConflict
 		}
 		in := branch.Message.Input()
@@ -151,8 +152,8 @@ func transactionIntent(sheet sourceSheet, row rankExecution) (sourceIntent, erro
 		if err != nil {
 			return sourceIntent{}, err
 		}
-		wireRef := standard.ReferenceFromMessage(wireMessage)
-		env, err := standard.VerifyReference(in, wireRef.Fingerprint, wireRef)
+		wireRef := eventmessage.ReferenceFromMessage(wireMessage)
+		env, err := eventmessage.VerifyReference(in, wireRef.Fingerprint, wireRef)
 		if err != nil {
 			return sourceIntent{}, err
 		}

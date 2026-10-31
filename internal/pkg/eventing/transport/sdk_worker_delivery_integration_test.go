@@ -32,7 +32,7 @@ func TestSDKWorkerDeliveryPersistsPoisonUnknownAndExhaustion(t *testing.T) {
 	cleanupNSQTopics(t, topic, nsqFailedHandoffTopic(topic, channel))
 	createNSQTopicAndChannel(t, topic, channel)
 
-	subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
+	subscriber, err := newLegacySDKDeliverySubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, 1, 1, SDKFailedHandoffHandler(recorder))
 	if err != nil {

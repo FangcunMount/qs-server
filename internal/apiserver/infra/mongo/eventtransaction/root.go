@@ -5,7 +5,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -79,7 +79,7 @@ func matchReference(e transaction.Execution, proof *evidence.EventEvidenceV2) er
 		}
 		raw, err := transaction.EncodeReference(ref)
 		if err == nil && bytes.Equal(raw, proof.TransactionReference) {
-			if standard.ReferenceFromMessage(branch.Message) != proof.Reference {
+			if eventmessage.ReferenceFromMessage(branch.Message) != proof.Reference {
 				return transaction.ErrBinding
 			}
 			return nil

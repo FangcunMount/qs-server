@@ -15,8 +15,8 @@ import (
 
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
-	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	eventtransport "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
@@ -160,7 +160,7 @@ func runBestEffortRealNSQDelivery(t *testing.T, notificationsConfigured bool) {
 		}
 	}
 	var terminal atomic.Int32
-	subscriber, err := eventtransport.NewSDKDeliverySubscriber(eventtransport.SubscriberConfig{
+	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: lookupAddress, NSQMessageTimeout: 2 * time.Second,
 	}, 1, 2, func(context.Context, legacy.FailedHandoff) error {
 		terminal.Add(1)

@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -26,7 +27,7 @@ func currentGapFixture(t *testing.T) (bson.Raw, sheetRow, sourceExecution, trans
 		Admission: &payload.AssessmentAdmission{Purpose: payload.AdmissionPurposeAssessment, QuestionnaireCode: sheet.QuestionnaireCode, QuestionnaireVersion: sheet.QuestionnaireVer, ModelKind: sheet.Admission.ModelKind, ModelCode: sheet.Admission.ModelCode, ModelVersion: sheet.Admission.ModelVersion, ModelTitle: "frozen title"}}
 	evt := event.New(eventType, "AnswerSheet", "42", data)
 	evt.OccurredAtValue = at
-	wire, err := standard.EncodeWire(evt, "api-server")
+	wire, err := eventmessage.EncodeWire(evt, "api-server")
 	require.NoError(t, err)
 	msg, err := message.New(message.Input{Producer: producer, ID: evt.EventID(), Destination: destination, EventType: eventType, SchemaVersion: "v1", Scope: "org:501", ContentType: "application/json", OccurredAt: at.Format(time.RFC3339Nano), Payload: []byte(`{"version":1,"fixture":"private submission artifact"}`)})
 	require.NoError(t, err)
@@ -36,7 +37,7 @@ func currentGapFixture(t *testing.T) (bson.Raw, sheetRow, sourceExecution, trans
 	require.NoError(t, err)
 	binding, err := eventevidencebinding.AnswerSheet(data)
 	require.NoError(t, err)
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(msg), ref, binding, at)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(msg), ref, binding, at)
 	require.NoError(t, err)
 	sheet.DurableAcceptance.SchemaVersion = 2
 	sheet.DurableAcceptance.EventID = evt.EventID()

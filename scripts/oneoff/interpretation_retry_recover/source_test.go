@@ -13,7 +13,8 @@ import (
 	"time"
 
 	domaininterp "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	interp "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ func validSource(t *testing.T) (sourceSnapshot, time.Time) {
 	now := time.Now().Truncate(time.Millisecond)
 	due, finished, confirmed := now.Add(-time.Minute), now.Add(-2*time.Minute), now.Add(-30*time.Second)
 	evt := domaininterp.NewInterpretationRetryRequestedEvent(domaininterp.RetryRequestedEventInput{OrgID: 7, GenerationID: "1001", RunID: "1002", AssessmentID: "1003", OutcomeID: "1004", TesteeID: 1005, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: due})
-	wire, err := standardoutbox.EncodeWire(evt, "apiserver")
+	wire, err := eventmessage.EncodeWire(evt, "apiserver")
 	if err != nil {
 		t.Fatal(err)
 	}

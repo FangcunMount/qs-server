@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -67,11 +67,11 @@ func freeze(q port.Request, resolver catalog.TopicResolver, owner, revision stri
 	return transaction.NewPlan(transaction.PlanInput{Owner: owner, Scope: scope, OperationID: intents[0].Message.Input().ID, IdempotencyKey: q.Key, InputHash: q.InputHash, Branches: branches})
 }
 
-func prepare(q port.Request, resolver catalog.TopicResolver) ([]standard.PreparedIntent, error) {
+func prepare(q port.Request, resolver catalog.TopicResolver) ([]eventmessage.PreparedIntent, error) {
 	if len(q.Prepared) == 0 {
-		return standard.PrepareIntents(q.Events, resolver, "api-server")
+		return eventmessage.PrepareIntents(q.Events, resolver, "api-server")
 	}
-	result := make([]standard.PreparedIntent, 0, len(q.Prepared))
+	result := make([]eventmessage.PreparedIntent, 0, len(q.Prepared))
 	for _, input := range q.Prepared {
 		topic, ok := resolver.GetTopicForEvent(input.EventType)
 		if !ok || topic != input.Destination {
@@ -87,11 +87,11 @@ func prepare(q port.Request, resolver catalog.TopicResolver) ([]standard.Prepare
 		if err != nil {
 			return nil, err
 		}
-		ref := standard.ReferenceFromMessage(msg)
-		if _, err := standard.VerifyReference(msg.Input(), ref.Fingerprint, ref); err != nil {
+		ref := eventmessage.ReferenceFromMessage(msg)
+		if _, err := eventmessage.VerifyReference(msg.Input(), ref.Fingerprint, ref); err != nil {
 			return nil, err
 		}
-		result = append(result, standard.PreparedIntent{Message: msg})
+		result = append(result, eventmessage.PreparedIntent{Message: msg})
 	}
 	return result, nil
 }
@@ -130,8 +130,8 @@ func artifactBody(p transaction.FrozenPlan, owner, revision string, routes *tran
 		if err != nil {
 			return nil, err
 		}
-		ref := standard.ReferenceFromMessage(original)
-		if _, err := standard.VerifyReference(in, ref.Fingerprint, ref); err != nil {
+		ref := eventmessage.ReferenceFromMessage(original)
+		if _, err := eventmessage.VerifyReference(in, ref.Fingerprint, ref); err != nil {
 			return nil, err
 		}
 		if body != nil && !bytes.Equal(body, a.Body) {

@@ -126,23 +126,6 @@ func buildEventConsumerOptions(cfg *config.Config) map[string]eventsubsystem.Con
 	return result
 }
 
-func buildEventProfileOptions(cfg *config.Config) (eventsubsystem.ProfileOptions, eventsubsystem.ProfileOptions) {
-	if cfg == nil || cfg.OutboxRelay == nil {
-		return eventsubsystem.ProfileOptions{}, eventsubsystem.ProfileOptions{}
-	}
-	mongoProfile := eventsubsystem.ProfileOptions{}
-	assessmentProfile := eventsubsystem.ProfileOptions{}
-	if cfg.OutboxRelay.Mongo != nil {
-		mongoProfile.Interval = cfg.OutboxRelay.Mongo.Interval
-		mongoProfile.PublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
-	}
-	if cfg.OutboxRelay.Assessment != nil {
-		assessmentProfile.Interval = cfg.OutboxRelay.Assessment.Interval
-		assessmentProfile.PublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
-	}
-	return mongoProfile, assessmentProfile
-}
-
 func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 	if s == nil || s.config == nil {
 		return container.ContainerCacheOptions{}

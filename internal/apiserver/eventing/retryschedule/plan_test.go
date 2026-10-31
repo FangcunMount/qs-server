@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -42,7 +42,7 @@ func fixture(t *testing.T, kind string, origin retrygovernance.AttemptOrigin, re
 		base.EventTypeValue, base.AggregateTypeValue, base.AggregateIDValue = catalog.InterpretationRetryRequested, "ReportGeneration", a.SubjectID
 		value = event.Event[outcome.InterpretationRetryRequestedPayload]{BaseEvent: base, Data: outcome.InterpretationRetryRequestedPayload{OrgID: 7, GenerationID: "51", RunID: "61", AssessmentID: "41", OutcomeID: "71", TesteeID: 9, ExpectedAttempt: 1, AttemptOrigin: string(origin), ActionRequestID: request, Mode: "next_attempt", RequestedAt: at}}
 	}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{value}, routes{}, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{value}, routes{}, "api-server")
 	require.NoError(t, err)
 	return a, prepared[0].Message.Input()
 }
@@ -149,7 +149,7 @@ func TestScheduleAcceptsTheActualEvaluationDomainRetryConstructor(t *testing.T) 
 	a, err := assessment.NewAssessment(7, testee.NewID(9), assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-RETRY"), "v1"), assessment.NewAnswerSheetRef(meta.FromUint64(6001)), assessment.NewAdhocOrigin(), assessment.WithID(meta.FromUint64(41)))
 	require.NoError(t, err)
 	evt := assessment.NewEvaluationRetryRequestedEvent(a, 1, retrygovernance.AttemptOriginAutomatic, "", at)
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, routes{}, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, routes{}, "api-server")
 	require.NoError(t, err)
 	authority := Authority{Owner: "qs.mysql", OrgID: 7, Kind: Evaluation, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: [32]byte{1}}
 	frozen, err := New(authority, prepared[0].Message.Input(), at)

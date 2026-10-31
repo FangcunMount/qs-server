@@ -10,7 +10,8 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	submit "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -74,7 +75,7 @@ func freezeSubmission(ctx context.Context, sheet *domain.AnswerSheet, meta submi
 	if meta.RequestID != "" {
 		evt.Data.RequestID = meta.RequestID
 	}
-	wire, err := standard.EncodeWire(evt, "api-server")
+	wire, err := eventmessage.EncodeWire(evt, "api-server")
 	if err != nil {
 		return transaction.FrozenPlan{}, err
 	}
@@ -172,8 +173,8 @@ func readSubmissionPlan(plan transaction.FrozenPlan, routes *transport.RouteReso
 	if err != nil {
 		return nil, "", err
 	}
-	ref := standard.ReferenceFromMessage(original)
-	envelope, err := standard.VerifyReference(m, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(original)
+	envelope, err := eventmessage.VerifyReference(m, ref.Fingerprint, ref)
 	if err != nil {
 		return nil, "", err
 	}
@@ -204,7 +205,7 @@ func materializeSubmission(e transaction.Execution, routes *transport.RouteResol
 	if len(refs) != 1 {
 		return nil, nil, transaction.ErrInvalidPlan
 	}
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(e.Plan.Input().Branches[0].Message), refs[0], binding, po.DurableAcceptance.AcceptedAt)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(e.Plan.Input().Branches[0].Message), refs[0], binding, po.DurableAcceptance.AcceptedAt)
 	if err != nil {
 		return nil, nil, err
 	}

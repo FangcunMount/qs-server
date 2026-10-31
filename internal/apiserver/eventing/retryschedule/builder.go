@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -38,7 +38,7 @@ func (b Builder) Freeze(a Authority, evt event.DomainEvent, d *retrygovernance.D
 		a.AuthorizationSHA256 = hex.EncodeToString(digest[:])
 		a.Authorization = bytes.Clone(raw)
 	}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, b.Resolver, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, b.Resolver, "api-server")
 	if err != nil {
 		return Frozen{}, err
 	}

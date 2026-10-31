@@ -51,8 +51,8 @@ func TestMessagingRejectsRetiredRabbitMQProvider(t *testing.T) {
 	options := NewMessagingOptions()
 	options.Enabled = true
 	options.Provider = "rabbitmq"
-	if !containsOptionError(options.Validate(), "supported: nsq") {
-		t.Fatal("RabbitMQ provider accepted despite NSQ-only support")
+	if !containsOptionError(options.Validate(), "supported: rocketmq") {
+		t.Fatal("RabbitMQ provider accepted despite RocketMQ-only support")
 	}
 }
 

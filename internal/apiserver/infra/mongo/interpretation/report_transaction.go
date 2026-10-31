@@ -13,8 +13,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	run "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	guarded "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventtransaction"
 	schedulestore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
@@ -108,8 +109,8 @@ func (c *TransactionCommitter) readExecution(e transaction.Execution) (frozenRep
 	if err != nil {
 		return f, err
 	}
-	ref := standard.ReferenceFromMessage(m)
-	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(m)
+	envelope, err := eventmessage.VerifyReference(consumer, ref.Fingerprint, ref)
 	if err != nil {
 		return f, err
 	}
@@ -153,7 +154,7 @@ func reportPlanProof(f frozenReportCommit, e transaction.Execution) (*evidence.E
 	if err != nil {
 		return nil, err
 	}
-	return evidence.NewTransactional(standard.ReferenceFromMessage(b.Message), ref, binding, f.At.UTC().Truncate(time.Millisecond))
+	return evidence.NewTransactional(eventmessage.ReferenceFromMessage(b.Message), ref, binding, f.At.UTC().Truncate(time.Millisecond))
 }
 
 func materializeReportCommit(f frozenReportCommit, e transaction.Execution) (*app.CommitResult, *FrozenRunTerminal, error) {

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	outcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
@@ -27,7 +27,7 @@ func plan(t *testing.T) model.Frozen {
 	at := time.Date(2026, 10, 21, 0, 0, 0, 123499999, time.UTC)
 	a := model.Authority{Owner: "qs.mongo", OrgID: 7, Kind: model.Interpretation, SubjectID: "51", RunID: "61", AssessmentID: 41, OutcomeID: 71, TesteeID: 9, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: [32]byte{1}}
 	evt := event.Event[outcome.InterpretationRetryRequestedPayload]{BaseEvent: event.BaseEvent{ID: "retry-first", EventTypeValue: catalog.InterpretationRetryRequested, OccurredAtValue: at, AggregateTypeValue: "ReportGeneration", AggregateIDValue: "51"}, Data: outcome.InterpretationRetryRequestedPayload{OrgID: 7, GenerationID: "51", RunID: "61", AssessmentID: "41", OutcomeID: "71", TesteeID: 9, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: at}}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, testRoutes{}, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, testRoutes{}, "api-server")
 	require.NoError(t, err)
 	f, err := model.New(a, prepared[0].Message.Input(), at)
 	require.NoError(t, err)

@@ -12,8 +12,9 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	schedulemodel "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
@@ -159,8 +160,8 @@ func (c *Committer) readExecution(e transaction.Execution) (frozenFailure, error
 	if err != nil {
 		return f, err
 	}
-	ref := standard.ReferenceFromMessage(m)
-	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(m)
+	envelope, err := eventmessage.VerifyReference(consumer, ref.Fingerprint, ref)
 	if err != nil {
 		return f, err
 	}

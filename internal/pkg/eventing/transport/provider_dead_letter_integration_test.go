@@ -20,8 +20,8 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	rmnsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
@@ -80,7 +80,7 @@ func TestWorkerSettlementThroughNSQPersistsPoisonUnknownAndExhaustion(t *testing
 
 	runtime := &workerSettlementRuntime{topic: topic}
 	observer := &workerSettlementObserver{}
-	subscriber, err := newFastSDKWorkerSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, 2, 20*time.Millisecond, recorder)
 	if err != nil {
@@ -176,7 +176,7 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 
 	var handlerCalls atomic.Int32
 	firstTransportID := make(chan string, 1)
-	subscriber, err := newFastSDKWorkerSubscriberWithRetry(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, 2,
+	subscriber, err := newFastSDKWorkerSubscriberWithRetry(legacySubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, 2,
 		rmnsq.Backoff{BaseDelay: 10 * time.Millisecond, MaxDelay: 20 * time.Millisecond}, recorder)
 
 	if err != nil {
@@ -318,7 +318,7 @@ func TestWorkerUnknownEventRecoversAfterSubscriberRestart(t *testing.T) {
 	createNSQTopicAndChannel(t, topic, channel)
 	runtime := &workerSettlementRuntime{topic: topic}
 	observer := &workerSettlementObserver{}
-	subscriberConfig := SubscriberConfig{
+	subscriberConfig := legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}
 	subscriber, err := newFastSDKWorkerSubscriber(subscriberConfig, 4, 500*time.Millisecond, wrappedRecorder)
@@ -431,7 +431,7 @@ func TestNSQFailedHandoffWaitsForMySQLRecoveryWithoutBusinessRetry(t *testing.T)
 	failedWrites := make(chan error, 4)
 	var businessCalls atomic.Int32
 	var auditCalls atomic.Int32
-	subscriber, err := newFastSDKWorkerSubscriberWithRetry(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriberWithRetry(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, 2, rmnsq.Backoff{BaseDelay: 100 * time.Millisecond, MaxDelay: 100 * time.Millisecond}, deadLetterRecorderFunc(func(ctx context.Context, record DeadLetterRecord) error {
 		auditCalls.Add(1)

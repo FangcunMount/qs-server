@@ -8,7 +8,8 @@ import (
 	evalevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventevidence "github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -28,11 +29,11 @@ func testCommittedReference(t *testing.T, id, assessmentID uint64, eventID strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, eventcatalog.NewCatalog(cfg), "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, eventcatalog.NewCatalog(cfg), "api-server")
 	if err != nil {
 		t.Fatal(err)
 	}
-	reference := standard.ReferenceFromMessage(prepared[0].Message)
+	reference := eventmessage.ReferenceFromMessage(prepared[0].Message)
 	in.CommittedEventEvidence, err = eventevidence.NewStandard(reference, domainoutcome.BusinessBindingSHA256(in))
 	if err != nil {
 		t.Fatal(err)

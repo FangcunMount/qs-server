@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	outcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -196,8 +196,8 @@ func validate(d document) error {
 	if err != nil {
 		return ErrInvalid
 	}
-	ref := standard.ReferenceFromMessage(m)
-	envelope, err := standard.VerifyReference(in, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(m)
+	envelope, err := eventmessage.VerifyReference(in, ref.Fingerprint, ref)
 	if err != nil {
 		return ErrInvalid
 	}

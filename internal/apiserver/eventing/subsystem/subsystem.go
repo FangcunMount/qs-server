@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -15,10 +14,8 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	rmtransport "github.com/FangcunMount/reliable-messaging/transport"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
-	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 )
@@ -41,37 +38,15 @@ type ConsumerOptions struct {
 	Channel string
 }
 
-type ProfileOptions struct {
-	Interval       time.Duration
-	PublishWorkers int
-}
-
 type Options struct {
 	MySQLDB              *gorm.DB
 	MongoDB              *mongo.Database
-	OpsRedis             redis.UniversalClient
 	Catalog              *eventcatalog.Catalog
 	WirePublisher        eventruntime.WirePublisher
 	PublisherMode        eventruntime.PublishMode
-	MySQLLimiter         backpressure.Acquirer
-	MongoLimiter         backpressure.Acquirer
-	Mongo                ProfileOptions
-	Assessment           ProfileOptions
 	SDKSubscriberFactory SDKSubscriberFactory
 	Consumers            map[string]ConsumerOptions
 	Observer             eventobservability.Observer
-}
-
-type profileRuntime struct {
-	name    string
-	binding appEventing.ProfileBinding
-	status  appEventing.NamedOutboxStatusReader
-	// SDK profiles own execution; the host owns bindings and shutdown ordering.
-	run            func(context.Context) error
-	drain          func(context.Context) error
-	drainTimeout   time.Duration
-	runtimeStatus  func() appEventing.ProfileRuntimeStatus
-	statusReporter appEventing.OutboxStatusReporter
 }
 
 type consumerRuntime struct {
@@ -90,14 +65,12 @@ type Subsystem struct {
 	catalog              *eventcatalog.Catalog
 	registry             *eventcatalog.EffectiveRegistry
 	publisher            *eventruntime.RoutingPublisher
-	profiles             map[eventcatalog.OutboxProfile]*profileRuntime
 	consumers            map[string]*consumerRuntime
 	sdkSubscriberFactory SDKSubscriberFactory
 	observer             eventobservability.Observer
 	started              bool
 	closed               bool
 	cancel               context.CancelFunc
-	wg                   sync.WaitGroup
 	closeStarted         bool
 	closeDone            chan struct{}
 	closeErr             error
@@ -106,15 +79,10 @@ type Subsystem struct {
 	transactions         *transactionState
 }
 
-var profileStartOrder = []eventcatalog.OutboxProfile{
-	eventcatalog.OutboxProfileMongoDomain,
-	eventcatalog.OutboxProfileAssessmentMySQL,
-}
-
-// New constructs consumer-only wiring. Durable profiles require the SDK constructor.
+// New constructs consumer-only wiring. Durable hosts require transaction owners.
 func New(opts Options) (*Subsystem, error) {
 	if opts.MongoDB != nil || opts.MySQLDB != nil {
-		return nil, errors.New("durable host databases require standard SDK profiles")
+		return nil, errors.New("durable host databases require transaction owners")
 	}
 	s, err := newBase(opts)
 	if err != nil {
@@ -138,7 +106,6 @@ func newBase(opts Options) (*Subsystem, error) {
 	})
 	s := &Subsystem{
 		catalog: opts.Catalog, registry: registry, publisher: publisher,
-		profiles:             make(map[eventcatalog.OutboxProfile]*profileRuntime),
 		consumers:            make(map[string]*consumerRuntime),
 		sdkSubscriberFactory: opts.SDKSubscriberFactory,
 		observer:             opts.Observer,
@@ -167,11 +134,10 @@ func (s *Subsystem) Catalog() *eventcatalog.Catalog            { return s.catalo
 func (s *Subsystem) Registry() *eventcatalog.EffectiveRegistry { return s.registry }
 func (s *Subsystem) Publisher() event.EventPublisher           { return s.publisher }
 
-func (s *Subsystem) Profile(profile eventcatalog.OutboxProfile) appEventing.ProfileBinding {
-	if s == nil || s.profiles[profile] == nil {
-		return appEventing.ProfileBinding{}
-	}
-	return s.profiles[profile].binding
+// Profile retains the module binding boundary without a publication fallback.
+// Durable module operations require their explicit transaction owner.
+func (s *Subsystem) Profile(_ eventcatalog.OutboxProfile) appEventing.ProfileBinding {
+	return appEventing.ProfileBinding{}
 }
 
 func (s *Subsystem) RegisterConsumer(id string, handler ConsumerHandler) error {
@@ -237,19 +203,6 @@ func (s *Subsystem) Start(parent context.Context) (startErr error) {
 			return err
 		}
 	}
-	profiles := s.orderedProfiles()
-	if s.publisher.IsMQBacked() {
-		for _, profile := range profiles {
-			if profile.run != nil {
-				s.startProfileRun(ctx, profile)
-				if profile.statusReporter != nil {
-					s.startProfileStatus(ctx, profile)
-				}
-				continue
-			}
-
-		}
-	}
 	s.mu.Lock()
 	closed := s.closed
 	s.mu.Unlock()
@@ -257,34 +210,6 @@ func (s *Subsystem) Start(parent context.Context) (startErr error) {
 		return errors.New("event subsystem closed during startup")
 	}
 	return nil
-}
-
-func (s *Subsystem) startProfileRun(ctx context.Context, profile *profileRuntime) {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		if err := profile.run(ctx); err != nil && ctx.Err() == nil {
-			slog.Error("event profile runner exited", "profile", profile.name, "error", err)
-		}
-	}()
-}
-
-func (s *Subsystem) startProfileStatus(ctx context.Context, profile *profileRuntime) {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		profile.statusReporter.ReportOutboxStatus(ctx)
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				profile.statusReporter.ReportOutboxStatus(ctx)
-			}
-		}
-	}()
 }
 
 func (s *Subsystem) startConsumers(ctx context.Context) error {
@@ -399,25 +324,13 @@ func (s *Subsystem) Close() error {
 		<-startDone
 	}
 	s.mu.Lock()
-	profiles := s.orderedProfiles()
 	consumerIDs := s.orderedConsumerIDs()
 	consumers := make([]*consumerRuntime, 0, len(consumerIDs))
 	for _, id := range consumerIDs {
 		consumers = append(consumers, s.consumers[id])
 	}
 	s.mu.Unlock()
-	s.wg.Wait()
 	var closeErrors []error
-	for i := len(profiles) - 1; i >= 0; i-- {
-		if profiles[i].drain != nil {
-			drainCtx, cancelDrain := context.WithTimeout(context.Background(), profiles[i].drainTimeout)
-			err := profiles[i].drain(drainCtx)
-			cancelDrain()
-			if err != nil {
-				closeErrors = append(closeErrors, fmt.Errorf("drain event profile %s: %w", profiles[i].name, err))
-			}
-		}
-	}
 	for i := len(consumers) - 1; i >= 0; i-- {
 		consumer := consumers[i]
 		if consumer.subscriber != nil {
@@ -439,16 +352,6 @@ func (s *Subsystem) Close() error {
 	close(s.closeDone)
 	s.mu.Unlock()
 	return closeErr
-}
-
-func (s *Subsystem) orderedProfiles() []*profileRuntime {
-	profiles := make([]*profileRuntime, 0, len(s.profiles))
-	for _, profile := range profileStartOrder {
-		if runtime := s.profiles[profile]; runtime != nil {
-			profiles = append(profiles, runtime)
-		}
-	}
-	return profiles
 }
 
 func (s *Subsystem) orderedConsumerIDs() []string {
@@ -503,29 +406,8 @@ func (s *Subsystem) runtimeStatusSnapshot() appEventing.RuntimeStatusSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := appEventing.RuntimeStatusSnapshot{
-		Profiles:  make(map[eventcatalog.OutboxProfile]appEventing.ProfileRuntimeStatus, len(s.profiles)),
+		Profiles:  make(map[eventcatalog.OutboxProfile]appEventing.ProfileRuntimeStatus, 0),
 		Consumers: make(map[string]appEventing.ConsumerRuntimeStatus, len(s.consumers)),
-	}
-	for profile, runtime := range s.profiles {
-		status := appEventing.ProfileRuntimeStatus{
-			Running: s.started && !s.closed, RelayEnabled: (runtime.run != nil) && s.publisher.IsMQBacked(),
-			ReconcilerEnabled: false, ImmediateEnabled: false,
-		}
-		if runtime.run != nil {
-			status.RelayKind = "sdk"
-			if runtime.runtimeStatus != nil {
-				actual := runtime.runtimeStatus()
-				status.Running = status.Running && actual.Running
-				status.ScanHealthy = actual.ScanHealthy
-				status.LastFailureKind = actual.LastFailureKind
-				if !status.Running && status.ScanHealthy != nil {
-					off := false
-					status.ScanHealthy = &off
-				}
-			}
-
-		}
-		result.Profiles[profile] = status
 	}
 	for id, consumer := range s.consumers {
 		result.Consumers[id] = appEventing.ConsumerRuntimeStatus{
@@ -535,14 +417,6 @@ func (s *Subsystem) runtimeStatusSnapshot() appEventing.RuntimeStatusSnapshot {
 	return result
 }
 
-func (s *Subsystem) Outboxes() []appEventing.NamedOutboxStatusReader {
-	if s == nil {
-		return nil
-	}
-	outboxes := make([]appEventing.NamedOutboxStatusReader, 0, len(s.profiles))
-	for _, profile := range s.profiles {
-		outboxes = append(outboxes, profile.status)
-	}
-	sort.Slice(outboxes, func(i, j int) bool { return outboxes[i].Name < outboxes[j].Name })
-	return outboxes
-}
+// Outboxes is empty for the current transaction-only host. Historical storage
+// readers are maintenance dependencies, never an active publication profile.
+func (s *Subsystem) Outboxes() []appEventing.NamedOutboxStatusReader { return nil }

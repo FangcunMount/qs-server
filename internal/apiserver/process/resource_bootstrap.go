@@ -16,9 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -41,8 +39,6 @@ type eventSubsystemResourceDeps struct {
 	sdkSubscriberFactory      eventsubsystem.SDKSubscriberFactory
 	buildSDKSubscriberFactory func(*gorm.DB) (eventsubsystem.SDKSubscriberFactory, error)
 	consumers                 map[string]eventsubsystem.ConsumerOptions
-	mongo                     eventsubsystem.ProfileOptions
-	assessment                eventsubsystem.ProfileOptions
 	wirePublisher             eventruntime.WirePublisher
 }
 
@@ -129,18 +125,15 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 				}
 				return func() (eventsubsystem.SDKSubscriber, error) {
 					return eventtransport.NewSDKDeliverySubscriber(config, 0,
-						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKFailedHandoffHandler(recorder, s.config.MessagingOptions.Provider), eventtransport.SDKRocketMQFailureHandler(recorder))
+						s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.SDKRocketMQFailureHandler(recorder))
 				}, nil
 			}
 		}
 	}
-	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
 	return eventSubsystemResourceDeps{
 		newSubsystem:              configuredEventSubsystem(s.config),
 		buildSDKSubscriberFactory: buildSDKSubscriberFactory,
 		consumers:                 buildEventConsumerOptions(s.config),
-		mongo:                     mongoProfile,
-		assessment:                assessmentProfile,
 	}
 }
 
@@ -306,7 +299,7 @@ func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr 
 	}
 
 	deps.eventSubsystem.wirePublisher = wirePublisher
-	events, err = buildResourceEventSubsystem(mysqlDB, mongoDB, cacheSubsystem, eventCatalog, publishMode, resilience, deps.eventSubsystem)
+	events, err = buildResourceEventSubsystem(mysqlDB, mongoDB, eventCatalog, publishMode, deps.eventSubsystem)
 	if err != nil {
 		return resourceOutput{}, err
 	}
@@ -344,24 +337,14 @@ func prepareResources(deps resourceStageDeps) (result resourceOutput, resultErr 
 func buildResourceEventSubsystem(
 	mysqlDB *gorm.DB,
 	mongoDB *mongo.Database,
-	cacheSubsystem *cachebootstrap.Subsystem,
 	catalog *eventcatalog.Catalog,
 	publishMode eventruntime.PublishMode,
-	resilience *resiliencesubsystem.Subsystem,
 	deps eventSubsystemResourceDeps,
 ) (*eventsubsystem.Subsystem, error) {
 	if deps.newSubsystem == nil {
 		return nil, fmt.Errorf("event subsystem constructor is not configured")
 	}
-	var opsRedis redis.UniversalClient
-	if cacheSubsystem != nil {
-		opsRedis = cacheSubsystem.Client(redisruntime.FamilyOps)
-	}
-	var mysqlLimiter, mongoLimiter backpressure.Acquirer
-	if resilience != nil {
-		mysqlLimiter = resilience.Backpressure("mysql")
-		mongoLimiter = resilience.Backpressure("mongo")
-	}
+
 	sdkSubscriberFactory := deps.sdkSubscriberFactory
 	if deps.buildSDKSubscriberFactory != nil {
 		var err error
@@ -371,10 +354,8 @@ func buildResourceEventSubsystem(
 		}
 	}
 	return deps.newSubsystem(eventsubsystem.Options{
-		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
+		MySQLDB: mysqlDB, MongoDB: mongoDB,
 		Catalog: catalog, WirePublisher: deps.wirePublisher, PublisherMode: publishMode,
-		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
-		Mongo: deps.mongo, Assessment: deps.assessment,
 		SDKSubscriberFactory: sdkSubscriberFactory, Consumers: deps.consumers,
 	})
 }

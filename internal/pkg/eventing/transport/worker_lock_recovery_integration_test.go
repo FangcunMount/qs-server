@@ -16,12 +16,12 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventobservability "github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/redisadapter"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -115,7 +115,7 @@ func TestWorkerLockHolderExitRetriesBeforeAck(t *testing.T) {
 	cleanupNSQTopics(t, topic, nsqFailedHandoffTopic(topic, channel))
 	createNSQTopicAndChannel(t, topic, channel)
 	observer := &lockRecoveryObserver{events: make(chan eventobservability.ConsumeEvent, 8)}
-	subscriber, err := newFastSDKWorkerSubscriber(SubscriberConfig{
+	subscriber, err := newFastSDKWorkerSubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, 3, 20*time.Millisecond, recorder)
 	if err != nil {

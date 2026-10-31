@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -32,7 +33,7 @@ func plan(t *testing.T) model.Frozen {
 	at := time.Date(2026, 10, 20, 15, 40, 0, 999999999, time.UTC)
 	a := model.Authority{Owner: "qs.mysql", OrgID: 7, Kind: model.Evaluation, SubjectID: "41", RunID: "41:1", AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, Origin: retrygovernance.AttemptOriginAutomatic, DecisionHash: [32]byte{1}}
 	evt := event.Event[payload.EvaluationRequestedData]{BaseEvent: event.BaseEvent{ID: "retry-first", EventTypeValue: catalog.EvaluationRetryRequested, OccurredAtValue: at, AggregateTypeValue: "Evaluation", AggregateIDValue: "41"}, Data: payload.EvaluationRequestedData{OrgID: 7, AssessmentID: 41, TesteeID: 9, ExpectedAttempt: 1, AttemptOrigin: "automatic", Mode: "next_attempt", RequestedAt: at}}
-	prepared, err := standard.PrepareIntents([]event.DomainEvent{evt}, testRoutes{}, "api-server")
+	prepared, err := eventmessage.PrepareIntents([]event.DomainEvent{evt}, testRoutes{}, "api-server")
 	require.NoError(t, err)
 	f, err := model.New(a, prepared[0].Message.Input(), at)
 	require.NoError(t, err)

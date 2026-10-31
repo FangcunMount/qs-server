@@ -119,9 +119,11 @@ jobs:
         run: |
           go test -tags=integration -run '^$' ./...
 
-      - name: Verify M4 standard Outbox build
+      - name: Verify current RocketMQ host build
         run: |
-          go build -tags=reliable_messaging_m4 ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-worker
+          go build ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-worker
+          go list -deps ./cmd/qs-apiserver ./cmd/collection-server ./cmd/qs-worker > "$RUNNER_TEMP/qs-production-dependencies.txt"
+          python3 scripts/testing/check-production-messaging-deps.py "$RUNNER_TEMP/qs-production-dependencies.txt"
           go test -tags=reliable_messaging_m4 ./internal/apiserver/application/systemgovernance ./internal/apiserver/infra/mysql/systemgovernance ./internal/apiserver/transport/rest ./internal/apiserver/process
           go vet -tags=reliable_messaging_m4 ./internal/apiserver/application/systemgovernance ./internal/apiserver/infra/mysql/systemgovernance ./internal/apiserver/transport/rest ./internal/apiserver/process
 
@@ -1000,17 +1002,14 @@ jobs:
             ./internal/apiserver/infra/mongo/mongoconsistency \
             ./internal/pkg/migration
 
-      - name: Run current runtime closure E2E
+      - name: Preserve historical Relay runtime closure against frozen source
         env:
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_runtime_closure_test
           QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15
         run: |
-          go test -tags=integration \
-            -ldflags "-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$(git rev-parse HEAD)" \
-            -run '^TestCurrentRuntimeClosure$' \
-            -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
+          bash scripts/testing/run-retired-outbox-contracts.sh runtime-closure
 
       - name: Verify hot-rank reconstruction from current transaction facts
         env:

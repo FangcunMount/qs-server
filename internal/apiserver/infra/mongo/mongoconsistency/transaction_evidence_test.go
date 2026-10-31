@@ -7,7 +7,8 @@ import (
 	"time"
 
 	appaudit "github.com/FangcunMount/qs-server/internal/apiserver/application/mongoconsistency"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
@@ -42,7 +43,7 @@ func transactionAuditFixture(t *testing.T) (*Scanner, *evidence.EventEvidenceV2,
 	b := plan.Input().Branches[0]
 	ref, err := plan.Reference(b.ID, 1, "m3-1")
 	require.NoError(t, err)
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(b.Message), ref, strings.Repeat("a", 64), time.Now())
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(b.Message), ref, strings.Repeat("a", 64), time.Now())
 	require.NoError(t, err)
 	owner := auditOwnerStub{plan: plan, fact: &transaction.Evidence{Reference: ref, ExecutionState: transaction.Committed, BranchState: transaction.Committed}, sameDB: true}
 	return &Scanner{transactionOwner: owner}, proof, owner

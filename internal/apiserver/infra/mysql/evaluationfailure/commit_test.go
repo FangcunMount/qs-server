@@ -8,7 +8,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	eventport "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -29,7 +30,7 @@ func (b *fakeBoundary) Reserve(_ context.Context, q eventport.Request) (transact
 	if b.e.Plan.Valid() {
 		return transaction.Reservation{Execution: b.e}, nil
 	}
-	intents, err := standard.PrepareIntents(q.Events, routes{}, "api-server")
+	intents, err := eventmessage.PrepareIntents(q.Events, routes{}, "api-server")
 	require.NoError(b.t, err)
 	require.Len(b.t, intents, 1)
 	in := intents[0].Message.Input()

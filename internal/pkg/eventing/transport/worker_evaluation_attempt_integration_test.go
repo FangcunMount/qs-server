@@ -19,7 +19,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	workermessaging "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
@@ -109,7 +109,7 @@ func TestWorkerDuplicateNSQEvaluationRequestKeepsOneDurableAttempt(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	subscriber, err := NewSDKDeliverySubscriber(SubscriberConfig{
+	subscriber, err := newLegacySDKDeliverySubscriber(legacySubscriberConfig{
 		Provider: "nsq", NSQLookupdAddr: integrationEnv("NSQ_LOOKUPD_ADDR", "127.0.0.1:4161"), NSQMessageTimeout: time.Minute,
 	}, 1, 2, SDKFailedHandoffHandler(recorder))
 	if err != nil {

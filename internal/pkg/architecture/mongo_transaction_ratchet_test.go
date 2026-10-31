@@ -120,9 +120,13 @@ func TestTransactionalMongoRepositoriesDoNotBypassAdmissionPrimitives(t *testing
 	}
 }
 
-func TestMongoOutboxTransactionalStageBindsOriginalSessionToSDK(t *testing.T) {
+func TestMongoTransactionGuardBindsOriginalSessionAndWitness(t *testing.T) {
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal/apiserver/infra/mongo/standardoutbox/stager.go")
+	retired := filepath.Join(root, "internal/apiserver/infra/mongo/standardoutbox/stager.go")
+	if _, err := os.Stat(retired); !os.IsNotExist(err) {
+		t.Fatalf("retired production stager returned: %v", err)
+	}
+	path := filepath.Join(root, "internal/apiserver/infra/mongo/eventtransaction/root.go")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +137,7 @@ func TestMongoOutboxTransactionalStageBindsOriginalSessionToSDK(t *testing.T) {
 			t.Fatalf("%s reintroduces host persistence %q", mustRel(t, root, path), token)
 		}
 	}
-	for _, token := range []string{"ctx.(mongo.SessionContext)", "sdkmongo.Bind(txCtx, s.collection)", "appender.Append(item.Message, when)"} {
+	for _, token := range []string{"mongo.SessionFromContext(ctx)", "o.authority.Bind(mongo.NewSessionContext(ctx, session), e)", "guard.CommitWitness(bound)"} {
 		if !strings.Contains(text, token) {
 			t.Fatalf("%s lost original transaction binding %q", mustRel(t, root, path), token)
 		}

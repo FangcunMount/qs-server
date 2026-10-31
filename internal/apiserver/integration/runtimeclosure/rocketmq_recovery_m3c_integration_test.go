@@ -505,7 +505,7 @@ func TestM3HostRetirementRecovery(t *testing.T) {
 			consumers[c.ID] = eventsubsystem.ConsumerOptions{Enabled: false}
 		}
 	}
-	events, err := eventsubsystem.NewWithTransactionOwners(eventsubsystem.Options{MySQLDB: db, MongoDB: mongoDB, OpsRedis: redisClient, Catalog: routes, WirePublisher: normal, PublisherMode: eventruntime.PublishModeMQ, Consumers: consumers}, &mq)
+	events, err := eventsubsystem.NewWithTransactionOwners(eventsubsystem.Options{MySQLDB: db, MongoDB: mongoDB, Catalog: routes, WirePublisher: normal, PublisherMode: eventruntime.PublishModeMQ, Consumers: consumers}, &mq)
 	require.NoError(t, err)
 	my, mg := events.MySQLTransactionOwner().Binding(), events.MongoTransactionOwner().Binding()
 	_, err = sqlDB.ExecContext(t.Context(), "INSERT INTO rm_tx_binding VALUES(?,?,?,1)", []byte(my.Owner), []byte(my.StoreID), []byte(my.WriterEpoch))

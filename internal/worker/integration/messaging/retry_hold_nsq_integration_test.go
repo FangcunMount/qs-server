@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
+	messagingruntime "github.com/FangcunMount/qs-server/internal/testutil/legacynsq"
 	"github.com/FangcunMount/reliable-messaging/wire/legacy"
 	driver "github.com/nsqio/go-nsq"
 	"github.com/stretchr/testify/require"

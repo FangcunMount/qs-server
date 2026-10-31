@@ -41,7 +41,7 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	subscriberConfig := s.loadedSubscriberConfig()
 	subscriber, err := eventtransport.NewSDKDeliverySubscriber(
 		subscriberConfig, s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(),
-		eventtransport.SDKFailedHandoffHandler(deadLetterRecorder, s.config.Messaging.Provider), eventtransport.SDKRocketMQFailureHandler(deadLetterRecorder),
+		eventtransport.SDKRocketMQFailureHandler(deadLetterRecorder),
 	)
 	if err != nil {
 		return output, err
@@ -105,7 +105,7 @@ func (s *server) consumeOnlyRocketMQ() bool {
 func (s *server) loadedSubscriberConfig() eventtransport.SubscriberConfig {
 	return eventtransport.SubscriberConfig{
 		RocketMQ: s.config.Messaging.RocketMQ, Provider: "rocketmq",
-		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout,
+		HandlerTimeout: s.config.Messaging.NSQMessageTimeout,
 	}
 }
 

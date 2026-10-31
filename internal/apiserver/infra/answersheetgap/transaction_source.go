@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -119,7 +120,7 @@ func currentIntent(sheet sheetRow, row sourceExecution) (outboxRow, recoveryConf
 	}
 	b := input.Branches[0]
 	proof := sheet.DurableAcceptance.TransactionEvidence
-	if standard.ReferenceFromMessage(b.Message) != proof.Reference {
+	if eventmessage.ReferenceFromMessage(b.Message) != proof.Reference {
 		return bad()
 	}
 	in := b.Message.Input()
@@ -128,8 +129,8 @@ func currentIntent(sheet sheetRow, row sourceExecution) (outboxRow, recoveryConf
 	if err != nil {
 		return bad()
 	}
-	wireRef := standard.ReferenceFromMessage(wireMessage)
-	envelope, err := standard.VerifyReference(in, wireRef.Fingerprint, wireRef)
+	wireRef := eventmessage.ReferenceFromMessage(wireMessage)
+	envelope, err := eventmessage.VerifyReference(in, wireRef.Fingerprint, wireRef)
 	if err != nil || !envelope.OccurredAt.Truncate(time.Millisecond).Equal(sheet.DurableAcceptance.AcceptedAt) {
 		return bad()
 	}

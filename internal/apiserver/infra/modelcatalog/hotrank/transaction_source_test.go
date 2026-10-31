@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -27,7 +28,7 @@ func rankTransactionFixtureAt(t *testing.T, id uint64, code string, at time.Time
 	data := payload.AnswerSheetSubmittedData{AnswerSheetID: strconv.FormatUint(id, 10), OrgID: 1, TesteeID: 7, FillerID: 8, QuestionnaireCode: code, QuestionnaireVersion: "v1", SubmittedAt: at}
 	evt := event.New("answersheet.submitted", "AnswerSheet", data.AnswerSheetID, data)
 	evt.OccurredAtValue = at
-	wire, err := standard.EncodeWire(evt, "api-server")
+	wire, err := eventmessage.EncodeWire(evt, "api-server")
 	require.NoError(t, err)
 	msg, err := message.New(message.Input{Producer: "qs-server", ID: evt.EventID(), Destination: "qs.evaluation.lifecycle", EventType: evt.EventType(), SchemaVersion: "v1", Scope: "org:1", ContentType: "application/json", OccurredAt: at.Format(time.RFC3339Nano), Payload: []byte(`{"version":1,"fixture":"frozen business artifact"}`)})
 	require.NoError(t, err)
@@ -37,7 +38,7 @@ func rankTransactionFixtureAt(t *testing.T, id uint64, code string, at time.Time
 	require.NoError(t, err)
 	binding, err := eventevidencebinding.AnswerSheet(data)
 	require.NoError(t, err)
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(msg), ref, binding, at)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(msg), ref, binding, at)
 	require.NoError(t, err)
 	sheet := sourceSheet{ID: id, OrgID: 1, TesteeID: 7, FillerID: 8, QuestionnaireCode: code, QuestionnaireVersion: "v1", FilledAt: at}
 	sheet.DurableAcceptance.SchemaVersion = 2

@@ -13,7 +13,8 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -57,7 +58,7 @@ func (s *outcomeBoundaryStub) Reserve(_ context.Context, q port.Request) (transa
 		return transaction.Reservation{}, s.reserveErr
 	}
 	*s.order = append(*s.order, "reserve")
-	intents, err := standard.PrepareIntents(q.Events, transactionResolver{}, "api-server")
+	intents, err := eventmessage.PrepareIntents(q.Events, transactionResolver{}, "api-server")
 	require.NoError(s.t, err)
 	var branches []transaction.BranchInput
 	for _, intent := range intents {

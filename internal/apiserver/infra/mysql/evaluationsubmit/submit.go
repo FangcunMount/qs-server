@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	repository "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	boundary "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventtransaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationtransaction"
@@ -154,8 +155,8 @@ func (s *Submitter) read(execution transaction.Execution) (*repository.Assessmen
 	if err != nil {
 		return nil, err
 	}
-	ref := standard.ReferenceFromMessage(original)
-	envelope, err := standard.VerifyReference(consumer, ref.Fingerprint, ref)
+	ref := eventmessage.ReferenceFromMessage(original)
+	envelope, err := eventmessage.VerifyReference(consumer, ref.Fingerprint, ref)
 	if err != nil {
 		return nil, err
 	}

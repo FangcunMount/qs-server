@@ -1,4 +1,4 @@
-package messagingruntime
+package legacynsq
 
 import (
 	"context"

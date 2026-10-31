@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"sync/atomic"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -77,7 +77,7 @@ func OriginalPlan(ctx context.Context, primary *sql.DB, proof *evidence.EventEvi
 			return transaction.FrozenPlan{}, err
 		}
 		raw, err := transaction.EncodeReference(ref)
-		if err == nil && bytes.Equal(raw, proof.TransactionReference) && standard.ReferenceFromMessage(b.Message) == proof.Reference {
+		if err == nil && bytes.Equal(raw, proof.TransactionReference) && eventmessage.ReferenceFromMessage(b.Message) == proof.Reference {
 			return root.execution.Plan, nil
 		}
 	}

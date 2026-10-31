@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	standard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	shared "github.com/FangcunMount/qs-server/internal/apiserver/eventing/transactionplan"
 	catalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -71,7 +71,7 @@ func ownerFixture(t *testing.T) (*Owner, *options.MessagingOptions, *mongo.Datab
 	e := transaction.Execution{Plan: plan, Fence: 1, WriterEpoch: "m3-1", Token: [32]byte{1}, LeaseUntil: time.Now().Add(time.Minute)}
 	ref, err := plan.Reference("generated", e.Fence, e.WriterEpoch)
 	require.NoError(t, err)
-	proof, err := evidence.NewTransactional(standard.ReferenceFromMessage(m), ref, strings.Repeat("b", 64), at)
+	proof, err := evidence.NewTransactional(eventmessage.ReferenceFromMessage(m), ref, strings.Repeat("b", 64), at)
 	require.NoError(t, err)
 	return owner, o, db, e, proof
 }
