@@ -279,11 +279,13 @@ func m5StartProcessRoots(t *testing.T, cfg m3cChildConfig) time.Duration {
 				ready := response.StatusCode == http.StatusOK
 				if root.Worker != nil {
 					var state struct {
-						Summary struct {
-							Ready bool `json:"ready"`
-						} `json:"summary"`
+						Redis struct {
+							Summary struct {
+								Ready bool `json:"ready"`
+							} `json:"summary"`
+						} `json:"redis"`
 					}
-					ready = ready && json.NewDecoder(response.Body).Decode(&state) == nil && state.Summary.Ready
+					ready = ready && json.NewDecoder(response.Body).Decode(&state) == nil && state.Redis.Summary.Ready
 				}
 				_ = response.Body.Close()
 				if ready {

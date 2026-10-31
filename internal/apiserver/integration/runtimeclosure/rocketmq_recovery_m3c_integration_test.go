@@ -1250,7 +1250,7 @@ redelivery:
 	require.NoError(t, c.Cleanup())
 	require.NoError(t, normal.Close(t.Context()))
 	protected := map[string]int64{}
-	for _, table := range []string{"assessment", "runtime_checkpoint", "evaluation_outcome", "rm_tx_binding", "rm_tx_request", "rm_tx_execution", "rm_tx_witness", "ai_messaging_archive", "ai_messaging_operations", "ai_messaging_inbox", "ai_messaging_admission", "rm_outbox"} {
+	for _, table := range []string{"assessment", "runtime_checkpoint", "evaluation_outcome", "rm_tx_binding", "rm_tx_request", "rm_tx_execution", "rm_tx_witness", "ai_messaging_archive", "ai_messaging_operations", "ai_messaging_inbox", "ai_messaging_admission", "rm_outbox", "task_opened_reminder_batch", "task_opened_reminder_delivery"} {
 		var count int64
 		require.NoError(t, db.Table(table).Count(&count).Error)
 		protected[table] = count
