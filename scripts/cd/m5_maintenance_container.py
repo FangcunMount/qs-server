@@ -61,7 +61,7 @@ def create_arguments(source, image, operation, env_file):
                  "--label", "com.fangcunmount.qs-m5.source=" + source["Id"],
                  "--user", "2000:2000", "--network", network,
                  "--volumes-from", source["Id"] + ":ro", "--env-file", str(env_file),
-                 "--entrypoint", "/bin/sh"]
+                 "--no-healthcheck", "--entrypoint", "/bin/sh"]
     host = source.get("HostConfig", {})
     for address in host.get("Dns") or []:
         ipaddress.ip_address(address)
@@ -128,6 +128,7 @@ def prepare(image, operation, *, stage=False, docker_prefix=None):
             if (actual["Image"] != image or actual["Config"]["User"] != "2000:2000"
                     or actual["Config"]["Entrypoint"] != ["/bin/sh"]
                     or actual["Config"]["Cmd"] != ["-c", SLEEP]
+                    or actual["Config"].get("Healthcheck", {}).get("Test") != ["NONE"]
                     or actual["Config"]["Labels"].get(LABEL) != operation
                     or any(m.get("RW") for m in actual.get("Mounts", []))):
                 raise ValueError("maintenance shape mismatch; preserve owned container")
@@ -176,6 +177,7 @@ def resolve_inventory_target(owner, default):
             or actual.get("Config", {}).get("User") != "2000:2000"
             or actual["Config"].get("Entrypoint") != ["/bin/sh"]
             or actual["Config"].get("Cmd") != ["-c", SLEEP]
+            or actual["Config"].get("Healthcheck", {}).get("Test") != ["NONE"]
             or actual["Config"].get("Labels", {}).get(LABEL) != operation
             or any(m.get("RW") for m in actual.get("Mounts", []))):
         raise ValueError("maintenance process/image/ownership mismatch")

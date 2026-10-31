@@ -58,6 +58,7 @@ class MaintenanceTransportTest(unittest.TestCase):
         args = m.create_arguments(s, s["Image"], "123-1", "/private/env")
         self.assertEqual(args[-3:], [s["Image"], "-c", m.SLEEP])
         self.assertEqual(args[args.index("--entrypoint") + 1], "/bin/sh")
+        self.assertIn("--no-healthcheck", args)
         self.assertEqual(args[args.index("--volumes-from") + 1], s["Id"] + ":ro")
         self.assertFalse(any("canary" in x or "JWT_SECRET" in x for x in args))
 
@@ -79,7 +80,7 @@ class MaintenanceTransportTest(unittest.TestCase):
     def test_inventory_override_requires_exact_idle_owned_image(self):
         name = "qs-m5-maintenance-123-1"
         actual = dict(Name="/" + name, Image=source()["Image"], State=dict(Running=True),
-                      Config=dict(User="2000:2000", Entrypoint=["/bin/sh"], Cmd=["-c", m.SLEEP],
+                      Config=dict(User="2000:2000", Entrypoint=["/bin/sh"], Cmd=["-c", m.SLEEP], Healthcheck=dict(Test=["NONE"]),
                                   Labels={m.LABEL: "123-1"}), Mounts=[])
         env = dict(QS_MAINTENANCE_CONTAINER=name, QS_MAINTENANCE_IMAGE_ID=source()["Image"],
                    RUNNER_SSH_CONFIG="/private/config", RUNNER_SSH_ALIAS="serverA")
@@ -88,7 +89,7 @@ class MaintenanceTransportTest(unittest.TestCase):
                 self.assertEqual(m.resolve_inventory_target("qs.mysql", "qs-apiserver"), name)
                 self.assertEqual(m.resolve_inventory_target("iam.mysql", "iam-apiserver"), "iam-apiserver")
                 for change in (dict(User="0"), dict(Entrypoint=["/app/qs-apiserver"]),
-                               dict(Labels={m.LABEL: "456-1"})):
+                               dict(Labels={m.LABEL: "456-1"}), dict(Healthcheck=dict(Test=["CMD", "application"]))):
                     bad = copy.deepcopy(actual)
                     bad["Config"].update(change)
                     with patch.object(m.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps([bad]).encode())):
@@ -125,7 +126,7 @@ def native():
         try:
             docker("pull", "alpine:3.22.1")
             base = json.loads(docker("image", "inspect", "alpine:3.22.1"))[0]["RepoDigests"][0]
-            (directory / "Dockerfile").write_text("FROM " + base + '\nENTRYPOINT ["/bin/sh","-c","touch /marker/application-started; exec sleep 2147483647"]\n')
+            (directory / "Dockerfile").write_text("FROM " + base + '\nENTRYPOINT ["/bin/sh","-c","touch /marker/application-started; exec sleep 2147483647"]\nHEALTHCHECK --interval=1s CMD touch /marker/image-health-command\n')
             docker("build", "--network=none", "-t", tag, str(directory))
             made_image = True
             image = json.loads(docker("image", "inspect", tag))[0]["Id"]
@@ -146,6 +147,7 @@ def native():
             assert not receipt["application_started"] and not receipt["database_queried"]
             actual = json.loads(docker("inspect", name))[0]
             assert actual["Path"] == "/bin/sh" and actual["Args"] == ["-c", m.SLEEP]
+            assert actual["Config"]["Healthcheck"]["Test"] == ["NONE"]
             env = docker("exec", name, "sh", "-c", 'printf "%s" "$QS_APISERVER_MYSQL_PASSWORD"')
             assert env == "owned=canary#value"
             assert docker("exec", name, "sh", "-c", 'printf "%s" "${JWT_SECRET:-}"') == ""
@@ -155,15 +157,18 @@ def native():
             denied = subprocess.run(["docker", "exec", name, "sh", "-c", "touch /marker/forbidden"],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
             assert denied.returncode != 0 and not (marker / "forbidden").exists()
+            docker("exec", name, "sh", "-c", "printf owned-marker > /tmp/original-consumed-marker")
             try:
                 m.prepare(image, operation, stage=True, docker_prefix=["docker"])
             except ValueError:
                 pass
             else:
                 raise AssertionError("existing operation was reused")
+            assert docker("exec", name, "cat", "/tmp/original-consumed-marker") == "owned-marker"
             result = dict(fixture_only=True, source_sha=os.environ.get("GITHUB_SHA", "unknown"),
                           base_image=base, source_image_id=image, stopped_source_supported=True,
                           application_not_started=True, private_env_preserved=True,
+                          image_healthcheck_disabled=True, original_private_marker_preserved=True,
                           unrelated_secret_not_copied=True, borrowed_mounts_read_only=True,
                           existing_operation_refused=True, no_database_connections=True)
         finally:
