@@ -11,7 +11,7 @@ import (
 
 const emptyAIPublisherSQLVersion = 111
 
-const emptyPublisherDependenciesQuery = "SELECT /*+ MAX_EXECUTION_TIME(2000) */ (SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.events WHERE event_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.key_column_usage WHERE referenced_table_schema=DATABASE() AND referenced_table_name='ai_messaging_outbox'),@@SESSION.foreign_key_checks"
+const emptyPublisherDependenciesQuery = "SELECT /*+ MAX_EXECUTION_TIME(2000) */ (SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.events WHERE event_schema=DATABASE())+(SELECT COUNT(*) FROM information_schema.key_column_usage WHERE referenced_table_schema=DATABASE() AND referenced_table_name='ai_messaging_outbox')+(SELECT COUNT(*) FROM information_schema.view_table_usage WHERE table_schema=DATABASE() AND table_name='ai_messaging_outbox'),@@SESSION.foreign_key_checks"
 
 // VerifyEmptyAIPublisherDependencies performs only reads. A narrow empty-table
 // retirement cannot discard attached programs or unreviewed schema dependencies;

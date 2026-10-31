@@ -65,6 +65,7 @@ func TestM5EmptyAIPublisherOwnedNativeMySQL(t *testing.T) {
 		ProtectedPreserved    bool     `json:"protected_fixture_facts_preserved"`
 		LockContentionRefused bool     `json:"lock_contention_refused"`
 		TriggerPreserved      bool     `json:"unreviewed_trigger_preserved"`
+		ViewPreserved         bool     `json:"dependent_view_preserved"`
 		Passed                bool     `json:"passed"`
 	}{FixtureOnly: true, ExecutionSource: os.Getenv("GITHUB_SHA"), MySQLVersion: version, NonemptyRejected: []string{}}
 	t.Cleanup(func() {
@@ -189,6 +190,26 @@ func TestM5EmptyAIPublisherOwnedNativeMySQL(t *testing.T) {
 			report.NonemptyRejected = append(report.NonemptyRejected, state)
 		})
 	}
+	t.Run("dependent_view_preserved", func(t *testing.T) {
+		create(t)
+		defer drop(t)
+		if _, err := db.ExecContext(ctx, "CREATE VIEW m5_owned_view AS SELECT producer FROM ai_messaging_outbox"); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := db.ExecContext(ctx, "DROP VIEW m5_owned_view"); err != nil {
+				t.Error(err)
+			}
+		}()
+		if err := run(t); err == nil {
+			t.Fatal("dependent view was accepted")
+		}
+		var count int
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM m5_owned_view").Scan(&count); err != nil || count != 0 {
+			t.Fatal("dependent view broken", err)
+		}
+		report.ViewPreserved = true
+	})
 	t.Run("unreviewed_trigger_preserved", func(t *testing.T) {
 		create(t)
 		defer drop(t)
