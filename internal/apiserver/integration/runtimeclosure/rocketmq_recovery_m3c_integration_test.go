@@ -1192,11 +1192,14 @@ redelivery:
 	runTool(hotTool, 1, nil, toolInput, corruptArgs...)
 	require.Equal(t, float64(1), rank())
 	cases["conflicting_source_refuses_whole_rebuild"] = true
-	for _, table := range []string{"rm_outbox", "ai_messaging_outbox"} {
+	for _, table := range []string{"rm_outbox"} {
 		var count int64
 		require.NoError(t, db.Table(table).Count(&count).Error)
 		require.Zero(t, count)
 	}
+	var retiredPublisherTables int64
+	require.NoError(t, db.Raw("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='ai_messaging_outbox'").Scan(&retiredPublisherTables).Error)
+	require.Zero(t, retiredPublisherTables, "current recovery must work after publisher-table retirement")
 	count, err := mongoDB.Collection("rm_outbox").CountDocuments(t.Context(), bson.M{})
 	require.NoError(t, err)
 	require.Zero(t, count)

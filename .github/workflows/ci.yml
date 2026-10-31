@@ -191,6 +191,16 @@ jobs:
           go test -tags=integration -count=1 -v ./scripts/oneoff/messaging_retirement_inventory -run '^TestRetirementInventoryOwnedNativeMySQL$' | tee "$RUNNER_TEMP/messaging-retirement-native.log"
           grep -q -- '--- PASS: TestRetirementInventoryOwnedNativeMySQL ' "$RUNNER_TEMP/messaging-retirement-native.log"
           if grep -q -- '--- SKIP:' "$RUNNER_TEMP/messaging-retirement-native.log"; then exit 1; fi
+          export QS_M5_NATIVE_REPORT="$RUNNER_TEMP/m5-empty-ai-publisher-native.json"
+          go test -tags=integration -count=1 -v ./internal/pkg/migration -run '^TestM5EmptyAIPublisherOwnedNativeMySQL$' | tee "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"
+          grep -q -- '--- PASS: TestM5EmptyAIPublisherOwnedNativeMySQL ' "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"; then exit 1; fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: m5-empty-ai-publisher-native-${{ github.run_id }}
+          path: ${{ runner.temp }}/m5-empty-ai-publisher-native.json
+          if-no-files-found: warn
 
   metadata-readiness-mongodb-native:
     name: MongoDB Authenticated Native Metadata
