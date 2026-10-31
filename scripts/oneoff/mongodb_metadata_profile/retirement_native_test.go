@@ -42,7 +42,7 @@ func TestRetirementMongoNativeOwnedReplicaSet(t *testing.T) {
 	// This collection belongs exclusively to this already verified CI fixture.
 	nativeCommand(t, admin, "qs", bson.D{{Key: "create", Value: "rm_outbox"}})
 	defer func() { nativeCommand(t, admin, "qs", bson.D{{Key: "drop", Value: "rm_outbox"}}) }()
-	nativeCommand(t, admin, "qs", bson.D{{Key: "insert", Value: "rm_outbox"}, {Key: "documents", Value: bson.A{
+	nativeCommand(t, admin, "qs", bson.D{{Key: "insert", Value: "rm_outbox"}, {Key: "writeConcern", Value: bson.D{{Key: "w", Value: "majority"}, {Key: "wtimeout", Value: 5000}}}, {Key: "documents", Value: bson.A{
 		bson.D{{Key: "state", Value: "published"}}, bson.D{{Key: "state", Value: "PUBLISHED"}}, bson.D{{Key: "state", Value: "published "}}, bson.D{{Key: "state", Value: nil}}, bson.D{{Key: "unrelated", Value: true}}, bson.D{{Key: "state", Value: "future"}}, bson.D{{Key: "state", Value: bson.A{"published"}}},
 	}}})
 	// Use an actual read-only account: the probe cannot insert/update/drop.
