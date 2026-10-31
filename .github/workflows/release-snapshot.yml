@@ -59,6 +59,7 @@ jobs:
     outputs:
       digest: ${{ steps.identity.outputs.digest }}
       mongo_digest: ${{ steps.identity.outputs.mongo_digest }}
+      offline_digest: ${{ steps.identity.outputs.offline_digest }}
     steps:
       - name: Refuse unreviewed source
         env:
@@ -76,16 +77,20 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X main.sourceSHA=$GITHUB_SHA" -o messaging-retirement-inventory ./scripts/oneoff/messaging_retirement_inventory
           go test -count=1 ./scripts/oneoff/mongodb_metadata_profile
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X main.retirementSourceSHA=$GITHUB_SHA" -o messaging-retirement-mongo-inventory ./scripts/oneoff/mongodb_metadata_profile
+          go test -count=1 ./scripts/maintenance/qs-migrate-offline
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X github.com/FangcunMount/qs-server/pkg/version.GitCommit=$GITHUB_SHA" -o qs-migrate-offline ./scripts/maintenance/qs-migrate-offline
       - id: identity
         run: |
           echo "digest=$(sha256sum messaging-retirement-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "mongo_digest=$(sha256sum messaging-retirement-mongo-inventory | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "offline_digest=$(sha256sum qs-migrate-offline | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
           name: messaging-retirement-reader-${{ github.run_id }}
           path: |
             messaging-retirement-inventory
             messaging-retirement-mongo-inventory
+            qs-migrate-offline
           if-no-files-found: error
 
   messaging-inventory:
@@ -110,6 +115,7 @@ jobs:
       INVENTORY_OWNER: ${{ matrix.owner }}
       EXPECTED_DIGEST: ${{ needs.inventory-reader.outputs.digest }}
       EXPECTED_MONGO_DIGEST: ${{ needs.inventory-reader.outputs.mongo_digest }}
+      EXPECTED_OFFLINE_DIGEST: ${{ needs.inventory-reader.outputs.offline_digest }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
@@ -120,6 +126,9 @@ jobs:
         run: bash scripts/cd/setup-runner-ssh.sh
       - name: Read retained messaging facts without changing application or database state
         run: python3 scripts/cd/run-messaging-retirement-inventory.py
+      - name: Inspect the exact canonical offline plan without applying or approving it
+        if: matrix.owner == 'qs.mysql'
+        run: python3 scripts/cd/run-offline-preview.py
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -128,8 +137,9 @@ jobs:
             messaging-retirement-inventory.json
             messaging-retirement-original-ai-publisher.sql
             messaging-retirement-original-ai-publisher.jsonl
+            messaging-retirement-offline-preview.json
           if-no-files-found: error
           retention-days: 30
       - name: Remove owned local key and companion
         if: always()
-        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json messaging-retirement-original-ai-publisher.sql messaging-retirement-original-ai-publisher.jsonl inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" messaging-retirement-inventory.json messaging-retirement-original-ai-publisher.sql messaging-retirement-original-ai-publisher.jsonl messaging-retirement-offline-preview.json inventory-companion/messaging-retirement-inventory inventory-companion/messaging-retirement-mongo-inventory inventory-companion/qs-migrate-offline

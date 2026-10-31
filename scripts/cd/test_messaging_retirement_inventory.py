@@ -168,5 +168,40 @@ class InventoryTransportTest(unittest.TestCase):
                 self.assertEqual(len(closed), 0 if failure == "binding" else 1)
 
 
+class CanonicalOfflinePreviewTest(unittest.TestCase):
+    def test_exact_inspector_cannot_apply_or_accept_failed_or_foreign_output(self):
+        for mode in ("ok", "failed", "foreign", "not-readonly", "malformed"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                previous = Path.cwd()
+                try:
+                    os.chdir(temporary)
+                    Path("inventory-companion").mkdir()
+                    binary = b"owned-inspector"
+                    Path("inventory-companion/qs-migrate-offline").write_bytes(binary)
+                    env = dict(GITHUB_SHA="a" * 40, GITHUB_RUN_ID="12345", EXPECTED_OFFLINE_DIGEST=hashlib.sha256(binary).hexdigest(), RUNNER_SSH_CONFIG="fixture", RUNNER_SSH_ALIAS="fixture")
+                    snapshot = dict(source_sha=("b" if mode == "foreign" else "a") * 40,
+                                    mysql_database="qs", mongo_database="qs", mysql_version=110, mongo_version=44,
+                                    target_mysql_version=111, target_mongo_version=44,
+                                    migration_resources_sha256="c" * 64, mysql_identity_sha256="d" * 64, mongo_cluster_sha256="e" * 64)
+                    error = None
+                    with patch.dict(os.environ, env), patch("subprocess.run", return_value=CompletedProcess([], 1 if mode == "failed" else 0, json.dumps(None if mode == "malformed" else dict(read_only=mode != "not-readonly", snapshot=snapshot)).encode())) as transport:
+                        try:
+                            runpy.run_path(str(SCRIPT.with_name("run-offline-preview.py")), run_name="__main__")
+                        except SystemExit as exc:
+                            error = str(exc)
+                    saved = json.loads(Path("messaging-retirement-offline-preview.json").read_text())
+                    self.assertEqual(saved["inventory_complete"], mode == "ok")
+                    self.assertEqual(error is None, mode == "ok")
+                    command = transport.call_args.args[0][-1]
+                    self.assertIn("--application-env", command)
+                    self.assertNotIn("--apply", command)
+                    self.assertNotIn("--approval", command)
+                    if mode != "ok":
+                        self.assertIsNone(saved["snapshot"])
+                        self.assertIsNone(saved["mutation"])
+                finally:
+                    os.chdir(previous)
+
+
 if __name__ == "__main__":
     unittest.main()

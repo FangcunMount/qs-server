@@ -24,6 +24,8 @@ sha256sum /private/task-owned/qs-migrate-offline
 
 只读JSON输出包含编译SHA、完整up/down资源摘要、实际选中库身份摘要、初始clean版本对和实际嵌入目标head。不会生成批准、查询业务正文、消费批准或证明业务已经冻结。未知、dirty、未来、未声明、低于100/39、pristine或旧对象复现均拒绝。
 
+实际发布准备也可显式传入 `--application-env`，复用所选 QS API 容器的 `QS_APISERVER_*` 数据库与 TLS 环境；此模式要求数据库名与参数一致、VERIFY_IDENTITY/CA 明确，拒绝同时传入独立离线连接串或冲突 TLS 选项。默认仍只读，批准文件及 apply 规则不变。既有 `release-snapshot.yml` 只读盘点入口固定构建并校验此执行器 SHA/digest，以应用 UID 运行无 apply/approval 参数的只读预览，保存真实初始/目标配对、资源和身份摘要；它不签发冻结或写执行许可。
+
 ## 独立文件批准
 
 写执行使用 `--apply --approval-file=<absolute-path> --approval-sha256=<raw-sha256>`。批准是具名责任人审查的原始JSON文件，0600普通文件、单硬链接、无symlink路径；采用与冷启动批准相同的私有文件检查。默认只读模式不接收批准参数。
