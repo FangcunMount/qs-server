@@ -2,6 +2,11 @@ name: Release inspection and verified Worker restore
 on:
   workflow_dispatch:
     inputs:
+      retention_operation:
+        description: Stage reviewed retention files, or install/verify only Worker where existing admin permission allows
+        type: choice
+        options: [none, stage, install-worker, verify-worker]
+        default: none
       ai_sdk_import_only:
         description: Compare default and tmp HOME imports in fixed AI image; no network or app startup
         type: boolean
@@ -44,7 +49,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true && inputs.worker_preflight_only != true && inputs.ai_sdk_import_only != true
+    if: (inputs.retention_operation == 'none' || inputs.retention_operation == '') && inputs.monitoring_only != true && inputs.image_binding_diagnostics != true && inputs.deployment_policy_only != true && inputs.business_observation_only != true && inputs.worker_restore_only != true && inputs.worker_preflight_only != true && inputs.ai_sdk_import_only != true
     environment: production
     runs-on:
       group: qlume
@@ -80,6 +85,50 @@ jobs:
       - name: Cleanup private runner SSH key
         if: always()
         run: rm -f "${RUNNER_SSH_KEY_FILE:-}" release-snapshot.json
+
+  retention-closeout:
+    if: inputs.retention_operation != '' && inputs.retention_operation != 'none'
+    environment: production
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJSON(inputs.retention_operation == 'stage' && '["SVRA","SVRB","SVRD"]' || '["SVRD"]') }}
+    env:
+      RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets[format('{0}_SSH_KEY', matrix.host)] || secrets.SVRA_SSH_KEY }}
+      RUNNER_SSH_HOST: ${{ vars[format('{0}_PUBLIC_HOST', matrix.host)] || secrets[format('{0}_PUBLIC_HOST', matrix.host)] || vars[format('{0}_HOST', matrix.host)] }}
+      RUNNER_SSH_USER: ${{ vars[format('{0}_USERNAME', matrix.host)] }}
+      RUNNER_SSH_PORT: ${{ vars[format('{0}_SSH_PORT', matrix.host)] || '22' }}
+      RUNNER_SSH_ALIAS: retention-closeout-${{ matrix.host }}
+      DEPLOY_NODE_HOSTNAME: ${{ matrix.host == 'SVRA' && 'serverA' || matrix.host == 'SVRB' && 'serverB' || 'serverD' }}
+      RETENTION_OPERATION: ${{ inputs.retention_operation }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          repository: FangcunMount/infra
+          ref: b5f44f27f81ac541f51b903e7431fd82098bda76
+          path: .retention-infra
+      - uses: actions/checkout@v6
+        with:
+          repository: FangcunMount/qs-server
+          ref: 4f45c1b26edd73773a6f702a58d6efb377c4af25
+          path: .retention-qs
+      - name: Establish existing SSH transport
+        run: bash scripts/cd/setup-runner-ssh.sh
+      - name: Run exact bounded retention operation
+        run: python3 scripts/cd/run-retention-closeout.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: retention-closeout-${{ matrix.host }}-${{ github.run_id }}
+          path: retention-closeout.json
+          if-no-files-found: error
+      - name: Remove private runner key and receipt
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" retention-closeout.json
 
   monitoring:
     if: inputs.monitoring_only == true
