@@ -45,6 +45,20 @@ def retention_installation_observation(docker):
         result['installation_policy'] = [line.strip() for line in policy.stdout.splitlines()
             if re.search(r'/(?:usr/)?(?:s?bin)/(?:install|cp|mv|mkdir|chown|chmod|python3)(?:\s|$)', line)
             or re.fullmatch(r'\s*\([^\n]*\)\s*(?:NOPASSWD:\s*)?ALL\s*', line)]
+        # Verify the exact remaining administrator operation rather than infer
+        # it solely from a filtered sudoers listing. Listing never executes it.
+        host = socket.gethostname().split('.')[0]
+        stage = Path('/tmp/qlume-retention-install-41152910653-' + host)
+        account = __import__('pwd').getpwuid(os.getuid()).pw_name
+        if host in ('serverA', 'serverB', 'serverD') and re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}', account):
+            result['exact_install_policy'] = dict(staged_files_present=stage.is_dir(), root_command_executed=False)
+            if stage.is_dir():
+                proposed = ['/bin/bash', str(stage/'install-image-retention.sh'), host, account, str(stage/'image-retention.py'), '--apply']
+                prefix = ['sudo', '-S', '-p', '', '-l', '--'] if password else ['sudo', '-n', '-l', '--']
+                query = subprocess.run(prefix + proposed, input=password+'\n' if password else None,
+                                       capture_output=True, text=True, timeout=15)
+                result['exact_install_policy'].update(returncode=query.returncode, allowed=query.returncode==0,
+                    authentication_required='password is required' in (query.stdout+query.stderr).lower())
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         result['error_type'] = type(error).__name__
     return result
