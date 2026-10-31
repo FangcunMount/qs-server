@@ -50,9 +50,11 @@ class InventoryTransportTest(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             command = calls[0].args[0]
             self.assertEqual(command[:3], ["ssh", "-F", "isolated-config"])
-            self.assertIn("--user 2000:2000", command[-1])
+            self.assertIn("--user " + ("10001:10001" if owner == "ai.mysql" else "2000:2000"), command[-1])
             self.assertIn(container, command[-1])
             self.assertNotIn("PASSWORD", command[-1])
+            if owner == "ai.mysql":
+                self.assertIn("/app/.venv/bin/python -", command[-1])
 
     def test_partial_evidence_is_preserved_but_fails(self):
         error, saved, _ = self.execute(available=False)

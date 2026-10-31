@@ -59,7 +59,7 @@ except Exception as error:
 report['phase']=phase
 print(json.dumps(report))
 """
-    args = ["sudo", "-n", "docker", "exec", "--user", "2000:2000", "-i", containers[owner], "python", "-"]
+    args = ["sudo", "-n", "docker", "exec", "--user", "10001:10001", "-i", containers[owner], "/app/.venv/bin/python", "-"]
 else:
     binary = Path("inventory-companion/messaging-retirement-inventory").read_bytes()
     if hashlib.sha256(binary).hexdigest() != os.environ["EXPECTED_DIGEST"]:
