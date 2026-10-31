@@ -204,3 +204,5 @@ SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRI
 输入和完整主库状态在消费批准前再次实读。只在目标缺失时执行原逐字DDL，完整复核目标和保留资产后，单个SERIALIZABLE根内锁定完整实际111账本，精确DELETE一行并INSERT捕获的完整原110/clean行；事务失败回滚，commit未知保留未知，不重试。最后独立复核全量原对象和110/44。DDL已成功而账本失败时保留实际111 dirty/clean，重新只读检查并另签下一次独立恢复，不手工清dirty。工具不证明全主机排他或首次启动尚未发生；外层必须通过infra `pre-start-repair`及持久首次启动边界调用。任何业务runtime首次启动尝试后禁用旧材料回放，只准111兼容前向修复。
 
 必需真实隔离CI `TestSchemaPairNativeM5RetainedFullBaseline`与`TestSchemaPairNativeM5OriginalRestoreCLI`覆盖完整原字节差异、预算/TTL拒绝、实际独立CLI三种中断、首次启动/停写声明及变化事实拒绝、实际ledger INSERT权限故障后的事务回滚及一次性批准。测试报告严格属于自有数据库，不构成生产恢复验收；实际CI结论按精确提交记录。
+
+原生CLI还必须先与两原SDK同时保持ready，随后确认原SDK正常停止、维护SDK仍活跃，再释放Broker回查并取得正向恢复审计与实际进程退出；该重叠交接是第9个显式必需回执字段，不用“旧owner先死、维护进程再启动”的夹具冒充生产顺序。原消费者13项先独立运行，避免CLI已提交夹具消息污染其pre-commit观察。

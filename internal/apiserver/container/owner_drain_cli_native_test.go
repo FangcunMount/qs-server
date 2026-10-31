@@ -190,9 +190,6 @@ func TestM5OwnerDrainCLI(t *testing.T) {
 			t.Fatal("unknown final did not finish")
 		}
 	}
-	for _, r := range runtimes {
-		require.NoError(t, r.Close(t.Context()))
-	}
 	ownedHostBroker(t, "start")
 	waitOwnedHostTLS(t, opts.RocketMQ)
 	ownedHostBroker(t, "hold-checks")
@@ -259,8 +256,17 @@ func TestM5OwnerDrainCLI(t *testing.T) {
 	}
 	require.Eventually(t, func() bool {
 		s := read()
-		return len(s.Owners) == 2 && s.Owners[0].Protocol.ConfirmationGapBranches > 0 && s.Owners[1].Protocol.ConfirmationGapBranches > 0
+		return len(s.Owners) == 2 && s.Owners[0].SDK.Ready && s.Owners[1].SDK.Ready && s.Owners[0].Protocol.ConfirmationGapBranches > 0 && s.Owners[1].Protocol.ConfirmationGapBranches > 0
 	}, 40*time.Second, 100*time.Millisecond)
+	// Production registers maintenance before stopping the old owners. Prove
+	// both original SDKs are still live, then close them while the independent
+	// CLI retains the last actual Checkers and unresolved primary responsibility.
+	for _, r := range runtimes {
+		require.True(t, r.SDKStats().Ready)
+		require.NoError(t, r.Close(t.Context()))
+		require.True(t, r.SDKStats().Stopped)
+	}
+	require.Eventually(t, func() bool { s := read(); return len(s.Owners) == 2 && s.Owners[0].SDK.Ready && s.Owners[1].SDK.Ready }, 10*time.Second, 100*time.Millisecond)
 	stop := []byte(`{"operation_id":"` + op + `","writers_stopped":true,"replacement_owner_ready":false,"receipt_sha256":"` + strings.Repeat("a", 64) + `"}`)
 	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(statusFile), "stop.json"), stop, 0600))
 	require.NoError(t, command.Process.Signal(syscall.SIGTERM))
@@ -315,7 +321,7 @@ func TestM5OwnerDrainCLI(t *testing.T) {
 	for i := range calls {
 		require.EqualValues(t, 1, calls[i].Load())
 	}
-	receipt, err := json.Marshal(map[string]any{"source_sha": source, "passed": 8, "failed": 0, "skipped": 0, "owner_count": 2, "actual_CLI": true, "config_and_pair_bound": true, "actual_Broker_unknown_final_and_recovery": true, "unresolved_signal_stop_refused": true, "no_new_halves": true, "original_business_facts_single": true, "original110_44_retained": true, "actual_SDK_and_process_exit": true, "production_or_system_acceptance": false})
+	receipt, err := json.Marshal(map[string]any{"source_sha": source, "passed": 9, "failed": 0, "skipped": 0, "owner_count": 2, "actual_CLI": true, "config_and_pair_bound": true, "actual_Broker_unknown_final_and_recovery": true, "unresolved_signal_stop_refused": true, "no_new_halves": true, "original_business_facts_single": true, "original110_44_retained": true, "actual_SDK_and_process_exit": true, "live_original_overlap_before_old_close": true, "production_or_system_acceptance": false})
 	require.NoError(t, err)
 	fmt.Println("M5_QS_OWNER_DRAIN_CLI_RECEIPT " + string(receipt))
 }
