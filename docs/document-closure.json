@@ -14397,7 +14397,7 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
+        "source_sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
         "verified_on": "2026-11-01"
       },
       "fact_sources": [
@@ -14504,6 +14504,26 @@
         {
           "kind": "source",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/ai_activity.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/ai_activity_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/oneoff/mysql_metadata_profile/ai_activity_native_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/mysql-ai-activity.py"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/dbops/test-mysql-ai-activity.py"
         }
       ],
       "verification": [
@@ -15036,7 +15056,8 @@
           "source_sha": "e81878e39d60b5bd116953b3d63326203487ee03",
           "verified_on": "2026-11-01",
           "summary": "Reviewed dedicated M5 admin activity job in exact17-job workflow inventory, all operation/database exclusion combinations and pre-checkout revision/empty archive gate; configcontract race suite passed. Actual readonly admin receipt41225913119 completed on110 with zero active/transaction/metadata lock observations, not a freeze proof."
-        }
+        },
+        "AI246 fixed AI-only readonly source review at 0ba3035e384efe46a1d2a2d3a2a9a851312d36e6; prior {\"source_sha\": \"e81878e39d60b5bd116953b3d63326203487ee03\", \"verified_on\": \"2026-11-01\"} retained. Added separate43/44 observer, original multiline DDL hashing, explicit job inventory exclusion and unchanged old QS/catalog behavior. Local targeted tests only; initial native target_ddl/catalog rejection and source-doc failures retained. No historical/native/production proof advanced."
       ]
     },
     {
