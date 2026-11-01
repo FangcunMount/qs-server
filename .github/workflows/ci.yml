@@ -168,6 +168,7 @@ jobs:
           python3 -B scripts/testing/test-m4-metadata-readiness-native-proof.py
           python3 -B scripts/dbops/test-mysql-metadata-readiness.py
           python3 -B scripts/dbops/test-mysql-m5-activity.py
+          python3 -B scripts/dbops/test-mysql-ai-activity.py
           python3 -B scripts/dbops/test-mysql-retirement-inventory.py
           python3 -B scripts/dbops/test-mysql-metadata-profile.py
           python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
@@ -193,6 +194,10 @@ jobs:
           go test -race -tags=integration -count=1 -timeout=2m -v ./scripts/oneoff/mysql_metadata_profile -run '^TestM5ActivityAdminOwnedNativeMySQL$' | tee "$RUNNER_TEMP/m5-activity-native.log"
           grep -q -- '--- PASS: TestM5ActivityAdminOwnedNativeMySQL ' "$RUNNER_TEMP/m5-activity-native.log"
           if grep -q -- '--- SKIP:' "$RUNNER_TEMP/m5-activity-native.log"; then exit 1; fi
+          export QS_AI_ACTIVITY_NATIVE_PROOF="$RUNNER_TEMP/ai-activity-native.json"
+          go test -race -tags=integration -count=1 -timeout=2m -v ./scripts/oneoff/mysql_metadata_profile -run '^TestAIActivityAdminOwnedNativeMySQL$' | tee "$RUNNER_TEMP/ai-activity-native.log"
+          grep -q -- '--- PASS: TestAIActivityAdminOwnedNativeMySQL ' "$RUNNER_TEMP/ai-activity-native.log"
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/ai-activity-native.log"; then exit 1; fi
           go test -tags=integration -count=1 -v ./scripts/oneoff/messaging_retirement_inventory -run '^TestRetirementInventoryOwnedNativeMySQL$' | tee "$RUNNER_TEMP/messaging-retirement-native.log"
           grep -q -- '--- PASS: TestRetirementInventoryOwnedNativeMySQL ' "$RUNNER_TEMP/messaging-retirement-native.log"
           if grep -q -- '--- SKIP:' "$RUNNER_TEMP/messaging-retirement-native.log"; then exit 1; fi
@@ -200,6 +205,12 @@ jobs:
           go test -tags=integration -count=1 -v ./internal/pkg/migration -run '^TestM5EmptyAIPublisherOwnedNativeMySQL$' | tee "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"
           grep -q -- '--- PASS: TestM5EmptyAIPublisherOwnedNativeMySQL ' "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"
           if grep -q -- '--- SKIP:' "$RUNNER_TEMP/m5-empty-ai-publisher-native.log"; then exit 1; fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ai-activity-native-${{ github.run_id }}
+          path: ${{ runner.temp }}/ai-activity-native.json
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v7
         with:
           name: m5-activity-native-${{ github.run_id }}

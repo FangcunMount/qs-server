@@ -18,6 +18,7 @@ on:
           - metadata-visibility-admin-profile
           - metadata-readiness-admin
           - m5-activity-admin
+          - ai-activity-admin
           - retirement-inventory-admin
           - cbpt-audit
           - cbpt-archive
@@ -91,7 +92,7 @@ permissions:
 # bounded metadata-only operations use the diagnostic group. New/unknown
 # operations default to the production lock; their job must also reject them.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'metadata-readiness-admin' || github.event.inputs.operation == 'm5-activity-admin' || github.event.inputs.operation == 'retirement-inventory-admin' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
+  group: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.operation == 'metadata-visibility-profile' || github.event.inputs.operation == 'metadata-visibility-admin-profile' || github.event.inputs.operation == 'metadata-readiness-admin' || github.event.inputs.operation == 'm5-activity-admin' || github.event.inputs.operation == 'ai-activity-admin' || github.event.inputs.operation == 'retirement-inventory-admin' || github.event.inputs.operation == 'inventory') && 'qs-server-db-metadata-visibility-profile' || 'production-deploy' }}
   cancel-in-progress: false
 
 jobs:
@@ -480,6 +481,97 @@ jobs:
           set -Eeuo pipefail
           [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
           python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --activity --archive "qs-mysql-m5-activity-${GITHUB_RUN_ID}.tar.gz"
+
+  mysql-ai-activity-admin:
+    name: Read Only AI246 Database Activity
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'ai-activity-admin' && github.event.inputs.database == 'mysql'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Validate exact reviewed readiness revision and empty archive input
+        env:
+          PROFILE_REVIEW_SOURCE_SHA: ${{ github.event.inputs.governance_confirm }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$PROFILE_REVIEW_SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$PROFILE_REVIEW_SOURCE_SHA" == "$GITHUB_SHA" ]] || { echo "AI activity source revision mismatch" >&2; exit 1; }
+          [[ -z "$PROFILE_ARCHIVE_INPUT" ]] || { echo "AI activity does not accept backup input" >&2; exit 1; }
+
+      - name: Checkout immutable readiness source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify organization public MySQL policy
+        env:
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+        run: bash scripts/cd/verify-mysql-public-env.sh
+
+      - name: Set up Go for the read-only readiness reader
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check and package read-only readiness reader
+        id: package
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          GOMAXPROCS=2 go test -p=2 -count=1 ./scripts/oneoff/mysql_metadata_profile
+          python3 -B scripts/dbops/test-mysql-ai-activity.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile.py
+          python3 -B scripts/dbops/test-mysql-metadata-profile-ssh.py
+          python3 -B scripts/dbops/test-receipt-transport.py
+          profile_package=$(mktemp -d "$RUNNER_TEMP/ai-activity-package.XXXXXX")
+          trap 'rm -f -- "$profile_package/profile-linux-amd64" "$profile_package/mysql-metadata-profile.py" "$profile_package/mysql-ai-activity.py" "$profile_package/cbpt-cleanup.py" "$profile_package/receipt-transport.py"; rmdir -- "$profile_package"' EXIT
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$profile_package/profile-linux-amd64" ./scripts/oneoff/mysql_metadata_profile
+          cp scripts/dbops/mysql-metadata-profile.py scripts/dbops/mysql-ai-activity.py scripts/dbops/cbpt-cleanup.py scripts/dbops/receipt-transport.py "$profile_package/"
+          profile_archive="ai-mysql-activity-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$profile_archive" -C "$profile_package" profile-linux-amd64 mysql-metadata-profile.py mysql-ai-activity.py cbpt-cleanup.py receipt-transport.py
+          echo "sha256=$(shasum -a 256 "$profile_archive" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Read fixed MySQL metadata and readiness over trusted SSH
+        env:
+          PROFILE_OPERATION: ${{ github.event.inputs.operation }}
+          PROFILE_DATABASE: ${{ github.event.inputs.database }}
+          PROFILE_ARCHIVE_INPUT: ${{ github.event.inputs.backup_name }}
+          PROFILE_SOURCE_SHA: ${{ github.sha }}
+          PROFILE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PROFILE_PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+          PROFILE_EXPECTED_TARGET_HASH: '83cd3186bd7de27e6a5b5aa0effbb3c5673274f65cd5d4635f36fed7304a5463'
+          MYSQL_HOST: ${{ vars.MYSQL_PUBLIC_HOST }}
+          MYSQL_TLS_MODE: ${{ vars.MYSQL_TLS_MODE }}
+          MYSQL_TLS_CA_REF: ${{ vars.MYSQL_TLS_CA_REF }}
+          MYSQL_TLS_CA_FILE: /data/infra/ssl/mysql/ca-chain.pem
+          MYSQL_PORT: ${{ vars.MYSQL_PUBLIC_PORT }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_METADATA_ADMIN_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_METADATA_ADMIN_PASSWORD }}
+          MYSQL_DATABASE: ai
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git rev-parse HEAD)" == "$PROFILE_SOURCE_SHA" ]] || exit 1
+          python3 -B scripts/dbops/mysql-metadata-profile-ssh.py --ai-activity --archive "ai-mysql-activity-${GITHUB_RUN_ID}.tar.gz" | tee ai-admin-observation.armored
+          python3 - <<'PYRECEIPT'
+          import importlib.util,json
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('receipt','scripts/dbops/receipt-transport.py')
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          raw=module.decode_armored_receipt(Path('ai-admin-observation.armored').read_text())
+          Path('ai-admin-observation.json').write_text(raw+'\n')
+          PYRECEIPT
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ai-admin-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ai-admin-observation.json
+          if-no-files-found: error
+          retention-days: 30
 
   mysql-retirement-inventory-admin:
     name: Read Only MySQL Retirement Counts
