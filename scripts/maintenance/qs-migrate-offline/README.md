@@ -211,3 +211,6 @@ SQL111 的直接资源执行会拒绝；只有精确配对驱动在目标表 WRI
 R2首次业务启动后的维护交接必须显式加`--owner-drain-forward`，只接受clean111/44；默认`--owner-drain`仍仅接受原clean110/44，不自动猜版本，也不接受dirty111。二者沿同一原配置/身份/binding及暂停新发送的SDK路径，保持原每实例预算，不执行DDL或账本修复。状态的`forward_only`和`registered_mysql_version`标明模式及注册时验证的SQL head，不代替当前schema复读。新业务首次启动后，协调器继续持原首次启动屏障，先证明111维护Checker真实ready，再停止/替换旧新实例；只用已固定111兼容镜像前向修复，不回放110材料。最后交还ready的业务owner并安全停止维护owner。
 
 原生CLI在原110模式的实际恢复/保留断言之后，由自有SDK夹具显式模拟111头，验证默认入口拒绝、显式forward真实双owner注册/ready/安全退出，且原业务事实保持单次、没有新half或版本改写；此模拟头不计为真实SQL111执行或完整schema-pair验收。完整SQL111与三中断原状恢复由独立真实schema-pair门禁覆盖，不能互相替代。
+
+
+2026-11-01 AI246接续：CI/运输增加独立AI库只读观察及其owned原生fixture，本工具本身的范围、账本/数据契约未改变。旧原生/生产证明保持原版本归属；AI观察不认证停写或允许生产DDL。

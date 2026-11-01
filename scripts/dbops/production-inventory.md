@@ -53,3 +53,6 @@ acceptance require separate runtime evidence.
 `mongodb-metadata-profile.py` 在读取 known_hosts 前后核对同一普通文件的设备、inode、链接数、类型/权限、UID/GID、大小及纳秒级 mtime/ctime。读取本身可能更新 atime，不能将它当作文件被替换的证据；只排除 atime，仍拒绝其它任一稳定字段变化。`O_NOFOLLOW`、原SSH别名/端点、代理与转发拒绝、host key及最终连接约束保持。该本地修复不更改生产SSH设置、凭据或数据库权限。
 
 离线门禁使用任务自己的临时文件复现访问时间更新，并逐项证明九个稳定字段变化仍被拒绝；原路由拒绝用例全部保留。真实MongoDB原生metadata验收仍由required CI执行，离线通过不表示已读取生产。
+
+
+2026-11-01 AI246接续：CI/运输增加独立AI库只读观察及其owned原生fixture，本工具本身的范围、账本/数据契约未改变。旧原生/生产证明保持原版本归属；AI观察不认证停写或允许生产DDL。
