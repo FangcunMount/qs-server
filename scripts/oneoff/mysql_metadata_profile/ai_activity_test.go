@@ -48,7 +48,7 @@ func mockAIActivity(t *testing.T, head string, denied bool) aiActivityReceipt {
 	m.ExpectQuery(aiTargetPresenceSQL).WillReturnRows(readinessRowsFixture(1, []any{present}))
 	if present == 1 {
 		m.ExpectQuery("SELECT /*+ MAX_EXECUTION_TIME(2000) */ COUNT(*) FROM messaging_outbox").WillReturnRows(readinessRowsFixture(1, []any{7}))
-		m.ExpectQuery("SHOW CREATE TABLE messaging_outbox").WillReturnRows(readinessRowsFixture(2, []any{"messaging_outbox", "CREATE TABLE messaging_outbox(id INT)"}))
+		m.ExpectQuery("SHOW CREATE TABLE messaging_outbox").WillReturnRows(readinessRowsFixture(2, []any{"messaging_outbox", "CREATE TABLE messaging_outbox(\n id INT\n)"}))
 	}
 	m.ExpectQuery("SELECT /*+ MAX_EXECUTION_TIME(2000) */ COUNT(*) FROM performance_schema.setup_instruments WHERE NAME='wait/lock/metadata/sql/mdl' AND ENABLED='YES'").WillReturnRows(readinessRowsFixture(1, []any{1}))
 	m.ExpectQuery("SELECT /*+ MAX_EXECUTION_TIME(2000) */ THREAD_ID FROM performance_schema.threads WHERE PROCESSLIST_ID=?").WithArgs(uint64(10)).WillReturnRows(readinessRowsFixture(1, []any{20}))

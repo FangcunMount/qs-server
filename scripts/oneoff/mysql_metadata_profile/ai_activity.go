@@ -10,6 +10,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/mysqltls"
 	"github.com/go-sql-driver/mysql"
@@ -191,14 +192,12 @@ func probeAIActivity(ctx context.Context, db *sql.DB, cfg connection, b binding)
 			return failAIActivity(r, "metadata_invalid", "target_rows", nil)
 		}
 		targetRows = &count
-		ddl, ok := read("SHOW CREATE TABLE messaging_outbox", "target_ddl", 2)
-		if !ok {
-			return r
+		r.QueryCount++
+		ddl, err := aiTargetDDL(ctx, c)
+		if err != nil {
+			return failAIActivity(r, "query_failed", "target_ddl", err)
 		}
-		if len(ddl) != 1 || !ddl[0][0].Valid || ddl[0][0].String != "messaging_outbox" || !ddl[0][1].Valid || ddl[0][1].String == "" {
-			return failAIActivity(r, "metadata_invalid", "target_ddl", nil)
-		}
-		sha := sha256.Sum256([]byte(ddl[0][1].String))
+		sha := sha256.Sum256([]byte(ddl))
 		text := hex.EncodeToString(sha[:])
 		targetDDL = &text
 	}
@@ -263,6 +262,39 @@ func probeAIActivity(ctx context.Context, db *sql.DB, cfg connection, b binding)
 	r.FailureStage = "none"
 	return r
 }
+
+// SHOW CREATE contains literal linefeeds. Keep the old strict catalog reader
+// unchanged; hash this one bounded original DDL in RAM without publishing it.
+func aiTargetDDL(ctx context.Context, c *sql.Conn) (ddl string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, queryLimit)
+	defer cancel()
+	rows, e := c.QueryContext(ctx, "SHOW CREATE TABLE messaging_outbox")
+	if e != nil {
+		return "", readinessQueryError(e)
+	}
+	defer func() {
+		if rows.Close() != nil {
+			ddl = ""
+			err = errors.New("metadata_release_failed")
+		}
+	}()
+	columns, e := rows.Columns()
+	if e != nil || len(columns) != 2 || !rows.Next() {
+		return "", errors.New("metadata_invalid")
+	}
+	var name string
+	if rows.Scan(&name, &ddl) != nil || name != "messaging_outbox" || ddl == "" || len(ddl) > 65536 || !utf8.ValidString(ddl) || strings.ContainsRune(ddl, 0) {
+		return "", errors.New("metadata_invalid")
+	}
+	if rows.Next() {
+		return "", errors.New("metadata_invalid")
+	}
+	if e = rows.Err(); e != nil {
+		return "", readinessQueryError(e)
+	}
+	return ddl, nil
+}
+
 func runAIActivity(get func(string) string, out io.Writer) int {
 	_ = mysql.SetLogger(&mysql.NopLogger{})
 	b := binding{SHA: get("PROFILE_SOURCE_SHA"), RunID: get("PROFILE_RUN_ID"), Expected: get("PROFILE_EXPECTED_TARGET_HASH")}

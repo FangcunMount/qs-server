@@ -98,7 +98,7 @@ func TestAIActivityAdminOwnedNativeMySQL(t *testing.T) {
 	}
 	before := read()
 	if before.Measurements.SchemaHead != aiHead43 || before.Measurements.TargetRows == nil || *before.Measurements.TargetRows != 1 || before.Measurements.Counts["target_view_dependencies"] != 1 {
-		t.Fatal("original110 not observed")
+		t.Fatal("original43 or actual view dependency not observed")
 	}
 	locker, e := db.Conn(ctx)
 	if e != nil {
