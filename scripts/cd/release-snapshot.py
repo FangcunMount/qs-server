@@ -7,7 +7,10 @@ import re
 import socket
 import subprocess
 
-NAMES = re.compile(r"(?:qs-(?:apiserver|collection.*|worker.*|ai|operating-system)|iam-apiserver|qs-ops|ops|prometheus|grafana|nginx)(?:-\d+)?$")
+NAMES = re.compile(
+    r"(?:qs-(?:apiserver|collection.*|worker.*|ai|operating-system)|iam-apiserver|qs-ops|ops|prometheus|grafana|nginx)(?:-\d+)?$"
+    r"|qs-m5-[0-9a-f]{12}-(?:apiserver|worker|collection)-[1-9][0-9]*$"
+)
 
 
 def command(*args):
