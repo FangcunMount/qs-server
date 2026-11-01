@@ -45,3 +45,6 @@ M4 实际部署和回读完成前不执行现网核对。即使报告完整且�
 既有 Deployment Contracts CI 另在独占Docker资源中验证真正停止的源容器仍可建立维护传输，UID/秘密筛选/挂载只读/原应用入口不运行/旧操作拒复用和自有资源释放。该测试不启动数据库、不证明生产sudo权限或停写，不计入原生业务14项。
 
 维护窗口的事务观察使用同一 `qs-migrate-offline --protocol-observation`，见[现有维护入口说明](../../maintenance/qs-migrate-offline/README.md#m5-事务凭证只读观察)。工作流显式选择 `messaging_retirement_inventory=true` 与 `protocol_observation=true`，在QS MySQL作业中依次执行原schema预览和独立协议观察。非零计数保存，读取失败不可冒充零；不签发停写或迁移批准。
+
+
+2026-11-01 AI246接续：CI/运输增加独立AI库只读观察及其owned原生fixture，本工具本身的范围、账本/数据契约未改变。旧原生/生产证明保持原版本归属；AI观察不认证停写或允许生产DDL。
