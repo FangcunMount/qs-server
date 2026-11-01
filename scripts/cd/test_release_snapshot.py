@@ -11,6 +11,33 @@ spec.loader.exec_module(module)
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_m5_six_runtime_instances_are_included_without_maintenance_or_lookalikes(self):
+        names = ['qs-m5-4620d11e2cff-apiserver-1']
+        names += [f'qs-m5-4620d11e2cff-worker-{n}' for n in range(1, 4)]
+        names += [f'qs-m5-4620d11e2cff-collection-{n}' for n in range(1, 3)]
+        excluded = ['qs-m5-maintenance-41209612364-1',
+                    'qs-m5-4620d11e2cff-worker-0',
+                    'qs-m5-4620d11e2cff-unknown-1',
+                    'qs-m5-4620d11e2cff-worker-1-extra']
+        inventory = ''.join(f'id{n} {name}\n' for n, name in enumerate(names + excluded))
+        def command(*args):
+            if args[1] == 'version': return '29.0'
+            if args[1] == 'ps': return inventory
+            if args[1] == 'inspect':
+                return json.dumps({'Image': 'sha256:'+'a'*64,
+                                   'Config': {'Image': 'sha256:'+'a'*64},
+                                   'State': {'Running': True}, 'Mounts': []})
+            if args[1:3] == ('image', 'inspect'):
+                return json.dumps({'Os': 'linux', 'Architecture': 'amd64',
+                                   'RepoDigests': [], 'Config': {'Labels': {
+                                       'org.opencontainers.image.revision': '4620d11e2cff'+'b'*28}}})
+            self.fail('Unapproved command')
+        with patch.object(module, 'command', command), patch.object(module.Path, 'is_file', return_value=False):
+            result = module.collect()
+        self.assertEqual([row['name'] for row in result['containers']], names)
+        self.assertTrue(result['read_only'])
+        self.assertFalse(result['business_acceptance_verified'])
+
     def test_inventory_exports_only_selected_fields_and_never_invokes_writes(self):
         calls = []
         def command(*args):
