@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-    "verified_on": "2026-11-01"
+    "sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+    "verified_on": "2026-11-09"
   },
   "status_policy": {
     "doc_status": [
@@ -12113,8 +12113,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-        "verified_on": "2026-11-01"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -13529,8 +13529,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
-        "verified_on": "2026-10-24"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -14399,8 +14399,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-        "verified_on": "2026-11-01"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -15192,8 +15192,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-        "verified_on": "2026-11-01"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -15711,8 +15711,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
-        "verified_on": "2026-10-24"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -15816,8 +15816,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "43a87f3fa735faa357e933c8d00e294004d6e8a6",
-        "verified_on": "2026-10-26"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -15906,8 +15906,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
-        "verified_on": "2026-10-31"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
@@ -16008,8 +16008,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-        "verified_on": "2026-11-01"
+        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
+        "verified_on": "2026-11-09"
       },
       "fact_sources": [
         {
