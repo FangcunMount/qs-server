@@ -4,8 +4,10 @@ package transaction_test
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -227,6 +229,10 @@ func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Sto
 	gaps, err := mysqlreplay.NewGapRecoveryLedger(pool)
 	require.NoError(t, err)
 
+	if os.Getenv("QS_F06_VERIFY_RESTRICTED_READER") == "1" {
+		verifyMySQLArchiveReaderGrants(t, pool)
+	}
+
 	// Live governance must observe current work even while a valid archive exists.
 	exec("UPDATE rm_outbox SET state='retry_wait' WHERE message_id=?", eventID)
 	live, err := status.ReadOutboxGovernance(ctx, org)
@@ -263,6 +269,34 @@ func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Sto
 	require.EqualValues(t, 1, summary.Authorized)
 	require.Zero(t, summary.WaitingRelay)
 
+	// Publish a fixture-only concurrent state change after the archive gate.
+	// Its later commit must not leak through the accepted read snapshot.
+	state, err := outboxhistory.ReadOperational(ctx, pool, func(tx *sql.Tx, source string) (string, error) {
+		require.Equal(t, outboxhistory.View, source)
+		exec("UPDATE isolated_outbox_history_rows SET state='retry_wait' WHERE message_id=?", eventID)
+		var outside, inside string
+		require.NoError(t, pool.QueryRowContext(ctx, "SELECT state FROM qs_rm_outbox_history WHERE message_id=?", eventID).Scan(&outside))
+		require.Equal(t, "retry_wait", outside)
+		err := tx.QueryRowContext(ctx, "SELECT state FROM qs_rm_outbox_history WHERE message_id=?", eventID).Scan(&inside)
+		return inside, err
+	})
+	require.NoError(t, err)
+	require.Equal(t, "held", state)
+	_, err = status.ListOutboxCandidates(ctx, org, 10)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	exec("UPDATE isolated_outbox_history_rows SET state='held' WHERE message_id=?", eventID)
+
+	exec(`CREATE OR REPLACE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT
+		NULL AS state, claim_token, lease_until, transport_confirmed_at, attempt_count, failure_count,
+		manual_replay_request_id, manual_replay_version, version, scope, message_id, last_error_code
+		FROM isolated_outbox_history_rows`)
+	_, err = outboxhistory.ReadOperational(ctx, pool, func(*sql.Tx, string) (bool, error) {
+		t.Error("a malformed archive must fail before the caller query")
+		return false, nil
+	})
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	exec("CREATE OR REPLACE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT * FROM isolated_outbox_history_rows")
+
 	if handoffCLIRequired(t) {
 		nativeArchiveHandoffLedger(t, pool, store.Binding(), f)
 	}
@@ -288,6 +322,44 @@ func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Sto
 	require.NoError(t, err)
 	require.Equal(t, expected, restored)
 	t.Log("F06_MYSQL_HISTORY_PROOF live_preferred=true archive_handoff_exact=true archived_pending_refused=true live_inventory_never_substitutes=true")
+}
+
+func verifyMySQLArchiveReaderGrants(t *testing.T, pool *sql.DB) {
+	t.Helper()
+	ctx := t.Context()
+	cfg, err := driver.ParseDSN(os.Getenv("QS_M3_RETRY_DSN"))
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&cfg.DBName))
+	require.Regexp(t, "^qs_m3_retry_store_[0-9]+$", cfg.DBName)
+	cfg.User = fmt.Sprintf("qsf06_%d", time.Now().UnixNano())
+	cfg.Passwd = fmt.Sprintf("%x", rand.Text())
+	account := "'" + cfg.User + "'@'%'"
+	_, err = pool.ExecContext(ctx, "CREATE USER "+account+" IDENTIFIED BY '"+cfg.Passwd+"'")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := pool.ExecContext(context.Background(), "DROP USER "+account)
+		require.NoError(t, err)
+	})
+	for _, table := range []string{"qs_rm_outbox_history", "isolated_outbox_history_rows", "qs_retry_schedule"} {
+		_, err = pool.ExecContext(ctx, "GRANT SELECT ON `"+cfg.DBName+"`."+table+" TO "+account)
+		require.NoError(t, err)
+	}
+	reader, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	defer func() { require.NoError(t, reader.Close()) }()
+	var state string
+	require.NoError(t, reader.QueryRowContext(ctx, "SELECT state FROM qs_rm_outbox_history LIMIT 1").Scan(&state))
+	require.Equal(t, "held", state)
+	_, err = outboxhistory.ActiveSource(ctx, reader)
+	require.ErrorIs(t, err, sql.ErrNoRows, "metadata hides the existing physical table")
+	_, err = outboxhistory.ReadOperational(ctx, reader, func(*sql.Tx, string) (bool, error) {
+		t.Error("the readable archive cannot cover the inaccessible original")
+		return false, nil
+	})
+	var denied *driver.MySQLError
+	require.ErrorAs(t, err, &denied)
+	require.EqualValues(t, 1142, denied.Number)
+	t.Log("F06_MYSQL_HIDDEN_ORIGINAL_REFUSED")
 }
 
 func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostore.Store, f model.Frozen, binding transaction.Binding) map[string]bool {

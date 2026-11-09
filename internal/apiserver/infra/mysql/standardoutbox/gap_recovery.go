@@ -66,12 +66,9 @@ func (l *GapRecoveryLedger) ReadSummary(ctx context.Context, orgID int64) (GapRe
 	if l == nil || l.db == nil || orgID <= 0 {
 		return result, errors.New("gap recovery summary requires host database and organization")
 	}
-	source, err := outboxhistory.OperationalSource(ctx, l.db)
-	if err != nil {
-		return result, err
-	}
-	var incomplete int64
-	err = l.db.QueryRowContext(ctx, `SELECT
+	return outboxhistory.ReadOperational(ctx, l.db, func(tx *sql.Tx, source string) (GapRecoverySummary, error) {
+		var incomplete int64
+		err := tx.QueryRowContext(ctx, `SELECT
 	COALESCE(SUM(result_code<>'' AND authorized=1),0),
 	COALESCE(SUM(result_code<>'' AND authorized=0),0),
 	COALESCE(SUM(result_code=''),0),
@@ -84,14 +81,15 @@ func (l *GapRecoveryLedger) ReadSummary(ctx context.Context, orgID int64) (GapRe
 	   AND o.manual_replay_version=pending.outbox_version_after
 	   AND o.version=pending.outbox_version_after AND o.state='retry_wait'))
 	FROM qs_rm_gap_recovery_request WHERE org_id=?`, orgID, orgID).
-		Scan(&result.Authorized, &result.Denied, &incomplete, &result.WaitingRelay)
-	if err != nil {
-		return GapRecoverySummary{}, err
-	}
-	if incomplete != 0 {
-		return GapRecoverySummary{}, ErrGapRecoveryLedgerCorrupt
-	}
-	return result, nil
+			Scan(&result.Authorized, &result.Denied, &incomplete, &result.WaitingRelay)
+		if err != nil {
+			return GapRecoverySummary{}, err
+		}
+		if incomplete != 0 {
+			return GapRecoverySummary{}, ErrGapRecoveryLedgerCorrupt
+		}
+		return result, nil
+	})
 }
 
 func (r GapRecoveryRequest) fingerprint() ([32]byte, string, error) {
