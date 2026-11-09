@@ -113,17 +113,18 @@ check_redis() {
     
     # 检查 Redis Cache 实例（端口 6379）
     printf "%-15s " "Redis Cache"
-    local cache_cmd="redis-cli -h $REDIS_HOST -p $REDIS_PORT"
+    local cache_cmd=(redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT")
     if [ -n "$REDIS_PASSWORD" ]; then
         if [ -n "$REDIS_USERNAME" ]; then
-            cache_cmd="$cache_cmd --user $REDIS_USERNAME --pass $REDIS_PASSWORD --no-auth-warning"
+            cache_cmd+=(--user "$REDIS_USERNAME" --pass "$REDIS_PASSWORD" --no-auth-warning)
         else
-            cache_cmd="$cache_cmd -a $REDIS_PASSWORD --no-auth-warning"
+            cache_cmd+=(-a "$REDIS_PASSWORD" --no-auth-warning)
         fi
     fi
-    
-    # redis-cli 默认有 5 秒超时，不需要额外的 timeout 命令
-    if $cache_cmd PING &> /dev/null; then
+
+    local reply
+    # redis-cli can exit successfully while the server returns NOAUTH.
+    if reply=$("${cache_cmd[@]}" PING 2>/dev/null) && [ "$reply" = "PONG" ]; then
         printf "[${GREEN}✓${NC}] 运行正常 (${REDIS_HOST}:${REDIS_PORT})\n"
     else
         printf "[${RED}✗${NC}] 连接失败 (${REDIS_HOST}:${REDIS_PORT})\n"
