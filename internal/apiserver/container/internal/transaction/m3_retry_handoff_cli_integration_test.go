@@ -215,4 +215,41 @@ func nativeArchiveHandoffLedger(t *testing.T, pool *sql.DB, binding transaction.
 	require.NoError(t, err)
 	require.Contains(t, string(raw), "m5-mysql-handoff-history-inventory/v1")
 	require.NotContains(t, string(raw), "old_responsibilities_accounted")
+
+	// A same-name merge view can otherwise impersonate the writer and even
+	// accept updates into the archived rows. The exact CLI must reject it.
+	_, err = pool.ExecContext(ctx, "CREATE ALGORITHM=MERGE SQL SECURITY INVOKER VIEW rm_outbox AS SELECT * FROM isolated_outbox_history_rows")
+	require.NoError(t, err)
+	defer func() {
+		_, err := pool.ExecContext(t.Context(), "DROP VIEW rm_outbox")
+		require.NoError(t, err)
+	}()
+	var updatable string
+	require.NoError(t, pool.QueryRowContext(ctx, `SELECT IS_UPDATABLE FROM information_schema.VIEWS
+		WHERE TABLE_SCHEMA=DATABASE() AND BINARY TABLE_NAME='rm_outbox'`).Scan(&updatable))
+	require.Equal(t, "YES", updatable)
+	rowProof := func() string {
+		var digest string
+		require.NoError(t, pool.QueryRowContext(ctx, `SELECT SHA2(CONCAT_WS(':',HEX(payload),HEX(fingerprint),state,last_error_code,version),256)
+			FROM isolated_outbox_history_rows WHERE message_id=?`, f.Message().Input().ID).Scan(&digest))
+		return digest
+	}
+	before := rowProof()
+	deniedReceipt := filepath.Join(dir, "same-name-view-denied.jsonl")
+	denied := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"),
+		"--apply", "--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]),
+		"--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch,
+		"--database", cfg.DBName, "--receipt", deniedReceipt, "--all-legacy-writers-stopped-and-admission-closed")
+	denied.Env = cmd.Env
+	out, err = denied.Output()
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit, "write against the archived view must fail")
+	require.Equal(t, 1, exit.ExitCode())
+	require.Empty(t, out)
+	raw, err = os.ReadFile(deniedReceipt)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"cutover_authorized":false`)
+	require.NotContains(t, string(raw), "already_transferred")
+	require.Equal(t, before, rowProof())
+	t.Log("F06_MYSQL_SAME_NAME_VIEW_APPLY_REFUSED")
 }
