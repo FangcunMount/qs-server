@@ -24,7 +24,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	outcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/reliable-messaging/message"
-	sdkmongo "github.com/FangcunMount/reliable-messaging/storage/mongo"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -42,7 +41,6 @@ type TransactionCommitter struct {
 	runs       *RunRepository
 	reports    *ReportRepository
 	catalog    *ReportCatalogProjector
-	future     *mongo.Collection
 	schedules  *schedulestore.Store
 }
 
@@ -65,7 +63,7 @@ func NewTransactionCommitter(db *mongo.Database, owner *guarded.Owner, runner gu
 		return nil, err
 	}
 	return &TransactionCommitter{schedules: schedules, boundary: boundary, resolver: resolver, generation: NewGenerationRepositoryWithoutSchema(primary, opts...), runs: NewRunRepositoryWithoutSchema(primary, opts...),
-		reports: NewReportRepositoryWithoutSchema(primary, opts...), catalog: NewReportCatalogProjectorWithoutSchema(primary, opts...), future: db.Collection("rm_outbox")}, nil
+		reports: NewReportRepositoryWithoutSchema(primary, opts...), catalog: NewReportCatalogProjectorWithoutSchema(primary, opts...)}, nil
 }
 
 func (c *TransactionCommitter) CommitSuccess(ctx context.Context, q app.CommitSuccessRequest) (*app.CommitResult, error) {
@@ -196,6 +194,11 @@ func (c *TransactionCommitter) commit(ctx context.Context, request port.Request)
 	if !reservation.Acquired {
 		return c.recover(ctx, e, f)
 	}
+	// Frozen v1 future intents are retained for read-only recovery. A new
+	// execution must use a v2 schedule and cannot recreate the old Outbox.
+	if f.Future != nil && f.Version == 1 {
+		return nil, errors.Join(port.ErrUnresolved, transaction.ErrInvalidPlan)
+	}
 	raw, err := c.boundary.Artifact(e.Plan)
 	if err != nil || !bytes.Equal(raw, request.Artifact) {
 		return nil, transaction.ErrInvalidPlan
@@ -204,16 +207,9 @@ func (c *TransactionCommitter) commit(ctx context.Context, request port.Request)
 	if err != nil {
 		return nil, errors.Join(port.ErrUnresolved, err)
 	}
-	var future message.Message
 	var retryPlan schedulemodel.Frozen
 	if f.Future != nil && f.Version == 2 {
 		retryPlan, err = f.retryPlan()
-		if err != nil {
-			return nil, err
-		}
-	}
-	if f.Future != nil && f.Version == 1 {
-		future, err = message.New(*f.Future)
 		if err != nil {
 			return nil, err
 		}
@@ -243,15 +239,6 @@ func (c *TransactionCommitter) commit(ctx context.Context, request port.Request)
 			if err := c.projectReport(tx, f.Report); err != nil {
 				return err
 			}
-		}
-		if f.Future != nil && f.Version == 1 {
-			// Recover the exact pre-T13 artifact's original responsibility. New V2
-			// plans never append a future event to the legacy publishing Outbox.
-			appender, err := sdkmongo.Bind(mongo.NewSessionContext(tx, mongo.SessionFromContext(tx)), c.future)
-			if err != nil {
-				return err
-			}
-			return appender.Append(future, f.Due)
 		}
 		return nil
 	})
