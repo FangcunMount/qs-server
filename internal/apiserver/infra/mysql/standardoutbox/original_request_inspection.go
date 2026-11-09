@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
 	domainwire "github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -38,7 +39,7 @@ func InspectOriginalRequest(ctx context.Context, db *sql.DB, orgID int64, assess
 		return OriginalRequestInspection{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := inspectOriginalRequest(ctx, tx, orgID, assessmentID, submittedBefore)
+	result, err := inspectOriginalRequest(ctx, tx, orgID, assessmentID, submittedBefore, true)
 	if err != nil {
 		return OriginalRequestInspection{}, err
 	}
@@ -56,7 +57,7 @@ type originalAssessment struct {
 	hasRun                                             bool
 }
 
-func inspectOriginalRequest(ctx context.Context, tx *sql.Tx, orgID int64, assessmentID uint64, submittedBefore time.Time) (OriginalRequestInspection, error) {
+func inspectOriginalRequest(ctx context.Context, tx *sql.Tx, orgID int64, assessmentID uint64, submittedBefore time.Time, readHistory bool) (OriginalRequestInspection, error) {
 	var a originalAssessment
 	err := tx.QueryRowContext(ctx, `SELECT org_id,status,DATE_FORMAT(submitted_at,'%Y-%m-%d %H:%i:%s.%f'),
 	DATE_FORMAT(deleted_at,'%Y-%m-%d %H:%i:%s.%f'),testee_id,answer_sheet_id,
@@ -114,9 +115,16 @@ func inspectOriginalRequest(ctx context.Context, tx *sql.Tx, orgID int64, assess
 	if len(eventIDs) != 1 {
 		return OriginalRequestInspection{State: "manual_required", Reason: "reference_missing_or_ambiguous"}, nil
 	}
+	source := outboxhistory.LegacyTable
+	if readHistory {
+		source, err = outboxhistory.Source(ctx, tx)
+		if err != nil {
+			return OriginalRequestInspection{}, err
+		}
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT producer,message_id,destination,event_type,schema_version,scope,
 	content_type,occurred_at,payload,fingerprint,state,transport_confirmed_at IS NOT NULL
-	FROM rm_outbox WHERE message_id=? LIMIT 2`, eventIDs[0])
+	FROM `+source+` WHERE message_id=? LIMIT 2`, eventIDs[0])
 	if err != nil {
 		return OriginalRequestInspection{}, err
 	}

@@ -291,7 +291,7 @@ func authorizeGapOne(ctx context.Context, tx *sql.Tx, input GapRecoveryRequest) 
 	if found[0].version != input.ExpectedVersion {
 		return denied("version_conflict")
 	}
-	inspection, err := inspectOriginalRequest(ctx, tx, input.OrgID, input.AssessmentID, input.SubmittedBefore)
+	inspection, err := inspectOriginalRequest(ctx, tx, input.OrgID, input.AssessmentID, input.SubmittedBefore, false)
 	if err != nil {
 		return GapRecoveryResult{}, err
 	}

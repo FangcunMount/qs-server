@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -186,6 +187,61 @@ func TestCommittedEvidenceAtomicNativeMySQL(t *testing.T) {
 	if err != nil || len(batch.Conflicts) != 1 || batch.Conflicts[0].MessageID != "native-orphan" {
 		t.Fatalf("reverse=%#v err=%v", batch, err)
 	}
+	// Install the compatibility view over an exact copy and hide the original
+	// name. The original fixture table stays intact throughout this proof.
+	originalBytes := readEvidenceRows(t, db, "rm_outbox")
+	for _, statement := range []string{
+		"CREATE TABLE isolated_outbox_archive LIKE rm_outbox",
+		"INSERT INTO isolated_outbox_archive SELECT * FROM rm_outbox",
+		"CREATE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT * FROM isolated_outbox_archive",
+		"RENAME TABLE rm_outbox TO isolated_original_rm_outbox",
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !reflect.DeepEqual(originalBytes, readEvidenceRows(t, db, "qs_rm_outbox_history")) {
+		t.Fatal("archive changed the original Outbox rows")
+	}
+	archived, err := reader.listCommittedOutboxEvidence(t.Context(), []uint64{42})
+	if err != nil || !reflect.DeepEqual(proof, archived) {
+		t.Fatalf("archived forward=%#v err=%v", archived, err)
+	}
+	archivedUpper, err := reader.OutboxUpperBound(t.Context())
+	if err != nil || archivedUpper != nextUpper {
+		t.Fatalf("archived upper=%d want=%d err=%v", archivedUpper, nextUpper, err)
+	}
+	archivedBatch, err := reader.ReadOutboxBatch(t.Context(), 0, archivedUpper, 10)
+	if err != nil || !reflect.DeepEqual(batch, archivedBatch) {
+		t.Fatalf("archived reverse=%#v err=%v", archivedBatch, err)
+	}
+	// A broken view must report an error even when the old table is available.
+	for _, statement := range []string{
+		"RENAME TABLE isolated_original_rm_outbox TO rm_outbox",
+		"RENAME TABLE isolated_outbox_archive TO isolated_archive_unavailable",
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := reader.OutboxUpperBound(t.Context()); err == nil {
+		t.Fatal("broken history view silently selected the old table")
+	}
+	if err := db.Exec("DROP VIEW qs_rm_outbox_history").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("CREATE TABLE qs_rm_outbox_history (id BIGINT UNSIGNED PRIMARY KEY)").Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reader.OutboxUpperBound(t.Context()); err == nil {
+		t.Fatal("a physical table shadowed the expected compatibility view")
+	}
+	if err := db.Exec("RENAME TABLE qs_rm_outbox_history TO isolated_history_shadow").Error; err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(originalBytes, readEvidenceRows(t, db, "rm_outbox")) {
+		t.Fatal("retained original table changed during the read-only proof")
+	}
 	// Even a forged SDK outer type/fingerprint cannot hide a committed orphan.
 	altered := orphanRow.input()
 	altered.EventType = eventcatalog.EvaluationRequested
@@ -209,4 +265,33 @@ func TestCommittedEvidenceAtomicNativeMySQL(t *testing.T) {
 		t.Fatalf("tamper=%#v err=%v", proof[42], err)
 	}
 	// No retired table was created anywhere in this fixture.
+}
+
+func readEvidenceRows(t *testing.T, db *gorm.DB, table string) [][][]byte {
+	t.Helper()
+	rows, err := db.Table(table).Order("id ASC").Rows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	columns, err := rows.Columns()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result [][][]byte
+	for rows.Next() {
+		values := make([][]byte, len(columns))
+		fields := make([]any, len(columns))
+		for i := range fields {
+			fields[i] = &values[i]
+		}
+		if err := rows.Scan(fields...); err != nil {
+			t.Fatal(err)
+		}
+		result = append(result, values)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
