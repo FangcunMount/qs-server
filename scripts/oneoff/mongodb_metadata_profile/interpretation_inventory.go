@@ -19,6 +19,7 @@ func runLegacyFutureInventory(w io.Writer) int {
 		Owner          string                                `json:"owner"`
 		Binding        string                                `json:"database_replica_sha256,omitempty"`
 		ReadOnly       bool                                  `json:"read_only"`
+		Mutation       bool                                  `json:"mutation"`
 		Complete       bool                                  `json:"inventory_complete"`
 		DropAuthorized bool                                  `json:"drop_authorized"`
 		PoolReleased   bool                                  `json:"pool_released"`
