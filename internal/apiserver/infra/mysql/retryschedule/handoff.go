@@ -6,6 +6,7 @@ import (
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 )
@@ -25,6 +26,9 @@ func (s *Store) TransferLegacy(ctx context.Context, f model.Frozen, authority po
 	ctx, cancel := context.WithTimeout(ctx, readBudget)
 	defer cancel()
 	if err = s.validateIn(ctx, tx, true); err != nil {
+		return false, err
+	}
+	if err := outboxhistory.RequireActiveWrite(ctx, tx); err != nil {
 		return false, err
 	}
 	in := f.Message().Input()

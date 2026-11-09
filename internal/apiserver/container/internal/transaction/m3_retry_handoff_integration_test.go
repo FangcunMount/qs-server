@@ -244,6 +244,8 @@ func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Sto
 	require.Len(t, candidates, 1)
 	require.Equal(t, eventID, candidates[0].ResourceID)
 	exec("UPDATE rm_outbox SET state='held' WHERE message_id=?", eventID)
+	verifyMySQLHandoffPhysicalNameLock(t, pool)
+
 	exec("RENAME TABLE rm_outbox TO isolated_original_rm_outbox")
 	_, err = store.InspectLegacy(ctx, plans)
 	require.Error(t, err, "live inventory cannot substitute archived evidence")
@@ -323,6 +325,31 @@ func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Sto
 	require.NoError(t, err)
 	require.Equal(t, expected, restored)
 	t.Log("F06_MYSQL_HISTORY_PROOF live_preferred=true archive_handoff_exact=true archived_pending_refused=true live_inventory_never_substitutes=true")
+}
+
+func verifyMySQLHandoffPhysicalNameLock(t *testing.T, pool *sql.DB) {
+	t.Helper()
+	ctx := t.Context()
+	tx, err := pool.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	require.NoError(t, outboxhistory.RequireActiveWrite(ctx, tx))
+	ddl, err := pool.Conn(ctx)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, ddl.Close()) }()
+	var original int64
+	require.NoError(t, ddl.QueryRowContext(ctx, "SELECT @@SESSION.lock_wait_timeout").Scan(&original))
+	_, err = ddl.ExecContext(ctx, "SET SESSION lock_wait_timeout=1")
+	require.NoError(t, err)
+	defer func() {
+		_, err := ddl.ExecContext(ctx, "SET SESSION lock_wait_timeout=?", original)
+		require.NoError(t, err)
+	}()
+	_, err = ddl.ExecContext(ctx, "RENAME TABLE rm_outbox TO isolated_original_rm_outbox")
+	var timeout *driver.MySQLError
+	require.ErrorAs(t, err, &timeout, "original name must remain pinned for the transaction")
+	require.EqualValues(t, 1205, timeout.Number)
+	t.Log("F06_MYSQL_ORIGINAL_NAME_LOCK_HELD")
 }
 
 func verifyMySQLArchiveReaderGrants(t *testing.T, pool *sql.DB) {
