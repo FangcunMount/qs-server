@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
@@ -48,7 +49,7 @@ func runInventory(parent context.Context, a arguments, getenv func(string) strin
 	defer func() { resultErr = errors.Join(resultErr, f.Close()) }()
 	schema := "m3-future-handoff-inventory/v1"
 	if a.history {
-		schema = "m5-mongo-handoff-history-inventory/v1"
+		schema = "m5-" + strings.TrimPrefix(a.binding.Owner, "qs.") + "-handoff-history-inventory/v1"
 	}
 	header := struct {
 		Schema            string              `json:"schema"`
@@ -84,7 +85,7 @@ func runInventory(parent context.Context, a arguments, getenv func(string) strin
 	if a.history {
 		reader, ok := host.(historyInspector)
 		if !ok {
-			return errors.New("host does not implement Mongo history inspection")
+			return errors.New("host does not implement Outbox history inspection")
 		}
 		snapshot, inspectErr = reader.InspectHistory(ctx, selected)
 	} else {

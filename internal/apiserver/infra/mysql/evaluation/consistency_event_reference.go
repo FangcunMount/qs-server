@@ -10,6 +10,7 @@ import (
 
 	evalevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
@@ -85,8 +86,12 @@ func (r *consistencyReadModel) listCommittedOutboxEvidence(ctx context.Context, 
 	}
 	rowsByID := make(map[string][]committedStandardRow)
 	if len(ids) > 0 {
+		source, err := outboxhistory.GORM(ctx, r.db)
+		if err != nil {
+			return nil, err
+		}
 		var rows []committedStandardRow
-		if err := r.db.WithContext(ctx).Table("rm_outbox").Where("message_id IN ?", ids).Order("id ASC").Find(&rows).Error; err != nil {
+		if err := r.db.WithContext(ctx).Table(source).Where("message_id IN ?", ids).Order("id ASC").Find(&rows).Error; err != nil {
 			return nil, err
 		}
 		for _, row := range rows {
@@ -164,16 +169,24 @@ func (r *consistencyReadModel) BusinessUpperBound(ctx context.Context) (uint64, 
 	return upper, err
 }
 func (r *consistencyReadModel) OutboxUpperBound(ctx context.Context) (uint64, error) {
+	source, err := outboxhistory.GORM(ctx, r.db)
+	if err != nil {
+		return 0, err
+	}
 	var upper uint64
-	err := r.db.WithContext(ctx).Table("rm_outbox").Select("COALESCE(MAX(id),0)").Scan(&upper).Error
+	err = r.db.WithContext(ctx).Table(source).Select("COALESCE(MAX(id),0)").Scan(&upper).Error
 	return upper, err
 }
 func (r *consistencyReadModel) ReadOutboxBatch(ctx context.Context, afterID, upperID uint64, limit int) (evaluationconsistency.ReverseBatch, error) {
 	if limit <= 0 {
 		return evaluationconsistency.ReverseBatch{}, fmt.Errorf("positive standard reverse audit batch limit is required")
 	}
+	source, err := outboxhistory.GORM(ctx, r.db)
+	if err != nil {
+		return evaluationconsistency.ReverseBatch{}, err
+	}
 	var rows []committedStandardRow
-	if err := r.db.WithContext(ctx).Table("rm_outbox").Where("id > ? AND id <= ?", afterID, upperID).Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table(source).Where("id > ? AND id <= ?", afterID, upperID).Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
 		return evaluationconsistency.ReverseBatch{}, err
 	}
 	batch := evaluationconsistency.ReverseBatch{Scanned: len(rows), CycleComplete: len(rows) < limit}

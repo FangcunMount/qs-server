@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appstandard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
 
@@ -28,8 +29,12 @@ func (r *StatusReader) OutboxStatusSnapshot(ctx context.Context, now time.Time) 
 	if r == nil || r.db == nil {
 		return outboxport.StatusSnapshot{}, fmt.Errorf("standard MySQL status reader is not configured")
 	}
+	source, err := outboxhistory.OperationalSource(ctx, r.db)
+	if err != nil {
+		return outboxport.StatusSnapshot{}, err
+	}
 	rows, err := r.db.QueryContext(ctx, `SELECT state, COUNT(*), DATE_FORMAT(MIN(created_at),'%Y-%m-%d %H:%i:%s.%f')
-FROM rm_outbox WHERE state <> 'published'
+FROM `+source+` WHERE state <> 'published'
  AND NOT (state='held' AND REGEXP_LIKE(last_error_code,'^m3_future_owner:[0-9a-f]{64}$','c')) GROUP BY state`)
 	if err != nil {
 		return outboxport.StatusSnapshot{}, err

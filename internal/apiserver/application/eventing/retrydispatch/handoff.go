@@ -60,12 +60,9 @@ func (h *Handoff) Inspect(ctx context.Context, selected []model.Frozen) (model.L
 	return result, nil
 }
 
-// InspectHistory checks the retained Mongo ledger against original schedule
+// InspectHistory checks the retained ledger against original schedule
 // plans. Its result is archival evidence and is not a live cutover inventory.
 func (h *Handoff) InspectHistory(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
-	if h.binding.Owner != "qs.mongo" {
-		return model.LegacyInventory{}, transaction.ErrBinding
-	}
 	if err := model.ValidateHandoffSelection(h.binding, selected); err != nil {
 		return model.LegacyInventory{}, err
 	}
