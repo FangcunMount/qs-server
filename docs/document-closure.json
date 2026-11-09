@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "070f2bc7241ab363245312ab998835c77fd1be87",
+    "sha": "0f9c79e19b9df5e482cc36899af18f4e7a2e2e12",
     "verified_on": "2026-11-10"
   },
   "status_policy": {
@@ -15906,8 +15906,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "34d67bf96a714dfa19a574d3fce965391f6d089f",
-        "verified_on": "2026-10-31"
+        "source_sha": "0f9c79e19b9df5e482cc36899af18f4e7a2e2e12",
+        "verified_on": "2026-11-10"
       },
       "fact_sources": [
         {
@@ -15941,6 +15941,10 @@
         {
           "kind": "source",
           "path": "internal/apiserver/infra/mongo/retryschedule/inventory.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/outboxhistory/source.go"
         },
         {
           "kind": "source",
@@ -15999,7 +16003,8 @@
       ],
       "review_note": "Original CLI development run39990541142 on aa977fc790104f636f4d301163a5eb8df6e7831a passed60/0/0 with cleanup. Readonly inventory source208fb8ff has only local pure/race/lint and tagged compile so far; do not reuse the earlier native report for this new behavior. Prior review marker preserved: {\"source_sha\": \"9edd299cf51a44beab766efb50a978c6f05dbbae\", \"verified_on\": \"2026-10-24\"}. Historical checks retain their own exact source attribution.",
       "notes": [
-        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed."
+        "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
+        "2026-11-10 Mongo archive inventory exercised the exact-source maintenance CLI against an isolated replica set. It preserves the original BSON row and records a separate archival receipt, with no production signoff. Previous source binding 34d67bf96a714dfa19a574d3fce965391f6d089f remains historical."
       ]
     },
     {
