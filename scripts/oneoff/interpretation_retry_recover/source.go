@@ -13,6 +13,7 @@ import (
 	"time"
 
 	interp "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/wire/domain"
@@ -65,7 +66,11 @@ type recoveryPlan struct {
 // Capture uses a single primary snapshot and the existing host indexes. It
 // reads one fixed Run and its original intent; it never resets published,
 // creates authority, writes an attempt or calls a model.
-func captureOriginal(ctx context.Context, db *mongo.Database, runID uint64, orgID int64, now time.Time) (recoveryPlan, error) {
+func captureOriginal(ctx context.Context, db *mongo.Database, history *outboxhistory.Reader, runID uint64, orgID int64, now time.Time) (recoveryPlan, error) {
+	outbox, err := history.Collection()
+	if err != nil {
+		return recoveryPlan{}, err
+	}
 	session, err := db.Client().StartSession()
 	if err != nil {
 		return recoveryPlan{}, err
@@ -97,10 +102,20 @@ func captureOriginal(ctx context.Context, db *mongo.Database, runID uint64, orgI
 		return recoveryPlan{}, errUnsafeSource
 	}
 	id := bson.D{{Key: "producer", Value: "qs-server"}, {Key: "message_id", Value: source.Run.RetryEventID}, {Key: "destination", Value: retryDestination}}
-	if err := db.Collection("rm_outbox").FindOne(sc, bson.M{"_id": id}, options.FindOne().SetHint("_id_").SetMaxTime(5*time.Second)).Decode(&source.Intent); err != nil {
+	if err := outbox.FindOne(sc, bson.M{"_id": id}, options.FindOne().SetHint("_id_").SetMaxTime(5*time.Second)).Decode(&source.Intent); err != nil {
 		return recoveryPlan{}, err
 	}
-	return validateOriginal(source, orgID, now)
+	plan, err := validateOriginal(source, orgID, now)
+	if err != nil {
+		return recoveryPlan{}, err
+	}
+	if err := session.AbortTransaction(sc); err != nil {
+		return recoveryPlan{}, err
+	}
+	if err := history.Verify(); err != nil {
+		return recoveryPlan{}, err
+	}
+	return plan, nil
 }
 
 func validateOriginal(source sourceSnapshot, orgID int64, now time.Time) (recoveryPlan, error) {
