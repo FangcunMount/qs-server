@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "e8853c632e6eed14ffe156eb50fa93920b267143",
+    "sha": "e8b302997ecdfe52bc8ca65e10d76ff682986d2c",
     "verified_on": "2026-11-10"
   },
   "status_policy": {
@@ -16018,8 +16018,8 @@
       "owner": "tooling",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-        "verified_on": "2026-11-01"
+        "source_sha": "e8b302997ecdfe52bc8ca65e10d76ff682986d2c",
+        "verified_on": "2026-11-10"
       },
       "fact_sources": [
         {
@@ -16045,6 +16045,10 @@
         {
           "kind": "source",
           "path": "scripts/oneoff/mongodb_metadata_profile/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/interpretation/legacy_future_inventory.go"
         },
         {
           "kind": "source",
