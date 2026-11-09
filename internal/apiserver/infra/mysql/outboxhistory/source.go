@@ -67,6 +67,17 @@ func ActiveSource(ctx context.Context, db rowQuery) (string, error) {
 	return LegacyTable, nil
 }
 
+// RequireActiveWrite acquires metadata on the original name within the
+// caller's transaction before checking its kind. An updatable view is never
+// a legacy writer or a source of transfer authority.
+func RequireActiveWrite(ctx context.Context, tx *sql.Tx) error {
+	if _, err := tx.ExecContext(ctx, "SELECT id FROM rm_outbox LIMIT 0"); err != nil {
+		return err
+	}
+	_, err := ActiveSource(ctx, tx)
+	return err
+}
+
 var ErrUnresolvedArchive = errors.New("MySQL Outbox history still contains unresolved publication responsibilities")
 
 // ReadOperational shares a consistent read-only snapshot between the archive

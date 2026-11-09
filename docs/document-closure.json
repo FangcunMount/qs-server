@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b23747498b4ddcd1a23e93a98eeab3a7a5be0494",
+    "sha": "9fbcbf2fc8a79a54e5f16b776de9e23bbfa36dff",
     "verified_on": "2026-11-10"
   },
   "status_policy": {
@@ -15906,7 +15906,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b23747498b4ddcd1a23e93a98eeab3a7a5be0494",
+        "source_sha": "9fbcbf2fc8a79a54e5f16b776de9e23bbfa36dff",
         "verified_on": "2026-11-10"
       },
       "fact_sources": [
@@ -16005,7 +16005,8 @@
       "notes": [
         "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
         "2026-11-10 source review and isolated MySQL 8.0.36/8.4.13 CLI tests cover explicit --inventory --history and its separate receipt. Prior source verification was 34d67bf96a714dfa19a574d3fce965391f6d089f on 2026-10-31. Production evidence and signoffs retain their previous attribution.",
-        "2026-11-10 isolated MySQL 8.0.36 and 8.4.13 validated one operational archive snapshot, a concurrently committed status change, malformed NULL state and refusal when permissions hide the physical source. Prior verification 2acc3d30566069a75e607eb1631e2e5106b6355c retains its original scope."
+        "2026-11-10 isolated MySQL 8.0.36 and 8.4.13 validated one operational archive snapshot, a concurrently committed status change, malformed NULL state and refusal when permissions hide the physical source. Prior verification 2acc3d30566069a75e607eb1631e2e5106b6355c retains its original scope.",
+        "2026-11-10 MySQL 8.0.36 and 8.4.13 verified metadata name protection in the original transaction and exact CLI refusal of an updatable view under the original name. Earlier snapshot verification b23747498b4ddcd1a23e93a98eeab3a7a5be0494 retains its attribution."
       ]
     },
     {
