@@ -51,6 +51,9 @@ jobs:
       - name: Check retired service authentication
         run: python3 scripts/check_service_token_retirement.py
 
+      - name: Verify current and legacy infrastructure preflights
+        run: python3 scripts/testing/test_check_infra.py -v
+
       - name: Run tests
         id: go_tests
         run: |

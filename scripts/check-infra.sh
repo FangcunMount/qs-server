@@ -5,7 +5,7 @@
 # ===================================
 # 用途：检查 MySQL、Redis、MongoDB、NSQ 等基础组件是否就绪
 # 使用：./scripts/check-infra.sh [component]
-#       component: mysql | redis | mongodb | nsq | all (默认)
+#       component: runtime | mysql | redis | mongodb | nsq | all (默认)
 
 set -e
 
@@ -197,8 +197,9 @@ COMPONENT:
     mysql       检查 MySQL 数据库
     redis       检查 Redis 双实例（Cache + Store）
     mongodb     检查 MongoDB 数据库
-    nsq         检查 NSQ 消息队列
-    all         检查所有组件 (默认)
+    runtime     检查当前运行时的数据依赖 MySQL、Redis、MongoDB
+    nsq         检查历史 NSQ 消息队列
+    all         检查所有组件，含历史 NSQ (脚本默认)
 
 环境变量:
     MySQL:
@@ -259,11 +260,13 @@ main() {
         nsq)
             check_nsq || failed=1
             ;;
-        all)
+        runtime|all)
             check_mysql || failed=1
             check_redis || failed=1
             check_mongodb || failed=1
-            check_nsq || failed=1
+            if [ "$component" = "all" ]; then
+                check_nsq || failed=1
+            fi
             ;;
         *)
             echo -e "${RED}错误: 未知的组件 '$component'${NC}\n"
