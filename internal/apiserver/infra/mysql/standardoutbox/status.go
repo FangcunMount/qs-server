@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appstandard "github.com/FangcunMount/qs-server/internal/apiserver/eventing/standardoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
 
@@ -28,29 +29,31 @@ func (r *StatusReader) OutboxStatusSnapshot(ctx context.Context, now time.Time) 
 	if r == nil || r.db == nil {
 		return outboxport.StatusSnapshot{}, fmt.Errorf("standard MySQL status reader is not configured")
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT state, COUNT(*), DATE_FORMAT(MIN(created_at),'%Y-%m-%d %H:%i:%s.%f')
-FROM rm_outbox WHERE state <> 'published'
+	return outboxhistory.ReadOperational(ctx, r.db, func(tx *sql.Tx, source string) (outboxport.StatusSnapshot, error) {
+		rows, err := tx.QueryContext(ctx, `SELECT state, COUNT(*), DATE_FORMAT(MIN(created_at),'%Y-%m-%d %H:%i:%s.%f')
+FROM `+source+` WHERE state <> 'published'
  AND NOT (state='held' AND REGEXP_LIKE(last_error_code,'^m3_future_owner:[0-9a-f]{64}$','c')) GROUP BY state`)
-	if err != nil {
-		return outboxport.StatusSnapshot{}, err
-	}
-	// Preserve scan/time/status errors and rows.Err(); cursor cleanup is best effort.
-	defer func() { _ = rows.Close() }()
-	counts := make([]appstandard.StatusCount, 0, 4)
-	for rows.Next() {
-		var state, oldestText string
-		var count int64
-		if err := rows.Scan(&state, &count, &oldestText); err != nil {
+		if err != nil {
 			return outboxport.StatusSnapshot{}, err
 		}
-		oldest, err := time.ParseInLocation(standardUTCLayout, oldestText, time.UTC)
-		if err != nil {
-			return outboxport.StatusSnapshot{}, fmt.Errorf("decode standard MySQL creation time: %w", err)
+		// Preserve scan/time/status errors and rows.Err(); cursor cleanup is best effort.
+		defer func() { _ = rows.Close() }()
+		counts := make([]appstandard.StatusCount, 0, 4)
+		for rows.Next() {
+			var state, oldestText string
+			var count int64
+			if err := rows.Scan(&state, &count, &oldestText); err != nil {
+				return outboxport.StatusSnapshot{}, err
+			}
+			oldest, err := time.ParseInLocation(standardUTCLayout, oldestText, time.UTC)
+			if err != nil {
+				return outboxport.StatusSnapshot{}, fmt.Errorf("decode standard MySQL creation time: %w", err)
+			}
+			counts = append(counts, appstandard.StatusCount{State: state, Count: count, OldestCreatedAt: &oldest})
 		}
-		counts = append(counts, appstandard.StatusCount{State: state, Count: count, OldestCreatedAt: &oldest})
-	}
-	if err := rows.Err(); err != nil {
-		return outboxport.StatusSnapshot{}, err
-	}
-	return appstandard.BuildStatusSnapshot("assessment-mysql-outbox", now, counts)
+		if err := rows.Err(); err != nil {
+			return outboxport.StatusSnapshot{}, err
+		}
+		return appstandard.BuildStatusSnapshot("assessment-mysql-outbox", now, counts)
+	})
 }

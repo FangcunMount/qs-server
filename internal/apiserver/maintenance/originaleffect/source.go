@@ -20,6 +20,7 @@ import (
 	checkpoint "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	sqlreport "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -83,8 +84,12 @@ func (r Reader) Capture(ctx context.Context, request Request, now time.Time) (Pl
 	}
 	var result Plan
 	err := r.SQL.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		source, err := outboxhistory.GORM(ctx, tx)
+		if err != nil {
+			return err
+		}
 		var row intentRow
-		if err := tx.Table("rm_outbox").Where("producer=? AND message_id=? AND destination=?", "qs-server", request.EventID, "qs.evaluation.lifecycle").Take(&row).Error; err != nil {
+		if err := tx.Table(source).Where("producer=? AND message_id=? AND destination=?", "qs-server", request.EventID, "qs.evaluation.lifecycle").Take(&row).Error; err != nil {
 			return err
 		}
 		original, env, err := validateIntent(row, request, now)

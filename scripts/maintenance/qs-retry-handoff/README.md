@@ -76,6 +76,12 @@ MySQL使用服务器只读Repeatable Read事务；Mongo在新snapshot事务中�
 
 盘点同样先持久化私有started，再记录完成时间、计数及核验结果。stdout只有固定状态和总量，不含wire、原ID或连接信息。`--inventory`与`--apply`互斥，不接受停写声明冒充自动停写；所有输出仍为`cutover_authorized=false`。
 
+### MySQL 存档盘点
+
+用 `--inventory --history` 显式选择 `qs_rm_outbox_history`，原绑定和已审核计划照常复验。该模式仅支持 `qs.mysql`，回执使用 `m5-mysql-handoff-history-inventory/v1`，stdout 使用 `history_responsibilities_accounted` 或 `history_responsibilities_present`。它提供存档中的原责任证据，切换前的现库盘点仍使用 `--inventory`。视图缺失或读取失败会拒绝，任一回执的 `cutover_authorized` 均为 false。
+
+MySQL 治理状态、候选列表和恢复汇总在同一只读快照校验历史视图与返回结果。原表在场时使用原表。历史回读要求账号能区分原表不存在与访问被拒。归档中出现异常状态或未收口责任时，治理读取返回失败。
+
 ### 2026-10-31 宿主退役 M4 复核
 
 本批未新增或执行数据库迁移、修复、重投或删除。当前发布构建检查三个实际进程的依赖图，禁止 NSQ、发布型 Relay 及历史测试夹具进入生产；旧 Relay runtime closure 明确在固定历史源码运行。重试交接夹具改用中立 `eventmessage` 编码与 Reference 校验，原身份、wire、计划/receipt 格式、原事务原子性与人工恢复权限保持。历史命令和生产证据保留原提交归属，不由本次源码复核补为当前验收。

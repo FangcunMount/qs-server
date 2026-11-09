@@ -27,8 +27,9 @@ func TestInspectOriginalRequestNeverClaimedWithVerifiedWire(t *testing.T) {
 	mockOriginalAssessment(mock, false)
 	mock.ExpectQuery("FROM qs_rm_evaluation_request_ref").WithArgs(originalAssessmentID).
 		WillReturnRows(sqlmock.NewRows([]string{"event_id", "org_id"}).AddRow(originalEventID, int64(12)))
+	mock.ExpectQuery("FROM information_schema.TABLES").WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}))
 	in, fingerprint := originalMessage(t)
-	mockOriginalOutbox(mock, in, fingerprint)
+	mockOriginalOutbox(mock, "rm_outbox", in, fingerprint)
 	mock.ExpectCommit()
 	got, err := InspectOriginalRequest(context.Background(), db, 12, originalAssessmentID, time.Date(2026, 9, 29, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*3600)))
 	if err != nil {
@@ -36,6 +37,29 @@ func TestInspectOriginalRequestNeverClaimedWithVerifiedWire(t *testing.T) {
 	}
 	if got.State != "candidate_never_claimed" || got.EventID != originalEventID || got.Reason != "" {
 		t.Fatalf("inspection = %+v", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInspectOriginalRequestReadsArchivedWire(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectBegin()
+	mockOriginalAssessment(mock, false)
+	mock.ExpectQuery("FROM qs_rm_evaluation_request_ref").WithArgs(originalAssessmentID).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id", "org_id"}).AddRow(originalEventID, int64(12)))
+	mock.ExpectQuery("FROM information_schema.TABLES").WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
+	in, fingerprint := originalMessage(t)
+	mockOriginalOutbox(mock, "qs_rm_outbox_history", in, fingerprint)
+	mock.ExpectCommit()
+	got, err := InspectOriginalRequest(t.Context(), db, 12, originalAssessmentID, time.Date(2026, 9, 29, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*3600)))
+	if err != nil || got.State != "candidate_never_claimed" || got.EventID != originalEventID {
+		t.Fatalf("archived inspection = %+v, err = %v", got, err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
@@ -114,8 +138,8 @@ func mockOriginalAssessment(mock sqlmock.Sqlmock, hasRun bool) {
 			AddRow(uint64(12), "submitted", "2026-09-29 09:00:00.000000", nil, uint64(34), uint64(56), "Q", "v1", "typology", "mbti", "MBTI-16P", "1.0", hasRun))
 }
 
-func mockOriginalOutbox(mock sqlmock.Sqlmock, in message.Input, fingerprint []byte) {
-	mock.ExpectQuery("FROM rm_outbox WHERE message_id=").WithArgs(originalEventID).
+func mockOriginalOutbox(mock sqlmock.Sqlmock, source string, in message.Input, fingerprint []byte) {
+	mock.ExpectQuery("FROM " + source + " WHERE message_id=").WithArgs(originalEventID).
 		WillReturnRows(sqlmock.NewRows([]string{"producer", "message_id", "destination", "event_type", "schema_version", "scope", "content_type", "occurred_at", "payload", "fingerprint", "state", "confirmed"}).
 			AddRow(in.Producer, in.ID, in.Destination, in.EventType, in.SchemaVersion, in.Scope, in.ContentType, in.OccurredAt, in.Payload, fingerprint, "published", true))
 }
