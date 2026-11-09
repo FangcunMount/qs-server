@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -150,8 +151,13 @@ func (s *MongoDaySource) Capture(ctx context.Context, day string) (RebuildSnapsh
 	if err != nil {
 		return RebuildSnapshot{}, err
 	}
+	history := outboxhistory.NewReader(ctx, s.db)
 	if len(ids) > 0 {
-		intents, err := s.db.Collection("rm_outbox").Find(sc, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetHint("_id_").SetLimit(MaxRebuildFacts+1).SetMaxTime(5*time.Second))
+		collection, err := history.Collection()
+		if err != nil {
+			return RebuildSnapshot{}, err
+		}
+		intents, err := collection.Find(sc, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetHint("_id_").SetLimit(MaxRebuildFacts+1).SetMaxTime(5*time.Second))
 		if err != nil {
 			return RebuildSnapshot{}, err
 		}
@@ -184,6 +190,9 @@ func (s *MongoDaySource) Capture(ctx context.Context, day string) (RebuildSnapsh
 		if sheet.DurableAcceptance.SchemaVersion == 2 {
 			snapshot.OriginalFingerprints[fact.EventID] = sheet.DurableAcceptance.TransactionEvidence.Reference.Fingerprint
 		}
+	}
+	if err := history.Verify(); err != nil {
+		return RebuildSnapshot{}, err
 	}
 	return snapshot, nil
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	txmongo "github.com/FangcunMount/reliable-messaging/storage/transaction/mongo"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	drivermysql "github.com/go-sql-driver/mysql"
@@ -157,14 +158,15 @@ func TestCurrentGapRejectsMissingOrConflictingSource(t *testing.T) {
 
 func TestCurrentGapMixedHistoricalAndCommittedSources(t *testing.T) {
 	ctx, mdb, _, scanner, current := currentGapNativeFixture(t)
-	_, legacy, intent, confirmation, _ := recoveryFixture(t)
-	legacy.DomainID = 43
-	// Rebuild the historical wire for this legacy sheet identity.
-	intent.Payload = makeWire(t, legacy, legacy.Admission.ModelCode)
-	intent.Fingerprint = fingerprint(t, intent)
+	_, legacy, intent, confirmation, _ := recoveryFixtureForSheet(t, 43)
 	raw, err := bson.Marshal(legacy)
 	require.NoError(t, err)
-	_, err = mdb.Collection("answersheets").InsertOne(ctx, raw)
+	var stored bson.M
+	require.NoError(t, bson.Unmarshal(raw, &stored))
+	stored["filled_at"], stored["filler_type"] = legacy.DurableAcceptance.AcceptedAt, "self"
+	admission := stored["admission"].(bson.M)
+	admission["questionnaire_code"], admission["questionnaire_version"], admission["model_title"] = legacy.QuestionnaireCode, legacy.QuestionnaireVer, "frozen title"
+	_, err = mdb.Collection("answersheets").InsertOne(ctx, stored)
 	require.NoError(t, err)
 	raw, err = bson.Marshal(intent)
 	require.NoError(t, err)
@@ -180,4 +182,36 @@ func TestCurrentGapMixedHistoricalAndCommittedSources(t *testing.T) {
 	require.Equal(t, current.DomainID, page.Findings[0].AnswerSheetID)
 	require.Equal(t, CommittedGap, page.Findings[0].Disposition)
 	require.Equal(t, Missing, page.Findings[1].Disposition)
+	cutoff, now := time.Now().Add(-10*time.Second), time.Now()
+	before, err := scanner.CaptureOriginalRecovery(ctx, legacy.DomainID, legacy.OrgID, cutoff, now)
+	require.NoError(t, err)
+	original, err := mdb.Collection(outboxhistory.Original).FindOne(ctx, bson.M{"_id": old["_id"]}).Raw()
+	require.NoError(t, err)
+	_, err = mdb.Collection(outboxhistory.Archive).InsertOne(ctx, original)
+	require.NoError(t, err)
+	require.NoError(t, mdb.Client().Database("admin").RunCommand(ctx, bson.D{
+		{Key: "renameCollection", Value: mdb.Name() + "." + outboxhistory.Original},
+		{Key: "to", Value: mdb.Name() + ".isolated_original_rm_outbox"},
+	}).Err())
+	after, err := scanner.CaptureOriginalRecovery(ctx, legacy.DomainID, legacy.OrgID, cutoff, now)
+	require.NoError(t, err)
+	require.Equal(t, before.SourceFingerprint, after.SourceFingerprint)
+	require.Equal(t, before.Message().Input(), after.Message().Input())
+	archive, err := mdb.Collection(outboxhistory.Archive).FindOne(ctx, bson.M{"_id": old["_id"]}).Raw()
+	require.NoError(t, err)
+	require.Equal(t, original, archive)
+	archivedPage, err := scanner.ScanPage(ctx, 0, legacy.DomainID, cutoff, 10)
+	require.NoError(t, err)
+	require.Equal(t, page, archivedPage)
+	_, err = mdb.Collection(outboxhistory.Archive).UpdateOne(ctx, bson.M{"_id": old["_id"]}, bson.M{"$set": bson.M{"payload": []byte("changed")}})
+	require.NoError(t, err)
+	_, err = scanner.CaptureOriginalRecovery(ctx, legacy.DomainID, legacy.OrgID, cutoff, now)
+	require.ErrorIs(t, err, ErrUnsafeRecoverySource)
+	currentReview, err := scanner.CaptureOriginalRecovery(ctx, current.DomainID, current.OrgID, cutoff, now)
+	require.NoError(t, err)
+	require.Equal(t, current.DurableAcceptance.EventID, currentReview.Message().Input().ID)
+	retained, err := mdb.Collection("isolated_original_rm_outbox").FindOne(ctx, bson.M{"_id": old["_id"]}).Raw()
+	require.NoError(t, err)
+	require.Equal(t, original, retained)
+	t.Log("F06_MONGO_GAP_PROOF v1_review_and_wire_equal=true v2_unaffected=true changed_archive_refused=true")
 }
