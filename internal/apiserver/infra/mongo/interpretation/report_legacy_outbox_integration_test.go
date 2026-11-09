@@ -77,6 +77,19 @@ func TestLegacyReportFutureWriteRetirementOnMongo(t *testing.T) {
 			if state != transaction.Prepared {
 				seedLegacyReportRoot(t, db, store, original.Execution, frozen, state)
 			}
+			counts, err := InventoryLegacyFutures(ctx, db)
+			require.NoError(t, err)
+			expected := LegacyFutureInventory{Executions: 1, ReportTerminals: 1}
+			switch state {
+			case transaction.Prepared:
+				expected.Prepared = 1
+			case transaction.Committed:
+				expected.Committed = 1
+			case transaction.Aborted:
+				expected.Aborted = 1
+			}
+			require.Equal(t, expected, counts)
+
 			admin := client.Database("admin")
 			require.NoError(t, admin.RunCommand(ctx, bson.D{
 				{Key: "renameCollection", Value: db.Name() + ".rm_outbox"},
@@ -126,10 +139,20 @@ func TestLegacyReportFutureWriteRetirementOnMongo(t *testing.T) {
 			collections, err := db.ListCollectionNames(ctx, bson.M{"name": "rm_outbox"})
 			require.NoError(t, err)
 			require.Empty(t, collections)
+			// Reject a missing request even though the execution and its
+			// witness otherwise still decode.
+			requestKey := transaction.RequestFor(plan).KeyDigest()
+			_, err = db.Collection("rm_tx_request").DeleteOne(ctx, bson.M{"_id": requestKey[:]})
+			require.NoError(t, err)
+			counts, err = InventoryLegacyFutures(ctx, db)
+			require.Error(t, err)
+			require.Empty(t, counts)
+
 		})
 	}
 	if !t.Failed() {
 		t.Log("F06_LEGACY_REPORT_ROOT_PROOF prepared_refused=true rollback_preserved=true committed_restart_read_only=true frozen_witness_bytes_unchanged=true retired_collection_not_recreated=true")
+		t.Log("F06_FROZEN_REPORT_INVENTORY_PROOF prepared_committed_aborted_counted=true missing_request_refused=true")
 	}
 }
 

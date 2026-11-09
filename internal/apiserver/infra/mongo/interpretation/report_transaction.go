@@ -87,6 +87,10 @@ func (c *TransactionCommitter) readExecution(e transaction.Execution) (frozenRep
 	if err != nil {
 		return frozenReportCommit{}, err
 	}
+	return validateReportExecution(e.Plan, raw)
+}
+
+func validateReportExecution(plan transaction.FrozenPlan, raw []byte) (frozenReportCommit, error) {
 	f, err := readReportPlan(raw)
 	if err != nil {
 		return f, err
@@ -96,7 +100,7 @@ func (c *TransactionCommitter) readExecution(e transaction.Execution) (frozenRep
 		return f, err
 	}
 	hash, err := f.inputHash()
-	in := e.Plan.Input()
+	in := plan.Input()
 	if err != nil || len(in.Branches) != 1 || in.Owner != "qs.mongo" || in.Scope != fmt.Sprintf("org:%d", f.Association.OrgID) || in.IdempotencyKey != reportCommitKey(original.ID()) || in.InputHash != hash {
 		return f, transaction.ErrInvalidPlan
 	}
