@@ -4,6 +4,7 @@ package transaction_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	mongostore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
 	mongoreplay "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	mysqlstore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/retryschedule"
 	mysqlreplay "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -174,6 +176,7 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 	require.Error(t, err, "malformed held state cannot be hidden")
 	_, err = pool.ExecContext(t.Context(), "UPDATE rm_outbox SET last_error_code=? WHERE message_id=?", model.HandoffMarker(f), f.Message().Input().ID)
 	require.NoError(t, err)
+	verifyMySQLHandoffHistory(t, pool, store, f, statusReader)
 	waitHandoffDue(t, f)
 	old, err := sdkmysql.New(pool)
 	require.NoError(t, err)
@@ -198,6 +201,95 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 	}
 	return cases
 }
+func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Store, f model.Frozen, status *mysqlreplay.StatusReader) {
+	t.Helper()
+	ctx := t.Context()
+	plans := []model.Frozen{f}
+	expected, err := store.InspectLegacy(ctx, plans)
+	require.NoError(t, err)
+	require.True(t, expected.ResponsibilitiesAccounted)
+	_, err = store.InspectHistory(ctx, plans)
+	require.Error(t, err, "an explicit archive audit cannot substitute the live table")
+	exec := func(query string, args ...any) {
+		t.Helper()
+		_, err := pool.ExecContext(ctx, query, args...)
+		require.NoError(t, err)
+	}
+	exec("CREATE TABLE isolated_outbox_history_rows LIKE rm_outbox")
+	exec("INSERT INTO isolated_outbox_history_rows SELECT * FROM rm_outbox")
+	exec("CREATE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT * FROM isolated_outbox_history_rows")
+	exec(string(retryMigration(t, "mysql", "000090_qs_gap_recovery_request.up.sql")))
+	org := f.Authority().OrgID
+	eventID := f.Message().Input().ID
+	exec(`INSERT INTO qs_rm_gap_recovery_request
+		(org_id,request_id,actor_id,assessment_id,event_id,expected_version,reason,submitted_before,input_hash,result_code,authorized,outbox_version_after)
+		VALUES(?,'retained-decision',1,?, ?,1,'isolated archive audit','2026-11-10T00:00:00Z',UNHEX(REPEAT('aa',32)),'authorized',1,1)`, org, f.Authority().AssessmentID, eventID)
+	gaps, err := mysqlreplay.NewGapRecoveryLedger(pool)
+	require.NoError(t, err)
+
+	// Live governance must observe current work even while a valid archive exists.
+	exec("UPDATE rm_outbox SET state='retry_wait' WHERE message_id=?", eventID)
+	live, err := status.ReadOutboxGovernance(ctx, org)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, live.Automatic)
+	candidates, err := status.ListOutboxCandidates(ctx, org, 10)
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	require.Equal(t, eventID, candidates[0].ResourceID)
+	exec("UPDATE rm_outbox SET state='held' WHERE message_id=?", eventID)
+	exec("RENAME TABLE rm_outbox TO isolated_original_rm_outbox")
+	_, err = store.InspectLegacy(ctx, plans)
+	require.Error(t, err, "live inventory cannot substitute archived evidence")
+	history, err := store.InspectHistory(ctx, plans)
+	require.NoError(t, err)
+	require.Equal(t, expected, history)
+	unselected, err := store.InspectHistory(ctx, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, unselected.UnverifiedHeld)
+	require.False(t, unselected.ResponsibilitiesAccounted)
+	archived, err := status.ReadOutboxGovernance(ctx, org)
+	require.NoError(t, err)
+	require.Zero(t, archived.Automatic)
+	candidates, err = status.ListOutboxCandidates(ctx, org, 10)
+	require.NoError(t, err)
+	require.Empty(t, candidates)
+	snapshot, err := status.OutboxStatusSnapshot(ctx, time.Now())
+	require.NoError(t, err)
+	for _, bucket := range snapshot.Buckets {
+		require.Zero(t, bucket.Count)
+	}
+	summary, err := gaps.ReadSummary(ctx, org)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, summary.Authorized)
+	require.Zero(t, summary.WaitingRelay)
+
+	if handoffCLIRequired(t) {
+		nativeArchiveHandoffLedger(t, pool, store.Binding(), f)
+	}
+
+	exec("UPDATE isolated_outbox_history_rows SET last_error_code=CONCAT('m3_future_owner:',REPEAT('a',64)) WHERE message_id=?", eventID)
+	_, err = status.OutboxStatusSnapshot(ctx, time.Now())
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	exec("UPDATE isolated_outbox_history_rows SET last_error_code=? WHERE message_id=?", model.HandoffMarker(f), eventID)
+	exec("UPDATE isolated_outbox_history_rows SET state='retry_wait' WHERE message_id=?", eventID)
+	_, err = status.OutboxStatusSnapshot(ctx, time.Now())
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = status.ReadOutboxGovernance(ctx, org)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = status.ListOutboxCandidates(ctx, org, 10)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = gaps.ReadSummary(ctx, org)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = store.InspectHistory(ctx, plans)
+	require.Error(t, err, "selected source no longer matches the retained handoff")
+	exec("RENAME TABLE isolated_original_rm_outbox TO rm_outbox")
+	exec("DROP VIEW qs_rm_outbox_history")
+	restored, err := store.InspectLegacy(ctx, plans)
+	require.NoError(t, err)
+	require.Equal(t, expected, restored)
+	t.Log("F06_MYSQL_HISTORY_PROOF live_preferred=true archive_handoff_exact=true archived_pending_refused=true live_inventory_never_substitutes=true")
+}
+
 func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostore.Store, f model.Frozen, binding transaction.Binding) map[string]bool {
 	root := modtx.NewMongoRunner(db, modtx.MongoRunnerOptions{Boundary: "interpretation_commit", Limiter: backpressure.NewLimiter(2, time.Second)})
 	authority, err := mongorepo.NewRetryDispatchAuthority(db)

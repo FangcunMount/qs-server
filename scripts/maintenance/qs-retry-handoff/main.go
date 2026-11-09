@@ -25,7 +25,7 @@ import (
 type arguments struct {
 	reviewFile, reviewSHA, database, receipt string
 	binding                                  transaction.Binding
-	apply, stopped, inventory                bool
+	apply, stopped, inventory, history       bool
 	timeout                                  time.Duration
 }
 
@@ -42,12 +42,14 @@ func parseArguments(args []string) (arguments, error) {
 	f.StringVar(&a.receipt, "receipt", "", "new private receipt path for apply")
 	f.BoolVar(&a.apply, "apply", false, "apply through original DB transactions")
 	f.BoolVar(&a.inventory, "inventory", false, "read-only original responsibility inventory; optional reviewed handoff selection")
+	f.BoolVar(&a.history, "history", false, "inspect the retained MySQL history view with --inventory")
 	f.BoolVar(&a.stopped, "all-legacy-writers-stopped-and-admission-closed", false, "operator attestation, not a stop mechanism or production approval")
 	f.DurationVar(&a.timeout, "timeout", 2*time.Minute, "total apply deadline, at most 5m")
 	if f.Parse(args) != nil || f.NArg() != 0 || (a.reviewFile == "") != (a.reviewSHA == "") ||
 		(!a.inventory && a.reviewFile == "") || (a.apply && a.inventory) ||
 		!a.binding.Valid() || (a.binding.Owner != "qs.mysql" && a.binding.Owner != "qs.mongo") ||
 		a.timeout <= 0 || a.timeout > 5*time.Minute ||
+		(a.history && (!a.inventory || a.binding.Owner != "qs.mysql")) ||
 		(a.apply && (a.database == "" || a.receipt == "" || !a.stopped)) ||
 		(a.inventory && (a.database == "" || a.receipt == "" || a.stopped)) ||
 		(!a.apply && !a.inventory && (a.database != "" || a.receipt != "" || a.stopped)) {
@@ -169,7 +171,7 @@ func run(parent context.Context, args []string, getenv func(string) string, outp
 
 func main() {
 	if len(os.Args) == 2 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
-		fmt.Println("qs-retry-handoff: default private review verification; --apply for stopped-writer original-root transfer; --inventory for read-only responsibility accounting. Explicit --owner/--store-id/--writer-epoch required. Database modes require --database and a new --receipt; credentials only via QS_RETRY_HANDOFF_MYSQL_DSN or QS_RETRY_HANDOFF_MONGO_URI. See scripts/maintenance/qs-retry-handoff/README.md.")
+		fmt.Println("qs-retry-handoff: default private review verification; --apply for stopped-writer original-root transfer; --inventory for read-only responsibility accounting; add --history for the retained MySQL view. Explicit --owner/--store-id/--writer-epoch required. Database modes require --database and a new --receipt; credentials only via QS_RETRY_HANDOFF_MYSQL_DSN or QS_RETRY_HANDOFF_MONGO_URI. See scripts/maintenance/qs-retry-handoff/README.md.")
 		return
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	mysqlstore "github.com/FangcunMount/reliable-messaging/storage/mysql"
 )
 
@@ -65,14 +66,18 @@ func (l *GapRecoveryLedger) ReadSummary(ctx context.Context, orgID int64) (GapRe
 	if l == nil || l.db == nil || orgID <= 0 {
 		return result, errors.New("gap recovery summary requires host database and organization")
 	}
+	source, err := outboxhistory.OperationalSource(ctx, l.db)
+	if err != nil {
+		return result, err
+	}
 	var incomplete int64
-	err := l.db.QueryRowContext(ctx, `SELECT
+	err = l.db.QueryRowContext(ctx, `SELECT
 	COALESCE(SUM(result_code<>'' AND authorized=1),0),
 	COALESCE(SUM(result_code<>'' AND authorized=0),0),
 	COALESCE(SUM(result_code=''),0),
 	(SELECT COUNT(*) FROM qs_rm_gap_recovery_request AS pending
 	 WHERE pending.org_id=? AND pending.authorized=1 AND EXISTS (
-	   SELECT 1 FROM rm_outbox AS o WHERE o.message_id=pending.event_id
+	   SELECT 1 FROM `+source+` AS o WHERE o.message_id=pending.event_id
 	   AND o.scope=CONCAT('org:',pending.org_id)
 	   AND o.producer='qs-server' AND o.event_type='evaluation.requested'
 	   AND o.manual_replay_request_id=pending.request_id

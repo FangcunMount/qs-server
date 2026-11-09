@@ -7,6 +7,7 @@ import (
 	"time"
 
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 )
 
 func (r *StatusReader) ReadOutboxGovernance(ctx context.Context, orgID int64) (app.OutboxGovernanceSummary, error) {
@@ -14,14 +15,18 @@ func (r *StatusReader) ReadOutboxGovernance(ctx context.Context, orgID int64) (a
 	if r == nil || r.db == nil || orgID <= 0 {
 		return summary, fmt.Errorf("standard MySQL governance requires a store and organization")
 	}
-	err := r.db.QueryRowContext(ctx, `SELECT
+	source, err := outboxhistory.OperationalSource(ctx, r.db)
+	if err != nil {
+		return summary, err
+	}
+	err = r.db.QueryRowContext(ctx, `SELECT
  COALESCE(SUM(state='retry_wait' AND (manual_replay_request_id IS NULL OR manual_replay_version IS NULL OR manual_replay_version<>version)),0),
  COALESCE(SUM(state='quarantined' AND last_error_code='publish_unknown'),0),
  COALESCE(SUM(state='retry_wait' AND manual_replay_request_id IS NOT NULL AND manual_replay_version=version),0),
  COALESCE(SUM(state='quarantined' AND last_error_code<>'publish_unknown'),0),
  COALESCE(SUM(state='quarantined' AND last_error_code='publish_unknown'
    AND event_type IN ('evaluation.retry.requested','interpretation.retry.requested')),0)
- FROM rm_outbox WHERE scope=?`, fmt.Sprintf("org:%d", orgID)).Scan(
+ FROM `+source+` WHERE scope=?`, fmt.Sprintf("org:%d", orgID)).Scan(
 		&summary.Automatic, &summary.ManualRequired, &summary.Authorized,
 		&summary.Terminal, &summary.BlockedRetryEvents)
 	return summary, err
@@ -31,10 +36,14 @@ func (r *StatusReader) ListOutboxCandidates(ctx context.Context, orgID int64, li
 	if r == nil || r.db == nil || orgID <= 0 || limit < 1 || limit > 10101 {
 		return nil, fmt.Errorf("invalid standard MySQL candidate query")
 	}
+	source, err := outboxhistory.OperationalSource(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := r.db.QueryContext(ctx, `SELECT message_id,failure_count,state,
  CASE WHEN state='retry_wait' THEN DATE_FORMAT(next_attempt_at,'%Y-%m-%d %H:%i:%s.%f') ELSE NULL END,
  last_error_code,DATE_FORMAT(updated_at,'%Y-%m-%d %H:%i:%s.%f')
- FROM rm_outbox WHERE scope=? AND (
+ FROM `+source+` WHERE scope=? AND (
  (state='retry_wait' AND (manual_replay_request_id IS NULL OR manual_replay_version IS NULL OR manual_replay_version<>version)) OR
  (state='quarantined' AND last_error_code='publish_unknown'))
  ORDER BY updated_at DESC,id DESC LIMIT ?`, fmt.Sprintf("org:%d", orgID), limit)

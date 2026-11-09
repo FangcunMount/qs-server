@@ -4,9 +4,11 @@ package transaction_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	driver "github.com/go-sql-driver/mysql"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -185,4 +187,32 @@ func nativeMissingHandoffLedger(t *testing.T, binding transaction.Binding, datab
 	require.NoError(t, json.Unmarshal([]byte(lines[1]), &final))
 	require.Equal(t, "inventory_unavailable", final.Status)
 	require.Nil(t, final.Inventory, "missing original ledger cannot be zero")
+}
+
+func nativeArchiveHandoffLedger(t *testing.T, pool *sql.DB, binding transaction.Binding, f model.Frozen) {
+	t.Helper()
+	cfg, err := driver.ParseDSN(os.Getenv("QS_M3_RETRY_DSN"))
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&cfg.DBName))
+	review, err := model.ReviewHandoff(binding, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_SOURCE_SHA"), "isolated-ci-owner", "verify archived future responsibility", []model.Frozen{f})
+	require.NoError(t, err)
+	dir := t.TempDir()
+	path, receipt := filepath.Join(dir, "review.json"), filepath.Join(dir, "history.jsonl")
+	require.NoError(t, os.WriteFile(path, review.Bytes(), 0600))
+	digest := review.Digest()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"),
+		"--inventory", "--history", "--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]),
+		"--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch,
+		"--database", cfg.DBName, "--receipt", receipt)
+	cmd.Env = append(os.Environ(), "QS_RETRY_HANDOFF_MYSQL_DSN="+cfg.FormatDSN())
+	out, err := cmd.Output()
+	require.NoError(t, err, "archive inventory failed; private output withheld")
+	require.Contains(t, string(out), "history_responsibilities_accounted")
+	require.Contains(t, string(out), `"cutover_authorized":false`)
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), "m5-mysql-handoff-history-inventory/v1")
+	require.NotContains(t, string(raw), "old_responsibilities_accounted")
 }
