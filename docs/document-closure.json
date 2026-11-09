@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "d3ec413bfc81b594399e2a8209743b66cc2610b1",
+    "sha": "39dbd72bb831764754eba18ff082e8d0f17d5882",
     "verified_on": "2026-11-10"
   },
   "status_policy": {
@@ -15906,7 +15906,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e561c59529df0732d819b515b610d23a25aa627b",
+        "source_sha": "39dbd72bb831764754eba18ff082e8d0f17d5882",
         "verified_on": "2026-11-10"
       },
       "fact_sources": [
@@ -16009,7 +16009,8 @@
       "notes": [
         "2026-10-31 M4 reviewed changed CI production graph/historical-source boundary and test-helper relocation only; production/migration/recovery evidence unchanged. No new DDL or execution is claimed.",
         "2026-11-10 Mongo archive inventory exercised the exact-source maintenance CLI against an isolated replica set. It preserves the original BSON row and records a separate archival receipt, with no production signoff. Previous source binding 34d67bf96a714dfa19a574d3fce965391f6d089f remains historical.",
-        "2026-11-10 source review and isolated MySQL 8.0.36/8.4.13 CLI tests cover explicit --inventory --history and its separate receipt. Prior source verification was 34d67bf96a714dfa19a574d3fce965391f6d089f on 2026-10-31. Production evidence and signoffs retain their previous attribution."
+        "2026-11-10 source review and isolated MySQL 8.0.36/8.4.13 CLI tests cover explicit --inventory --history and its separate receipt. Prior source verification was 34d67bf96a714dfa19a574d3fce965391f6d089f on 2026-10-31. Production evidence and signoffs retain their previous attribution.",
+        "2026-11-10 isolated MySQL snapshot and Mongo archive tests used the same exact-source CLI. MySQL gate refuses hidden originals, malformed states and unresolved obligations. Prior verification e561c59529df0732d819b515b610d23a25aa627b retains its original attribution."
       ]
     },
     {
