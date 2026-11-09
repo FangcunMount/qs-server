@@ -732,11 +732,29 @@ func runDefaultOwnerRuntime(t *testing.T, recovery bool) {
 		next := newInstance(true)
 		require.NoError(t, next.normal.Start())
 		require.NoError(t, next.events.Start(t.Context()))
-		require.True(t, next.events.MySQLTransactionOwner().Runtime().Stats().Ready)
-		require.True(t, next.events.MongoTransactionOwner().Runtime().Stats().Ready)
+		replacements := []*messagingruntime.TransactionRuntime{
+			next.events.MySQLTransactionOwner().Runtime(),
+			next.events.MongoTransactionOwner().Runtime(),
+		}
+		for i, runtime := range replacements {
+			stats, observation := runtime.Stats(), runtime.ProtectionStats()
+			require.False(t, stats.Ready, "paused owner must keep write admission closed")
+			require.False(t, stats.Stopped)
+			require.True(t, observation.Available && observation.Fresh && observation.SamplerRunning,
+				"paused replacement must keep the original owner observation running")
+			input := branches[i].plan.Input()
+			_, e := runtime.Reserve(t.Context(), transaction.Request{
+				Owner: input.Owner, Scope: input.Scope, Key: input.IdempotencyKey, InputHash: input.InputHash,
+			}, branches[i].plan)
+			require.ErrorIs(t, e, messagingruntime.ErrTransactionAdmissionClosed)
+			require.Zero(t, runtime.Stats().HalfPreparedResults)
+		}
 		closeCtx, closeCancel := context.WithTimeout(t.Context(), 30*time.Second)
 		defer closeCancel()
 		require.NoError(t, next.events.CloseContext(closeCtx))
+		for _, runtime := range replacements {
+			require.True(t, runtime.Stats().Stopped)
+		}
 		require.NoError(t, next.normal.Close(closeCtx))
 		require.NoError(t, next.host.Cleanup())
 		require.NoError(t, data.pool.PingContext(t.Context()))
