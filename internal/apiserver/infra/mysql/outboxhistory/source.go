@@ -105,7 +105,7 @@ func OperationalSource(ctx context.Context, db rowQuery) (string, error) {
 // GORM keeps metadata lookup on the same connection or transaction as the
 // data read. Existing non-MySQL test adapters use the legacy table.
 func GORM(ctx context.Context, db *gorm.DB) (string, error) {
-	if db.Dialector.Name() != "mysql" {
+	if db.Name() != "mysql" {
 		return LegacyTable, nil
 	}
 	return Source(ctx, db.Statement.ConnPool)
