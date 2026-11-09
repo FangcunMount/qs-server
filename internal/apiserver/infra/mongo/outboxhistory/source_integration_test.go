@@ -24,13 +24,13 @@ func TestHistoryReaderRejectsCollectionIdentityChange(t *testing.T) {
 		{Key: "to", Value: db.Name() + ".isolated_retained_history"},
 	}).Err())
 	require.NoError(t, db.CreateCollection(ctx, Archive))
-	require.ErrorIs(t, reader.Verify(), errIdentity)
+	require.ErrorIs(t, reader.Verify(), ErrIdentity)
 
 	reader = NewReader(ctx, db)
 	_, err = reader.Collection()
 	require.NoError(t, err)
 	require.NoError(t, db.CreateCollection(ctx, Original))
-	require.ErrorIs(t, reader.Verify(), errIdentity)
+	require.ErrorIs(t, reader.Verify(), ErrIdentity)
 	fresh, err := NewReader(ctx, db).Collection()
 	require.NoError(t, err)
 	require.Equal(t, Original, fresh.Name())

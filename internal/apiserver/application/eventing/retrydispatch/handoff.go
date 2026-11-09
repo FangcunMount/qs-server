@@ -60,6 +60,29 @@ func (h *Handoff) Inspect(ctx context.Context, selected []model.Frozen) (model.L
 	return result, nil
 }
 
+// InspectHistory checks the retained Mongo ledger against original schedule
+// plans. Its result is archival evidence and is not a live cutover inventory.
+func (h *Handoff) InspectHistory(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	if h.binding.Owner != "qs.mongo" {
+		return model.LegacyInventory{}, transaction.ErrBinding
+	}
+	if err := model.ValidateHandoffSelection(h.binding, selected); err != nil {
+		return model.LegacyInventory{}, err
+	}
+	reader, ok := h.store.(port.HandoffHistoryInspector)
+	if !ok {
+		return model.LegacyInventory{}, transaction.ErrBinding
+	}
+	result, err := reader.InspectHistory(ctx, selected)
+	if err != nil {
+		return model.LegacyInventory{}, err
+	}
+	if result.Binding != h.binding {
+		return model.LegacyInventory{}, transaction.ErrBinding
+	}
+	return result, nil
+}
+
 // Apply transfers each selected plan in its own original root, stopping at the
 // first failure. Earlier confirmations remain explicit; a commit error remains
 // unknown. Repeating this metadata operation with the SAME reviewed plan is

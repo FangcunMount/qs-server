@@ -186,3 +186,69 @@ func nativeMissingHandoffLedger(t *testing.T, binding transaction.Binding, datab
 	require.Equal(t, "inventory_unavailable", final.Status)
 	require.Nil(t, final.Inventory, "missing original ledger cannot be zero")
 }
+
+// nativeMongoHistoryHandoffCLI invokes the same binary and binding used by
+// live inventory, but demands an explicitly separate archival receipt.
+func nativeMongoHistoryHandoffCLI(t *testing.T, binding transaction.Binding, f model.Frozen, database string, selected bool, exitCode int) {
+	t.Helper()
+	dir := t.TempDir()
+	receipt := filepath.Join(dir, "history.jsonl")
+	args := []string{"--inventory", "--history", "--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch, "--database", database, "--receipt", receipt}
+	if selected {
+		review, err := model.ReviewHandoff(binding, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_SOURCE_SHA"), "isolated-ci-owner", "verify archived future responsibility", []model.Frozen{f})
+		require.NoError(t, err)
+		path := filepath.Join(dir, "review.json")
+		require.NoError(t, os.WriteFile(path, review.Bytes(), 0600))
+		digest := review.Digest()
+		args = append(args, "--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]))
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"), args...)
+	cmd.Env = append(os.Environ(), "QS_RETRY_HANDOFF_MONGO_URI="+os.Getenv("QS_M3_MONGO_URI"))
+	out, err := cmd.Output()
+	if exitCode == 0 {
+		require.NoError(t, err)
+	} else {
+		var exit *exec.ExitError
+		require.ErrorAs(t, err, &exit)
+		require.Equal(t, exitCode, exit.ExitCode())
+	}
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	require.Len(t, lines, 2)
+	var header struct {
+		Schema   string `json:"schema"`
+		ReadOnly bool   `json:"read_only"`
+		Cutover  bool   `json:"cutover_authorized"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(lines[0]), &header))
+	require.Equal(t, "m5-mongo-handoff-history-inventory/v1", header.Schema)
+	require.True(t, header.ReadOnly)
+	require.False(t, header.Cutover)
+	var final struct {
+		Status    string                 `json:"status"`
+		Inventory *model.LegacyInventory `json:"inventory"`
+		Cutover   bool                   `json:"cutover_authorized"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(lines[1]), &final))
+	require.False(t, final.Cutover)
+	switch exitCode {
+	case 0:
+		require.Equal(t, "history_responsibilities_accounted", final.Status)
+		require.NotNil(t, final.Inventory)
+		require.Equal(t, binding, final.Inventory.Binding)
+		require.EqualValues(t, 1, final.Inventory.VerifiedHandoffs)
+		require.True(t, final.Inventory.ResponsibilitiesAccounted)
+	case 1:
+		require.Equal(t, "inventory_unavailable", final.Status)
+		require.Nil(t, final.Inventory)
+		require.Empty(t, out)
+	case 2:
+		require.Equal(t, "history_responsibilities_present", final.Status)
+		require.NotNil(t, final.Inventory)
+		require.EqualValues(t, 1, final.Inventory.UnverifiedHeld)
+		require.False(t, final.Inventory.ResponsibilitiesAccounted)
+	}
+}

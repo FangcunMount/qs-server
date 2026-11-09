@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -264,6 +265,15 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 		}
 		cliCases["offline_cli_no_new_tables_or_collections"] = true
 		cliCases["offline_cli_no_sdk_transaction_rows"] = true
+		nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 1)
+		legacy := db.Collection("rm_outbox")
+		archive := db.Collection("qs_rm_outbox_history")
+		var original bson.Raw
+		require.NoError(t, legacy.FindOne(t.Context(), filter).Decode(&original))
+		_, err = archive.InsertOne(t.Context(), original)
+		require.NoError(t, err)
+		nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), false, 2)
+		nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 0)
 		func() {
 			admin := db.Client().Database("admin")
 			require.NoError(t, admin.RunCommand(t.Context(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox"}, {Key: "to", Value: db.Name() + ".rm_outbox_native_hidden"}}).Err())
@@ -271,8 +281,31 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 				require.NoError(t, admin.RunCommand(context.Background(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox_native_hidden"}, {Key: "to", Value: db.Name() + ".rm_outbox"}}).Err())
 			}()
 			nativeMissingHandoffLedger(t, binding, db.Name(), "QS_RETRY_HANDOFF_MONGO_URI", os.Getenv("QS_M3_MONGO_URI"))
+			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 0)
+			var retained bson.Raw
+			require.NoError(t, archive.FindOne(t.Context(), filter).Decode(&retained))
+			require.Equal(t, original, retained)
+			_, err := archive.UpdateOne(t.Context(), filter, bson.M{"$set": bson.M{"last_error_code": "m3_future_owner:" + strings.Repeat("0", 64)}})
+			require.NoError(t, err)
+			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 1)
+			_, err = archive.DeleteOne(t.Context(), filter)
+			require.NoError(t, err)
+			var changed bson.D
+			require.NoError(t, bson.Unmarshal(original, &changed))
+			require.Equal(t, "_id", changed[0].Key)
+			changed[0].Value = "substituted-bson-identity"
+			_, err = archive.InsertOne(t.Context(), changed)
+			require.NoError(t, err)
+			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 1)
 		}()
+		var retained bson.Raw
+		require.NoError(t, legacy.FindOne(t.Context(), filter).Decode(&retained))
+		require.Equal(t, original, retained)
 		cliCases["offline_inventory_missing_ledger_not_empty"] = true
+		cliCases["offline_mongo_history_requires_explicit_archive"] = true
+		cliCases["offline_mongo_history_verifies_only_reviewed_held"] = true
+		cliCases["offline_mongo_history_preserves_original_and_rejects_false_marker"] = true
+		t.Log("F06_MONGO_SCHEDULE_PROOF live_missing_refused=true explicit_archive_required=true unselected_held_blocked=true exact_pair=true false_marker_refused=true substituted_bson_id_refused=true original_unchanged=true")
 	} else {
 		require.NoError(t, root.WithinTransaction(t.Context(), func(ctx context.Context) error {
 			already, err := store.TransferLegacy(ctx, f, authority)

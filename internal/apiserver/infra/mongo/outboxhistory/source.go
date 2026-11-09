@@ -21,7 +21,7 @@ const (
 
 var (
 	ErrMissing  = errors.New("historical MongoDB outbox collections are unavailable")
-	errIdentity = errors.New("historical MongoDB outbox collection identity changed or is invalid")
+	ErrIdentity = errors.New("historical MongoDB outbox collection identity changed or is invalid")
 )
 
 type source struct {
@@ -34,6 +34,7 @@ type source struct {
 type Reader struct {
 	ctx      context.Context
 	db       *mongo.Database
+	name     string
 	resolved bool
 	source   source
 	err      error
@@ -41,6 +42,16 @@ type Reader struct {
 
 func NewReader(ctx context.Context, db *mongo.Database) *Reader {
 	return &Reader{ctx: ctx, db: db}
+}
+
+// NewOriginalReader requires the physical legacy collection for a live audit.
+func NewOriginalReader(ctx context.Context, db *mongo.Database) *Reader {
+	return &Reader{ctx: ctx, db: db, name: Original}
+}
+
+// NewArchiveReader requires the fixed archive even if the original exists.
+func NewArchiveReader(ctx context.Context, db *mongo.Database) *Reader {
+	return &Reader{ctx: ctx, db: db, name: Archive}
 }
 
 // Collection resolves lazily. A v2-only path never reads legacy metadata, and
@@ -65,17 +76,21 @@ func (r *Reader) Verify() error {
 		return err
 	}
 	if after.name != r.source.name || !bytes.Equal(after.uuid.Data, r.source.uuid.Data) {
-		return errIdentity
+		return ErrIdentity
 	}
 	return nil
 }
 
 func (r *Reader) resolve() (source, error) {
 	if mongo.SessionFromContext(r.ctx) != nil {
-		return source{}, errIdentity
+		return source{}, ErrIdentity
 	}
 	db := r.db.Client().Database(r.db.Name(), options.Database().SetReadPreference(readpref.Primary()))
-	cursor, err := db.ListCollections(r.ctx, bson.M{"name": bson.M{"$in": bson.A{Original, Archive}}}, options.ListCollections().SetNameOnly(false))
+	var names any = bson.M{"$in": bson.A{Original, Archive}}
+	if r.name != "" {
+		names = r.name
+	}
+	cursor, err := db.ListCollections(r.ctx, bson.M{"name": names}, options.ListCollections().SetNameOnly(false))
 	if err != nil {
 		return source{}, err
 	}
@@ -99,10 +114,10 @@ func (r *Reader) resolve() (source, error) {
 		case Archive:
 			dst = &archive
 		default:
-			return source{}, errIdentity
+			return source{}, ErrIdentity
 		}
 		if dst.name != "" || meta.Type != "collection" || meta.Info.UUID.Subtype != 4 || len(meta.Info.UUID.Data) != 16 {
-			return source{}, errIdentity
+			return source{}, ErrIdentity
 		}
 		*dst = source{meta.Name, meta.Info.UUID}
 	}
