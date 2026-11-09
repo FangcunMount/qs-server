@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -68,28 +69,59 @@ func ActiveSource(ctx context.Context, db rowQuery) (string, error) {
 
 var ErrUnresolvedArchive = errors.New("MySQL Outbox history still contains unresolved publication responsibilities")
 
-// OperationalSource keeps backlog and recovery status on the live table while
+// ReadOperational shares a consistent read-only snapshot between the archive
+// safety gate and the caller's results. No data is returned on a failed read.
+func ReadOperational[T any](ctx context.Context, db *sql.DB, read func(*sql.Tx, string) (T, error)) (T, error) {
+	var zero T
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return zero, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	source, err := operationalSource(ctx, tx)
+	if err != nil {
+		return zero, err
+	}
+	result, err := read(tx, source)
+	if err != nil {
+		return zero, err
+	}
+	if err := tx.Commit(); err != nil {
+		return zero, err
+	}
+	return result, nil
+}
+
+// operationalSource keeps backlog and recovery status on the live table while
 // it exists. An archive cannot turn unfinished publication into a live candidate
 // or an empty healthy snapshot. Exact held-to-schedule matches are verified by
 // the separate responsibility inventory.
-func OperationalSource(ctx context.Context, db rowQuery) (string, error) {
-	source, err := ActiveSource(ctx, db)
+func operationalSource(ctx context.Context, tx *sql.Tx) (string, error) {
+	source, err := ActiveSource(ctx, tx)
 	if err == nil {
 		return source, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-	source, err = ArchiveSource(ctx, db)
+	// Metadata visibility depends on grants. A physical-table access denial
+	// cannot be treated as proof that its publication responsibilities retired.
+	var absent *mysql.MySQLError
+	_, err = tx.ExecContext(ctx, "SELECT id FROM rm_outbox LIMIT 0")
+	if !errors.As(err, &absent) || absent.Number != 1146 {
+		return "", errors.Join(errors.New("active MySQL Outbox absence is unverified"), err)
+	}
+	source, err = ArchiveSource(ctx, tx)
 	if err != nil {
 		return "", err
 	}
 	var unresolved bool
-	err = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM `+source+` AS o
-		WHERE o.state NOT IN ('published','held') OR o.claim_token IS NOT NULL OR o.lease_until IS NOT NULL
-		OR (o.state='published' AND (o.transport_confirmed_at IS NULL OR o.transport_confirmed_at<'1970-01-01'))
-		OR (o.state='held' AND (o.transport_confirmed_at IS NOT NULL OR o.attempt_count<>0 OR o.failure_count<>0
-			OR o.manual_replay_request_id IS NOT NULL OR o.manual_replay_version IS NOT NULL OR o.version=0
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM `+source+` AS o
+		WHERE o.state IS NULL OR BINARY o.state NOT IN ('published','held')
+		OR o.claim_token IS NOT NULL OR o.lease_until IS NOT NULL
+		OR (BINARY o.state='published' AND (o.transport_confirmed_at IS NULL OR o.transport_confirmed_at<'1970-01-01'))
+		OR (BINARY o.state='held' AND (o.transport_confirmed_at IS NOT NULL OR NOT (o.attempt_count <=> 0) OR NOT (o.failure_count <=> 0)
+			OR o.manual_replay_request_id IS NOT NULL OR o.manual_replay_version IS NOT NULL OR o.version IS NULL OR o.version=0
 			OR NOT EXISTS (SELECT 1 FROM qs_retry_schedule AS s
 				WHERE s.owner='qs.mysql' AND s.scope=o.scope AND s.message_id=o.message_id
 				AND BINARY o.last_error_code=CONCAT('m3_future_owner:', LOWER(HEX(s.plan_hash)))))))`).Scan(&unresolved)
