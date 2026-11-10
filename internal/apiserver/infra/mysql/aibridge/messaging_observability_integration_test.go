@@ -88,8 +88,11 @@ func TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory(t *testing.T
 	mustMQ(t, err)
 	mustMQ(t, insert(tx, uuid.NewString(), "", future))
 	mustMQ(t, tx.Commit())
-	snapshot, err := MessagingSnapshot(t.Context(), db)
+	snapshot, gaps, err := ObserveMessagingSnapshot(t.Context(), db)
 	mustMQ(t, err)
+	if gaps == nil || *gaps != 0 {
+		t.Fatal("complete transaction anchors did not report a measured zero", gaps)
+	}
 	if snapshot["committed_commands"] != 5 || snapshot["awaiting_command_receipts"] != 3 || snapshot["held_command_receipts"] != 1 || snapshot["oldest_awaiting_command_receipt_seconds"] < 300 {
 		t.Fatal("stages/age conflated", snapshot)
 	}
@@ -99,6 +102,7 @@ func TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory(t *testing.T
 	// Committed business rows alone cannot stand in for exact transaction evidence.
 	// Every mutation below is confined to this test's randomly owned schema.
 	for _, change := range []struct{ damage, restore string }{
+		{"UPDATE ai_messaging_archive SET destination='other'", "UPDATE ai_messaging_archive SET destination='qs-ai'"},
 		{"UPDATE rm_tx_execution SET state='prepared'", "UPDATE rm_tx_execution SET state='committed'"},
 		{"UPDATE rm_tx_execution SET owner='other.mysql'", "UPDATE rm_tx_execution SET owner='qs.mysql'"},
 		{"UPDATE rm_tx_witness SET state='aborted'", "UPDATE rm_tx_witness SET state='committed'"},
@@ -109,6 +113,10 @@ func TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory(t *testing.T
 		invalid, err := MessagingSnapshot(t.Context(), db)
 		if err != ErrMessagingLedgerIntegrity || invalid != nil {
 			t.Fatal("unproven transaction exposed receipt counts", change.damage, invalid, err)
+		}
+		values, gaps, err := ObserveMessagingSnapshot(t.Context(), db)
+		if err != ErrMessagingLedgerIntegrity || values != nil || gaps == nil || *gaps != 5 {
+			t.Fatal("integrity count must be measured separately from receipt counts", change.damage, values, gaps, err)
 		}
 		_, err = db.Exec(change.restore)
 		mustMQ(t, err)
@@ -145,8 +153,8 @@ func TestMQSnapshotCommittedStateWithoutSettlementOrInventedHistory(t *testing.T
 	// even already-read transaction counts rather than expose a partial empty state.
 	_, err = db.Exec("DROP TABLE ai_messaging_quarantine")
 	mustMQ(t, err)
-	partial, err := MessagingSnapshot(t.Context(), db)
-	if err == nil || partial != nil {
-		t.Fatal("failed snapshot exposed partial state", partial, err)
+	partial, gaps, err := ObserveMessagingSnapshot(t.Context(), db)
+	if err == nil || partial != nil || gaps != nil {
+		t.Fatal("failed snapshot exposed partial state", partial, gaps, err)
 	}
 }
