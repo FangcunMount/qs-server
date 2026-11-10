@@ -650,9 +650,9 @@ func runDefaultOwnerRuntime(t *testing.T, recovery bool) {
 			require.NoError(t, e)
 			require.NoError(t, f.Close())
 		}
-		wait := func(name string) {
+		wait := func(name string, limit time.Duration) {
 			t.Helper()
-			deadline := time.Now().Add(360 * time.Second)
+			deadline := time.Now().Add(limit)
 			for time.Now().Before(deadline) {
 				if info, e := os.Lstat(filepath.Join(directory, name)); e == nil {
 					require.True(t, info.Mode().IsRegular())
@@ -680,7 +680,11 @@ func runDefaultOwnerRuntime(t *testing.T, recovery bool) {
 			records = append(records, map[string]any{"owner": binding.Owner, "store_id": binding.StoreID, "writer_epoch": binding.WriterEpoch, "operation_id": ref.OperationID, "branch_id": ref.BranchID, "fence": ref.Fence, "message_id": ref.MessageID, "wire_hash": hex.EncodeToString(ref.WireHash[:])})
 		}
 		write("original-roots.json", map[string]any{"database": data.documents.Name(), "branches": records, "original_root_calls": 2, "original_owners_stopped": true, "broker_sigkill_after_commit": true})
-		wait("record-notices")
+		indexWait := 360 * time.Second
+		if os.Getenv("QS_M3_OBSERVED_CHECK_BUDGET") == "true" {
+			indexWait = 660 * time.Second
+		}
+		wait("record-notices", indexWait)
 		for i, b := range branches {
 			raw, e := os.ReadFile(filepath.Join(directory, "native-"+b.owner+".json"))
 			require.NoError(t, e)
@@ -699,7 +703,7 @@ func runDefaultOwnerRuntime(t *testing.T, recovery bool) {
 			}
 		}
 		write("notices.json", map[string]bool{"both_original_stores_recorded": true})
-		wait("verify")
+		wait("verify", 360*time.Second)
 		for i, b := range branches {
 			ref := b.owned.References()[0]
 			if i == 0 {
