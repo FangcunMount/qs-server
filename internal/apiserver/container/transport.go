@@ -172,6 +172,7 @@ func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 		Options:                   c.systemGovernanceOptions,
 		EventStatusService:        eventStatus,
 		EventOutboxes:             outboxes,
+		TransactionOnlyEventing:   c.eventSubsystem != nil,
 		CacheGovernance:           cacheGovernance,
 		CachePolicyReloader:       c.CachePolicyReloader(),
 		MySQLDB:                   c.mysqlDB,
