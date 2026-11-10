@@ -472,6 +472,13 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 				require.NoError(t, admin.RunCommand(context.Background(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox_native_hidden"}, {Key: "to", Value: db.Name() + ".rm_outbox"}}).Err())
 			}()
 			nativeMissingHandoffLedger(t, binding, db.Name(), "QS_RETRY_HANDOFF_MONGO_URI", os.Getenv("QS_M3_MONGO_URI"))
+			t.Run("offline_apply_requires_physical_original", func(t *testing.T) {
+				require.NoError(t, db.CreateView(t.Context(), "rm_outbox", "rm_outbox_native_hidden", mongo.Pipeline{}))
+				defer func() {
+					require.NoError(t, db.Collection("rm_outbox").Drop(context.Background()))
+				}()
+				nativeMongoApplyRejectsView(t, binding, f, db.Name())
+			})
 			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 0)
 			var retained bson.Raw
 			require.NoError(t, archive.FindOne(t.Context(), filter).Decode(&retained))

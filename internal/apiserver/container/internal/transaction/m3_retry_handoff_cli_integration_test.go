@@ -189,6 +189,46 @@ func nativeMissingHandoffLedger(t *testing.T, binding transaction.Binding, datab
 	require.Nil(t, final.Inventory, "missing original ledger cannot be zero")
 }
 
+func nativeMongoApplyRejectsView(t *testing.T, binding transaction.Binding, f model.Frozen, database string) {
+	t.Helper()
+	dir := t.TempDir()
+	receipt := filepath.Join(dir, "refused-view.jsonl")
+	review, err := model.ReviewHandoff(binding, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_SOURCE_SHA"), "isolated-ci-owner", "refuse a view under the original write name", []model.Frozen{f})
+	require.NoError(t, err)
+	path := filepath.Join(dir, "review.json")
+	require.NoError(t, os.WriteFile(path, review.Bytes(), 0600))
+	digest := review.Digest()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"),
+		"--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]),
+		"--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch,
+		"--apply", "--database", database, "--receipt", receipt, "--all-legacy-writers-stopped-and-admission-closed")
+	cmd.Env = append(os.Environ(), "QS_RETRY_HANDOFF_MONGO_URI="+os.Getenv("QS_M3_MONGO_URI"))
+	output, err := cmd.Output()
+	require.Error(t, err, "apply accepted a view of the transferred original")
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit)
+	require.Equal(t, 1, exit.ExitCode())
+	require.Empty(t, output)
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	require.Len(t, lines, 2)
+	var final struct {
+		Status   string `json:"status"`
+		Outcomes []struct {
+			Status string `json:"status"`
+		} `json:"outcomes"`
+		Cutover bool `json:"cutover_authorized"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(lines[1]), &final))
+	require.Equal(t, "handoff_incomplete", final.Status)
+	require.False(t, final.Cutover)
+	require.Len(t, final.Outcomes, 1)
+	require.Equal(t, "unknown", final.Outcomes[0].Status)
+}
+
 // nativeMongoHistoryHandoffCLI invokes the same binary and binding used by
 // live inventory, but demands an explicitly separate archival receipt.
 func nativeMongoHistoryHandoffCLI(t *testing.T, binding transaction.Binding, f model.Frozen, database string, selected bool, exitCode int) {
