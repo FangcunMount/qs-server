@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "0ba3035e384efe46a1d2a2d3a2a9a851312d36e6",
-    "verified_on": "2026-11-01"
+    "sha": "9d34975fc6440e60a8ab95e38d0f63d78882735a",
+    "verified_on": "2026-11-10"
   },
   "status_policy": {
     "doc_status": [
@@ -15711,8 +15711,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
-        "verified_on": "2026-10-24"
+        "source_sha": "9d34975fc6440e60a8ab95e38d0f63d78882735a",
+        "verified_on": "2026-11-10"
       },
       "fact_sources": [
         {
@@ -15777,6 +15777,7 @@
         "observed_at": null,
         "limitations": [
           "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
+          "2026-11-10 source review covers read-only container selection and runtime identity checks. Prior global baseline 0ba3035e384efe46a1d2a2d3a2a9a851312d36e6 (2026-11-01) and this entry’s prior binding 9edd299cf51a44beab766efb50a978c6f05dbbae (2026-10-24) retain their original evidence. IAM subject setup and business acceptance remain separately tracked.",
           "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
           "AuthZ availability-probe followup retains prior current bindings as JSON: {\"source_baseline\": {\"sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Only the explicit missing-entrypoint status42 selects the old-image command. Generic exec/privilege errors, probe125 and command failure42 refuse without a legacy retry; fake-container shell contracts and ShellCheck passed. No real Docker or production operation occurred.",
           "Maintenance entrypoint relocation source review preserves prior current verified marker as JSON: {\"source_sha\": \"cb6a0aabbf3315b827ee36de46a80c9e8bb91fe4\", \"verified_on\": \"2026-10-18\"}. Go implementation bytes, binary names, runtime script ABI, operation inputs, evidence and side-effect boundaries are unchanged; only the audit integration fixture resource path changes. Local ordinary/race tests and package builds passed after relocation; the exact committed source also passed make build-maintenance. Docker context inclusion was checked with cached Moby patternmatcher v0.6.0 without changing repository dependencies. Real Docker images/database integrations and production operations were not executed. Historical package/native/CI/production records retain original source/path attribution.",
