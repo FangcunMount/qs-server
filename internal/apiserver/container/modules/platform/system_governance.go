@@ -31,6 +31,7 @@ type RESTSystemGovernanceInput struct {
 	Options                   *options.SystemGovernanceOptions
 	EventStatusService        appEventing.StatusService
 	EventOutboxes             []appEventing.NamedOutboxStatusReader
+	TransactionOnlyEventing   bool
 	CacheGovernance           cachegovernance.Facade
 	CachePolicyReloader       systemgov.CachePolicyReloader
 	LocalResilienceSnapshot   func() resilience.RuntimeSnapshot
@@ -70,8 +71,12 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 				auditStore, governanceinfra.NewActionAuditStore(in.MySQLDB), replayResolvers)
 		}
 	}
-	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB).
-		WithStandardOutboxes(buildStandardOutboxGovernanceReaders(in.EventOutboxes))
+	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB)
+	if in.TransactionOnlyEventing && len(in.EventOutboxes) == 0 {
+		retryReader.WithTransactionOnlyPublication()
+	} else {
+		retryReader.WithStandardOutboxes(buildStandardOutboxGovernanceReaders(in.EventOutboxes))
+	}
 	actions := systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, auditStore).
 		BindEventReplayStores(buildEventReplayStores(in.EventOutboxes, retryReader)).
 		BindDurableEventReplayStores(durableReplays).
