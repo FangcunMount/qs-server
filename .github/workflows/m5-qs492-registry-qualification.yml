@@ -66,7 +66,7 @@ jobs:
           "${probe[@]}" --entrypoint /bin/sh "$LOCAL_TAG" -ec             'id -u; id -g; printf "%s\n" "$TZ"; sha256sum "$@"' probe "${files[@]}" > runtime.txt
           "${probe[@]}" --entrypoint /bin/cat "$LOCAL_TAG" "/app/$EXECUTABLE" > executable
           go version -m executable > build.txt
-          docker image save "$LOCAL_TAG" | gzip -1n > image.tar.gz
+          docker image save "$LOCAL_TAG" | gzip -1n > "$GITHUB_WORKSPACE/image.tar.gz"
           python3 - <<'PY'
           import hashlib
           import json
@@ -93,7 +93,8 @@ jobs:
               assert set(files) == {'/app/'+name for name in ('qs-apiserver','qs-ai-messaging','qs-ai-messaging-preflight','qs-authz')}
           else:
               assert set(files) == {'/app/'+executable}
-          archive_path = Path('image.tar.gz')
+          workspace = Path(os.environ['GITHUB_WORKSPACE'])
+          archive_path = workspace / 'image.tar.gz'
           with tarfile.open(archive_path) as archive:
               def verify(desc, structured=False):
                   algo,value = desc['digest'].split(':')
@@ -117,8 +118,6 @@ jobs:
               assert docker_manifest['RepoTags'] == [local]
           with archive_path.open('rb') as stream:
               archive_sha = hashlib.file_digest(stream,'sha256').hexdigest()
-          workspace = Path(os.environ['GITHUB_WORKSPACE'])
-          archive_path.rename(workspace / 'image.tar.gz')
           (workspace / 'qualification.json').write_text(json.dumps(dict(
               schema='qs-m5-registry-image-qualification/v1', source=source, registry_ref=ref,
               config=expected, archive_manifest=manifest_descriptor['digest'],
