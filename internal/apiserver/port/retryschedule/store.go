@@ -70,3 +70,9 @@ type HandoffStore interface {
 type HandoffInspector interface {
 	InspectLegacy(context.Context, []model.Frozen) (model.LegacyInventory, error)
 }
+
+// HandoffHistoryInspector audits an explicitly selected immutable source. It
+// cannot stand in for live pre-cutover inventory.
+type HandoffHistoryInspector interface {
+	InspectHistory(context.Context, []model.Frozen) (model.LegacyInventory, error)
+}

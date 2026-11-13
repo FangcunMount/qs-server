@@ -13,6 +13,7 @@ import (
 	modeldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modelmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	modelport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -26,6 +27,7 @@ type Scanner struct {
 	limiter          backpressure.Acquirer
 	outcomes         evaluationfact.Repository
 	transactionOwner transactionAuditOwner
+	history          *outboxhistory.Reader
 }
 
 func NewScanner(db *mongo.Database, limiter backpressure.Acquirer) *Scanner {
@@ -76,6 +78,19 @@ func (s *Scanner) ScanBatch(ctx context.Context, request appaudit.BatchRequest) 
 	defer release()
 	ctx, cancel := context.WithTimeout(ctx, request.MaxTime)
 	defer cancel()
+	batch := *s
+	batch.history = outboxhistory.NewReader(ctx, s.db)
+	result, err := batch.scanBatch(ctx, request)
+	if err != nil {
+		return result, err
+	}
+	if err := batch.history.Verify(); err != nil {
+		return appaudit.BatchResult{}, err
+	}
+	return result, nil
+}
+
+func (s *Scanner) scanBatch(ctx context.Context, request appaudit.BatchRequest) (appaudit.BatchResult, error) {
 	switch request.Phase {
 	case appaudit.PhaseAnswerSheetOutbox:
 		return s.scanAnswerSheetOutbox(ctx, request)

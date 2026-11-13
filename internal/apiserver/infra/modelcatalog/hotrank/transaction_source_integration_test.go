@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	txmongo "github.com/FangcunMount/reliable-messaging/storage/transaction/mongo"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"github.com/google/uuid"
@@ -172,13 +173,37 @@ func TestHotRankMixedHistoricalAndCurrentDay(t *testing.T) {
 	snapshot, err := source.Capture(ctx, start.Format("20060102"))
 	require.NoError(t, err)
 	require.Len(t, snapshot.Facts, 2)
-	_, counts, err := snapshot.Manifest()
+	digest, counts, err := snapshot.Manifest()
 	require.NoError(t, err)
 	require.Equal(t, map[string]int{"Q-A": 1, "Q-B": 1}, counts)
-	// Historical responsibility remains mandatory even in an otherwise valid v2 day.
-	_, err = db.Collection("rm_outbox").DeleteMany(ctx, bson.M{})
+	original, err := db.Collection(outboxhistory.Original).FindOne(ctx, bson.M{"_id": old["_id"]}).Raw()
 	require.NoError(t, err)
-	snapshot, err = source.Capture(ctx, start.Format("20060102"))
+	_, err = db.Collection(outboxhistory.Archive).InsertOne(ctx, original)
+	require.NoError(t, err)
+	// A live collection with a missing record cannot borrow the archived row.
+	_, err = db.Collection(outboxhistory.Original).DeleteOne(ctx, bson.M{"_id": old["_id"]})
+	require.NoError(t, err)
+	incomplete, err := source.Capture(ctx, start.Format("20060102"))
 	require.Error(t, err)
-	require.Empty(t, snapshot.Facts)
+	require.Empty(t, incomplete.Facts)
+	_, err = db.Collection(outboxhistory.Original).InsertOne(ctx, original)
+	require.NoError(t, err)
+	require.NoError(t, db.Client().Database("admin").RunCommand(ctx, bson.D{
+		{Key: "renameCollection", Value: db.Name() + "." + outboxhistory.Original},
+		{Key: "to", Value: db.Name() + ".isolated_original_rm_outbox"},
+	}).Err())
+	archived, err := source.Capture(ctx, start.Format("20060102"))
+	require.NoError(t, err)
+	afterDigest, afterCounts, err := archived.Manifest()
+	require.NoError(t, err)
+	require.Equal(t, digest, afterDigest)
+	require.Equal(t, counts, afterCounts)
+	require.Equal(t, snapshot.OriginalFingerprints, archived.OriginalFingerprints)
+	// Historical responsibility remains mandatory even in an otherwise valid v2 day.
+	_, err = db.Collection(outboxhistory.Archive).DeleteMany(ctx, bson.M{})
+	require.NoError(t, err)
+	archived, err = source.Capture(ctx, start.Format("20060102"))
+	require.Error(t, err)
+	require.Empty(t, archived.Facts)
+	t.Log("F06_MONGO_HOTRANK_PROOF original_priority=true mixed_day_manifest_equal=true missing_archived_row_refused=true")
 }

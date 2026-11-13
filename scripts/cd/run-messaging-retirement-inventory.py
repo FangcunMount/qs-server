@@ -10,13 +10,21 @@ import subprocess
 from m5_maintenance_container import resolve_inventory_target
 
 owner = os.environ["INVENTORY_OWNER"]
+mode = os.environ.get("INTERPRETATION_FUTURE_INVENTORY", "false")
+if mode not in {"true", "false"}:
+    raise SystemExit("Explicit inventory mode required")
+future = mode == "true"
+if future and (not __debug__ or owner != "qs.mongo" or not os.environ.get("QS_MAINTENANCE_CONTAINER")):
+    raise SystemExit("Interpretation inventory requires the owned QS Mongo maintenance transport")
 containers = {"iam.mysql": "iam-apiserver", "qs.mysql": "qs-apiserver", "ai.mysql": "qs-ai", "qs.mongo": "qs-apiserver"}
 if owner not in containers or not re.fullmatch(r"[0-9a-f]{40}", os.environ["GITHUB_SHA"]):
     raise SystemExit("Explicit fixed owner and source required")
-try:
-    containers[owner] = resolve_inventory_target(owner, containers[owner])
-except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
-    raise SystemExit("Owned maintenance transport unavailable; no complete inventory inferred") from None
+def target_container():
+    try:
+        return resolve_inventory_target(owner, containers[owner], pin_container=future)
+    except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
+        raise SystemExit("Owned maintenance transport unavailable; no complete inventory inferred") from None
+
 
 if owner == "ai.mysql":
     # Reuse the installed, tested historical messaging audit and its TLS policy.
@@ -65,7 +73,7 @@ except Exception as error:
 report['phase']=phase
 print(json.dumps(report))
 """
-    args = ["sudo", "-n", "docker", "exec", "--user", "10001:10001", "-i", containers[owner], "/app/.venv/bin/python", "-"]
+    args = ["sudo", "-n", "docker", "exec", "--user", "10001:10001", "-i", target_container(), "/app/.venv/bin/python", "-"]
 else:
     filename = "messaging-retirement-mongo-inventory" if owner == "qs.mongo" else "messaging-retirement-inventory"
     binary = (Path("inventory-companion") / filename).read_bytes()
@@ -76,15 +84,76 @@ else:
     if not run_id.isdecimal():
         raise SystemExit("Explicit run identity required")
     temporary = "/tmp/messaging-retirement-inventory-" + run_id + "-" + owner.replace(".", "-")
-    script = ("set -eu; umask 077; p=" + shlex.quote(temporary)
+    operation = "--messaging-retirement-inventory" if owner == "qs.mongo" else owner
+    temp_expr = shlex.quote(temporary)
+    if future:
+        operation = "--interpretation-future-inventory"
+        temp_expr = "$(mktemp " + shlex.quote(temporary + "-interpretation-future.XXXXXX") + ")"
+    script = ("set -eu; umask 077; p=" + temp_expr
               + '; trap \'rm -f "$p"\' EXIT; cat > "$p"; chmod 0700 "$p"; "$p" '
-              + shlex.quote("--messaging-retirement-inventory" if owner == "qs.mongo" else owner))
-    args = ["sudo", "-n", "docker", "exec", "--user", "2000:2000", "-i", containers[owner], "sh", "-c", script]
+              + shlex.quote(operation))
+    container = target_container()
+    args = ["sudo", "-n", "docker", "exec", "--user", "2000:2000", "-i", container, "sh", "-c", script]
     payload = binary
 
-result = subprocess.run(["ssh", "-F", os.environ["RUNNER_SSH_CONFIG"],
+
+def run_transport():
+    return subprocess.run(["ssh", "-F", os.environ["RUNNER_SSH_CONFIG"],
                          os.environ["RUNNER_SSH_ALIAS"], shlex.join(args)],
                         input=payload, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+
+def save_future_receipt():
+    source = os.environ["GITHUB_SHA"]
+    receipt = dict(owner="qs.mongo", read_only_requested=True, inventory_complete=False, drop_authorized=False,
+                   diagnostic_source_sha=source, workflow_run=os.environ["GITHUB_RUN_ID"],
+                   companion_sha256=os.environ["EXPECTED_MONGO_DIGEST"], transport_container_id=container,
+                   transport_image_id=os.environ["QS_MAINTENANCE_IMAGE_ID"], receipt_validated=False, error_phase="transport_reply")
+    try:
+        result = run_transport()
+        if len(result.stdout) > 8192:
+            raise ValueError("receipt exceeds output budget")
+        value = json.loads(result.stdout)
+        required = {"source_sha", "observed_at", "owner", "read_only", "mutation", "inventory_complete",
+                    "drop_authorized", "pool_released", "error_phase"}
+        assert isinstance(value, dict) and required <= set(value) <= required | {"counts", "database_replica_sha256"}
+        assert value["source_sha"] == source and value["owner"] == "qs.mongo"
+        assert value["read_only"] is True and value["mutation"] is False and value["drop_authorized"] is False
+        assert type(value["inventory_complete"]) is bool and type(value["pool_released"]) is bool
+        assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z", value["observed_at"])
+        if "database_replica_sha256" in value:
+            assert re.fullmatch(r"[0-9a-f]{64}", value["database_replica_sha256"])
+        if value["inventory_complete"]:
+            assert result.returncode == 0 and value["pool_released"] is True and value["error_phase"] == "none"
+            assert "database_replica_sha256" in value
+            counts = value["counts"]
+            fields = {"owner_executions", "report_terminal_executions", "v1_future_prepared",
+                      "v1_future_committed", "v1_future_aborted", "v1_future_inactive"}
+            assert isinstance(counts, dict) and set(counts) == fields
+            assert all(type(n) is int and 0 <= n <= 10000 for n in counts.values())
+            old_total = counts["v1_future_prepared"] + counts["v1_future_committed"] + counts["v1_future_aborted"]
+            assert old_total <= counts["report_terminal_executions"] <= counts["owner_executions"]
+            assert counts["v1_future_inactive"] <= counts["v1_future_aborted"]
+        else:
+            assert result.returncode == 1 and "counts" not in value
+            assert value["error_phase"] in {"application_binding", "replica_identity", "execution_inventory", "release"}
+        receipt.update(value, receipt_validated=True, process_completed_successfully=result.returncode == 0)
+    except (AssertionError, KeyError, OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+        pass
+    descriptor = os.open("messaging-retirement-interpretation-future.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w") as evidence:
+        json.dump(receipt, evidence, indent=2)
+        evidence.write("\n")
+        evidence.flush()
+        os.fsync(evidence.fileno())
+    if not receipt["inventory_complete"]:
+        raise SystemExit("Interpretation future inventory incomplete; no valid counts or deletion authority")
+
+
+if future:
+    save_future_receipt()
+    raise SystemExit(0)
+
+result = run_transport()
 try:
     value = json.loads(result.stdout)
     assert value["owner"] == owner and value["read_only"] is True and value["mutation"] is False

@@ -251,3 +251,23 @@ func TestReportFutureOwnershipVersionKeepsLegacyRequestAndOriginalWire(t *testin
 	require.ErrorIs(t, err, transaction.ErrInvalidPlan)
 	require.Equal(t, current.Future.Payload, old.Future.Payload)
 }
+
+func TestAcquiredLegacyFutureIntentCannotOpenBusinessRoot(t *testing.T) {
+	q := reportTransactionRequest(t)
+	request, err := freezeReportFailure(app.CommitFailureRequest{Generation: q.Generation, Run: q.Run,
+		OutcomeID: q.Generation.Key().OutcomeID, Association: q.InterpretReport.Association(), FailedAt: q.CompletedAt,
+		Failure: run.Failure{Kind: run.FailureKindBuild, Code: "controlled", SafeMessage: "fixture", Retryable: true}}, reportRoutes{})
+	require.NoError(t, err)
+	legacy, err := readReportPlan(request.Artifact)
+	require.NoError(t, err)
+	require.NotNil(t, legacy.Future)
+	legacy.Version = 1
+	request.Artifact, err = json.Marshal(legacy)
+	require.NoError(t, err)
+	boundary := &reportBoundaryStub{}
+	result, err := (&TransactionCommitter{boundary: boundary, resolver: reportRoutes{}}).commit(t.Context(), request)
+	require.ErrorIs(t, err, port.ErrUnresolved)
+	require.ErrorIs(t, err, transaction.ErrInvalidPlan)
+	require.Nil(t, result)
+	require.Zero(t, boundary.commitCalls)
+}

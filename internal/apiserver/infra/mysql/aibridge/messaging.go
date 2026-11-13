@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"strconv"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/aiworkflow"
 	app "github.com/FangcunMount/qs-server/internal/apiserver/application/aibridge"
@@ -27,33 +26,6 @@ func NewMessagingStore() *MessagingStore {
 func messagingHash(value []byte) string {
 	hash := sha256.Sum256(value)
 	return hex.EncodeToString(hash[:])
-}
-
-func operationScopeMatches(e *pb.MessagingEnvelope, b *pb.MessagingBody, scope app.OperationScope) bool {
-	var org, subject, resource string
-	switch e.Kind {
-	case pb.MessagingKind_START:
-		c := b.GetStart()
-		org, subject, resource = c.GetActor().GetOrgId(), c.GetActor().GetSubjectId(), c.RequestId
-		if e.AggregateKey != c.RequestId {
-			return false
-		}
-	case pb.MessagingKind_CHANGE:
-		c := b.GetChange()
-		org, subject, resource = c.GetActor().GetOrgId(), c.GetActor().GetSubjectId(), c.SessionId
-	case pb.MessagingKind_PARTICIPANT_RETRY:
-		c := b.GetParticipantRetry()
-		org, subject, resource = strconv.FormatInt(c.GetScope().GetOrganizationId(), 10), strconv.FormatInt(c.GetScope().GetOperatorUserId(), 10), c.SessionId
-	case pb.MessagingKind_EVALUATION_START:
-		c := b.GetEvaluationStart().GetScope()
-		org, subject, resource = strconv.FormatInt(c.GetOrganizationId(), 10), strconv.FormatInt(c.GetOperatorUserId(), 10), c.GetRunId()
-	case pb.MessagingKind_EVALUATION_CANCEL:
-		c := b.GetEvaluationCancel().GetScope()
-		org, subject, resource = strconv.FormatInt(c.GetOrganizationId(), 10), strconv.FormatInt(c.GetOperatorUserId(), 10), c.GetRunId()
-	}
-	parsedOrg, err := strconv.ParseUint(org, 10, 64)
-	id, idErr := uuid.Parse(resource)
-	return err == nil && parsedOrg > 0 && strconv.FormatUint(parsedOrg, 10) == org && idErr == nil && id.String() == resource && org == scope.OrganizationID && subject == scope.SubjectID && resource == scope.ResourceID
 }
 
 // existingOperation reads immutable submission fields, without reserving a

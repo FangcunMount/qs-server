@@ -122,3 +122,31 @@ func TestInventoryUnavailableOrWrongBindingNeverBecomesEmptySuccess(t *testing.T
 		})
 	}
 }
+
+type historyInventoryFixture struct{ inventoryHostFixture }
+
+func (h *historyInventoryFixture) InspectHistory(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	return h.Inspect(ctx, selected)
+}
+
+func TestHistoryInventoryHasSeparateReceiptAndNeverApplies(t *testing.T) {
+	review, args, receipt := fixture(t)
+	snapshot, err := model.Inventory(review.Binding(), map[string]uint64{"held": 1}, 1, 0)
+	require.NoError(t, err)
+	host := &historyInventoryFixture{inventoryHostFixture{snapshot: snapshot}}
+	open := func(_ context.Context, a arguments, _ func(string) string) (executor, func() error, error) {
+		require.True(t, a.history)
+		return host, func() error { return nil }, nil
+	}
+	var output bytes.Buffer
+	err = run(t.Context(), append(args, "--inventory", "--history", "--database", "original-db", "--receipt", receipt), noEnvironment, &output, open)
+	require.NoError(t, err)
+	require.Equal(t, 1, host.inspections)
+	require.Zero(t, host.calls)
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), "m5-mysql-handoff-history-inventory/v1")
+	require.Contains(t, output.String(), "history_responsibilities_accounted")
+	require.Contains(t, output.String(), `"cutover_authorized":false`)
+	require.NotContains(t, output.String(), "old_responsibilities_accounted")
+}

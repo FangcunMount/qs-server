@@ -15,9 +15,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type config struct {
@@ -101,16 +103,25 @@ func runCLI(parent context.Context, args []string, stdin io.Reader, stdout, stde
 		_, _ = fmt.Fprintln(stderr, "interpretation retry gap audit: Mongo unavailable")
 		return 1
 	}
-	db := client.Database(cfg.mongoDB)
+	db := client.Database(cfg.mongoDB, options.Database().SetReadPreference(readpref.Primary()))
+	history := outboxhistory.NewReader(ctx, db)
+	outbox, err := history.Collection()
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, "interpretation retry gap audit: original evidence collection unavailable")
+		return 1
+	}
 	runs := db.Collection("interpretation_runs")
-	outbox := db.Collection("rm_outbox")
 	if err := requireIndexes(ctx, runs, db.Collection("report_generations"), outbox); err != nil {
 		_, _ = fmt.Fprintln(stderr, "interpretation retry gap audit: required bounded lookup index unavailable")
 		return 1
 	}
-	result, err := scan(ctx, db, cfg)
+	result, err := scan(ctx, db, outbox, cfg)
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "interpretation retry gap audit: read failed")
+		return 1
+	}
+	if err := history.Verify(); err != nil {
+		_, _ = fmt.Fprintln(stderr, "interpretation retry gap audit: original evidence collection changed")
 		return 1
 	}
 	if !cfg.includeIDs {
@@ -245,7 +256,7 @@ func requireIndexes(ctx context.Context, runs, generations, outbox *mongo.Collec
 	return errors.New("outbox message identity index unavailable")
 }
 
-func scan(ctx context.Context, db *mongo.Database, cfg config) (report, error) {
+func scan(ctx context.Context, db *mongo.Database, outbox *mongo.Collection, cfg config) (report, error) {
 	result := report{
 		AfterID: strconv.FormatUint(cfg.afterID, 10), UpperID: strconv.FormatUint(cfg.upperID, 10),
 		NextAfterID: strconv.FormatUint(cfg.afterID, 10), DueBefore: cfg.dueBefore,
@@ -272,7 +283,7 @@ func scan(ctx context.Context, db *mongo.Database, cfg config) (report, error) {
 		if err := cursor.Decode(&row); err != nil {
 			return report{}, err
 		}
-		category, err := inspectRun(ctx, db, row, cfg.dueBefore)
+		category, err := inspectRun(ctx, db, outbox, row, cfg.dueBefore)
 		if err != nil {
 			return report{}, err
 		}
@@ -292,7 +303,7 @@ func scan(ctx context.Context, db *mongo.Database, cfg config) (report, error) {
 	return result, nil
 }
 
-func inspectRun(ctx context.Context, db *mongo.Database, row runRecord, dueBefore time.Time) (string, error) {
+func inspectRun(ctx context.Context, db *mongo.Database, outbox *mongo.Collection, row runRecord, dueBefore time.Time) (string, error) {
 	if row.Status != "failed" || row.Disposition != "automatic" {
 		return other, nil
 	}
@@ -325,7 +336,7 @@ func inspectRun(ctx context.Context, db *mongo.Database, row runRecord, dueBefor
 	if generation.Status != "failed" || generation.LatestRunID != row.ID {
 		return manualRequired, nil
 	}
-	cursor, err := db.Collection("rm_outbox").Find(ctx, bson.M{"message_id": row.RetryEventID},
+	cursor, err := outbox.Find(ctx, bson.M{"message_id": row.RetryEventID},
 		options.Find().SetLimit(2).SetProjection(bson.M{"event_type": 1, "state": 1, "transport_confirmed_at": 1}))
 	if err != nil {
 		return "", err

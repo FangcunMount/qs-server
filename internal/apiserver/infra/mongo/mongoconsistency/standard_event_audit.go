@@ -19,6 +19,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	sheetmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	interpretmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	evaluationfact "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
@@ -94,15 +95,23 @@ func (s *Scanner) OutboxUpperBound(ctx context.Context, maxTime time.Duration) (
 	defer release()
 	ctx, cancel := context.WithTimeout(ctx, maxTime)
 	defer cancel()
+	history := outboxhistory.NewReader(ctx, s.db)
+	collection, err := history.Collection()
+	if err != nil {
+		return nil, err
+	}
 	var row struct {
 		ID bson.Raw `bson:"_id"`
 	}
-	err = s.db.Collection("rm_outbox").FindOne(ctx, bson.D{}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}).SetHint("_id_").SetProjection(bson.M{"_id": 1}).SetMaxTime(maxTime)).Decode(&row)
+	err = collection.FindOne(ctx, bson.D{}, options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}}).SetHint("_id_").SetProjection(bson.M{"_id": 1}).SetMaxTime(maxTime)).Decode(&row)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+	if checkErr := history.Verify(); checkErr != nil {
+		return nil, checkErr
+	}
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, nil
-	}
-	if err != nil {
-		return nil, err
 	}
 	if _, err := decodeOutboxToken(row.ID); err != nil {
 		return nil, err
@@ -127,7 +136,11 @@ var artifactAuditProjection = bson.M{"domain_id": 1, "generation_id": 1, "outcom
 
 func (s *Scanner) standardRow(ctx context.Context, ref evidence.StandardReference) (standardEventRow, error) {
 	var row standardEventRow
-	err := s.db.Collection("rm_outbox").FindOne(ctx, bson.D{{Key: "_id", Value: identity(ref)}}, options.FindOne().SetHint("_id_")).Decode(&row)
+	collection, err := s.history.Collection()
+	if err != nil {
+		return row, err
+	}
+	err = collection.FindOne(ctx, bson.D{{Key: "_id", Value: identity(ref)}}, options.FindOne().SetHint("_id_")).Decode(&row)
 	return row, err
 }
 func verifyRow(row standardEventRow, ref evidence.StandardReference) (*domainwire.Envelope, error) {
@@ -497,8 +510,12 @@ func (s *Scanner) scanOutboxAnswerSheet(ctx context.Context, request appaudit.Ba
 		}
 		rangeQuery = append(rangeQuery, bson.E{Key: "$gt", Value: after})
 	}
+	collection, err := s.history.Collection()
+	if err != nil {
+		return appaudit.BatchResult{}, err
+	}
 	var rows []standardEventRow
-	if err := findAll(ctx, s.db.Collection("rm_outbox"), bson.D{{Key: "_id", Value: rangeQuery}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetLimit(int64(request.Limit)).SetMaxTime(request.MaxTime), &rows); err != nil {
+	if err := findAll(ctx, collection, bson.D{{Key: "_id", Value: rangeQuery}}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetHint("_id_").SetLimit(int64(request.Limit)).SetMaxTime(request.MaxTime), &rows); err != nil {
 		return appaudit.BatchResult{}, err
 	}
 	result := appaudit.BatchResult{Scanned: len(rows)}

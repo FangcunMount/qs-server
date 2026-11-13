@@ -27,6 +27,7 @@ func newMessagingCollector(db *sql.DB) *messagingCollector {
 		"recorded_payload_serve_workload_denied":        "Durably recorded local workload refusals.",
 		"recorded_payload_serve_storage_unavailable":    "Durably recorded local storage failures.",
 		"observation_available":                         "Whether the complete committed MQ state snapshot is available.",
+		"unverified_transaction_anchors":                "Observed active commands with missing or conflicting transaction anchors.",
 		"committed_commands":                            "Current commands with committed transaction evidence.",
 		"awaiting_command_receipts":                     "Current commands without an accepted or rejected AI receipt.",
 		"held_command_receipts":                         "Current commands whose latest admission receipt is held.",
@@ -53,7 +54,10 @@ func (c *messagingCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *messagingCollector) Collect(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	values, err := store.MessagingSnapshot(ctx, c.db)
+	values, unverifiedAnchors, err := store.ObserveMessagingSnapshot(ctx, c.db)
+	if unverifiedAnchors != nil {
+		ch <- prometheus.MustNewConstMetric(c.descriptions["unverified_transaction_anchors"], prometheus.GaugeValue, float64(*unverifiedAnchors))
+	}
 	if err != nil {
 		ch <- prometheus.MustNewConstMetric(c.descriptions["observation_available"], prometheus.GaugeValue, 0)
 		return

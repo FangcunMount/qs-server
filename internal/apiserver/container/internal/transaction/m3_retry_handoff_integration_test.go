@@ -4,8 +4,12 @@ package transaction_test
 
 import (
 	"context"
+	"crypto/rand"
+	"database/sql"
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +20,7 @@ import (
 	mongostore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/retryschedule"
 	mongoreplay "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/standardoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	mysqlstore "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/retryschedule"
 	mysqlreplay "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/standardoutbox"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -174,6 +179,7 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 	require.Error(t, err, "malformed held state cannot be hidden")
 	_, err = pool.ExecContext(t.Context(), "UPDATE rm_outbox SET last_error_code=? WHERE message_id=?", model.HandoffMarker(f), f.Message().Input().ID)
 	require.NoError(t, err)
+	verifyMySQLHandoffHistory(t, pool, store, f, statusReader)
 	waitHandoffDue(t, f)
 	old, err := sdkmysql.New(pool)
 	require.NoError(t, err)
@@ -198,6 +204,192 @@ func verifyLegacyHandoffMySQL(t *testing.T, db *gorm.DB, store *mysqlstore.Store
 	}
 	return cases
 }
+func verifyMySQLHandoffHistory(t *testing.T, pool *sql.DB, store *mysqlstore.Store, f model.Frozen, status *mysqlreplay.StatusReader) {
+	t.Helper()
+	ctx := t.Context()
+	plans := []model.Frozen{f}
+	expected, err := store.InspectLegacy(ctx, plans)
+	require.NoError(t, err)
+	require.True(t, expected.ResponsibilitiesAccounted)
+	_, err = store.InspectHistory(ctx, plans)
+	require.Error(t, err, "an explicit archive audit cannot substitute the live table")
+	exec := func(query string, args ...any) {
+		t.Helper()
+		_, err := pool.ExecContext(ctx, query, args...)
+		require.NoError(t, err)
+	}
+	exec("CREATE TABLE isolated_outbox_history_rows LIKE rm_outbox")
+	exec("INSERT INTO isolated_outbox_history_rows SELECT * FROM rm_outbox")
+	exec("CREATE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT * FROM isolated_outbox_history_rows")
+	exec(string(retryMigration(t, "mysql", "000090_qs_gap_recovery_request.up.sql")))
+	org := f.Authority().OrgID
+	eventID := f.Message().Input().ID
+	exec(`INSERT INTO qs_rm_gap_recovery_request
+		(org_id,request_id,actor_id,assessment_id,event_id,expected_version,reason,submitted_before,input_hash,result_code,authorized,outbox_version_after)
+		VALUES(?,'retained-decision',1,?, ?,1,'isolated archive audit','2026-11-10T00:00:00Z',UNHEX(REPEAT('aa',32)),'authorized',1,1)`, org, f.Authority().AssessmentID, eventID)
+	gaps, err := mysqlreplay.NewGapRecoveryLedger(pool)
+	require.NoError(t, err)
+
+	if os.Getenv("QS_F06_VERIFY_RESTRICTED_READER") == "1" {
+		verifyMySQLArchiveReaderGrants(t, pool)
+	}
+
+	// Live governance must observe current work even while a valid archive exists.
+	exec("UPDATE rm_outbox SET state='retry_wait' WHERE message_id=?", eventID)
+	live, err := status.ReadOutboxGovernance(ctx, org)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, live.Automatic)
+	candidates, err := status.ListOutboxCandidates(ctx, org, 10)
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	require.Equal(t, eventID, candidates[0].ResourceID)
+	exec("UPDATE rm_outbox SET state='held' WHERE message_id=?", eventID)
+	verifyMySQLHandoffPhysicalNameLock(t, pool)
+
+	exec("RENAME TABLE rm_outbox TO isolated_original_rm_outbox")
+	_, err = store.InspectLegacy(ctx, plans)
+	require.Error(t, err, "live inventory cannot substitute archived evidence")
+	history, err := store.InspectHistory(ctx, plans)
+	require.NoError(t, err)
+	require.Equal(t, expected, history)
+	unselected, err := store.InspectHistory(ctx, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, unselected.UnverifiedHeld)
+	require.False(t, unselected.ResponsibilitiesAccounted)
+	archived, err := status.ReadOutboxGovernance(ctx, org)
+	require.NoError(t, err)
+	require.Zero(t, archived.Automatic)
+	candidates, err = status.ListOutboxCandidates(ctx, org, 10)
+	require.NoError(t, err)
+	require.Empty(t, candidates)
+	snapshot, err := status.OutboxStatusSnapshot(ctx, time.Now())
+	require.NoError(t, err)
+	for _, bucket := range snapshot.Buckets {
+		require.Zero(t, bucket.Count)
+	}
+	summary, err := gaps.ReadSummary(ctx, org)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, summary.Authorized)
+	require.Zero(t, summary.WaitingRelay)
+
+	// Publish a fixture-only concurrent state change after the archive gate.
+	// Its later commit must not leak through the accepted read snapshot.
+	state, err := outboxhistory.ReadOperational(ctx, pool, func(tx *sql.Tx, source string) (string, error) {
+		require.Equal(t, outboxhistory.View, source)
+		exec("UPDATE isolated_outbox_history_rows SET state='retry_wait' WHERE message_id=?", eventID)
+		var outside, inside string
+		require.NoError(t, pool.QueryRowContext(ctx, "SELECT state FROM qs_rm_outbox_history WHERE message_id=?", eventID).Scan(&outside))
+		require.Equal(t, "retry_wait", outside)
+		err := tx.QueryRowContext(ctx, "SELECT state FROM qs_rm_outbox_history WHERE message_id=?", eventID).Scan(&inside)
+		return inside, err
+	})
+	require.NoError(t, err)
+	require.Equal(t, "held", state)
+	_, err = status.ListOutboxCandidates(ctx, org, 10)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	exec("UPDATE isolated_outbox_history_rows SET state='held' WHERE message_id=?", eventID)
+
+	exec(`CREATE OR REPLACE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT
+		NULL AS state, claim_token, lease_until, transport_confirmed_at, attempt_count, failure_count,
+		manual_replay_request_id, manual_replay_version, version, scope, message_id, last_error_code
+		FROM isolated_outbox_history_rows`)
+	_, err = outboxhistory.ReadOperational(ctx, pool, func(*sql.Tx, string) (bool, error) {
+		t.Error("a malformed archive must fail before the caller query")
+		return false, nil
+	})
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	exec("CREATE OR REPLACE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT * FROM isolated_outbox_history_rows")
+
+	if handoffCLIRequired(t) {
+		nativeArchiveHandoffLedger(t, pool, store.Binding(), f)
+	}
+
+	exec("UPDATE isolated_outbox_history_rows SET last_error_code=CONCAT('m3_future_owner:',REPEAT('a',64)) WHERE message_id=?", eventID)
+	_, err = status.OutboxStatusSnapshot(ctx, time.Now())
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	exec("UPDATE isolated_outbox_history_rows SET last_error_code=? WHERE message_id=?", model.HandoffMarker(f), eventID)
+	exec("UPDATE isolated_outbox_history_rows SET state='retry_wait' WHERE message_id=?", eventID)
+	_, err = status.OutboxStatusSnapshot(ctx, time.Now())
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = status.ReadOutboxGovernance(ctx, org)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = status.ListOutboxCandidates(ctx, org, 10)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = gaps.ReadSummary(ctx, org)
+	require.ErrorIs(t, err, outboxhistory.ErrUnresolvedArchive)
+	_, err = store.InspectHistory(ctx, plans)
+	require.Error(t, err, "selected source no longer matches the retained handoff")
+	exec("RENAME TABLE isolated_original_rm_outbox TO rm_outbox")
+	exec("DROP VIEW qs_rm_outbox_history")
+	restored, err := store.InspectLegacy(ctx, plans)
+	require.NoError(t, err)
+	require.Equal(t, expected, restored)
+	t.Log("F06_MYSQL_HISTORY_PROOF live_preferred=true archive_handoff_exact=true archived_pending_refused=true live_inventory_never_substitutes=true")
+}
+
+func verifyMySQLHandoffPhysicalNameLock(t *testing.T, pool *sql.DB) {
+	t.Helper()
+	ctx := t.Context()
+	tx, err := pool.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	require.NoError(t, outboxhistory.RequireActiveWrite(ctx, tx))
+	ddl, err := pool.Conn(ctx)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, ddl.Close()) }()
+	var original int64
+	require.NoError(t, ddl.QueryRowContext(ctx, "SELECT @@SESSION.lock_wait_timeout").Scan(&original))
+	_, err = ddl.ExecContext(ctx, "SET SESSION lock_wait_timeout=1")
+	require.NoError(t, err)
+	defer func() {
+		_, err := ddl.ExecContext(ctx, "SET SESSION lock_wait_timeout=?", original)
+		require.NoError(t, err)
+	}()
+	_, err = ddl.ExecContext(ctx, "RENAME TABLE rm_outbox TO isolated_original_rm_outbox")
+	var timeout *driver.MySQLError
+	require.ErrorAs(t, err, &timeout, "original name must remain pinned for the transaction")
+	require.EqualValues(t, 1205, timeout.Number)
+	t.Log("F06_MYSQL_ORIGINAL_NAME_LOCK_HELD")
+}
+
+func verifyMySQLArchiveReaderGrants(t *testing.T, pool *sql.DB) {
+	t.Helper()
+	ctx := t.Context()
+	cfg, err := driver.ParseDSN(os.Getenv("QS_M3_RETRY_DSN"))
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&cfg.DBName))
+	require.Regexp(t, "^qs_m3_retry_store_[0-9]+$", cfg.DBName)
+	cfg.User = fmt.Sprintf("qsf06_%d", time.Now().UnixNano())
+	cfg.Passwd = fmt.Sprintf("%x", rand.Text())
+	account := "'" + cfg.User + "'@'%'"
+	_, err = pool.ExecContext(ctx, "CREATE USER "+account+" IDENTIFIED BY '"+cfg.Passwd+"'")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := pool.ExecContext(context.Background(), "DROP USER "+account)
+		require.NoError(t, err)
+	})
+	for _, table := range []string{"qs_rm_outbox_history", "isolated_outbox_history_rows", "qs_retry_schedule"} {
+		_, err = pool.ExecContext(ctx, "GRANT SELECT ON `"+cfg.DBName+"`."+table+" TO "+account)
+		require.NoError(t, err)
+	}
+	reader, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	defer func() { require.NoError(t, reader.Close()) }()
+	var state string
+	require.NoError(t, reader.QueryRowContext(ctx, "SELECT state FROM qs_rm_outbox_history LIMIT 1").Scan(&state))
+	require.Equal(t, "held", state)
+	_, err = outboxhistory.ActiveSource(ctx, reader)
+	require.ErrorIs(t, err, sql.ErrNoRows, "metadata hides the existing physical table")
+	_, err = outboxhistory.ReadOperational(ctx, reader, func(*sql.Tx, string) (bool, error) {
+		t.Error("the readable archive cannot cover the inaccessible original")
+		return false, nil
+	})
+	var denied *driver.MySQLError
+	require.ErrorAs(t, err, &denied)
+	require.EqualValues(t, 1142, denied.Number)
+	t.Log("F06_MYSQL_HIDDEN_ORIGINAL_REFUSED")
+}
+
 func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostore.Store, f model.Frozen, binding transaction.Binding) map[string]bool {
 	root := modtx.NewMongoRunner(db, modtx.MongoRunnerOptions{Boundary: "interpretation_commit", Limiter: backpressure.NewLimiter(2, time.Second)})
 	authority, err := mongorepo.NewRetryDispatchAuthority(db)
@@ -264,6 +456,15 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 		}
 		cliCases["offline_cli_no_new_tables_or_collections"] = true
 		cliCases["offline_cli_no_sdk_transaction_rows"] = true
+		nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 1)
+		legacy := db.Collection("rm_outbox")
+		archive := db.Collection("qs_rm_outbox_history")
+		var original bson.Raw
+		require.NoError(t, legacy.FindOne(t.Context(), filter).Decode(&original))
+		_, err = archive.InsertOne(t.Context(), original)
+		require.NoError(t, err)
+		nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), false, 2)
+		nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 0)
 		func() {
 			admin := db.Client().Database("admin")
 			require.NoError(t, admin.RunCommand(t.Context(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox"}, {Key: "to", Value: db.Name() + ".rm_outbox_native_hidden"}}).Err())
@@ -271,8 +472,38 @@ func verifyLegacyHandoffMongo(t *testing.T, db *mongo.Database, store *mongostor
 				require.NoError(t, admin.RunCommand(context.Background(), bson.D{{Key: "renameCollection", Value: db.Name() + ".rm_outbox_native_hidden"}, {Key: "to", Value: db.Name() + ".rm_outbox"}}).Err())
 			}()
 			nativeMissingHandoffLedger(t, binding, db.Name(), "QS_RETRY_HANDOFF_MONGO_URI", os.Getenv("QS_M3_MONGO_URI"))
+			t.Run("offline_apply_requires_physical_original", func(t *testing.T) {
+				require.NoError(t, db.CreateView(t.Context(), "rm_outbox", "rm_outbox_native_hidden", mongo.Pipeline{}))
+				defer func() {
+					require.NoError(t, db.Collection("rm_outbox").Drop(context.Background()))
+				}()
+				nativeMongoApplyRejectsView(t, binding, f, db.Name())
+			})
+			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 0)
+			var retained bson.Raw
+			require.NoError(t, archive.FindOne(t.Context(), filter).Decode(&retained))
+			require.Equal(t, original, retained)
+			_, err := archive.UpdateOne(t.Context(), filter, bson.M{"$set": bson.M{"last_error_code": "m3_future_owner:" + strings.Repeat("0", 64)}})
+			require.NoError(t, err)
+			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 1)
+			_, err = archive.DeleteOne(t.Context(), filter)
+			require.NoError(t, err)
+			var changed bson.D
+			require.NoError(t, bson.Unmarshal(original, &changed))
+			require.Equal(t, "_id", changed[0].Key)
+			changed[0].Value = "substituted-bson-identity"
+			_, err = archive.InsertOne(t.Context(), changed)
+			require.NoError(t, err)
+			nativeMongoHistoryHandoffCLI(t, binding, f, db.Name(), true, 1)
 		}()
+		var retained bson.Raw
+		require.NoError(t, legacy.FindOne(t.Context(), filter).Decode(&retained))
+		require.Equal(t, original, retained)
 		cliCases["offline_inventory_missing_ledger_not_empty"] = true
+		cliCases["offline_mongo_history_requires_explicit_archive"] = true
+		cliCases["offline_mongo_history_verifies_only_reviewed_held"] = true
+		cliCases["offline_mongo_history_preserves_original_and_rejects_false_marker"] = true
+		t.Log("F06_MONGO_SCHEDULE_PROOF live_missing_refused=true explicit_archive_required=true unselected_held_blocked=true exact_pair=true false_marker_refused=true substituted_bson_id_refused=true original_unchanged=true")
 	} else {
 		require.NoError(t, root.WithinTransaction(t.Context(), func(ctx context.Context) error {
 			already, err := store.TransferLegacy(ctx, f, authority)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
 	mongoanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
 	"github.com/FangcunMount/reliable-messaging/transaction"
@@ -85,7 +86,8 @@ func (s *Scanner) CaptureOriginalRecovery(ctx context.Context, sheetID, orgID ui
 	if sheet.DomainID != sheetID || sheet.OrgID != orgID || sheet.DurableAcceptance.EventID == "" {
 		return RecoveryPlan{}, ErrUnsafeRecoverySource
 	}
-	intent, confirmation, err := s.originalIntent(sc, sheet)
+	history := outboxhistory.NewReader(ctx, s.mongo)
+	intent, confirmation, err := s.originalIntent(sc, history, sheet)
 	if err != nil {
 		return RecoveryPlan{}, err
 	}
@@ -97,7 +99,14 @@ func (s *Scanner) CaptureOriginalRecovery(ctx context.Context, sheetID, orgID ui
 	if len(effects) != 0 {
 		return RecoveryPlan{}, ErrUnsafeRecoverySource
 	}
-	return validateRecovery(raw, sheet, intent, confirmation, orgID, acceptedBefore, now)
+	plan, err := validateRecovery(raw, sheet, intent, confirmation, orgID, acceptedBefore, now)
+	if err != nil {
+		return RecoveryPlan{}, err
+	}
+	if err := history.Verify(); err != nil {
+		return RecoveryPlan{}, err
+	}
+	return plan, nil
 }
 
 func validateRecovery(raw bson.Raw, sheet sheetRow, row outboxRow, confirmation recoveryConfirmation, orgID uint64, acceptedBefore, now time.Time) (RecoveryPlan, error) {

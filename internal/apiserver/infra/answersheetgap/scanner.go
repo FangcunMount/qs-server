@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/evidence"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/reliable-messaging/message"
@@ -132,10 +133,18 @@ func (s *Scanner) ScanPage(ctx context.Context, afterID, upperID uint64, accepte
 		defer cancel()
 		_ = session.AbortTransaction(cleanup)
 	}()
-	return s.scanPage(mongo.NewSessionContext(ctx, session), afterID, upperID, acceptedBefore, limit)
+	history := outboxhistory.NewReader(ctx, s.mongo)
+	page, err := s.scanPage(mongo.NewSessionContext(ctx, session), history, afterID, upperID, acceptedBefore, limit)
+	if err != nil {
+		return page, err
+	}
+	if err := history.Verify(); err != nil {
+		return Page{}, err
+	}
+	return page, nil
 }
 
-func (s *Scanner) scanPage(ctx context.Context, afterID, upperID uint64, acceptedBefore time.Time, limit int) (Page, error) {
+func (s *Scanner) scanPage(ctx context.Context, history *outboxhistory.Reader, afterID, upperID uint64, acceptedBefore time.Time, limit int) (Page, error) {
 	filter := bson.M{
 		"durable_acceptance": bson.M{"$ne": nil},
 		"$or": bson.A{
@@ -187,7 +196,7 @@ func (s *Scanner) scanPage(ctx context.Context, afterID, upperID uint64, accepte
 		bySheet[a.AnswerSheetID] = append(bySheet[a.AnswerSheetID], assessmentEffect{a.ID, a.OrgID, a.DeletedAt != nil})
 	}
 	for _, sheet := range sheets {
-		finding := s.classify(ctx, sheet, bySheet[sheet.DomainID])
+		finding := s.classify(ctx, history, sheet, bySheet[sheet.DomainID])
 		page.Findings = append(page.Findings, finding)
 	}
 	return page, nil
@@ -198,15 +207,15 @@ type assessmentEffect struct {
 	deleted   bool
 }
 
-func (s *Scanner) classify(ctx context.Context, sheet sheetRow, assessments []assessmentEffect) Finding {
+func (s *Scanner) classify(ctx context.Context, history *outboxhistory.Reader, sheet sheetRow, assessments []assessmentEffect) Finding {
 	f := Finding{AnswerSheetID: sheet.DomainID, EventID: sheet.DurableAcceptance.EventID}
 	if sheet.DomainID == 0 || sheet.OrgID == 0 || sheet.DurableAcceptance.EventID == "" || sheet.DurableAcceptance.AcceptedAt.IsZero() || sheet.Admission == nil {
 		f.Disposition, f.Reason = ManualRequired, "incomplete_frozen_answer_sheet"
 		return f
 	}
-	row, _, err := s.originalIntent(ctx, sheet)
+	row, _, err := s.originalIntent(ctx, history, sheet)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) || errors.Is(err, ErrUnsafeRecoverySource) {
+		if errors.Is(err, mongo.ErrNoDocuments) || errors.Is(err, outboxhistory.ErrMissing) || errors.Is(err, ErrUnsafeRecoverySource) {
 			f.Disposition, f.Reason = ManualRequired, "original_source_missing_or_conflicting"
 		} else {
 			f.Disposition, f.Reason = Unknown, "original_source_query_failed"

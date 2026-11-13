@@ -20,8 +20,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type fakePublisher struct{ onClose func() }
-
 type fakeWirePublisher struct{ onClose func() }
 
 func (*fakeWirePublisher) PublishWire(context.Context, string, []byte) error { return nil }
@@ -31,8 +29,6 @@ func (p *fakeWirePublisher) Close() error {
 	}
 	return nil
 }
-
-func (*fakePublisher) PublishWire(context.Context, string, []byte) error { return nil }
 
 func TestAPIRejectsRetiredPublisherFactories(t *testing.T) {
 	for _, provider := range []string{"nsq", "rabbitmq", ""} {
@@ -110,13 +106,6 @@ func TestAPIProjectionOnlySelectsFinalRocketMQSubscriber(t *testing.T) {
 			}
 		})
 	}
-}
-
-func (p *fakePublisher) Close() error {
-	if p.onClose != nil {
-		p.onClose()
-	}
-	return nil
 }
 
 func TestPrepareResourcesClosesPublisherWhenEventSubsystemFails(t *testing.T) {
