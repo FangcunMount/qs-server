@@ -109,6 +109,103 @@ class InventoryTransportTest(unittest.TestCase):
             self.assertIsNotNone(error)
             self.assertFalse(self.last_exports)
 
+    def execute_future(self, change=None, *, status=0, owner="qs.mongo", mode="true",
+                       owned=True, wrong_image=False, wrong_network=False, bad_digest=False, prior_receipt=False):
+        with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory):
+            companion = Path("inventory-companion/messaging-retirement-mongo-inventory")
+            companion.parent.mkdir()
+            companion.write_bytes(b"fixed-fixture")
+            digest = hashlib.sha256(companion.read_bytes()).hexdigest()
+            expected = "sha256:" + "b" * 64
+            name = "qs-m5-maintenance-12345-1"
+            env = dict(INVENTORY_OWNER=owner, INTERPRETATION_FUTURE_INVENTORY=mode,
+                       EXPECTED_MONGO_DIGEST="0" * 64 if bad_digest else digest,
+                       GITHUB_SHA="a" * 40, GITHUB_RUN_ID="12345",
+                       RUNNER_SSH_CONFIG="isolated-config", RUNNER_SSH_ALIAS="isolated-alias",
+                       QS_MAINTENANCE_CONTAINER=name if owned else "", QS_MAINTENANCE_IMAGE_ID=expected)
+            inspected = dict(Name="/" + name, Id="e" * 64, Image=("sha256:" + "c" * 64 if wrong_image else expected),
+                             State={"Running": True}, Config={"User": "2000:2000", "Entrypoint": ["/bin/sh"],
+                             "Cmd": ["-c", "exec sleep 2147483647"], "Healthcheck": {"Test": ["NONE"]},
+                             "Labels": {"com.fangcunmount.qs-m5.operation": "12345-1"}}, Mounts=[],
+                             NetworkSettings={"Networks": {"other" if wrong_network else "infra-network": {}}})
+            report = dict(owner=owner, read_only=True, mutation=False, drop_authorized=False, pool_released=True,
+                          inventory_complete=True, source_sha="a" * 40, database_replica_sha256="d" * 64,
+                          error_phase="none", observed_at="2026-11-09T17:14:00.123456789Z",
+                          counts=dict(owner_executions=7, report_terminal_executions=5, v1_future_prepared=1,
+                                      v1_future_committed=1, v1_future_aborted=2, v1_future_inactive=1))
+            if change:
+                change(report)
+            results = [CompletedProcess([], 0, json.dumps([inspected]).encode()),
+                       CompletedProcess([], status, json.dumps(report).encode())]
+            path = Path("messaging-retirement-interpretation-future.json")
+            if prior_receipt:
+                path.write_text('{"earlier":true}')
+            with patch.dict(os.environ, env), patch("subprocess.run", side_effect=results) as transport:
+                error = None
+                try:
+                    runpy.run_path(str(SCRIPT), run_name="__main__")
+                except (SystemExit, FileExistsError) as exc:
+                    error = exc.code if isinstance(exc, SystemExit) else exc
+                saved = json.loads(path.read_text()) if path.exists() else None
+                if path.exists() and not prior_receipt:
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                self.assertFalse(Path("messaging-retirement-inventory.json").exists())
+                return error, saved, transport.call_args_list
+
+    def test_interpretation_mode_requires_owned_transport_and_exact_companion(self):
+        for case in (dict(owned=False), dict(mode="mistyped"), dict(owner="qs.mysql"), dict(bad_digest=True)):
+            error, saved, calls = self.execute_future(**case)
+            self.assertIsNotNone(error)
+            self.assertIsNone(saved)
+            self.assertFalse(calls)
+        for case in (dict(wrong_image=True), dict(wrong_network=True)):
+            error, saved, calls = self.execute_future(**case)
+            self.assertIn("unavailable", error)
+            self.assertIsNone(saved)
+            self.assertEqual(len(calls), 1)
+            self.assertIn("docker inspect qs-m5-maintenance-12345-1", calls[0].args[0][-1])
+
+    def test_interpretation_mode_binds_owned_transport_and_separate_receipt(self):
+        exit_code, saved, calls = self.execute_future()
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(saved["receipt_validated"])
+        self.assertTrue(saved["inventory_complete"])
+        self.assertEqual(saved["counts"]["v1_future_prepared"], 1)
+        self.assertFalse(saved["drop_authorized"])
+        self.assertEqual(saved["companion_sha256"], hashlib.sha256(b"fixed-fixture").hexdigest())
+        self.assertEqual(len(calls), 2)
+        command = calls[1].args[0][-1]
+        self.assertIn("docker exec --user 2000:2000 -i " + "e" * 64, command)
+        self.assertIn("mktemp ", command)
+        self.assertIn("--interpretation-future-inventory", command)
+        self.assertNotIn("--messaging-retirement-inventory", command)
+        self.assertEqual(calls[1].kwargs["input"], b"fixed-fixture")
+
+    def test_interpretation_mode_rejects_untrusted_counts_and_does_not_overwrite(self):
+        for change, status in (
+            (lambda r: None, 1),
+            (lambda r: r.update(source_sha="b" * 40), 0),
+            (lambda r: r.update(drop_authorized=True), 0),
+            (lambda r: r.update(plan="private fixture"), 0),
+            (lambda r: r["counts"].update(v1_future_inactive=3), 0),
+            (lambda r: r["counts"].update(v1_future_prepared=True), 0),
+        ):
+            error, saved, _ = self.execute_future(change, status=status)
+            self.assertIn("incomplete", error)
+            self.assertFalse(saved["receipt_validated"])
+            self.assertNotIn("counts", saved)
+            self.assertNotIn("plan", saved)
+        def incomplete(receipt):
+            receipt.pop("counts")
+            receipt.update(inventory_complete=False, error_phase="execution_inventory")
+        error, saved, _ = self.execute_future(incomplete, status=1)
+        self.assertIn("incomplete", error)
+        self.assertTrue(saved["receipt_validated"])
+        self.assertNotIn("counts", saved)
+        error, saved, _ = self.execute_future(prior_receipt=True)
+        self.assertIsInstance(error, FileExistsError)
+        self.assertEqual(saved, {"earlier": True})
+
     def test_actual_ai_payload_preserves_classified_errors_without_private_values(self):
         _, _, calls = self.execute(owner="ai.mysql")
         payload = calls[0].kwargs["input"]

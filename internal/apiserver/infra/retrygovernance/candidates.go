@@ -35,11 +35,13 @@ func (r *Reader) ListRetryCandidates(ctx context.Context, orgID int64, cursor st
 	if err := r.appendInterpretationCandidates(ctx, orgID, fetch, &items); err != nil {
 		return app.RetryCandidatePage{}, err
 	}
-	if err := r.appendMySQLOutboxCandidates(ctx, orgID, fetch, &items); err != nil {
-		return app.RetryCandidatePage{}, err
-	}
-	if err := r.appendMongoOutboxCandidates(ctx, orgID, fetch, &items); err != nil {
-		return app.RetryCandidatePage{}, err
+	if !r.transactionOnly {
+		if err := r.appendMySQLOutboxCandidates(ctx, orgID, fetch, &items); err != nil {
+			return app.RetryCandidatePage{}, err
+		}
+		if err := r.appendMongoOutboxCandidates(ctx, orgID, fetch, &items); err != nil {
+			return app.RetryCandidatePage{}, err
+		}
 	}
 	if err := r.appendDeliveryCandidates(ctx, orgID, fetch, &items); err != nil {
 		return app.RetryCandidatePage{}, err

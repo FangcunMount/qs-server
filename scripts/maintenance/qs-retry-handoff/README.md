@@ -40,6 +40,8 @@
 
 每个计划独立使用原根事务：保存原冻结计划并将原未尝试 Outbox 记录改为精确 `held` 标记。原有实现只允许未到期、未尝试、无 claim/lease/confirmation/manual replay 的源；原 Relay 和 Replay 不能再次取得已交接记录。到期或已有发布责任的记录必须先沿旧链路排空/具名处置，不能被此命令补发。
 
+Mongo 每个计划的根事务前核对原名的物理集合和 UUID，提交前从事务外复验该身份。实际账户需要主节点的库级 `listCollections` 权限，现场仍需冻结 DDL。
+
 Mongo 驱动 callback 重入只重复这段确定性 DB 交接；不更换 ID、due、授权或 wire。任一失败停止后续计划；已确认前缀保留，提交回复未知的当前计划记录 `unknown`。不得把整个批次假定为已回滚，也不提供跨库原子提交。原样重复同一审核清单只执行幂等元数据核验/交接，不是业务重试授权。
 
 ## 回执与后续判断
@@ -75,6 +77,16 @@ MySQL使用服务器只读Repeatable Read事务；Mongo在新snapshot事务中�
 | 1 | 参数、绑定、schema/原集合、读取或清理不可用；不能解释为空 |
 
 盘点同样先持久化私有started，再记录完成时间、计数及核验结果。stdout只有固定状态和总量，不含wire、原ID或连接信息。`--inventory`与`--apply`互斥，不接受停写声明冒充自动停写；所有输出仍为`cutover_authorized=false`。
+
+### 历史盘点
+
+用 `--inventory --history` 显式盘点 `qs_rm_outbox_history`，仍须指定原 owner、store、writer epoch、数据库和新的私有回执。MySQL 核对固定视图，Mongo 在同一快照核对原 BSON 身份、原报文和已审核计划，并在前后核对存档 UUID。两种模式分别记录 `m5-mysql-handoff-history-inventory/v1` 和 `m5-mongo-handoff-history-inventory/v1`，均保留 `cutover_authorized=false`。
+
+存档缺失或读取失败退出 1。未选择的 held 或其他尚未结清的原责任退出 2。普通 `--inventory` 要求物理 `rm_outbox`。现库同窗口保全、两地原件、存档完整性及实际账户资格须分别签收。
+
+MySQL 治理状态、候选列表和恢复汇总在同一只读快照校验历史视图与返回结果。原表在场时使用原表。历史回读要求账号能区分原表不存在与访问被拒。归档中出现异常状态或未收口责任时，治理读取返回失败。
+
+MySQL 的 `--apply` 在每次交接事务中先取得原名的元数据锁，再验证 `rm_outbox` 是物理表。原名视图即使可更新也会被拒绝。只读历史回执和实际交接授权分别核验。
 
 ### 2026-10-31 宿主退役 M4 复核
 

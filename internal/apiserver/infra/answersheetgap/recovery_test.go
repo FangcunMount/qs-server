@@ -13,7 +13,16 @@ import (
 
 func recoveryFixture(t *testing.T) (bson.Raw, sheetRow, outboxRow, recoveryConfirmation, time.Time) {
 	t.Helper()
+	return recoveryFixtureForSheet(t, 0)
+}
+
+func recoveryFixtureForSheet(t *testing.T, id uint64) (bson.Raw, sheetRow, outboxRow, recoveryConfirmation, time.Time) {
+	t.Helper()
 	sheet, row := validOriginal(t)
+	if id != 0 {
+		sheet.DomainID = id
+		row.Payload = makeWire(t, sheet, sheet.Admission.ModelCode)
+	}
 	now := time.Now().Truncate(time.Millisecond)
 	at := now.Add(-time.Minute)
 	sheet.DurableAcceptance.AcceptedAt = at

@@ -6,11 +6,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	appaudit "github.com/FangcunMount/qs-server/internal/apiserver/application/mongoconsistency"
 	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	answersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	basemongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -279,6 +281,60 @@ func TestScannerPagesActualCompoundBSONIdentitiesAndResumes(t *testing.T) {
 	if total != len(docs) {
 		t.Fatalf("scanned %d, want %d", total, len(docs))
 	}
+	cur, err := db.Collection(outboxhistory.Original).Find(ctx, bson.D{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var original []bson.Raw
+	if err := cur.All(ctx, &original); err != nil {
+		t.Fatal(err)
+	}
+	rawDocs := make([]any, len(original))
+	for i := range original {
+		rawDocs[i] = original[i]
+	}
+	mustInsertMany(t, ctx, db.Collection(outboxhistory.Archive), rawDocs)
+	if err := db.Client().Database("admin").RunCommand(ctx, bson.D{
+		{Key: "renameCollection", Value: db.Name() + "." + outboxhistory.Original},
+		{Key: "to", Value: db.Name() + ".isolated_original_rm_outbox"},
+	}).Err(); err != nil {
+		t.Fatal(err)
+	}
+	archivedUpper, err := scanner.OutboxUpperBound(ctx, 3*time.Second)
+	if err != nil || !bytes.Equal(upper, archivedUpper) {
+		t.Fatalf("archive changed frozen cursor boundary: %v", err)
+	}
+	request := appaudit.BatchRequest{Phase: appaudit.PhaseOutboxAnswerSheet, OutboxUpperBound: upper, Limit: 2, MaxTime: 3 * time.Second}
+	archivedSeen := map[string]bool{}
+	for page := 0; page < 20; page++ {
+		batch, err := scanner.ScanBatch(ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if batch.Scanned == 0 || len(batch.Findings) != batch.Scanned {
+			t.Fatalf("archive skipped original conflicts: %#v", batch)
+		}
+		archivedSeen[hex.EncodeToString(batch.NextOutboxCursor)] = true
+		if batch.Exhausted {
+			break
+		}
+		request.OutboxCursor = append([]byte(nil), batch.NextOutboxCursor...)
+	}
+	if len(archivedSeen) != len(seen) {
+		t.Fatal("archive changed original page count")
+	}
+	for token := range seen {
+		if !archivedSeen[token] {
+			t.Fatal("archive changed a compound BSON cursor")
+		}
+	}
+	if err := db.Collection(outboxhistory.Archive).Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scanner.OutboxUpperBound(ctx, 3*time.Second); !errors.Is(err, outboxhistory.ErrMissing) {
+		t.Fatalf("missing original and archive became an empty success: %v", err)
+	}
+	t.Log("F06_MONGO_REVERSE_PROOF bson_cursor_equal=true original_conflicts_retained=true both_sources_missing_refused=true")
 }
 
 func TestReverseAuditDetectsCoveredOrphanHiddenByCorruptOuterType(t *testing.T) {

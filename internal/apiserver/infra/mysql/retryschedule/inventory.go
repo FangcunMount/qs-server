@@ -6,17 +6,27 @@ import (
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
 	hostmysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 )
 
 var _ port.HandoffInspector = (*Store)(nil)
+var _ port.HandoffHistoryInspector = (*Store)(nil)
 
 // InspectLegacy uses a fresh server-enforced read-only snapshot. Its 30s total
 // maintenance budget is separate from the SDK's 2s Checker budget; it starts no
 // workers and holds one borrowed host admission slot until the DB boundary ends.
 func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	return s.inspectLedger(ctx, selected, false)
+}
+
+func (s *Store) InspectHistory(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	return s.inspectLedger(ctx, selected, true)
+}
+
+func (s *Store) inspectLedger(ctx context.Context, selected []model.Frozen, history bool) (model.LegacyInventory, error) {
 	if _, active := hostmysql.TxFromContext(ctx); active {
 		return model.LegacyInventory{}, transaction.ErrTransactionRequired
 	}
@@ -38,8 +48,17 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 	if err := s.validateIn(ctx, tx, false); err != nil {
 		return model.LegacyInventory{}, err
 	}
+	var source string
+	if history {
+		source, err = outboxhistory.ArchiveSource(ctx, tx)
+	} else {
+		source, err = outboxhistory.ActiveSource(ctx, tx)
+	}
+	if err != nil {
+		return model.LegacyInventory{}, err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT state,COUNT(*),COALESCE(SUM(state='published' AND (transport_confirmed_at IS NULL OR transport_confirmed_at<'1970-01-01')),0)
- FROM rm_outbox GROUP BY state LIMIT 7`)
+ FROM `+source+` GROUP BY state LIMIT 7`)
 	if err != nil {
 		return model.LegacyInventory{}, err
 	}
@@ -64,7 +83,7 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 		return model.LegacyInventory{}, closeErr
 	}
 	for _, f := range selected {
-		if err := s.inspectHeld(ctx, tx, f); err != nil {
+		if err := s.inspectHeld(ctx, tx, f, source); err != nil {
 			return model.LegacyInventory{}, err
 		}
 	}
@@ -78,7 +97,7 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 	return result, nil
 }
 
-func (s *Store) inspectHeld(ctx context.Context, tx *sql.Tx, f model.Frozen) error {
+func (s *Store) inspectHeld(ctx context.Context, tx *sql.Tx, f model.Frozen, source string) error {
 	in := f.Message().Input()
 	var row model.LegacySource
 	var duplicates uint64
@@ -86,8 +105,8 @@ func (s *Store) inspectHeld(ctx context.Context, tx *sql.Tx, f model.Frozen) err
 	var lease, confirmed sql.NullTime
 	var replayVersion sql.NullInt64
 	var due string
-	err := tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM rm_outbox WHERE producer=? AND message_id=? AND destination=?),producer,message_id,destination,event_type,schema_version,scope,content_type,occurred_at,payload,fingerprint,state,last_error_code,DATE_FORMAT(next_attempt_at,'%Y-%m-%d %H:%i:%s.%f'),version,attempt_count,failure_count,claim_token,lease_until,transport_confirmed_at,manual_replay_request_id,manual_replay_version
- FROM rm_outbox WHERE producer=? AND message_id=? AND destination=? AND OCTET_LENGTH(payload)<=262144 LIMIT 1`,
+	err := tx.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM `+source+` WHERE producer=? AND message_id=? AND destination=?),producer,message_id,destination,event_type,schema_version,scope,content_type,occurred_at,payload,fingerprint,state,last_error_code,DATE_FORMAT(next_attempt_at,'%Y-%m-%d %H:%i:%s.%f'),version,attempt_count,failure_count,claim_token,lease_until,transport_confirmed_at,manual_replay_request_id,manual_replay_version
+ FROM `+source+` WHERE producer=? AND message_id=? AND destination=? AND OCTET_LENGTH(payload)<=262144 LIMIT 1`,
 		[]byte(in.Producer), []byte(in.ID), []byte(in.Destination), []byte(in.Producer), []byte(in.ID), []byte(in.Destination)).Scan(
 		&duplicates, &row.Input.Producer, &row.Input.ID, &row.Input.Destination, &row.Input.EventType, &row.Input.SchemaVersion, &row.Input.Scope, &row.Input.ContentType, &row.Input.OccurredAt, &row.Input.Payload, &row.Fingerprint, &row.State, &row.Code, &due, &row.Version, &row.Attempts, &row.Failures, &token, &lease, &confirmed, &replay, &replayVersion)
 	if err != nil {

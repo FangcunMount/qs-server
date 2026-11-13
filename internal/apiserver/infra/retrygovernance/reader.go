@@ -14,6 +14,7 @@ type Reader struct {
 	mysql            *gorm.DB
 	mongo            *mongo.Database
 	standardOutboxes map[string]app.OutboxGovernanceReader
+	transactionOnly  bool
 }
 
 type countRow struct {
@@ -29,11 +30,20 @@ func NewReader(mysql *gorm.DB, mongoDB *mongo.Database) *Reader {
 // delivery dead letters and holds remain owned by their existing readers.
 func (r *Reader) WithStandardOutboxes(readers map[string]app.OutboxGovernanceReader) *Reader {
 	if r != nil {
+		r.transactionOnly = false
 		r.standardOutboxes = make(map[string]app.OutboxGovernanceReader, len(readers))
 		for name, reader := range readers {
 			r.standardOutboxes[name] = reader
 		}
 	}
+	return r
+}
+
+// WithTransactionOnlyPublication declares that the active host does not have
+// publication Outbox profiles. Historical responsibility is audited separately.
+func (r *Reader) WithTransactionOnlyPublication() *Reader {
+	r.transactionOnly = true
+	r.standardOutboxes = nil
 	return r
 }
 
@@ -82,11 +92,13 @@ GROUP BY rc.retry_disposition`, orgID).Scan(&evaluation).Error; err != nil {
 		addDisposition(&summary, row.Disposition, row.Count)
 	}
 
-	if err := r.addOutboxGovernance(ctx, orgID, "assessment-mysql-outbox", &summary); err != nil {
-		return summary, err
-	}
-	if err := r.addOutboxGovernance(ctx, orgID, "mongo-domain-events", &summary); err != nil {
-		return summary, err
+	if !r.transactionOnly {
+		if err := r.addOutboxGovernance(ctx, orgID, "assessment-mysql-outbox", &summary); err != nil {
+			return summary, err
+		}
+		if err := r.addOutboxGovernance(ctx, orgID, "mongo-domain-events", &summary); err != nil {
+			return summary, err
+		}
 	}
 	if err := r.mysql.WithContext(ctx).Raw("SELECT COUNT(*) FROM event_delivery_dead_letter WHERE org_id=? AND retry_disposition='manual_required'", orgID).Scan(&summary.TransportDeadLetters).Error; err != nil {
 		return summary, err

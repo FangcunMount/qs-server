@@ -3,53 +3,37 @@ package retryschedule
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/retryschedule"
 	"github.com/FangcunMount/reliable-messaging/transaction"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-var _ port.HandoffInspector = (*Store)(nil)
+var (
+	_ port.HandoffInspector        = (*Store)(nil)
+	_ port.HandoffHistoryInspector = (*Store)(nil)
+)
 
-func legacyCollectionUUID(ctx context.Context, db *mongo.Database) (primitive.Binary, error) {
-	cur, err := db.ListCollections(ctx, bson.M{"name": "rm_outbox"}, options.ListCollections().SetNameOnly(false))
-	if err != nil {
-		return primitive.Binary{}, err
-	}
-	defer func() { _ = cur.Close(ctx) }()
-	if !cur.Next(ctx) {
-		return primitive.Binary{}, transaction.ErrSchema
-	}
-	var metadata struct {
-		Name string `bson:"name"`
-		Type string `bson:"type"`
-		Info struct {
-			UUID primitive.Binary `bson:"uuid"`
-		} `bson:"info"`
-	}
-	if err := cur.Decode(&metadata); err != nil {
-		return primitive.Binary{}, err
-	}
-	if metadata.Name != "rm_outbox" || metadata.Type != "collection" || metadata.Info.UUID.Subtype != 4 || len(metadata.Info.UUID.Data) != 16 || cur.Next(ctx) {
-		return primitive.Binary{}, transaction.ErrSchema
-	}
-	if err := cur.Err(); err != nil {
-		return primitive.Binary{}, err
-	}
-	return metadata.Info.UUID, nil
+// InspectLegacy accounts for the original physical collection only.
+func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	return s.inspect(ctx, selected, outboxhistory.NewOriginalReader)
 }
 
-// InspectLegacy performs reads only in a new snapshot transaction, then aborts
-// it. Original collection UUID is checked on both sides: a missing, replaced or
-// recreated ledger cannot be interpreted as an empty original ledger.
-func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+// InspectHistory checks retained original bytes against the frozen schedule in
+// a read-only snapshot. It never uses the active collection as a fallback.
+func (s *Store) InspectHistory(ctx context.Context, selected []model.Frozen) (model.LegacyInventory, error) {
+	return s.inspect(ctx, selected, outboxhistory.NewArchiveReader)
+}
+
+func (s *Store) inspect(ctx context.Context, selected []model.Frozen, newReader func(context.Context, *mongo.Database) *outboxhistory.Reader) (model.LegacyInventory, error) {
 	if mongo.SessionFromContext(ctx) != nil {
 		return model.LegacyInventory{}, transaction.ErrTransactionRequired
 	}
@@ -63,8 +47,12 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 		return model.LegacyInventory{}, err
 	}
 	defer release()
-	before, err := legacyCollectionUUID(ctx, s.primary)
+	reader := newReader(ctx, s.primary)
+	legacy, err := reader.Collection()
 	if err != nil {
+		if errors.Is(err, outboxhistory.ErrMissing) || errors.Is(err, outboxhistory.ErrIdentity) {
+			return model.LegacyInventory{}, transaction.ErrSchema
+		}
 		return model.LegacyInventory{}, err
 	}
 	session, err := s.primary.Client().StartSession()
@@ -89,7 +77,7 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 			bson.M{"$lt": bson.A{"$transport_confirmed_at", time.Unix(0, 0).UTC()}},
 		}},
 	}}
-	cur, err := s.primary.Collection("rm_outbox").Aggregate(tx, mongo.Pipeline{
+	cur, err := legacy.Aggregate(tx, mongo.Pipeline{
 		bson.D{{Key: "$group", Value: bson.M{"_id": "$state", "count": bson.M{"$sum": 1}, "missing": bson.M{"$sum": bson.M{"$cond": bson.A{badConfirmation, 1, 0}}}}}},
 		bson.D{{Key: "$limit", Value: 7}},
 	}, options.Aggregate().SetMaxTime(30*time.Second).SetBatchSize(7))
@@ -116,7 +104,7 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 		return model.LegacyInventory{}, err
 	}
 	for _, f := range selected {
-		if err := s.inspectHeld(tx, f); err != nil {
+		if err := s.inspectHeld(tx, legacy, f); err != nil {
 			return model.LegacyInventory{}, err
 		}
 	}
@@ -127,20 +115,19 @@ func (s *Store) InspectLegacy(ctx context.Context, selected []model.Frozen) (mod
 	if err := session.AbortTransaction(tx); err != nil {
 		return model.LegacyInventory{}, err
 	}
-	after, err := legacyCollectionUUID(ctx, s.primary)
-	if err != nil {
+	if err := reader.Verify(); err != nil {
+		if errors.Is(err, outboxhistory.ErrMissing) || errors.Is(err, outboxhistory.ErrIdentity) {
+			return model.LegacyInventory{}, transaction.ErrSchema
+		}
 		return model.LegacyInventory{}, err
-	}
-	if before.Subtype != after.Subtype || !bytes.Equal(before.Data, after.Data) {
-		return model.LegacyInventory{}, transaction.ErrSchema
 	}
 	return result, nil
 }
 
-func (s *Store) inspectHeld(ctx context.Context, f model.Frozen) error {
+func (s *Store) inspectHeld(ctx context.Context, legacy *mongo.Collection, f model.Frozen) error {
 	in := f.Message().Input()
 	identity := bson.M{"producer": in.Producer, "message_id": in.ID, "destination": in.Destination}
-	count, err := s.primary.Collection("rm_outbox").CountDocuments(ctx, identity, options.Count().SetLimit(2))
+	count, err := legacy.CountDocuments(ctx, identity, options.Count().SetLimit(2))
 	if err != nil {
 		return err
 	}
@@ -149,8 +136,15 @@ func (s *Store) inspectHeld(ctx context.Context, f model.Frozen) error {
 	}
 	identity["$expr"] = bson.M{"$lte": bson.A{bson.M{"$binarySize": "$payload"}, 262144}}
 	var source legacyHandoffDocument
-	if err := s.primary.Collection("rm_outbox").FindOne(ctx, identity).Decode(&source); err != nil {
+	if err := legacy.FindOne(ctx, identity).Decode(&source); err != nil {
 		return err
+	}
+	expectedID, err := bson.Marshal(bson.D{{Key: "producer", Value: in.Producer}, {Key: "message_id", Value: in.ID}, {Key: "destination", Value: in.Destination}})
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(source.ID, expectedID) {
+		return model.ErrLegacyOwnership
 	}
 	already, err := model.MatchLegacy(f, source.legacySource(), time.Millisecond)
 	if err != nil {

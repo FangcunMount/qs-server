@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 	"github.com/FangcunMount/reliable-messaging/transport"
 	sdknsq "github.com/FangcunMount/reliable-messaging/transport/nsq"
 	driver "github.com/nsqio/go-nsq"
@@ -126,7 +127,12 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 		defer stop()
 		_ = client.Disconnect(cleanup)
 	}()
-	plan, err := captureOriginal(ctx, client.Database(dbName), cfg.runID, cfg.orgID, time.Now())
+	db := client.Database(dbName)
+	newEvidence := outboxhistory.NewOriginalReader
+	if cfg.mode == "inspect" {
+		newEvidence = outboxhistory.NewReader
+	}
+	plan, err := captureOriginal(ctx, db, newEvidence(ctx, db), cfg.runID, cfg.orgID, time.Now())
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "original retry recovery: source rejected or unavailable")
 		return 1
@@ -176,7 +182,7 @@ func runCLI(parent context.Context, args []string, stdout, stderr io.Writer) int
 	// Revalidate after the durable reservation and immediately before PUB.
 	// If a consumer wins this final race, its existing generation CAS and
 	// attempt unique index govern the original authorization at consumption.
-	current, err := captureOriginal(ctx, client.Database(dbName), cfg.runID, cfg.orgID, time.Now())
+	current, err := captureOriginal(ctx, db, newEvidence(ctx, db), cfg.runID, cfg.orgID, time.Now())
 	if err != nil || current.SourceFingerprint != plan.SourceFingerprint {
 		_, _ = fmt.Fprintln(stderr, "original retry recovery: source changed; reserved operation requires reconciliation")
 		return 2

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/outboxhistory"
 	mysqlstore "github.com/FangcunMount/reliable-messaging/storage/mysql"
 )
 
@@ -65,28 +66,30 @@ func (l *GapRecoveryLedger) ReadSummary(ctx context.Context, orgID int64) (GapRe
 	if l == nil || l.db == nil || orgID <= 0 {
 		return result, errors.New("gap recovery summary requires host database and organization")
 	}
-	var incomplete int64
-	err := l.db.QueryRowContext(ctx, `SELECT
+	return outboxhistory.ReadOperational(ctx, l.db, func(tx *sql.Tx, source string) (GapRecoverySummary, error) {
+		var incomplete int64
+		err := tx.QueryRowContext(ctx, `SELECT
 	COALESCE(SUM(result_code<>'' AND authorized=1),0),
 	COALESCE(SUM(result_code<>'' AND authorized=0),0),
 	COALESCE(SUM(result_code=''),0),
 	(SELECT COUNT(*) FROM qs_rm_gap_recovery_request AS pending
 	 WHERE pending.org_id=? AND pending.authorized=1 AND EXISTS (
-	   SELECT 1 FROM rm_outbox AS o WHERE o.message_id=pending.event_id
+	   SELECT 1 FROM `+source+` AS o WHERE o.message_id=pending.event_id
 	   AND o.scope=CONCAT('org:',pending.org_id)
 	   AND o.producer='qs-server' AND o.event_type='evaluation.requested'
 	   AND o.manual_replay_request_id=pending.request_id
 	   AND o.manual_replay_version=pending.outbox_version_after
 	   AND o.version=pending.outbox_version_after AND o.state='retry_wait'))
 	FROM qs_rm_gap_recovery_request WHERE org_id=?`, orgID, orgID).
-		Scan(&result.Authorized, &result.Denied, &incomplete, &result.WaitingRelay)
-	if err != nil {
-		return GapRecoverySummary{}, err
-	}
-	if incomplete != 0 {
-		return GapRecoverySummary{}, ErrGapRecoveryLedgerCorrupt
-	}
-	return result, nil
+			Scan(&result.Authorized, &result.Denied, &incomplete, &result.WaitingRelay)
+		if err != nil {
+			return GapRecoverySummary{}, err
+		}
+		if incomplete != 0 {
+			return GapRecoverySummary{}, ErrGapRecoveryLedgerCorrupt
+		}
+		return result, nil
+	})
 }
 
 func (r GapRecoveryRequest) fingerprint() ([32]byte, string, error) {
@@ -291,7 +294,7 @@ func authorizeGapOne(ctx context.Context, tx *sql.Tx, input GapRecoveryRequest) 
 	if found[0].version != input.ExpectedVersion {
 		return denied("version_conflict")
 	}
-	inspection, err := inspectOriginalRequest(ctx, tx, input.OrgID, input.AssessmentID, input.SubmittedBefore)
+	inspection, err := inspectOriginalRequest(ctx, tx, input.OrgID, input.AssessmentID, input.SubmittedBefore, false)
 	if err != nil {
 		return GapRecoveryResult{}, err
 	}

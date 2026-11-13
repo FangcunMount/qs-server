@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -86,6 +87,65 @@ func TestGovernanceSummaryReconcilesWithOrganizationCandidates(t *testing.T) {
 	}
 	if summary.BlockedRetryEvents != 2 {
 		t.Fatalf("blocked retry events = %d, want 2", summary.BlockedRetryEvents)
+	}
+}
+
+func TestTransactionOnlyPublicationKeepsCurrentRetryGovernance(t *testing.T) {
+	mysqlDB := openRetryGovernanceMySQL(t)
+	mongoDB := openRetryGovernanceMongo(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	seedRetryGovernanceMySQL(t, mysqlDB, now)
+	seedRetryGovernanceMongo(t, mongoDB, now)
+
+	reader := NewReader(mysqlDB, mongoDB)
+	if _, err := reader.ReadRetryGovernance(t.Context(), 7); err == nil {
+		t.Fatal("an unconfigured publication reader must still fail closed")
+	}
+	reader.WithTransactionOnlyPublication()
+	summary, err := reader.ReadRetryGovernance(t.Context(), 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.OutboxAutomatic != 0 || summary.OutboxManual != 0 || summary.OutboxAuthorized != 0 ||
+		summary.OutboxTerminal != 0 || summary.BlockedRetryEvents != 0 {
+		t.Fatalf("historical publication rows leaked into live governance: %+v", summary)
+	}
+	page, err := reader.ListRetryCandidates(t.Context(), 7, "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := make(map[string]int)
+	for _, item := range page.Items {
+		kinds[item.Kind]++
+		if item.ResourceID == "8001" || item.ResourceID == "8" || item.ResourceID == "hold-org-8" || item.MessageID == "manual-8" {
+			t.Fatalf("organization 8 candidate leaked: %+v", item)
+		}
+	}
+	if kinds["outbox"] != 0 || kinds["evaluation"] == 0 || kinds["interpretation"] == 0 ||
+		kinds["transport_delivery"] == 0 || kinds["retry_hold"] == 0 || summary.TransportReplayUnresolved != 1 {
+		t.Fatalf("live retry governance lost a current source: kinds=%+v summary=%+v", kinds, summary)
+	}
+
+	// Preserve the original objects under their history names in the fixture.
+	if err := mysqlDB.Exec("RENAME TABLE rm_outbox TO isolated_outbox_history_rows").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := mysqlDB.Exec("CREATE SQL SECURITY INVOKER VIEW qs_rm_outbox_history AS SELECT * FROM isolated_outbox_history_rows").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := mongoDB.Client().Database("admin").RunCommand(t.Context(), bson.D{
+		{Key: "renameCollection", Value: mongoDB.Name() + ".rm_outbox"},
+		{Key: "to", Value: mongoDB.Name() + ".qs_rm_outbox_history"},
+	}).Err(); err != nil {
+		t.Fatal(err)
+	}
+	afterSummary, err := reader.ReadRetryGovernance(t.Context(), 7)
+	if err != nil || afterSummary != summary {
+		t.Fatalf("legacy object rename changed the current summary: %+v, error=%v", afterSummary, err)
+	}
+	afterPage, err := reader.ListRetryCandidates(t.Context(), 7, "", 100)
+	if err != nil || !reflect.DeepEqual(afterPage, page) {
+		t.Fatalf("legacy object rename changed current candidates: %+v, error=%v", afterPage, err)
 	}
 }
 

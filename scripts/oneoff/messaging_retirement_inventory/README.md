@@ -30,6 +30,12 @@ M4 实际部署和回读完成前不执行现网核对。即使报告完整且�
 
 空表保护材料还包含同一只读快照中的完整原 `schema_migrations` 账本：验证恰好 version/dirty 两列的实际类型、单行 clean 原值，并保存原 DDL/哈希。未知列、dirty/多行或释放失败使整体材料不完整；不是仅按预期目标数字重建版本。具体恢复只可在独立审定、原对象复原和保留事实核对后事务回放完整原账本，不提供通用 Force/down 或生产修复授权。
 
+## 解释旧版冻结计划盘点
+
+同一伴随二进制的 `--interpretation-future-inventory` 固定读取应用显式绑定的 `qs` 库。该模式在主节点的同一只读快照内扫描 `qs.mongo` 执行，校验计划、原请求、原见证及集合身份。只输出 v1 future 的 prepared、committed、aborted 和已由新 fence 取代的计数。inactive 是 aborted 的子集。总读取限时 20 秒、最多 10,000 条、128 MiB 投影 BSON。账本缺失、权限不足、身份变化、超限、坏计划或未知状态均无有效计数。
+
+工作流 `release-snapshot.yml` 显式选择 `interpretation_future_inventory=true`，提供受核的 `reviewed_source`、已存在的 `maintenance_container` 及其原 `maintenance_image_id`。仅执行 QS Mongo 盘点，与普通盘点、协议观察、容器创建互斥。运输复核独立数据库网络、完整容器 ID 和伴随二进制摘要，单独持久化私有回执。快照结果只描述本地事务状态，Broker 最终结果、同窗口保全和退役批准独立核对。
+
 ## 停机后的维护传输
 
 默认运输仍在原应用容器中执行。全部 QS 进程停止后，需要独立的维护容器，不能把停机前快照冒充同窗口保护材料。
