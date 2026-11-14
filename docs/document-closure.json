@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "b525a7d306e3a4c93b28f49f8e0ab4bdc647e210",
+    "sha": "9dbf393e733ca9c1b4ce30aeee77825e771ccc30",
     "verified_on": "2026-11-14"
   },
   "status_policy": {
@@ -15711,8 +15711,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9d34975fc6440e60a8ab95e38d0f63d78882735a",
-        "verified_on": "2026-11-10"
+        "source_sha": "9dbf393e733ca9c1b4ce30aeee77825e771ccc30",
+        "verified_on": "2026-11-14"
       },
       "fact_sources": [
         {
@@ -15776,6 +15776,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
+          "2026-11-14 verifies MySQL TLS option propagation with an isolated MySQL 8.0.36 server. A trusted certificate with the wrong host is rejected. This does not imply production role fixtures are ready.",
           "2026-11-10 source review covers read-only container selection and runtime identity checks. Prior global baseline 0ba3035e384efe46a1d2a2d3a2a9a851312d36e6 (2026-11-01) and this entry’s prior binding 9edd299cf51a44beab766efb50a978c6f05dbbae (2026-10-24) retain their original evidence. IAM subject setup and business acceptance remain separately tracked.",
           "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
           "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
