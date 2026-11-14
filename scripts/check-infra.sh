@@ -3,9 +3,9 @@
 # ===================================
 # 基础设施检查脚本
 # ===================================
-# 用途：检查 MySQL、Redis、MongoDB、NSQ 等基础组件是否就绪
+# 用途：检查 MySQL、Redis、MongoDB，并提供显式的历史 NSQ 检查
 # 使用：./scripts/check-infra.sh [component]
-#       component: mysql | redis | mongodb | nsq | all (默认)
+#       component: runtime | mysql | redis | mongodb | nsq | all (默认)
 
 set -e
 
@@ -25,7 +25,7 @@ MYSQL_PASSWORD="${MYSQL_PASSWORD:-dev_root_123}"
 # Redis Cache 实例（端口 6379）
 REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
 REDIS_PORT="${REDIS_PORT:-6379}"
-REDIS_USERNAME="${REDIS_USERNAME:-${REDIS_USERNAME:-app}}"
+REDIS_USERNAME="${REDIS_USERNAME:-app}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-dev_app_123}"
 
 # MongoDB
@@ -104,8 +104,6 @@ check_redis() {
     if ! command -v redis-cli &> /dev/null; then
         printf "%-15s " "Redis Cache"
         printf "[${YELLOW}!${NC}] redis-cli 命令未安装，跳过连接测试\n"
-        printf "%-15s " "Redis Store"
-        printf "[${YELLOW}!${NC}] redis-cli 命令未安装，跳过连接测试\n"
         return 1
     fi
     
@@ -113,17 +111,19 @@ check_redis() {
     
     # 检查 Redis Cache 实例（端口 6379）
     printf "%-15s " "Redis Cache"
-    local cache_cmd="redis-cli -h $REDIS_HOST -p $REDIS_PORT"
+    local cache_cmd=(redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT")
     if [ -n "$REDIS_PASSWORD" ]; then
         if [ -n "$REDIS_USERNAME" ]; then
-            cache_cmd="$cache_cmd --user $REDIS_USERNAME --pass $REDIS_PASSWORD --no-auth-warning"
+            cache_cmd+=(--user "$REDIS_USERNAME" --pass "$REDIS_PASSWORD" --no-auth-warning)
         else
-            cache_cmd="$cache_cmd -a $REDIS_PASSWORD --no-auth-warning"
+            cache_cmd+=(-a "$REDIS_PASSWORD" --no-auth-warning)
         fi
     fi
-    
-    # redis-cli 默认有 5 秒超时，不需要额外的 timeout 命令
-    if $cache_cmd PING &> /dev/null; then
+
+    local reply
+    # A rejected AUTH is written to stderr. An unauthenticated PING can still
+    # return PONG when the server enables its default user.
+    if reply=$("${cache_cmd[@]}" PING 2>&1) && [ "$reply" = "PONG" ]; then
         printf "[${GREEN}✓${NC}] 运行正常 (${REDIS_HOST}:${REDIS_PORT})\n"
     else
         printf "[${RED}✗${NC}] 连接失败 (${REDIS_HOST}:${REDIS_PORT})\n"
@@ -195,18 +195,18 @@ show_usage() {
 
 COMPONENT:
     mysql       检查 MySQL 数据库
-    redis       检查 Redis 双实例（Cache + Store）
+    redis       检查 Redis Cache
     mongodb     检查 MongoDB 数据库
-    nsq         检查 NSQ 消息队列
-    all         检查所有组件 (默认)
+    runtime     检查当前运行时的数据依赖 MySQL、Redis、MongoDB
+    nsq         检查历史 NSQ 消息队列
+    all         检查所有组件，含历史 NSQ (脚本默认)
 
 环境变量:
     MySQL:
         MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD
     
-    Redis (双实例架构，支持 ACL 认证):
-        REDIS_CACHE_HOST, REDIS_CACHE_PORT, REDIS_CACHE_USERNAME, REDIS_CACHE_PASSWORD  # Cache 实例
-        REDIS_STORE_HOST, REDIS_STORE_PORT, REDIS_STORE_USERNAME, REDIS_STORE_PASSWORD  # Store 实例
+    Redis Cache (支持 ACL 认证):
+        REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD
     
     MongoDB:
         MONGODB_HOST, MONGODB_PORT, MONGODB_USER, MONGODB_PASSWORD
@@ -220,13 +220,13 @@ COMPONENT:
 示例:
     $0              # 检查所有组件
     $0 mysql        # 只检查 MySQL
-    $0 redis        # 检查 Redis 双实例
+    $0 redis        # 检查 Redis Cache
     
     # 使用自定义配置
     MYSQL_HOST=192.168.1.100 $0 mysql
     
-    # 检查自定义 Redis Store 实例
-    REDIS_STORE_HOST=192.168.1.101 REDIS_STORE_PORT=6380 $0 redis
+    # 检查自定义 Redis Cache 实例
+    REDIS_HOST=192.168.1.101 REDIS_PORT=6380 $0 redis
 
 退出码:
     0 - 所有检查通过
@@ -259,11 +259,13 @@ main() {
         nsq)
             check_nsq || failed=1
             ;;
-        all)
+        runtime|all)
             check_mysql || failed=1
             check_redis || failed=1
             check_mongodb || failed=1
-            check_nsq || failed=1
+            if [ "$component" = "all" ]; then
+                check_nsq || failed=1
+            fi
             ;;
         *)
             echo -e "${RED}错误: 未知的组件 '$component'${NC}\n"
