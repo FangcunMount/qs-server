@@ -88,6 +88,7 @@ func openReadOnlySource(opts *apiserveroptions.Options) (*database.MySQLConnecti
 	}
 	configured := opts.MySQLOptions
 	connection := database.NewMySQLConnection(&database.MySQLConfig{
+		TLSMode: configured.TLSMode, TLSCAFile: configured.TLSCAFile,
 		Host: configured.Host, Username: configured.Username, Password: configured.Password, Database: configured.Database,
 		MaxIdleConnections: 1, MaxOpenConnections: 2, MaxConnectionLifeTime: configured.MaxConnectionLifeTime,
 		LogLevel: configured.LogLevel, Location: configured.Location, SessionTimeZone: configured.SessionTimeZone,

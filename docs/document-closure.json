@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c77816a97a9eeddbfb164adcc1192d843be169bc",
-    "verified_on": "2026-11-11"
+    "sha": "2f2e576aad6e43a7b4fe6e05721981dd8e4e9d86",
+    "verified_on": "2026-11-14"
   },
   "status_policy": {
     "doc_status": [
@@ -15711,8 +15711,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "9edd299cf51a44beab766efb50a978c6f05dbbae",
-        "verified_on": "2026-10-24"
+        "source_sha": "2f2e576aad6e43a7b4fe6e05721981dd8e4e9d86",
+        "verified_on": "2026-11-14"
       },
       "fact_sources": [
         {
@@ -15776,6 +15776,9 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
+          "2026-11-14 verifies the explicit provisioning shell contract against the current M5 runtime identity, current subject names, the original rollback entrypoint, and post-call drift. Production subject changes remain separately authorized.",
+          "2026-11-14 verifies MySQL TLS option propagation with an isolated MySQL 8.0.36 server. A trusted certificate with the wrong host is rejected. This does not imply production role fixtures are ready.",
+          "2026-11-10 source review covers read-only container selection and runtime identity checks. Prior global baseline 0ba3035e384efe46a1d2a2d3a2a9a851312d36e6 (2026-11-01) and this entry’s prior binding 9edd299cf51a44beab766efb50a978c6f05dbbae (2026-10-24) retain their original evidence. IAM subject setup and business acceptance remain separately tracked.",
           "Command-family implementation and local checks do not establish deployment or real operational acceptance.",
           "Current command routing and source documentation reviewed at 713b2651ba5a727f12eba1ec852f4859b9ec18f5; local race tests passed. Earlier live/native/production statements retain their original attribution; no current production execution or Docker/MySQL integration run is implied.",
           "AuthZ availability-probe followup retains prior current bindings as JSON: {\"source_baseline\": {\"sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}, \"verified\": {\"source_sha\": \"713b2651ba5a727f12eba1ec852f4859b9ec18f5\", \"verified_on\": \"2026-10-18\"}}. Only the explicit missing-entrypoint status42 selects the old-image command. Generic exec/privilege errors, probe125 and command failure42 refuse without a legacy retry; fake-container shell contracts and ShellCheck passed. No real Docker or production operation occurred.",
