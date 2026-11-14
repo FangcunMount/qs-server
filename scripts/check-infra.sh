@@ -121,8 +121,9 @@ check_redis() {
     fi
 
     local reply
-    # redis-cli can exit successfully while the server returns NOAUTH.
-    if reply=$("${cache_cmd[@]}" PING 2>/dev/null) && [ "$reply" = "PONG" ]; then
+    # A rejected AUTH is written to stderr. An unauthenticated PING can still
+    # return PONG when the server enables its default user.
+    if reply=$("${cache_cmd[@]}" PING 2>&1) && [ "$reply" = "PONG" ]; then
         printf "[${GREEN}✓${NC}] 运行正常 (${REDIS_HOST}:${REDIS_PORT})\n"
     else
         printf "[${RED}✗${NC}] 连接失败 (${REDIS_HOST}:${REDIS_PORT})\n"
