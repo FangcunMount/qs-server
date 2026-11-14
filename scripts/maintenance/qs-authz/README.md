@@ -14,3 +14,5 @@ provision 要求 QS_AUTHZ_MATRIX_PROVISION_CONFIRM=provision-isolated-authz-matr
 脚本保留 exact SHA、证据内容和固定确认校验，普通服务默认入口不变。只读巡检与显式准备的工作流触发关系保持。
 
 只读巡检默认从运行中的容器选择唯一 QS API 候选。存在多个候选时须通过 `APISERVER_CONTAINER` 指定。M5 命名容器须健康，Compose 项目、服务和版本前缀须匹配。以本地不可变镜像 ID 启动时，从该镜像的 OCI revision 读取完整 Git SHA。巡检按完整容器 ID 执行，并在接收结果前再次核对容器、镜像、启动时间和重启计数。
+
+显式准备脚本对 M5 实例使用同样的容器身份绑定。现行命令的回执须包含隔离测评操作员和计划管理员这两类主体。旧回滚入口仍接受原 evaluator 命名。启动身份在调用后漂移时，以 IAM 只读回执复核原调用结果后再决定后续动作。
