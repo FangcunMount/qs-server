@@ -80,7 +80,8 @@ if ! [[ "$deployed_sha" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 if [[ "$APISERVER_CONTAINER" =~ $m5_api_pattern ]]; then
-  if [[ "$project" != "${APISERVER_CONTAINER%-*}" || "$project" != "qs-m5-${deployed_sha:0:12}-apiserver" ||
+  expected_project="qs-m5-${deployed_sha:0:12}-apiserver"
+  if [[ "${APISERVER_CONTAINER%-*}" != "$expected_project" || "$project" != "$expected_project" ||
         "$service" != "apiserver-${APISERVER_CONTAINER##*-}" || "$health" != healthy ]]; then
     echo "Named M5 apiserver release identity or health differs" >&2
     exit 1
