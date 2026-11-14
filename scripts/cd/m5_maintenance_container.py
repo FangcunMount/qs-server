@@ -163,7 +163,7 @@ def prepare(image, operation, *, stage=False, docker_prefix=None):
                 source_was_running=source["State"]["Running"])
 
 
-def resolve_inventory_target(owner, default):
+def resolve_inventory_target(owner, default, *, pin_container=False):
     """Explicit optional transport, validated with the existing SSH identity."""
     name = os.environ.get("QS_MAINTENANCE_CONTAINER", "")
     if not name:
@@ -198,6 +198,12 @@ def resolve_inventory_target(owner, default):
             or actual["Config"].get("Labels", {}).get(LABEL) != operation
             or any(m.get("RW") for m in actual.get("Mounts", []))):
         raise ValueError("maintenance process/image/ownership mismatch")
+    if pin_container:
+        container_id = actual.get("Id")
+        networks = actual.get("NetworkSettings", {}).get("Networks", {})
+        if not isinstance(container_id, str) or not re.fullmatch(r"[0-9a-f]{64}", container_id) or set(networks) != {"infra-network"}:
+            raise ValueError("maintenance container ID or isolated database network mismatch")
+        return container_id
     return name
 
 

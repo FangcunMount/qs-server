@@ -4,9 +4,11 @@ package transaction_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	driver "github.com/go-sql-driver/mysql"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -185,4 +187,175 @@ func nativeMissingHandoffLedger(t *testing.T, binding transaction.Binding, datab
 	require.NoError(t, json.Unmarshal([]byte(lines[1]), &final))
 	require.Equal(t, "inventory_unavailable", final.Status)
 	require.Nil(t, final.Inventory, "missing original ledger cannot be zero")
+}
+
+func nativeMongoApplyRejectsView(t *testing.T, binding transaction.Binding, f model.Frozen, database string) {
+	t.Helper()
+	dir := t.TempDir()
+	receipt := filepath.Join(dir, "refused-view.jsonl")
+	review, err := model.ReviewHandoff(binding, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_SOURCE_SHA"), "isolated-ci-owner", "refuse a view under the original write name", []model.Frozen{f})
+	require.NoError(t, err)
+	path := filepath.Join(dir, "review.json")
+	require.NoError(t, os.WriteFile(path, review.Bytes(), 0600))
+	digest := review.Digest()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"),
+		"--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]),
+		"--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch,
+		"--apply", "--database", database, "--receipt", receipt, "--all-legacy-writers-stopped-and-admission-closed")
+	cmd.Env = append(os.Environ(), "QS_RETRY_HANDOFF_MONGO_URI="+os.Getenv("QS_M3_MONGO_URI"))
+	output, err := cmd.Output()
+	require.Error(t, err, "apply accepted a view of the transferred original")
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit)
+	require.Equal(t, 1, exit.ExitCode())
+	require.Empty(t, output)
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	require.Len(t, lines, 2)
+	var final struct {
+		Status   string `json:"status"`
+		Outcomes []struct {
+			Status string `json:"status"`
+		} `json:"outcomes"`
+		Cutover bool `json:"cutover_authorized"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(lines[1]), &final))
+	require.Equal(t, "handoff_incomplete", final.Status)
+	require.False(t, final.Cutover)
+	require.Len(t, final.Outcomes, 1)
+	require.Equal(t, "unknown", final.Outcomes[0].Status)
+}
+
+// nativeMongoHistoryHandoffCLI invokes the same binary and binding used by
+// live inventory, but demands an explicitly separate archival receipt.
+func nativeMongoHistoryHandoffCLI(t *testing.T, binding transaction.Binding, f model.Frozen, database string, selected bool, exitCode int) {
+	t.Helper()
+	dir := t.TempDir()
+	receipt := filepath.Join(dir, "history.jsonl")
+	args := []string{"--inventory", "--history", "--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch, "--database", database, "--receipt", receipt}
+	if selected {
+		review, err := model.ReviewHandoff(binding, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_SOURCE_SHA"), "isolated-ci-owner", "verify archived future responsibility", []model.Frozen{f})
+		require.NoError(t, err)
+		path := filepath.Join(dir, "review.json")
+		require.NoError(t, os.WriteFile(path, review.Bytes(), 0600))
+		digest := review.Digest()
+		args = append(args, "--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]))
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"), args...)
+	cmd.Env = append(os.Environ(), "QS_RETRY_HANDOFF_MONGO_URI="+os.Getenv("QS_M3_MONGO_URI"))
+	out, err := cmd.Output()
+	if exitCode == 0 {
+		require.NoError(t, err)
+	} else {
+		var exit *exec.ExitError
+		require.ErrorAs(t, err, &exit)
+		require.Equal(t, exitCode, exit.ExitCode())
+	}
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	require.Len(t, lines, 2)
+	var header struct {
+		Schema   string `json:"schema"`
+		ReadOnly bool   `json:"read_only"`
+		Cutover  bool   `json:"cutover_authorized"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(lines[0]), &header))
+	require.Equal(t, "m5-mongo-handoff-history-inventory/v1", header.Schema)
+	require.True(t, header.ReadOnly)
+	require.False(t, header.Cutover)
+	var final struct {
+		Status    string                 `json:"status"`
+		Inventory *model.LegacyInventory `json:"inventory"`
+		Cutover   bool                   `json:"cutover_authorized"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(lines[1]), &final))
+	require.False(t, final.Cutover)
+	switch exitCode {
+	case 0:
+		require.Equal(t, "history_responsibilities_accounted", final.Status)
+		require.NotNil(t, final.Inventory)
+		require.Equal(t, binding, final.Inventory.Binding)
+		require.EqualValues(t, 1, final.Inventory.VerifiedHandoffs)
+		require.True(t, final.Inventory.ResponsibilitiesAccounted)
+	case 1:
+		require.Equal(t, "inventory_unavailable", final.Status)
+		require.Nil(t, final.Inventory)
+		require.Empty(t, out)
+	case 2:
+		require.Equal(t, "history_responsibilities_present", final.Status)
+		require.NotNil(t, final.Inventory)
+		require.EqualValues(t, 1, final.Inventory.UnverifiedHeld)
+		require.False(t, final.Inventory.ResponsibilitiesAccounted)
+	}
+}
+
+func nativeArchiveHandoffLedger(t *testing.T, pool *sql.DB, binding transaction.Binding, f model.Frozen) {
+	t.Helper()
+	cfg, err := driver.ParseDSN(os.Getenv("QS_M3_RETRY_DSN"))
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&cfg.DBName))
+	review, err := model.ReviewHandoff(binding, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_SOURCE_SHA"), "isolated-ci-owner", "verify archived future responsibility", []model.Frozen{f})
+	require.NoError(t, err)
+	dir := t.TempDir()
+	path, receipt := filepath.Join(dir, "review.json"), filepath.Join(dir, "history.jsonl")
+	require.NoError(t, os.WriteFile(path, review.Bytes(), 0600))
+	digest := review.Digest()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"),
+		"--inventory", "--history", "--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]),
+		"--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch,
+		"--database", cfg.DBName, "--receipt", receipt)
+	cmd.Env = append(os.Environ(), "QS_RETRY_HANDOFF_MYSQL_DSN="+cfg.FormatDSN())
+	out, err := cmd.Output()
+	require.NoError(t, err, "archive inventory failed; private output withheld")
+	require.Contains(t, string(out), "history_responsibilities_accounted")
+	require.Contains(t, string(out), `"cutover_authorized":false`)
+	raw, err := os.ReadFile(receipt)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), "m5-mysql-handoff-history-inventory/v1")
+	require.NotContains(t, string(raw), "old_responsibilities_accounted")
+
+	// A same-name merge view can otherwise impersonate the writer and even
+	// accept updates into the archived rows. The exact CLI must reject it.
+	_, err = pool.ExecContext(ctx, "CREATE ALGORITHM=MERGE SQL SECURITY INVOKER VIEW rm_outbox AS SELECT * FROM isolated_outbox_history_rows")
+	require.NoError(t, err)
+	defer func() {
+		_, err := pool.ExecContext(t.Context(), "DROP VIEW rm_outbox")
+		require.NoError(t, err)
+	}()
+	var updatable string
+	require.NoError(t, pool.QueryRowContext(ctx, `SELECT IS_UPDATABLE FROM information_schema.VIEWS
+		WHERE TABLE_SCHEMA=DATABASE() AND BINARY TABLE_NAME='rm_outbox'`).Scan(&updatable))
+	require.Equal(t, "YES", updatable)
+	rowProof := func() string {
+		var digest string
+		require.NoError(t, pool.QueryRowContext(ctx, `SELECT SHA2(CONCAT_WS(':',HEX(payload),HEX(fingerprint),state,last_error_code,version),256)
+			FROM isolated_outbox_history_rows WHERE message_id=?`, f.Message().Input().ID).Scan(&digest))
+		return digest
+	}
+	before := rowProof()
+	deniedReceipt := filepath.Join(dir, "same-name-view-denied.jsonl")
+	denied := exec.CommandContext(ctx, os.Getenv("QS_M3_RETRY_HANDOFF_CLI_BINARY"),
+		"--apply", "--review-file", path, "--review-sha256", hex.EncodeToString(digest[:]),
+		"--owner", binding.Owner, "--store-id", binding.StoreID, "--writer-epoch", binding.WriterEpoch,
+		"--database", cfg.DBName, "--receipt", deniedReceipt, "--all-legacy-writers-stopped-and-admission-closed")
+	denied.Env = cmd.Env
+	out, err = denied.Output()
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit, "write against the archived view must fail")
+	require.Equal(t, 1, exit.ExitCode())
+	require.Empty(t, out)
+	raw, err = os.ReadFile(deniedReceipt)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"cutover_authorized":false`)
+	require.NotContains(t, string(raw), "already_transferred")
+	require.Equal(t, before, rowProof())
+	t.Log("F06_MYSQL_SAME_NAME_VIEW_APPLY_REFUSED")
 }

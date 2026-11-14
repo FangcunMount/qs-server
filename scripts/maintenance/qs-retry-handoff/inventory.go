@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	model "github.com/FangcunMount/qs-server/internal/apiserver/eventing/retryschedule"
@@ -19,6 +20,10 @@ var errInventoryPending = errors.New("original ledger responsibilities remain")
 
 type inspector interface {
 	Inspect(context.Context, []model.Frozen) (model.LegacyInventory, error)
+}
+
+type historyInspector interface {
+	InspectHistory(context.Context, []model.Frozen) (model.LegacyInventory, error)
 }
 
 func runInventory(parent context.Context, a arguments, getenv func(string) string, output io.Writer, open openHost) (resultErr error) {
@@ -42,6 +47,10 @@ func runInventory(parent context.Context, a arguments, getenv func(string) strin
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, f.Close()) }()
+	schema := "m3-future-handoff-inventory/v1"
+	if a.history {
+		schema = "m5-" + strings.TrimPrefix(a.binding.Owner, "qs.") + "-handoff-history-inventory/v1"
+	}
 	header := struct {
 		Schema            string              `json:"schema"`
 		Status            string              `json:"status"`
@@ -51,7 +60,7 @@ func runInventory(parent context.Context, a arguments, getenv func(string) strin
 		Selected          int                 `json:"selected_handoffs"`
 		ReadOnly          bool                `json:"read_only"`
 		CutoverAuthorized bool                `json:"cutover_authorized"`
-	}{"m3-future-handoff-inventory/v1", "started", version.GitCommit, a.binding, a.database, len(selected), true, false}
+	}{schema, "started", version.GitCommit, a.binding, a.database, len(selected), true, false}
 	if err := json.NewEncoder(f).Encode(header); err != nil {
 		return err
 	}
@@ -70,12 +79,22 @@ func runInventory(parent context.Context, a arguments, getenv func(string) strin
 			resultErr = errors.Join(resultErr, closeHost())
 		}
 	}()
-	reader, ok := host.(inspector)
-	if !ok {
-		return errors.New("host does not implement original-ledger inspection")
-	}
 	started := time.Now().UTC()
-	snapshot, inspectErr := reader.Inspect(ctx, selected)
+	var snapshot model.LegacyInventory
+	var inspectErr error
+	if a.history {
+		reader, ok := host.(historyInspector)
+		if !ok {
+			return errors.New("host does not implement Outbox history inspection")
+		}
+		snapshot, inspectErr = reader.InspectHistory(ctx, selected)
+	} else {
+		reader, ok := host.(inspector)
+		if !ok {
+			return errors.New("host does not implement original-ledger inspection")
+		}
+		snapshot, inspectErr = reader.Inspect(ctx, selected)
+	}
 	if inspectErr == nil && snapshot.Binding != a.binding {
 		inspectErr = transaction.ErrBinding
 	}
@@ -84,6 +103,12 @@ func runInventory(parent context.Context, a arguments, getenv func(string) strin
 	status := "old_responsibilities_accounted"
 	if !snapshot.ResponsibilitiesAccounted {
 		status = "old_responsibilities_present"
+	}
+	if a.history {
+		status = "history_responsibilities_accounted"
+		if !snapshot.ResponsibilitiesAccounted {
+			status = "history_responsibilities_present"
+		}
 	}
 	var verified *model.LegacyInventory
 	if inspectErr == nil {

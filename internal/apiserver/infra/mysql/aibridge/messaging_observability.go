@@ -6,21 +6,28 @@ import (
 	"errors"
 )
 
-// MessagingSnapshot borrows the host pool for one consistent, read-only snapshot.
-// The caller bounds its context. No payload/identity, scheduling, commit or close.
 func MessagingSnapshot(ctx context.Context, db *sql.DB) (map[string]float64, error) {
+	values, _, err := ObserveMessagingSnapshot(ctx, db)
+	return values, err
+}
+
+// ObserveMessagingSnapshot uses one consistent read-only transaction. A non-nil
+// gap count comes from a successful anchor query. A proven gap blocks all
+// business receipt metrics while allowing the integrity count to be reported.
+func ObserveMessagingSnapshot(ctx context.Context, db *sql.DB) (map[string]float64, *uint64, error) {
 	if db == nil {
-		return nil, errors.New("MQ observation storage unavailable")
+		return nil, nil, errors.New("MQ observation storage unavailable")
 	}
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	values := map[string]float64{}
 	// Current command admission receipts are owned by operations and the exact
 	// committed transaction archive. Retired publication queues are not backlog.
-	var committed, awaiting, held, oldest, invalid float64
+	var committed, awaiting, held, oldest float64
+	var invalid uint64
 	err = tx.QueryRowContext(ctx, `SELECT /*+ MAX_EXECUTION_TIME(1000) */
  COUNT(*), COALESCE(SUM(o.decision NOT IN ('accepted','rejected')),0),
  COALESCE(SUM(o.decision='held'),0),
@@ -35,10 +42,10 @@ func MessagingSnapshot(ctx context.Context, db *sql.DB) (map[string]float64, err
  LEFT JOIN rm_tx_witness w ON w.execution_key=a.execution_key AND w.branch_key=a.branch_key
  WHERE o.retired=FALSE AND o.kind IN (1,2,3,4,5)`).Scan(&committed, &awaiting, &held, &oldest, &invalid)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if invalid != 0 {
-		return nil, ErrMessagingLedgerIntegrity
+		return nil, &invalid, ErrMessagingLedgerIntegrity
 	}
 	values["committed_commands"] = committed
 	values["awaiting_command_receipts"] = awaiting
@@ -46,22 +53,22 @@ func MessagingSnapshot(ctx context.Context, db *sql.DB) (map[string]float64, err
 	values["oldest_awaiting_command_receipt_seconds"] = oldest
 	var inboxHeld float64
 	if err = tx.QueryRowContext(ctx, "SELECT /*+ MAX_EXECUTION_TIME(1000) */ COUNT(*) FROM ai_messaging_inbox WHERE outcome='held'").Scan(&inboxHeld); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	values["held_inbox_events"] = inboxHeld
 	for _, code := range []string{"authentication_failed", "identity_conflict", "technical_budget_exhausted", "failed_delivery"} {
 		var n float64
 		if err = tx.QueryRowContext(ctx, "SELECT /*+ MAX_EXECUTION_TIME(1000) */ COUNT(*) FROM ai_messaging_quarantine WHERE code=?", code).Scan(&n); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		values["quarantine_"+code+"_records"] = n
 	}
 	technical, err := collectTechnicalObservations(ctx, tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for kind, value := range technical {
 		values[kind] = value
 	}
-	return values, nil
+	return values, &invalid, nil
 }

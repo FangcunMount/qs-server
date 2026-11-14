@@ -156,7 +156,7 @@ func retirementProbe(ctx context.Context, c commander, source string) (out retir
 	return out
 }
 
-func retirementConnection(ctx context.Context) (commander, error) {
+func retirementConnection(ctx context.Context) (*mongoCommander, error) {
 	get := func(k string) string { return os.Getenv("QS_APISERVER_MONGODB_" + k) }
 	// This fixed production namespace is independently reviewed; no arbitrary
 	// database/collection/command or credentials enter command-line arguments.

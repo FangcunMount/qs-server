@@ -195,14 +195,6 @@ func contractFunction(source, name string) (*ast.BlockStmt, error) {
 	return bodies[0], nil
 }
 
-func contractStringLiteral(expr ast.Expr) (string, error) {
-	literal, ok := expr.(*ast.BasicLit)
-	if !ok || literal.Kind != token.STRING {
-		return "", fmt.Errorf("host contract is not a literal string")
-	}
-	return strconv.Unquote(literal.Value)
-}
-
 func TestMatrixStoreEvidenceRejectsAmbiguousAndRetiredSources(t *testing.T) {
 	composition := `package host; func NewWithTransactionOwners(){ mysqlTx.New();mongoTx.New() }`
 	mongo := `[{"create":"rm_tx_execution"}]`

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventevidencebinding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/outboxhistory"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/eventing/eventmessage"
 	payload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
@@ -34,14 +35,18 @@ type sourceExecution struct {
 
 // originalIntent reads only the exact source in the caller's primary snapshot.
 // V2 never queries a retired publishing collection or starts a sender/Checker.
-func (s *Scanner) originalIntent(ctx context.Context, sheet sheetRow) (outboxRow, recoveryConfirmation, error) {
+func (s *Scanner) originalIntent(ctx context.Context, history *outboxhistory.Reader, sheet sheetRow) (outboxRow, recoveryConfirmation, error) {
 	switch sheet.DurableAcceptance.SchemaVersion {
 	case 1:
 		if sheet.DurableAcceptance.TransactionEvidence != nil {
 			return outboxRow{}, recoveryConfirmation{}, ErrUnsafeRecoverySource
 		}
 		id := bson.D{{Key: "producer", Value: producer}, {Key: "message_id", Value: sheet.DurableAcceptance.EventID}, {Key: "destination", Value: destination}}
-		raw, err := s.mongo.Collection("rm_outbox").FindOne(ctx, bson.M{"_id": id}, options.FindOne().SetHint("_id_").SetMaxTime(5*time.Second)).Raw()
+		collection, err := history.Collection()
+		if err != nil {
+			return outboxRow{}, recoveryConfirmation{}, err
+		}
+		raw, err := collection.FindOne(ctx, bson.M{"_id": id}, options.FindOne().SetHint("_id_").SetMaxTime(5*time.Second)).Raw()
 		if err != nil {
 			return outboxRow{}, recoveryConfirmation{}, err
 		}
