@@ -198,29 +198,30 @@ jobs:
           echo "   Version: $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo unknown)"
           echo "=========================================="
 
-      - name: SSH reachability to ServerA
+      - name: Validate ServerA SSH configuration
         env:
-          RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
-          RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
         run: |
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          key_file=~/.ssh/runner_servera_key
-          printf '%s\n' "$RUNNER_SSH_KEY" >"$key_file" && chmod 600 "$key_file"
-          touch ~/.ssh/config && chmod 600 ~/.ssh/config
-          if ! grep -q '^Host servera$' ~/.ssh/config; then
-            {
-              echo ""
-              echo "Host servera"
-              echo "  HostName ${RUNNER_SSH_HOST}"
-              echo "  User ${RUNNER_SSH_USER}"
-              echo "  Port ${RUNNER_SSH_PORT}"
-              echo "  IdentityFile ${key_file}"
-              echo "  StrictHostKeyChecking accept-new"
-            } >> ~/.ssh/config
-          fi
-          ssh servera 'echo "✅ SSH to ServerA ($(hostname)) OK"'
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: SSH reachability to ServerA
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          timeout: 10s
+          command_timeout: 15s
+          script: 'echo "✅ SSH to ServerA ($(hostname)) OK"'
 
       - name: SSH reachability to ServerB
         env:

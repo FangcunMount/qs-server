@@ -205,6 +205,25 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		}
 	}
 
+	_, serverASSH, found := strings.Cut(ping, "- name: SSH reachability to ServerA\n")
+	if !found {
+		t.Fatal("runner health workflow must verify SSH reachability to ServerA")
+	}
+	serverASSH, _, _ = strings.Cut(serverASSH, "- name: SSH reachability to ServerB\n")
+	for _, required := range []string{
+		"uses: appleboy/ssh-action@",
+		"host: ${{ vars.SVRA_HOST }}",
+		"port: ${{ vars.SVRA_SSH_PORT || 22 }}",
+		"fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}",
+	} {
+		if !strings.Contains(serverASSH, required) {
+			t.Errorf("ServerD's ServerA SSH check must contain %q", required)
+		}
+	}
+	if strings.Contains(serverASSH, "~/.ssh") || strings.Contains(serverASSH, "ssh servera") {
+		t.Error("ServerD's ServerA SSH check must use the current workflow target")
+	}
+
 	serverHealth := readDeploymentContractFile(t, "scripts", "cd", "verify-servera-qs-health.sh")
 	for _, required := range []string{
 		"com.docker.compose.project",
