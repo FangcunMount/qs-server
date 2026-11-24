@@ -645,8 +645,8 @@ health-check: ## 检查所有服务健康状态
 # 基础设施检查
 # ============================================================================
 
-check-infra: ## 检查所有基础设施组件是否就绪
-	@bash scripts/check-infra.sh all
+check-infra: ## 检查当前运行时的数据依赖
+	@bash scripts/check-infra.sh runtime
 
 check-mysql: ## 检查 MySQL 是否就绪
 	@bash scripts/check-infra.sh mysql
@@ -657,7 +657,7 @@ check-redis: ## 检查 Redis 是否就绪
 check-mongodb: ## 检查 MongoDB 是否就绪
 	@bash scripts/check-infra.sh mongodb
 
-check-nsq: ## 检查 NSQ 是否就绪
+check-nsq: ## 检查历史 NSQ 环境是否就绪
 	@bash scripts/check-infra.sh nsq
 
 # ============================================================================
