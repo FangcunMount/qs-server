@@ -61,178 +61,16 @@ jobs:
             uptime | awk -F'load average:' '{print $2}'
             echo "=========================================="
 
-      - name: Docker Service Check
+      - name: Prepare ServerA health checks
+        run: |
+          set -Eeuo pipefail
+          # The governance probe uses the API container identified by the health check.
+          cat scripts/cd/verify-servera-qs-health.sh scripts/cd/verify-worker-governance.sh \
+            > "$RUNNER_TEMP/qs-servera-health.sh"
+
+      - name: Docker, API and Worker Governance Health Check
         env:
           EXPECTED_COLLECTION_REPLICAS: ${{ vars.QS_COLLECTION_REPLICAS || '2' }}
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: EXPECTED_COLLECTION_REPLICAS
-          script: |
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-            echo "=========================================="
-            echo "Docker Service Status (ServerA)"
-            echo "=========================================="
-
-            if ! sudo docker info >/dev/null 2>&1; then
-              echo "❌ Docker is not running"
-              exit 1
-            fi
-            echo "✅ Docker daemon is running"
-            echo ""
-            echo "QS-Server containers:"
-            sudo docker ps --filter "name=qs-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            echo ""
-
-            missing=0
-            if sudo docker ps --filter "name=qs-apiserver" --format "{{.Names}}" | grep -qx "qs-apiserver"; then
-              echo "✅ qs-apiserver is running"
-            else
-              echo "❌ qs-apiserver is NOT running"
-              missing=1
-            fi
-
-            case "${EXPECTED_COLLECTION_REPLICAS}" in
-              ''|*[!0-9]*|0)
-                echo "❌ invalid EXPECTED_COLLECTION_REPLICAS=${EXPECTED_COLLECTION_REPLICAS}"
-                exit 1
-                ;;
-            esac
-            collection_count=$(sudo docker ps \
-              --filter "label=com.docker.compose.project=qs-collection" \
-              --filter "label=com.docker.compose.service=server" \
-              --format "{{.ID}}" | sed '/^$/d' | wc -l | tr -d '[:space:]')
-            if [ "$collection_count" -eq "$EXPECTED_COLLECTION_REPLICAS" ]; then
-              echo "✅ qs-collection-server replicas running (${collection_count}/${EXPECTED_COLLECTION_REPLICAS})"
-            else
-              echo "❌ qs-collection-server replicas running (${collection_count}/${EXPECTED_COLLECTION_REPLICAS})"
-              missing=1
-            fi
-            if [ "$missing" -ne 0 ]; then
-              exit 1
-            fi
-            echo "=========================================="
-
-      - name: API Health Check
-        env:
-          EXPECTED_COLLECTION_REPLICAS: ${{ vars.QS_COLLECTION_REPLICAS || '2' }}
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: EXPECTED_COLLECTION_REPLICAS
-          script: |
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-            echo "=========================================="
-            echo "API Health Check (ServerA)"
-            echo "=========================================="
-
-            failed=0
-
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/healthz 2>/dev/null || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ API Server HTTP (8081/healthz): OK"
-            else
-              echo "❌ API Server HTTP (8081/healthz): Failed ($HTTP_CODE)"
-              failed=1
-            fi
-
-            collection_ids=$(sudo docker ps \
-              --filter "label=com.docker.compose.project=qs-collection" \
-              --filter "label=com.docker.compose.service=server" \
-              --format "{{.ID}}")
-            ready_count=0
-            for container_id in $collection_ids; do
-              if sudo docker exec "$container_id" wget -qO- \
-                http://127.0.0.1:8080/serve-readyz >/dev/null 2>&1; then
-                ready_count=$((ready_count + 1))
-              else
-                echo "❌ Collection replica ${container_id} serving readiness failed"
-              fi
-            done
-            if [ "$ready_count" -eq "$EXPECTED_COLLECTION_REPLICAS" ]; then
-              echo "✅ Collection replicas serving-ready (${ready_count}/${EXPECTED_COLLECTION_REPLICAS})"
-            else
-              echo "❌ Collection replicas serving-ready (${ready_count}/${EXPECTED_COLLECTION_REPLICAS})"
-              failed=1
-            fi
-
-            nginx_version=$(sudo docker exec nginx nginx -v 2>&1 | sed -n 's#^nginx version: nginx/##p')
-            if [ -z "$nginx_version" ] ||
-              [ "$(printf '%s\n' 1.27.3 "$nginx_version" | sort -V | head -n1)" != "1.27.3" ]; then
-              echo "❌ Nginx version ${nginx_version:-unknown} is below required 1.27.3"
-              failed=1
-            else
-              echo "✅ Nginx version gate: ${nginx_version} >= 1.27.3"
-            fi
-
-            nginx_effective=$(sudo docker exec nginx nginx -T 2>&1 || true)
-            upstream_count=$(printf '%s\n' "$nginx_effective" |
-              grep -Ec '^[[:space:]]*upstream[[:space:]]+collect-api[[:space:]]*\{' || true)
-            collect_upstream=$(printf '%s\n' "$nginx_effective" |
-              awk '
-                /^[[:space:]]*upstream[[:space:]]+collect-api[[:space:]]*\{/ { inside = 1 }
-                inside {
-                  print
-                  if ($0 ~ /^[[:space:]]*}[[:space:]]*$/) exit
-                }
-              ')
-            if [ "$upstream_count" -eq 1 ] &&
-              printf '%s\n' "$collect_upstream" | grep -Fq 'resolver 127.0.0.11 valid=10s ipv6=off;' &&
-              printf '%s\n' "$collect_upstream" | grep -Fq 'resolver_timeout 5s;' &&
-              printf '%s\n' "$collect_upstream" | grep -Fq 'server qs-collection-server:8080 resolve;' &&
-              ! printf '%s\n' "$collect_upstream" |
-                grep -Eq '(^|[[:space:]])ip_hash[[:space:]]*;|weight[[:space:]]*=|(^|[[:space:]])backup([[:space:];]|$)'; then
-              echo "✅ Effective collect-api upstream uses Docker DNS"
-            else
-              echo "❌ Effective collect-api upstream contract failed"
-              failed=1
-            fi
-
-            collection_ips=""
-            for container_id in $collection_ids; do
-              collection_ip=$(sudo docker inspect "$container_id" \
-                --format '{{with index .NetworkSettings.Networks "infra-network"}}{{.IPAddress}}{{end}}')
-              collection_ips="${collection_ips}${collection_ip}\n"
-            done
-            collection_ips=$(printf '%b' "$collection_ips" | sed '/^$/d' | sort -u)
-            resolved_ips=$(sudo docker exec nginx getent ahostsv4 qs-collection-server 2>/dev/null |
-              awk '$1 ~ /^[0-9]+([.][0-9]+){3}$/ {print $1}' | sort -u || true)
-            if [ "$resolved_ips" = "$collection_ips" ] &&
-              [ "$(printf '%s\n' "$resolved_ips" | sed '/^$/d' | wc -l | tr -d '[:space:]')" -eq "$EXPECTED_COLLECTION_REPLICAS" ]; then
-              echo "✅ Nginx Docker DNS resolves every collection replica"
-            else
-              echo "❌ Nginx Docker DNS mismatch"
-              echo "Expected:"
-              printf '%s\n' "$collection_ips"
-              echo "Resolved:"
-              printf '%s\n' "$resolved_ips"
-              failed=1
-            fi
-
-            HTTP_CODE=$(curl -sS --resolve collect.fangcunmount.cn:443:127.0.0.1 \
-              -o /dev/null -w "%{http_code}" https://collect.fangcunmount.cn/health 2>/dev/null || true)
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Collection Nginx route: OK"
-            else
-              echo "❌ Collection Nginx route: Failed (${HTTP_CODE:-000})"
-              failed=1
-            fi
-
-            if [ "$failed" -ne 0 ]; then
-              exit 1
-            fi
-            echo "=========================================="
-
-      - name: Worker Governance Reverse Check
-        env:
           EXPECTED_WORKER_REPLICAS: ${{ vars.QS_WORKER_REPLICAS || '3' }}
           WORKER_DNS_NAME: qs-worker-governance
         uses: appleboy/ssh-action@v1.2.2
@@ -242,8 +80,8 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: EXPECTED_WORKER_REPLICAS,WORKER_DNS_NAME
-          script_path: scripts/cd/verify-worker-governance.sh
+          envs: EXPECTED_COLLECTION_REPLICAS,EXPECTED_WORKER_REPLICAS,WORKER_DNS_NAME
+          script_path: ${{ runner.temp }}/qs-servera-health.sh
 
       - name: K6 Observability Reverse Check
         env:
