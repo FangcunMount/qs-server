@@ -192,21 +192,34 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 
 	ping := readDeploymentContractFile(t, ".github", "workflows", "ping-runner.yml")
 	for _, required := range []string{
+		"scripts/cd/verify-servera-qs-health.sh scripts/cd/verify-worker-governance.sh",
+		"script_path: ${{ runner.temp }}/qs-servera-health.sh",
 		"EXPECTED_COLLECTION_REPLICAS",
-		"com.docker.compose.project=qs-collection",
-		"com.docker.compose.service=server",
 		"com.docker.compose.project=qs-worker",
 		"com.docker.compose.service=runtime",
-		`http://127.0.0.1:8080/serve-readyz`,
-		"https://collect.fangcunmount.cn/health",
-		"nginx -T",
-		"1.27.3",
-		"getent ahostsv4 qs-collection-server",
 		"qs-worker-governance",
 		"EXPECTED_WORKER_REPLICAS",
 	} {
 		if !strings.Contains(ping, required) {
 			t.Errorf("runner health workflow must contain %q", required)
+		}
+	}
+
+	serverHealth := readDeploymentContractFile(t, "scripts", "cd", "verify-servera-qs-health.sh")
+	for _, required := range []string{
+		"com.docker.compose.project",
+		"com.docker.compose.service",
+		`$3 == "qs-collection" && $4 == "server"`,
+		`$2 != generation`,
+		`export APISERVER_CONTAINER`,
+		`http://127.0.0.1:8080/serve-readyz`,
+		"https://collect.fangcunmount.cn/health",
+		"nginx -T",
+		"1.27.3",
+		"getent ahostsv4 qs-collection-server",
+	} {
+		if !strings.Contains(serverHealth, required) {
+			t.Errorf("ServerA health check must contain %q", required)
 		}
 	}
 
