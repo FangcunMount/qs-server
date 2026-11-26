@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3ba0238207c9841d23739511a9143c20e4b38bfc",
-    "verified_on": "2026-11-25"
+    "sha": "65e53ce1022d069e32eed51a39b76efd516d612b",
+    "verified_on": "2026-11-26"
   },
   "status_policy": {
     "doc_status": [
@@ -12113,8 +12113,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "49fcc7592804c1c67303db5e2515d066c28b892d",
-        "verified_on": "2026-11-09"
+        "source_sha": "65e53ce1022d069e32eed51a39b76efd516d612b",
+        "verified_on": "2026-11-26"
       },
       "fact_sources": [
         {
@@ -12187,6 +12187,13 @@
         }
       ],
       "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap",
+          "result": "passed",
+          "source_sha": "65e53ce1022d069e32eed51a39b76efd516d612b",
+          "verified_on": "2026-11-26"
+        },
         {
           "kind": "command",
           "command": "go test ./internal/pkg/migration ./internal/pkg/options ./internal/apiserver/bootstrap -count=1",
@@ -12802,6 +12809,7 @@
         }
       ],
       "notes": [
+        "Reviewed the API shutdown follow-up 65e53ce10. The database bootstrap delta separates Redis pools and retains storage close errors. Reviewed migration startup, DDL policy and retained resource definitions at the new source. The previous verified binding was 49fcc7592804c1c67303db5e2515d066c28b892d on 2026-11-09. All existing verification and production records retain their original bindings.",
         "Source3cbe9a26d8b7f2b5c82bf3e64679368165a51c3e only adds fresh C native CI phase/strict21 once RUN/PASS and compiledSHA proof. Original A47/B37 embedded proof blocks are byte-equal to d0052672, metadata phase and production/offline protocols remain unchanged. This is source review of the changed CI fact source, not execution of new C21 or promotion of old command/native/production evidence.",
         "incoming main beeee historical verification retained as complete original JSON, not relabelled as current verification: {\"kind\":\"source_selector\",\"path\":\".github/workflows/ci.yml\",\"result\":\"matched\",\"selector\":\"timeout-minutes: 45\",\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",
         "incoming main beeee verified binding retained as complete original JSON, not relabelled as current verification: {\"source_sha\":\"3fa468655a5d2a1a0a705d21055da46976b925bc\",\"verified_on\":\"2026-10-15\"}",

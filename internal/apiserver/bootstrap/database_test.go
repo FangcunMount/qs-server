@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,7 +12,65 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/alicebob/miniredis/v2"
+	redis "github.com/redis/go-redis/v9"
 )
+
+type failingDatabaseClose struct {
+	database.DatabaseConnection
+	err error
+}
+
+func (c failingDatabaseClose) Close() error { return c.err }
+
+func TestDatabaseManagerCloseRetainsEveryResourceError(t *testing.T) {
+	mr := miniredis.RunT(t)
+	host, port := splitTestMiniredisAddr(t, mr.Addr())
+	dm := NewDatabaseManager(nil)
+	mysqlErr := errors.New("MySQL close failed")
+	mongoErr := errors.New("MongoDB close failed")
+	if err := dm.registry.Register(database.MySQL, nil, failingDatabaseClose{err: mysqlErr}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dm.registry.Register(database.MongoDB, nil, failingDatabaseClose{err: mongoErr}); err != nil {
+		t.Fatal(err)
+	}
+	dm.redisProfiles = newAPIRedisProfiles(&database.RedisConfig{Host: host, Port: port}, map[string]*database.RedisConfig{
+		"object_cache": {Database: 1},
+		"static_cache": {Database: 2},
+	})
+	if err := dm.redisProfiles.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	defaultClient, err := dm.GetRedisClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"object_cache", "static_cache"} {
+		client, err := dm.GetRedisClientByProfile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A second pool close reports redis.ErrClosed, independently for each profile.
+		if err := client.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = dm.Close()
+	for _, want := range []error{mysqlErr, mongoErr, redis.ErrClosed} {
+		if !errors.Is(err, want) {
+			t.Errorf("Close() = %v, missing cause %v", err, want)
+		}
+	}
+	for _, name := range []string{"mysql", "mongodb", "redis/profile/object_cache", "redis/profile/static_cache"} {
+		if err == nil || !strings.Contains(err.Error(), "close "+name+":") {
+			t.Errorf("Close() = %v, missing resource %s", err, name)
+		}
+	}
+	if err := defaultClient.Ping(t.Context()).Err(); !errors.Is(err, redis.ErrClosed) {
+		t.Errorf("default Redis still open: Ping() = %v", err)
+	}
+}
 
 func TestDatabaseManagerGetRedisClientByProfile(t *testing.T) {
 	mr := miniredis.RunT(t)
@@ -19,7 +78,7 @@ func TestDatabaseManagerGetRedisClientByProfile(t *testing.T) {
 
 	dm := &DatabaseManager{
 		registry: database.NewRegistry(),
-		redisProfiles: database.NewNamedRedisRegistry(&database.RedisConfig{
+		redisProfiles: newAPIRedisProfiles(&database.RedisConfig{
 			Host: host,
 			Port: port,
 		}, map[string]*database.RedisConfig{
@@ -38,7 +97,7 @@ func TestDatabaseManagerGetRedisClientByProfile(t *testing.T) {
 		t.Fatalf("Connect() error = %v", err)
 	}
 	t.Cleanup(func() {
-		_ = dm.redisProfiles.Close()
+		_ = dm.Close()
 	})
 
 	ctx := context.Background()
