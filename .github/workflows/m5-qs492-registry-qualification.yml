@@ -47,9 +47,25 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker pull --platform linux/amd64 "$IMAGE"
+          export PLATFORM_IMAGE
+          PLATFORM_DIGEST=$(docker buildx imagetools inspect --raw "$IMAGE" | python3 -c '
+          import hashlib,json,os,sys
+          raw=sys.stdin.buffer.read()
+          assert "sha256:"+hashlib.sha256(raw).hexdigest()==os.environ["IMAGE"].split("@")[1]
+          rows=json.loads(raw)["manifests"]
+          match,=(row for row in rows if row.get("platform",{}).get("os")=="linux" and row["platform"]["architecture"]=="amd64")
+          print(match["digest"])
+          ')
+          PLATFORM_IMAGE="${IMAGE%@*}@$PLATFORM_DIGEST"
+          docker buildx imagetools inspect --raw "$PLATFORM_IMAGE" | python3 -c '
+          import hashlib,json,os,sys
+          raw=sys.stdin.buffer.read()
+          assert "sha256:"+hashlib.sha256(raw).hexdigest()==os.environ["PLATFORM_IMAGE"].split("@")[1]
+          assert json.loads(raw)["config"]["digest"]==os.environ["CONFIG"]
+          '
+          docker pull --platform linux/amd64 "$PLATFORM_IMAGE"
           export LOCAL_TAG="m5-qualification/$EXECUTABLE:$CANDIDATE"
-          docker tag "$IMAGE" "$LOCAL_TAG"
+          docker tag "$PLATFORM_IMAGE" "$LOCAL_TAG"
           export REPORT_DIR
           REPORT_DIR=$(mktemp -d "${RUNNER_TEMP}/qs-m5-image.XXXXXXXX")
           cd "$REPORT_DIR"
@@ -66,7 +82,7 @@ jobs:
           "${probe[@]}" --entrypoint /bin/sh "$LOCAL_TAG" -ec             'id -u; id -g; printf "%s\n" "$TZ"; sha256sum "$@"' probe "${files[@]}" > runtime.txt
           "${probe[@]}" --entrypoint /bin/cat "$LOCAL_TAG" "/app/$EXECUTABLE" > executable
           go version -m executable > build.txt
-          docker image save "$LOCAL_TAG" | gzip -1n > "$GITHUB_WORKSPACE/image.tar.gz"
+          docker image save --platform linux/amd64 "$LOCAL_TAG" | gzip -1n > "$GITHUB_WORKSPACE/image.tar.gz"
           python3 - <<'PY'
           import hashlib
           import json
@@ -77,7 +93,9 @@ jobs:
           expected, source, executable, ref = (os.environ[key] for key in ('CONFIG','CANDIDATE','EXECUTABLE','IMAGE'))
           local = os.environ['LOCAL_TAG']
           image, = json.loads(Path('image.json').read_bytes())
-          assert image['Id'] == expected and ref in image['RepoDigests']
+          platform = os.environ['PLATFORM_IMAGE']
+          assert image['Id'] in (expected,platform.split('@')[1]), image['Id']
+          assert platform in image['RepoDigests'], image['RepoDigests']
           assert (image['Os'],image['Architecture']) == ('linux','amd64')
           assert image['Config']['Labels']['org.opencontainers.image.revision'] == source
           assert image['Config']['User'] == 'www' and image['Config']['Entrypoint'] == ['/app/'+executable]
@@ -119,7 +137,7 @@ jobs:
           with archive_path.open('rb') as stream:
               archive_sha = hashlib.file_digest(stream,'sha256').hexdigest()
           (workspace / 'qualification.json').write_text(json.dumps(dict(
-              schema='qs-m5-registry-image-qualification/v1', source=source, registry_ref=ref,
+              schema='qs-m5-registry-image-qualification/v1', source=source, registry_ref=ref, registry_platform_ref=platform,
               config=expected, archive_manifest=manifest_descriptor['digest'],
               archive_sha256=archive_sha, archive_bytes=archive_path.stat().st_size,
               layers_verified=len(manifest['layers']), runtime_uid=int(uid), runtime_gid=int(gid),
@@ -128,13 +146,16 @@ jobs:
           PY
           docker image rm "$LOCAL_TAG"
           docker image load -i "$GITHUB_WORKSPACE/image.tar.gz"
-          test "$(docker image inspect "$LOCAL_TAG" --format '{{.Id}}')" = "$CONFIG"
+          docker image inspect "$LOCAL_TAG" > reload.json
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
           path = Path(os.environ['GITHUB_WORKSPACE'],'qualification.json')
           receipt = json.loads(path.read_bytes())
+          image, = json.loads(Path('reload.json').read_bytes())
+          assert image['Id'] in (receipt['config'],receipt['archive_manifest'],receipt['registry_platform_ref'].split('@')[1]), image['Id']
+          assert image['Config']['Labels']['org.opencontainers.image.revision']==receipt['source']
           receipt['offline_image_reload_verified'] = True
           path.write_text(json.dumps(receipt, indent=2)+'\n')
           PY
