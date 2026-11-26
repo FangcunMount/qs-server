@@ -1,0 +1,149 @@
+name: QS 6f6f41a1 exact image export
+on:
+  push:
+    branches: [codex/m5-qs492-6f6f41a-registry-export]
+    paths:
+      - .github/workflows/m5-qs492-registry-qualification.yml
+permissions:
+  contents: read
+  packages: read
+env:
+  CANDIDATE: '6f6f41a12cdc67e885dd75be5306856ac8146550'
+jobs:
+  qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: qs-apiserver
+            executable: qs-apiserver
+            digest: sha256:0daf72001f46c83b0bacbd36cf36dbb792b196824f31b2f345ac5b4bcc42b23a
+            config: sha256:e04b1eea086c0711e235231f281ef66c1a79764cb75abdc68d15a3ebf6ce7cb5
+          - repository: qs-collection-server
+            executable: collection-server
+            digest: sha256:d5e63ab9a16531ec464f23fc19c02306c84e09d2bee40f312444d9677808d5aa
+            config: sha256:942789bb55a95ee521848bcf66f74cd242726cad18a150beb64801a10aeb9aa9
+          - repository: qs-worker
+            executable: qs-worker
+            digest: sha256:f8195ab647c19eadd72c1830f5dbc1ca63ee341f39a5c0baa9889c7f67efc3aa
+            config: sha256:50f9795a3130ef0cccfa7e7b1cde94ddfde6316a43c014819d2af33b554b103b
+    env:
+      IMAGE: ghcr.io/fangcunmount/${{ matrix.repository }}@${{ matrix.digest }}
+      CONFIG: ${{ matrix.config }}
+      EXECUTABLE: ${{ matrix.executable }}
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Pull the immutable image and inspect isolated entrypoints
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker pull --platform linux/amd64 "$IMAGE"
+          export LOCAL_TAG="m5-qualification/$EXECUTABLE:$CANDIDATE"
+          docker tag "$IMAGE" "$LOCAL_TAG"
+          export REPORT_DIR
+          REPORT_DIR=$(mktemp -d "${RUNNER_TEMP}/qs-m5-image.XXXXXXXX")
+          cd "$REPORT_DIR"
+          docker image inspect "$LOCAL_TAG" > image.json
+          probe=(docker run --rm --pull=never --platform linux/amd64 --network none --read-only
+                 --cap-drop ALL --security-opt no-new-privileges)
+          files=("/app/$EXECUTABLE")
+          if [[ "$EXECUTABLE" == qs-apiserver ]]; then
+            files+=(/app/qs-ai-messaging /app/qs-ai-messaging-preflight /app/qs-authz)
+            "${probe[@]}" --entrypoint /app/qs-ai-messaging-preflight "$LOCAL_TAG" --source-sha > preflight.txt
+          fi
+          # The shell inside the container expands TZ and the arguments.
+          # shellcheck disable=SC2016
+          "${probe[@]}" --entrypoint /bin/sh "$LOCAL_TAG" -ec             'id -u; id -g; printf "%s\n" "$TZ"; sha256sum "$@"' probe "${files[@]}" > runtime.txt
+          "${probe[@]}" --entrypoint /bin/cat "$LOCAL_TAG" "/app/$EXECUTABLE" > executable
+          go version -m executable > build.txt
+          docker image save "$LOCAL_TAG" | gzip -1n > "$GITHUB_WORKSPACE/image.tar.gz"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import tarfile
+
+          expected, source, executable, ref = (os.environ[key] for key in ('CONFIG','CANDIDATE','EXECUTABLE','IMAGE'))
+          local = os.environ['LOCAL_TAG']
+          image, = json.loads(Path('image.json').read_bytes())
+          assert image['Id'] == expected and ref in image['RepoDigests']
+          assert (image['Os'],image['Architecture']) == ('linux','amd64')
+          assert image['Config']['Labels']['org.opencontainers.image.revision'] == source
+          assert image['Config']['User'] == 'www' and image['Config']['Entrypoint'] == ['/app/'+executable]
+          uid,gid,tz,*rows = Path('runtime.txt').read_text().splitlines()
+          assert uid.isdecimal() and int(uid)>0 and gid.isdecimal() and int(gid)>0 and tz=='Asia/Shanghai'
+          files = {name:digest for digest,name in (row.split() for row in rows)}
+          with Path('executable').open('rb') as binary:
+              assert files['/app/'+executable]==hashlib.file_digest(binary,'sha256').hexdigest()
+          build = Path('build.txt').read_text()
+          assert all(value in build for value in ('go1.25.12','GOARCH=amd64','GOOS=linux','GitCommit='+source))
+          if executable == 'qs-apiserver':
+              assert Path('preflight.txt').read_text().strip() == source
+              assert set(files) == {'/app/'+name for name in ('qs-apiserver','qs-ai-messaging','qs-ai-messaging-preflight','qs-authz')}
+          else:
+              assert set(files) == {'/app/'+executable}
+          workspace = Path(os.environ['GITHUB_WORKSPACE'])
+          archive_path = workspace / 'image.tar.gz'
+          with tarfile.open(archive_path) as archive:
+              def verify(desc, structured=False):
+                  algo,value = desc['digest'].split(':')
+                  assert algo == 'sha256'
+                  member = archive.getmember('blobs/sha256/'+value)
+                  assert member.isfile() and member.size == desc['size']
+                  with archive.extractfile(member) as stream:
+                      if structured:
+                          raw = stream.read()
+                          assert hashlib.sha256(raw).hexdigest() == value
+                          return json.loads(raw)
+                      assert hashlib.file_digest(stream,'sha256').hexdigest() == value
+              index = json.load(archive.extractfile('index.json'))
+              manifest_descriptor, = index['manifests']
+              manifest = verify(manifest_descriptor, True)
+              assert manifest['config']['digest'] == expected
+              verify(manifest['config'], True)
+              for layer in manifest['layers']:
+                  verify(layer)
+              docker_manifest, = json.load(archive.extractfile('manifest.json'))
+              assert docker_manifest['RepoTags'] == [local]
+          with archive_path.open('rb') as stream:
+              archive_sha = hashlib.file_digest(stream,'sha256').hexdigest()
+          (workspace / 'qualification.json').write_text(json.dumps(dict(
+              schema='qs-m5-registry-image-qualification/v1', source=source, registry_ref=ref,
+              config=expected, archive_manifest=manifest_descriptor['digest'],
+              archive_sha256=archive_sha, archive_bytes=archive_path.stat().st_size,
+              layers_verified=len(manifest['layers']), runtime_uid=int(uid), runtime_gid=int(gid),
+              runtime_files=files, network='none', application_started=False, production_deployed=False),
+              indent=2)+'\n')
+          PY
+          docker image rm "$LOCAL_TAG"
+          docker image load -i "$GITHUB_WORKSPACE/image.tar.gz"
+          test "$(docker image inspect "$LOCAL_TAG" --format '{{.Id}}')" = "$CONFIG"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          path = Path(os.environ['GITHUB_WORKSPACE'],'qualification.json')
+          receipt = json.loads(path.read_bytes())
+          receipt['offline_image_reload_verified'] = True
+          path.write_text(json.dumps(receipt, indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qs-m5-qualification-${{ matrix.repository }}-${{ github.run_attempt }}
+          path: |
+            qualification.json
+            image.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
