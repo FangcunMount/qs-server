@@ -3,6 +3,8 @@ package container
 import (
 	"context"
 	"fmt"
+
+	"github.com/FangcunMount/component-base/pkg/log"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 )
 
@@ -129,15 +131,14 @@ func (c *Container) cleanupResources(ctx context.Context) error {
 	// Transaction consumers may still finalize original business writes. Drain
 	// them while owner Checkers and the original databases remain alive.
 	transactionMode := c.transactions != nil
-	if transactionMode {
-		if err := c.cleanupModules(ctx); err != nil {
-			return err
+	if err := c.drainEventing(ctx, transactionMode); err != nil {
+		if transactionMode {
+			log.Errorw("API shutdown stage", "stage", "transaction_drain", "result", "failed", "error", err)
 		}
+		return err
 	}
-	if c.eventSubsystem != nil {
-		if err := c.eventSubsystem.CloseContext(ctx); err != nil {
-			return fmt.Errorf("failed to close event subsystem: %w", err)
-		}
+	if transactionMode {
+		log.Infow("API shutdown stage", "stage", "transaction_drain", "result", "success")
 	}
 	if c.cache != nil {
 		if err := c.cache.Close(); err != nil {
@@ -162,6 +163,20 @@ func (c *Container) cleanupResources(ctx context.Context) error {
 	c.initialized = false
 	c.printf("🏁 Container cleanup completed\n")
 
+	return nil
+}
+
+func (c *Container) drainEventing(ctx context.Context, transactionMode bool) error {
+	if transactionMode {
+		if err := c.cleanupModules(ctx); err != nil {
+			return err
+		}
+	}
+	if c.eventSubsystem != nil {
+		if err := c.eventSubsystem.CloseContext(ctx); err != nil {
+			return fmt.Errorf("failed to close event subsystem: %w", err)
+		}
+	}
 	return nil
 }
 

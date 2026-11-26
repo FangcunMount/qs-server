@@ -141,20 +141,21 @@ func runProcessLifecycleDeps(deps processLifecycleDeps) error {
 	}
 	if deps.container.containerCleanup != nil {
 		if err := deps.container.containerCleanup(); err != nil {
-			log.Errorf("Failed to cleanup container resources: %v", err)
+			log.Errorw("API shutdown stage", "stage", "container_cleanup", "result", "failed", "error", err)
 			// A failed drain is not proof that dependency users stopped. Preserve
 			// host pools and return the actual error, including incomplete shutdown.
 			return err
-
 		}
+		log.Infow("API shutdown stage", "stage", "container_cleanup", "result", "success")
 	}
 	// The container first stops relays and drains standard Outbox publishes.
-	// The direct SDK NSQ event producer closes next.
+	// The direct event publisher closes next.
 	if deps.resource.closePublisher != nil {
 		if err := deps.resource.closePublisher(); err != nil {
-			log.Errorf("Failed to close event publisher: %v", err)
+			log.Errorw("API shutdown stage", "stage", "publisher", "result", "failed", "error", err)
 			return err
 		}
+		log.Infow("API shutdown stage", "stage", "publisher", "result", "success")
 	}
 	if deps.resource.closeDatabase != nil {
 		if err := deps.resource.closeDatabase(); err != nil {

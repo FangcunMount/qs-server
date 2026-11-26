@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 type DatabaseManager struct {
 	registry      *database.Registry
 	config        *config.Config
-	redisProfiles *database.NamedRedisRegistry
+	redisProfiles *apiRedisProfiles
 }
 
 // NewDatabaseManager 创建数据库管理器
@@ -69,7 +70,7 @@ func (dm *DatabaseManager) Initialize() error {
 	if err := dm.registry.Init(); err != nil {
 		return fmt.Errorf("failed to initialize database connections: %w", err)
 	}
-	if dm.redisProfiles != nil && dm.redisProfiles.HasConnections() {
+	if dm.redisProfiles != nil {
 		if err := dm.redisProfiles.Connect(); err != nil {
 			return fmt.Errorf("failed to initialize redis profiles: %w", err)
 		}
@@ -149,7 +150,7 @@ func (dm *DatabaseManager) initRedis(ctx context.Context) error {
 		return nil
 	}
 
-	dm.redisProfiles = database.NewNamedRedisRegistry(redisConfig, redisProfiles)
+	dm.redisProfiles = newAPIRedisProfiles(redisConfig, redisProfiles)
 	logger.L(ctx).Infow("Redis initialized successfully",
 		"component", "Redis",
 		"action", "initialize",
@@ -321,20 +322,28 @@ func (dm *DatabaseManager) HealthCheck() error {
 // Close 关闭所有数据库连接
 func (dm *DatabaseManager) Close() error {
 	ctx := context.Background()
-	logger.L(ctx).Infow("Closing database connections...",
-		"component", "DatabaseManager",
-		"action", "close",
-	)
-	var lastErr error
-	if err := dm.registry.Close(); err != nil {
-		lastErr = err
+	var failures []error
+	for _, kind := range []database.DatabaseType{database.MySQL, database.MongoDB, database.Redis} {
+		connection, err := dm.registry.GetConnection(kind)
+		if err != nil {
+			continue // This store was not configured.
+		}
+		failures = append(failures, closeDatabaseResource(ctx, string(kind), connection.Close))
 	}
 	if dm.redisProfiles != nil {
-		if err := dm.redisProfiles.Close(); err != nil {
-			lastErr = err
-		}
+		failures = append(failures, dm.redisProfiles.Close(ctx))
 	}
-	return lastErr
+	return errors.Join(failures...)
+}
+
+func closeDatabaseResource(ctx context.Context, resource string, closeResource func() error) error {
+	log := logger.L(ctx)
+	if err := closeResource(); err != nil {
+		log.Errorw("Database resource shutdown", "resource", resource, "result", "failed", "error", err)
+		return fmt.Errorf("close %s: %w", resource, err)
+	}
+	log.Infow("Database resource shutdown", "resource", resource, "result", "success")
+	return nil
 }
 
 // GetRegistry 获取数据库注册器（用于测试和调试）
